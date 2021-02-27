@@ -25,6 +25,13 @@
             },
             "spec": {
                 "volumes": [
+                    {
+                      "name": "tmp",
+                      "emptyDir": {
+                        "medium": "Memory",
+                        "sizeLimit": "16Mi"
+                      }
+                    }{{ if .PgbackrestRestoreVolumes }},{{ end }}
                     {{.PgbackrestRestoreVolumes}}
                 ],
                 "securityContext": {{.SecurityContext}},
@@ -36,6 +43,10 @@
                     "name": "backrest",
                     "image": "{{.Image}}",
                     "volumeMounts": [
+                        {
+                            "mountPath": "/tmp",
+                            "name": "tmp"
+                        }{{ if .PgbackrestRestoreVolumeMounts }},{{ end }}
                         {{.PgbackrestRestoreVolumeMounts}}
                     ],
                     "env": [{

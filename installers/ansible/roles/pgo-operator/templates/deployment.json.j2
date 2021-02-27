@@ -111,7 +111,12 @@
                                 "value": "localhost:4150"
                             }
                         ],
-                        "volumeMounts": []
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/tmp",
+                                "name": "tmp"
+                            }
+                        ]
                     }, {
                         "name": "operator",
                         "image": "{% if pgo_image | default('') != '' %}{{ pgo_image }}
@@ -175,7 +180,8 @@
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-scheduler
                                 {%- endif %}",
                         "securityContext": {
-                          "allowPrivilegeEscalation": false
+                          "allowPrivilegeEscalation": false,
+                          "readOnlyRootFilesystem": true
                         },
                         "livenessProbe": {
                             "exec": {
@@ -229,7 +235,8 @@
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-event
                                 {%- endif %}",
                         "securityContext": {
-                          "allowPrivilegeEscalation": false
+                          "allowPrivilegeEscalation": false,
+                          "readOnlyRootFilesystem": true
                         },
                         "livenessProbe": {
                             "httpGet": {
@@ -251,7 +258,15 @@
                                           {%- endif %}"
                     }
                 ],
-                "volumes": []
+                "volumes": [
+                    {
+                        "name": "tmp",
+                        "emptyDir": {
+                            "medium": "Memory",
+                            "sizeLimit": "16Mi"
+                        }
+                    }
+                ]
             }
         }
     }
