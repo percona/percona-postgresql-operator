@@ -174,6 +174,9 @@
                         "image": "{% if pgo_scheduler_image | default('') != '' %}{{ pgo_scheduler_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-scheduler
                                 {%- endif %}",
+                        "securityContext": {
+                          "allowPrivilegeEscalation": false
+                        },
                         "livenessProbe": {
                             "exec": {
                                 "command": [
@@ -225,6 +228,9 @@
                         "image": "{% if pgo_event_image | default('') != '' %}{{ pgo_event_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-event
                                 {%- endif %}",
+                        "securityContext": {
+                          "allowPrivilegeEscalation": false
+                        },
                         "livenessProbe": {
                             "httpGet": {
                                 "path": "/ping",

@@ -29,7 +29,14 @@
                 {{ end }}
                 "containers": [{
                     "name": "rmdata",
+<<<<<<< HEAD
                     "image": "{{.PGOImagePrefix}}:{{.PGOImageTag}}-pgo-rmdata",
+=======
+                    "image": "{{.PGOImagePrefix}}/pgo-rmdata:{{.PGOImageTag}}",
+                    "securityContext": {
+                      "allowPrivilegeEscalation": false
+                    },
+>>>>>>> 55c2d9b98... Explicitly disallow allowPrivilegeEscalation on containers
                     "env": [{
                         "name": "PG_CLUSTER",
                         "value": "{{.ClusterName}}"
