@@ -1,0 +1,69 @@
+apiVersion: crunchydata.com/v1
+kind: Pgcluster
+metadata:
+  annotations:
+    current-primary: hippo
+  labels:
+    crunchy-pgha-scope: hippo
+    deployment-name: hippo
+    name: hippo
+    pg-cluster: hippo
+    pgo-version: 4.6.1
+    pgouser: admin
+  name: hippo
+  namespace: pgo
+spec:
+  imagePullPolicy: Always
+  pgBouncer:
+    limits:
+      memory: 36Mi
+    replicas: 2
+    serviceType: LoadBalancer
+  BackrestStorage:
+    accessmode: ReadWriteOnce
+    matchLabels: ""
+    name: ""
+    size: 1G
+    storageclass: ""
+    storagetype: dynamic
+    supplementalgroups: ""
+  PrimaryStorage:
+    accessmode: ReadWriteOnce
+    matchLabels: ""
+    name: hippo
+    size: 1G
+    storageclass: ""
+    storagetype: dynamic
+    supplementalgroups: ""
+  ReplicaStorage:
+    accessmode: ReadWriteOnce
+    matchLabels: ""
+    name: ""
+    size: 1G
+    storageclass: ""
+    storagetype: dynamic
+    supplementalgroups: ""
+  annotations: {}
+  ccpimage: percona-postgres-operator
+  ccpimageprefix: perconalab
+  ccpimagetag: main-postgres-ha
+  clustername: hippo
+  database: hippo
+  exporterport: "9187"
+  limits: {}
+  name: hippo
+  namespace: pgo
+  pgDataSource:
+    restoreFrom: ""
+    restoreOpts: ""
+  pgbadgerport: "10000"
+  pgoimageprefix: registry.developers.crunchydata.com/crunchydata
+  podAntiAffinity:
+    default: preferred
+    pgBackRest: preferred
+    pgBouncer: preferred
+  port: "5432"
+  tolerations: []
+  user: hippo
+  userlabels:
+    pgo-version: 4.6.1
