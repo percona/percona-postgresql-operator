@@ -1,4 +1,4 @@
-module github.com/crunchydata/postgres-operator/testing
+module github.com/percona/percona-postgresql-operator/testing
 
 go 1.12
 

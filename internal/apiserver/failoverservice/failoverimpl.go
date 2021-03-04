@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/crunchydata/postgres-operator/internal/apiserver"
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/operator"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
+	"github.com/percona/percona-postgresql-operator/internal/apiserver"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"

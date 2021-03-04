@@ -18,7 +18,7 @@ package operator
 import (
 	"testing"
 
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 )
 
 func TestGetRepoType(t *testing.T) {

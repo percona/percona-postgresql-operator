@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 )
 
 const (

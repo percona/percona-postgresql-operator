@@ -23,7 +23,7 @@ import (
 	"regexp"
 	"strings"
 
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
+	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 	"github.com/spf13/pflag"
 )
 

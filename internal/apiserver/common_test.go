@@ -19,8 +19,8 @@ import (
 	"errors"
 	"testing"
 
-	pgpassword "github.com/crunchydata/postgres-operator/internal/postgres/password"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	pgpassword "github.com/percona/percona-postgresql-operator/internal/postgres/password"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )

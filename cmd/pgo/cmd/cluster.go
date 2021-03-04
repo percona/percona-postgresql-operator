@@ -25,10 +25,10 @@ import (
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/crunchydata/postgres-operator/cmd/pgo/api"
-	"github.com/crunchydata/postgres-operator/cmd/pgo/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/api"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 )
 
 // below are the tablespace parameters and the expected values of each

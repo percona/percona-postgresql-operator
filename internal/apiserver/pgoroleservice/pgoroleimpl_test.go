@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/crunchydata/postgres-operator/internal/apiserver"
+	"github.com/percona/percona-postgresql-operator/internal/apiserver"
 )
 
 func TestValidPermissions(t *testing.T) {

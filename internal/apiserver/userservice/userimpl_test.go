@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	pgpassword "github.com/crunchydata/postgres-operator/internal/postgres/password"
+	pgpassword "github.com/percona/percona-postgresql-operator/internal/postgres/password"
 )
 
 func TestGeneratePassword(t *testing.T) {

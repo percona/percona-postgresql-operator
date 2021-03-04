@@ -20,11 +20,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/crunchydata/postgres-operator/cmd/pgo/api"
-	"github.com/crunchydata/postgres-operator/cmd/pgo/util"
-	"github.com/crunchydata/postgres-operator/internal/apiserver"
-	utiloperator "github.com/crunchydata/postgres-operator/internal/util"
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/api"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/util"
+	"github.com/percona/percona-postgresql-operator/internal/apiserver"
+	utiloperator "github.com/percona/percona-postgresql-operator/internal/util"
+	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 
 	log "github.com/sirupsen/logrus"
 )

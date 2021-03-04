@@ -18,7 +18,7 @@ limitations under the License.
 import (
 	"fmt"
 
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 )
 
 type Request struct {

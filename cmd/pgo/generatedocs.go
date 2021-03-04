@@ -26,7 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra/doc"
 
-	"github.com/crunchydata/postgres-operator/cmd/pgo/cmd"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/cmd"
 )
 
 const fmTemplate = `---

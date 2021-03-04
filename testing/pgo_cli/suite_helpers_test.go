@@ -26,8 +26,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crunchydata/postgres-operator/testing/kubeapi"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/percona/percona-postgresql-operator/testing/kubeapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"

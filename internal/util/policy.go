@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	pgo "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	pgo "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned"
 
 	log "github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"

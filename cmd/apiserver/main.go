@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crunchydata/postgres-operator/internal/apiserver"
-	"github.com/crunchydata/postgres-operator/internal/apiserver/routing"
-	crunchylog "github.com/crunchydata/postgres-operator/internal/logging"
-	"github.com/crunchydata/postgres-operator/internal/tlsutil"
+	"github.com/percona/percona-postgresql-operator/internal/apiserver"
+	"github.com/percona/percona-postgresql-operator/internal/apiserver/routing"
+	crunchylog "github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/tlsutil"
 
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"

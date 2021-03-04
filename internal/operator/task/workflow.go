@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"time"
 
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	pgo "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	pgo "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

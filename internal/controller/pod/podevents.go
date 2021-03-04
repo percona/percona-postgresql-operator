@@ -18,9 +18,9 @@ limitations under the License.
 import (
 	"time"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	"github.com/crunchydata/postgres-operator/pkg/events"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/pkg/events"
 	log "github.com/sirupsen/logrus"
 )
 

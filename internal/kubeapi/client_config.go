@@ -21,9 +21,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	crunchydata "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned"
-	crunchydatascheme "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned/scheme"
-	crunchydatav1 "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned/typed/crunchydata.com/v1"
+	crunchydata "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned"
+	crunchydatascheme "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/scheme"
+	crunchydatav1 "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/typed/crunchydata.com/v1"
 )
 
 func init() {
