@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/crunchydata/postgres-operator/internal/controller"
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	"github.com/crunchydata/postgres-operator/internal/ns"
+	"github.com/percona/percona-postgresql-operator/internal/controller"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/ns"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 

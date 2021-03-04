@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crunchydata/postgres-operator/cmd/pgo/cmd"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/cmd"
 )
 
 func main() {

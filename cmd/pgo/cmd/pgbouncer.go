@@ -20,9 +20,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/crunchydata/postgres-operator/cmd/pgo/api"
-	"github.com/crunchydata/postgres-operator/cmd/pgo/util"
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/api"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/util"
+	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 	v1 "k8s.io/api/core/v1"
 )
 

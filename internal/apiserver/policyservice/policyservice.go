@@ -19,8 +19,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	apiserver "github.com/crunchydata/postgres-operator/internal/apiserver"
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
+	apiserver "github.com/percona/percona-postgresql-operator/internal/apiserver"
+	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/validation"
 )

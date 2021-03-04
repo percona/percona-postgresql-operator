@@ -20,7 +20,7 @@ package fake
 import (
 	"context"
 
-	crunchydatacomv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	crunchydatacomv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

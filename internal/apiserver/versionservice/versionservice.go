@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/crunchydata/postgres-operator/internal/apiserver"
+	"github.com/percona/percona-postgresql-operator/internal/apiserver"
 	log "github.com/sirupsen/logrus"
 )
 
