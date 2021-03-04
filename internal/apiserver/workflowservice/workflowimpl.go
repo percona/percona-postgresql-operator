@@ -19,10 +19,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/crunchydata/postgres-operator/internal/apiserver"
-	"github.com/crunchydata/postgres-operator/internal/config"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
+	"github.com/percona/percona-postgresql-operator/internal/apiserver"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

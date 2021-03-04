@@ -24,9 +24,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	fakecrunchy "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	fakecrunchy "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/fake"
 )
 
 const (

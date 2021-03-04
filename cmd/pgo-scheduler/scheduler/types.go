@@ -18,7 +18,7 @@ package scheduler
 import (
 	"time"
 
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	cv3 "github.com/robfig/cron/v3"
 )
 

@@ -21,10 +21,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	backrestoperator "github.com/crunchydata/postgres-operator/internal/operator/backrest"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	backrestoperator "github.com/percona/percona-postgresql-operator/internal/operator/backrest"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	log "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/batch/v1"

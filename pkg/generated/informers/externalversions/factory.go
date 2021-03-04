@@ -22,9 +22,9 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned"
-	crunchydatacom "github.com/crunchydata/postgres-operator/pkg/generated/informers/externalversions/crunchydata.com"
-	internalinterfaces "github.com/crunchydata/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	versioned "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned"
+	crunchydatacom "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com"
+	internalinterfaces "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

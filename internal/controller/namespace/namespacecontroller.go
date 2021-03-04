@@ -16,7 +16,7 @@ limitations under the License.
 */
 
 import (
-	"github.com/crunchydata/postgres-operator/internal/controller"
+	"github.com/percona/percona-postgresql-operator/internal/controller"
 
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
