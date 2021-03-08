@@ -28,7 +28,7 @@
                     {
                         "name": "apiserver",
                         "image": "{% if pgo_apiserver_image | default('') != '' %}{{ pgo_apiserver_image }}
-                                {%- else %}{{ pgo_image_prefix }}/pgo-apiserver:{{ pgo_image_tag }}
+                                {%- else %}{{ pgo_image_prefix }}/percona-postgres-operator:main-pgo-apiserver
                                 {%- endif %}",
                         "imagePullPolicy": "IfNotPresent",
                         "ports": [
@@ -110,7 +110,7 @@
                     }, {
                         "name": "operator",
                         "image": "{% if pgo_image | default('') != '' %}{{ pgo_image }}
-                                {%- else %}{{ pgo_image_prefix }}/postgres-operator:{{ pgo_image_tag }}
+                                {%- else %}{{ pgo_image_prefix }}/percona-postgres-operator:main-postgres-operator
                                 {%- endif %}",
                         "imagePullPolicy": "IfNotPresent",
                         "readinessProbe": {
@@ -124,6 +124,22 @@
                             "periodSeconds": 5
                         },
                         "env": [
+                            {
+                                "name": "RELATED_IMAGE_PGO_BACKREST_REPO",
+                                "value": "perconalab/percona-postgres-operator:main-pgbackrest-repo"
+                            },
+                            {
+                                "name": "RELATED_IMAGE_PGO_BACKREST",
+                                "value": "perconalab/percona-postgres-operator:main-pgbackrest"
+                            },
+                            {
+                                "name": "RELATED_IMAGE_CRUNCHY_POSTGRES_HA",
+                                "value": "perconalab/percona-postgres-operator:main-postgres-ha"
+                            },
+                            {
+                                "name": "RELATED_IMAGE_CRUNCHY_PGBOUNCER",
+                                "value": "perconalab/percona-postgres-operator:main-pgbouncer"
+                            },
                             {
                                 "name": "CRUNCHY_DEBUG",
                                 "value": "{{ crunchy_debug }}"
@@ -165,7 +181,7 @@
                     }, {
                         "name": "scheduler",
                         "image": "{% if pgo_scheduler_image | default('') != '' %}{{ pgo_scheduler_image }}
-                                {%- else %}{{ pgo_image_prefix }}/pgo-scheduler:{{ pgo_image_tag }}
+                                {%- else %}{{ pgo_image_prefix }}/percona-postgres-operator:main-pgo-scheduler
                                 {%- endif %}",
                         "livenessProbe": {
                             "exec": {
@@ -214,7 +230,7 @@
                     }, {
                         "name": "event",
                         "image": "{% if pgo_event_image | default('') != '' %}{{ pgo_event_image }}
-                                {%- else %}{{ pgo_image_prefix }}/pgo-event:{{ pgo_image_tag }}
+                                {%- else %}{{ pgo_image_prefix }}/percona-postgres-operator:main-pgo-event
                                 {%- endif %}",
                         "livenessProbe": {
                             "httpGet": {

@@ -1,0 +1,168 @@
+apiVersion: crunchydata.com/v1
+kind: Pgcluster
+metadata:
+  annotations:
+    current-primary: hippo
+  labels:
+    crunchy-pgha-scope: hippo
+    deployment-name: hippo
+    name: hippo
+    pg-cluster: hippo
+    pgo-version: 4.6.1
+    pgouser: admin
+  name: hippo
+  namespace: pgo
+spec:
+####################################################
+  BackrestStorage:
+    accessmode: ReadWriteOnce
+    matchLabels: ""
+    name: ""
+    size: 1G
+    storageclass: ""
+    storagetype: dynamic
+    supplementalgroups: ""
+  PrimaryStorage:
+    accessmode: ReadWriteOnce
+    matchLabels: ""
+    name: hippo
+    size: 1G
+    storageclass: ""
+    storagetype: dynamic
+    supplementalgroups: ""
+  ReplicaStorage:
+    accessmode: ReadWriteOnce
+    matchLabels: ""
+    name: ""
+    size: 1G
+    storageclass: ""
+    storagetype: dynamic
+    supplementalgroups: ""
+  WALStorage:
+    accessmode: ""
+    matchLabels: ""
+    name: ""
+    size: ""
+    storageclass: ""
+    storagetype: ""
+    supplementalgroups: ""
+#######################################################
+# specify Kubernetes annotations that can be applied to the different deployments
+# managed by the PostgreSQL Operator (PostgreSQL, pgBackRest, pgBouncer)
+  annotations:
+    backrest: {}
+    global: {}
+    pgBouncer: {}
+    postgres: {}
+#######################################################
+# Optional references to pgBackRest configuration files
+  backrestConfig: null
+  backrestLimits: {}
+# optional reference to the location of the pgBackRest repositor
+  backrestRepoPath: ""
+  backrestResources:
+    memory: 48Mi
+  backrestS3Bucket: ""
+  backrestS3Endpoint: ""
+  backrestS3Region: ""
+# optional parameter that specifies if pgBackRest should use the path or host S3 URI style.
+  backrestS3URIStyle: ""
+  backrestS3VerifyTLS: "true"
+# posix and s3. If nothing is specified, it defaults to posix.
+# (local, equivalent to posix, is available for backwards compatibility).
+#  backrestStorageTypes:
+#  - s3
+#######################################################
+  ccpimage: percona-postgres-operator
+  ccpimageprefix: perconalab
+  ccpimagetag: main-postgres-ha
+  clustername: hippo
+# references a custom ConfigMap to use when bootstrapping a PostgreSQL cluster
+  customconfig: ""
+# name of a database that the PostgreSQL user can log into after the PostgreSQL cluster is created.
+  database: hippo
+# disables the high availability capabilities of a PostgreSQL cluster.
+# By default, every cluster can have high availability if there is at least one replica.
+  disableAutofail: false
+#  exporter: false
+#  exporterLimits: {}
+#  exporterResources:
+#    memory: 24Mi
+# c exporterport: "9187"
+#  limits:
+#    memory: 1G
+#   cpu: 700m
+# cluster name
+  name: hippo
+  namespace: pgo
+  nodeAffinity:
+    default: null
+######################################################
+# If true, deploys the pgbadger sidecar for query analysis.
+  pgBadger: false
+  pgbadgerport: "10000"
+######################################################
+  pgBouncer:
+    limits:
+      cpu: "2"
+      memory: 512Mi
+    replicas: 1
+    resources:
+      cpu: "1"
+      memory: 128Mi
+    serviceType: ""
+    tlsSecret: ""
+    serviceType: LoadBalancer
+######################################################
+#Used to indicate if a PostgreSQL cluster should bootstrap its data from a pgBackRest repository
+  pgDataSource:
+# The name of a PostgreSQL cluster, active or former, that will be used
+# for bootstrapping the data of a new PostgreSQL cluster.
+    restoreFrom: ""
+# Additional pgBackRest restore options that can be used as part of the
+# bootstrapping operation, for example, point-in-time-recovery options
+# https://pgbackrest.org/command.html#command-restore
+    restoreOpts: ""
+#####################################################
+  pgoimageprefix: perconalab/percona-postgres-operator
+  podAntiAffinity:
+    default: preferred
+    pgBackRest: preferred
+    pgBouncer: preferred
+  policies: ""
+  port: "5432"
+# The number of replicas to create after a PostgreSQL primary
+# is first initialized. This only works on create
+  replicas: "0"
+  resources:
+    memory: 128Mi
+#    cpu: 700m
+# serviceType for replicas and for cluster
+# also can be set via replicas CR
+  serviceType: ""
+# stop/start cluster aka 'pause'
+  shutdown: false
+# if true, indicates that the PostgreSQL cluster is a 'standby' cluster, i.e. is in read-only mode entirely
+  standby: false
+# If set to true, specifies the PostgreSQL cluster to use synchronous replication
+  syncReplication: null
+#  tablespaceMounts:
+#    lake:
+#      accessmode: ReadWriteMany
+#      matchLabels: ""
+#      size: 5Gi
+#      storageclass: ""
+#      storagetype: dynamic
+#      supplementalgroups: ""
+  tls:
+    caSecret: ""
+    replicationTLSSecret: ""
+    tlsSecret: ""
+  tlsOnly: false
+  tolerations: []
+# The name of the PostgreSQL user that is created when the PostgreSQL cluster is first created.
+  user: hippo
+# A set of key-value string pairs that are used as a sort of 'catch-all'
+# as well as a way to add custom labels to clusters
+  userlabels:
+    pgo-version: 4.6.1

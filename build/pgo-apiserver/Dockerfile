@@ -1,23 +1,42 @@
-ARG BASEOS
-ARG BASEVER
-ARG PREFIX
-ARG PGVERSION
-ARG BACKREST_VERSION
-FROM ${PREFIX}/pgo-base:${BASEOS}-${BASEVER}
+FROM golang:1.15 AS go_builder
+WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
-LABEL name="pgo-apiserver" \
-	summary="Crunchy PostgreSQL Operator - Apiserver" \
-	description="Crunchy PostgreSQL Operator - Apiserver"
+COPY . .
 
-RUN yum -y install \
-	--setopt=skip_missing_names_on_install=False \
-	postgresql${PGVERSION} \
-	hostname \
-	&& yum -y clean all
+RUN GOBIN="$(pwd -P)/hack/tools" ./hack/update-codegen.sh
 
-ADD bin/apiserver /usr/local/bin
-ADD installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
-ADD conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
+ARG GOOS=linux
+ARG GOARCH=amd64
+ARG CGO_ENABLED=0
+
+RUN mkdir -p build/_output/bin \
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH \
+       go build \
+           -o build/_output/bin/apiserver \
+               ./cmd/apiserver \
+    && cp -r build/_output/bin/apiserver /usr/local/bin/apiserver
+
+FROM perconalab/percona-postgres-operator:main-base
+
+RUN microdnf update && microdnf clean all
+
+LABEL name="Percona Postgres Operator" \
+      vendor="Percona" \
+      summary="Percona Postgres Operator" \
+      description="Percona Postgres Operator" \
+      maintainer="Percona Development <info@percona.com>"
+
+ENV PG_MAJOR 13
+
+RUN set -ex; \
+    microdnf -y install \
+	    postgresql${PG_MAJOR} \
+	    hostname; \
+	microdnf -y clean all
+
+COPY --from=go_builder /usr/local/bin/apiserver /usr/local/bin
+COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
+COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
 
 USER 2
 
