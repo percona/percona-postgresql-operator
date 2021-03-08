@@ -1,0 +1,41 @@
+apiVersion: crunchydata.com/v1
+kind: Pgreplica
+metadata:
+  labels:
+    name: hippo-repl
+    pg-cluster: hippo
+    pgouser: admin
+  name: hippo-repl1
+  namespace: pgo
+spec:
+# name of the PostgreSQL cluster, e.g. hippo. This is used to group
+# PostgreSQL instances (primary, replicas) together.
+  clustername: hippo
+# name of this PostgreSQL replica. It should be unique within a ClusterName.
+  name: hippo-repl1
+  namespace: pgo
+#  nodeAffinity:
+#    requiredDuringSchedulingIgnoredDuringExecution:
+#      nodeSelectorTerms:
+#      - matchExpressions:
+#        - key: kubernetes.io/e2e-az-name
+#          operator: In
+#          values:
+#          - e2e-az1
+#          - e2e-az2
+  replicastorage:
+    accessmode: ReadWriteOnce
+    matchLabels: ""
+    name: hippo-repl1
+    size: 1G
+    storageclass: ""
+    storagetype: dynamic
+    supplementalgroups: ""
+#  serviceType: ClusterIP
+#  tolerations:
+#  - key: "node.alpha.kubernetes.io/unreachable"
+#    operator: "Exists"
+#    effect: "NoExecute"
+#    tolerationSeconds: 6000
+  userlabels:
+    pgo-version: 4.6.1
