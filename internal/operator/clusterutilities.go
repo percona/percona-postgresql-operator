@@ -91,10 +91,9 @@ type exporterTemplateFields struct {
 
 // consolidate
 type badgerTemplateFields struct {
-	CCPImageTag    string
-	CCPImagePrefix string
-	BadgerTarget   string
-	PGBadgerPort   string
+	Image        string
+	BadgerTarget string
+	PGBadgerPort string
 }
 
 type PgbackrestEnvVarsTemplateFields struct {
@@ -328,10 +327,9 @@ func GetBadgerAddon(cluster *crv1.Pgcluster, target string) string {
 	log.Debugf("pgBadger enabled for cluster %q", cluster.Name)
 
 	badgerTemplateFields := badgerTemplateFields{
-		BadgerTarget:   target,
-		CCPImagePrefix: util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag:    util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
-		PGBadgerPort:   cluster.Spec.PGBadgerPort,
+		BadgerTarget: target,
+		Image:        cluster.Spec.PGBadgerImage,
+		PGBadgerPort: cluster.Spec.PGBadgerPort,
 	}
 
 	if CRUNCHY_DEBUG {

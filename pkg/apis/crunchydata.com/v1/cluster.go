@@ -55,8 +55,9 @@ type PgclusterSpec struct {
 	// autofail being on, given we're doing some legacy CRD stuff here
 	DisableAutofail bool `json:"disableAutofail"`
 	// PGBadger, if set to true, enables the pgBadger sidecar
-	PGBadger     bool   `json:"pgBadger"`
-	PGBadgerPort string `json:"pgbadgerport"`
+	PGBadger      bool   `json:"pgBadger"`
+	PGBadgerPort  string `json:"pgbadgerport"`
+	PGBadgerImage string `json:"pgBadgerImage"`
 	// Exporter, if set to true, enables the exporter sidecar
 	Exporter     bool   `json:"exporter"`
 	ExporterPort string `json:"exporterport"`
@@ -111,6 +112,7 @@ type PgclusterSpec struct {
 	// PgBouncer contains all of the settings to properly maintain a pgBouncer
 	// implementation
 	PgBouncer           PgBouncerSpec         `json:"pgBouncer"`
+	PgAdminImage        string                `json:"PgAdminImage"`
 	User                string                `json:"user"`
 	Database            string                `json:"database"`
 	Replicas            string                `json:"replicas"`
@@ -127,6 +129,8 @@ type PgclusterSpec struct {
 	BackrestS3URIStyle  string                `json:"backrestS3URIStyle"`
 	BackrestS3VerifyTLS string                `json:"backrestS3VerifyTLS"`
 	BackrestRepoPath    string                `json:"backrestRepoPath"`
+	BackrestImage       string                `json:"backrestImage"`
+	BackrestRepoImage   string                `json:"backrestRepoImage"`
 	// BackrestStorageTypes is a list of the different pgBackRest storage types
 	// to be used for this cluster. Presently, it can only accept up to local
 	// and S3, but is available to support different repo types in the future
@@ -329,6 +333,7 @@ type PgBouncerSpec struct {
 	// This follows the Kubernetes secret format ("kubernetes.io/tls") which has
 	// two keys: tls.crt and tls.key
 	TLSSecret string `json:"tlsSecret"`
+	Image     string `json:"image"`
 }
 
 // Enabled returns true if the pgBouncer is enabled for the cluster, i.e. there

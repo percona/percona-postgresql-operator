@@ -34,7 +34,7 @@
                 {{ end }}
                 "containers": [{
                     "name": "backrest",
-                    "image": "{{.CCPImagePrefix}}/crunchy-pgbackrest:{{.CCPImageTag}}",
+                    "image": "{{.Image}}",
                     "volumeMounts": [
                         {{.PgbackrestRestoreVolumeMounts}}
                     ],
