@@ -112,7 +112,7 @@ type PgclusterSpec struct {
 	// PgBouncer contains all of the settings to properly maintain a pgBouncer
 	// implementation
 	PgBouncer           PgBouncerSpec         `json:"pgBouncer"`
-	PgAdminImage        string                `json:"PgAdminImage"`
+	PgAdminImage        string                `json:"pgAdminImage"`
 	User                string                `json:"user"`
 	Database            string                `json:"database"`
 	Replicas            string                `json:"replicas"`
