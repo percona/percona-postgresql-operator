@@ -77,6 +77,7 @@ spec:
   ccpimageprefix: perconalab
   ccpimagetag: main-postgres-ha
   clustername: hippo
+  pgImage: perconalab/percona-postgres-operator:main-postgres-ha
   backrestImage: perconalab/percona-postgres-operator:main-pgbackrest
   backrestRepoImage: perconalab/percona-postgres-operator:main-pgbackrest-repo
   pgAdminImage: perconalab/percona-postgres-operator:main-pgadmin

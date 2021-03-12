@@ -312,6 +312,19 @@ func UpdateResources(clientset kubernetes.Interface, cluster *crv1.Pgcluster) er
 	return err
 }
 
+func UpdateBackrestRepoImage(clientset kubernetes.Interface, cluster *crv1.Pgcluster) error {
+	deployment, err := operator.GetBackrestDeployment(clientset, cluster)
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].Image = cluster.Spec.BackrestRepoImage
+
+	_, err = clientset.AppsV1().Deployments(deployment.Namespace).
+		Update(context.TODO(), deployment, metav1.UpdateOptions{})
+	return err
+}
+
 func createService(clientset kubernetes.Interface, fields *RepoServiceTemplateFields, namespace string) error {
 	ctx := context.TODO()
 

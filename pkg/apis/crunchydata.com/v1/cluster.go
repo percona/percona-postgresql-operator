@@ -49,6 +49,7 @@ type PgclusterSpec struct {
 	CCPImageTag    string `json:"ccpimagetag"`
 	CCPImagePrefix string `json:"ccpimageprefix"`
 	PGOImagePrefix string `json:"pgoimageprefix"`
+	PGImage        string `json:"pgImage"`
 	Port           string `json:"port"`
 	// DisableAutofail, if set to true, disables the autofail/HA capabilities
 	// We choose this, instead of the affirmative, so that way we default to

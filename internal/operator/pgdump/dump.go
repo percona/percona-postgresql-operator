@@ -107,7 +107,7 @@ func Dump(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) {
 		ClusterName:      task.Spec.Parameters[config.LABEL_PG_CLUSTER],
 		PodName:          task.Spec.Parameters[config.LABEL_POD_NAME],
 		SecurityContext:  operator.GetPodSecurityContext(task.Spec.StorageSpec.GetSupplementalGroups()),
-		Image:            cluster.Spec.CCPImagePrefix + "/" + cluster.Spec.CCPImage + ":" + cluster.Spec.CCPImageTag,
+		Image:            cluster.Spec.PGImage,
 		Command:          cmd, //??
 		CommandOpts:      task.Spec.Parameters[config.LABEL_PGDUMP_OPTS],
 		PgDumpHost:       task.Spec.Parameters[config.LABEL_PGDUMP_HOST],

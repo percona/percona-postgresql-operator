@@ -468,3 +468,19 @@ func publishPgAdminEvent(eventType string, task *crv1.Pgtask) {
 		log.Error(err.Error())
 	}
 }
+
+func UpdatePGAdminImage(clientset kubernetes.Interface, cluster *crv1.Pgcluster) error {
+	pgadminDeploymentName := fmt.Sprintf(pgAdminDeploymentFormat, cluster.Name)
+
+	deployment, err := clientset.AppsV1().Deployments(cluster.Namespace).Get(context.TODO(), pgadminDeploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	deployment.Spec.Template.Spec.Containers[0].Image = cluster.Spec.PgAdminImage
+
+	if _, err := clientset.AppsV1().Deployments(cluster.Namespace).
+		Update(context.TODO(), deployment, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+	return nil
+}

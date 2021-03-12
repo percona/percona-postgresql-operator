@@ -103,7 +103,7 @@ func Restore(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) {
 		PgPrimaryPort:       operator.Pgo.Cluster.Port,
 		PGRestoreOpts:       task.Spec.Parameters[config.LABEL_PGRESTORE_OPTS],
 		PITRTarget:          task.Spec.Parameters[config.LABEL_PGRESTORE_PITR_TARGET],
-		Image:               cluster.Spec.CCPImagePrefix + "/" + cluster.Spec.CCPImage + ":" + cluster.Spec.CCPImageTag,
+		Image:               cluster.Spec.PGImage,
 		NodeSelector:        operator.GetNodeAffinity(nodeAffinity),
 		Tolerations:         util.GetTolerations(cluster.Spec.Tolerations),
 	}

@@ -400,7 +400,8 @@ func UpdatePgbouncer(clientset kubernetes.Interface, oldCluster, newCluster *crv
 	}
 
 	// check if the replicas differ
-	if oldCluster.Spec.PgBouncer.Replicas != newCluster.Spec.PgBouncer.Replicas {
+	if oldCluster.Spec.PgBouncer.Replicas != newCluster.Spec.PgBouncer.Replicas ||
+		oldCluster.Spec.PgBouncer.Image != newCluster.Spec.PgBouncer.Image {
 		if err := updatePgBouncerReplicas(clientset, newCluster); err != nil {
 			return err
 		}
@@ -893,6 +894,7 @@ func updatePgBouncerReplicas(clientset kubernetes.Interface, cluster *crv1.Pgclu
 
 	// update the number of replicas
 	deployment.Spec.Replicas = &cluster.Spec.PgBouncer.Replicas
+	deployment.Spec.Template.Spec.Containers[0].Image = cluster.Spec.PgBouncer.Image
 
 	// and update the deployment
 	// update the deployment with the new values

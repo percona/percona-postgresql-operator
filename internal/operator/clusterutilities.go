@@ -138,9 +138,7 @@ type DeploymentTemplateFields struct {
 	Name             string
 	ClusterName      string
 	Port             string
-	CCPImagePrefix   string
-	CCPImageTag      string
-	CCPImage         string
+	Image            string
 	Database         string
 	DeploymentLabels string
 	// PodAnnotations are user-specified annotations that can be applied to a
