@@ -21,7 +21,7 @@ RUN mkdir -p build/_output/bin \
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-LABEL name="Data remove wrapper for Percona Postgres Operator" \
+LABEL name="Data removal wrapper for Percona Postgres Operator" \
       vendor="Percona" \
       summary="Percona Postgres database remover" \
       description="Container is used to wipe out all possible data for a particular database cluster." \

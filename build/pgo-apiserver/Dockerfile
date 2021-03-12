@@ -24,7 +24,7 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal
 LABEL name="Percona Postgres Operator API server" \
       vendor="Percona" \
       summary="API server for Percona Postgres database management" \
-      description="Percona Postgres Operator API server allows user clients to interact with Percona Postgres Operator software bundle and running databases in kubectl manner" \
+      description="Percona Postgres Operator API server allows user clients to interact with Percona Postgres Operator software bundle and run databases in kubectl manner" \
       maintainer="Percona Development <info@percona.com>"
 
 COPY redhat/licenses /licenses
