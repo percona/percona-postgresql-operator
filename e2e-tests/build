@@ -126,9 +126,9 @@ main() {
     local args=$@
     export IMAGE
 
-    # set +o xtrace
+    set +o xtrace
     arg_parse ${args}
-    # set -o xtrace
+    set -o xtrace
 
     if [[ -n ${REQUESTED_APP} ]]; then    # if app is set, build it
         prepare_n_build "${REQUESTED_APP}" "${BUILD_ONLY}"
