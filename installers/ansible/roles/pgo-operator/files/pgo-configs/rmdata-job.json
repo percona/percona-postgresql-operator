@@ -35,8 +35,7 @@
                     "image": "{{.PGOImagePrefix}}/pgo-rmdata:{{.PGOImageTag}}",
                     "securityContext": {
                       "allowPrivilegeEscalation": false,
-                      "privileged": false,
-                      "readOnlyRootFilesystem": true
+                      "privileged": false
                     },
 >>>>>>> 55c2d9b98... Explicitly disallow allowPrivilegeEscalation on containers
                     "env": [{

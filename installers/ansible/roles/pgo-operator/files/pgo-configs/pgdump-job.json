@@ -23,13 +23,6 @@
             "spec": {
                 "volumes": [
                     {
-                        "name": "tmp",
-                        "emptyDir": {
-                          "medium": "Memory",
-                          "sizeLimit": "1Mi"
-                        }
-                    },
-                    {
                         "name": "pgdata",
                         "persistentVolumeClaim": {
                             "claimName": "{{.PgDumpPVC}}"
@@ -48,12 +41,9 @@
                         "args": ["/opt/crunchy/bin/start.sh"],
                         "volumeMounts": [
                             {
-                                "mountPath": "/tmp",
-                                "name": "tmp"
-                            },
-                            {
                                 "mountPath": "/pgdata",
-                                "name": "pgdata"
+                                "name": "pgdata",
+                                "readOnly": false
                             }
                         ],
                         "env": [

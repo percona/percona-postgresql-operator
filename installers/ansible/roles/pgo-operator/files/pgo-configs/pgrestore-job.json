@@ -23,13 +23,6 @@
             "spec": {
                 "volumes": [
                     {
-                        "name": "tmp",
-                        "emptyDir": {
-                          "medium": "Memory",
-                          "sizeLimit": "1Mi"
-                        }
-                    },
-                    {
                         "name": "pgdata",
                         "persistentVolumeClaim": {
                             "claimName": "{{.FromClusterPVCName}}"
@@ -48,10 +41,6 @@
                         "command": ["/opt/crunchy/bin/uid_postgres.sh"],
                         "args": ["/opt/crunchy/bin/start.sh"],
                         "volumeMounts": [
-                            {
-                                "mountPath": "/tmp",
-                                "name": "tmp"
-                            },
                             {
                                 "mountPath": "/pgdata",
                                 "name": "pgdata",

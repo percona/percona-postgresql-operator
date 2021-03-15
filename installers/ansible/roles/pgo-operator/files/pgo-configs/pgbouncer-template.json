@@ -66,10 +66,6 @@
                         "value": "{{.PrimaryServiceName}}"
                     }],
                     "volumeMounts": [
-                      {
-                          "mountPath": "/tmp",
-                          "name": "tmp"
-                      },
                       {{if .TLSEnabled}}
                       {
                         "mountPath": "/pgconf/tls/pgbouncer",
@@ -84,13 +80,6 @@
                     ]
                 }],
                 "volumes": [
-                  {
-                    "name": "tmp",
-                    "emptyDir": {
-                      "medium": "Memory",
-                      "sizeLimit": "1Mi"
-                    }
-                  },
                   {{if .TLSEnabled}}
                   {
                     "name": "tls-pgbouncer",

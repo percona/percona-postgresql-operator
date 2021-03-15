@@ -111,12 +111,7 @@
                                 "value": "localhost:4150"
                             }
                         ],
-                        "volumeMounts": [
-                            {
-                                "mountPath": "/tmp",
-                                "name": "tmp"
-                            }
-                        ]
+                        "volumeMounts": []
                     }, {
                         "name": "operator",
                         "image": "{% if pgo_image | default('') != '' %}{{ pgo_image }}
@@ -181,8 +176,7 @@
                                 {%- endif %}",
                         "securityContext": {
                           "allowPrivilegeEscalation": false,
-                          "privileged": false,
-                          "readOnlyRootFilesystem": true
+                          "privileged": false
                         },
                         "livenessProbe": {
                             "exec": {
@@ -237,8 +231,7 @@
                                 {%- endif %}",
                         "securityContext": {
                           "allowPrivilegeEscalation": false,
-                          "privileged": false,
-                          "readOnlyRootFilesystem": true
+                          "privileged": false
                         },
                         "livenessProbe": {
                             "httpGet": {
@@ -260,15 +253,7 @@
                                           {%- endif %}"
                     }
                 ],
-                "volumes": [
-                    {
-                        "name": "tmp",
-                        "emptyDir": {
-                            "medium": "Memory",
-                            "sizeLimit": "16Mi"
-                        }
-                    }
-                ]
+                "volumes": []
             }
         }
     }

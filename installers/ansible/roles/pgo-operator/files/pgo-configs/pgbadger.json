@@ -28,10 +28,6 @@
     },
     "volumeMounts": [
         {
-            "mountPath": "/tmp",
-            "name": "tmp"
-        },
-        {
             "mountPath": "/pgdata",
             "name": "pgdata",
             "readOnly": true
