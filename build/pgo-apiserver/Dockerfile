@@ -16,7 +16,7 @@ RUN mkdir -p build/_output/bin \
                ./cmd/apiserver \
     && cp -r build/_output/bin/apiserver /usr/local/bin/apiserver
 
-FROM perconalab/percona-postgres-operator:main-base
+FROM perconalab/percona-postgresql-operator:main-base
 
 RUN microdnf update && microdnf clean all
 
