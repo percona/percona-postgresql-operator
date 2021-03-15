@@ -16,7 +16,7 @@ RUN mkdir -p build/_output/bin \
                ./cmd/pgo-scheduler \
     && cp -r build/_output/bin/pgo-scheduler /usr/local/bin/pgo-scheduler
 
-FROM perconalab/percona-postgres-operator:main-pgo-base
+FROM perconalab/percona-postgresql-operator:main-pgo-base
 
 LABEL name="pgo-scheduler" \
 	summary="Perccona PostgreSQL Operator - Scheduler" \

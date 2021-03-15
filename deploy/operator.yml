@@ -176,10 +176,10 @@ data:
     pgo_cluster_admin: "false"
     pgo_disable_eventing: "false"
     pgo_disable_tls: "false"
-    pgo_image_prefix: "perconalab"
+    pgo_image_prefix: "perconalab/percona-postgresql-operator"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "centos8-4.6.1"
+    pgo_image_tag: "main"
     pgo_installation_name: "devtest"
     pgo_noauth_routes: ""
     pgo_operator_namespace: "pgo"
@@ -269,7 +269,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: perconalab/percona-postgres-operator:main-pgo-deployer
+          image: perconalab/percona-postgresql-operator:main-pgo-deployer
           imagePullPolicy: IfNotPresent
           env:
             - name: DEPLOY_ACTION

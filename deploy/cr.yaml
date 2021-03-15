@@ -73,7 +73,7 @@ spec:
 #  backrestStorageTypes:
 #  - s3
 #######################################################
-  ccpimage: percona-postgres-operator
+  ccpimage: percona-postgresql-operator
   ccpimageprefix: perconalab
   ccpimagetag: main-postgres-ha
   clustername: hippo
@@ -124,7 +124,7 @@ spec:
 # https://pgbackrest.org/command.html#command-restore
     restoreOpts: ""
 #####################################################
-  pgoimageprefix: perconalab/percona-postgres-operator
+  pgoimageprefix: perconalab/percona-postgresql-operator
   podAntiAffinity:
     default: preferred
     pgBackRest: preferred

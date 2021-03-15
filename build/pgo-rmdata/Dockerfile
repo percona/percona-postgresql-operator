@@ -16,7 +16,7 @@ RUN mkdir -p build/_output/bin \
                ./cmd/pgo-rmdata \
     && cp -r build/_output/bin/pgo-rmdata /usr/local/bin/pgo-rmdata
 
-FROM perconalab/percona-postgres-operator:main-pgo-base
+FROM perconalab/percona-postgresql-operator:main-pgo-base
 
 LABEL name="pgo-rmdata" \
 	summary="Percona PostgreSQL Operator - Remove Data" \
