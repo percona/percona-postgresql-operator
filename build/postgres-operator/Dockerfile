@@ -16,7 +16,7 @@ RUN mkdir -p build/_output/bin \
                ./cmd/postgres-operator \
     && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator
 
-FROM perconalab/percona-postgres-operator:main-pgo-base
+FROM perconalab/percona-postgresql-operator:main-pgo-base
 
 LABEL name="postgres-operator" \
 	summary="Percona PostgreSQL Operator" \

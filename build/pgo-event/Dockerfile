@@ -1,4 +1,4 @@
-FROM perconalab/percona-postgres-operator:main-pgo-base
+FROM perconalab/percona-postgresql-operator:main-pgo-base
 
 LABEL name="pgo-event" \
     summary="Percona PostgreSQL Operator - pgo-event" \

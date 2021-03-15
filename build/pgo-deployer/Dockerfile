@@ -1,4 +1,4 @@
-FROM perconalab/percona-postgres-operator:main-pgo-base
+FROM perconalab/percona-postgresql-operator:main-pgo-base
 
 LABEL name="Percona Postgres Operator" \
       vendor="Percona" \
