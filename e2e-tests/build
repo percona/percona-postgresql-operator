@@ -10,76 +10,7 @@ GIT_COMMIT=$(git rev-parse HEAD)
 GIT_BRANCH=${VERSION:-$(git rev-parse --abbrev-ref HEAD | sed -e 's^/^-^g; s^[.]^-^g;' | sed -e 's/_/-/g' | tr '[:upper:]' '[:lower:]')}
 IMAGE=${IMAGE:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}"}
 IMAGE=$(echo "$IMAGE" | sed -e 's#percona/#perconalab/#')
-STANDALONE_APPS_TO_BUILD=( 'pgo-apiserver' 'pgo-event' 'pgo-rmdata' 'pgo-scheduler' 'postgres-operator' )
-REQUESTED_APP=''
-
-usage() {
-    echo "Usage:"                                                                                       1>&2
-    echo "    $0 -h                      Display this help message."                                    1>&2
-    echo "    $0 -l                      Build images only. Don't push to repo."                        1>&2
-    echo "    $0 -l <app_name>           Build particular image only. Don't push to repo."              1>&2
-    echo "    $0 <app_name>              Build one of pg applications:"                                 1>&2
-    echo                                                                                                1>&2
-    echo "                                          pgo-apiserver "                                     1>&2
-    echo "                                          pgo-deployer"                                       1>&2
-    echo "                                          pgo-event"                                          1>&2
-    echo "                                          pgo-rmdata"                                         1>&2
-    echo "                                          pgo-scheduler"                                      1>&2
-    echo "                                          postgres-operator"                                  1>&2
-}
-
-arg_parse() {
-    while getopts "hl" opt; do
-        case ${opt} in
-        h )
-            usage
-            exit 1
-            ;;
-        l )
-            BUILD_ONLY="true"
-            ;;
-        \? )
-            echo "Invalid Option: -$OPTARG" 1>&2
-            exit 1
-            ;;
-        esac
-    done
-    shift $((OPTIND -1))
-
-    if [[ -n $1 ]]; then
-        subcommand=$1; shift
-        case "$subcommand" in
-            pgo-apiserver)
-                REQUESTED_APP='pgo-apiserver'
-                return 0
-                ;;
-            pgo-deployer)
-                REQUESTED_APP='pgo-deployer'
-                return 0
-                ;;
-            pgo-event)
-                REQUESTED_APP='pgo-event'
-                return 0
-                ;;
-            pgo-rmdata)
-                REQUESTED_APP='pgo-rmdata'
-                return 0
-                ;;
-            pgo-scheduler)
-                REQUESTED_APP='pgo-scheduler'
-                return 0
-                ;;
-            postgres-operator)
-                REQUESTED_APP='postgres-operator'
-                return 0
-                ;;
-            *)
-                usage
-                exit 1
-                ;;
-        esac
-    fi
-}
+STANDALONE_APPS_TO_BUILD=(pgo-apiserver pgo-event pgo-rmdata pgo-scheduler postgres-operator)
 
 get_target_tag() {
     if [[ "${1}" == "postgres-operator" ]]; then
@@ -92,7 +23,7 @@ get_target_tag() {
 build_image() {
     local app=${1}
     local tag=${2}
-    local build_only=${3}
+    local push=${3}
     until docker ps;
         do sleep 1;
     done
@@ -106,32 +37,20 @@ build_image() {
             --no-cache \
             -t "${tag}" -f build/${app}/Dockerfile .
     popd
-    if [[ ! -n ${build_only} ]]; then
-        docker push "${tag}"
-    else
-        echo "Skipping image push to repo..."
-    fi
-}
 
-prepare_n_build() {
-    case ${1} in
-        pgo-deployer)
-            $sed -i.bak 's/tag_prefix.*/tag_prefix:\ "'"${GIT_BRANCH}"'"/g' ${src_dir}/deploy/operator.yml
-            ;;
-    esac
-    build_image ${1} $(get_target_tag ${1}) "${2}"
+    [[ ${push} == 'true' ]] && docker push "${tag}"  || echo "Skipping image push to repo..."
 }
 
 main() {
-    local args=$@
     export IMAGE
 
-    set +o xtrace
-    arg_parse ${args}
-    set -o xtrace
-
-    if [[ -n ${REQUESTED_APP} ]]; then    # if app is set, build it
-        prepare_n_build "${REQUESTED_APP}" "${BUILD_ONLY}"
+    if [[ -n $* ]]; then    # if app is set, build it
+        for arg in ${@}; do
+            [[ ${STANDALONE_APPS_TO_BUILD[*]} =~ (^|[[:space:]])"${arg}"($|[[:space:]]) ]] \
+            || [[ 'pgo-deployer' =~ (^|[[:space:]])"${arg}"($|[[:space:]]) ]] \
+            && build_image "${arg}" $(get_target_tag ${arg}) "${PUSH_TO_REGISTRY}" \
+            || echo "${arg} is not allowed"
+        done
     else                    # build all apps
         for app in ${STANDALONE_APPS_TO_BUILD[@]}; do
             set +x
@@ -140,9 +59,8 @@ main() {
             echo
             set -x
 
-            build_image ${app} $(get_target_tag ${app}) "${BUILD_ONLY}"
+            build_image ${app} $(get_target_tag ${app}) "${PUSH_TO_REGISTRY}"
         done
-        prepare_n_build 'pgo-deployer' "${BUILD_ONLY}"
     fi
 }
 
