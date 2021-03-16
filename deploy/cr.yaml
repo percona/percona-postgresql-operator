@@ -77,10 +77,10 @@ spec:
   ccpimageprefix: perconalab
   ccpimagetag: main-postgres-ha
   clustername: hippo
-  pgImage: perconalab/percona-postgres-operator:main-postgres-ha
-  backrestImage: perconalab/percona-postgres-operator:main-pgbackrest
-  backrestRepoImage: perconalab/percona-postgres-operator:main-pgbackrest-repo
-  pgAdminImage: perconalab/percona-postgres-operator:main-pgadmin
+  pgImage: perconalab/percona-postgresql-operator:main-postgres-ha
+  backrestImage: perconalab/percona-postgresql-operator:main-pgbackrest
+  backrestRepoImage: perconalab/percona-postgresql-operator:main-pgbackrest-repo
+  pgAdminImage: perconalab/percona-postgresql-operator:main-pgadmin
 # references a custom ConfigMap to use when bootstrapping a PostgreSQL cluster
   customconfig: ""
 # name of a database that the PostgreSQL user can log into after the PostgreSQL cluster is created.
@@ -105,10 +105,10 @@ spec:
 # If true, deploys the pgbadger sidecar for query analysis.
   pgBadger: false
   pgbadgerport: "10000"
-  pgBadgerImage: perconalab/percona-postgres-operator:main-pgbadger
+  pgBadgerImage: perconalab/percona-postgresql-operator:main-pgbadger
 ######################################################
   pgBouncer:
-    image: perconalab/percona-postgres-operator:main-pgbouncer
+    image: perconalab/percona-postgresql-operator:main-pgbouncer
     limits:
       cpu: "2"
       memory: 512Mi
