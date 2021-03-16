@@ -19,6 +19,7 @@ RUN mkdir -p build/_output/bin \
                ./cmd/apiserver \
     && cp -r build/_output/bin/apiserver /usr/local/bin/apiserver
 
+
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 LABEL name="Percona Postgres Operator API server" \
