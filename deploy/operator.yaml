@@ -270,7 +270,7 @@ spec:
       containers:
         - name: pgo-deploy
           image: perconalab/percona-postgresql-operator:main-pgo-deployer
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
             - name: DEPLOY_ACTION
               value: install
