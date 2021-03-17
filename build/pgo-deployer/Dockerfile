@@ -11,6 +11,8 @@ COPY redhat/atomic/help.1 /help.1
 COPY redhat/atomic/help.md /help.md
 COPY licenses /licenses
 
+ENV PG_MAJOR 13
+
 RUN set -ex; \
     export GNUPGHOME="$(mktemp -d)"; \
     gpg --batch --keyserver ha.pool.sks-keyservers.net --recv-keys 430BDF5C56E7C94E848EE60C1C4CBDCDCD2EFD2A 99DB70FAE1D7CE227FB6488205B555B38483C65D 94E279EB8D8F25B21810ADF121EA45AB2F86D6A1; \
@@ -29,8 +31,8 @@ RUN set -ex; \
     microdnf -y update; \
     microdnf -y install glibc-langpack-en; \
     microdnf clean all; \
-    percona-release enable ppg-13 experimental; \
-    percona-release enable ppg-13.2 testing
+    percona-release enable ppg-${PG_MAJOR} experimental; \
+    percona-release enable ppg-${PG_MAJOR}.2 testing
 
 COPY installers/image/conf/kubernetes.repo /etc/yum.repos.d/kubernetes.repo
 

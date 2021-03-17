@@ -240,7 +240,6 @@ data:
     storage9_size: "1Gi"
     storage9_type: "dynamic"
     storage9_class: "rook-ceph-block"
-    tag_prefix: ""
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
