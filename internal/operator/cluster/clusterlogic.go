@@ -311,9 +311,7 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		Replicas:          "0",
 		ClusterName:       cl.Spec.Name,
 		Port:              cl.Spec.Port,
-		CCPImagePrefix:    util.GetValueOrDefault(cl.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
-		CCPImage:          cl.Spec.CCPImage,
-		CCPImageTag:       cl.Spec.CCPImageTag,
+		Image:             cl.Spec.PGImage,
 		PVCName:           dataVolume.InlineVolumeSource(),
 		DeploymentLabels:  operator.GetLabelsFromMap(cl.Spec.UserLabels),
 		PodAnnotations:    operator.GetAnnotations(cl, crv1.ClusterAnnotationPostgres),
@@ -416,14 +414,6 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 	cluster.Spec.UserLabels["name"] = serviceName
 	cluster.Spec.UserLabels[config.LABEL_PG_CLUSTER] = replica.Spec.ClusterName
 
-	image := cluster.Spec.CCPImage
-
-	// check for --ccp-image-tag at the command line
-	imageTag := cluster.Spec.CCPImageTag
-	if replica.Spec.UserLabels[config.LABEL_CCP_IMAGE_TAG_KEY] != "" {
-		imageTag = replica.Spec.UserLabels[config.LABEL_CCP_IMAGE_TAG_KEY]
-	}
-
 	cluster.Spec.UserLabels[config.LABEL_DEPLOYMENT_NAME] = replica.Spec.Name
 
 	// Set the exporter labels, if applicable
@@ -453,9 +443,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		Name:               replica.Spec.Name,
 		ClusterName:        replica.Spec.ClusterName,
 		Port:               cluster.Spec.Port,
-		CCPImagePrefix:     util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag:        imageTag,
-		CCPImage:           image,
+		Image:              cluster.Spec.PGImage,
 		PVCName:            dataVolume.InlineVolumeSource(),
 		Database:           cluster.Spec.Database,
 		DataPathOverride:   replica.Spec.Name,

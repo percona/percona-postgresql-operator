@@ -1,6 +1,6 @@
 {
     "name": "pgbadger",
-    "image": "{{.CCPImagePrefix}}/crunchy-pgbadger:{{.CCPImageTag}}",
+    "image": "{{.Image}}",
     "ports": [ {
             "containerPort": {{.PGBadgerPort}},
             "protocol": "TCP"

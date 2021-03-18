@@ -641,6 +641,21 @@ func UpdateTolerations(clientset kubeapi.Interface, cluster *crv1.Pgcluster, dep
 	return nil
 }
 
+func UpdatePGImage(clientset kubernetes.Interface, cluster *crv1.Pgcluster) error {
+	ctx := context.TODO()
+
+	deployment, err := clientset.AppsV1().Deployments(cluster.Namespace).Get(ctx, cluster.Annotations[config.ANNOTATION_CURRENT_PRIMARY], metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].Image = cluster.Spec.PGImage
+
+	_, err = clientset.AppsV1().Deployments(cluster.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+
+	return err
+}
+
 // annotateBackrestSecret annotates the pgBackRest repository secret with relevant cluster
 // configuration as needed to support bootstrapping from the repository after the cluster
 // has been deleted

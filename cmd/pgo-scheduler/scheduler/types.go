@@ -63,8 +63,7 @@ type Policy struct {
 type PolicyTemplate struct {
 	JobName        string
 	ClusterName    string
-	CCPImagePrefix string
-	CCPImageTag    string
+	Image          string
 	PGHost         string
 	PGPort         string
 	PGDatabase     string

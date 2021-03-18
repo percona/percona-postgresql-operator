@@ -41,7 +41,7 @@
         {{ end }}
         "containers": [{
           "name": "pgadminweb",
-          "image": "{{.CCPImagePrefix}}/crunchy-pgadmin4:{{.CCPImageTag}}",
+          "image": "{{.Image}}",
           "ports": [{
             "containerPort": {{.Port}},
             "protocol": "TCP"

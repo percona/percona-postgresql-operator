@@ -229,6 +229,14 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		updateServices(c.Client, newcluster)
 	}
 
+	//TODO add check for replicas
+	if oldcluster.Spec.PGImage != newcluster.Spec.PGImage {
+		err := clusteroperator.UpdatePGImage(c.Client, newcluster)
+		if err != nil {
+			log.Error("Can't update pg image", err)
+		}
+	}
+
 	// see if we are adding / removing the metrics collection sidecar
 	if oldcluster.Spec.Exporter != newcluster.Spec.Exporter {
 		var err error
@@ -248,8 +256,16 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		}
 	}
 
+	if oldcluster.Spec.PgAdminImage != newcluster.Spec.PgAdminImage {
+		err := clusteroperator.UpdatePGAdminImage(c.Client, newcluster)
+		if err != nil {
+			log.Errorf("failed to update pgadmin image", err)
+		}
+	}
+
 	// see if we are adding / removing the pgBadger sidecar
-	if oldcluster.Spec.PGBadger != newcluster.Spec.PGBadger {
+	if oldcluster.Spec.PGBadger != newcluster.Spec.PGBadger || oldcluster.Spec.PGBadgerImage != newcluster.Spec.PGBadgerImage ||
+		oldcluster.Spec.PGBadgerPort != newcluster.Spec.PGBadgerPort {
 		var err error
 
 		// determine if the sidecar is being enabled/disabled and take the precursor
@@ -283,6 +299,13 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		if err := backrestoperator.UpdateResources(c.Client, newcluster); err != nil {
 			log.Error(err)
 			return
+		}
+	}
+
+	if oldcluster.Spec.BackrestRepoImage != newcluster.Spec.BackrestRepoImage {
+		err := backrestoperator.UpdateBackrestRepoImage(c.Client, newcluster)
+		if err != nil {
+			log.Error("Failed to update backrest repo image", err)
 		}
 	}
 
