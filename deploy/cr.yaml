@@ -73,14 +73,10 @@ spec:
 #  backrestStorageTypes:
 #  - s3
 #######################################################
-  ccpimage: percona-postgresql-operator
-  ccpimageprefix: perconalab
-  ccpimagetag: main-postgres-ha
   clustername: hippo
   pgImage: perconalab/percona-postgresql-operator:main-postgres-ha
   backrestImage: perconalab/percona-postgresql-operator:main-pgbackrest
   backrestRepoImage: perconalab/percona-postgresql-operator:main-pgbackrest-repo
-  pgAdminImage: perconalab/percona-postgresql-operator:main-pgadmin
 # references a custom ConfigMap to use when bootstrapping a PostgreSQL cluster
   customconfig: ""
 # name of a database that the PostgreSQL user can log into after the PostgreSQL cluster is created.
