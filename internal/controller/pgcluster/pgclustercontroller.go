@@ -233,7 +233,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if oldcluster.Spec.PGImage != newcluster.Spec.PGImage {
 		err := clusteroperator.UpdatePGImage(c.Client, newcluster)
 		if err != nil {
-			log.Error("Can't update pgo image", err)
+			log.Error("Can't update pg image", err)
 		}
 	}
 
