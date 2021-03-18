@@ -135,8 +135,7 @@ func (p PolicyJob) Run() {
 	policyJob := PolicyTemplate{
 		JobName:        name,
 		ClusterName:    p.cluster,
-		CCPImagePrefix: util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, p.ccpImagePrefix),
-		CCPImageTag:    p.ccpImageTag,
+		Image:          cluster.Spec.PGImage,
 		PGHost:         p.cluster,
 		PGPort:         cluster.Spec.Port,
 		PGDatabase:     p.database,

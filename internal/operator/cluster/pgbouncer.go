@@ -62,8 +62,7 @@ type pgBouncerTemplateFields struct {
 	Name                      string
 	CASecret                  string
 	ClusterName               string
-	CCPImagePrefix            string
-	CCPImageTag               string
+	Image                     string
 	DisableFSGroup            bool
 	Port                      string
 	PrimaryServiceName        string
@@ -401,7 +400,8 @@ func UpdatePgbouncer(clientset kubernetes.Interface, oldCluster, newCluster *crv
 	}
 
 	// check if the replicas differ
-	if oldCluster.Spec.PgBouncer.Replicas != newCluster.Spec.PgBouncer.Replicas {
+	if oldCluster.Spec.PgBouncer.Replicas != newCluster.Spec.PgBouncer.Replicas ||
+		oldCluster.Spec.PgBouncer.Image != newCluster.Spec.PgBouncer.Image {
 		if err := updatePgBouncerReplicas(clientset, newCluster); err != nil {
 			return err
 		}
@@ -562,11 +562,9 @@ func createPgBouncerDeployment(clientset kubernetes.Interface, cluster *crv1.Pgc
 
 	// get the fields that will be substituted in the pgBouncer template
 	fields := pgBouncerTemplateFields{
-		Name:           pgbouncerDeploymentName,
-		ClusterName:    cluster.Name,
-		CCPImagePrefix: util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
-			operator.Pgo.Cluster.CCPImageTag),
+		Name:               pgbouncerDeploymentName,
+		ClusterName:        cluster.Name,
+		Image:              cluster.Spec.PgBouncer.Image,
 		DisableFSGroup:     operator.Pgo.DisableFSGroup(),
 		Port:               cluster.Spec.Port,
 		PGBouncerConfigMap: util.GeneratePgBouncerConfigMapName(cluster.Name),
@@ -896,6 +894,7 @@ func updatePgBouncerReplicas(clientset kubernetes.Interface, cluster *crv1.Pgclu
 
 	// update the number of replicas
 	deployment.Spec.Replicas = &cluster.Spec.PgBouncer.Replicas
+	deployment.Spec.Template.Spec.Containers[0].Image = cluster.Spec.PgBouncer.Image
 
 	// and update the deployment
 	// update the deployment with the new values

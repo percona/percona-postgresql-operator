@@ -136,7 +136,7 @@ data:
     backrest_aws_s3_verify_tls: "true"
     backrest_port: "2022"
     badger: "false"
-    ccp_image_prefix: "perconalab/percona-postgres-operator"
+    ccp_image_prefix: "perconalab/percona-postgresql-operator"
     ccp_image_pull_secret: ""
     ccp_image_pull_secret_manifest: ""
     ccp_image_tag: "main-postgres-ha"

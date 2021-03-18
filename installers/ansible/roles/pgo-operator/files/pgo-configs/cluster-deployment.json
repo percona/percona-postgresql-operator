@@ -41,11 +41,7 @@
                 "containers": [
             {
                     "name": "database",
-                    "image": "{{.CCPImagePrefix}}/{{.CCPImage}}:{{.CCPImageTag}}",
-                    "securityContext": {
-                      "allowPrivilegeEscalation": false,
-                      "privileged": false
-                    },
+                    "image": "{{.Image}}",
                     "readinessProbe": {
                         "exec": {
                             "command": [

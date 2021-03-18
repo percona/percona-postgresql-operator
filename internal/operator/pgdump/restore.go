@@ -47,8 +47,7 @@ type restorejobTemplateFields struct {
 	PgPrimaryPort       string
 	PGRestoreOpts       string
 	PITRTarget          string
-	CCPImagePrefix      string
-	CCPImageTag         string
+	Image               string
 	PgPort              string
 	NodeSelector        string
 	Tolerations         string
@@ -104,11 +103,9 @@ func Restore(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) {
 		PgPrimaryPort:       operator.Pgo.Cluster.Port,
 		PGRestoreOpts:       task.Spec.Parameters[config.LABEL_PGRESTORE_OPTS],
 		PITRTarget:          task.Spec.Parameters[config.LABEL_PGRESTORE_PITR_TARGET],
-		CCPImagePrefix:      util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
-			operator.Pgo.Cluster.CCPImageTag),
-		NodeSelector: operator.GetNodeAffinity(nodeAffinity),
-		Tolerations:  util.GetTolerations(cluster.Spec.Tolerations),
+		Image:               cluster.Spec.PGImage,
+		NodeSelector:        operator.GetNodeAffinity(nodeAffinity),
+		Tolerations:         util.GetTolerations(cluster.Spec.Tolerations),
 	}
 
 	var doc2 bytes.Buffer
