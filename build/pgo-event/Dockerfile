@@ -1,8 +1,15 @@
-FROM perconalab/percona-postgresql-operator:main-pgo-base
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-LABEL name="pgo-event" \
-    summary="Percona PostgreSQL Operator - pgo-event" \
-    description="Percona PostgreSQL Operator - pgo-event"
+LABEL name="Event dispatcher for Percona Postgres Operator" \
+      vendor="Percona" \
+      summary="Users entrypoint to cluster database events" \
+      description="The container provides an interface for User to check lifecycle events of the database cluster" \
+      maintainer="Percona Development <info@percona.com>"
+
+COPY redhat/licenses /licenses
+COPY redhat/atomic/help.1 /help.1
+COPY redhat/atomic/help.md /help.md
+COPY licenses /licenses
 
 RUN set -ex; \
     microdnf -y install \
