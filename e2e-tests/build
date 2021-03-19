@@ -10,6 +10,7 @@ GIT_COMMIT=$(git rev-parse HEAD)
 GIT_BRANCH=${VERSION:-$(git rev-parse --abbrev-ref HEAD | sed -e 's^/^-^g; s^[.]^-^g;' | sed -e 's/_/-/g' | tr '[:upper:]' '[:lower:]')}
 IMAGE=${IMAGE:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}"}
 IMAGE=$(echo "$IMAGE" | sed -e 's#percona/#perconalab/#')
+PUSH_TO_REGISTRY=${PUSH_TO_REGISTRY:-true}
 STANDALONE_APPS_TO_BUILD=(pgo-apiserver pgo-event pgo-rmdata pgo-scheduler postgres-operator pgo-deployer)
 
 get_target_tag() {
@@ -47,7 +48,7 @@ main() {
     if [[ -n $* ]]; then    # if app is set, build it
         for arg in ${@}; do
             [[ ${STANDALONE_APPS_TO_BUILD[*]} =~ (^|[[:space:]])"${arg}"($|[[:space:]]) ]] \
-            && build_image "${arg}" $(get_target_tag ${arg}) "${PUSH_TO_REGISTRY}" \
+            && build_image "${arg}" "${IMAGE}-${arg}" "${PUSH_TO_REGISTRY}" \
             || echo "${arg} is not allowed"
         done
     else                    # build all apps
@@ -58,7 +59,7 @@ main() {
             echo
             set -x
 
-            build_image ${app} $(get_target_tag ${app}) "${PUSH_TO_REGISTRY}"
+            build_image "${app}" "${IMAGE}-${app}" "${PUSH_TO_REGISTRY}"
         done
     fi
 }

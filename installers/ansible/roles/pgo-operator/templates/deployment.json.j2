@@ -110,7 +110,7 @@
                     }, {
                         "name": "operator",
                         "image": "{% if pgo_image | default('') != '' %}{{ pgo_image }}
-                                {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}
+                                {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-postgres-operator
                                 {%- endif %}",
                         "imagePullPolicy": "IfNotPresent",
                         "readinessProbe": {
