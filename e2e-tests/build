@@ -13,14 +13,6 @@ IMAGE=$(echo "$IMAGE" | sed -e 's#percona/#perconalab/#')
 PUSH_TO_REGISTRY=${PUSH_TO_REGISTRY:-true}
 STANDALONE_APPS_TO_BUILD=(pgo-apiserver pgo-event pgo-rmdata pgo-scheduler postgres-operator pgo-deployer)
 
-get_target_tag() {
-    if [[ "${1}" == "postgres-operator" ]]; then
-        echo ${IMAGE}
-    else
-        echo "${IMAGE}-${1}"
-    fi
-}
-
 build_image() {
     local app=${1}
     local tag=${2}
