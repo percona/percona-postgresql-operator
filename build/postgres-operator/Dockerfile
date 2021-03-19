@@ -5,29 +5,32 @@ COPY . .
 
 RUN GOBIN="$(pwd -P)/hack/tools" ./hack/update-codegen.sh
 
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+ARG GO_LDFLAGS
 ARG GOOS=linux
 ARG GOARCH=amd64
 ARG CGO_ENABLED=0
 
 RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH \
-       go build \
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
+       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/postgres-operator \
                ./cmd/postgres-operator \
     && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator
 
-FROM perconalab/percona-postgresql-operator:main-pgo-base
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-LABEL name="postgres-operator" \
-	summary="Percona PostgreSQL Operator" \
-	description="Percona PostgreSQL Operator"
+LABEL name="Percona Postgres Operator" \
+      vendor="Percona" \
+      summary="Percona Postgres Operator performs Postgres database creation, adjustment and maintenance inside Kubernetes cluster" \
+      description="Percona Postgres Operator simplifies and automates all essential actions for stable and continious database operation during the whole database lifecycle" \
+      maintainer="Percona Development <info@percona.com>"
 
-ENV PGVERSION 13
-RUN set -ex; \
-	microdnf -y install \
-		postgresql${PGVERSION}; \
-	microdnf -y clean all
-
+COPY redhat/licenses /licenses
+COPY redhat/atomic/help.1 /help.1
+COPY redhat/atomic/help.md /help.md
+COPY licenses /licenses
 
 COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
 COPY installers/ansible/roles/pgo-operator/files/pgo-backrest-repo /default-pgo-backrest-repo

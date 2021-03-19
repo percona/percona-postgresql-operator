@@ -5,28 +5,32 @@ COPY . .
 
 RUN GOBIN="$(pwd -P)/hack/tools" ./hack/update-codegen.sh
 
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+ARG GO_LDFLAGS
 ARG GOOS=linux
 ARG GOARCH=amd64
 ARG CGO_ENABLED=0
 
 RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH \
-       go build \
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
+       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/pgo-scheduler \
                ./cmd/pgo-scheduler \
     && cp -r build/_output/bin/pgo-scheduler /usr/local/bin/pgo-scheduler
 
-FROM perconalab/percona-postgresql-operator:main-pgo-base
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-LABEL name="pgo-scheduler" \
-	summary="Perccona PostgreSQL Operator - Scheduler" \
-	description="Percona PostgreSQL Operator - Scheduler"
+LABEL name="Percona Postgres Operator task scheduler" \
+      vendor="Percona" \
+      summary="Cron job processor for Percona Postgres Operator" \
+      description="Scheduler for database repeatable tasks like backups or other periodic activities." \
+      maintainer="Percona Development <info@percona.com>"
 
-RUN set -ex; \
-    curl -Lf -o /tmp/epel-release.rpm https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm; \
-    rpmkeys --checksig /tmp/epel-release.rpm; \
-    rpm -i /tmp/epel-release.rpm; \
-    rm -rf /tmp/epel-release.rpm
+COPY redhat/licenses /licenses
+COPY redhat/atomic/help.1 /help.1
+COPY redhat/atomic/help.md /help.md
+COPY licenses /licenses
 
 RUN set -ex; \
 	mkdir -p /opt/cpm/bin /opt/cpm/conf /pgo-config /configs; \

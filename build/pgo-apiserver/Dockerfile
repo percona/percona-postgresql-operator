@@ -5,32 +5,36 @@ COPY . .
 
 RUN GOBIN="$(pwd -P)/hack/tools" ./hack/update-codegen.sh
 
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+ARG GO_LDFLAGS
 ARG GOOS=linux
 ARG GOARCH=amd64
 ARG CGO_ENABLED=0
 
 RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH \
-       go build \
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
+       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/apiserver \
                ./cmd/apiserver \
     && cp -r build/_output/bin/apiserver /usr/local/bin/apiserver
 
-FROM perconalab/percona-postgresql-operator:main-base
 
-RUN microdnf update && microdnf clean all
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-LABEL name="Percona Postgres Operator" \
+LABEL name="Percona Postgres Operator API server" \
       vendor="Percona" \
-      summary="Percona Postgres Operator" \
-      description="Percona Postgres Operator" \
+      summary="API server for Percona Postgres database management" \
+      description="Percona Postgres Operator API server allows user clients to interact with Percona Postgres Operator software bundle and run databases in kubectl manner" \
       maintainer="Percona Development <info@percona.com>"
 
-ENV PG_MAJOR 13
+COPY redhat/licenses /licenses
+COPY redhat/atomic/help.1 /help.1
+COPY redhat/atomic/help.md /help.md
+COPY licenses /licenses
 
 RUN set -ex; \
     microdnf -y install \
-	    postgresql${PG_MAJOR} \
 	    hostname; \
 	microdnf -y clean all
 
