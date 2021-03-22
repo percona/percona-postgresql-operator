@@ -99,13 +99,6 @@ void runTest(String TEST_NAME, String CLUSTER_PREFIX) {
     echo "The $TEST_NAME test was finished!"
 }
 
-void installRpms() {
-    sh '''
-        sudo yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
-        sudo percona-release enable-only tools
-        sudo yum install -y percona-xtrabackup-80 jq | true
-    '''
-}
 
 def skipBranchBulds = true
 if ( env.CHANGE_URL ) {
@@ -115,10 +108,9 @@ if ( env.CHANGE_URL ) {
 pipeline {
     environment {
         CLOUDSDK_CORE_DISABLE_PROMPTS = 1
-        CLEAN_NAMESPACE = 1
         GIT_SHORT_COMMIT = sh(script: 'git describe --always --dirty', , returnStdout: true).trim()
         VERSION = "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}"
-        CLUSTER_NAME = sh(script: "echo jenkins-psmdb-${GIT_SHORT_COMMIT} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
+        CLUSTER_NAME = sh(script: "echo jenkins-pgo-${GIT_SHORT_COMMIT} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
         AUTHOR_NAME  = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
     }
     agent {
@@ -132,8 +124,6 @@ pipeline {
                 }
             }
             steps {
-                stash includes: 'vendor/**', name: 'vendorFILES'
-                installRpms()
                 script {
                     if ( AUTHOR_NAME == 'null' )  {
                         AUTHOR_NAME = sh(script: "git show -s --pretty=%ae | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
@@ -182,22 +172,21 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
                     sh '''
-                        DOCKER_TAG=perconalab/percona-postgresql-operator:$VERSION
-                        docker_tag_file='./results/docker/TAG'
-                        mkdir -p $(dirname ${docker_tag_file})
-                        echo ${DOCKER_TAG} > "${docker_tag_file}"
+                        URI_BASE=perconalab/percona-postgresql-operator:$VERSION
+                        docker_uri_base_file='./results/docker/URI_BASE'
+                        mkdir -p $(dirname ${docker_uri_base_file})
+                        echo ${URI_BASE} > "${docker_uri_base_file}"
                             sg docker -c "
                                 docker login -u '${USER}' -p '${PASS}'
-                                export RELEASE=0
-                                export IMAGE=\$DOCKER_TAG
+                                export IMAGE=\$URI_BASE
                                 ./e2e-tests/build
                                 docker logout
                             "
                         sudo rm -rf ./build
                     '''
                 }
-                stash includes: 'results/docker/TAG', name: 'IMAGE'
-                archiveArtifacts 'results/docker/TAG'
+                stash includes: 'results/docker/URI_BASE', name: 'URI_BASE'
+                archiveArtifacts 'results/docker/URI_BASE'
             }
         }
     }
@@ -217,9 +206,9 @@ pipeline {
                         }
                     }
                     makeReport()
-                    unstash 'IMAGE'
-                    def IMAGE = sh(returnStdout: true, script: "cat results/docker/TAG").trim()
-                    TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${IMAGE}`\r\n"
+                    unstash 'URI_BASE'
+                    def URI_BASE = sh(returnStdout: true, script: "cat results/docker/URI_BASE").trim()
+                    TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${URI_BASE}-pgo-apiserver`\r\n\r\nimage: `${URI_BASE}-pgo-event`\r\n\r\nimage: `${URI_BASE}-pgo-rmdata`\r\n\r\nimage: `${URI_BASE}-pgo-scheduler`\r\n\r\nimage: `${URI_BASE}-postgres-operator`\r\n\r\nimage: `${URI_BASE}-pgo-deployer`\r\n"
                     pullRequest.comment(TestsReport)
 
                     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
