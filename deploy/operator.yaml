@@ -177,6 +177,7 @@ data:
     pgo_disable_eventing: "false"
     pgo_disable_tls: "false"
     pgo_image_prefix: "perconalab/percona-postgresql-operator"
+    pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
     pgo_image_tag: "main"
