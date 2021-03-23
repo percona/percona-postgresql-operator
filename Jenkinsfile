@@ -189,6 +189,107 @@ pipeline {
                 archiveArtifacts 'results/docker/URI_BASE'
             }
         }
+        stage('GoLicenseDetector test') {
+            when {
+                expression {
+                    !skipBranchBulds
+                }
+            }
+            steps {
+                sh """
+                    mkdir -p $WORKSPACE/src/github.com/percona
+                    ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
+                    sg docker -c "
+                        docker run \
+                            --rm \
+                            -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
+                            -w /go/src/github.com/percona/percona-postgresql-operator \
+                            -e GO111MODULE=on \
+                            golang:1.16 sh -c '
+                                go get github.com/google/go-licenses;
+                                /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/apiserver \
+                                    | cut -d , -f 3 \
+                                    | sort -u \
+                                    > apiserver-licenses-new || :
+                                /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/pgo-rmdata \
+                                    | cut -d , -f 3 \
+                                    | sort -u \
+                                    > pgo-rmdata-licenses-new || :
+                                /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler \
+                                    | cut -d , -f 3 \
+                                    | sort -u \
+                                    > pgo-scheduler-licenses-new || :
+                                /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
+                                    | cut -d , -f 3 \
+                                    | sort -u \
+                                    > postgres-operator-licenses-new || :
+                            '
+                    "
+                    diff -u e2e-tests/license/compare/apiserver-licenses apiserver-licenses-new
+                    diff -u e2e-tests/license/compare/pgo-rmdata-licenses pgo-rmdata-licenses-new
+                    diff -u e2e-tests/license/compare/pgo-scheduler-licenses pgo-scheduler-licenses-new
+                    diff -u e2e-tests/license/compare/postgres-operator-licenses postgres-operator-licenses-new
+                 """
+            }
+        }
+        stage('GoLicense test') {
+            when {
+                expression {
+                    !skipBranchBulds
+                }
+            }
+            steps {
+                sh '''
+                    mkdir -p $WORKSPACE/src/github.com/percona
+                    ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
+                    sg docker -c "
+                        docker run \
+                            --rm \
+                            -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
+                            -w /go/src/github.com/percona/percona-postgresql-operator \
+                            -e GO111MODULE=on \
+                            golang:1.16 sh -c 'go build -v -o apiserver github.com/percona/percona-postgresql-operator/cmd/apiserver;
+                                               go build -v -o pgo-rmdata github.com/percona/percona-postgresql-operator/cmd/pgo-rmdata;
+                                               go build -v -o pgo-scheduler github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler;
+                                               go build -v -o postgres-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator '
+                    "
+                '''
+
+                withCredentials([string(credentialsId: 'GITHUB_API_TOKEN', variable: 'GITHUB_TOKEN')]) {
+                    sh """
+                        golicense -plain ./apiserver \
+                            | grep -v 'license not found' \
+                            | sed -r 's/^[^ ]+[ ]+//' \
+                            | sort \
+                            | uniq \
+                            > apiserver-golicense-new || true
+                        golicense -plain ./pgo-rmdata \
+                            | grep -v 'license not found' \
+                            | sed -r 's/^[^ ]+[ ]+//' \
+                            | sort \
+                            | uniq \
+                            > pgo-rmdata-golicense-new || true
+                        golicense -plain ./pgo-scheduler \
+                            | grep -v 'license not found' \
+                            | sed -r 's/^[^ ]+[ ]+//' \
+                            | sort \
+                            | uniq \
+                            > pgo-scheduler-golicense-new || true
+                        golicense -plain ./postgres-operator \
+                            | grep -v 'license not found' \
+                            | sed -r 's/^[^ ]+[ ]+//' \
+                            | sort \
+                            | uniq \
+                            > postgres-operator-golicense-new || true
+
+                        diff -u e2e-tests/license/compare/apiserver-golicense apiserver-golicense-new
+                        diff -u e2e-tests/license/compare/pgo-rmdata-golicense pgo-rmdata-golicense-new
+                        diff -u e2e-tests/license/compare/pgo-scheduler-golicense pgo-scheduler-golicense-new
+                        diff -u e2e-tests/license/compare/postgres-operator-golicense postgres-operator-golicense-new
+                    """
+                }
+            }
+        }
     }
     post {
         always {
