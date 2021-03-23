@@ -33,11 +33,9 @@
                         "image": "{% if pgo_apiserver_image | default('') != '' %}{{ pgo_apiserver_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-apiserver
                                 {%- endif %}",
-                        "imagePullPolicy": "IfNotPresent",
-                        "securityContext": {
-                          "allowPrivilegeEscalation": false,
-                          "privileged": false
-                        },
+                        "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
+                                          {%- else %}IfNotPresent
+                                          {%- endif %}",
                         "ports": [
                             { "containerPort": {{ pgo_apiserver_port }} }
                         ],
@@ -119,11 +117,9 @@
                         "image": "{% if pgo_image | default('') != '' %}{{ pgo_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-postgres-operator
                                 {%- endif %}",
-                        "imagePullPolicy": "IfNotPresent",
-                        "securityContext": {
-                          "allowPrivilegeEscalation": false,
-                          "privileged": false
-                        },
+                        "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
+                                          {%- else %}IfNotPresent
+                                          {%- endif %}",
                         "readinessProbe": {
                             "exec": {
                                 "command": [
@@ -225,7 +221,9 @@
                             }
                         ],
                         "volumeMounts": [],
-                        "imagePullPolicy": "IfNotPresent"
+                        "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
+                                          {%- else %}IfNotPresent
+                                          {%- endif %}"
                     }, {
                         "name": "event",
                         "image": "{% if pgo_event_image | default('') != '' %}{{ pgo_event_image }}
@@ -250,7 +248,9 @@
                             }
                         ],
                         "volumeMounts": [],
-                        "imagePullPolicy": "IfNotPresent"
+                        "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
+                                          {%- else %}IfNotPresent
+                                          {%- endif %}"
                     }
                 ],
                 "volumes": []
