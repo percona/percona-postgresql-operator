@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crunchydata/postgres-operator/cmd/pgo/api"
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
+	"github.com/percona/percona-postgresql-operator/cmd/pgo/api"
+	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 	log "github.com/sirupsen/logrus"
 )
 

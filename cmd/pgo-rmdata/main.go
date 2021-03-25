@@ -21,8 +21,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	crunchylog "github.com/crunchydata/postgres-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	crunchylog "github.com/percona/percona-postgresql-operator/internal/logging"
 )
 
 func main() {

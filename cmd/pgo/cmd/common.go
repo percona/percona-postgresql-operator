@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"strings"
 
-	operatorutil "github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	operatorutil "github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 )
 
 // unitType is used to group together the unit types

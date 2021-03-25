@@ -18,9 +18,9 @@ package fake
 import (
 	fakekubernetes "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	fakecrunchydata "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned/fake"
-	crunchydatav1 "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned/typed/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	fakecrunchydata "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/fake"
+	crunchydatav1 "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/typed/crunchydata.com/v1"
 )
 
 type Clientset struct {

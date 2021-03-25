@@ -18,7 +18,7 @@ package scheduler
 import (
 	"time"
 
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	cv3 "github.com/robfig/cron/v3"
 )
 
@@ -63,8 +63,7 @@ type Policy struct {
 type PolicyTemplate struct {
 	JobName        string
 	ClusterName    string
-	CCPImagePrefix string
-	CCPImageTag    string
+	Image          string
 	PGHost         string
 	PGPort         string
 	PGDatabase     string

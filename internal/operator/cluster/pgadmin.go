@@ -25,14 +25,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	"github.com/crunchydata/postgres-operator/internal/operator"
-	"github.com/crunchydata/postgres-operator/internal/operator/pvc"
-	"github.com/crunchydata/postgres-operator/internal/pgadmin"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	"github.com/crunchydata/postgres-operator/pkg/events"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
+	"github.com/percona/percona-postgresql-operator/internal/operator/pvc"
+	"github.com/percona/percona-postgresql-operator/internal/pgadmin"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/pkg/events"
 
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
@@ -50,8 +50,7 @@ const (
 type pgAdminTemplateFields struct {
 	Name           string
 	ClusterName    string
-	CCPImagePrefix string
-	CCPImageTag    string
+	Image          string
 	DisableFSGroup bool
 	Port           string
 	ServicePort    string
@@ -354,9 +353,7 @@ func createPgAdminDeployment(clientset kubernetes.Interface, cluster *crv1.Pgclu
 	fields := pgAdminTemplateFields{
 		Name:           pgAdminDeploymentName,
 		ClusterName:    cluster.Name,
-		CCPImagePrefix: util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
-			operator.Pgo.Cluster.CCPImageTag),
+		Image:          cluster.Spec.PgAdminImage,
 		DisableFSGroup: operator.Pgo.DisableFSGroup(),
 		Port:           defPgAdminPort,
 		InitUser:       defSetupUsername,
@@ -470,4 +467,20 @@ func publishPgAdminEvent(eventType string, task *crv1.Pgtask) {
 	if err := events.Publish(event); err != nil {
 		log.Error(err.Error())
 	}
+}
+
+func UpdatePGAdminImage(clientset kubernetes.Interface, cluster *crv1.Pgcluster) error {
+	pgadminDeploymentName := fmt.Sprintf(pgAdminDeploymentFormat, cluster.Name)
+
+	deployment, err := clientset.AppsV1().Deployments(cluster.Namespace).Get(context.TODO(), pgadminDeploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	deployment.Spec.Template.Spec.Containers[0].Image = cluster.Spec.PgAdminImage
+
+	if _, err := clientset.AppsV1().Deployments(cluster.Namespace).
+		Update(context.TODO(), deployment, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+	return nil
 }

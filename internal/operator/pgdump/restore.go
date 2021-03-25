@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	"github.com/crunchydata/postgres-operator/internal/operator"
-	"github.com/crunchydata/postgres-operator/internal/operator/pvc"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
+	"github.com/percona/percona-postgresql-operator/internal/operator/pvc"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	log "github.com/sirupsen/logrus"
 	v1batch "k8s.io/api/batch/v1"
@@ -47,8 +47,7 @@ type restorejobTemplateFields struct {
 	PgPrimaryPort       string
 	PGRestoreOpts       string
 	PITRTarget          string
-	CCPImagePrefix      string
-	CCPImageTag         string
+	Image               string
 	PgPort              string
 	NodeSelector        string
 	Tolerations         string
@@ -104,11 +103,9 @@ func Restore(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) {
 		PgPrimaryPort:       operator.Pgo.Cluster.Port,
 		PGRestoreOpts:       task.Spec.Parameters[config.LABEL_PGRESTORE_OPTS],
 		PITRTarget:          task.Spec.Parameters[config.LABEL_PGRESTORE_PITR_TARGET],
-		CCPImagePrefix:      util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
-			operator.Pgo.Cluster.CCPImageTag),
-		NodeSelector: operator.GetNodeAffinity(nodeAffinity),
-		Tolerations:  util.GetTolerations(cluster.Spec.Tolerations),
+		Image:               cluster.Spec.PGImage,
+		NodeSelector:        operator.GetNodeAffinity(nodeAffinity),
+		Tolerations:         util.GetTolerations(cluster.Spec.Tolerations),
 	}
 
 	var doc2 bytes.Buffer

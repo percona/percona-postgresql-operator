@@ -18,10 +18,10 @@ limitations under the License.
 import (
 	"context"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	backrestoperator "github.com/crunchydata/postgres-operator/internal/operator/backrest"
-	clusteroperator "github.com/crunchydata/postgres-operator/internal/operator/cluster"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	backrestoperator "github.com/percona/percona-postgresql-operator/internal/operator/backrest"
+	clusteroperator "github.com/percona/percona-postgresql-operator/internal/operator/cluster"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

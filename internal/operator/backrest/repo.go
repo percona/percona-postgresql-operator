@@ -24,11 +24,11 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/operator"
-	"github.com/crunchydata/postgres-operator/internal/operator/pvc"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
+	"github.com/percona/percona-postgresql-operator/internal/operator/pvc"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,8 +44,7 @@ var s3RepoTypeRegex = regexp.MustCompile(`--repo-type=["']?s3["']?`)
 
 type RepoDeploymentTemplateFields struct {
 	SecurityContext           string
-	CCPImagePrefix            string
-	CCPImageTag               string
+	Image                     string
 	ContainerResources        string
 	BackrestRepoClaimName     string
 	SshdSecretsName           string
@@ -228,9 +227,7 @@ func getRepoDeploymentFields(clientset kubernetes.Interface, cluster *crv1.Pgclu
 	replicas int) *RepoDeploymentTemplateFields {
 
 	repoFields := RepoDeploymentTemplateFields{
-		CCPImagePrefix: util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
-			operator.Pgo.Cluster.CCPImageTag),
+		Image:                 cluster.Spec.BackrestRepoImage,
 		ContainerResources:    operator.GetResourcesJSON(cluster.Spec.BackrestResources, cluster.Spec.BackrestLimits),
 		BackrestRepoClaimName: fmt.Sprintf(util.BackrestRepoPVCName, cluster.Name),
 		SshdSecretsName:       fmt.Sprintf(util.BackrestRepoSecretName, cluster.Name),
@@ -312,6 +309,19 @@ func UpdateResources(clientset kubernetes.Interface, cluster *crv1.Pgcluster) er
 	_, err = clientset.AppsV1().Deployments(deployment.Namespace).
 		Update(ctx, deployment, metav1.UpdateOptions{})
 
+	return err
+}
+
+func UpdateBackrestRepoImage(clientset kubernetes.Interface, cluster *crv1.Pgcluster) error {
+	deployment, err := operator.GetBackrestDeployment(clientset, cluster)
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].Image = cluster.Spec.BackrestRepoImage
+
+	_, err = clientset.AppsV1().Deployments(deployment.Namespace).
+		Update(context.TODO(), deployment, metav1.UpdateOptions{})
 	return err
 }
 

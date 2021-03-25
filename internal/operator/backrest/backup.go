@@ -26,13 +26,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	"github.com/crunchydata/postgres-operator/internal/operator"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	"github.com/crunchydata/postgres-operator/pkg/events"
-	pgo "github.com/crunchydata/postgres-operator/pkg/generated/clientset/versioned"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/pkg/events"
+	pgo "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned"
 	log "github.com/sirupsen/logrus"
 	v1batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -50,8 +50,7 @@ type backrestJobTemplateFields struct {
 	CommandOpts                   string
 	PITRTarget                    string
 	PodName                       string
-	CCPImagePrefix                string
-	CCPImageTag                   string
+	Image                         string
 	SecurityContext               string
 	PgbackrestStanza              string
 	PgbackrestDBPath              string
@@ -101,16 +100,14 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 
 	// create the Job to run the backrest command
 	jobFields := backrestJobTemplateFields{
-		JobName:         task.Spec.Parameters[config.LABEL_JOB_NAME],
-		ClusterName:     task.Spec.Parameters[config.LABEL_PG_CLUSTER],
-		PodName:         task.Spec.Parameters[config.LABEL_POD_NAME],
-		SecurityContext: `{"runAsNonRoot": true}`,
-		Command:         cmd,
-		CommandOpts:     task.Spec.Parameters[config.LABEL_BACKREST_OPTS],
-		PITRTarget:      "",
-		CCPImagePrefix:  util.GetValueOrDefault(task.Spec.Parameters[config.LABEL_IMAGE_PREFIX], operator.Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
-			operator.Pgo.Cluster.CCPImageTag),
+		JobName:                       task.Spec.Parameters[config.LABEL_JOB_NAME],
+		ClusterName:                   task.Spec.Parameters[config.LABEL_PG_CLUSTER],
+		PodName:                       task.Spec.Parameters[config.LABEL_POD_NAME],
+		SecurityContext:               "{}",
+		Command:                       cmd,
+		CommandOpts:                   task.Spec.Parameters[config.LABEL_BACKREST_OPTS],
+		PITRTarget:                    "",
+		Image:                         cluster.Spec.BackrestImage,
 		PgbackrestStanza:              task.Spec.Parameters[config.LABEL_PGBACKREST_STANZA],
 		PgbackrestDBPath:              task.Spec.Parameters[config.LABEL_PGBACKREST_DB_PATH],
 		PgbackrestRepo1Path:           task.Spec.Parameters[config.LABEL_PGBACKREST_REPO_PATH],

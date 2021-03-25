@@ -47,11 +47,7 @@
                 },
                 "containers": [{
                     "name": "pgbouncer",
-                    "image": "{{.CCPImagePrefix}}/crunchy-pgbouncer:{{.CCPImageTag}}",
-                    "securityContext": {
-                      "allowPrivilegeEscalation": false,
-                      "privileged": false
-                    },
+                    "image": "{{.Image}}",
                     "ports": [{
                         "containerPort": {{.Port}},
                         "protocol": "TCP"

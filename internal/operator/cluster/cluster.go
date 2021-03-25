@@ -25,14 +25,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/kubeapi"
-	"github.com/crunchydata/postgres-operator/internal/operator"
-	"github.com/crunchydata/postgres-operator/internal/operator/backrest"
-	"github.com/crunchydata/postgres-operator/internal/operator/pvc"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	"github.com/crunchydata/postgres-operator/pkg/events"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
+	"github.com/percona/percona-postgresql-operator/internal/operator/backrest"
+	"github.com/percona/percona-postgresql-operator/internal/operator/pvc"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/pkg/events"
 
 	log "github.com/sirupsen/logrus"
 	apps_v1 "k8s.io/api/apps/v1"
@@ -639,6 +639,21 @@ func UpdateTolerations(clientset kubeapi.Interface, cluster *crv1.Pgcluster, dep
 	deployment.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
 
 	return nil
+}
+
+func UpdatePGImage(clientset kubernetes.Interface, cluster *crv1.Pgcluster) error {
+	ctx := context.TODO()
+
+	deployment, err := clientset.AppsV1().Deployments(cluster.Namespace).Get(ctx, cluster.Annotations[config.ANNOTATION_CURRENT_PRIMARY], metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].Image = cluster.Spec.PGImage
+
+	_, err = clientset.AppsV1().Deployments(cluster.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+
+	return err
 }
 
 // annotateBackrestSecret annotates the pgBackRest repository secret with relevant cluster

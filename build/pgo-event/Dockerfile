@@ -1,18 +1,24 @@
-ARG BASEOS
-ARG BASEVER
-ARG PREFIX
-FROM ${PREFIX}/pgo-base:${BASEOS}-${BASEVER}
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-ARG PGVERSION
-ARG BACKREST_VERSION
-ARG PACKAGER
-ARG DFSET
+LABEL name="Event dispatcher for Percona Postgres Operator" \
+      vendor="Percona" \
+      summary="Users entrypoint to cluster database events" \
+      description="The container provides an interface for User to check lifecycle events of the database cluster" \
+      maintainer="Percona Development <info@percona.com>"
 
-LABEL name="pgo-event" \
-    summary="Crunchy PostgreSQL Operator - pgo-event" \
-    description="Crunchy PostgreSQL Operator - pgo-event"
+COPY redhat/licenses /licenses
+COPY redhat/atomic/help.1 /help.1
+COPY redhat/atomic/help.md /help.md
+COPY licenses /licenses
 
-ADD bin/pgo-event /usr/local/bin
+RUN set -ex; \
+    microdnf -y install \
+       gzip \
+       tar; \
+    curl -S https://s3.amazonaws.com/bitly-downloads/nsq/nsq-1.1.0.linux-amd64.go1.10.3.tar.gz | \
+        tar xz --strip=2 -C /usr/local/bin/ '*/bin/*'
+
+COPY bin/pgo-event /usr/local/bin
 
 USER 2
 

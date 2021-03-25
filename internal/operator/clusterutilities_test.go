@@ -22,10 +22,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	fakekubeapi "github.com/crunchydata/postgres-operator/internal/kubeapi/fake"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	fakekubeapi "github.com/percona/percona-postgresql-operator/internal/kubeapi/fake"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

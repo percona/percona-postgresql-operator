@@ -29,11 +29,7 @@
                 {{ end }}
                 "containers": [{
                     "name": "rmdata",
-                    "image": "{{.PGOImagePrefix}}/pgo-rmdata:{{.PGOImageTag}}",
-                    "securityContext": {
-                      "allowPrivilegeEscalation": false,
-                      "privileged": false
-                    },
+                    "image": "{{.PGOImagePrefix}}:{{.PGOImageTag}}-pgo-rmdata",
                     "env": [{
                         "name": "PG_CLUSTER",
                         "value": "{{.ClusterName}}"

@@ -24,9 +24,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	log "github.com/sirupsen/logrus"
 	apps_v1 "k8s.io/api/apps/v1"
@@ -91,10 +91,9 @@ type exporterTemplateFields struct {
 
 // consolidate
 type badgerTemplateFields struct {
-	CCPImageTag    string
-	CCPImagePrefix string
-	BadgerTarget   string
-	PGBadgerPort   string
+	Image        string
+	BadgerTarget string
+	PGBadgerPort string
 }
 
 type PgbackrestEnvVarsTemplateFields struct {
@@ -139,9 +138,7 @@ type DeploymentTemplateFields struct {
 	Name             string
 	ClusterName      string
 	Port             string
-	CCPImagePrefix   string
-	CCPImageTag      string
-	CCPImage         string
+	Image            string
 	Database         string
 	DeploymentLabels string
 	// PodAnnotations are user-specified annotations that can be applied to a
@@ -328,10 +325,9 @@ func GetBadgerAddon(cluster *crv1.Pgcluster, target string) string {
 	log.Debugf("pgBadger enabled for cluster %q", cluster.Name)
 
 	badgerTemplateFields := badgerTemplateFields{
-		BadgerTarget:   target,
-		CCPImagePrefix: util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, Pgo.Cluster.CCPImagePrefix),
-		CCPImageTag:    util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
-		PGBadgerPort:   cluster.Spec.PGBadgerPort,
+		BadgerTarget: target,
+		Image:        cluster.Spec.PGBadgerImage,
+		PGBadgerPort: cluster.Spec.PGBadgerPort,
 	}
 
 	if CRUNCHY_DEBUG {

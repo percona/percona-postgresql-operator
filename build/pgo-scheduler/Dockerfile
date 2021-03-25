@@ -1,38 +1,52 @@
-ARG BASEOS
-ARG BASEVER
-ARG PREFIX
-FROM ${PREFIX}/pgo-base:${BASEOS}-${BASEVER}
+FROM golang:1.15 AS go_builder
+WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
-ARG PGVERSION
-ARG BACKREST_VERSION
-ARG PACKAGER
-ARG DFSET
+COPY . .
 
-LABEL name="pgo-scheduler" \
-	summary="Crunchy PostgreSQL Operator - Scheduler" \
-	description="Crunchy PostgreSQL Operator - Scheduler"
+RUN GOBIN="$(pwd -P)/hack/tools" ./hack/update-codegen.sh
 
-RUN if [ "$DFSET" = "centos" ] ; then \
-	mkdir -p /opt/cpm/bin /opt/cpm/conf /configs \
-	&& chown -R 2:2 /opt/cpm /configs \
-	&& ${PACKAGER} -y install epel-release \
-	&& ${PACKAGER} -y install \
-		--setopt=skip_missing_names_on_install=False \
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+ARG GO_LDFLAGS
+ARG GOOS=linux
+ARG GOARCH=amd64
+ARG CGO_ENABLED=0
+
+RUN mkdir -p build/_output/bin \
+	&& CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
+	   go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
+		   -o build/_output/bin/pgo-scheduler \
+			   ./cmd/pgo-scheduler \
+	&& cp -r build/_output/bin/pgo-scheduler /usr/local/bin/pgo-scheduler
+
+FROM registry.access.redhat.com/ubi8/ubi-minimal
+
+LABEL name="Percona Postgres Operator task scheduler" \
+	  vendor="Percona" \
+	  summary="Cron job processor for Percona Postgres Operator" \
+	  description="Scheduler for database repeatable tasks like backups or other periodic activities." \
+	  maintainer="Percona Development <info@percona.com>"
+
+COPY redhat/licenses /licenses
+COPY redhat/atomic/help.1 /help.1
+COPY redhat/atomic/help.md /help.md
+COPY licenses /licenses
+
+RUN set -ex; \
+	mkdir -p /opt/cpm/bin /opt/cpm/conf /pgo-config /configs; \
+	chown -R 2:2 /opt/cpm /pgo-config /configs; \
+	microdnf -y install \
 		gettext \
 		hostname  \
 		nss_wrapper \
-		procps-ng \
-	&& ${PACKAGER} -y clean all ; \
-fi
+		findutils \
+		procps-ng; \
+	microdnf -y clean all
 
-RUN if [ "$DFSET" = "rhel" ] ; then \
-	mkdir -p /opt/cpm/bin /opt/cpm/conf /pgo-config \
-	&& chown -R 2:2 /opt/cpm /pgo-config ; \
-fi
-
-ADD bin/pgo-scheduler /opt/cpm/bin
-ADD installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
-ADD conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
+COPY --from=go_builder /usr/local/bin/pgo-scheduler /opt/cpm/bin
+COPY bin/pgo-scheduler /opt/cpm/bin
+COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
+COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
 
 USER 2
 
