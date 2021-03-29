@@ -30,7 +30,7 @@ create_namespace() {
 	local namespace="$1"
 	local skip_clean_namespace="$2"
 
-	if [[ "${CLEAN_NAMESPACE}" == 1 ]] && [[ -z "${skip_clean_namespace}" ]]; then
+	if [[ ${CLEAN_NAMESPACE} == 1 ]] && [[ -z ${skip_clean_namespace} ]]; then
 		kubectl_bin get ns \
 			| egrep -v "^kube-|^default|Terminating|pxc-operator|openshift|^NAME" \
 			| awk '{print$1}' \
@@ -64,17 +64,17 @@ deploy_operator() {
 
 	# modifing ini structure from configMap
 	yq r -d'2' ${src_dir}/deploy/operator.yaml 'data[values.yaml]' \
-	| $sed -e "s#namespace: .*#namespace: ${namespace}#g" \
-	| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: ${namespace}#g" \
-	| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: ${GIT_BRANCH}#g" \
-	> ${tmp_dir}/operator.ini
+		| $sed -e "s#namespace: .*#namespace: ${namespace}#g" \
+		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: ${namespace}#g" \
+		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: ${GIT_BRANCH}#g" \
+			>${tmp_dir}/operator.ini
 
 	# updating yaml itself
 	yq w -d'*' ${src_dir}/deploy/operator.yaml 'metadata.namespace' ${namespace} \
-	| yq w -d'3' - 'subjects[0].namespace' ${namespace} \
-	| yq w -d'4' - 'spec.template.spec.containers[0].image' ${IMAGE_DEPLOYER} \
-	| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
-	| kubectl_bin apply -f -
+		| yq w -d'3' - 'subjects[0].namespace' ${namespace} \
+		| yq w -d'4' - 'spec.template.spec.containers[0].image' ${IMAGE_DEPLOYER} \
+		| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
+		| kubectl_bin apply -f -
 
 	wait_pod_completion $(kubectl_bin get pod --selector=job-name=pgo-deploy -o 'jsonpath={.items[].metadata.name}')
 
@@ -167,8 +167,8 @@ kubectl_bin() {
 	for i in $(seq 0 2); do
 		kubectl "$@" 1>"$LAST_OUT" 2>"$LAST_ERR"
 		exit_status=$?
-		[[ ${-/x} != $- ]] && echo "--- $i stdout" | cat - "$LAST_OUT" >&$BASH_XTRACEFD
-		[[ ${-/x} != $- ]] && echo "--- $i stderr" | cat - "$LAST_ERR" >&$BASH_XTRACEFD
+		[[ ${-/x/} != $- ]] && echo "--- $i stdout" | cat - "$LAST_OUT" >&$BASH_XTRACEFD
+		[[ ${-/x/} != $- ]] && echo "--- $i stderr" | cat - "$LAST_ERR" >&$BASH_XTRACEFD
 		if [[ ${exit_status} != 0 ]]; then
 			sleep "$((timeout * i))"
 		else
@@ -213,7 +213,7 @@ wait_deployment() {
 	set +o xtrace
 	retry=0
 	echo -n $name
-	until [ "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.readyReplicas}')"  ]; do
+	until [ "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.readyReplicas}')" ]; do
 		sleep 1
 		echo -n .
 		let retry+=1
@@ -242,7 +242,7 @@ spinup_pgcluster() {
 	desc 'write data'
 
 	run_psql \
-		'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);'  \
+		'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
 		"postgres:postgres_pass@${cluster}.${namespace}"
 	run_psql \
 		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
