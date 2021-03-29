@@ -1,0 +1,332 @@
+#!/bin/bash
+
+exec 5>&2
+BASH_XTRACEFD="5"
+
+GIT_COMMIT=$(git rev-parse HEAD)
+GIT_BRANCH=${VERSION:-$(git rev-parse --abbrev-ref HEAD | sed -e 's^/^-^g; s^[.]^-^g;' | sed -e 's/_/-/g' | tr '[:upper:]' '[:lower:]')}
+IMAGE_URI_BASE=${IMAGE_URI_BASE:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}"}
+IMAGE_APISERVER=${IMAGE_APISERVER:-"${IMAGE_URI_BASE}-pgo-apiserver"}
+IMAGE_PGOEVENT=${IMAGE_PGOEVENT:-"${IMAGE_URI_BASE}-pgo-event"}
+IMAGE_RMDATA=${IMAGE_RMDATA:-"${IMAGE_URI_BASE}-pgo-rmdata"}
+IMAGE_SCHEDULER=${IMAGE_SCHEDULER:-"${IMAGE_URI_BASE}-pgo-scheduler"}
+IMAGE_OPERATOR=${IMAGE_OPERATOR:-"${IMAGE_URI_BASE}-postgres-operator"}
+IMAGE_DEPLOYER=${IMAGE_DEPLOYER:-"${IMAGE_URI_BASE}-pgo-deployer"}
+SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
+tmp_dir=$(mktemp -d)
+sed=$(which gsed || which sed)
+date=$(which gdate || which date)
+
+test_name=$(basename $test_dir)
+namespace="${test_name}-${RANDOM}"
+conf_dir=$(realpath $test_dir/../conf || :)
+src_dir=$(realpath $test_dir/../..)
+
+if [ -f "$conf_dir/cloud-secret.yml" ]; then
+	SKIP_BACKUPS_TO_AWS_GCP=''
+fi
+
+create_namespace() {
+	local namespace="$1"
+	local skip_clean_namespace="$2"
+
+	if [[ "${CLEAN_NAMESPACE}" == 1 ]] && [[ -z "${skip_clean_namespace}" ]]; then
+		kubectl_bin get ns \
+			| egrep -v "^kube-|^default|Terminating|pxc-operator|openshift|^NAME" \
+			| awk '{print$1}' \
+			| xargs kubectl delete ns &
+	fi
+
+	if [ -n "${OPENSHIFT}" ]; then
+		oc delete project "$namespace" && sleep 40 || :
+		oc new-project "$namespace"
+		oc project "$namespace"
+		oc adm policy add-scc-to-user hostaccess -z default || :
+	else
+		kubectl_bin delete namespace "$namespace" || :
+		wait_for_delete "namespace/$namespace"
+		kubectl_bin create namespace "$namespace"
+		kubectl_bin config set-context $(kubectl_bin config current-context) --namespace="$namespace"
+	fi
+}
+
+desc() {
+	set +o xtrace
+	local msg="$@"
+	printf "\n\n-----------------------------------------------------------------------------------\n"
+	printf "$msg"
+	printf "\n-----------------------------------------------------------------------------------\n\n"
+	set -o xtrace
+}
+
+deploy_operator() {
+	desc 'start operator'
+
+	# modifing ini structure from configMap
+	yq r -d'2' ${src_dir}/deploy/operator.yaml 'data[values.yaml]' \
+	| $sed -e "s#namespace: .*#namespace: ${namespace}#g" \
+	| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: ${namespace}#g" \
+	| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: ${GIT_BRANCH}#g" \
+	> ${tmp_dir}/operator.ini
+
+	# updating yaml itself
+	yq w -d'*' ${src_dir}/deploy/operator.yaml 'metadata.namespace' ${namespace} \
+	| yq w -d'3' - 'subjects[0].namespace' ${namespace} \
+	| yq w -d'4' - 'spec.template.spec.containers[0].image' ${IMAGE_DEPLOYER} \
+	| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
+	| kubectl_bin apply -f -
+
+	wait_pod_completion $(kubectl_bin get pod --selector=job-name=pgo-deploy -o 'jsonpath={.items[].metadata.name}')
+
+	wait_pod $(get_operator_pod)
+}
+
+get_operator_pod() {
+	kubectl_bin get pods \
+		--selector=name=postgres-operator \
+		-o 'jsonpath={.items[].metadata.name}'
+}
+
+wait_pod_completion() {
+	local pod=$1
+	local target_phase=${2:-"Succeeded"}
+
+	set +o xtrace
+	retry=0
+	echo -n $pod
+	#until kubectl_bin get pod/$pod -o jsonpath='{.status.phase}' 2>/dev/null | grep 'Running'; do
+	until kubectl_bin get pod/$pod -o jsonpath='{.status.phase}' 2>/dev/null | grep "${target_phase}"; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			kubectl_bin describe pod/$pod
+			kubectl_bin logs $pod
+			kubectl_bin logs $(get_operator_pod) \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| grep -v 'Getting tasks for pod' \
+				| grep -v 'Getting pods from source' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	set -o xtrace
+}
+
+wait_pod() {
+	local pod=$1
+
+	set +o xtrace
+	retry=0
+	echo -n $pod
+	#until kubectl_bin get pod/$pod -o jsonpath='{.status.phase}' 2>/dev/null | grep 'Running'; do
+	until kubectl_bin get pod/$pod -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null | grep 'true'; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			kubectl_bin describe pod/$pod
+			kubectl_bin logs $pod
+			kubectl_bin logs $(get_operator_pod) \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	set -o xtrace
+}
+
+apply_cluster() {
+	local path=${1}
+	local name=${2}
+	yq w "${path}" 'metadata.namespace' ${namespace} \
+		| yq w - 'spec.namespace' ${namespace} \
+		| yq w - 'metadata.annotations.current-primary' ${name} \
+		| yq w - 'metadata.labels.crunchy-pgha-scope' ${name} \
+		| yq w - 'metadata.labels.deployment-name' ${name} \
+		| yq w - 'metadata.labels.name' ${name} \
+		| yq w - 'metadata.labels.pg-cluster' ${name} \
+		| yq w - 'metadata.name' ${name} \
+		| yq w - 'spec.PrimaryStorage.name' ${name} \
+		| yq w - 'spec.clustername' ${name} \
+		| yq w - 'spec.database' ${name} \
+		| yq w - 'spec.name' ${name} \
+		| yq w - 'spec.user' ${name} \
+		| kubectl_bin apply -f -
+}
+
+kubectl_bin() {
+	local LAST_OUT="$(mktemp)"
+	local LAST_ERR="$(mktemp)"
+	local exit_status=0
+	local timeout=4
+	for i in $(seq 0 2); do
+		kubectl "$@" 1>"$LAST_OUT" 2>"$LAST_ERR"
+		exit_status=$?
+		[[ ${-/x} != $- ]] && echo "--- $i stdout" | cat - "$LAST_OUT" >&$BASH_XTRACEFD
+		[[ ${-/x} != $- ]] && echo "--- $i stderr" | cat - "$LAST_ERR" >&$BASH_XTRACEFD
+		if [[ ${exit_status} != 0 ]]; then
+			sleep "$((timeout * i))"
+		else
+			cat "$LAST_OUT"
+			cat "$LAST_ERR" >&2
+			rm "$LAST_OUT" "$LAST_ERR"
+			return ${exit_status}
+		fi
+	done
+	cat "$LAST_OUT"
+	cat "$LAST_ERR" >&2
+	rm "$LAST_OUT" "$LAST_ERR"
+	return ${exit_status}
+}
+
+wait_for_delete() {
+	local res="$1"
+
+	set +o xtrace
+	echo -n "$res - "
+	retry=0
+	until (kubectl_bin get $res || :) 2>&1 | grep NotFound; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 60 ]; then
+			kubectl_bin logs $(get_operator_pod) \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	set -o xtrace
+}
+
+wait_deployment() {
+	local name=$1
+
+	sleep 10
+	set +o xtrace
+	retry=0
+	echo -n $name
+	until [ "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.readyReplicas}')"  ]; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			kubectl_bin logs $(get_operator_pod) \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+}
+
+spinup_pgcluster() {
+	local cluster=$1
+	local config=$2
+
+	desc 'create first PG cluster'
+	apply_cluster ${config} ${cluster}
+
+	wait_cluster_consistency ${cluster}
+
+	# compare_kubectl "statefulset/${cluster}"
+
+	desc 'write data'
+
+	run_psql \
+		'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);'  \
+		"postgres:postgres_pass@${cluster}.${namespace}"
+	run_psql \
+		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
+		"postgres:postgres_pass@${cluster}.${namespace}"
+	run_psql \
+		'\c myapp \\\ GRANT SELECT ON myApp to "some-name";GRANT USAGE ON SCHEMA public TO "some-name";' \
+		"postgres:postgres_pass@${cluster}.${namespace}"
+	sleep 10
+}
+
+wait_cluster_consistency() {
+	cluster_name=${1}
+	retry=0
+
+	wait_deployment ${1}
+	wait_deployment "${1}-backrest-shared-repo"
+	wait_deployment "${1}-pgbouncer"
+
+	until [[ "$(kubectl_bin get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "pgcluster Initialized" ]]; do
+		let retry+=1
+		if [ $retry -ge 16 ]; then
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+		echo 'waiting for cluster readyness'
+		sleep 10
+	done
+}
+
+get_client_pod() {
+	kubectl_bin get pods \
+		--selector=name=pg-client \
+		-o 'jsonpath={.items[].metadata.name}'
+}
+
+compare_psql_cmd() {
+	local command_id="$1"
+	local command="$2"
+	local uri="$3"
+	local postfix="$4"
+	local expected_result=${test_dir}/compare/${command_id}${postfix}.sql
+
+	run_psql "$command" "$uri" \
+		>$tmp_dir/${command_id}.sql
+	if [ ! -s "$tmp_dir/${command_id}.sql" ]; then
+		sleep 20
+		run_psql "$command" "$uri" \
+			>$tmp_dir/${command_id}.sql
+	fi
+	diff -u $expected_result $tmp_dir/${command_id}.sql
+}
+
+run_psql() {
+	local command="$1"
+	local uri="$2"
+	local driver=${3:-postgres}
+	local suffix=${4:-.svc.cluster.local}
+	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+
+	kubectl_bin exec ${client_container} -- \
+		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix"
+}
+
+destroy() {
+	local namespace="$1"
+
+	kubectl_bin logs $(get_operator_pod) \
+		| grep -v 'level=info' \
+		| grep -v 'level=debug' \
+		| grep -v 'Getting tasks for pod' \
+		| grep -v 'Getting pods from source' \
+		| grep -v 'the object has been modified' \
+		| grep -v 'get backup status: Job.batch' \
+		| $sed -r 's/"ts":[0-9.]+//; s^limits-[0-9.]+/^^g' \
+		| sort -u \
+		| tee $tmp_dir/operator.log
+
+	# kubectl_bin delete -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml 2>/dev/null || :
+	if [ -n "$OPENSHIFT" ]; then
+		oc delete --grace-period=0 --force=true project "$namespace"
+	else
+		kubectl_bin delete --grace-period=0 --force=true namespace "$namespace"
+	fi
+	kubectl_bin delete clusterrolebindings pgo-cluster-role pgo-deployer-cr || true
+	kubectl_bin delete clusterroles pgo-cluster-role pgo-deployer-cr || true
+	rm -rf ${tmp_dir}
+}

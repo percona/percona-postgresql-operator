@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. ${test_dir}/../functions
+
+create_namespace $namespace
+deploy_operator
+
+desc 'create first PSMDB cluster'
+cluster="some-name"
+kubectl_bin apply \
+	-f $conf_dir/${cluster}-secrets.yml \
+	-f $conf_dir/client.yml
+
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+
+compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:postgres_pass@${cluster}.${namespace}"
+
+compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"
+
+compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}.${namespace}"
+
+destroy $namespace
