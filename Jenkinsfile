@@ -300,9 +300,9 @@ pipeline {
                 timeout(time: 3, unit: 'HOURS')
             }
             steps {
-                CreateCluster('basic')
-                runTest('init-deploy', 'basic')
-                ShutdownCluster('basic')
+                CreateCluster('sandbox')
+                runTest('init-deploy', 'sandbox')
+                ShutdownCluster('sandbox')
             }
         }
     }

@@ -17,14 +17,27 @@ kubectl_bin apply \
 
 spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
+compare_kubectl "deployment/postgres-operator"
+compare_kubectl "deployment/${cluster}"
+compare_kubectl "deployment/${cluster}-backrest-shared-repo"
+compare_kubectl "service/postgres-operator"
+compare_kubectl "service/${cluster}"
+compare_kubectl "service/${cluster}-backrest-shared-repo"
+
 desc 'checking essential users access'
 
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:postgres_pass@${cluster}.${namespace}"
-
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}.${namespace}"
 
-compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"
+desc 'enabling pgbouncer'
 
+enable_pgBouncer ${cluster}
+
+wait_deployment "${cluster}-pgbouncer"
+compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
+
+compare_kubectl "deployment/${cluster}-pgbouncer"
+compare_kubectl "service/${cluster}-pgbouncer"
 
 destroy $namespace

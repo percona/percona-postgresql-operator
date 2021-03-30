@@ -5,13 +5,15 @@ BASH_XTRACEFD="5"
 
 GIT_COMMIT=$(git rev-parse HEAD)
 GIT_BRANCH=${VERSION:-$(git rev-parse --abbrev-ref HEAD | sed -e 's^/^-^g; s^[.]^-^g;' | sed -e 's/_/-/g' | tr '[:upper:]' '[:lower:]')}
-IMAGE_URI_BASE=${IMAGE_URI_BASE:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}"}
+IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
+IMAGE_URI_BASE=${IMAGE_URI_BASE:-"${IMAGE_BASE}:${GIT_BRANCH}"}
 IMAGE_APISERVER=${IMAGE_APISERVER:-"${IMAGE_URI_BASE}-pgo-apiserver"}
 IMAGE_PGOEVENT=${IMAGE_PGOEVENT:-"${IMAGE_URI_BASE}-pgo-event"}
 IMAGE_RMDATA=${IMAGE_RMDATA:-"${IMAGE_URI_BASE}-pgo-rmdata"}
 IMAGE_SCHEDULER=${IMAGE_SCHEDULER:-"${IMAGE_URI_BASE}-pgo-scheduler"}
 IMAGE_OPERATOR=${IMAGE_OPERATOR:-"${IMAGE_URI_BASE}-postgres-operator"}
 IMAGE_DEPLOYER=${IMAGE_DEPLOYER:-"${IMAGE_URI_BASE}-pgo-deployer"}
+IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
@@ -32,9 +34,11 @@ create_namespace() {
 
 	if [[ ${CLEAN_NAMESPACE} == 1 ]] && [[ -z ${skip_clean_namespace} ]]; then
 		kubectl_bin get ns \
-			| egrep -v "^kube-|^default|Terminating|pxc-operator|openshift|^NAME" \
+			| egrep -v "^kube-|^default|Terminating|openshift|^NAME" \
 			| awk '{print$1}' \
 			| xargs kubectl delete ns &
+		kubectl delete clusterrolebindings pgo-cluster-role pgo-deployer-cr || true
+		kubectl_bin delete clusterroles pgo-cluster-role pgo-deployer-cr || true
 	fi
 
 	if [ -n "${OPENSHIFT}" ]; then
@@ -94,7 +98,6 @@ wait_pod_completion() {
 	set +o xtrace
 	retry=0
 	echo -n $pod
-	#until kubectl_bin get pod/$pod -o jsonpath='{.status.phase}' 2>/dev/null | grep 'Running'; do
 	until kubectl_bin get pod/$pod -o jsonpath='{.status.phase}' 2>/dev/null | grep "${target_phase}"; do
 		sleep 1
 		echo -n .
@@ -121,7 +124,6 @@ wait_pod() {
 	set +o xtrace
 	retry=0
 	echo -n $pod
-	#until kubectl_bin get pod/$pod -o jsonpath='{.status.phase}' 2>/dev/null | grep 'Running'; do
 	until kubectl_bin get pod/$pod -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null | grep 'true'; do
 		sleep 1
 		echo -n .
@@ -156,6 +158,7 @@ apply_cluster() {
 		| yq w - 'spec.database' ${name} \
 		| yq w - 'spec.name' ${name} \
 		| yq w - 'spec.user' ${name} \
+		| yq d - 'spec.pgBouncer' \
 		| kubectl_bin apply -f -
 }
 
@@ -226,6 +229,74 @@ wait_deployment() {
 			exit 1
 		fi
 	done
+	echo
+	set -o xtrace
+}
+
+enable_pgBouncer() {
+	local cluster_name=${1}
+	local replicas_num=${2:-'1'}
+
+	kubectl_bin patch \
+		"pgcluster/${cluster_name}" \
+		--type json \
+		-p='[{"op":"add","path":"/spec/pgBouncer","value":{"image":"'"${IMAGE_PGBOUNCER}"'","limits":{"cpu":"2","memory":"512Mi"},"replicas":'${replicas_num}',"resources":{"cpu":"1","memory":"128Mi"},"tlsSecret":"","serviceType":"LoadBalancer"}}]'
+}
+
+disable_pgbouncer() {
+	kubectl_bin patch \
+		"pgcluster/${1}" \
+		--type json \
+		-p='[{"op":"remove","path":"/spec/pgBouncer"}]'
+}
+
+compare_kubectl() {
+	local resource="$1"
+	local postfix="$2"
+	local expected_result=${test_dir}/compare/${resource//\//_}${postfix}.yml
+	local new_result="${tmp_dir}/${resource//\//_}.yml"
+
+	kubectl_bin get -o yaml ${resource} \
+		| yq d - 'metadata.managedFields' \
+		| yq d - '**.creationTimestamp' \
+		| yq d - '**.namespace' \
+		| yq d - '**.uid' \
+		| yq d - 'metadata.resourceVersion' \
+		| yq d - 'metadata.selfLink' \
+		| yq d - 'metadata.deletionTimestamp' \
+		| yq d - 'metadata.annotations."k8s.v1.cni.cncf.io*"' \
+		| yq d - 'metadata.annotations."kubernetes.io/psp"' \
+		| yq d - '**.creationTimestamp' \
+		| yq d - '**.image' \
+		| yq d - '**.clusterIP' \
+		| yq d - '**.dataSource' \
+		| yq d - '**.procMount' \
+		| yq d - '**.storageClassName' \
+		| yq d - '**.finalizers' \
+		| yq d - '**."kubernetes.io/pvc-protection"' \
+		| yq d - '**.volumeName' \
+		| yq d - '**."volume.beta.kubernetes.io/storage-provisioner"' \
+		| yq d - 'spec.volumeMode' \
+		| yq d - 'spec.nodeName' \
+		| yq d - '**."volume.kubernetes.io/selected-node"' \
+		| yq d - '**."percona.com/*"' \
+		| yq d - '**.(volumeMode==Filesystem).volumeMode' \
+		| yq d - '**.healthCheckNodePort' \
+		| yq d - '**.nodePort' \
+		| yq d - '**.imagePullSecrets' \
+		| yq d - '**.enableServiceLinks' \
+		| yq d - 'status' \
+		| yq d - '**.(name==suffix)' \
+		| yq d - '**.(name==NAMESPACE)' \
+		| yq d - 'spec.volumeClaimTemplates.*.apiVersion' \
+		| yq d - 'spec.volumeClaimTemplates.*.kind' \
+		| yq d - 'metadata.ownerReferences.*.apiVersion' \
+		| yq d - '**.controller-uid' \
+		| yq d - '**.preemptionPolicy' \
+			>${new_result}
+	# last sed is needed for backup cronjob content
+
+	diff -u ${expected_result} ${new_result}
 }
 
 spinup_pgcluster() {
@@ -236,8 +307,6 @@ spinup_pgcluster() {
 	apply_cluster ${config} ${cluster}
 
 	wait_cluster_consistency ${cluster}
-
-	# compare_kubectl "statefulset/${cluster}"
 
 	desc 'write data'
 
@@ -259,7 +328,6 @@ wait_cluster_consistency() {
 
 	wait_deployment ${1}
 	wait_deployment "${1}-backrest-shared-repo"
-	wait_deployment "${1}-pgbouncer"
 
 	until [[ "$(kubectl_bin get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "pgcluster Initialized" ]]; do
 		let retry+=1
@@ -320,7 +388,6 @@ destroy() {
 		| sort -u \
 		| tee $tmp_dir/operator.log
 
-	# kubectl_bin delete -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml 2>/dev/null || :
 	if [ -n "$OPENSHIFT" ]; then
 		oc delete --grace-period=0 --force=true project "$namespace"
 	else

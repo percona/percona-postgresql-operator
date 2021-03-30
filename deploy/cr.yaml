@@ -112,7 +112,6 @@ spec:
     resources:
       cpu: "1"
       memory: 128Mi
-    serviceType: ""
     tlsSecret: ""
     serviceType: LoadBalancer
 ######################################################
