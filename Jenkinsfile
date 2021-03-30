@@ -290,7 +290,7 @@ pipeline {
                 }
             }
         }
-        stage('Run tests for operator') {
+		stage('Run tests for operator') {
             when {
                 expression {
                     !skipBranchBulds
@@ -302,6 +302,7 @@ pipeline {
             steps {
                 CreateCluster('sandbox')
                 runTest('init-deploy', 'sandbox')
+                runTest('scaling', 'sandbox')
                 ShutdownCluster('sandbox')
             }
         }
