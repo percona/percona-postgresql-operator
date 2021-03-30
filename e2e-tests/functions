@@ -365,6 +365,30 @@ compare_psql_cmd() {
 	diff -u $expected_result $tmp_dir/${command_id}.sql
 }
 
+wait_for_delete() {
+	local res="$1"
+
+	set +o xtrace
+	echo -n "$res - "
+	retry=0
+	until (kubectl_bin get $res || :) 2>&1 | grep NotFound; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 60 ]; then
+			kubectl_bin logs $(get_operator_pod) \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| grep -v 'Getting tasks for pod' \
+				| grep -v 'Getting pods from source' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	set -o xtrace
+}
+
 run_psql() {
 	local command="$1"
 	local uri="$2"
