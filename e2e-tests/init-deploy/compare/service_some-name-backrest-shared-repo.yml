@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: some-name-backrest-shared-repo
+    pg-cluster: some-name
+    pgo-backrest-repo: "true"
+    vendor: crunchydata
+  name: some-name-backrest-shared-repo
+spec:
+  ports:
+    - port: 2022
+      protocol: TCP
+      targetPort: 2022
+  selector:
+    name: some-name-backrest-shared-repo
+  sessionAffinity: None
+  type: ClusterIP
