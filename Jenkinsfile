@@ -290,7 +290,7 @@ pipeline {
                 }
             }
         }
-		stage('Run tests for operator') {
+        stage('Run tests for operator') {
             when {
                 expression {
                     !skipBranchBulds
