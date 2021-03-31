@@ -294,7 +294,6 @@ compare_kubectl() {
 		| yq d - '**.controller-uid' \
 		| yq d - '**.preemptionPolicy' \
 			>${new_result}
-	# last sed is needed for backup cronjob content
 
 	diff -u ${expected_result} ${new_result}
 }
@@ -422,4 +421,18 @@ destroy() {
 	kubectl_bin delete clusterrolebindings pgo-cluster-role pgo-deployer-cr || true
 	kubectl_bin delete clusterroles pgo-cluster-role pgo-deployer-cr || true
 	rm -rf ${tmp_dir}
+}
+
+create_replica() {
+	local cluster=${1}
+	local suffix=${2}
+
+	yq w ${conf_dir}/some-name-replica.yml 'metadata.labels.name' "${cluster}-${suffix}" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| yq w - 'metadata.name' "${cluster}-${suffix}" \
+		| yq w - 'spec.clustername' "${cluster}" \
+		| yq w - 'spec.name' "${cluster}-${suffix}" \
+		| yq w - 'spec.namespace' "${namespace}" \
+		| yq w - 'spec.replicastorage.name' "${cluster}-${suffix}" \
+		| kubectl_bin apply -f -
 }
