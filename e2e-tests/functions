@@ -400,54 +400,6 @@ run_psql() {
 		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix"
 }
 
-compare_kubectl() {
-	local resource="$1"
-	local postfix="$2"
-	local expected_result=${test_dir}/compare/${resource//\//_}${postfix}.yml
-	local new_result="${tmp_dir}/${resource//\//_}.yml"
-
-	kubectl_bin get -o yaml ${resource} \
-		| yq d - 'metadata.managedFields' \
-		| yq d - '**.creationTimestamp' \
-		| yq d - '**.namespace' \
-		| yq d - '**.uid' \
-		| yq d - 'metadata.resourceVersion' \
-		| yq d - 'metadata.selfLink' \
-		| yq d - 'metadata.deletionTimestamp' \
-		| yq d - 'metadata.annotations."k8s.v1.cni.cncf.io*"' \
-		| yq d - 'metadata.annotations."kubernetes.io/psp"' \
-		| yq d - '**.creationTimestamp' \
-		| yq d - '**.image' \
-		| yq d - '**.clusterIP' \
-		| yq d - '**.dataSource' \
-		| yq d - '**.procMount' \
-		| yq d - '**.storageClassName' \
-		| yq d - '**.finalizers' \
-		| yq d - '**."kubernetes.io/pvc-protection"' \
-		| yq d - '**.volumeName' \
-		| yq d - '**."volume.beta.kubernetes.io/storage-provisioner"' \
-		| yq d - 'spec.volumeMode' \
-		| yq d - 'spec.nodeName' \
-		| yq d - '**."volume.kubernetes.io/selected-node"' \
-		| yq d - '**."percona.com/*"' \
-		| yq d - '**.(volumeMode==Filesystem).volumeMode' \
-		| yq d - '**.healthCheckNodePort' \
-		| yq d - '**.nodePort' \
-		| yq d - '**.imagePullSecrets' \
-		| yq d - '**.enableServiceLinks' \
-		| yq d - 'status' \
-		| yq d - '**.(name==suffix)' \
-		| yq d - 'spec.volumeClaimTemplates.*.apiVersion' \
-		| yq d - 'spec.volumeClaimTemplates.*.kind' \
-		| yq d - 'metadata.ownerReferences.*.apiVersion' \
-		| yq d - '**.controller-uid' \
-		| yq d - '**.preemptionPolicy' \
-			>${new_result}
-	# last sed is needed for backup cronjob content
-
-	diff -u ${expected_result} ${new_result}
-}
-
 destroy() {
 	local namespace="$1"
 
