@@ -290,6 +290,21 @@ pipeline {
                 }
             }
         }
+        stage('Run tests for operator') {
+            when {
+                expression {
+                    !skipBranchBulds
+                }
+            }
+            options {
+                timeout(time: 3, unit: 'HOURS')
+            }
+            steps {
+                CreateCluster('sandbox')
+                runTest('init-deploy', 'sandbox')
+                ShutdownCluster('sandbox')
+            }
+        }
     }
     post {
         always {
