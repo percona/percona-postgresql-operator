@@ -77,6 +77,12 @@ spec:
   pgImage: perconalab/percona-postgresql-operator:main-postgres-ha
   backrestImage: perconalab/percona-postgresql-operator:main-pgbackrest
   backrestRepoImage: perconalab/percona-postgresql-operator:main-pgbackrest-repo
+  pmm:
+    enabled: true
+    image: percona/pmm-client:2.12.0
+    serverHost: 1.11.1.11
+    serverUser: admin
+    pmmSecret: hippo-pmm-secret
 # references a custom ConfigMap to use when bootstrapping a PostgreSQL cluster
   customconfig: ""
 # name of a database that the PostgreSQL user can log into after the PostgreSQL cluster is created.
@@ -157,9 +163,9 @@ spec:
 #      storagetype: dynamic
 #      supplementalgroups: ""
   tls:
-    caSecret: ""
+    caSecret: "postgresql-ca"
     replicationTLSSecret: ""
-    tlsSecret: ""
+    tlsSecret: "hippo-tls-keypair"
   tlsOnly: false
   tolerations: []
 # The name of the PostgreSQL user that is created when the PostgreSQL cluster is first created.

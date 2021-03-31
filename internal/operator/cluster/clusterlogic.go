@@ -347,6 +347,11 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		CASecret:                  cl.Spec.TLS.CASecret,
 		Standby:                   cl.Spec.Standby,
 		Tolerations:               util.GetTolerations(cl.Spec.Tolerations),
+		PMMEnabled:                cl.Spec.PMM.Enabled,
+		PMMImage:                  cl.Spec.PMM.Image,
+		PMMServerHost:             cl.Spec.PMM.ServerHost,
+		PMMServerUser:             cl.Spec.PMM.ServerUser,
+		PMMSecret:                 cl.Spec.PMM.PMMSecret,
 	}
 
 	return deploymentFields

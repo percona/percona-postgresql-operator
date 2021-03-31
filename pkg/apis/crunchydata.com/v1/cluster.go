@@ -155,6 +155,17 @@ type PgclusterSpec struct {
 	// Tolerations are an optional list of Pod toleration rules that are applied
 	// to the PostgreSQL instance.
 	Tolerations []v1.Toleration `json:"tolerations"`
+
+	PMM PMMSpec `json:"pmm"`
+}
+
+// PMMSpec contains settings for PMM
+type PMMSpec struct {
+	Enabled    bool   `json:"enabled"`
+	Image      string `json:"image"`
+	ServerHost string `json:"serverHost,omitempty"`
+	ServerUser string `json:"serverUser,omitempty"`
+	PMMSecret  string `json:"pmmSecret,omitempty"`
 }
 
 // BackrestStorageType refers to the types of storage accept by pgBackRest
