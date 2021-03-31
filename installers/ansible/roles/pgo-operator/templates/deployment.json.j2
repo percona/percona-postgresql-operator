@@ -31,7 +31,7 @@
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-apiserver
                                 {%- endif %}",
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
-                                          {%- else %}IfNotPresent
+                                          {%- else %}Always
                                           {%- endif %}",
                         "ports": [
                             { "containerPort": {{ pgo_apiserver_port }} }
@@ -115,7 +115,7 @@
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-postgres-operator
                                 {%- endif %}",
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
-                                          {%- else %}IfNotPresent
+                                          {%- else %}Always
                                           {%- endif %}",
                         "readinessProbe": {
                             "exec": {
@@ -215,7 +215,7 @@
                         ],
                         "volumeMounts": [],
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
-                                          {%- else %}IfNotPresent
+                                          {%- else %}Always
                                           {%- endif %}"
                     }, {
                         "name": "event",
@@ -238,7 +238,7 @@
                         ],
                         "volumeMounts": [],
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
-                                          {%- else %}IfNotPresent
+                                          {%- else %}Always
                                           {%- endif %}"
                     }
                 ],

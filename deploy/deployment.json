@@ -28,7 +28,7 @@
                     {
                         "name": "apiserver",
                         "image": "$PGO_IMAGE_PREFIX/pgo-apiserver:$PGO_IMAGE_TAG",
-                        "imagePullPolicy": "IfNotPresent",
+                        "imagePullPolicy": "Always",
                         "ports": [
                             { "containerPort": $PGO_APISERVER_PORT }
                         ],
@@ -108,7 +108,7 @@
                     }, {
                         "name": "operator",
                         "image": "$PGO_IMAGE_PREFIX/postgres-operator:$PGO_IMAGE_TAG",
-                        "imagePullPolicy": "IfNotPresent",
+                        "imagePullPolicy": "Always",
                         "readinessProbe": {
                             "exec": {
                                 "command": [
@@ -204,7 +204,7 @@
                             }
                         ],
                         "volumeMounts": [],
-                        "imagePullPolicy": "IfNotPresent"
+                        "imagePullPolicy": "Always"
                     },
                     {
                         "name": "event",
@@ -224,7 +224,7 @@
                             }
                         ],
                         "volumeMounts": [],
-                        "imagePullPolicy": "IfNotPresent"
+                        "imagePullPolicy": "Always"
                     }
                 ],
                 "volumes": []
