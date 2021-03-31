@@ -113,7 +113,7 @@ spec:
       cpu: "1"
       memory: 128Mi
     tlsSecret: ""
-    serviceType: LoadBalancer
+    serviceType: ""
 ######################################################
 #Used to indicate if a PostgreSQL cluster should bootstrap its data from a pgBackRest repository
   pgDataSource:
