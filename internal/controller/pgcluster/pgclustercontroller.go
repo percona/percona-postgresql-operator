@@ -431,14 +431,28 @@ func (c *Controller) onDelete(obj interface{}) {
 	}
 
 	// determine if the data directory or backups should be kept
-	_, keepBackups := cluster.ObjectMeta.GetAnnotations()[config.ANNOTATION_CLUSTER_KEEP_BACKUPS]
-	_, keepData := cluster.ObjectMeta.GetAnnotations()[config.ANNOTATION_CLUSTER_KEEP_DATA]
+	keepBackups := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_BACKUPS)
+	keepData := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_DATA)
 
 	// create the deletion job. this will delete any data and backups for this
 	// cluster
 	if err := util.CreateRMDataTask(c.Client, cluster, "", !keepBackups, !keepData, false, false); err != nil {
 		log.Error(err)
 	}
+}
+
+// isAnnotation cheks if annotation exists or not
+func isAnnotationExists(cluster *crv1.Pgcluster, key string) (isAnnotation bool) {
+	_, isAnnotation = cluster.Spec.Annotations.Backrest[key]
+	if isAnnotation {
+		return
+	}
+	_, isAnnotation = cluster.Spec.Annotations.Postgres[key]
+	if isAnnotation {
+		return
+	}
+	_, isAnnotation = cluster.Spec.Annotations.Global[key]
+	return
 }
 
 // AddPGClusterEventHandler adds the pgcluster event handler to the pgcluster informer
