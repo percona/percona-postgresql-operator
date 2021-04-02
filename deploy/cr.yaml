@@ -78,7 +78,7 @@ spec:
   backrestImage: perconalab/percona-postgresql-operator:main-pgbackrest
   backrestRepoImage: perconalab/percona-postgresql-operator:main-pgbackrest-repo
   pmm:
-    enabled: true
+    enabled: false
     image: percona/pmm-client:2.15.1
     serverHost: monitoring-service
     serverUser: admin
