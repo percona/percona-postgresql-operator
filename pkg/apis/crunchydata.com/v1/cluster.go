@@ -161,11 +161,13 @@ type PgclusterSpec struct {
 
 // PMMSpec contains settings for PMM
 type PMMSpec struct {
-	Enabled    bool   `json:"enabled"`
-	Image      string `json:"image"`
-	ServerHost string `json:"serverHost,omitempty"`
-	ServerUser string `json:"serverUser,omitempty"`
-	PMMSecret  string `json:"pmmSecret,omitempty"`
+	Enabled    bool            `json:"enabled"`
+	Image      string          `json:"image"`
+	ServerHost string          `json:"serverHost,omitempty"`
+	ServerUser string          `json:"serverUser,omitempty"`
+	PMMSecret  string          `json:"pmmSecret,omitempty"`
+	Resources  v1.ResourceList `json:"resources"`
+	Limits     v1.ResourceList `json:"limits"`
 }
 
 // BackrestStorageType refers to the types of storage accept by pgBackRest

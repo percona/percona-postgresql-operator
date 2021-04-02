@@ -194,14 +194,15 @@ type DeploymentTemplateFields struct {
 	ReplicationTLSSecret string
 	// CASecret is the name of the Secret that has the trusted CA that the
 	// PostgreSQL server is using
-	CASecret      string
-	PMMEnabled    bool
-	PMMImage      string
-	PMMAddress    string
-	PMMServerHost string
-	PMMServerUser string
-	PGParams      string
-	PMMSecret     string
+	CASecret              string
+	PMMEnabled            bool
+	PMMImage              string
+	PMMAddress            string
+	PMMServerHost         string
+	PMMServerUser         string
+	PGParams              string
+	PMMSecret             string
+	PMMContainerResources string
 }
 
 // tablespaceVolumeFields are the fields used to create the volumes in a
