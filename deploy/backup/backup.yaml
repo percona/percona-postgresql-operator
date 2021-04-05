@@ -2,12 +2,12 @@ apiVersion: crunchydata.com/v1
 kind: Pgtask
 metadata:
   labels:
-    pg-cluster: hippo
+    pg-cluster: cluster1
     pgouser: admin
-  name: backrest-backup1-hippo
+  name: backrest-backup1-cluster1
   namespace: pgo
 spec:
-  name: backrest-backup1-hippo
+  name: backrest-backup1-cluster1
   namespace: pgo
   parameters:
     backrest-command: backup
@@ -28,10 +28,10 @@ spec:
     backrest-storage-type: ""
     containername: database
     image-prefix: perconalab
-    job-name: backrest-backup1-hippo
-    pg-cluster: hippo
+    job-name: backrest-backup1-cluster1
+    pg-cluster: cluster1
 # backrest repo pod name
-    podname: hippo-backrest-shared-repo-58589779b4-59zn6
+    podname: cluster1-backrest-shared-repo-5f84955754-tpfv2
   storagespec:
     accessmode: ""
     matchLabels: ""
