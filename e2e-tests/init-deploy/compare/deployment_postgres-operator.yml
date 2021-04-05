@@ -141,6 +141,9 @@ spec:
             timeoutSeconds: 1
           name: scheduler
           resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
         - env:
@@ -159,12 +162,16 @@ spec:
             timeoutSeconds: 1
           name: event
           resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
-      securityContext: {}
+      securityContext:
+        runAsNonRoot: true
       serviceAccount: postgres-operator
       serviceAccountName: postgres-operator
       terminationGracePeriodSeconds: 30
