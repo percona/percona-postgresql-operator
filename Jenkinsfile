@@ -302,6 +302,7 @@ pipeline {
             steps {
                 CreateCluster('sandbox')
                 runTest('init-deploy', 'sandbox')
+                runTest('scaling', 'sandbox')
                 ShutdownCluster('sandbox')
             }
         }
