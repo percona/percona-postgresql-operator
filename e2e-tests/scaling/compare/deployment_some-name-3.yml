@@ -3,25 +3,25 @@ kind: Deployment
 metadata:
   annotations:
     deployment.kubernetes.io/revision: "1"
-  generation: 2
+  generation: 1
   labels:
     crunchy-pgha-scope: some-name
-    deployment-name: some-name
-    name: some-name
+    deployment-name: some-name-3
+    name: some-name-replica
     pg-cluster: some-name
     pgo-pg-database: "true"
     pgo-version: 4.6.2
-    pgouser: admin
-    service-name: some-name
+    replica-name: some-name-3
+    service-name: some-name-replica
     vendor: crunchydata
-  name: some-name
+  name: some-name-3
 spec:
   progressDeadlineSeconds: 600
   replicas: 1
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      deployment-name: some-name
+      deployment-name: some-name-3
       pg-cluster: some-name
       pgo-pg-database: "true"
       vendor: crunchydata
@@ -34,13 +34,13 @@ spec:
     metadata:
       labels:
         crunchy-pgha-scope: some-name
-        deployment-name: some-name
-        name: some-name
+        deployment-name: some-name-3
+        name: some-name-replica
         pg-cluster: some-name
         pg-pod-anti-affinity: preferred
         pgo-pg-database: "true"
         pgo-version: 4.6.2
-        pgouser: admin
+        replica-name: some-name-3
         vendor: crunchydata
     spec:
       affinity:
@@ -69,13 +69,8 @@ spec:
               value: "5432"
             - name: PGHA_USER
               value: postgres
-            - name: PGHA_INIT
-              valueFrom:
-                configMapKeyRef:
-                  key: init
-                  name: some-name-pgha-config
             - name: PATRONI_POSTGRESQL_DATA_DIR
-              value: /pgdata/some-name
+              value: /pgdata/some-name-3
             - name: PGBACKREST_STANZA
               value: db
             - name: PGBACKREST_REPO1_HOST
@@ -87,7 +82,7 @@ spec:
             - name: PGBACKREST_REPO1_PATH
               value: /backrestrepo/some-name-backrest-shared-repo
             - name: PGBACKREST_DB_PATH
-              value: /pgdata/some-name
+              value: /pgdata/some-name-3
             - name: ENABLE_SSHD
               value: "true"
             - name: PGBACKREST_LOG_PATH
@@ -192,7 +187,7 @@ spec:
       volumes:
         - name: pgdata
           persistentVolumeClaim:
-            claimName: some-name
+            claimName: some-name-3
         - name: user-volume
           secret:
             defaultMode: 420
