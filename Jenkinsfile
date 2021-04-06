@@ -304,6 +304,7 @@ pipeline {
                 CreateCluster('sandbox')
                 runTest('init-deploy', 'sandbox')
                 runTest('scaling', 'sandbox')
+                runTest('recreate', 'sandbox')
                 ShutdownCluster('sandbox')
             }
         }
