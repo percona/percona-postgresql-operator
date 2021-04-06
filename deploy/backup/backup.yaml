@@ -31,7 +31,7 @@ spec:
     job-name: backrest-backup1-cluster1
     pg-cluster: cluster1
 # backrest repo pod name
-    podname: cluster1-backrest-shared-repo-5f84955754-tpfv2
+    podname: cluster1-backrest-shared-repo-6676bd9d67-shpk7
   storagespec:
     accessmode: ""
     matchLabels: ""
