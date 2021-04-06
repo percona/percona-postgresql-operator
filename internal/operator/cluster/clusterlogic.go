@@ -347,12 +347,7 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		CASecret:                  cl.Spec.TLS.CASecret,
 		Standby:                   cl.Spec.Standby,
 		Tolerations:               util.GetTolerations(cl.Spec.Tolerations),
-		PMMEnabled:                cl.Spec.PMM.Enabled,
-		PMMImage:                  cl.Spec.PMM.Image,
-		PMMServerHost:             cl.Spec.PMM.ServerHost,
-		PMMServerUser:             cl.Spec.PMM.ServerUser,
-		PMMSecret:                 cl.Spec.PMM.PMMSecret,
-		PMMContainerResources:     operator.GetResourcesJSON(cl.Spec.PMM.Resources, cl.Spec.PMM.Limits),
+		PMMContainer:              operator.GetPMMContainer(cl),
 	}
 
 	return deploymentFields
@@ -488,12 +483,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		Tolerations: util.GetValueOrDefault(
 			util.GetTolerations(replica.Spec.Tolerations),
 			util.GetTolerations(cluster.Spec.Tolerations)),
-		PMMEnabled:            cluster.Spec.PMM.Enabled,
-		PMMImage:              cluster.Spec.PMM.Image,
-		PMMServerHost:         cluster.Spec.PMM.ServerHost,
-		PMMServerUser:         cluster.Spec.PMM.ServerUser,
-		PMMSecret:             cluster.Spec.PMM.PMMSecret,
-		PMMContainerResources: operator.GetResourcesJSON(cluster.Spec.PMM.Resources, cluster.Spec.PMM.Limits),
+		PMMContainer: operator.GetPMMContainer(cluster),
 	}
 
 	switch replica.Spec.ReplicaStorage.StorageType {
