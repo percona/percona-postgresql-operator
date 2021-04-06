@@ -2,17 +2,17 @@ apiVersion: crunchydata.com/v1
 kind: Pgreplica
 metadata:
   labels:
-    name: hippo-repl
-    pg-cluster: hippo
+    name: cluster1-repl1
+    pg-cluster: cluster1
     pgouser: admin
-  name: hippo-repl1
+  name: cluster-repl1
   namespace: pgo
 spec:
-# name of the PostgreSQL cluster, e.g. hippo. This is used to group
+# name of the PostgreSQL cluster, e.g. cluster. This is used to group
 # PostgreSQL instances (primary, replicas) together.
-  clustername: hippo
+  clustername: cluster1
 # name of this PostgreSQL replica. It should be unique within a ClusterName.
-  name: hippo-repl1
+  name: cluster1-repl1
   namespace: pgo
 #  nodeAffinity:
 #    requiredDuringSchedulingIgnoredDuringExecution:
@@ -26,7 +26,7 @@ spec:
   replicastorage:
     accessmode: ReadWriteOnce
     matchLabels: ""
-    name: hippo-repl1
+    name: cluster-repl1
     size: 1G
     storageclass: ""
     storagetype: dynamic
