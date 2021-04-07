@@ -440,6 +440,7 @@ create_replica() {
 check_replica() {
 	local name=${1}
 	local cluster=${2}
+	local sql_cmp=${3:-"select-2"}
 
 	run_psql \
 		'SELECT usename,application_name,client_addr,state from pg_stat_replication' \
@@ -454,7 +455,7 @@ check_replica() {
 	fi
 	replica_pod_IP=$(kubectl_bin get pods --selector=replica-name=${name} -o 'jsonpath={.items[0].status.podIP}')
 	compare_psql_cmd \
-		"select-2" \
+		"${sql_cmp}" \
 		'\c myapp \\\ SELECT * from myApp;' \
 		"some-name:some-name_pass@${replica_pod_IP}" '' ' '
 }
