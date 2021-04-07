@@ -1,6 +1,29 @@
 {
     "name": "pmm-client",
     "image": "{{.PMMImage}}",
+    "livenessProbe": {
+      "failureThreshold": 3,
+      "httpGet": {
+          "path": "/local/Status",
+          "port": 7777,
+          "scheme": "HTTP"
+      },
+      "initialDelaySeconds": 60,
+      "periodSeconds": 10,
+      "successThreshold": 1,
+      "timeoutSeconds": 5
+    },
+    "lifecycle": {
+      "preStop": {
+          "exec": {
+              "command": [
+                  "bash",
+                  "-c",
+                  "pmm-admin inventory remove node --force $(pmm-admin status --json | python -c \"import sys, json; print(json.load(sys.stdin)['pmm_agent_status']['node_id'])\")"
+              ]
+          }
+      }
+    },
     "ports": [{
           "containerPort": 7777,
           "protocol": "TCP"

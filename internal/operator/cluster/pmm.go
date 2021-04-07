@@ -14,18 +14,18 @@ import (
 func UpdatePMMSidecar(clientset kubeapi.Interface, cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
 	// need to determine if we are adding or removing
 	if cluster.Spec.PMM.Enabled {
-		return addPMMSidecar(cluster, deployment)
+		return AddPMMSidecar(cluster, cluster.Name, deployment)
 	}
 
-	removePMMSidecar(deployment)
+	RemovePMMSidecar(deployment)
 
 	return nil
 }
 
-func addPMMSidecar(cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
+func AddPMMSidecar(cluster *crv1.Pgcluster, name string, deployment *appsv1.Deployment) error {
 	// use the legacy template generation to make the appropriate substitutions,
 	// and then get said generation to be placed into an actual Container object
-	template := operator.GetPMMContainer(cluster, cluster.Name)
+	template := operator.GetPMMContainer(cluster, name)
 	container := v1.Container{}
 
 	if err := json.Unmarshal([]byte(template), &container); err != nil {
@@ -53,7 +53,7 @@ func addPMMSidecar(cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error
 	return nil
 }
 
-func removePMMSidecar(deployment *appsv1.Deployment) {
+func RemovePMMSidecar(deployment *appsv1.Deployment) {
 	// first, find the container entry in the list of containers and remove it
 	containers := []v1.Container{}
 	for _, c := range deployment.Spec.Template.Spec.Containers {

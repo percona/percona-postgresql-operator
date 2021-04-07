@@ -271,12 +271,14 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			log.Errorf("could not find instance for pgreplica: %q", err.Error())
 			return
 		}
-		pmmCluster := cluster
-		pmmCluster.Name = newPgreplica.Name
-		clusteroperator.UpdatePMMSidecar(c.Client, pmmCluster, deployment)
-		if err != nil {
-			log.Errorf("could not update pmm sideccar for pgreplica: %q", err.Error())
-			return
+		if newPgreplica.Spec.PMM.Enabled {
+			err = clusteroperator.AddPMMSidecar(cluster, newPgreplica.Name, deployment)
+			if err != nil {
+				log.Errorf("could not update pmm sideccar for pgreplica: %q", err.Error())
+				return
+			}
+		} else {
+			clusteroperator.RemovePMMSidecar(deployment)
 		}
 		if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 			log.Errorf("could not update deployment for pgreplica update pmm: %q", err.Error())
