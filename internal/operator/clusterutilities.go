@@ -123,6 +123,7 @@ type PgmonitorEnvVarsTemplateFields struct {
 
 type PMMTemplateFields struct {
 	Enabled               bool
+	Name                  string
 	PMMImage              string
 	PMMContainerResources string
 	PMMServerUser         string
@@ -394,7 +395,7 @@ func GetExporterAddon(spec crv1.PgclusterSpec) string {
 	return exporterDoc.String()
 }
 
-func GetPMMContainer(cl *crv1.Pgcluster) string {
+func GetPMMContainer(cl *crv1.Pgcluster, name string) string {
 	fmt.Println("Working on PMM", cl.Spec.PMM.Enabled)
 	if !cl.Spec.PMM.Enabled {
 		return ""
@@ -410,6 +411,7 @@ func GetPMMContainer(cl *crv1.Pgcluster) string {
 		PMMSecret:             cl.Spec.PMM.PMMSecret,
 		PMMContainerResources: GetResourcesJSON(cl.Spec.PMM.Resources, cl.Spec.PMM.Limits),
 		RootSecretName:        crv1.UserSecretName(cl, crv1.PGUserSuperuser),
+		Name:                  name,
 	}
 
 	if CRUNCHY_DEBUG {

@@ -658,64 +658,6 @@ func UpdatePGImage(clientset kubernetes.Interface, cluster *crv1.Pgcluster) erro
 	return err
 }
 
-/*
-func UpdatePMMSidecar(clientset kubeapi.Interface, cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
-	// need to determine if we are adding or removing
-	if cluster.Spec.PMM.Enabled {
-		return addPMMSidecar(cluster, deployment)
-	}
-
-	removePMMSidecar(deployment)
-
-	return nil
-}
-
-func addPMMSidecar(cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
-	// use the legacy template generation to make the appropriate substitutions,
-	// and then get said generation to be placed into an actual Container object
-	template := operator.GetPMMContainer(cluster)
-	container := v1.Container{}
-
-	if err := json.Unmarshal([]byte(template), &container); err != nil {
-		return fmt.Errorf("error unmarshalling exporter json into Container: %w ", err)
-	}
-
-	// append the container to the deployment container list. However, we are
-	// going to do this carefully, in case the pmm container already exists.
-	// this definition will supersede any exporter container already in the
-	// containers list
-	containers := []v1.Container{}
-	for _, c := range deployment.Spec.Template.Spec.Containers {
-		// skip if this is the PMM container.
-		if c.Name == pmmContainerName {
-			continue
-		}
-
-		containers = append(containers, c)
-	}
-
-	// add the pgBadger container and override the containers list definition
-	containers = append(containers, container)
-	deployment.Spec.Template.Spec.Containers = containers
-
-	return nil
-}
-
-func removePMMSidecar(deployment *appsv1.Deployment) {
-	// first, find the container entry in the list of containers and remove it
-	containers := []v1.Container{}
-	for _, c := range deployment.Spec.Template.Spec.Containers {
-		// skip if this is the PMM container
-		if c.Name == pmmContainerName {
-			continue
-		}
-
-		containers = append(containers, c)
-	}
-
-	deployment.Spec.Template.Spec.Containers = containers
-}
-*/
 // annotateBackrestSecret annotates the pgBackRest repository secret with relevant cluster
 // configuration as needed to support bootstrapping from the repository after the cluster
 // has been deleted

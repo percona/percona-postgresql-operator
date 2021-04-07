@@ -25,7 +25,7 @@ func UpdatePMMSidecar(clientset kubeapi.Interface, cluster *crv1.Pgcluster, depl
 func addPMMSidecar(cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
 	// use the legacy template generation to make the appropriate substitutions,
 	// and then get said generation to be placed into an actual Container object
-	template := operator.GetPMMContainer(cluster)
+	template := operator.GetPMMContainer(cluster, cluster.Name)
 	container := v1.Container{}
 
 	if err := json.Unmarshal([]byte(template), &container); err != nil {

@@ -23,6 +23,8 @@ spec:
 #          values:
 #          - e2e-az1
 #          - e2e-az2
+  pmm:
+    enabled: false
   replicastorage:
     accessmode: ReadWriteOnce
     matchLabels: ""

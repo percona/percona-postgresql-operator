@@ -261,6 +261,27 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			log.Errorf("could not update deployment for pgreplica update: %q", err.Error())
 		}
 	}
+
+	if !reflect.DeepEqual(oldPgreplica.Spec.PMM, newPgreplica.Spec.PMM) || oldPgreplica.Name != newPgreplica.Name {
+		// get the Deployment object associated with this instance
+		deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
+			newPgreplica.Name, metav1.GetOptions{})
+
+		if err != nil {
+			log.Errorf("could not find instance for pgreplica: %q", err.Error())
+			return
+		}
+		pmmCluster := cluster
+		pmmCluster.Name = newPgreplica.Name
+		clusteroperator.UpdatePMMSidecar(c.Client, pmmCluster, deployment)
+		if err != nil {
+			log.Errorf("could not update pmm sideccar for pgreplica: %q", err.Error())
+			return
+		}
+		if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+			log.Errorf("could not update deployment for pgreplica update pmm: %q", err.Error())
+		}
+	}
 }
 
 // onDelete is called when a pgreplica is deleted
