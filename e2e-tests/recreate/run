@@ -31,7 +31,7 @@ for i in $(seq 1 3); do
 	create_replica "${cluster}" "${i}"
 	wait_deployment "${cluster}-${i}"
 
-	check_replica "${cluster}-${i}" "${cluster}"
+	check_replica "${cluster}-${i}" "${cluster}" "select-1"
 done
 
 desc 'Restart the cluster'
@@ -56,11 +56,20 @@ kubectl_bin apply \
 apply_cluster ${src_dir}/deploy/cr.yaml ${cluster}
 wait_cluster_consistency ${cluster}
 
+compare_psql_cmd \
+	"select-1" \
+	'\c myapp \\\ SELECT * from myApp;' \
+	"some-name:some-name_pass@${cluster}.${namespace}"
+
+run_psql \
+	'\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
+	"postgres:postgres_pass@${cluster}.${namespace}"
+
 for i in $(seq 1 3); do
 	create_replica "${cluster}" "${i}"
 	wait_deployment "${cluster}-${i}"
 
-	check_replica "${cluster}-${i}" "${cluster}"
+	check_replica "${cluster}-${i}" "${cluster}" "select-2"
 done
 
 destroy $namespace
