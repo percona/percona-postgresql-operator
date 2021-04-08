@@ -32,23 +32,9 @@ func AddPMMSidecar(cluster *crv1.Pgcluster, name string, deployment *appsv1.Depl
 		return fmt.Errorf("error unmarshalling exporter json into Container: %w ", err)
 	}
 
-	// append the container to the deployment container list. However, we are
-	// going to do this carefully, in case the pmm container already exists.
-	// this definition will supersede any exporter container already in the
-	// containers list
-	containers := []v1.Container{}
-	for _, c := range deployment.Spec.Template.Spec.Containers {
-		// skip if this is the PMM container.
-		if c.Name == pmmContainerName {
-			continue
-		}
+	RemovePMMSidecar(deployment)
 
-		containers = append(containers, c)
-	}
-
-	// add the pgBadger container and override the containers list definition
-	containers = append(containers, container)
-	deployment.Spec.Template.Spec.Containers = containers
+	deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, container)
 
 	return nil
 }
