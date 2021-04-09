@@ -261,29 +261,19 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			log.Errorf("could not update deployment for pgreplica update: %q", err.Error())
 		}
 	}
+	// get the Deployment object associated with this instance
+	deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
+		newPgreplica.Name, metav1.GetOptions{})
 
-	if !reflect.DeepEqual(oldPgreplica.Spec.PMM, newPgreplica.Spec.PMM) || oldPgreplica.Name != newPgreplica.Name {
-		// get the Deployment object associated with this instance
-		deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
-			newPgreplica.Name, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("could not find instance for pgreplica: %q", err.Error())
+		return
+	}
 
-		if err != nil {
-			log.Errorf("could not find instance for pgreplica: %q", err.Error())
-			return
-		}
-		if newPgreplica.Spec.PMM.Enabled {
-			clusteroperator.PutReplicaPMMparamsToCluster(cluster, newPgreplica)
-			err = clusteroperator.AddPMMSidecar(cluster, newPgreplica.Name, deployment)
-			if err != nil {
-				log.Errorf("could not update pmm sideccar for pgreplica: %q", err.Error())
-				return
-			}
-		} else {
-			clusteroperator.RemovePMMSidecar(deployment)
-		}
-		if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-			log.Errorf("could not update deployment for pgreplica update pmm: %q", err.Error())
-		}
+	clusteroperator.AddPMMSidecar(cluster, newPgreplica.Name, deployment)
+
+	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+		log.Errorf("could not update deployment for pgreplica update pmm: %q", err.Error())
 	}
 }
 

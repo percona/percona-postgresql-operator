@@ -439,11 +439,6 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		nodeAffinity = replica.Spec.NodeAffinity
 	}
 
-	var pmmContainer string
-	if replica.Spec.PMM.Enabled {
-		PutReplicaPMMparamsToCluster(cluster, replica)
-		pmmContainer = operator.GetPMMContainer(cluster, replica.Name)
-	}
 	// create the replica deployment
 	replicaDeploymentFields := operator.DeploymentTemplateFields{
 		Name:               replica.Spec.Name,
@@ -488,7 +483,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		Tolerations: util.GetValueOrDefault(
 			util.GetTolerations(replica.Spec.Tolerations),
 			util.GetTolerations(cluster.Spec.Tolerations)),
-		PMMContainer: pmmContainer,
+		PMMContainer: operator.GetPMMContainer(cluster, replica.Name),
 	}
 
 	switch replica.Spec.ReplicaStorage.StorageType {

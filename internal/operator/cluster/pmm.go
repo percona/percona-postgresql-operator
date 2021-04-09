@@ -53,25 +53,3 @@ func RemovePMMSidecar(deployment *appsv1.Deployment) {
 
 	deployment.Spec.Template.Spec.Containers = containers
 }
-
-func PutReplicaPMMparamsToCluster(cluster *crv1.Pgcluster, replica *crv1.Pgreplica) {
-	cluster.Spec.PMM.Enabled = replica.Spec.PMM.Enabled
-	if len(replica.Spec.PMM.Image) > 0 {
-		cluster.Spec.PMM.Image = replica.Spec.PMM.Image
-	}
-	if len(replica.Spec.PMM.PMMSecret) > 0 {
-		cluster.Spec.PMM.PMMSecret = replica.Spec.PMM.PMMSecret
-	}
-	if len(replica.Spec.PMM.ServerHost) > 0 {
-		cluster.Spec.PMM.ServerHost = replica.Spec.PMM.ServerHost
-	}
-	if len(replica.Spec.PMM.ServerUser) > 0 {
-		cluster.Spec.PMM.ServerUser = replica.Spec.PMM.ServerUser
-	}
-	if len(replica.Spec.PMM.Resources) > 0 {
-		cluster.Spec.PMM.Resources = replica.Spec.PMM.Resources
-	}
-	if len(replica.Spec.PMM.Limits) > 0 {
-		cluster.Spec.PMM.Limits = replica.Spec.PMM.Limits
-	}
-}

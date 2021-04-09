@@ -396,7 +396,6 @@ func GetExporterAddon(spec crv1.PgclusterSpec) string {
 }
 
 func GetPMMContainer(cl *crv1.Pgcluster, name string) string {
-	fmt.Println("Working on PMM", cl.Spec.PMM.Enabled)
 	if !cl.Spec.PMM.Enabled {
 		return ""
 	}
