@@ -65,6 +65,8 @@ const (
 
 	// pgBadgerContainerName is the name of the pgBadger container
 	pgBadgerContainerName = "pgbadger"
+
+	pmmContainerName = "pmm-client"
 )
 
 func AddClusterBase(clientset kubeapi.Interface, cl *crv1.Pgcluster, namespace string) {

@@ -195,7 +195,8 @@
                     "ports": [{
                         "containerPort": 5432,
                         "protocol": "TCP"
-                    }, {
+                    }, 
+                    {
                         "containerPort": 8009,
                         "protocol": "TCP"
                     }],
@@ -206,6 +207,9 @@
                 {{ end }}
                 {{ if .BadgerAddon }}
                 ,{{.BadgerAddon }}
+                {{ end }}
+                {{ if .PMMContainer }}
+                ,{{.PMMContainer }}
                 {{ end }}
                 ],
                 "volumes": [{
