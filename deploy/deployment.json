@@ -224,7 +224,7 @@
                             }
                         ],
                         "volumeMounts": [],
-                        "imagePullPolicy": "Always"
+                        "imagePullPolicy": "IfNotPresent"
                     }
                 ],
                 "volumes": []

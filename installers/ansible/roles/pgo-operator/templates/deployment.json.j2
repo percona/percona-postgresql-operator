@@ -238,7 +238,7 @@
                         ],
                         "volumeMounts": [],
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
-                                          {%- else %}Always
+                                          {%- else %}IfNotPresent
                                           {%- endif %}"
                     }
                 ],
