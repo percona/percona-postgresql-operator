@@ -272,6 +272,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			return
 		}
 		if newPgreplica.Spec.PMM.Enabled {
+			clusteroperator.PutReplicaPMMparamsToCluster(cluster, newPgreplica)
 			err = clusteroperator.AddPMMSidecar(cluster, newPgreplica.Name, deployment)
 			if err != nil {
 				log.Errorf("could not update pmm sideccar for pgreplica: %q", err.Error())

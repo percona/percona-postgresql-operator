@@ -441,6 +441,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 
 	var pmmContainer string
 	if replica.Spec.PMM.Enabled {
+		PutReplicaPMMparamsToCluster(cluster, replica)
 		pmmContainer = operator.GetPMMContainer(cluster, replica.Name)
 	}
 	// create the replica deployment
