@@ -436,3 +436,26 @@ create_replica() {
 		| yq w - 'spec.replicastorage.name' "${cluster}-${suffix}" \
 		| kubectl_bin apply -f -
 }
+
+check_replica() {
+	local name=${1}
+	local cluster=${2}
+	local sql_cmp=${3:-"select-2"}
+
+	run_psql \
+		'SELECT usename,application_name,client_addr,state from pg_stat_replication' \
+		"postgres:postgres_pass@${cluster}.${namespace}" \
+		>${tmp_dir}/replicas.list
+
+	replica_pod_name=$(kubectl_bin get pods --selector=replica-name=${name} -o 'jsonpath={.items[0].metadata.name}')
+	if [[ -z "$(grep ${replica_pod_name} ${tmp_dir}/replicas.list | grep "streaming")" ]]; then
+		echo "${replica_pod_name} is not connected or has valid data. Exiting..."
+		cat "${tmp_dir}/replicas.list"
+		exit 1
+	fi
+	replica_pod_IP=$(kubectl_bin get pods --selector=replica-name=${name} -o 'jsonpath={.items[0].status.podIP}')
+	compare_psql_cmd \
+		"${sql_cmp}" \
+		'\c myapp \\\ SELECT * from myApp;' \
+		"some-name:some-name_pass@${replica_pod_IP}" '' ' '
+}
