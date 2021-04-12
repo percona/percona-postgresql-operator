@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio-gateway
+  labels:
+    app: minio-gw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio-gw
+  template:
+    metadata:
+      labels:
+        app: minio-gw
+    spec:
+      containers:
+      - name: minio-gw
+        image: minio/minio
+        command: ["minio"]
+        args: ["-S", "/etc/minio/certs/", "gateway", "gcs", "your_gcp_project_id"]
+        volumeMounts:
+        - name: gcs-secret
+          mountPath: /etc/minio/secrets
+        - mountPath: /etc/minio/certs/
+          name: cert-secret-volume
+        - mountPath: /etc/minio/certs/CAs
+          name: trusted-cert-secret-volume
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/minio/secrets/credentials.json
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: minio-gw-gcs-secret
+              key: MINIO_ROOT_USER
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: minio-gw-gcs-secret
+              key: MINIO_ROOT_PASSWORD
+        ports:
+        - containerPort: 9000
+      volumes:
+      - name: gcs-secret
+        secret:
+          defaultMode: 420
+          secretName: minio-gw-gcs-secret
+      - name: cert-secret-volume
+        secret:
+          defaultMode: 420
+          items:
+          - key: tls.crt
+            path: public.crt
+          - key: tls.key
+            path: private.key
+          secretName: minio-gw-tls
+      - name: trusted-cert-secret-volume
+        secret:
+          defaultMode: 420
+          items:
+          - key: ca.crt
+            path: public.crt
+          secretName: minio-gw-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-gateway-svc
+spec:
+  selector:
+    app: minio-gw
+  ports:
+    - protocol: TCP
+      port: 9000
+      targetPort: 9000
