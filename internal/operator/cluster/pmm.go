@@ -34,6 +34,16 @@ func AddPMMSidecar(cluster *crv1.Pgcluster, name string, deployment *appsv1.Depl
 
 	RemovePMMSidecar(deployment)
 
+	if cluster.Spec.PMM.Enabled && len(deployment.Spec.Template.Spec.SecurityContext.SupplementalGroups) == 0 {
+		group := int64(1001)
+		// set up the security context struct
+		deployment.Spec.Template.Spec.SecurityContext = &v1.PodSecurityContext{
+			FSGroup:            &group,
+			SupplementalGroups: []int64{1001, 1002, 1003},
+		}
+
+	}
+
 	deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, container)
 
 	return nil

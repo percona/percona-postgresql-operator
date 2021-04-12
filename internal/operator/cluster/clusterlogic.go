@@ -304,7 +304,7 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		supplementalGroups = append(supplementalGroups, v.SupplementalGroups...)
 	}
 	sc := operator.GetPodSecurityContext(supplementalGroups)
-	if cl.Spec.PMM.Enabled {
+	if cl.Spec.PMM.Enabled && len(supplementalGroups) == 0 {
 		sc = operator.GetPMMPodSecurityContext()
 	}
 	// create the primary deployment
@@ -442,7 +442,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		nodeAffinity = replica.Spec.NodeAffinity
 	}
 	sc := operator.GetPodSecurityContext(supplementalGroups)
-	if cluster.Spec.PMM.Enabled {
+	if cluster.Spec.PMM.Enabled && len(supplementalGroups) == 0 {
 		sc = operator.GetPMMPodSecurityContext()
 	}
 	// create the replica deployment
