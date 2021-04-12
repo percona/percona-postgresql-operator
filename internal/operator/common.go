@@ -196,6 +196,28 @@ func GetPodSecurityContext(supplementalGroups []int64) string {
 	return string(doc)
 }
 
+func GetPMMPodSecurityContext() string {
+	group := int64(1001)
+	// set up the security context struct
+	securityContext := v1.PodSecurityContext{
+		FSGroup:            &group,
+		SupplementalGroups: []int64{1001, 1002, 1003},
+	}
+
+	// ...convert to JSON. Errors are ignored
+	doc, err := json.Marshal(securityContext)
+	// if there happens to be an error, warn about it
+	if err != nil {
+		log.Warn(err)
+	}
+
+	// for debug purposes, we can look at the document
+	log.Debug(doc)
+
+	// return a string of the security context
+	return string(doc)
+}
+
 // GetResourcesJSON is a pseudo-legacy method that creates JSON that applies the
 // CPU and Memory settings. The settings are only included if:
 // a) they exist
