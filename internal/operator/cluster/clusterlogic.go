@@ -303,7 +303,10 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 	for _, v := range tablespaceVolumes {
 		supplementalGroups = append(supplementalGroups, v.SupplementalGroups...)
 	}
-
+	sc := operator.GetPodSecurityContext(supplementalGroups)
+	if cl.Spec.PMM.Enabled && len(supplementalGroups) == 0 {
+		sc = operator.GetPMMPodSecurityContext()
+	}
 	// create the primary deployment
 	deploymentFields := operator.DeploymentTemplateFields{
 		Name:              cl.Annotations[config.ANNOTATION_CURRENT_PRIMARY],
@@ -318,7 +321,7 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		PodLabels:         operator.GetLabelsFromMap(cl.Spec.UserLabels),
 		DataPathOverride:  cl.Annotations[config.ANNOTATION_CURRENT_PRIMARY],
 		Database:          cl.Spec.Database,
-		SecurityContext:   operator.GetPodSecurityContext(supplementalGroups),
+		SecurityContext:   sc,
 		RootSecretName:    crv1.UserSecretName(cl, crv1.PGUserSuperuser),
 		PrimarySecretName: crv1.UserSecretName(cl, crv1.PGUserReplication),
 		UserSecretName:    crv1.UserSecretName(cl, cl.Spec.User),
@@ -347,6 +350,7 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		CASecret:                  cl.Spec.TLS.CASecret,
 		Standby:                   cl.Spec.Standby,
 		Tolerations:               util.GetTolerations(cl.Spec.Tolerations),
+		PMMContainer:              operator.GetPMMContainer(cl, cl.Name),
 	}
 
 	return deploymentFields
@@ -437,7 +441,10 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 	if replica.Spec.NodeAffinity != nil {
 		nodeAffinity = replica.Spec.NodeAffinity
 	}
-
+	sc := operator.GetPodSecurityContext(supplementalGroups)
+	if cluster.Spec.PMM.Enabled && len(supplementalGroups) == 0 {
+		sc = operator.GetPMMPodSecurityContext()
+	}
 	// create the replica deployment
 	replicaDeploymentFields := operator.DeploymentTemplateFields{
 		Name:               replica.Spec.Name,
@@ -452,7 +459,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		DeploymentLabels:   operator.GetLabelsFromMap(cluster.Spec.UserLabels),
 		PodAnnotations:     operator.GetAnnotations(cluster, crv1.ClusterAnnotationPostgres),
 		PodLabels:          operator.GetLabelsFromMap(cluster.Spec.UserLabels),
-		SecurityContext:    operator.GetPodSecurityContext(supplementalGroups),
+		SecurityContext:    sc,
 		RootSecretName:     crv1.UserSecretName(cluster, crv1.PGUserSuperuser),
 		PrimarySecretName:  crv1.UserSecretName(cluster, crv1.PGUserReplication),
 		UserSecretName:     crv1.UserSecretName(cluster, cluster.Spec.User),
@@ -482,6 +489,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		Tolerations: util.GetValueOrDefault(
 			util.GetTolerations(replica.Spec.Tolerations),
 			util.GetTolerations(cluster.Spec.Tolerations)),
+		PMMContainer: operator.GetPMMContainer(cluster, replica.Name),
 	}
 
 	switch replica.Spec.ReplicaStorage.StorageType {
