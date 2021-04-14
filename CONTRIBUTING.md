@@ -32,15 +32,15 @@ Contributions to the source tree should follow the workflow described below:
    Create the branch in your local repo as follows:
 
    ```
-   git checkout -b K8SPG-42-fix-feature-X
+   $ git checkout -b K8SPG-42-fix-feature-X
    ```
 
    When your changes are ready, make a commit, mentioning the Jira issue in the commit message, if any:
 
    ```
-   git add .
-   git commit -m "K8SPG-42 fixed by ......"
-   git push -u origin K8SPG-42-fix-feature-X
+   $ git add .
+   $ git commit -m "K8SPG-42 fixed by ......"
+   $ git push -u origin K8SPG-42-fix-feature-X
    ```
 
 3. Create a pull request to the main repository on GitHub.
