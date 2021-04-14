@@ -75,9 +75,9 @@ spec:
 #######################################################
 #  name of the PostgreSQL cluster, this is used to group PostgreSQL instances (primary, replicas) together.
   clustername: cluster1
-  pgImage: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
-  backrestImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
-  backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
+  pgImage: perconalab/percona-postgresql-operator:main-ppg12-postgres-ha
+  backrestImage: perconalab/percona-postgresql-operator:main-ppg12-pgbackrest
+  backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg12-pgbackrest-repo
   pmm:
     enabled: false
     image: percona/pmm-client:2.15.1
@@ -112,10 +112,10 @@ spec:
 # If true, deploys the pgbadger sidecar for query analysis.
   pgBadger: false
   pgbadgerport: "10000"
-  pgBadgerImage: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
+  pgBadgerImage: perconalab/percona-postgresql-operator:main-ppg12-pgbadger
 ######################################################
   pgBouncer:
-    image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
+    image: perconalab/percona-postgresql-operator:main-ppg12-pgbouncer
     limits:
       cpu: "2"
       memory: 512Mi
