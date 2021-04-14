@@ -4,15 +4,13 @@ metadata:
   labels:
     pg-cluster: cluster1
     pgouser: admin
-  name: backrest-backup1-cluster1
-  namespace: pgo
+  name: cluster1-backrest-full-backup
 spec:
-  name: backrest-backup1-cluster1
-  namespace: pgo
+  name: cluster1-backrest-full-backup
   parameters:
     backrest-command: backup
 # backup type can be:
-# Differential: Create a backup of everything since the last full back up was taken
+# Differential: Create a backup of everything since the last full backup was taken
 # --type=diff
 # Full: Back up the entire database
 # --type=full
@@ -23,21 +21,11 @@ spec:
 # --repo1-retention-diff=4 how many differential backups to retain
 # --repo1-retention-archive=6 how many sets of WAL archives to retain alongside
 # the full and differential backups that are retained
-    backrest-opts: --type=full --repo1-retention-full=2
+    backrest-opts: --type=full --repo1-retention-full=5
     backrest-s3-verify-tls: "true"
     backrest-storage-type: ""
-    containername: database
-    image-prefix: perconalab
-    job-name: backrest-backup1-cluster1
+    job-name: cluster1-backrest-full-backup
     pg-cluster: cluster1
 # backrest repo pod name
-    podname: cluster1-backrest-shared-repo-5f84955754-tpfv2
-  storagespec:
-    accessmode: ""
-    matchLabels: ""
-    name: ""
-    size: ""
-    storageclass: ""
-    storagetype: ""
-    supplementalgroups: ""
+    podname: cluster1-backrest-shared-repo-5f84955754-xd52d
   tasktype: backrest
