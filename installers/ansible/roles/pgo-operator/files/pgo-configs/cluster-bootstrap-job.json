@@ -28,7 +28,7 @@
                 {{ end }}
                 "containers": [{
                     "name": "database",
-                    "image": "{{.CCPImagePrefix}}/{{.CCPImage}}:{{.CCPImageTag}}",
+                    "image": "{{.Image}}",
                     {{.ContainerResources}}
                     "env": [{
                         "name": "PGHA_PG_PORT",
