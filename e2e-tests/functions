@@ -165,7 +165,6 @@ wait_job_completion() {
 	local job=$1
 
 	set +o xtrace
-	# echo -n $job
 	retry=0
 	until kubectl_bin get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
 		sleep 1
@@ -178,21 +177,23 @@ wait_job_completion() {
 	done
 
 	retry=0
-	until kubectl_bin get job/$job -o jsonpath='{.status.succeeded}' 2>/dev/null | grep 1 ; do
-		sleep 1
-		echo -n .
-		let retry+=1
-		if [ $retry -ge 360 ]; then
-			kubectl_bin describe job/$job
-			kubectl_bin logs $(kubectl_bin get pods --selector=job-name=${job} --jsonpath='{.items[0].metadata.name}')
-			kubectl_bin logs $(get_operator_pod) \
-				| grep -v 'level=info' \
-				| grep -v 'level=debug' \
-				| tail -100
-			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
-			exit 1
-		fi
+	until [[ $(kubectl_bin get job/$job -o jsonpath='{.metadata.name}' 2>&1 | grep -io 'not found') == "not found" ]] \
+		|| [[ $(kubectl_bin get job/$job -o jsonpath='{.status.succeeded}' 2>/dev/null) == '1' ]]; do
+			sleep 1
+			echo -n .
+			let retry+=1
+			if [ $retry -ge 360 ]; then
+				kubectl_bin describe job/$job
+				kubectl_bin logs $(kubectl_bin get pods --selector=job-name=${job} --jsonpath='{.items[0].metadata.name}')
+				kubectl_bin logs $(get_operator_pod) \
+					| grep -v 'level=info' \
+					| grep -v 'level=debug' \
+					| tail -100
+				echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+				exit 1
+			fi
 	done
+	echo
 	set -o xtrace
 }
 
@@ -398,7 +399,7 @@ spinup_pgcluster() {
 	desc 'create first PG cluster'
 	apply_cluster ${config} ${cluster} ${backup}
 
-	sleep 20
+	wait_job_completion "${cluster}-stanza-create"
 	wait_job_completion "backrest-backup-${cluster}"
 
 	wait_cluster_consistency ${cluster}
@@ -596,6 +597,8 @@ run_restore() {
 		| yq w - 'spec.parameters.backrest-restore-from-cluster' "${cluster}" \
 		| yq w - 'spec.parameters.backrest-storage-type' "${storage}" \
 		| kubectl_bin apply -f -
-	sleep 10
+
 	wait_job_completion	"${cluster}-bootstrap"
+	wait_job_completion "${cluster}-stanza-create"
+	wait_job_completion "backrest-backup-${cluster}"
 }
