@@ -50,9 +50,7 @@ run_psql \
 
 run_restore ${cluster} "full" "s3"
 
-sleep 600
-
 compare_psql_cmd \
 	"select-1" \
 	'\c myapp \\\ SELECT * from myApp;' \
-	"some-name:some-name_pass@some-name.${namespace}"
+	"postgres:postgres_pass@${cluster}.${namespace}"
