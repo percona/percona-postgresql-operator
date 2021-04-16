@@ -1,0 +1,58 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. ${test_dir}/../functions
+
+create_namespace $namespace
+deploy_cert_manager
+deploy_operator
+
+desc 'create first PSMDB cluster'
+cluster="some-name-${RANDOM}"
+
+deploy_miniogw
+
+kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}'
+
+yq w $conf_dir/cloud-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
+	| yq w - 'data[aws-s3-ca.crt]' $(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}') \
+	| kubectl_bin apply -f -
+yq r -d0 $conf_dir/some-name-secrets.yml \
+	| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
+	| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+	| kubectl_bin apply -f -
+yq r -d1 $conf_dir/some-name-secrets.yml \
+	| yq w - 'metadata.name' "${cluster}-postgres-secret" \
+	| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+	| kubectl_bin apply -f -
+yq r -d2 $conf_dir/some-name-secrets.yml \
+	| yq w - 'metadata.name' "${cluster}-primaryuser-secret" \
+	| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+	| kubectl_bin apply -f -
+yq r -d3 $conf_dir/some-name-secrets.yml \
+	| yq w - 'metadata.name' "${cluster}-${cluster}-secret" \
+	| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+	| kubectl_bin apply -f -
+
+kubectl_bin apply \
+	-f $conf_dir/client.yml
+
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "true"
+
+create_backup ${cluster} "initialbackup"
+
+run_psql \
+	'\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
+	"postgres:postgres_pass@${cluster}.${namespace}"
+
+run_restore ${cluster} "full" "s3"
+
+sleep 600
+
+compare_psql_cmd \
+	"select-1" \
+	'\c myapp \\\ SELECT * from myApp;' \
+	"some-name:some-name_pass@some-name.${namespace}"
