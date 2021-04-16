@@ -30,8 +30,6 @@ spec:
     image-prefix: perconalab
     job-name: backrest-backup1-cluster1
     pg-cluster: cluster1
-# backrest repo pod name
-    podname: cluster1-backrest-shared-repo-5f84955754-tpfv2
   storagespec:
     accessmode: ""
     matchLabels: ""
