@@ -81,7 +81,7 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
 
 ## Deployment Requirements
 
-The Operator is validated for deployment on Kubernetes, GKE and EKS clusters. the Operator is cloud native and storage agnostic, working with a wide variety of storage classes, hostPath, and NFS.
+The Operator is validated for deployment on Kubernetes, GKE and EKS clusters. The Operator is cloud native and storage agnostic, working with a wide variety of storage classes, hostPath, and NFS.
 
 The Operator includes various components that get deployed to your Kubernetes cluster as shown in the following diagram and detailed in the Design section of the documentation for the version you are running.
 
@@ -162,4 +162,3 @@ See the [Contribution Guide](CONTRIBUTING.md) for more information.
 If you find a bug related to the Operator, please submit a report to the project's [Jira](https://jira.percona.com/projects/K8SPG/issues) issue tracker.
 
 Learn more about submitting bugs, new feature ideas, and improvements in the [Contribution Guide](CONTRIBUTING.md).
-
