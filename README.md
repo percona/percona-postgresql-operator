@@ -78,6 +78,7 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
     * Customize your PostgreSQL configuration 
     * Bring your own trusted certificate authority (CA) for use with the Operator API server
     * Override your PostgreSQL configuration for each cluster
+    * Use your own custom images, re-define the image for each container separately
 
 ## Deployment Requirements
 
@@ -113,19 +114,25 @@ The following steps will quickly make the Operator up and running with cloud nat
     $ cd percona-postgresql-operator
     ```
 
-2. Deploy the operator with the following command:
+2. Create the ``pgo`` Namespace for the Operator:
+
+    ```
+    $ kubectl create namespace pgo
+    ```
+
+3. Deploy the operator with the following command:
 
     ```
     $ kubectl apply -f ./deploy/operator.yaml
     ```
 
-3. Percona Server for PostgreSQL cluster can be created with the following command:
+4. Percona Server for PostgreSQL cluster can be created with the following command:
 
     ```
     $ kubectl apply -f ./deploy/cr.yaml
     ```
 
-4. You can also deploy PosgreSQL replica at any time as follows: 
+5. You can also deploy PosgreSQL replica at any time as follows: 
 
     ```
     $ kubectl apply -f ./deploy/cr-pgreplica.yaml
