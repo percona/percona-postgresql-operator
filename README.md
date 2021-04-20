@@ -20,7 +20,7 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
 
     Backups and restores leverage the open source pgBackRest utility and includes support for full, incremental, and differential backups as well as efficient delta restores. Set how long you want your backups retained for. Works great with very large databases!
 
-* **TLS**
+* **Communication Security**
 
     Secure communication between your applications and data servers by enabling TLS for your PostgreSQL servers, including the ability to enforce all of your connections to use TLS.
 
