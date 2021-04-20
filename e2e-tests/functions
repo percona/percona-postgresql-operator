@@ -56,10 +56,10 @@ create_namespace() {
 }
 
 deploy_cert_manager() {
-    kubectl_bin create namespace cert-manager || :
-    kubectl_bin label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-    kubectl_bin apply -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml --validate=false || : 2>/dev/null
-    sleep 30
+	kubectl_bin create namespace cert-manager || :
+	kubectl_bin label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
+	kubectl_bin apply -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml --validate=false || : 2>/dev/null
+	sleep 30
 }
 
 desc() {
@@ -96,7 +96,7 @@ deploy_operator() {
 deploy_miniogw() {
 	local gsc_projectid=${1:-"cloud-dev-112233"}
 	kubectl_bin apply -f $conf_dir/cloud-secret-minio-gw.yml \
-					  -f $src_dir/deploy/backup/minio-gw-tls.yaml
+			-f $src_dir/deploy/backup/minio-gw-tls.yaml
 
 	yq w -d0 --style=single $src_dir/deploy/backup/minio-gw.yaml 'spec.template.spec.containers[0].args[4]' "${gsc_projectid}" \
 		| kubectl_bin apply -f -
@@ -167,7 +167,7 @@ wait_job_completion() {
 	set +o xtrace
 	retry=0
 	until kubectl_bin get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
-		sleep 1
+		sleep 0.1
 		echo -n .
 		let retry+=1
 		if [ $retry -ge 360 ]; then
@@ -203,6 +203,7 @@ apply_cluster() {
 	local backup=${3:-"false"}
 	local restore_from=${4:-"false"}
 	local restore_opts=${5:-"false"}
+	local custom_config=${6:-"false"}
 
 	yq w "${path}" 'metadata.namespace' ${namespace} \
 		| yq w - 'spec.namespace' ${namespace} \
@@ -219,16 +220,16 @@ apply_cluster() {
 		| yq w - 'spec.user' ${name} \
 		| yq w - 'spec.pgImage' ${IMAGE_PG_HA} \
 		| yq d - 'spec.pgBouncer' \
-			> "${tmp_dir}/cr.yaml"
+			>"${tmp_dir}/cr.yaml"
 
-	if [[ "${backup}" == "true" ]]; then
+	if [[ ${backup} == "true" ]]; then
 		yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
 			| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
 			| yq w - 'spec.backrestS3Region' 'us-east-1' \
 			| yq w - 'spec.backrestS3URIStyle' 'path' \
 			| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
 			| yq w - 'spec.backrestStorageTypes[0]' 's3' \
-				> "${tmp_dir}/cr.backup.yaml"
+				>"${tmp_dir}/cr.backup.yaml"
 
 		# yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
 		# 	| yq w - 'spec.backrestS3Endpoint' 's3.amazonaws.com' \
@@ -241,15 +242,19 @@ apply_cluster() {
 		mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 	fi
 
-	if [[ "${restore_from}" != "false" ]]; then
+	if [[ ${restore_from} != "false" ]]; then
 		yq w "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreFrom' "${restore_from}" \
 			> "${tmp_dir}/cr.restore.yaml"
 		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
-		if [[ "${restore_opts}" != "false" ]]; then
+		if [[ ${restore_opts} != "false" ]]; then
 			yq w --style=single "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreOpts' "${restore_opts}" \
 				> "${tmp_dir}/cr.restore.yaml"
 			mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
 		fi
+	fi
+
+	if [[ ${custom_config} != "false" ]]; then
+		yq w -i "${tmp_dir}/cr.yaml" 'spec.customconfig' ${custom_config}
 	fi
 
 	kubectl_bin apply -f "${tmp_dir}/cr.yaml"
@@ -395,9 +400,10 @@ spinup_pgcluster() {
 	local cluster=$1
 	local config=$2
 	local backup=${3:-"false"}
+	local custom_config=${4:-"false"}
 
 	desc 'create first PG cluster'
-	apply_cluster ${config} ${cluster} ${backup}
+	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config}
 
 	wait_job_completion "${cluster}-stanza-create"
 	wait_job_completion "backrest-backup-${cluster}"
@@ -589,6 +595,7 @@ run_restore() {
 	local cluster=${1}
 	local rstr_prefix=${2}
 	local storage=${3:-"local"}
+	local target_time=${4:-"null"}
 
 	yq w ${test_dir}/conf/restore.yml 'metadata.labels.pg-cluster' "${cluster}" \
 		| yq w - 'metadata.name' "${rstr_prefix}-${cluster}" \
@@ -596,9 +603,18 @@ run_restore() {
 		| yq w - 'spec.namespace' "${namespace}" \
 		| yq w - 'spec.parameters.backrest-restore-from-cluster' "${cluster}" \
 		| yq w - 'spec.parameters.backrest-storage-type' "${storage}" \
-		| kubectl_bin apply -f -
+			>${tmp_dir}/restore.yml
 
-	wait_job_completion	"${cluster}-bootstrap"
+	if [[ ${target_time} != "null" ]]; then
+		yq w ${tmp_dir}/restore.yml --style=single 'spec.parameters.backrest-pitr-target' "${target_time}" \
+			| yq w --style=single -- - 'spec.parameters.backrest-restore-opts' '--type=time' \
+				>${tmp_dir}/restore.pitr.yml
+		mv ${tmp_dir}/restore.pitr.yml ${tmp_dir}/restore.yml
+	fi
+
+	kubectl apply -f ${tmp_dir}/restore.yml
+
+	wait_job_completion "${cluster}-bootstrap"
 	wait_job_completion "${cluster}-stanza-create"
 	wait_job_completion "backrest-backup-${cluster}"
 }

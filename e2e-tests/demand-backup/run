@@ -37,18 +37,34 @@ yq r -d3 $conf_dir/some-name-secrets.yml \
 	| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
 	| kubectl_bin apply -f -
 
+yq r $test_dir/conf/custom-config.yml \
+	| yq w - 'metadata.name' "${cluster}-custom-config" \
+	| kubectl_bin apply -f -
+
 kubectl_bin apply \
 	-f $conf_dir/client.yml
 
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "true"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "true" "${cluster}-custom-config"
 
-create_backup ${cluster} "initialbackup"
+create_backup ${cluster} "initialbackup" "incr"
 
 run_psql \
 	'\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
 	"postgres:postgres_pass@${cluster}.${namespace}"
 
-run_restore ${cluster} "full" "s3"
+run_psql \
+	'\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' \
+	"postgres:postgres_pass@${cluster}.${namespace}"
+sleep 1
+RESTORE_TIME="$(run_psql \
+				'\c myapp \\\ SELECT pg_xact_commit_timestamp(xmin) FROM myApp WHERE id='100501';' \
+				"postgres:postgres_pass@${cluster}.${namespace}" | awk '{$1=$1;print}')"
+
+run_psql \
+	'DROP DATABASE myapp' \
+	"postgres:postgres_pass@${cluster}.${namespace}"
+
+run_restore ${cluster} "full" "s3" "${RESTORE_TIME}"
 
 compare_psql_cmd \
 	"select-1" \
