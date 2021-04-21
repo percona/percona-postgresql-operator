@@ -32,7 +32,7 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
 
     Quickly add and remove users from your PostgreSQL clusters with powerful commands. Manage password expiration policies or use your preferred PostgreSQL authentication scheme.
 
-* **Upgrade Management**
+* **Updates Management**
 
     Safely apply PostgreSQL updates with minimal availability impact to your PostgreSQL clusters.
 
@@ -86,13 +86,10 @@ The Operator is validated for deployment on Kubernetes, GKE and EKS clusters. Th
 
 The Operator includes various components that get deployed to your Kubernetes cluster as shown in the following diagram and detailed in the Design section of the documentation for the version you are running.
 
-The Operator is developed and tested on CentOS and RHEL platforms but is known to run on other Linux variants.
-
 ### Supported Platforms
 
 The Operator is tested against the following platforms:
 
-* Kubernetes 1.17+ 
 * Google Kubernetes Engine (GKE)
 * Amazon EKS 
 
