@@ -149,6 +149,7 @@ PostgreSQL containers deployed with the PostgreSQL Operator include the followin
 * [pgBackRest](https://pgbackrest.org/)
 * [pgBouncer](http://pgbouncer.github.io/)
 * [Patroni](https://patroni.readthedocs.io/)
+* [pg_stat_monitor](https://github.com/percona/pg_stat_monitor/)
 * LLVM (for JIT compilation)
 
 PostgreSQL Operator Monitoring involves the following components:
