@@ -107,7 +107,7 @@ The following steps will quickly make the Operator up and running with cloud nat
 1. Clone the percona-postgresql-operator repository:
 
     ```
-    $ git clone  -b release-0.1.0 https://github.com/percona/percona-postgresql-operator
+    $ git clone -b  v0.1.0 https://github.com/percona/percona-postgresql-operator
     $ cd percona-postgresql-operator
     ```
 
