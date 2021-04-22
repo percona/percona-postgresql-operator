@@ -184,19 +184,19 @@ wait_job_completion() {
 	retry=0
 	until [[ $(kubectl_bin get job/$job -o jsonpath='{.metadata.name}' 2>&1 | grep -io 'not found') == "not found" ]] \
 		|| [[ $(kubectl_bin get job/$job -o jsonpath='{.status.succeeded}' 2>/dev/null) == '1' ]]; do
-			sleep 1
-			echo -n .
-			let retry+=1
-			if [ $retry -ge 360 ]; then
-				kubectl_bin describe job/$job
-				kubectl_bin logs $(kubectl_bin get pods --selector=job-name=${job} -o jsonpath='{.items[0].metadata.name}')
-				kubectl_bin logs $(get_operator_pod) \
-					| grep -v 'level=info' \
-					| grep -v 'level=debug' \
-					| tail -100
-				echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
-				exit 1
-			fi
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			kubectl_bin describe job/$job
+			kubectl_bin logs $(kubectl_bin get pods --selector=job-name=${job} -o jsonpath='{.items[0].metadata.name}')
+			kubectl_bin logs $(get_operator_pod) \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
 	done
 	echo
 	set -o xtrace
@@ -254,32 +254,32 @@ apply_cluster() {
 	esac
 
 	case ${backup} in
-	'local')
-		yq w -i "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'posix'
-		;;
-	's3')
-		yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
-			| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
-			| yq w - 'spec.backrestS3Region' 'us-east-1' \
-			| yq w - 'spec.backrestS3URIStyle' 'path' \
-			| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
-			| yq w - 'spec.backrestStorageTypes[0]' 's3' \
-				>"${tmp_dir}/cr.backup.yaml"
-		mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
-		;;
-	'local,s3')
-		yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
-			| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
-			| yq w - 'spec.backrestS3Region' 'us-east-1' \
-			| yq w - 'spec.backrestS3URIStyle' 'path' \
-			| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
-			| yq w - 'spec.backrestStorageTypes[0]' 'local' \
-			| yq w - 'spec.backrestStorageTypes[1]' 's3' \
-				>"${tmp_dir}/cr.backup.yaml"
-		mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
-		;;
-	*)
-		;;
+		'local')
+			yq w -i "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'posix'
+			;;
+		's3')
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
+				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
+				| yq w - 'spec.backrestS3Region' 'us-east-1' \
+				| yq w - 'spec.backrestS3URIStyle' 'path' \
+				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
+				| yq w - 'spec.backrestStorageTypes[0]' 's3' \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
+		'local,s3')
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
+				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
+				| yq w - 'spec.backrestS3Region' 'us-east-1' \
+				| yq w - 'spec.backrestS3URIStyle' 'path' \
+				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
+				| yq w - 'spec.backrestStorageTypes[0]' 'local' \
+				| yq w - 'spec.backrestStorageTypes[1]' 's3' \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
+		*)
+			;;
 	esac
 
 	if [[ ${restore_from} != "false" ]]; then
@@ -654,7 +654,7 @@ run_restore() {
 	local cluster=${1}
 	local rstr_prefix=${2}
 	local storage=${3:-"posix"}
-	local target=${4:-"null"} 	#time, xid or name
+	local target=${4:-"null"} #time, xid or name
 	local type=${5:-"time"}
 
 	yq w ${test_dir}/conf/restore.yml 'metadata.labels.pg-cluster' "${cluster}" \
