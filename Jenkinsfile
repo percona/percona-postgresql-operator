@@ -305,6 +305,7 @@ pipeline {
                 runTest('scaling', 'sandbox')
                 runTest('recreate', 'sandbox')
                 runTest('affinity', 'sandbox')
+                runTest('demand-backup', 'sandbox')
                 ShutdownCluster('sandbox')
             }
         }
