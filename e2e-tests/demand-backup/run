@@ -27,8 +27,8 @@ function prepare_n_restore {
 		"postgres:postgres_pass@${cluster}.${namespace}"
 
 	restore_target="$(run_psql \
-					'\c myapp \\\ SELECT xmin FROM myApp WHERE id='100501';' \
-					"postgres:postgres_pass@${cluster}.${namespace}" | awk '{$1=$1;print}')"
+		'\c myapp \\\ SELECT xmin FROM myApp WHERE id='100501';' \
+		"postgres:postgres_pass@${cluster}.${namespace}" | awk '{$1=$1;print}')"
 
 	run_psql \
 		'DROP DATABASE myapp' \
@@ -92,8 +92,8 @@ function main {
 
 	kubectl_bin delete pgcluster/${cluster}
 	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
-			/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
-			/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
+		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
+		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
 
 	sleep 60
 
@@ -114,8 +114,8 @@ function main {
 	sleep 30
 
 	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
-                /usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
-                /usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
+		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
+		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
 
 	desc 'Testing backup/restore from local with storate hybrid storage'
 	apply_configs ${cluster}
