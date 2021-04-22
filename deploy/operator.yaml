@@ -278,6 +278,8 @@ spec:
           volumeMounts:
             - name: deployer-conf
               mountPath: "/conf"
+      imagePullSecrets:
+        - name: ""
       volumes:
         - name: deployer-conf
           configMap:
