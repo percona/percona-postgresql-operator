@@ -278,8 +278,7 @@ apply_cluster() {
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
-		*)
-			;;
+		*) ;;
 	esac
 
 	if [[ ${restore_from} != "false" ]]; then
