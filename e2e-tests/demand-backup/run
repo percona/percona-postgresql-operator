@@ -9,9 +9,10 @@ test_dir=$(realpath $(dirname $0))
 function prepare_n_restore {
 	local cluster=${1}
 	local storage=${2}
+	local backup_type=${3}
 	local restore_target=''
 
-	create_backup ${cluster} "initialbackup" "incr"
+	create_backup ${cluster} "initialbackup" ${backup_type}
 
 	run_psql \
 		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
@@ -34,7 +35,7 @@ function prepare_n_restore {
 		'DROP DATABASE myapp' \
 		"postgres:postgres_pass@${cluster}.${namespace}"
 
-	run_restore ${cluster} "incr" ${storage} "${restore_target}" 'xid'
+	run_restore ${cluster} ${backup_type} ${storage} "${restore_target}" 'xid'
 
 	compare_psql_cmd \
 		"select-1" \
@@ -49,6 +50,8 @@ function apply_configs {
 
 	yq w $conf_dir/cloud-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
 		| yq w - 'data[aws-s3-ca.crt]' $(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}') \
+		| kubectl_bin apply -f -
+	yq w $test_dir/conf/minio-gw-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
 		| kubectl_bin apply -f -
 	yq r -d0 $conf_dir/some-name-secrets.yml \
 		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
@@ -84,23 +87,23 @@ function main {
 	cluster="some-name-${RANDOM}"
 
 	deploy_miniogw
-	apply_configs ${cluster}
 
 	desc 'Testing backup/restore from s3'
+	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config"
-	prepare_n_restore ${cluster} "s3"
+	prepare_n_restore ${cluster} "s3" "incr"
 
 	kubectl_bin delete pgcluster/${cluster}
 	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
 		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
 		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
 
-	sleep 60
+	sleep 30
 
 	desc 'Testing backup/restore from local'
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local" "${cluster}-custom-config"
-	prepare_n_restore ${cluster} "posix"
+	prepare_n_restore ${cluster} "posix" "full"
 
 	kubectl_bin delete pgcluster/${cluster}
 	sleep 30
@@ -108,7 +111,7 @@ function main {
 	desc 'Testing backup/restore from local with storate hybrid storage'
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config"
-	prepare_n_restore ${cluster} "posix"
+	prepare_n_restore ${cluster} "posix" "diff"
 
 	kubectl_bin delete pgcluster/${cluster}
 	sleep 30
@@ -120,10 +123,7 @@ function main {
 	desc 'Testing backup/restore from local with storate hybrid storage'
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config"
-	prepare_n_restore ${cluster} "s3"
-
-	kubectl_bin delete pgcluster/${cluster}
-	sleep 30
+	prepare_n_restore ${cluster} "s3" "diff"
 
 	destroy ${namespace}
 }
