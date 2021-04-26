@@ -214,7 +214,7 @@ func AddClusterBase(clientset kubeapi.Interface, cl *crv1.Pgcluster, namespace s
 			return
 		}
 		// create a CRD for each replica
-		for i := 0; i < replicaCount; i++ {
+		for i := 1; i <= replicaCount; i++ {
 			spec := crv1.PgreplicaSpec{}
 			// get the storage config
 			spec.ReplicaStorage = cl.Spec.ReplicaStorage
@@ -232,8 +232,7 @@ func AddClusterBase(clientset kubeapi.Interface, cl *crv1.Pgcluster, namespace s
 			labels[config.LABEL_PG_CLUSTER] = cl.Spec.Name
 
 			spec.ClusterName = cl.Spec.Name
-			uniqueName := util.RandStringBytesRmndr(4)
-			labels[config.LABEL_NAME] = cl.Spec.Name + "-" + uniqueName
+			labels[config.LABEL_NAME] = cl.Name + "-repl" + strconv.Itoa(i)
 			spec.Name = labels[config.LABEL_NAME]
 			newInstance := &crv1.Pgreplica{
 				ObjectMeta: metav1.ObjectMeta{
@@ -439,8 +438,10 @@ func ScaleDownBase(clientset kubeapi.Interface, replica *crv1.Pgreplica, namespa
 		return
 	}
 
-	_ = DeleteReplica(clientset, replica, namespace)
-
+	err = DeleteReplica(clientset, replica, namespace)
+	if err != nil {
+		log.Errorf("delete replica: %s", err)
+	}
 	// publish event for scale down
 	topics := make([]string, 1)
 	topics[0] = events.EventTopicCluster

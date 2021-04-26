@@ -18,7 +18,9 @@ limitations under the License.
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
@@ -76,6 +78,17 @@ func (c *Controller) waitForShutdown(stopCh <-chan struct{}) {
 	<-stopCh
 	c.Queue.ShutDown()
 	log.Debug("pgcluster Contoller: received stop signal, worker queue told to shutdown")
+}
+
+func getNewReplicaObject(cluster *crv1.Pgcluster, index int) crv1.Pgreplica {
+	newReplica := crv1.Pgreplica{}
+	newReplica.Spec.ClusterName = cluster.Name
+	newReplica.Name = cluster.Name + "-repl" + strconv.Itoa(index)
+	newReplica.Namespace = cluster.Namespace
+	newReplica.Spec.Name = cluster.Spec.Name + "-repl" + strconv.Itoa(index)
+	newReplica.Spec.ReplicaStorage = cluster.Spec.ReplicaStorage
+
+	return newReplica
 }
 
 func (c *Controller) processNextItem() bool {
@@ -179,6 +192,45 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	log.Debugf("pgcluster onUpdate for cluster %s (namespace %s)", newcluster.ObjectMeta.Namespace,
 		newcluster.ObjectMeta.Name)
+
+	fmt.Println("old:", oldcluster.Spec.Replicas, "new:", newcluster.Spec.Replicas)
+	if oldcluster.Spec.Replicas != newcluster.Spec.Replicas {
+		replicaCount, err := strconv.Atoi(newcluster.Spec.Replicas)
+		if err != nil {
+			log.Error("error in newcluster replicas value: " + err.Error())
+			return
+		}
+		oldReplicaCount, err := strconv.Atoi(oldcluster.Spec.Replicas)
+		if err != nil {
+			log.Error("error in oldCluster replicas value " + err.Error())
+			return
+		}
+		if replicaCount == 0 {
+			for i := 1; i <= oldReplicaCount; i++ {
+				newReplica := getNewReplicaObject(newcluster, i)
+				log.Infof("delete replica %s", newReplica.Spec.Name)
+				clusteroperator.ScaleDownBase(c.Client, &newReplica, newReplica.ObjectMeta.Namespace)
+			}
+			return
+		}
+		if replicaCount < oldReplicaCount {
+			for i := oldReplicaCount; i > 0; i-- {
+				if i == replicaCount {
+					break
+				}
+				newReplica := getNewReplicaObject(newcluster, i)
+				clusteroperator.ScaleDownBase(c.Client, &newReplica, newReplica.Namespace)
+			}
+			return
+		}
+
+		// create a CRD for each replica
+		for i := 1; i <= replicaCount; i++ {
+			newReplica := getNewReplicaObject(newcluster, i)
+			log.Infof("Creating replicas %s", newReplica.Name)
+			clusteroperator.ScaleBase(c.Client, &newReplica, newcluster.ObjectMeta.Namespace)
+		}
+	}
 
 	// if the status of the pgcluster shows that it has been bootstrapped, then proceed with
 	// creating the cluster (i.e. the cluster deployment, services, etc.)
