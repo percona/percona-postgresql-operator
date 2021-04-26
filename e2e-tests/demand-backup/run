@@ -48,10 +48,8 @@ function apply_configs {
 
 	kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}'
 
-	yq w $conf_dir/cloud-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
-		| yq w - 'data[aws-s3-ca.crt]' $(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}') \
-		| kubectl_bin apply -f -
 	yq w $test_dir/conf/minio-gw-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
+		| yq w - 'data[aws-s3-ca.crt]' $(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}') \
 		| kubectl_bin apply -f -
 	yq r -d0 $conf_dir/some-name-secrets.yml \
 		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
