@@ -14,7 +14,9 @@ IMAGE_SCHEDULER=${IMAGE_SCHEDULER:-"${IMAGE_URI_BASE}-pgo-scheduler"}
 IMAGE_OPERATOR=${IMAGE_OPERATOR:-"${IMAGE_URI_BASE}-postgres-operator"}
 IMAGE_DEPLOYER=${IMAGE_DEPLOYER:-"${IMAGE_URI_BASE}-pgo-deployer"}
 IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-ppg13-pgbouncer"}
-IMAGE_PG_HA=${IMAGE_PG_HA:-"${IMAGE_BASE}:main-postgres-ha"}
+IMAGE_PG_HA=${IMAGE_PG_HA:-"${IMAGE_BASE}:main-ppg13-postgres-ha"}
+IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg13-pgbackrest"}
+IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg13-pgbackrest-repo"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
@@ -225,6 +227,8 @@ apply_cluster() {
 		| yq w - 'spec.name' ${name} \
 		| yq w - 'spec.user' ${name} \
 		| yq w - 'spec.pgImage' ${IMAGE_PG_HA} \
+		| yq w - 'spec.backrestImage' ${IMAGE_BACKREST} \
+		| yq w - 'spec.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
 		| yq d - 'spec.pgBouncer' \
 			>"${tmp_dir}/cr.yaml"
 
