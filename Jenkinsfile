@@ -304,6 +304,7 @@ pipeline {
                 runTest('init-deploy', 'sandbox')
                 runTest('scaling', 'sandbox')
                 runTest('recreate', 'sandbox')
+                runTest('affinity', 'sandbox')
                 ShutdownCluster('sandbox')
             }
         }
