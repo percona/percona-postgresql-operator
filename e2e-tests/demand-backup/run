@@ -92,6 +92,8 @@ function main {
 	prepare_n_restore ${cluster} "s3" "incr"
 
 	kubectl_bin delete pgcluster/${cluster}
+	sleep 30
+
 	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
 		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
 		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
@@ -117,6 +119,8 @@ function main {
 	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
 		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
 		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
+
+	sleep 30
 
 	desc 'Testing backup/restore from local with storate hybrid storage'
 	apply_configs ${cluster}
