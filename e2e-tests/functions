@@ -255,7 +255,7 @@ apply_cluster() {
 
 	case ${backup} in
 		'local')
-			yq w -i "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'posix'
+			yq w -i "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'local'
 			;;
 		's3')
 			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
