@@ -108,7 +108,7 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 		log.Errorf("error getting pods from selector %s: %s", selector, err)
 		return
 	} else if len(pods.Items) != 1 {
-		log.Error("error getting pods from selector: 0 or more then 1 pods present")
+		log.Error("error getting pods from selector: 0 or more than 1 pods present")
 		return
 	}
 	// create the Job to run the backrest command
