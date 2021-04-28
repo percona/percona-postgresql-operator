@@ -186,6 +186,7 @@ spec:
       schedulerName: default-scheduler
       securityContext:
         fsGroup: 26
+        runAsNonRoot: true
       serviceAccount: pgo-pg
       serviceAccountName: pgo-pg
       terminationGracePeriodSeconds: 30
