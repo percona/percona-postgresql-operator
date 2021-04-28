@@ -160,31 +160,31 @@ apply_cluster() {
 		| yq w - 'spec.name' ${name} \
 		| yq w - 'spec.user' ${name} \
 		| yq d - 'spec.pgBouncer' \
-		>${tmp_dir}/cr.yml
+			>${tmp_dir}/cr.yml
 
 	case ${podAntiAffinity} in
-			'preferred')
-					yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
-						| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
-						| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-						>${tmp_dir}/cr.podAffinity.yml
-					mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
-					;;
-			'required')
-					yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
-						| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
-						| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-						>${tmp_dir}/cr.podAffinity.yml
-					mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
-					;;
-			'disabled')
-					yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
-						| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
-						| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-						>${tmp_dir}/cr.podAffinity.yml
-					mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
-					;;
-			*) ;;
+		'preferred')
+			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+				>${tmp_dir}/cr.podAffinity.yml
+			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+			;;
+		'required')
+			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+				>${tmp_dir}/cr.podAffinity.yml
+			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+			;;
+		'disabled')
+			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+				>${tmp_dir}/cr.podAffinity.yml
+			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+			;;
+		*) ;;
 	esac
 
 	kubectl_bin apply -f ${tmp_dir}/cr.yml
