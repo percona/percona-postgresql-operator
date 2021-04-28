@@ -28,5 +28,4 @@ RUN set -ex; \
     microdnf -y update; \
     microdnf -y install glibc-langpack-en; \
     microdnf clean all; \
-    percona-release enable ppg-13 experimental; \
-    percona-release enable ppg-13.2 testing
+    percona-release enable ppg-13 release
