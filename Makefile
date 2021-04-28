@@ -1,252 +1,145 @@
+# Makefile for Sphinx documentation
+#
 
-# Default values if not already set
-ANSIBLE_VERSION ?= 2.9.*
-PGOROOT ?= $(CURDIR)
-PGO_BASEOS ?= centos8
-PGO_IMAGE_PREFIX ?= crunchydata
-PGO_IMAGE_TAG ?= $(PGO_BASEOS)-$(PGO_VERSION)
-PGO_VERSION ?= 0.1.0
-PGO_PG_VERSION ?= 13
-PGO_PG_FULLVERSION ?= 13.2
-PGO_BACKREST_VERSION ?= 2.31
-PACKAGER ?= yum
+# You can set these variables from the command line.
+SPHINXOPTS    =
+SPHINXBUILD   = sphinx-build
+PAPER         =
+BUILDDIR      = build
 
-RELTMPDIR=/tmp/release.$(PGO_VERSION)
-RELFILE=/tmp/postgres-operator.$(PGO_VERSION).tar.gz
+# Internal variables.
+PAPEROPT_a4     = -D latex_paper_size=a4
+PAPEROPT_letter = -D latex_paper_size=letter
+ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 
-# Valid values: buildah (default), docker
-IMGBUILDER ?= buildah
-# Determines whether or not rootless builds are enabled
-IMG_ROOTLESS_BUILD ?= false
-# The utility to use when pushing/pulling to and from an image repo (e.g. docker or buildah)
-IMG_PUSHER_PULLER ?= docker
-# Determines whether or not images should be pushed to the local docker daemon when building with
-# a tool other than docker (e.g. when building with buildah)
-IMG_PUSH_TO_DOCKER_DAEMON ?= true
-# Defines the sudo command that should be prepended to various build commands when rootless builds are
-# not enabled
-IMGCMDSUDO=
-ifneq ("$(IMG_ROOTLESS_BUILD)", "true")
-	IMGCMDSUDO=sudo --preserve-env
-endif
-IMGCMDSTEM=$(IMGCMDSUDO) buildah bud --layers $(SQUASH)
-DFSET=$(PGO_BASEOS)
+.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest
 
-# Default the buildah format to docker to ensure it is possible to pull the images from a docker
-# repository using docker (otherwise the images may not be recognized)
-export BUILDAH_FORMAT ?= docker
+help:
+	@echo "Please use \`make <target>' where <target> is one of"
+	@echo "  html       to make standalone HTML files"
+	@echo "  offhtml    to make standalone HTML files without fetching fresh percona-them files"
+	@echo "  dirhtml    to make HTML files named index.html in directories"
+	@echo "  singlehtml to make a single large HTML file"
+	@echo "  pickle     to make pickle files"
+	@echo "  json       to make JSON files"
+	@echo "  htmlhelp   to make HTML files and a HTML help project"
+	@echo "  qthelp     to make HTML files and a qthelp project"
+	@echo "  devhelp    to make HTML files and a Devhelp project"
+	@echo "  epub       to make an epub"
+	@echo "  latex      to make LaTeX files, you can set PAPER=a4 or PAPER=letter"
+	@echo "  latexpdf   to make LaTeX files and run them through pdflatex"
+	@echo "  text       to make text files"
+	@echo "  man        to make manual pages"
+	@echo "  changes    to make an overview of all changed/added/deprecated items"
+	@echo "  linkcheck  to check all external links for integrity"
+	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
 
-DOCKERBASEREGISTRY=registry.access.redhat.com/
+clean:
+	-rm -rf $(BUILDDIR)/*
 
-# Allows simplification of IMGBUILDER switching
-ifeq ("$(IMGBUILDER)","docker")
-        IMGCMDSTEM=docker build
-endif
+html:
+	@echo "Downloading percona-theme ..."
+	@wget -O percona-theme.tar.gz https://www.percona.com/docs/theme-1-4/percona-operator-for-pxc/1.0
+	@echo "Extracting theme."
+	@tar -mzxf percona-theme.tar.gz
+	@rm -rf source/percona-theme
+	@mv percona-theme-1-4 source/percona-theme
+	@rm percona-theme.tar.gz
+	@echo "Building html doc"
 
-# Allows consolidation of ubi/rhel/centos Dockerfile sets
-ifeq ("$(PGO_BASEOS)", "rhel7")
-        DFSET=rhel
-endif
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
-ifeq ("$(PGO_BASEOS)", "ubi7")
-        DFSET=rhel
-endif
+dirhtml:
+	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
 
-ifeq ("$(PGO_BASEOS)", "ubi8")
-        DFSET=rhel
-        PACKAGER=dnf
-endif
+offhtml:
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
-ifeq ("$(PGO_BASEOS)", "centos7")
-        DFSET=centos
-        DOCKERBASEREGISTRY=centos:
-endif
+singlehtml:
+	$(SPHINXBUILD) -b singlehtml $(ALLSPHINXOPTS) $(BUILDDIR)/singlehtml
+	@echo
+	@echo "Build finished. The HTML page is in $(BUILDDIR)/singlehtml."
 
-ifeq ("$(PGO_BASEOS)", "centos8")
-        DFSET=centos
-        PACKAGER=dnf
-        DOCKERBASEREGISTRY=centos:
-endif
+pickle:
+	$(SPHINXBUILD) -b pickle $(ALLSPHINXOPTS) $(BUILDDIR)/pickle
+	@echo
+	@echo "Build finished; now you can process the pickle files."
 
-DEBUG_BUILD ?= false
-GO_BUILD = $(GO_CMD) build
-GO_CMD = $(GO_ENV) go
+json:
+	$(SPHINXBUILD) -b json $(ALLSPHINXOPTS) $(BUILDDIR)/json
+	@echo
+	@echo "Build finished; now you can process the JSON files."
 
-# Disable optimizations if creating a debug build
-ifeq ("$(DEBUG_BUILD)", "true")
-	GO_BUILD += -gcflags='all=-N -l'
-endif
+htmlhelp:
+	$(SPHINXBUILD) -b htmlhelp $(ALLSPHINXOPTS) $(BUILDDIR)/htmlhelp
+	@echo
+	@echo "Build finished; now you can run HTML Help Workshop with the" \
+	      ".hhp project file in $(BUILDDIR)/htmlhelp."
 
-# To build a specific image, run 'make <name>-image' (e.g. 'make pgo-apiserver-image')
-images = pgo-apiserver \
-	pgo-event \
-	pgo-rmdata \
-	pgo-scheduler \
-	pgo-client \
-	pgo-deployer \
-	crunchy-postgres-exporter \
-	postgres-operator
+qthelp:
+	$(SPHINXBUILD) -b qthelp $(ALLSPHINXOPTS) $(BUILDDIR)/qthelp
+	@echo
+	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
+	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/PerconaServer.qhcp"
+	@echo "To view the help file:"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/PerconaServer.qhc"
 
-.PHONY: all installrbac setup setupnamespaces cleannamespaces \
-	deployoperator cli-docs clean push pull release
+devhelp:
+	$(SPHINXBUILD) -b devhelp $(ALLSPHINXOPTS) $(BUILDDIR)/devhelp
+	@echo
+	@echo "Build finished."
+	@echo "To view the help file:"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/PerconaServer"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/PerconaServer"
+	@echo "# devhelp"
 
+epub:
+	$(SPHINXBUILD) -b epub $(ALLSPHINXOPTS) $(BUILDDIR)/epub
+	@echo
+	@echo "Build finished. The epub file is in $(BUILDDIR)/epub."
 
-#======= Main functions =======
-all: linuxpgo $(images:%=%-image)
+latex:
+	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
+	@echo
+	@echo "Build finished; the LaTeX files are in $(BUILDDIR)/latex."
+	@echo "Run \`make' in that directory to run these through (pdf)latex" \
+	      "(use \`make latexpdf' here to do that automatically)."
 
-installrbac:
-	PGOROOT='$(PGOROOT)' ./deploy/install-rbac.sh
+latexpdf:
+	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
+	@echo "Running LaTeX files through pdflatex..."
+	make -C $(BUILDDIR)/latex all-pdf
+	@echo "pdflatex finished; the PDF files are in $(BUILDDIR)/latex."
 
-setup:
-	PGOROOT='$(PGOROOT)' ./bin/get-deps.sh
-	./bin/check-deps.sh
+text:
+	$(SPHINXBUILD) -b text $(ALLSPHINXOPTS) $(BUILDDIR)/text
+	@echo
+	@echo "Build finished. The text files are in $(BUILDDIR)/text."
 
-setupnamespaces:
-	PGOROOT='$(PGOROOT)' ./deploy/setupnamespaces.sh
+man:
+	$(SPHINXBUILD) -b man $(ALLSPHINXOPTS) $(BUILDDIR)/man
+	@echo
+	@echo "Build finished. The manual pages are in $(BUILDDIR)/man."
 
-cleannamespaces:
-	PGOROOT='$(PGOROOT)' ./deploy/cleannamespaces.sh
+changes:
+	$(SPHINXBUILD) -b changes $(ALLSPHINXOPTS) $(BUILDDIR)/changes
+	@echo
+	@echo "The overview file is in $(BUILDDIR)/changes."
 
-deployoperator:
-	PGOROOT='$(PGOROOT)' ./deploy/deploy.sh
+linkcheck:
+	$(SPHINXBUILD) -b linkcheck $(ALLSPHINXOPTS) $(BUILDDIR)/linkcheck
+	@echo
+	@echo "Link check complete; look for any errors in the above output " \
+	      "or in $(BUILDDIR)/linkcheck/output.txt."
 
-
-#======= Binary builds =======
-build: build-postgres-operator build-pgo-apiserver build-pgo-client build-pgo-rmdata build-pgo-scheduler
-
-build-pgo-apiserver:
-	$(GO_BUILD) -o bin/apiserver ./cmd/apiserver
-
-build-pgo-rmdata:
-	$(GO_BUILD) -o bin/pgo-rmdata/pgo-rmdata ./cmd/pgo-rmdata
-
-build-pgo-scheduler:
-	$(GO_BUILD) -o bin/pgo-scheduler/pgo-scheduler ./cmd/pgo-scheduler
-
-build-postgres-operator:
-	$(GO_BUILD) -o bin/postgres-operator ./cmd/postgres-operator
-
-build-pgo-client:
-	$(GO_BUILD) -o bin/pgo ./cmd/pgo
-
-build-pgo-%:
-	$(info No binary build needed for $@)
-
-build-crunchy-postgres-exporter:
-	$(info No binary build needed for $@)
-
-linuxpgo: GO_ENV += GOOS=linux GOARCH=amd64
-linuxpgo:
-	$(GO_BUILD) -o bin/pgo ./cmd/pgo
-
-macpgo: GO_ENV += GOOS=darwin GOARCH=amd64
-macpgo:
-	$(GO_BUILD) -o bin/pgo-mac ./cmd/pgo
-
-winpgo: GO_ENV += GOOS=windows GOARCH=386
-winpgo:
-	$(GO_BUILD) -o bin/pgo.exe ./cmd/pgo
-
-
-#======= Image builds =======
-$(PGOROOT)/build/%/Dockerfile:
-	$(error No Dockerfile found for $* naming pattern: [$@])
-
-%-img-build: pgo-base-$(IMGBUILDER) build-% $(PGOROOT)/build/%/Dockerfile
-	$(IMGCMDSTEM) \
-		-f $(PGOROOT)/build/$*/Dockerfile \
-		-t $(PGO_IMAGE_PREFIX)/$*:$(PGO_IMAGE_TAG) \
-		--build-arg BASEOS=$(PGO_BASEOS) \
-		--build-arg BASEVER=$(PGO_VERSION) \
-		--build-arg PREFIX=$(PGO_IMAGE_PREFIX) \
-		--build-arg PGVERSION=$(PGO_PG_VERSION) \
-		--build-arg BACKREST_VERSION=$(PGO_BACKREST_VERSION) \
-		--build-arg ANSIBLE_VERSION=$(ANSIBLE_VERSION) \
-		--build-arg DFSET=$(DFSET) \
-		--build-arg PACKAGER=$(PACKAGER) \
-		$(PGOROOT)
-
-%-img-buildah: %-img-build ;
-# only push to docker daemon if variable PGO_PUSH_TO_DOCKER_DAEMON is set to "true"
-ifeq ("$(IMG_PUSH_TO_DOCKER_DAEMON)", "true")
-	$(IMGCMDSUDO) buildah push $(PGO_IMAGE_PREFIX)/$*:$(PGO_IMAGE_TAG) docker-daemon:$(PGO_IMAGE_PREFIX)/$*:$(PGO_IMAGE_TAG)
-endif
-
-%-img-docker: %-img-build ;
-
-%-image: %-img-$(IMGBUILDER) ;
-
-pgo-base: pgo-base-$(IMGBUILDER)
-
-pgo-base-build: $(PGOROOT)/build/pgo-base/Dockerfile
-	$(IMGCMDSTEM) \
-		-f $(PGOROOT)/build/pgo-base/Dockerfile \
-		-t $(PGO_IMAGE_PREFIX)/pgo-base:$(PGO_IMAGE_TAG) \
-		--build-arg BASEOS=$(PGO_BASEOS) \
-		--build-arg RELVER=$(PGO_VERSION) \
-		--build-arg PGVERSION=$(PGO_PG_VERSION) \
-		--build-arg PG_FULL=$(PGO_PG_FULLVERSION) \
-		--build-arg DFSET=$(DFSET) \
-		--build-arg PACKAGER=$(PACKAGER) \
-		--build-arg DOCKERBASEREGISTRY=$(DOCKERBASEREGISTRY) \
-		$(PGOROOT)
-
-pgo-base-buildah: pgo-base-build ;
-# only push to docker daemon if variable PGO_PUSH_TO_DOCKER_DAEMON is set to "true"
-ifeq ("$(IMG_PUSH_TO_DOCKER_DAEMON)", "true")
-	$(IMGCMDSUDO) buildah push $(PGO_IMAGE_PREFIX)/pgo-base:$(PGO_IMAGE_TAG) docker-daemon:$(PGO_IMAGE_PREFIX)/pgo-base:$(PGO_IMAGE_TAG)
-endif
-
-pgo-base-docker: pgo-base-build
-
-
-#======== Utility =======
-check:
-	PGOROOT=$(PGOROOT) go test ./...
-
-cli-docs:
-	rm docs/content/pgo-client/reference/*.md
-	cd docs/content/pgo-client/reference && go run ../../../../cmd/pgo/generatedocs.go
-	sed -e '1,5 s|^title:.*|title: "pgo Client Reference"|' \
-		docs/content/pgo-client/reference/pgo.md > \
-		docs/content/pgo-client/reference/_index.md
-	rm docs/content/pgo-client/reference/pgo.md
-
-clean: clean-deprecated
-	rm -f bin/apiserver
-	rm -f bin/postgres-operator
-	rm -f bin/pgo bin/pgo-mac bin/pgo.exe
-	rm -f bin/pgo-rmdata/pgo-rmdata
-	rm -f bin/pgo-scheduler/pgo-scheduler
-	[ -z "$$(ls hack/tools)" ] || rm hack/tools/*
-
-clean-deprecated:
-	@# packages used to be downloaded into the vendor directory
-	[ ! -d vendor ] || rm -r vendor
-	@# executables used to be compiled into the $GOBIN directory
-	[ ! -n '$(GOBIN)' ] || rm -f $(GOBIN)/postgres-operator $(GOBIN)/apiserver $(GOBIN)/*pgo
-	[ ! -d bin/postgres-operator ] || rm -r bin/postgres-operator
-
-push: $(images:%=push-%) ;
-
-push-%:
-	$(IMG_PUSHER_PULLER) push $(PGO_IMAGE_PREFIX)/$*:$(PGO_IMAGE_TAG)
-
-pull: $(images:%=pull-%) ;
-
-pull-%:
-	$(IMG_PUSHER_PULLER) pull $(PGO_IMAGE_PREFIX)/$*:$(PGO_IMAGE_TAG)
-
-release:  linuxpgo macpgo winpgo
-	rm -rf $(RELTMPDIR) $(RELFILE)
-	mkdir $(RELTMPDIR)
-	cp -r $(PGOROOT)/examples $(RELTMPDIR)
-	cp -r $(PGOROOT)/deploy $(RELTMPDIR)
-	cp -r $(PGOROOT)/conf $(RELTMPDIR)
-	cp bin/pgo $(RELTMPDIR)
-	cp bin/pgo-mac $(RELTMPDIR)
-	cp bin/pgo.exe $(RELTMPDIR)
-	tar czvf $(RELFILE) -C $(RELTMPDIR) .
-
-generate:
-	GOBIN='$(CURDIR)/hack/tools' ./hack/update-codegen.sh
+doctest:
+	$(SPHINXBUILD) -b doctest $(ALLSPHINXOPTS) $(BUILDDIR)/doctest
+	@echo "Testing of doctests in the sources finished, look at the " \
+	      "results in $(BUILDDIR)/doctest/output.txt."
