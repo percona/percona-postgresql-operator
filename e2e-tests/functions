@@ -145,6 +145,7 @@ wait_pod() {
 apply_cluster() {
 	local path=${1}
 	local name=${2}
+	local podAntiAffinity=${3}
 	yq w "${path}" 'metadata.namespace' ${namespace} \
 		| yq w - 'spec.namespace' ${namespace} \
 		| yq w - 'metadata.annotations.current-primary' ${name} \
@@ -159,7 +160,34 @@ apply_cluster() {
 		| yq w - 'spec.name' ${name} \
 		| yq w - 'spec.user' ${name} \
 		| yq d - 'spec.pgBouncer' \
-		| kubectl_bin apply -f -
+			>${tmp_dir}/cr.yml
+
+	case ${podAntiAffinity} in
+		'preferred')
+			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+					>${tmp_dir}/cr.podAffinity.yml
+			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+			;;
+		'required')
+			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+					>${tmp_dir}/cr.podAffinity.yml
+			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+			;;
+		'disabled')
+			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
+				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+					>${tmp_dir}/cr.podAffinity.yml
+			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+			;;
+		*) ;;
+	esac
+
+	kubectl_bin apply -f ${tmp_dir}/cr.yml
 }
 
 kubectl_bin() {
@@ -301,9 +329,28 @@ compare_kubectl() {
 spinup_pgcluster() {
 	local cluster=$1
 	local config=$2
+	local podAntiAffinity=${3}
 
 	desc 'create first PG cluster'
-	apply_cluster ${config} ${cluster}
+
+	yq r -d0 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d1 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-postgres-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d2 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-primaryuser-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d3 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-${cluster}-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+
+	apply_cluster ${config} ${cluster} ${podAntiAffinity}
 
 	wait_cluster_consistency ${cluster}
 
