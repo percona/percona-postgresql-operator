@@ -98,7 +98,7 @@ deploy_operator() {
 deploy_miniogw() {
 	local gsc_projectid=${1:-"cloud-dev-112233"}
 	kubectl_bin apply -f $conf_dir/cloud-secret-minio-gw.yml \
-			-f $src_dir/deploy/backup/minio-gw-tls.yaml
+		-f $src_dir/deploy/backup/minio-gw-tls.yaml
 
 	yq w -d0 --style=single $src_dir/deploy/backup/minio-gw.yaml 'spec.template.spec.containers[0].args[4]' "${gsc_projectid}" \
 		| kubectl_bin apply -f -
@@ -287,11 +287,11 @@ apply_cluster() {
 
 	if [[ ${restore_from} != "false" ]]; then
 		yq w "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreFrom' "${restore_from}" \
-			> "${tmp_dir}/cr.restore.yaml"
+			>"${tmp_dir}/cr.restore.yaml"
 		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
 		if [[ ${restore_opts} != "false" ]]; then
 			yq w --style=single "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreOpts' "${restore_opts}" \
-				> "${tmp_dir}/cr.restore.yaml"
+				>"${tmp_dir}/cr.restore.yaml"
 			mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
 		fi
 	fi
