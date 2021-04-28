@@ -167,21 +167,21 @@ apply_cluster() {
 			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-				>${tmp_dir}/cr.podAffinity.yml
+					>${tmp_dir}/cr.podAffinity.yml
 			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
 			;;
 		'required')
 			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-				>${tmp_dir}/cr.podAffinity.yml
+					>${tmp_dir}/cr.podAffinity.yml
 			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
 			;;
 		'disabled')
 			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-				>${tmp_dir}/cr.podAffinity.yml
+					>${tmp_dir}/cr.podAffinity.yml
 			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
 			;;
 		*) ;;
