@@ -51,22 +51,6 @@ function apply_configs {
 	yq w $test_dir/conf/minio-gw-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
 		| yq w - 'data[aws-s3-ca.crt]' $(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}') \
 		| kubectl_bin apply -f -
-	yq r -d0 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d1 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-postgres-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d2 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-primaryuser-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d3 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-${cluster}-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
 
 	yq r $test_dir/conf/custom-config.yml \
 		| yq w - 'metadata.name' "${cluster}-custom-config" \
