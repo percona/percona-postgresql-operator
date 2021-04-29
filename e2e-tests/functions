@@ -14,6 +14,9 @@ IMAGE_SCHEDULER=${IMAGE_SCHEDULER:-"${IMAGE_URI_BASE}-pgo-scheduler"}
 IMAGE_OPERATOR=${IMAGE_OPERATOR:-"${IMAGE_URI_BASE}-postgres-operator"}
 IMAGE_DEPLOYER=${IMAGE_DEPLOYER:-"${IMAGE_URI_BASE}-pgo-deployer"}
 IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-ppg13-pgbouncer"}
+IMAGE_PG_HA=${IMAGE_PG_HA:-"${IMAGE_BASE}:main-ppg13-postgres-ha"}
+IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg13-pgbackrest"}
+IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg13-pgbackrest-repo"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
@@ -54,6 +57,13 @@ create_namespace() {
 	fi
 }
 
+deploy_cert_manager() {
+	kubectl_bin create namespace cert-manager || :
+	kubectl_bin label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
+	kubectl_bin apply -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml --validate=false || : 2>/dev/null
+	sleep 30
+}
+
 desc() {
 	set +o xtrace
 	local msg="$@"
@@ -80,9 +90,20 @@ deploy_operator() {
 		| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
 		| kubectl_bin apply -f -
 
-	wait_pod_completion $(kubectl_bin get pod --selector=job-name=pgo-deploy -o 'jsonpath={.items[].metadata.name}')
+	wait_job_completion "pgo-deploy"
 
 	wait_pod $(get_operator_pod)
+}
+
+deploy_miniogw() {
+	local gsc_projectid=${1:-"cloud-dev-112233"}
+	kubectl_bin apply -f $conf_dir/cloud-secret-minio-gw.yml \
+		-f $src_dir/deploy/backup/minio-gw-tls.yaml
+
+	yq w -d0 --style=single $src_dir/deploy/backup/minio-gw.yaml 'spec.template.spec.containers[0].args[4]' "${gsc_projectid}" \
+		| kubectl_bin apply -f -
+
+	wait_pod "$(kubectl_bin get pod --selector=app=minio-gw -o 'jsonpath={.items[].metadata.name}')"
 }
 
 get_operator_pod() {
@@ -142,10 +163,56 @@ wait_pod() {
 	set -o xtrace
 }
 
+wait_job_completion() {
+	local job=$1
+	local mandatory=${2:-"true"}
+
+	retry=0
+	set +o xtrace
+	until kubectl get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [[ $retry -ge 30 && ${mandatory} == "true" ]]; then
+			echo max retry count $retry reached. No target object found.
+			exit 1
+		elif [[ $retry -ge 30 && ${mandatory} != "true" ]]; then
+			echo Can not detect job. Passing by.
+			set -o xtrace
+			return 0
+		fi
+	done
+
+	retry=0
+	until [[ $(kubectl_bin get job/$job -o jsonpath='{.metadata.name}' 2>&1 | grep -io 'not found') == "not found" ]] \
+		|| [[ $(kubectl_bin get job/$job -o jsonpath='{.status.succeeded}' 2>/dev/null) == '1' ]]; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			kubectl_bin describe job/$job
+			kubectl_bin logs $(kubectl_bin get pods --selector=job-name=${job} -o jsonpath='{.items[0].metadata.name}')
+			kubectl_bin logs $(get_operator_pod) \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	echo
+	set -o xtrace
+}
+
 apply_cluster() {
 	local path=${1}
 	local name=${2}
-	local podAntiAffinity=${3}
+	local backup=${3:-"false"}
+	local restore_from=${4:-"false"}
+	local restore_opts=${5:-"false"}
+	local custom_config=${6:-"false"}
+	local podAntiAffinity=${7}
+
 	yq w "${path}" 'metadata.namespace' ${namespace} \
 		| yq w - 'spec.namespace' ${namespace} \
 		| yq w - 'metadata.annotations.current-primary' ${name} \
@@ -159,35 +226,81 @@ apply_cluster() {
 		| yq w - 'spec.database' ${name} \
 		| yq w - 'spec.name' ${name} \
 		| yq w - 'spec.user' ${name} \
+		| yq w - 'spec.pgImage' ${IMAGE_PG_HA} \
+		| yq w - 'spec.backrestImage' ${IMAGE_BACKREST} \
+		| yq w - 'spec.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
 		| yq d - 'spec.pgBouncer' \
-			>${tmp_dir}/cr.yml
+			>"${tmp_dir}/cr.yaml"
 
 	case ${podAntiAffinity} in
 		'preferred')
-			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-					>${tmp_dir}/cr.podAffinity.yml
-			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+					>${tmp_dir}/cr.podAffinity.yaml
+			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
 		'required')
-			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-					>${tmp_dir}/cr.podAffinity.yml
-			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+					>${tmp_dir}/cr.podAffinity.yaml
+			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
 		'disabled')
-			yq w ${tmp_dir}/cr.yml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
 				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
-					>${tmp_dir}/cr.podAffinity.yml
-			mv ${tmp_dir}/cr.podAffinity.yml ${tmp_dir}/cr.yml
+					>${tmp_dir}/cr.podAffinity.yaml
+			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
 		*) ;;
 	esac
 
-	kubectl_bin apply -f ${tmp_dir}/cr.yml
+	case ${backup} in
+		'local')
+			yq w -i "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'local'
+			;;
+		's3')
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
+				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
+				| yq w - 'spec.backrestS3Region' 'us-east-1' \
+				| yq w - 'spec.backrestS3URIStyle' 'path' \
+				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
+				| yq w - 'spec.backrestStorageTypes[0]' 's3' \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
+		'local,s3')
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
+				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
+				| yq w - 'spec.backrestS3Region' 'us-east-1' \
+				| yq w - 'spec.backrestS3URIStyle' 'path' \
+				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
+				| yq w - 'spec.backrestStorageTypes[0]' 'local' \
+				| yq w - 'spec.backrestStorageTypes[1]' 's3' \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
+		*) ;;
+	esac
+
+	if [[ ${restore_from} != "false" ]]; then
+		yq w "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreFrom' "${restore_from}" \
+			>"${tmp_dir}/cr.restore.yaml"
+		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
+		if [[ ${restore_opts} != "false" ]]; then
+			yq w --style=single "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreOpts' "${restore_opts}" \
+				>"${tmp_dir}/cr.restore.yaml"
+			mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
+		fi
+	fi
+
+	if [[ ${custom_config} != "false" ]]; then
+		yq w -i "${tmp_dir}/cr.yaml" 'spec.customconfig' ${custom_config}
+	fi
+
+	kubectl_bin apply -f "${tmp_dir}/cr.yaml"
 }
 
 kubectl_bin() {
@@ -329,7 +442,9 @@ compare_kubectl() {
 spinup_pgcluster() {
 	local cluster=$1
 	local config=$2
-	local podAntiAffinity=${3}
+	local backup=${3:-"false"}
+	local custom_config=${4:-"false"}
+	local podAntiAffinity=${5}
 
 	desc 'create first PG cluster'
 
@@ -350,7 +465,13 @@ spinup_pgcluster() {
 		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
 		| kubectl_bin apply -f -
 
-	apply_cluster ${config} ${cluster} ${podAntiAffinity}
+	desc 'create fresh PG cluster'
+	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity}
+
+	wait_deployment "${cluster}-backrest-shared-repo"
+	wait_deployment "${cluster}"
+	wait_job_completion "${cluster}-stanza-create" 'false'
+	wait_job_completion "backrest-backup-${cluster}"
 
 	wait_cluster_consistency ${cluster}
 
@@ -371,9 +492,6 @@ spinup_pgcluster() {
 wait_cluster_consistency() {
 	cluster_name=${1}
 	retry=0
-
-	wait_deployment ${1}
-	wait_deployment "${1}-backrest-shared-repo"
 
 	until [[ "$(kubectl_bin get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "pgcluster Initialized" ]]; do
 		let retry+=1
@@ -460,6 +578,8 @@ destroy() {
 		| sort -u \
 		| tee $tmp_dir/operator.log
 
+	kubectl_bin delete -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml 2>/dev/null || :
+
 	if [ -n "$OPENSHIFT" ]; then
 		oc delete --grace-period=0 --force=true project "$namespace"
 	else
@@ -512,4 +632,54 @@ check_replica() {
 		"${sql_cmp}" \
 		'\c myapp \\\ SELECT * from myApp;' \
 		"some-name:some-name_pass@${replica_pod_IP}" '' ' '
+}
+
+create_backup() {
+	local cluster=${1}
+	local bckp_prefix=${2}
+	local bckp_type=${3:-"full"}
+
+	yq w ${test_dir}/conf/backup.yml 'metadata.labels.pg-cluster' "${cluster}" \
+		| yq w - 'metadata.name' "${bckp_prefix}-${cluster}" \
+		| yq w - 'spec.name' "${bckp_prefix}-${cluster}" \
+		| yq w - 'spec.namespace' "${namespace}" \
+		| yq w - 'spec.parameters.job-name' "${bckp_prefix}-${cluster}" \
+		| yq w --style=single -- - 'spec.parameters.backrest-opts' "--type=${bckp_type}" \
+		| yq w - 'spec.parameters.pg-cluster' "${cluster}" \
+		| yq w - 'spec.parameters.podname' $(kubectl_bin get pods --selector=name=${cluster}-backrest-shared-repo,pg-cluster=${cluster} -o 'jsonpath={.items[].metadata.name}') \
+		| kubectl_bin apply -f -
+	sleep 10
+
+	wait_job_completion "${bckp_prefix}-${cluster}"
+}
+
+run_restore() {
+	local cluster=${1}
+	local rstr_prefix=${2}
+	local storage=${3:-"posix"}
+	local target=${4:-"null"} #time, xid or name
+	local type=${5:-"time"}
+
+	yq w ${test_dir}/conf/restore.yml 'metadata.labels.pg-cluster' "${cluster}" \
+		| yq w - 'metadata.name' "${rstr_prefix}-${cluster}" \
+		| yq w - 'spec.name' "${rstr_prefix}-${cluster}" \
+		| yq w - 'spec.namespace' "${namespace}" \
+		| yq w - 'spec.parameters.backrest-restore-from-cluster' "${cluster}" \
+		| yq w - 'spec.parameters.backrest-storage-type' "${storage}" \
+			>${tmp_dir}/restore.yml
+
+	if [[ ${target_time} != "null" ]]; then
+		yq w ${tmp_dir}/restore.yml --style=single 'spec.parameters.backrest-pitr-target' "${target}" \
+			| yq w --style=single -- - 'spec.parameters.backrest-restore-opts' "--type=${type}" \
+				>${tmp_dir}/restore.pitr.yml
+		mv ${tmp_dir}/restore.pitr.yml ${tmp_dir}/restore.yml
+	fi
+
+	kubectl apply -f ${tmp_dir}/restore.yml
+
+	wait_job_completion "${cluster}-bootstrap"
+	wait_deployment "${cluster}-backrest-shared-repo"
+	wait_deployment "${cluster}"
+	wait_job_completion "${cluster}-stanza-create" 'false'
+	wait_job_completion "backrest-backup-${cluster}"
 }
