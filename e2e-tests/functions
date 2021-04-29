@@ -80,7 +80,7 @@ deploy_operator() {
 	yq r -d'2' ${src_dir}/deploy/operator.yaml 'data[values.yaml]' \
 		| $sed -e "s#namespace: .*#namespace: ${namespace}#g" \
 		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: ${namespace}#g" \
-		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: ${GIT_BRANCH}#g" \
+		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: $(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)#g" \
 			>${tmp_dir}/operator.ini
 
 	# updating yaml itself
