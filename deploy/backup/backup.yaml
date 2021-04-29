@@ -26,12 +26,4 @@ spec:
     backrest-storage-type: ""
     job-name: cluster1-backrest-full-backup
     pg-cluster: cluster1
-  storagespec:
-    accessmode: ""
-    matchLabels: ""
-    name: ""
-    size: ""
-    storageclass: ""
-    storagetype: ""
-    supplementalgroups: ""
   tasktype: backrest
