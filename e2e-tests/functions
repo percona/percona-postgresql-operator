@@ -17,6 +17,7 @@ IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-ppg13-pgbouncer"}
 IMAGE_PG_HA=${IMAGE_PG_HA:-"${IMAGE_BASE}:main-ppg13-postgres-ha"}
 IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg13-pgbackrest"}
 IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg13-pgbackrest-repo"}
+IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg13-pgbadger"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
@@ -229,6 +230,7 @@ apply_cluster() {
 		| yq w - 'spec.pgImage' ${IMAGE_PG_HA} \
 		| yq w - 'spec.backrestImage' ${IMAGE_BACKREST} \
 		| yq w - 'spec.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
+		| yq w - 'spec.pgBadgerImage' ${IMAGE_PGBADGER} \
 		| yq d - 'spec.pgBouncer' \
 			>"${tmp_dir}/cr.yaml"
 
