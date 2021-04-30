@@ -338,7 +338,7 @@ pipeline {
                             source $HOME/google-cloud-sdk/path.bash.inc
                             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                             gcloud config set project $GCP_PROJECT
-                            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-basic $CLUSTER_NAME-scaling $CLUSTER_NAME-selfhealing $CLUSTER_NAME-backups || true
+                            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-sandbox || true
                             sudo docker rmi -f \$(sudo docker images -q) || true
 
                             sudo rm -rf $HOME/google-cloud-sdk
