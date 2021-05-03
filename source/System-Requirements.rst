@@ -15,7 +15,3 @@ The following platforms were tested and are officially supported by the Operator
 * Amazon Elastic Kubernetes Service (EKS)
 
 Other Kubernetes platforms may also work but have not been tested.
-
-
-
-
