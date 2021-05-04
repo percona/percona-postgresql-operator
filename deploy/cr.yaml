@@ -75,9 +75,9 @@ spec:
 #######################################################
 #  name of the PostgreSQL cluster, this is used to group PostgreSQL instances (primary, replicas) together.
   clustername: cluster1
-  pgImage: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
-  backrestImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
-  backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
+  pgImage: percona/percona-postgresql-operator:0.1.0-ppg13-postgres-ha
+  backrestImage: percona/percona-postgresql-operator:0.1.0-ppg13-pgbackrest
+  backrestRepoImage: percona/percona-postgresql-operator:0.1.0-ppg13-pgbackrest-repo
   pmm:
     enabled: false
     image: percona/pmm-client:2.15.1
@@ -112,10 +112,10 @@ spec:
 # If true, deploys the pgbadger sidecar for query analysis.
   pgBadger: false
   pgbadgerport: "10000"
-  pgBadgerImage: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
+  pgBadgerImage: percona/percona-postgresql-operator:0.1.0-ppg13-pgbadger
 ######################################################
   pgBouncer:
-    image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
+    image: percona/percona-postgresql-operator:0.1.0-ppg13-pgbouncer
     limits:
       cpu: "2"
       memory: 512Mi
@@ -136,7 +136,7 @@ spec:
 # https://pgbackrest.org/command.html#command-restore
     restoreOpts: ""
 #####################################################
-  pgoimageprefix: perconalab/percona-postgresql-operator
+  pgoimageprefix: percona/percona-postgresql-operator
   podAntiAffinity:
     default: preferred
     pgBackRest: preferred
