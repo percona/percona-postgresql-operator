@@ -1,7 +1,11 @@
 .. _install-kubernetes:
 
-Install Persona Server for PostgreSQL on Kubernetes
-====================================================
+Install Percona Distribution for PostgreSQL on Kubernetes
+=========================================================
+
+Following steps will allow you to install Percona Distribution for PostgreSQL
+Operator and use it to manage Percona Distribution for PostgreSQL in a
+Kubernetes-based environment.
 
 #. First of all, clone the percona-postgresql-operator repository:
 
@@ -28,11 +32,12 @@ Install Persona Server for PostgreSQL on Kubernetes
 
       $ kubectl apply -f deploy/operator.yaml
 
-#. After the operator is started Percona server for PostgreSQL
-   can be created at any time with the following command:
+#. After the operator is started Percona distribution for PostgreSQL
+   can be created at any time with the following commands:
 
    .. code:: bash
 
+      $ kubectl apply -f deploy/pguser-secret.yaml
       $ kubectl apply -f deploy/cr.yaml
 
    Creation process will take some time. The process is over when both
@@ -42,13 +47,12 @@ Install Persona Server for PostgreSQL on Kubernetes
 
       $ kubectl get pods
       NAME                                              READY   STATUS    RESTARTS   AGE
-      cluster1-haproxy-0                                1/1     Running   0          5m
-      cluster1-haproxy-1                                1/1     Running   0          5m
-      cluster1-haproxy-2                                1/1     Running   0          5m
-      cluster1-pxc-0                                    1/1     Running   0          5m
-      cluster1-pxc-1                                    1/1     Running   0          4m
-      cluster1-pxc-2                                    1/1     Running   0          2m
-      percona-xtradb-cluster-operator-dc67778fd-qtspz   1/1     Running   0          6m
+      backrest-backup-cluster1-j275w                    0/1     Completed 0          10m
+      cluster1-85486d645f-gpxzb                         1/1     Running   0          10m
+      cluster1-backrest-shared-repo-6495464548-c8wvl    1/1     Running   0          10m
+      cluster1-pgbouncer-fc45869f7-s86rf                1/1     Running   0          10m
+      pgo-deploy-rhv6k                                  0/1     Completed 0          5m
+      postgres-operator-8646c68b57-z8m62                4/4     Running   1          5m
 
 #. You can also deploy PosgreSQL replica at any time as follows: 
 
@@ -60,23 +64,15 @@ Install Persona Server for PostgreSQL on Kubernetes
 
    .. code:: bash
 
-      $ kubectl run -i --rm --tty percona-client --image=percona:8.0 --restart=Never -- bash -il
-      percona-client:/$ mysql -h cluster1-haproxy -uroot -proot_password
+      $ kubectl run -i --rm --tty pg-client --image=perconalab/percona-distribution-postgresql:13.2 --restart=Never -- bash -il
+      [postgres@pg-client /]$ PGPASSWORD='pguser_password' psql -h cluster1-pgbouncer -p 5432 -U pguser pgdb
 
-   This command will connect you to the MySQL monitor.
+
+   This command will connect you to the PostgreSQL interactive terminal.
 
    .. code:: text
 
-      mysql: [Warning] Using a password on the command line interface can be insecure.
-      Welcome to the MySQL monitor.  Commands end with ; or \g.
-      Your MySQL connection id is 1976
-      Server version: 8.0.19-10 Percona XtraDB Cluster (GPL), Release rel10, Revision 727f180, WSREP version 26.4.3
+      psql (13.2)
+      Type "help" for help.
+      pgdb=>
 
-      Copyright (c) 2009-2020 Percona LLC and/or its affiliates
-      Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
-
-      Oracle is a registered trademark of Oracle Corporation and/or its
-      affiliates. Other names may be trademarks of their respective
-      owners.
-
-      Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.

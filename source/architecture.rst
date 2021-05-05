@@ -33,9 +33,7 @@ To provide data storage for stateful applications, Kubernetes uses
 Persistent Volumes. A *PersistentVolumeClaim* (PVC) is used to implement
 the automatic storage provisioning to pods. If a failure occurs, the
 Container Storage Interface (CSI) should be able to re-mount storage on
-a different node. The PVC StorageClass must support this feature
-(Kubernetes and OpenShift support this in versions 1.9 and 3.9
-respectively).
+a different node.
 
 The Operator functionality extends the Kubernetes API with
 *PerconaXtraDBCluster* object, and it is implemented as a golang

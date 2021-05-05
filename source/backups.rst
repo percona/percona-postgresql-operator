@@ -40,13 +40,11 @@ The PostgreSQL Operator supports three types of pgBackRest backups:
 
 The Operator also supports setting pgBackRest retention policies for backups.
 Backup retention can be controlled by the following pgBackRest options:
+
 * ``--repo1-retention-full`` the number of full backups to retain,
 * ``--repo1-retention-diff`` the number of differential backups to retain,
 * ``--repo1-retention-archive`` how many sets of write-ahead log archives to
   retain alongside the full and differential backups that are retained.
-
-
-.. contents:: :local:
 
 .. _backups.configure:
 
@@ -125,7 +123,7 @@ scenarios where using this technique is helpful:
 
 To restore the previously saved backup the user should use a *backup restore*
 configuration file. The example of the backup configuration file is
- `deploy/backup/restore.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_.
+`deploy/backup/restore.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_.
 
 The most important keys in the parameters section of this file are the
 following:

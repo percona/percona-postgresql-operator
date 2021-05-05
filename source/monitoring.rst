@@ -5,7 +5,7 @@ Monitoring
 
 Percona Monitoring and Management (PMM) `provides an excellent
 solution <https://www.percona.com/doc/percona-monitoring-and-management/2.x/setting-up/client/postgresql.html>`_
-to monitor Percona Server for PostgreSQL.
+to monitor Percona Distribution for PostgreSQL.
 
 .. note:: Only PMM 2.x versions are supported by the Operator.
 
@@ -55,7 +55,7 @@ Kubernetes-based environment:
 
          .. code:: bash
 
-            kubectl patch secret/my-cluster-name-secrets -p '{"data":{"pmmserver": '$(echo -n new_password | base64)'}}'
+            kubectl patch secret/cluster1-pmm-secret -p '{"data":{"pmmserver": '$(echo -n new_password | base64)'}}'
 
    Apply changes with the ``kubectl apply -f deploy/secrets.yaml`` command.
 
@@ -71,7 +71,7 @@ Kubernetes-based environment:
    .. code:: bash
    
       $ kubectl get pods
-      $ kubectl logs cluster1-pgo-node-0 -c pmm-client
+      $ kubectl logs cluster1-7b7f7898d5-7f5pz -c pmm-client
 
 #. Now you can access PMM via *https* in a web browser, with the
    login/password authentication, and the browser is configured to show
