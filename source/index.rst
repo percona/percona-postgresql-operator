@@ -1,7 +1,7 @@
-Percona Kubernetes Operator for Percona XtraDB Cluster
-======================================================
+Percona Distribution for PostgreSQL Operator
+============================================
 
-Kubernetes and the OpenShift platform, based on Kubernetes, have added a way to
+Kubernetes and platforms, based on Kubernetes, have added a way to
 manage containerized systems, including database clusters. This management is
 achieved by controllers, declared in configuration files. These controllers
 provide automation with the ability to create objects, such as a container or a
@@ -22,8 +22,8 @@ Requirements
    System-Requirements
    architecture
 
-Quickstart guides
-=================
+Installation guides
+===================
 
 .. toctree::
    :maxdepth: 1
@@ -31,22 +31,14 @@ Quickstart guides
    minikube
    gke
    eks
-
-Advanced Installation Guides
-============================
-
-.. toctree::
-   :maxdepth: 1
-
    kubernetes
-   openshift
    custom-registry
    broker
    helm
    cluster-wide
 
-Configuration
-=============
+Configuration and Management
+============================
 
 .. toctree::
    :maxdepth: 1
@@ -59,13 +51,6 @@ Configuration
    proxysql-conf
    TLS
    encryption
-
-Management
-==========
-
-.. toctree::
-   :maxdepth: 1
-
    backups
    pause
    update
