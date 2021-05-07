@@ -54,6 +54,7 @@ type ServiceTemplateFields struct {
 	PGBadgerPort string
 	ExporterPort string
 	ServiceType  v1.ServiceType
+	Ranges       []string
 }
 
 // ReplicaSuffix is the suffix of the replica Service name
@@ -205,49 +206,27 @@ func AddClusterBase(clientset kubeapi.Interface, cl *crv1.Pgcluster, namespace s
 	// determine if a restore
 	_, restore := cl.GetAnnotations()[config.ANNOTATION_BACKREST_RESTORE]
 
-	// add replicas if requested, and if not a restore
-	if cl.Spec.Replicas != "" && !restore {
-		replicaCount, err := strconv.Atoi(cl.Spec.Replicas)
+	replicaCount := 0
+
+	if len(cl.Spec.Replicas) > 0 {
+		replicaCount, err = strconv.Atoi(cl.Spec.Replicas)
 		if err != nil {
-			log.Error("error in replicas value " + err.Error())
-			publishClusterCreateFailure(cl, err.Error())
+			log.Error("error in cluster replicas value: " + err.Error())
 			return
 		}
+	}
+
+	if cl.Spec.PGReplicas != nil {
+		replicaCount = cl.Spec.PGReplicas.HotStandby.Size
+	}
+
+	// add replicas if requested, and if not a restore
+	if replicaCount > 0 && !restore {
 		// create a CRD for each replica
 		for i := 1; i <= replicaCount; i++ {
-			spec := crv1.PgreplicaSpec{}
-			// get the storage config
-			spec.ReplicaStorage = cl.Spec.ReplicaStorage
-
-			spec.UserLabels = cl.Spec.UserLabels
-
-			// if the primary cluster has default node affinity rules set, we need
-			// to honor them in the spec. if a different affinity is desired, the
-			// replica needs to set its own rules
-			if cl.Spec.NodeAffinity.Default != nil {
-				spec.NodeAffinity = cl.Spec.NodeAffinity.Default
-			}
-
-			labels := make(map[string]string)
-			labels[config.LABEL_PG_CLUSTER] = cl.Spec.Name
-
-			spec.ClusterName = cl.Spec.Name
-			labels[config.LABEL_NAME] = cl.Name + "-repl" + strconv.Itoa(i)
-			spec.Name = labels[config.LABEL_NAME]
-			newInstance := &crv1.Pgreplica{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   labels[config.LABEL_NAME],
-					Labels: labels,
-				},
-				Spec: spec,
-				Status: crv1.PgreplicaStatus{
-					State:   crv1.PgreplicaStateCreated,
-					Message: "Created, not processed yet",
-				},
-			}
-
+			newInstance := GetNewReplicaObject(cl, i)
 			_, err = clientset.CrunchydataV1().Pgreplicas(namespace).
-				Create(ctx, newInstance, metav1.CreateOptions{})
+				Create(ctx, &newInstance, metav1.CreateOptions{})
 			if err != nil {
 				log.Error(" in creating Pgreplica instance" + err.Error())
 				publishClusterCreateFailure(cl, err.Error())
@@ -255,6 +234,45 @@ func AddClusterBase(clientset kubeapi.Interface, cl *crv1.Pgcluster, namespace s
 
 		}
 	}
+}
+
+func GetNewReplicaObject(cluster *crv1.Pgcluster, index int) crv1.Pgreplica {
+	labels := make(map[string]string)
+	labels[config.LABEL_PG_CLUSTER] = cluster.Spec.Name
+	labels[config.LABEL_NAME] = cluster.Name + "-repl" + strconv.Itoa(index)
+	spec := crv1.PgreplicaSpec{
+		Name:           labels[config.LABEL_NAME],
+		ReplicaStorage: cluster.Spec.ReplicaStorage,
+		UserLabels:     cluster.Spec.UserLabels,
+		ClusterName:    cluster.Spec.Name,
+	}
+	if cluster.Spec.NodeAffinity.Default != nil {
+		spec.NodeAffinity = cluster.Spec.NodeAffinity.Default
+	}
+	newReplica := crv1.Pgreplica{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      labels[config.LABEL_NAME],
+			Namespace: cluster.Namespace,
+			Labels:    labels,
+		},
+		Spec: spec,
+		Status: crv1.PgreplicaStatus{
+			State:   crv1.PgreplicaStateCreated,
+			Message: "Created, not processed yet",
+		},
+	}
+	if cluster.Spec.PGReplicas != nil {
+		if len(cluster.Spec.PGReplicas.HotStandby.Expose.ServiceType) > 0 {
+			newReplica.Spec.ServiceType = cluster.Spec.PGReplicas.HotStandby.Expose.ServiceType
+		}
+		if len(cluster.Spec.PGReplicas.HotStandby.Expose.LoadBalancerSourceRanges) > 0 {
+			newReplica.Spec.LoadBalancerRanges = cluster.Spec.PGReplicas.HotStandby.Expose.LoadBalancerSourceRanges
+		}
+		if cluster.Spec.PGReplicas.HotStandby.Storage != nil {
+			newReplica.Spec.ReplicaStorage = *cluster.Spec.PGReplicas.HotStandby.Storage
+		}
+	}
+	return newReplica
 }
 
 // AddClusterBootstrap creates the resources needed to bootstrap a new cluster from an existing

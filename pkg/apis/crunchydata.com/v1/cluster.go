@@ -157,6 +157,36 @@ type PgclusterSpec struct {
 	Tolerations []v1.Toleration `json:"tolerations"`
 
 	PMM PMMSpec `json:"pmm"`
+
+	PGReplicas *PGReplicas `json:"pgReplicas"`
+}
+
+type PGReplicas struct {
+	HotStandby HotStandby `json:"hotStandby"`
+}
+
+type HotStandby struct {
+	Size              int               `json:"size"`
+	Resources         Resources         `json:"resources"`
+	Storage           *PgStorageSpec    `json:"storage"`
+	Labels            map[string]string `json:"labels"`
+	Annotations       map[string]string `json:"annotations"`
+	Affinity          *v1.NodeAffinity  `json:"affinity"`
+	EnableSyncStandby *bool             `json:"enableSyncStandby"`
+	Expose            Expose            `json:"expose"`
+}
+
+type Expose struct {
+	Enabled                  bool              `json:"enabled"`
+	ServiceType              v1.ServiceType    `json:"serviceType"`
+	LoadBalancerSourceRanges []string          `json:"loadBalancerSourceRanges"`
+	Annotations              map[string]string `json:"annotations"`
+	Labels                   map[string]string `json:"labels"`
+}
+
+type Resources struct {
+	Requests v1.ResourceList `json:"requests"`
+	Limits   v1.ResourceList `json:"limits"`
 }
 
 // PMMSpec contains settings for PMM

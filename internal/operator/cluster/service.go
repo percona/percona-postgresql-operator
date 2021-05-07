@@ -68,6 +68,10 @@ func CreateService(clientset kubernetes.Interface, fields *ServiceTemplateFields
 			return err
 		}
 
+		if fields.ServiceType == v1.ServiceTypeLoadBalancer {
+			service.Spec.LoadBalancerSourceRanges = fields.Ranges
+		}
+
 		_, err = clientset.CoreV1().Services(namespace).Create(ctx, &service, metav1.CreateOptions{})
 	}
 

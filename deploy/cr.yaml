@@ -145,7 +145,11 @@ spec:
   port: "5432"
 # The number of replicas to create after a PostgreSQL primary
 # is first initialized. This only works on create
-  replicas: "0"
+#  replicas: "0"
+  pgReplicas:
+    hotStandby:
+      size: 0
+      syncReplication: null
   resources:
     memory: 128Mi
 #    cpu: 700m

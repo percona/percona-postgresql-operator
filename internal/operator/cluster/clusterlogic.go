@@ -381,6 +381,7 @@ func scaleReplicaCreateMissingService(clientset kubernetes.Interface, replica *c
 		ClusterName: replica.Spec.ClusterName,
 		Port:        cluster.Spec.Port,
 		ServiceType: serviceType,
+		Ranges:      replica.Spec.LoadBalancerRanges,
 	}
 
 	// only add references to the exporter / pgBadger ports
@@ -485,6 +486,9 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 			util.GetTolerations(cluster.Spec.Tolerations)),
 		PMMContainer: operator.GetPMMContainer(cluster, replica.Name),
 	}
+	if cluster.Spec.PGReplicas != nil {
+		updateDeploymentFromReplicaSection(&replicaDeploymentFields, cluster.Spec.PGReplicas)
+	}
 
 	switch replica.Spec.ReplicaStorage.StorageType {
 	case "", "emptydir":
@@ -528,6 +532,24 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 	_, err = clientset.AppsV1().Deployments(namespace).
 		Create(ctx, &replicaDeployment, metav1.CreateOptions{})
 	return err
+}
+
+func updateDeploymentFromReplicaSection(replicaDeploymentFields *operator.DeploymentTemplateFields, replicas *crv1.PGReplicas) {
+	replicaDeploymentFields.SyncReplication = operator.GetSyncReplication(replicas.HotStandby.EnableSyncStandby)
+	if replicas.HotStandby.Affinity != nil {
+		replicaDeploymentFields.PodAntiAffinity = replicas.HotStandby.Affinity.String()
+	}
+	if replicas.HotStandby.Labels != nil {
+		replicaDeploymentFields.PodLabels = operator.GetLabelsFromMap(replicas.HotStandby.Labels)
+	}
+	annotatioins, err := json.Marshal(replicas.HotStandby.Annotations)
+	// if there is an error, warn in our logs and return an empty string
+	if err != nil {
+		log.Errorf("could not set replica annotations: %q", err)
+	}
+	replicaDeploymentFields.PodAnnotations = string(annotatioins)
+	replicaDeploymentFields.ContainerResources = operator.GetResourcesJSON(replicas.HotStandby.Resources.Requests, replicas.HotStandby.Resources.Limits)
+
 }
 
 // DeleteReplica ...

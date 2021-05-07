@@ -51,8 +51,9 @@ type PgreplicaSpec struct {
 	NodeAffinity *v1.NodeAffinity `json:"nodeAffinity"`
 	// Tolerations are an optional list of Pod toleration rules that are applied
 	// to the PostgreSQL instance.
-	Tolerations []v1.Toleration `json:"tolerations"`
-	PMM         PMMSpec         `json:"pmm"`
+	Tolerations        []v1.Toleration `json:"tolerations"`
+	PMM                PMMSpec         `json:"pmm"`
+	LoadBalancerRanges []string        `json:"loadBalancerRanges"`
 }
 
 // PgreplicaList ...
