@@ -325,7 +325,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			log.Error("Failed to update backrest repo image", err)
 		}
 	}
-]
+
 	// see if the pgBackRest PVC size value changed.
 	if oldcluster.Spec.BackrestStorage.Size != newcluster.Spec.BackrestStorage.Size {
 		// validate that this resize can occur

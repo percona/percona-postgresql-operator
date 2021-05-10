@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/percona/percona-postgresql-operator/internal/apiserver"
-	"github.com/percona/percona-postgresql-operator/internal/config"
+	//	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"

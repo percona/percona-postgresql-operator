@@ -30,6 +30,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/cmd/pgo/api"
 	"github.com/percona/percona-postgresql-operator/cmd/pgo/util"
+	pgoutil "github.com/percona/percona-postgresql-operator/internal/util"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
 )

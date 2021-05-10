@@ -62,13 +62,8 @@ type pgBouncerTemplateFields struct {
 	Name                      string
 	CASecret                  string
 	ClusterName               string
-<<<<<<< HEAD
 	Image                     string
-=======
-	CCPImagePrefix            string
-	CCPImageTag               string
 	CustomLabels              string
->>>>>>> master
 	DisableFSGroup            bool
 	Port                      string
 	PrimaryServiceName        string

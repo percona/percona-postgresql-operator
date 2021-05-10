@@ -161,6 +161,7 @@ data:
     metrics: "false"
     namespace: "pgo"
     namespace_mode: "dynamic"
+    pgadmin_storage: "default"
     pgbadgerport: "10000"
     pgo_add_os_ca_store: "false"
     pgo_admin_password: "examplepassword"
