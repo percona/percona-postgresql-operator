@@ -69,7 +69,6 @@ options:
   for example ``us-east-1``,
 * ``BackrestS3URIStyle`` specifies whether ``host`` or ``path`` style URIs
   should be utilized,
-    --pgbackrest-s3-verify-tls - set this value to “true” 
 * ``BackrestS3VerifyTLS`` should be set to ``true`` to enable TLS verification
   or set to ``false`` to disable it.
 

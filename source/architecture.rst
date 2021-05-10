@@ -18,7 +18,7 @@ PostgreSQL containers deployed with the PostgreSQL Operator include the followin
   * `wal2json output plugin <https://github.com/eulerto/wal2json>`_,
 
 * The `pgBackRest <https://pgbackrest.org/>`_ Backup & Restore utility,
-* The `pgBouncer <http://pgbouncer.github.io/>`_ connection pooler for PostgreSQL,
+* The `pgBouncer <http://pgbouncer.github.io/>`__ connection pooler for PostgreSQL,
 * The PostgreSQL high-availability implementation based on the `Patroni template <https://patroni.readthedocs.io/>`_,
 * the `pg_stat_monitor <https://github.com/percona/pg_stat_monitor/>`_ PostgreSQL Query Performance Monitoring utility,
 * LLVM (for JIT compilation).
@@ -41,7 +41,7 @@ Definitions <https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension
 These CRDs provide extensions to the Kubernetes API, and, in the case of the
 Operator, allow you to perform actions such as creating a PostgreSQL Cluster,
 updating PostgreSQL Cluster resource allocations, adding additional utilities to
-a PostgreSQL cluster, e.g. `pgBouncer <https://www.pgbouncer.org/>`_ for
+a PostgreSQL cluster, e.g. `pgBouncer <https://www.pgbouncer.org/>`__ for
 connection pooling and more.
 
 When a new Custom Resource is created or an existing one undergoes some changes
