@@ -645,6 +645,15 @@ execute the following command:
 pgo create cluster newcluster --restore-from=oldcluster
 ```
 
+##### Full Restore Across Namespaces
+
+To create a new PostgreSQL cluster from a backup in another namespace and restore it
+fully, you can execute the following command:
+
+```
+pgo create cluster newcluster --restore-from=oldcluster --restore-from-namespace=oldnamespace
+```
+
 ##### Point-in-time-Recovery (PITR)
 
 To create a new PostgreSQL cluster and restore it to specific point-in-time
@@ -1187,6 +1196,39 @@ of `verify-ca`. If you wish to perform TLS mutual authentication between
 PostgreSQL instances (i.e. certificate-based authentication with SSL mode of
 `verify-full`), you will need to create a
 [PostgreSQL custom configuration]({{< relref "/advanced/custom-configuration.md" >}}).
+
+### Add TLS to an Existing PostgreSQL Cluster
+
+You can add TLS support to an existing PostgreSQL cluster using the
+[`pgo update cluster`]({{< relref "/pgo-client/reference/pgo_update_cluster.md" >}})
+command. The following flags are used to manage TLS in a Postgres cluster,
+including:
+
+- `--disable-server-tls`: removes TLS from a cluster
+- `--disable-tls-only`: removes the TLS-only requirement from a cluster
+- `--enable-tls-only`: adds the TLS-only requirement to a cluster
+- `--server-ca-secret`: combined with `--server-tls-secret`, enables TLS in a
+cluster
+- `--server-tls-secret`: combined with `--server-ca-secret`, enables TLS in a
+cluster
+- `--replication-tls-secret`: enables certificate-based authentication between
+Postgres instances.
+
+Using the above examples, to add TLS to a PostgreSQL cluster named `hippo` and
+require TLS, you can use the following command:
+
+```
+pgo update cluster hippo \
+  --enable-tls-only \
+  --server-ca-secret=postgresql-ca \
+  --server-tls-secret=hacluster-tls-keypair
+```
+
+Conversely, you can disable TLS with the `--disable-tls` flag:
+
+```
+pgo update cluster hippo --disable-server-tls
+```
 
 ## [Custom PostgreSQL Configuration]({{< relref "/advanced/custom-configuration.md" >}})
 

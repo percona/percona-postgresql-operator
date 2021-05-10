@@ -27,7 +27,7 @@ var (
 	ClusterReplicaCount                                                                          int
 	ManagedUser                                                                                  bool
 	AllNamespaces                                                                                bool
-	BackrestStorageConfig, ReplicaStorageConfig, StorageConfig                                   string
+	BackrestStorageConfig, PGAdminStorageConfig, ReplicaStorageConfig, StorageConfig             string
 	CustomConfig                                                                                 string
 	ArchiveFlag, DisableAutofailFlag, EnableAutofailFlag, PgbouncerFlag, MetricsFlag, BadgerFlag bool
 	BackrestRestoreFrom                                                                          string
@@ -58,6 +58,10 @@ var (
 	PodAntiAffinityPgBouncer                                                                     string
 	SyncReplication                                                                              bool
 	BackrestConfig                                                                               string
+	BackrestGCSBucket                                                                            string
+	BackrestGCSEndpoint                                                                          string
+	BackrestGCSKey                                                                               string
+	BackrestGCSKeyType                                                                           string
 	BackrestS3Key                                                                                string
 	BackrestS3KeySecret                                                                          string
 	BackrestS3Bucket                                                                             string
@@ -67,9 +71,11 @@ var (
 	BackrestS3VerifyTLS                                                                          bool
 	PVCSize                                                                                      string
 	BackrestPVCSize                                                                              string
+	PGAdminPVCSize                                                                               string
 	WALStorageConfig                                                                             string
 	WALPVCSize                                                                                   string
 	RestoreFrom                                                                                  string
+	RestoreFromNamespace                                                                         string
 )
 
 // group the annotation requests
@@ -412,6 +418,8 @@ func init() {
 	createClusterCmd.Flags().StringVarP(&NodeLabel, "node-label", "", "", "The node label (key=value) to use in placing the primary database. If not set, any node is used.")
 	createClusterCmd.Flags().StringVarP(&Password, "password", "", "", "The password to use for standard user account created during cluster initialization.")
 	createClusterCmd.Flags().IntVarP(&PasswordLength, "password-length", "", 0, "If no password is supplied, sets the length of the automatically generated password. Defaults to the value set on the server.")
+	createClusterCmd.Flags().StringVar(&PasswordType, "password-type", "", "The default Postgres password type to use for managed users. "+
+		"Either \"scram-sha-256\" or \"md5\". Defaults to \"md5\".")
 	createClusterCmd.Flags().StringVarP(&PasswordSuperuser, "password-superuser", "", "", "The password to use for the PostgreSQL superuser.")
 	createClusterCmd.Flags().StringVarP(&PasswordReplication, "password-replication", "", "", "The password to use for the PostgreSQL replication user.")
 	createClusterCmd.Flags().StringVar(&BackrestCPURequest, "pgbackrest-cpu", "", "Set the number of millicores to request for CPU "+
@@ -428,6 +436,18 @@ func init() {
 	createClusterCmd.Flags().StringVarP(&BackrestRepoPath, "pgbackrest-repo-path", "", "",
 		"The pgBackRest repository path that should be utilized instead of the default. Required "+
 			"for standby\nclusters to define the location of an existing pgBackRest repository.")
+	createClusterCmd.Flags().StringVar(&BackrestGCSBucket, "pgbackrest-gcs-bucket", "",
+		"The GCS bucket that should be utilized for the cluster when the \"gcs\" "+
+			"storage type is enabled for pgBackRest.")
+	createClusterCmd.Flags().StringVar(&BackrestGCSEndpoint, "pgbackrest-gcs-endpoint", "",
+		"The GCS endpoint that should be utilized for the cluster when the \"gcs\" "+
+			"storage type is enabled for pgBackRest.")
+	createClusterCmd.Flags().StringVar(&BackrestGCSKey, "pgbackrest-gcs-key", "",
+		"The GCS key that should be utilized for the cluster when the \"gcs\" "+
+			"storage type is enabled for pgBackRest. This must be a path to a file.")
+	createClusterCmd.Flags().StringVar(&BackrestGCSKeyType, "pgbackrest-gcs-key-type", "service",
+		"The GCS key type should be utilized for the cluster when the \"gcs\" "+
+			"storage type is enabled for pgBackRest.")
 	createClusterCmd.Flags().StringVarP(&BackrestS3Key, "pgbackrest-s3-key", "", "",
 		"The AWS S3 key that should be utilized for the cluster when the \"s3\" "+
 			"storage type is enabled for pgBackRest.")
@@ -449,7 +469,7 @@ func init() {
 	createClusterCmd.Flags().StringVarP(&BackrestS3URIStyle, "pgbackrest-s3-uri-style", "", "", "Specifies whether \"host\" or \"path\" style URIs will be used when connecting to S3.")
 	createClusterCmd.Flags().BoolVarP(&BackrestS3VerifyTLS, "pgbackrest-s3-verify-tls", "", true, "This sets if pgBackRest should verify the TLS certificate when connecting to S3. To disable, use \"--pgbackrest-s3-verify-tls=false\".")
 	createClusterCmd.Flags().StringVar(&BackrestStorageConfig, "pgbackrest-storage-config", "", "The name of the storage config in pgo.yaml to use for the pgBackRest local repository.")
-	createClusterCmd.Flags().StringVarP(&BackrestStorageType, "pgbackrest-storage-type", "", "", "The type of storage to use with pgBackRest. Either \"posix\", \"s3\" or both, comma separated. (default \"posix\")")
+	createClusterCmd.Flags().StringVarP(&BackrestStorageType, "pgbackrest-storage-type", "", "", "The type of storage to use with pgBackRest. Either \"posix\", \"s3\", \"gcs\", \"posix,s3\" or \"posix,gcs\". (default \"posix\")")
 	createClusterCmd.Flags().BoolVarP(&BadgerFlag, "pgbadger", "", false, "Adds the crunchy-pgbadger container to the database pod.")
 	createClusterCmd.Flags().BoolVarP(&PgbouncerFlag, "pgbouncer", "", false, "Adds a crunchy-pgbouncer deployment to the cluster.")
 	createClusterCmd.Flags().StringVar(&PgBouncerCPURequest, "pgbouncer-cpu", "", "Set the number of millicores to request for CPU "+
@@ -485,6 +505,9 @@ func init() {
 		"the TLS keypair to use for enabling certificate-based authentication between PostgreSQL instances, "+
 		"particularly for the purpose of replication. Must be used with \"server-tls-secret\" and \"server-ca-secret\".")
 	createClusterCmd.Flags().StringVarP(&RestoreFrom, "restore-from", "", "", "The name of cluster to restore from when bootstrapping a new cluster")
+	createClusterCmd.Flags().StringVarP(&RestoreFromNamespace, "restore-from-namespace", "", "",
+		"The namespace for the cluster specified using --restore-from.  Defaults to the "+
+			"namespace of the cluster being created if not provided.")
 	createClusterCmd.Flags().StringVarP(&BackupOpts, "restore-opts", "", "",
 		"The options to pass into pgbackrest where performing a restore to bootrap the cluster. "+
 			"Only applicable when a \"restore-from\" value is specified")
@@ -526,6 +549,9 @@ func init() {
 
 	// pgo create pgadmin
 	createPgAdminCmd.Flags().StringVarP(&Selector, "selector", "s", "", "The selector to use for cluster filtering.")
+	createPgAdminCmd.Flags().StringVarP(&PGAdminStorageConfig, "storage-config", "", "", "The name of the storage config in pgo.yaml to use for pgAdmin.")
+	createPgAdminCmd.Flags().StringVarP(&PGAdminPVCSize, "pvc-size", "", "",
+		`The size of the PVC capacity for pgAdmin. Overrides the value set in the storage class. Must follow the standard Kubernetes format, e.g. "10.1Gi"`)
 
 	// pgo create pgbouncer
 	createPgbouncerCmd.Flags().StringVar(&PgBouncerCPURequest, "cpu", "", "Set the number of millicores to request for CPU "+
@@ -571,7 +597,7 @@ func init() {
 	createUserCmd.Flags().StringVarP(&OutputFormat, "output", "o", "", `The output format. Supported types are: "json"`)
 	createUserCmd.Flags().StringVarP(&Password, "password", "", "", "The password to use for creating a new user which overrides a generated password.")
 	createUserCmd.Flags().IntVarP(&PasswordLength, "password-length", "", 0, "If no password is supplied, sets the length of the automatically generated password. Defaults to the value set on the server.")
-	createUserCmd.Flags().StringVar(&PasswordType, "password-type", "md5", "The type of password hashing to use."+
+	createUserCmd.Flags().StringVar(&PasswordType, "password-type", "", "The type of password hashing to use."+
 		"Choices are: (md5, scram-sha-256).")
 	createUserCmd.Flags().StringVarP(&Selector, "selector", "s", "", "The selector to use for cluster filtering.")
 	createUserCmd.Flags().StringVarP(&Username, "username", "", "", "The username to use for creating a new user")

@@ -3,6 +3,7 @@
 ANSIBLE_VERSION ?= 2.9.*
 PGOROOT ?= $(CURDIR)
 PGO_BASEOS ?= centos8
+BASE_IMAGE_OS ?= $(PGO_BASEOS)
 PGO_IMAGE_PREFIX ?= crunchydata
 PGO_IMAGE_TAG ?= $(PGO_BASEOS)-$(PGO_VERSION)
 PGO_VERSION ?= 0.1.0
@@ -54,7 +55,8 @@ endif
 
 ifeq ("$(PGO_BASEOS)", "ubi8")
         DFSET=rhel
-        PACKAGER=dnf
+        PACKAGER=microdnf
+        BASE_IMAGE_OS=ubi8-minimal
 endif
 
 ifeq ("$(PGO_BASEOS)", "centos7")
@@ -88,7 +90,7 @@ images = pgo-apiserver \
 	postgres-operator
 
 .PHONY: all installrbac setup setupnamespaces cleannamespaces \
-	deployoperator cli-docs clean push pull release
+	deployoperator cli-docs clean push pull release license
 
 
 #======= Main functions =======
@@ -112,7 +114,9 @@ deployoperator:
 
 
 #======= Binary builds =======
-build: build-postgres-operator build-pgo-apiserver build-pgo-client build-pgo-rmdata build-pgo-scheduler
+build: build-dev license
+
+build-dev: build-postgres-operator build-pgo-apiserver build-pgo-client build-pgo-rmdata build-pgo-scheduler
 
 build-pgo-apiserver:
 	$(GO_BUILD) -o bin/apiserver ./cmd/apiserver
@@ -178,7 +182,7 @@ endif
 
 pgo-base: pgo-base-$(IMGBUILDER)
 
-pgo-base-build: $(PGOROOT)/build/pgo-base/Dockerfile
+pgo-base-build: build $(PGOROOT)/build/pgo-base/Dockerfile
 	$(IMGCMDSTEM) \
 		-f $(PGOROOT)/build/pgo-base/Dockerfile \
 		-t $(PGO_IMAGE_PREFIX)/pgo-base:$(PGO_IMAGE_TAG) \
@@ -189,6 +193,7 @@ pgo-base-build: $(PGOROOT)/build/pgo-base/Dockerfile
 		--build-arg DFSET=$(DFSET) \
 		--build-arg PACKAGER=$(PACKAGER) \
 		--build-arg DOCKERBASEREGISTRY=$(DOCKERBASEREGISTRY) \
+		--build-arg BASE_IMAGE_OS=$(BASE_IMAGE_OS) \
 		$(PGOROOT)
 
 pgo-base-buildah: pgo-base-build ;
@@ -226,6 +231,9 @@ clean-deprecated:
 	@# executables used to be compiled into the $GOBIN directory
 	[ ! -n '$(GOBIN)' ] || rm -f $(GOBIN)/postgres-operator $(GOBIN)/apiserver $(GOBIN)/*pgo
 	[ ! -d bin/postgres-operator ] || rm -r bin/postgres-operator
+
+license:
+	./bin/license_aggregator.sh
 
 push: $(images:%=push-%) ;
 

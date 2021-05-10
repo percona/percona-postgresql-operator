@@ -16,9 +16,12 @@ package cmd
 */
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -229,8 +232,13 @@ func printCluster(detail *msgs.ShowClusterDetail) {
 		fmt.Println(TreeBranch + "pgreplica : " + replica.Name)
 	}
 
-	fmt.Printf("%s%s", TreeBranch, "labels : ")
+	labels := pgoutil.GetCustomLabels(&detail.Cluster)
 	for k, v := range detail.Cluster.ObjectMeta.Labels {
+		labels[k] = v
+	}
+
+	fmt.Printf("%s%s", TreeBranch, "labels : ")
+	for k, v := range labels {
 		fmt.Printf("%s=%s ", k, v)
 	}
 	fmt.Println("")
@@ -266,6 +274,7 @@ func createCluster(args []string, ns string, createClusterCmd *cobra.Command) {
 	r.PasswordSuperuser = PasswordSuperuser
 	r.PasswordReplication = PasswordReplication
 	r.Password = Password
+	r.PasswordType = PasswordType
 	r.SecretFrom = SecretFrom
 	r.UserLabels = getLabels(UserLabels)
 	r.Policies = PoliciesFlag
@@ -293,6 +302,9 @@ func createCluster(args []string, ns string, createClusterCmd *cobra.Command) {
 	r.PodAntiAffinityPgBackRest = PodAntiAffinityPgBackRest
 	r.PodAntiAffinityPgBouncer = PodAntiAffinityPgBouncer
 	r.BackrestConfig = BackrestConfig
+	r.BackrestGCSBucket = BackrestGCSBucket
+	r.BackrestGCSEndpoint = BackrestGCSEndpoint
+	r.BackrestGCSKeyType = BackrestGCSKeyType
 	r.BackrestS3CASecretName = BackrestS3CASecretName
 	r.BackrestS3Key = BackrestS3Key
 	r.BackrestS3KeySecret = BackrestS3KeySecret
@@ -332,6 +344,7 @@ func createCluster(args []string, ns string, createClusterCmd *cobra.Command) {
 	r.WALStorageConfig = WALStorageConfig
 	r.WALPVCSize = WALPVCSize
 	r.PGDataSource.RestoreFrom = RestoreFrom
+	r.PGDataSource.Namespace = RestoreFromNamespace
 	r.PGDataSource.RestoreOpts = BackupOpts
 	// set any annotations
 	r.Annotations = getClusterAnnotations(Annotations, AnnotationsPostgres, AnnotationsBackrest,
@@ -342,6 +355,11 @@ func createCluster(args []string, ns string, createClusterCmd *cobra.Command) {
 	// only set SyncReplication in the request if actually provided via the CLI
 	if createClusterCmd.Flag("sync-replication").Changed {
 		r.SyncReplication = &SyncReplication
+
+		// if it is true, ensure there is at least one replica
+		if r.SyncReplication != nil && *r.SyncReplication && r.ReplicaCount < 1 {
+			r.ReplicaCount = 1
+		}
 	}
 	// only set BackrestS3VerifyTLS in the request if actually provided via the CLI
 	// if set, store provided value accordingly
@@ -353,6 +371,28 @@ func createCluster(args []string, ns string, createClusterCmd *cobra.Command) {
 		} else {
 			r.BackrestS3VerifyTLS = msgs.UpdateBackrestS3VerifyTLSDisable
 		}
+	}
+
+	// r.BackrestGCSKey = BackrestGCSKey
+	// if a GCS key is provided, it is a path to the file, so we need to see if
+	// the file exists. and if it does, load it in
+	if BackrestGCSKey != "" {
+		gcsKeyFile, err := filepath.Abs(BackrestGCSKey)
+
+		if err != nil {
+			fmt.Println("invalid filename for --pgbackrest-gcs-key: ", err.Error())
+			os.Exit(1)
+		}
+
+		gcsKey, err := ioutil.ReadFile(gcsKeyFile)
+
+		if err != nil {
+			fmt.Println("could not read GCS Key from file: ", err.Error())
+			os.Exit(1)
+		}
+
+		// now we have a value that can be sent to the API server
+		r.BackrestGCSKey = base64.StdEncoding.EncodeToString(gcsKey)
 	}
 
 	// if the user provided resources for CPU or Memory, validate them to ensure
@@ -688,6 +728,7 @@ func updateCluster(args []string, ns string) {
 	log.Debugf("updateCluster called %v", args)
 
 	r := msgs.UpdateClusterRequest{}
+	r.Clustername = args
 	r.Selector = Selector
 	r.ClientVersion = msgs.PGO_VERSION
 	r.Namespace = ns
@@ -696,16 +737,18 @@ func updateCluster(args []string, ns string) {
 	r.BackrestCPULimit = BackrestCPULimit
 	r.BackrestMemoryRequest = BackrestMemoryRequest
 	r.BackrestMemoryLimit = BackrestMemoryLimit
+	r.BackrestPVCSize = BackrestPVCSize
 	// set the Crunchy Postgres Exporter resource requests
 	r.ExporterCPURequest = ExporterCPURequest
 	r.ExporterCPULimit = ExporterCPULimit
 	r.ExporterMemoryRequest = ExporterMemoryRequest
 	r.ExporterMemoryLimit = ExporterMemoryLimit
 	r.ExporterRotatePassword = ExporterRotatePassword
-	r.Clustername = args
+	r.PVCSize = PVCSize
 	r.ServiceType = v1.ServiceType(ServiceType)
 	r.Startup = Startup
 	r.Shutdown = Shutdown
+	r.WALPVCSize = WALPVCSize
 	// set the container resource requests
 	r.CPURequest = CPURequest
 	r.CPULimit = CPULimit
@@ -719,6 +762,22 @@ func updateCluster(args []string, ns string) {
 		AnnotationsPgBouncer)
 	r.Tolerations = getClusterTolerations(Tolerations, false)
 	r.TolerationsDelete = getClusterTolerations(Tolerations, true)
+
+	// most of the TLS settings
+	if DisableTLS {
+		r.DisableTLS = DisableTLS
+	} else {
+		r.TLSSecret = TLSSecret
+		r.ReplicationTLSSecret = ReplicationTLSSecret
+		r.CASecret = CASecret
+
+		// check to see if we need to enable/disable TLS only
+		if EnableTLSOnly {
+			r.TLSOnly = msgs.UpdateClusterTLSOnlyEnable
+		} else if DisableTLSOnly {
+			r.TLSOnly = msgs.UpdateClusterTLSOnlyDisable
+		}
+	}
 
 	// check to see if EnableStandby or DisableStandby is set. If so,
 	// set a value for Standby

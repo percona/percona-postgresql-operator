@@ -37,6 +37,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -51,6 +52,7 @@ type pgAdminTemplateFields struct {
 	Name           string
 	ClusterName    string
 	Image          string
+	CustomLabels   string
 	DisableFSGroup bool
 	Port           string
 	ServicePort    string
@@ -101,7 +103,7 @@ func AddPgAdmin(
 	pvcName := fmt.Sprintf(pgAdminDeploymentFormat, cluster.Name)
 
 	// create the pgAdmin storage volume
-	if _, err := pvc.CreateIfNotExists(clientset, *storageClass, pvcName, cluster.Name, ns); err != nil {
+	if _, err := pvc.CreateIfNotExists(clientset, *storageClass, pvcName, cluster.Name, ns, util.GetCustomLabels(cluster)); err != nil {
 		log.Errorf("Error creating PVC: %s", err.Error())
 		return err
 	} else {
@@ -128,7 +130,7 @@ func AddPgAdmin(
 func AddPgAdminFromPgTask(clientset kubeapi.Interface, restconfig *rest.Config, task *crv1.Pgtask) {
 	ctx := context.TODO()
 	clusterName := task.Spec.Parameters[config.LABEL_PGADMIN_TASK_CLUSTER]
-	namespace := task.Spec.Namespace
+	namespace := task.Namespace
 	storage := task.Spec.StorageSpec
 
 	log.Debugf("add pgAdmin from task called for cluster [%s] in namespace [%s]",
@@ -303,7 +305,7 @@ func DeletePgAdmin(clientset kubeapi.Interface, restconfig *rest.Config, cluster
 func DeletePgAdminFromPgTask(clientset kubeapi.Interface, restconfig *rest.Config, task *crv1.Pgtask) {
 	ctx := context.TODO()
 	clusterName := task.Spec.Parameters[config.LABEL_PGADMIN_TASK_CLUSTER]
-	namespace := task.Spec.Namespace
+	namespace := task.Namespace
 
 	log.Debugf("delete pgAdmin from task called for cluster [%s] in namespace [%s]",
 		clusterName, namespace)
@@ -330,6 +332,58 @@ func DeletePgAdminFromPgTask(clientset kubeapi.Interface, restconfig *rest.Confi
 	}
 }
 
+// ResizePGAdminPVC resizes the pgAdmin PVC. To do this, the pgAdmin Deployment
+// is scaled down to ensure the PVC unmounted, and then scaled back up. This
+// will ensure that the new PVC size is applied to pgAdmin.
+func ResizePGAdminPVC(clientset kubeapi.Interface, cluster *crv1.Pgcluster) error {
+	log.Debugf("resize pgAdmin PVC on [%s]", cluster.Name)
+	ctx := context.TODO()
+
+	// this should not error as it should be validated before this step.
+	size, err := resource.ParseQuantity(cluster.Spec.PGAdminStorage.Size)
+	if err != nil {
+		return err
+	}
+
+	// OK, let's now perform the resize. In this case, we need to update the value
+	// on the PVC.
+	pvcName := fmt.Sprintf(pgAdminDeploymentFormat, cluster.Name)
+	pvc, err := clientset.CoreV1().PersistentVolumeClaims(cluster.Namespace).Get(ctx,
+		pvcName, metav1.GetOptions{})
+
+	// if we can't locate the PVC, we can't resize, and we really need to return
+	// an error
+	if err != nil {
+		return err
+	}
+
+	// alright, update the PVC size
+	pvc.Spec.Resources.Requests[v1.ResourceStorage] = size
+
+	// and update!
+	if _, err := clientset.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx,
+		pvc, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+
+	// rescale the pgAdmin Deployment -- this is the same as the PVC name, but
+	// we'll use a diff variable to make this very clear
+	deploymentName := pvcName
+	deployment, err := clientset.AppsV1().Deployments(cluster.Namespace).Get(ctx,
+		deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	replicas := new(int32)
+	if err := operator.ScaleDeployment(clientset, deployment, replicas); err != nil {
+		return err
+	}
+
+	*replicas = 1
+	return operator.ScaleDeployment(clientset, deployment, replicas)
+}
+
 // createPgAdminDeployment creates the Kubernetes Deployment for pgAdmin
 func createPgAdminDeployment(clientset kubernetes.Interface, cluster *crv1.Pgcluster, pvcName string) error {
 	ctx := context.TODO()
@@ -354,6 +408,7 @@ func createPgAdminDeployment(clientset kubernetes.Interface, cluster *crv1.Pgclu
 		Name:           pgAdminDeploymentName,
 		ClusterName:    cluster.Name,
 		Image:          cluster.Spec.PgAdminImage,
+		CustomLabels:   operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 		DisableFSGroup: operator.Pgo.DisableFSGroup(),
 		Port:           defPgAdminPort,
 		InitUser:       defSetupUsername,
@@ -401,9 +456,10 @@ func createPgAdminService(clientset kubernetes.Interface, cluster *crv1.Pgcluste
 
 	// get the fields that will be substituted in the pgAdmin template
 	fields := pgAdminTemplateFields{
-		Name:        pgAdminSvcName,
-		ClusterName: cluster.Name,
-		Port:        defPgAdminPort,
+		Name:         pgAdminSvcName,
+		ClusterName:  cluster.Name,
+		Port:         defPgAdminPort,
+		CustomLabels: operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 	}
 
 	// For debugging purposes, put the template substitution in stdout
@@ -441,7 +497,7 @@ func publishPgAdminEvent(eventType string, task *crv1.Pgtask) {
 	topics := []string{events.EventTopicPgAdmin}
 	// set up the event header
 	eventHeader := events.EventHeader{
-		Namespace: task.Spec.Namespace,
+		Namespace: task.Namespace,
 		Username:  task.ObjectMeta.Labels[config.LABEL_PGOUSER],
 		Topic:     topics,
 		Timestamp: time.Now(),

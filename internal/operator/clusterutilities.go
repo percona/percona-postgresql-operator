@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -97,13 +98,20 @@ type badgerTemplateFields struct {
 }
 
 type PgbackrestEnvVarsTemplateFields struct {
-	PgbackrestStanza            string
-	PgbackrestDBPath            string
-	PgbackrestRepo1Path         string
-	PgbackrestRepo1Host         string
-	PgbackrestRepo1Type         crv1.BackrestStorageType
-	PgbackrestLocalAndS3Storage bool
-	PgbackrestPGPort            string
+	PgbackrestStanza             string
+	PgbackrestDBPath             string
+	PgbackrestRepo1Path          string
+	PgbackrestRepo1Host          string
+	PgbackrestRepo1Type          crv1.BackrestStorageType
+	PgbackrestLocalAndGCSStorage bool
+	PgbackrestLocalAndS3Storage  bool
+	PgbackrestPGPort             string
+}
+
+type PgbackrestGCSEnvVarsTemplateFields struct {
+	PgbackrestGCSBucket   string
+	PgbackrestGCSEndpoint string
+	PgbackrestGCSKeyType  string
 }
 
 type PgbackrestS3EnvVarsTemplateFields struct {
@@ -169,11 +177,13 @@ type DeploymentTemplateFields struct {
 	BadgerAddon               string
 	PgbackrestEnvVars         string
 	PgbackrestS3EnvVars       string
+	PgbackrestGCSEnvVars      string
 	PgmonitorEnvVars          string
 	ScopeLabel                string
 	Replicas                  string
 	IsInit                    bool
 	ReplicaReinitOnStartFail  bool
+	PasswordType              string
 	PodAntiAffinity           string
 	PodAntiAffinityLabelName  string
 	PodAntiAffinityLabelValue string
@@ -278,13 +288,14 @@ func GetAnnotations(cluster *crv1.Pgcluster, annotationType crv1.ClusterAnnotati
 // consolidate with cluster.GetPgbackrestEnvVars
 func GetPgbackrestEnvVars(cluster *crv1.Pgcluster, depName, port string) string {
 	fields := PgbackrestEnvVarsTemplateFields{
-		PgbackrestStanza:            "db",
-		PgbackrestRepo1Host:         cluster.Name + "-backrest-shared-repo",
-		PgbackrestRepo1Path:         GetPGBackRestRepoPath(cluster),
-		PgbackrestDBPath:            "/pgdata/" + depName,
-		PgbackrestPGPort:            port,
-		PgbackrestRepo1Type:         GetRepoType(cluster),
-		PgbackrestLocalAndS3Storage: IsLocalAndS3Storage(cluster),
+		PgbackrestStanza:             "db",
+		PgbackrestRepo1Host:          cluster.Name + "-backrest-shared-repo",
+		PgbackrestRepo1Path:          GetPGBackRestRepoPath(cluster),
+		PgbackrestDBPath:             "/pgdata/" + depName,
+		PgbackrestPGPort:             port,
+		PgbackrestRepo1Type:          GetRepoType(cluster),
+		PgbackrestLocalAndS3Storage:  IsLocalAndS3Storage(cluster),
+		PgbackrestLocalAndGCSStorage: IsLocalAndGCSStorage(cluster),
 	}
 
 	doc := bytes.Buffer{}
@@ -298,14 +309,36 @@ func GetPgbackrestEnvVars(cluster *crv1.Pgcluster, depName, port string) string 
 
 // GetPgbackrestBootstrapEnvVars returns a string containing the pgBackRest environment variables
 // for a bootstrap job
-func GetPgbackrestBootstrapEnvVars(restoreClusterName, depName string,
+func GetPgbackrestBootstrapEnvVars(cluster *crv1.Pgcluster,
 	restoreFromSecret *v1.Secret) (string, error) {
+	ctx := context.TODO()
+
+	depName := cluster.GetAnnotations()[config.ANNOTATION_CURRENT_PRIMARY]
+	restoreClusterName := cluster.Spec.PGDataSource.RestoreFrom
+
+	// get the namespace for the repo we're restoring from
+	restoreFromNamespace := GetBootstrapNamespace(cluster)
+
+	// Lookup an existing Service to determine its fully qualified domain name.
+	// This is inexpensive because the "net" package uses OS-level DNS caching.
+	// - https://golang.org/issue/24796
+	api := "kubernetes.default.svc"
+	cname, err := net.DefaultResolver.LookupCNAME(ctx, api)
+	if err != nil {
+		return "", err
+	}
+	domain := strings.TrimPrefix(cname, api+".")
+
+	// use DNS for the host for bootstrap Jobs since we might be bootstrapping across namespaces
+	repoHost := fmt.Sprintf(util.BackrestRepoDeploymentName, restoreClusterName) + "." +
+		restoreFromNamespace + ".svc." + domain
+
 	fields := PgbackrestEnvVarsTemplateFields{
 		PgbackrestStanza:    "db",
 		PgbackrestDBPath:    fmt.Sprintf("/pgdata/%s", depName),
 		PgbackrestRepo1Path: restoreFromSecret.Annotations[config.ANNOTATION_REPO_PATH],
 		PgbackrestPGPort:    restoreFromSecret.Annotations[config.ANNOTATION_PG_PORT],
-		PgbackrestRepo1Host: fmt.Sprintf(util.BackrestRepoDeploymentName, restoreClusterName),
+		PgbackrestRepo1Host: repoHost,
 		PgbackrestRepo1Type: crv1.BackrestStorageTypePosix, // just set to the default, can be overridden via CLI args
 	}
 
@@ -354,6 +387,19 @@ func GetBadgerAddon(cluster *crv1.Pgcluster, target string) string {
 	}
 
 	return doc.String()
+}
+
+// GetBootstrapNamespace returns the proper namespace to use when looking up and/or creating any
+// resources required to bootstrap a PostgreSQL cluster.  This includes either using the namespace
+// specified by the user in the PGDataSource, or defaulting to the same namespace as the pgcluster.
+func GetBootstrapNamespace(cluster *crv1.Pgcluster) string {
+	var restoreFromNamespace string
+	if cluster.Spec.PGDataSource.Namespace != "" {
+		restoreFromNamespace = cluster.Spec.PGDataSource.Namespace
+	} else {
+		restoreFromNamespace = cluster.Namespace
+	}
+	return restoreFromNamespace
 }
 
 // GetExporterAddon returns the template used to create an exporter container
@@ -474,10 +520,17 @@ func CreatePGHAConfigMap(clientset kubernetes.Interface, cluster *crv1.Pgcluster
 	// set "init" to true in the postgres-ha configMap
 	data[PGHAConfigInitSetting] = "true"
 
-	// if a standby cluster then we want to create replicas using the S3 pgBackRest repository
-	// (and not the local in-cluster pgBackRest repository)
+	// if a standby cluster then we want to create replicas using either S3 or GCS
+	// pgBackRest repository (and not the local in-cluster pgBackRest repository)
 	if cluster.Spec.Standby {
-		data[PGHAConfigReplicaBootstrapRepoType] = "s3"
+		repoType := crv1.BackrestStorageTypeS3
+		for _, rt := range cluster.Spec.BackrestStorageTypes {
+			if rt == crv1.BackrestStorageTypeGCS {
+				repoType = crv1.BackrestStorageTypeGCS
+			}
+		}
+
+		data[PGHAConfigReplicaBootstrapRepoType] = string(repoType)
 	}
 
 	configmap := &v1.ConfigMap{
@@ -486,6 +539,10 @@ func CreatePGHAConfigMap(clientset kubernetes.Interface, cluster *crv1.Pgcluster
 			Labels: labels,
 		},
 		Data: data,
+	}
+
+	for k, v := range util.GetCustomLabels(cluster) {
+		configmap.ObjectMeta.Labels[k] = v
 	}
 
 	if _, err := clientset.CoreV1().ConfigMaps(namespace).Create(ctx, configmap, metav1.CreateOptions{}); err != nil {
@@ -511,6 +568,20 @@ func GetNodeAffinity(nodeAffinity *v1.NodeAffinity) string {
 	}
 
 	return string(data)
+}
+
+// GetPasswordType returns the specific password type to use as part of Postgres
+// user management. If it's not "scram-sha-256" or "md5", it will just
+// return "" and use the default set in Postgres
+func GetPasswordType(cluster *crv1.Pgcluster) string {
+	switch cluster.Spec.PasswordType {
+	case "scram":
+		return "scram-sha-256"
+	case "scram-sha-256", "md5":
+		return cluster.Spec.PasswordType
+	}
+
+	return ""
 }
 
 // GetTablespaceNamePVCMap returns a map of the tablespace name to the PVC name
@@ -667,7 +738,7 @@ func GetTablespaceVolumeName(tablespaceName string) string {
 
 // needs to be consolidated with cluster.GetLabelsFromMap
 // GetLabelsFromMap ...
-func GetLabelsFromMap(labels map[string]string) string {
+func GetLabelsFromMap(labels map[string]string, trimComma bool) string {
 	var output string
 
 	for key, value := range labels {
@@ -675,8 +746,12 @@ func GetLabelsFromMap(labels map[string]string) string {
 			output += fmt.Sprintf("\"%s\": \"%s\",", key, value)
 		}
 	}
-	// removing the trailing comma from the final label
-	return strings.TrimSuffix(output, ",")
+	// removing the trailing comma from the final label, if request
+	if trimComma {
+		return strings.TrimSuffix(output, ",")
+	}
+
+	return output
 }
 
 // GetPodAntiAffinity returns the populated pod anti-affinity json that should be attached to
@@ -806,6 +881,70 @@ func GetPgmonitorEnvVars(cluster *crv1.Pgcluster) string {
 	return doc.String()
 }
 
+// GetPgbackrestGCSEnvVars retrieves the values for the various configuration
+// settings required to configure pgBackRest for GCS.
+func GetPgbackrestGCSEnvVars(clientset kubernetes.Interface, cluster crv1.Pgcluster) string {
+	// determine if backups are enabled to be stored in GCS
+	isGCS := false
+
+	for _, storageType := range cluster.Spec.BackrestStorageTypes {
+		isGCS = isGCS || (storageType == crv1.BackrestStorageTypeGCS)
+	}
+
+	if !isGCS {
+		return ""
+	}
+
+	// determine the secret for getting the credentials for using GCS as a
+	// pgBackRest repository. If we can't do that, then we can't move on
+	if _, err := util.GetGCSCredsFromBackrestRepoSecret(clientset, cluster.Namespace, cluster.Name); err != nil {
+		return ""
+	}
+
+	// populate the GCS bucket, endpoint and key type using either the values in
+	// the pgcluster spec (if present), otherwise populate using the values from
+	// the pgo.yaml config file
+	gcsEnvVars := PgbackrestGCSEnvVarsTemplateFields{
+		PgbackrestGCSBucket:   Pgo.Cluster.BackrestGCSBucket,
+		PgbackrestGCSEndpoint: Pgo.Cluster.BackrestGCSEndpoint,
+		PgbackrestGCSKeyType:  Pgo.Cluster.BackrestGCSKeyType,
+	}
+
+	if cluster.Spec.BackrestGCSBucket != "" {
+		gcsEnvVars.PgbackrestGCSBucket = cluster.Spec.BackrestGCSBucket
+	}
+
+	if cluster.Spec.BackrestGCSEndpoint != "" {
+		gcsEnvVars.PgbackrestGCSEndpoint = cluster.Spec.BackrestGCSEndpoint
+	}
+
+	if cluster.Spec.BackrestGCSKeyType != "" {
+		gcsEnvVars.PgbackrestGCSKeyType = cluster.Spec.BackrestGCSKeyType
+	}
+
+	// ensure that bucket is set
+	if gcsEnvVars.PgbackrestGCSBucket == "" {
+		log.Error("pgBackRest GCS bucket must be set")
+		return ""
+	}
+
+	// if key type is set, ensure it is of a valid value
+	if gcsEnvVars.PgbackrestGCSKeyType != "" &&
+		!(gcsEnvVars.PgbackrestGCSKeyType == "service" || gcsEnvVars.PgbackrestGCSKeyType == "token") {
+		log.Error(`pgBackRest GCS key type must be either "service" or "token"`)
+		return ""
+	}
+
+	doc := bytes.Buffer{}
+
+	if err := config.PgbackrestGCSEnvVarsTemplate.Execute(&doc, gcsEnvVars); err != nil {
+		log.Error(err.Error())
+		return ""
+	}
+
+	return doc.String()
+}
+
 // GetPgbackrestS3EnvVars retrieves the values for the various configuration settings require to
 // configure pgBackRest for AWS S3, including a bucket, endpoint, region, key and key secret.
 // The bucket, endpoint & region are obtained from the associated parameters in the pgcluster
@@ -902,6 +1041,27 @@ func GetS3VerifyTLSSetting(cluster *crv1.Pgcluster) string {
 	}
 
 	return strconv.FormatBool(verifyTLS)
+}
+
+// GetPgbackrestBootstrapGCSEnvVars retrieves the values for the various
+// configuration settings required to configure pgBackRest for GCS, specifically
+// for a bootstrap job.
+func GetPgbackrestBootstrapGCSEnvVars(pgDataSourceRestoreFrom string,
+	restoreFromSecret *v1.Secret) string {
+	gcsEnvVars := PgbackrestGCSEnvVarsTemplateFields{
+		PgbackrestGCSBucket:   restoreFromSecret.Annotations[config.ANNOTATION_GCS_BUCKET],
+		PgbackrestGCSEndpoint: restoreFromSecret.Annotations[config.ANNOTATION_GCS_ENDPOINT],
+		PgbackrestGCSKeyType:  restoreFromSecret.Annotations[config.ANNOTATION_GCS_KEY_TYPE],
+	}
+
+	doc := bytes.Buffer{}
+
+	if err := config.PgbackrestGCSEnvVarsTemplate.Execute(&doc, gcsEnvVars); err != nil {
+		log.Error(err)
+		return ""
+	}
+
+	return doc.String()
 }
 
 // GetPgbackrestBootstrapS3EnvVars retrieves the values for the various configuration settings

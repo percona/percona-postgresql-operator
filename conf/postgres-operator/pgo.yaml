@@ -2,7 +2,7 @@ Cluster:
   CCPImagePrefix:  registry.developers.crunchydata.com/crunchydata
   Metrics:  false
   Badger:  false
-  CCPImageTag:  centos8-13.2-4.6.1
+  CCPImageTag:  centos8-13.2-4.7.0-beta.3
   Port:  5432
   PGBadgerPort: 10000
   ExporterPort: 9187
@@ -13,6 +13,9 @@ Cluster:
   Replicas:  0
   ServiceType:  ClusterIP
   BackrestPort:  2022
+  BackrestGCSBucket:
+  BackrestGCSEndpoint:
+  BackrestGCSKeyType:
   BackrestS3Bucket:
   BackrestS3Endpoint:
   BackrestS3Region:
@@ -32,6 +35,7 @@ WALStorage:
 BackupStorage: default
 ReplicaStorage: default
 BackrestStorage: default
+PGAdminStorage: default
 Storage:
   default:
     AccessMode:  ReadWriteOnce
@@ -80,4 +84,4 @@ Storage:
 Pgo:
   Audit:  false
   PGOImagePrefix:  registry.developers.crunchydata.com/crunchydata
-  PGOImageTag:  centos8-4.6.1
+  PGOImageTag:  centos8-4.7.0-beta.3

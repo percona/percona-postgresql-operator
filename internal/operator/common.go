@@ -25,14 +25,17 @@ import (
 	"path"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/ns"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	log "github.com/sirupsen/logrus"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -71,6 +74,9 @@ var ContainerImageOverrides = map[string]string{}
 // e.g. "dynamic", "readonly" or "disabled".  See type NamespaceOperatingMode
 // for detailed explanations of each mode available.
 var namespaceOperatingMode ns.NamespaceOperatingMode
+
+// runAsNonRoot forces the Pod to run as a non-root Pod
+var runAsNonRoot = true
 
 type containerResourcesTemplateFields struct {
 	// LimitsMemory and LimitsCPU detemrine the memory/CPU limits
@@ -166,6 +172,8 @@ func Initialize(clientset kubernetes.Interface) {
 func GetPodSecurityContext(supplementalGroups []int64) string {
 	// set up the security context struct
 	securityContext := v1.PodSecurityContext{
+		// we don't want to run the pods as root, so explicitly disallow this
+		RunAsNonRoot: &runAsNonRoot,
 		// add any supplemental groups that the user passed in
 		SupplementalGroups: supplementalGroups,
 	}
@@ -271,6 +279,25 @@ func GetRepoType(cluster *crv1.Pgcluster) crv1.BackrestStorageType {
 	return cluster.Spec.BackrestStorageTypes[0]
 }
 
+// IsLocalAndGCSStorage a boolean indicating whether or not local and gcs
+// storage should be enabled for pgBackRest based on the backrestStorageType
+// string provided
+func IsLocalAndGCSStorage(cluster *crv1.Pgcluster) bool {
+	// this works for the time being. if the counter is two or greater, then we
+	// have both local and GCS storage
+	i := 0
+
+	for _, storageType := range cluster.Spec.BackrestStorageTypes {
+		switch storageType {
+		default: // no-op
+		case crv1.BackrestStorageTypeLocal, crv1.BackrestStorageTypePosix, crv1.BackrestStorageTypeGCS:
+			i += 1
+		}
+	}
+
+	return i >= 2
+}
+
 // IsLocalAndS3Storage a boolean indicating whether or not local and s3 storage should
 // be enabled for pgBackRest based on the backrestStorageType string provided
 func IsLocalAndS3Storage(cluster *crv1.Pgcluster) bool {
@@ -287,6 +314,25 @@ func IsLocalAndS3Storage(cluster *crv1.Pgcluster) bool {
 	}
 
 	return i >= 2
+}
+
+// ScaleDeployment scales a deployment to a specified number of replicas. It
+// will also wait to ensure that the Deployment is actually scaled down.
+func ScaleDeployment(clientset kubeapi.Interface,
+	deployment *appsv1.Deployment, replicas *int32) error {
+	ctx := context.TODO()
+
+	patch, _ := kubeapi.NewMergePatch().Add("spec", "replicas")(*replicas).Bytes()
+
+	log.Debugf("patching deployment %s: %s", deployment.GetName(), patch)
+
+	// Patch the Deployment with the updated number of replicas, which will
+	// trigger the scaling operation. We store the updated deployment so the
+	// object can be later updated when we scale back up
+	_, err := clientset.AppsV1().Deployments(deployment.Namespace).
+		Patch(ctx, deployment.GetName(), types.MergePatchType, patch, metav1.PatchOptions{})
+
+	return err
 }
 
 // SetContainerImageOverride determines if there is an override available for

@@ -4,6 +4,9 @@
   "metadata": {
     "name": "{{.Name}}",
     "labels": {
+      {{ if .CustomLabels }}
+      {{ .CustomLabels }}
+      {{ end }}
       "name": "{{.Name}}",
       "crunchy-pgadmin": "true",
       "pg-cluster": "{{.ClusterName}}",
@@ -25,6 +28,9 @@
     "template": {
       "metadata": {
         "labels": {
+          {{ if .CustomLabels }}
+          {{ .CustomLabels }}
+          {{ end }}
           "name": "{{.Name}}",
           "crunchy-pgadmin": "true",
           "pg-cluster": "{{.ClusterName}}",
@@ -34,17 +40,24 @@
       },
       "spec": {
         "serviceAccountName": "pgo-default",
-        {{ if not .DisableFSGroup }}
         "securityContext": {
-          "fsGroup": 2
+          {{ if not .DisableFSGroup }}
+          "fsGroup": 2,
+          {{ end }}
+          "runAsNonRoot": true
         },
-        {{ end }}
         "containers": [{
           "name": "pgadminweb",
           "image": "{{.Image}}",
+          "securityContext": {
+            "allowPrivilegeEscalation": false,
+            "privileged": false,
+            "readOnlyRootFilesystem": true
+          },
           "ports": [{
             "containerPort": {{.Port}},
-            "protocol": "TCP"
+            "protocol": "TCP",
+            "name": "pgadmin4"
           }],
           "env": [{
             "name": "PGADMIN_SETUP_EMAIL",
@@ -54,12 +67,37 @@
             "value": "{{.InitPass}}"
           }],
           "volumeMounts": [{
+              "name": "tmp",
+              "mountPath": "/tmp"
+            },
+            {
+              "name": "pgadmin-log",
+              "mountPath": "/var/log/pgadmin"
+            },
+            {
+              "name": "tmp",
+              "mountPath": "/etc/httpd/run"
+            },
+            {
             "name": "pgadmin-datadir",
-            "mountPath": "/var/lib/pgadmin",
-            "readOnly": false
-          }]
+            "mountPath": "/var/lib/pgadmin"
+            }]
         }],
         "volumes": [{
+            "name": "tmp",
+            "emptyDir": {
+              "medium": "Memory",
+              "sizeLimit": "16Mi"
+            }
+          },
+          {
+            "name": "pgadmin-log",
+            "emptyDir": {
+              "medium": "Memory",
+              "sizeLimit": "16Mi"
+            }
+          },
+          {
           "name": "pgadmin-datadir",
           "persistentVolumeClaim": {
             "claimName": "{{.PVCName}}"

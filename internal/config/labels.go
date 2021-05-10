@@ -34,7 +34,6 @@ const (
 
 const (
 	LABEL_PGPOLICY           = "pgpolicy"
-	LABEL_PGREMOVE           = "pgremove"
 	LABEL_PVCNAME            = "pvcname"
 	LABEL_EXPORTER           = "crunchy-postgres-exporter"
 	LABEL_ARCHIVE            = "archive"
@@ -177,11 +176,12 @@ const (
 const GLOBAL_CUSTOM_CONFIGMAP = "pgo-custom-pg-config"
 
 const (
-	LABEL_PGHA_SCOPE        = "crunchy-pgha-scope"
-	LABEL_PGHA_CONFIGMAP    = "pgha-config"
-	LABEL_PGHA_BACKUP_TYPE  = "pgha-backup-type"
-	LABEL_PGHA_ROLE         = "role"
-	LABEL_PGHA_ROLE_PRIMARY = "master"
-	LABEL_PGHA_ROLE_REPLICA = "replica"
-	LABEL_PGHA_BOOTSTRAP    = "pgha-bootstrap"
+	LABEL_PGHA_SCOPE               = "crunchy-pgha-scope"
+	LABEL_PGHA_CONFIGMAP           = "pgha-config"
+	LABEL_PGHA_BACKUP_TYPE         = "pgha-backup-type"
+	LABEL_PGHA_ROLE                = "role"
+	LABEL_PGHA_ROLE_PRIMARY        = "master"
+	LABEL_PGHA_ROLE_REPLICA        = "replica"
+	LABEL_PGHA_BOOTSTRAP           = "pgha-bootstrap"
+	LABEL_PGHA_BOOTSTRAP_NAMESPACE = "pgha-bootstrap-namespace"
 )

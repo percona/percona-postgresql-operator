@@ -48,18 +48,20 @@ RUN set -ex; \
         openssl; \
     microdnf  -y clean all
 
+RUN mkdir -p /opt/cpm/bin
+
 COPY installers/ansible /ansible/postgres-operator
 COPY installers/metrics/ansible /ansible/metrics
 COPY installers/image/bin/pgo-deploy.sh /pgo-deploy.sh
-COPY bin/uid_daemon.sh /uid_daemon.sh
+ADD bin/common /opt/cpm/bin
 
 ENV ANSIBLE_CONFIG="/ansible/postgres-operator/ansible.cfg"
 ENV HOME="/tmp"
 
-RUN chmod g=u /etc/passwd
-RUN chmod g=u /uid_daemon.sh
+# Defines a unique directory name that will be utilized by the nss_wrapper in the UID script
+ENV NSS_WRAPPER_SUBDIR="deployer"
 
-ENTRYPOINT ["/uid_daemon.sh"]
+ENTRYPOINT ["/opt/cpm/bin/uid_daemon.sh"]
 
 USER 2
 

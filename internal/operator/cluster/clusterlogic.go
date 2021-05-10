@@ -65,11 +65,12 @@ func addClusterCreateMissingService(clientset kubernetes.Interface, cluster *crv
 
 	// create the primary service
 	serviceFields := ServiceTemplateFields{
-		Name:        cluster.Spec.Name,
-		ServiceName: cluster.Spec.Name,
-		ClusterName: cluster.Spec.Name,
-		Port:        cluster.Spec.Port,
-		ServiceType: serviceType,
+		Name:         cluster.Spec.Name,
+		ServiceName:  cluster.Spec.Name,
+		ClusterName:  cluster.Spec.Name,
+		Port:         cluster.Spec.Port,
+		ServiceType:  serviceType,
+		CustomLabels: operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 	}
 
 	// set the pgBadger port if pgBadger is enabled
@@ -87,13 +88,14 @@ func addClusterCreateMissingService(clientset kubernetes.Interface, cluster *crv
 
 // addClusterBootstrapJob creates a job that will be used to bootstrap a PostgreSQL cluster from an
 // existing data source
-func addClusterBootstrapJob(clientset kubeapi.Interface,
-	cl *crv1.Pgcluster, namespace string, dataVolume, walVolume operator.StorageResult,
-	tablespaceVolumes map[string]operator.StorageResult) error {
+func addClusterBootstrapJob(clientset kubeapi.Interface, cl *crv1.Pgcluster,
+	dataVolume, walVolume operator.StorageResult,
+	tablespaceVolumes map[string]operator.StorageResult, bootstrapSecret *v1.Secret) error {
 	ctx := context.TODO()
+	namespace := cl.GetNamespace()
 
 	bootstrapFields, err := getBootstrapJobFields(clientset, cl, dataVolume,
-		tablespaceVolumes)
+		tablespaceVolumes, bootstrapSecret)
 	if err != nil {
 		return err
 	}
@@ -136,7 +138,7 @@ func addClusterDeployments(clientset kubeapi.Interface,
 	tablespaceVolumes map[string]operator.StorageResult) error {
 	ctx := context.TODO()
 
-	if err := backrest.CreateRepoDeployment(clientset, cl, true, false, 0); err != nil {
+	if err := backrest.CreateRepoDeployment(clientset, cl, true, false, 0, namespace); err != nil {
 		return err
 	}
 
@@ -178,7 +180,8 @@ func addClusterDeployments(clientset kubeapi.Interface,
 // getBootstrapJobFields obtains the fields needed to populate the cluster bootstrap job template
 func getBootstrapJobFields(clientset kubeapi.Interface,
 	cluster *crv1.Pgcluster, dataVolume operator.StorageResult,
-	tablespaceVolumes map[string]operator.StorageResult) (operator.BootstrapJobTemplateFields, error) {
+	tablespaceVolumes map[string]operator.StorageResult,
+	bootstrapSecret *v1.Secret) (operator.BootstrapJobTemplateFields, error) {
 	ctx := context.TODO()
 
 	restoreClusterName := cluster.Spec.PGDataSource.RestoreFrom
@@ -205,15 +208,6 @@ func getBootstrapJobFields(clientset kubeapi.Interface,
 			strings.TrimSpace(bootstrapFields.RestoreOpts + " --target-action=promote")
 	}
 
-	// Grab the pgBackRest secret from the "restore from" cluster to obtain the annotations
-	// containing the additional configuration details needed to bootstrap from the clusters
-	// pgBackRest repository
-	restoreFromSecret, err := clientset.CoreV1().Secrets(cluster.GetNamespace()).Get(ctx,
-		fmt.Sprintf(util.BackrestRepoSecretName, restoreClusterName), metav1.GetOptions{})
-	if err != nil {
-		return bootstrapFields, err
-	}
-
 	// Grab the cluster to restore from to see if it still exists
 	restoreCluster, err := clientset.CrunchydataV1().Pgclusters(cluster.GetNamespace()).
 		Get(ctx, restoreClusterName, metav1.GetOptions{})
@@ -234,22 +228,24 @@ func getBootstrapJobFields(clientset kubeapi.Interface,
 	}
 
 	// Now override any backrest env vars for the bootstrap job
-	bootstrapBackrestVars, err := operator.GetPgbackrestBootstrapEnvVars(restoreClusterName,
-		cluster.GetAnnotations()[config.ANNOTATION_CURRENT_PRIMARY], restoreFromSecret)
+	bootstrapBackrestVars, err := operator.GetPgbackrestBootstrapEnvVars(cluster,
+		bootstrapSecret)
 	if err != nil {
 		return bootstrapFields, err
 	}
 	bootstrapFields.PgbackrestEnvVars = bootstrapBackrestVars
 
-	// if an s3 restore is detected, override or set the pgbackrest S3 env vars, otherwise do
-	// not set the s3 env vars at all
-	s3Restore := backrest.S3RepoTypeCLIOptionExists(cluster.Spec.PGDataSource.RestoreOpts)
-	if s3Restore {
-		// Now override any backrest S3 env vars for the bootstrap job
+	// if an s3 or gcs restore is detected, override or set the pgbackrest S3/GCS
+	// env vars, otherwise do not set the s3/gcs env vars at all
+	bootstrapFields.PgbackrestGCSEnvVars = ""
+	bootstrapFields.PgbackrestS3EnvVars = ""
+
+	if backrest.S3RepoTypeCLIOptionExists(cluster.Spec.PGDataSource.RestoreOpts) {
 		bootstrapFields.PgbackrestS3EnvVars = operator.GetPgbackrestBootstrapS3EnvVars(
-			cluster.Spec.PGDataSource.RestoreFrom, restoreFromSecret)
-	} else {
-		bootstrapFields.PgbackrestS3EnvVars = ""
+			cluster.Spec.PGDataSource.RestoreFrom, bootstrapSecret)
+	} else if backrest.GCSRepoTypeCLIOptionExists(cluster.Spec.PGDataSource.RestoreOpts) {
+		bootstrapFields.PgbackrestGCSEnvVars = operator.GetPgbackrestBootstrapGCSEnvVars(
+			cluster.Spec.PGDataSource.RestoreFrom, bootstrapSecret)
 	}
 
 	return bootstrapFields, nil
@@ -260,32 +256,38 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 	cl *crv1.Pgcluster, dataVolume operator.StorageResult,
 	tablespaceVolumes map[string]operator.StorageResult) operator.DeploymentTemplateFields {
 	namespace := cl.GetNamespace()
+	labels := map[string]string{}
+
+	// copy any of the custom labels that are in user labels.
+	for k, v := range cl.Spec.UserLabels {
+		labels[k] = v
+	}
 
 	log.Infof("creating Pgcluster %s in namespace %s", cl.Name, namespace)
 
-	cl.Spec.UserLabels["name"] = cl.Spec.Name
-	cl.Spec.UserLabels[config.LABEL_PG_CLUSTER] = cl.Spec.ClusterName
+	labels["name"] = cl.Spec.Name
+	labels[config.LABEL_PG_CLUSTER] = cl.Spec.ClusterName
 
 	// if the current deployment label value does not match current primary name
 	// update the label so that the new deployment will match the existing PVC
 	// as determined previously
 	// Note that the use of this value brings the initial deployment creation in line with
 	// the paradigm used during cluster restoration, as in operator/backrest/restore.go
-	if cl.Annotations[config.ANNOTATION_CURRENT_PRIMARY] != cl.Spec.UserLabels[config.LABEL_DEPLOYMENT_NAME] {
-		cl.Spec.UserLabels[config.LABEL_DEPLOYMENT_NAME] = cl.Annotations[config.ANNOTATION_CURRENT_PRIMARY]
+	if cl.Annotations[config.ANNOTATION_CURRENT_PRIMARY] != labels[config.LABEL_DEPLOYMENT_NAME] {
+		labels[config.LABEL_DEPLOYMENT_NAME] = cl.Annotations[config.ANNOTATION_CURRENT_PRIMARY]
 	}
 
-	cl.Spec.UserLabels[config.LABEL_PGOUSER] = cl.ObjectMeta.Labels[config.LABEL_PGOUSER]
+	labels[config.LABEL_PGOUSER] = cl.ObjectMeta.Labels[config.LABEL_PGOUSER]
 
 	// Set the Patroni scope to the name of the primary deployment.  Replicas will get scope using the
 	// 'crunchy-pgha-scope' label on the pgcluster
-	cl.Spec.UserLabels[config.LABEL_PGHA_SCOPE] = cl.Spec.Name
+	labels[config.LABEL_PGHA_SCOPE] = cl.Name
 
 	// If applicable, set the exporter labels, used for the scrapers, and create
 	// the secret. We don't need to take any additional actions, as the cluster
 	// creation process will handle those. Magic!
 	if cl.Spec.Exporter {
-		cl.Spec.UserLabels[config.LABEL_EXPORTER] = config.LABEL_TRUE
+		labels[config.LABEL_EXPORTER] = config.LABEL_TRUE
 
 		log.Debugf("creating exporter secret for cluster %s", cl.Spec.Name)
 
@@ -313,9 +315,9 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		Port:              cl.Spec.Port,
 		Image:             cl.Spec.PGImage,
 		PVCName:           dataVolume.InlineVolumeSource(),
-		DeploymentLabels:  operator.GetLabelsFromMap(cl.Spec.UserLabels),
+		DeploymentLabels:  operator.GetLabelsFromMap(labels, true),
 		PodAnnotations:    operator.GetAnnotations(cl, crv1.ClusterAnnotationPostgres),
-		PodLabels:         operator.GetLabelsFromMap(cl.Spec.UserLabels),
+		PodLabels:         operator.GetLabelsFromMap(labels, true),
 		DataPathOverride:  cl.Annotations[config.ANNOTATION_CURRENT_PRIMARY],
 		Database:          cl.Spec.Database,
 		SecurityContext:   operator.GetPodSecurityContext(supplementalGroups),
@@ -323,6 +325,7 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		PrimarySecretName: crv1.UserSecretName(cl, crv1.PGUserReplication),
 		UserSecretName:    crv1.UserSecretName(cl, cl.Spec.User),
 		NodeSelector:      operator.GetNodeAffinity(cl.Spec.NodeAffinity.Default),
+		PasswordType:      operator.GetPasswordType(cl),
 		PodAntiAffinity: operator.GetPodAntiAffinity(cl,
 			crv1.PodAntiAffinityDeploymentDefault, cl.Spec.PodAntiAffinity.Default),
 		PodAntiAffinityLabelName:  config.LABEL_POD_ANTI_AFFINITY,
@@ -335,6 +338,7 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		ScopeLabel:                config.LABEL_PGHA_SCOPE,
 		PgbackrestEnvVars:         operator.GetPgbackrestEnvVars(cl, cl.Annotations[config.ANNOTATION_CURRENT_PRIMARY], cl.Spec.Port),
 		PgbackrestS3EnvVars:       operator.GetPgbackrestS3EnvVars(clientset, *cl),
+		PgbackrestGCSEnvVars:      operator.GetPgbackrestGCSEnvVars(clientset, *cl),
 		ReplicaReinitOnStartFail:  !operator.Pgo.Cluster.DisableReplicaStartFailReinit,
 		SyncReplication:           operator.GetSyncReplication(cl.Spec.SyncReplication),
 		Tablespaces:               operator.GetTablespaceNames(cl.Spec.TablespaceMounts),
@@ -376,11 +380,12 @@ func scaleReplicaCreateMissingService(clientset kubernetes.Interface, replica *c
 
 	serviceName := fmt.Sprintf("%s-replica", replica.Spec.ClusterName)
 	serviceFields := ServiceTemplateFields{
-		Name:        serviceName,
-		ServiceName: serviceName,
-		ClusterName: replica.Spec.ClusterName,
-		Port:        cluster.Spec.Port,
-		ServiceType: serviceType,
+		Name:         serviceName,
+		ServiceName:  serviceName,
+		ClusterName:  replica.Spec.ClusterName,
+		Port:         cluster.Spec.Port,
+		ServiceType:  serviceType,
+		CustomLabels: operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 	}
 
 	// only add references to the exporter / pgBadger ports
@@ -409,17 +414,23 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 	var replicaDoc bytes.Buffer
 
 	serviceName := replica.Spec.ClusterName + "-replica"
+	labels := map[string]string{}
 
-	//	replicaLabels := operator.GetPrimaryLabels(serviceName, replica.Spec.ClusterName, replicaFlag, cluster.Spec.UserLabels)
-	cluster.Spec.UserLabels[config.LABEL_REPLICA_NAME] = replica.Spec.Name
-	cluster.Spec.UserLabels["name"] = serviceName
-	cluster.Spec.UserLabels[config.LABEL_PG_CLUSTER] = replica.Spec.ClusterName
+	// copy any of the custom labels that are in user labels.
+	for k, v := range cluster.Spec.UserLabels {
+		labels[k] = v
+	}
+
+	labels["name"] = serviceName
+	labels[config.LABEL_PG_CLUSTER] = replica.Spec.ClusterName
 
 	cluster.Spec.UserLabels[config.LABEL_DEPLOYMENT_NAME] = replica.Spec.Name
 
+	labels[config.LABEL_DEPLOYMENT_NAME] = replica.Spec.Name
+
 	// Set the exporter labels, if applicable
 	if cluster.Spec.Exporter {
-		cluster.Spec.UserLabels[config.LABEL_EXPORTER] = config.LABEL_TRUE
+		labels[config.LABEL_EXPORTER] = config.LABEL_TRUE
 	}
 
 	// set up a map of the names of the tablespaces as well as the storage classes
@@ -450,15 +461,16 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		DataPathOverride:   replica.Spec.Name,
 		Replicas:           "1",
 		ConfVolume:         operator.GetConfVolume(clientset, cluster, namespace),
-		DeploymentLabels:   operator.GetLabelsFromMap(cluster.Spec.UserLabels),
+		DeploymentLabels:   operator.GetLabelsFromMap(labels, true),
 		PodAnnotations:     operator.GetAnnotations(cluster, crv1.ClusterAnnotationPostgres),
-		PodLabels:          operator.GetLabelsFromMap(cluster.Spec.UserLabels),
+		PodLabels:          operator.GetLabelsFromMap(labels, true),
 		SecurityContext:    operator.GetPodSecurityContext(supplementalGroups),
 		RootSecretName:     crv1.UserSecretName(cluster, crv1.PGUserSuperuser),
 		PrimarySecretName:  crv1.UserSecretName(cluster, crv1.PGUserReplication),
 		UserSecretName:     crv1.UserSecretName(cluster, cluster.Spec.User),
 		ContainerResources: operator.GetResourcesJSON(cluster.Spec.Resources, cluster.Spec.Limits),
 		NodeSelector:       operator.GetNodeAffinity(nodeAffinity),
+		PasswordType:       operator.GetPasswordType(cluster),
 		PodAntiAffinity: operator.GetPodAntiAffinity(cluster,
 			crv1.PodAntiAffinityDeploymentDefault, cluster.Spec.PodAntiAffinity.Default),
 		PodAntiAffinityLabelName:  config.LABEL_POD_ANTI_AFFINITY,
@@ -468,6 +480,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		ScopeLabel:                config.LABEL_PGHA_SCOPE,
 		PgbackrestEnvVars:         operator.GetPgbackrestEnvVars(cluster, replica.Spec.Name, cluster.Spec.Port),
 		PgbackrestS3EnvVars:       operator.GetPgbackrestS3EnvVars(clientset, *cluster),
+		PgbackrestGCSEnvVars:      operator.GetPgbackrestGCSEnvVars(clientset, *cluster),
 		ReplicaReinitOnStartFail:  !operator.Pgo.Cluster.DisableReplicaStartFailReinit,
 		SyncReplication:           operator.GetSyncReplication(cluster.Spec.SyncReplication),
 		Tablespaces:               operator.GetTablespaceNames(cluster.Spec.TablespaceMounts),
@@ -522,8 +535,8 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 
 	// set the replica scope to the same scope as the primary, i.e. the scope defined using label
 	// 'crunchy-pgha-scope'
-	replicaDeployment.Labels[config.LABEL_PGHA_SCOPE] = cluster.Labels[config.LABEL_PGHA_SCOPE]
-	replicaDeployment.Spec.Template.Labels[config.LABEL_PGHA_SCOPE] = cluster.Labels[config.LABEL_PGHA_SCOPE]
+	replicaDeployment.Labels[config.LABEL_PGHA_SCOPE] = cluster.Name
+	replicaDeployment.Spec.Template.Labels[config.LABEL_PGHA_SCOPE] = cluster.Name
 
 	_, err = clientset.AppsV1().Deployments(namespace).
 		Create(ctx, &replicaDeployment, metav1.CreateOptions{})
@@ -547,7 +560,7 @@ func DeleteReplica(clientset kubernetes.Interface, cl *crv1.Pgreplica, namespace
 	return err
 }
 
-func publishScaleError(namespace string, username string, cluster *crv1.Pgcluster) {
+func publishScaleError(namespace string, username string, cluster *crv1.Pgcluster, replica *crv1.Pgreplica) {
 	topics := make([]string, 1)
 	topics[0] = events.EventTopicCluster
 
@@ -559,8 +572,8 @@ func publishScaleError(namespace string, username string, cluster *crv1.Pgcluste
 			Timestamp: time.Now(),
 			EventType: events.EventScaleCluster,
 		},
-		Clustername: cluster.Spec.UserLabels[config.LABEL_REPLICA_NAME],
-		Replicaname: cluster.Spec.UserLabels[config.LABEL_PG_CLUSTER],
+		Clustername: cluster.Name,
+		Replicaname: replica.Name,
 	}
 
 	err := events.Publish(f)
@@ -624,7 +637,7 @@ func ShutdownCluster(clientset kubeapi.Interface, cluster crv1.Pgcluster) error 
 	}
 
 	// disable autofailover to prevent failovers while shutting down deployments
-	if err := util.ToggleAutoFailover(clientset, false, cluster.Labels[config.LABEL_PGHA_SCOPE],
+	if err := util.ToggleAutoFailover(clientset, false, cluster.Name,
 		cluster.Namespace); err != nil {
 		return fmt.Errorf("Cluster Operator: Unable to toggle autofailover when shutting "+
 			"down cluster %s", cluster.Name)
@@ -653,7 +666,7 @@ func ShutdownCluster(clientset kubeapi.Interface, cluster crv1.Pgcluster) error 
 	}
 
 	if err := clientset.CoreV1().ConfigMaps(cluster.Namespace).
-		Delete(ctx, fmt.Sprintf("%s-leader", cluster.Labels[config.LABEL_PGHA_SCOPE]),
+		Delete(ctx, fmt.Sprintf("%s-leader", cluster.Name),
 			metav1.DeleteOptions{}); err != nil {
 		return err
 	}
@@ -670,7 +683,7 @@ func StartupCluster(clientset kubernetes.Interface, cluster crv1.Pgcluster) erro
 	log.Debugf("Cluster Operator: starting cluster %s", cluster.Name)
 
 	// ensure autofailover is enabled to ensure proper startup of the cluster
-	if err := util.ToggleAutoFailover(clientset, true, cluster.Labels[config.LABEL_PGHA_SCOPE],
+	if err := util.ToggleAutoFailover(clientset, true, cluster.Name,
 		cluster.Namespace); err != nil {
 		return fmt.Errorf("Cluster Operator: Unable to toggle autofailover when starting "+
 			"cluster %s", cluster.Name)

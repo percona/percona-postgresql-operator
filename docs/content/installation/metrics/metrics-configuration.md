@@ -25,7 +25,7 @@ These variables affect the general configuration of PostgreSQL Operator Monitori
 | `create_rbac` | true | **Required** | Set to true if the installer should create the RBAC resources required to run the PostgreSQL Operator Monitoring infrastructure. |
 | `db_port` | 5432 | **Required** | Set to configure the PostgreSQL port used by all PostgreSQL clusters. |
 | `delete_metrics_namespace` | false |  | Set to configure whether or not the metrics namespace (defined using variable `metrics_namespace`) is deleted when uninstalling the monitoring infrastructure. |
-| `disable_fsgroup` | false |  | Set to `true` for deployments where you do not want to have the default PostgreSQL fsGroup (26) set. The typical usage is in OpenShift environments that have a `restricted` Security Context Constraints. |
+| `disable_fsgroup` | false |  | Set to `true` for deployments where you do not want to have the default PostgreSQL fsGroup (26) set. The typical usage is in OpenShift environments that have a `restricted` Security Context Constraints. If you use the `anyuid` SCC, you would want to set this to `false`. The Postgres Operator will set this value appropriately by default, except for when using the `anyuid` SCC.  |
 | `grafana_admin_password` | admin | **Required** | Set to configure the login password for the Grafana administrator. |
 | `grafana_admin_username` | admin | **Required** | Set to configure the login username for the Grafana administrator. |
 | `grafana_install` | true | **Required** | Set to true to install Grafana to visualize metrics. |
@@ -108,10 +108,10 @@ and tag as needed to use the RedHat certified containers:
 | `alertmanager_image_tag` | v0.21.0 | **Required** | Configures the image tag to use for the Alertmanager container. |
 | `grafana_image_prefix` | grafana | **Required** | Configures the image prefix to use for the Grafana container.|
 | `grafana_image_name` | grafana | **Required** | Configures the image name to use for the Grafana container. |
-| `grafana_image_tag` | 6.7.5 | **Required** | Configures the image tag to use for the Grafana container. |
+| `grafana_image_tag` | 7.4.5 | **Required** | Configures the image tag to use for the Grafana container. |
 | `prometheus_image_prefix` | prom | **Required** | Configures the image prefix to use for the Prometheus container. |
 | `prometheus_image_name` | promtheus | **Required** | Configures the image name to use for the Prometheus container. |
-| `prometheus_image_tag` | v2.24.0 | **Required** | Configures the image tag to use for the Prometheus container. |
+| `prometheus_image_tag` | v2.26.0 | **Required** | Configures the image tag to use for the Prometheus container. |
 
 Additionally, these same settings can be utilized as needed to support custom image names,
 tags, and additional container registries.

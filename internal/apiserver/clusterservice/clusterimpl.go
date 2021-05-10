@@ -17,6 +17,7 @@ limitations under the License.
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -299,11 +300,14 @@ func getServices(cluster *crv1.Pgcluster, ns string) ([]msgs.ShowClusterService,
 	for _, p := range services.Items {
 		d := msgs.ShowClusterService{}
 		d.Name = p.Name
-		if strings.Contains(p.Name, "-backrest-repo") {
+		if strings.HasSuffix(p.Name, "-backrest-repo") {
 			d.BackrestRepo = true
 			d.ClusterName = cluster.Name
-		} else if strings.Contains(p.Name, "-pgbouncer") {
+		} else if strings.HasSuffix(p.Name, "-pgbouncer") {
 			d.Pgbouncer = true
+			d.ClusterName = cluster.Name
+		} else if strings.HasSuffix(p.Name, "-pgadmin") {
+			d.PGAdmin = true
 			d.ClusterName = cluster.Name
 		}
 		d.ClusterIP = p.Spec.ClusterIP
@@ -485,6 +489,8 @@ func TestCluster(name, selector, ns, pgouser string, allFlag bool) msgs.ClusterT
 				endpoint.InstanceType = msgs.ClusterTestInstanceTypePrimary
 			case (strings.HasSuffix(service.Name, "-"+msgs.PodTypeReplica) && strings.Count(service.Name, "-"+msgs.PodTypeReplica) == 1):
 				endpoint.InstanceType = msgs.ClusterTestInstanceTypeReplica
+			case service.PGAdmin:
+				endpoint.InstanceType = msgs.ClusterTestInstanceTypePGAdmin
 			case service.Pgbouncer:
 				endpoint.InstanceType = msgs.ClusterTestInstanceTypePGBouncer
 			case service.BackrestRepo:
@@ -786,6 +792,15 @@ func CreateCluster(request *msgs.CreateClusterRequest, ns, pgouser string) msgs.
 		}
 	}
 
+	// determine if the the password type is valid
+	if _, err := apiserver.GetPasswordType(request.PasswordType); err != nil {
+		resp.Status.Code = msgs.Error
+		resp.Status.Msg = err.Error()
+		return resp
+	} else if request.PasswordType == "scram" {
+		request.PasswordType = "scram-sha-256"
+	}
+
 	// if the pgBouncer flag is set, validate that replicas is set to a
 	// nonnegative value and the service type.
 	if request.PgbouncerFlag {
@@ -919,7 +934,7 @@ func CreateCluster(request *msgs.CreateClusterRequest, ns, pgouser string) msgs.
 		resp.Result.Users = append(resp.Result.Users, user)
 	}
 
-	// Create Backrest secret for S3/SSH Keys:
+	// Create Backrest secret for GCS/S3/SSH Keys:
 	// We make this regardless if backrest is enabled or not because
 	// the deployment template always tries to mount /sshd volume
 	secretName := fmt.Sprintf("%s-%s", clusterName, config.LABEL_BACKREST_REPO_SECRET)
@@ -947,6 +962,19 @@ func CreateCluster(request *msgs.CreateClusterRequest, ns, pgouser string) msgs.
 			backrestS3CACert = backrestSecret.Data[util.BackRestRepoSecretKeyAWSS3KeyAWSS3CACert]
 		}
 
+		// if a GCS key is provided, we need to base64 decode it
+		backrestGCSKey := []byte{}
+		if request.BackrestGCSKey != "" {
+			// try to decode the string
+			backrestGCSKey, err = base64.StdEncoding.DecodeString(request.BackrestGCSKey)
+
+			if err != nil {
+				resp.Status.Code = msgs.Error
+				resp.Status.Msg = fmt.Sprintf("could not decode GCS key: %s", err.Error())
+				return resp
+			}
+		}
+
 		// set up the secret for the cluster that contains the pgBackRest
 		// information
 		secret := &v1.Secret{
@@ -962,7 +990,12 @@ func CreateCluster(request *msgs.CreateClusterRequest, ns, pgouser string) msgs.
 				util.BackRestRepoSecretKeyAWSS3KeyAWSS3CACert:    backrestS3CACert,
 				util.BackRestRepoSecretKeyAWSS3KeyAWSS3Key:       []byte(request.BackrestS3Key),
 				util.BackRestRepoSecretKeyAWSS3KeyAWSS3KeySecret: []byte(request.BackrestS3KeySecret),
+				util.BackRestRepoSecretKeyAWSS3KeyGCSKey:         backrestGCSKey,
 			},
+		}
+
+		for k, v := range util.GetCustomLabels(newInstance) {
+			secret.ObjectMeta.Labels[k] = v
 		}
 
 		if _, err := apiserver.Clientset.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{}); err != nil && !kubeapi.IsAlreadyExists(err) {
@@ -1044,7 +1077,6 @@ func validateConfigPolicies(clusterName, PoliciesFlag, ns string) error {
 		spec.Parameters[v] = v
 	}
 	spec.Name = clusterName + "-policies"
-	spec.Namespace = ns
 	labels := make(map[string]string)
 	labels[config.LABEL_PG_CLUSTER] = clusterName
 
@@ -1332,7 +1364,6 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, ns string
 	// otherwise, set the value from the global configuration
 	spec.PGOImagePrefix = util.GetValueOrDefault(request.PGOImagePrefix, apiserver.Pgo.Pgo.PGOImagePrefix)
 
-	spec.Namespace = ns
 	spec.Name = name
 	spec.ClusterName = name
 	spec.Port = apiserver.Pgo.Cluster.Port
@@ -1382,6 +1413,9 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, ns string
 
 	log.Debugf("username set to [%s]", spec.User)
 
+	// set the password type
+	spec.PasswordType = request.PasswordType
+
 	// set the name of the database. The hierarchy is as such:
 	// 1. Use the name that the user provides in the request
 	// 2. Use the name that is in the pgo.yaml file
@@ -1405,6 +1439,12 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, ns string
 
 	spec.CustomConfig = request.CustomConfig
 	spec.SyncReplication = request.SyncReplication
+
+	replicas, _ := strconv.Atoi(spec.Replicas)
+	if spec.SyncReplication != nil && *spec.SyncReplication && replicas < 1 {
+		spec.Replicas = "1"
+		log.Infof("sync replication set. ensuring there is at least one replica.")
+	}
 
 	if request.BackrestConfig != "" {
 		configmap := v1.ConfigMapProjection{}
@@ -1447,6 +1487,22 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, ns string
 		spec.BackrestS3VerifyTLS = apiserver.Pgo.Cluster.BackrestS3VerifyTLS
 	}
 
+	// set the pgBackRest GCS settings
+	spec.BackrestGCSBucket = apiserver.Pgo.Cluster.BackrestGCSBucket
+	if request.BackrestGCSBucket != "" {
+		spec.BackrestGCSBucket = request.BackrestGCSBucket
+	}
+
+	spec.BackrestGCSEndpoint = apiserver.Pgo.Cluster.BackrestGCSEndpoint
+	if request.BackrestGCSEndpoint != "" {
+		spec.BackrestGCSEndpoint = request.BackrestGCSEndpoint
+	}
+
+	spec.BackrestGCSKeyType = apiserver.Pgo.Cluster.BackrestGCSKeyType
+	if request.BackrestGCSKeyType != "" {
+		spec.BackrestGCSKeyType = request.BackrestGCSKeyType
+	}
+
 	// set the data source that should be utilized to bootstrap the cluster
 	spec.PGDataSource = request.PGDataSource
 
@@ -1485,6 +1541,7 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, ns string
 	newInstance := &crv1.Pgcluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
+			Namespace:   ns,
 			Labels:      labels,
 			Annotations: annotations,
 		},
@@ -1571,7 +1628,6 @@ func createWorkflowTask(clusterName, ns, pgouser string) (string, error) {
 
 	// create pgtask CRD
 	spec := crv1.PgtaskSpec{}
-	spec.Namespace = ns
 	spec.Name = clusterName + "-" + crv1.PgtaskWorkflowCreateClusterType
 	spec.TaskType = crv1.PgtaskWorkflow
 
@@ -1673,7 +1729,7 @@ func createUserSecret(request *msgs.CreateClusterRequest, cluster *crv1.Pgcluste
 	// if the secret already exists, we can perform an early exit
 	// if there is an error, we'll ignore it
 	if secret, err := apiserver.Clientset.
-		CoreV1().Secrets(cluster.Spec.Namespace).
+		CoreV1().Secrets(cluster.Namespace).
 		Get(ctx, secretName, metav1.GetOptions{}); err == nil {
 		log.Infof("secret exists: [%s] - skipping", secretName)
 
@@ -1692,7 +1748,7 @@ func createUserSecret(request *msgs.CreateClusterRequest, cluster *crv1.Pgcluste
 		secretFromSecretName := fmt.Sprintf("%s-%s-secret", request.SecretFrom, username)
 
 		// now attempt to load said secret
-		oldPassword, err := util.GetPasswordFromSecret(apiserver.Clientset, cluster.Spec.Namespace, secretFromSecretName)
+		oldPassword, err := util.GetPasswordFromSecret(apiserver.Clientset, cluster.Namespace, secretFromSecretName)
 		// if there is an error, abandon here, otherwise set the oldPassword as the
 		// current password
 		if err != nil {
@@ -1720,7 +1776,7 @@ func createUserSecret(request *msgs.CreateClusterRequest, cluster *crv1.Pgcluste
 
 	// great, now we can create the secret! if we can't, return an error
 	if err := util.CreateSecret(apiserver.Clientset, cluster.Spec.Name, secretName,
-		username, password, cluster.Spec.Namespace); err != nil {
+		username, password, cluster.Namespace, util.GetCustomLabels(cluster)); err != nil {
 		return "", err
 	}
 
@@ -1737,14 +1793,6 @@ func UpdateCluster(request *msgs.UpdateClusterRequest) msgs.UpdateClusterRespons
 	response.Results = make([]string, 0)
 
 	log.Debugf("autofail is [%v]\n", request.Autofail)
-
-	switch {
-	case request.Startup && request.Shutdown:
-		response.Status.Code = msgs.Error
-		response.Status.Msg = fmt.Sprintf("A startup and a shutdown were requested. " +
-			"Please specify one or the other.")
-		return response
-	}
 
 	if request.Startup && request.Shutdown {
 		response.Status.Code = msgs.Error
@@ -1817,6 +1865,31 @@ func UpdateCluster(request *msgs.UpdateClusterRequest) msgs.UpdateClusterRespons
 		return response
 	}
 
+	// if any PVC resizing is occurring, ensure that it is a valid quantity
+	if request.PVCSize != "" {
+		if err := apiserver.ValidateQuantity(request.PVCSize); err != nil {
+			response.Status.Code = msgs.Error
+			response.Status.Msg = err.Error()
+			return response
+		}
+	}
+
+	if request.BackrestPVCSize != "" {
+		if err := apiserver.ValidateQuantity(request.BackrestPVCSize); err != nil {
+			response.Status.Code = msgs.Error
+			response.Status.Msg = err.Error()
+			return response
+		}
+	}
+
+	if request.WALPVCSize != "" {
+		if err := apiserver.ValidateQuantity(request.WALPVCSize); err != nil {
+			response.Status.Code = msgs.Error
+			response.Status.Msg = err.Error()
+			return response
+		}
+	}
+
 	clusterList := crv1.PgclusterList{}
 
 	// get the clusters list
@@ -1858,6 +1931,92 @@ func UpdateCluster(request *msgs.UpdateClusterRequest) msgs.UpdateClusterRespons
 
 	for i := range clusterList.Items {
 		cluster := clusterList.Items[i]
+
+		// validate any PVC resizing. If we are resizing a PVC, ensure that we are
+		// making it larger
+		if request.PVCSize != "" {
+			if err := util.ValidatePVCResize(cluster.Spec.PrimaryStorage.Size, request.PVCSize); err != nil {
+				response.Status.Code = msgs.Error
+				response.Status.Msg = err.Error()
+				return response
+			}
+
+			cluster.Spec.PrimaryStorage.Size = request.PVCSize
+		}
+
+		if request.BackrestPVCSize != "" {
+			if err := util.ValidatePVCResize(cluster.Spec.BackrestStorage.Size, request.BackrestPVCSize); err != nil {
+				response.Status.Code = msgs.Error
+				response.Status.Msg = err.Error()
+				return response
+			}
+
+			cluster.Spec.BackrestStorage.Size = request.BackrestPVCSize
+		}
+
+		if request.WALPVCSize != "" {
+			if err := util.ValidatePVCResize(cluster.Spec.WALStorage.Size, request.WALPVCSize); err != nil {
+				response.Status.Code = msgs.Error
+				response.Status.Msg = err.Error()
+				return response
+			}
+
+			cluster.Spec.WALStorage.Size = request.WALPVCSize
+		}
+
+		// validate an TLS settings. This is fun...to leverage a validation we have
+		// on create, we're doing to use a "CreateClusterRequest" struct and fill
+		// in the settings from both the request the current cluster spec.
+		// though, if we're disabling TLS, then we're skipping that
+		if request.DisableTLS {
+			cluster.Spec.TLS.CASecret = ""
+			cluster.Spec.TLS.ReplicationTLSSecret = ""
+			cluster.Spec.TLS.TLSSecret = ""
+			cluster.Spec.TLSOnly = false
+		} else {
+			v := &msgs.CreateClusterRequest{
+				CASecret:             cluster.Spec.TLS.CASecret,
+				Namespace:            cluster.Namespace,
+				ReplicationTLSSecret: cluster.Spec.TLS.ReplicationTLSSecret,
+				TLSOnly:              cluster.Spec.TLSOnly,
+				TLSSecret:            cluster.Spec.TLS.TLSSecret,
+			}
+
+			// while we check for overrides, we can add them to the spec as well. If
+			// there is an error during the validation, we're not going to be updating
+			// the spec anyway
+			if request.CASecret != "" {
+				v.CASecret = request.CASecret
+				cluster.Spec.TLS.CASecret = request.CASecret
+			}
+
+			if request.ReplicationTLSSecret != "" {
+				v.ReplicationTLSSecret = request.ReplicationTLSSecret
+				cluster.Spec.TLS.ReplicationTLSSecret = request.ReplicationTLSSecret
+			}
+
+			if request.TLSSecret != "" {
+				v.TLSSecret = request.TLSSecret
+				cluster.Spec.TLS.TLSSecret = request.TLSSecret
+			}
+
+			switch request.TLSOnly {
+			default: // no-op
+			case msgs.UpdateClusterTLSOnlyEnable:
+				v.TLSOnly = true
+				cluster.Spec.TLSOnly = true
+			case msgs.UpdateClusterTLSOnlyDisable:
+				v.TLSOnly = false
+				cluster.Spec.TLSOnly = false
+			}
+
+			// validate!
+			if err := validateClusterTLS(v); err != nil {
+				response.Status.Code = msgs.Error
+				response.Status.Msg = err.Error()
+				return response
+			}
+		}
 
 		// set --enable-autofail / --disable-autofail on each pgcluster CRD
 		// Make the change based on the value of Autofail vis-a-vis UpdateClusterAutofailStatus
@@ -1915,16 +2074,17 @@ func UpdateCluster(request *msgs.UpdateClusterRequest) msgs.UpdateClusterRespons
 		case msgs.UpdateClusterStandbyDoNothing: // no-op
 		}
 		// return an error if attempting to enable standby for a cluster that does not have the
-		// required S3 settings
+		// required S3/GCS settings
 		if cluster.Spec.Standby {
-			s3Enabled := false
+			blobEnabled := false
 			for _, storageType := range cluster.Spec.BackrestStorageTypes {
-				s3Enabled = s3Enabled || (storageType == crv1.BackrestStorageTypeS3)
+				blobEnabled = blobEnabled ||
+					(storageType == crv1.BackrestStorageTypeS3 || storageType == crv1.BackrestStorageTypeGCS)
 			}
 
-			if !s3Enabled {
+			if !blobEnabled {
 				response.Status.Code = msgs.Error
-				response.Status.Msg = "Backrest storage type 's3' must be enabled in order to enable " +
+				response.Status.Msg = "Backrest storage type 's3' or 'gcs' must be enabled in order to enable " +
 					"standby mode"
 				return response
 			}
@@ -2189,16 +2349,42 @@ func validateBackrestStorageTypeOnCreate(request *msgs.CreateClusterRequest) ([]
 		return nil, err
 	}
 
-	// a special check -- if S3 storage is included, check to see if all of the
-	// appropriate settings are in place
+	// a special check: cannot have both GCS and S3 active at the same time
+	i := 0
 	for _, storageType := range storageTypes {
-		if storageType == crv1.BackrestStorageTypeS3 {
+		if storageType == "s3" || storageType == "gcs" {
+			i += 1
+		}
+	}
+
+	if i == 2 {
+		return nil, fmt.Errorf("Cannot use S3 and GCS at the same time.")
+	}
+
+	// a special check -- if S3 or GCS storage is included, check to see if all
+	// of the appropriate settings are in place
+	for _, storageType := range storageTypes {
+		switch storageType {
+		default: // no-op
+		case crv1.BackrestStorageTypeGCS:
+			if isMissingGCSConfig(request) {
+				return nil, fmt.Errorf("A configuration settings for GCS storage is missing. " +
+					"Values must be provided for the GCS bucket, GCS endpoint, and a GCS key in order " +
+					"to use the GCS storage type with pgBackRest.")
+			}
+		case crv1.BackrestStorageTypeS3:
 			if isMissingS3Config(request) {
 				return nil, fmt.Errorf("A configuration setting for AWS S3 storage is missing. Values must be " +
 					"provided for the S3 bucket, S3 endpoint and S3 region in order to use the 's3' " +
 					"storage type with pgBackRest.")
 			}
-			break
+
+			// a check on the KeyType attribute...if set, it has to be one of two
+			// values
+			if request.BackrestGCSKeyType != "" &&
+				request.BackrestGCSKeyType != "service" && request.BackrestGCSKeyType != "token" {
+				return nil, fmt.Errorf("Invalid GCS key type. Must either be \"service\" or \"token\".")
+			}
 		}
 	}
 
@@ -2299,6 +2485,12 @@ func validateTablespaces(tablespaces []msgs.ClusterTablespaceDetail) error {
 	return nil
 }
 
+// determines if any of the required GCS configuration settings (bucket) are
+// missing from both the incoming request or the pgo.yaml config file
+func isMissingGCSConfig(request *msgs.CreateClusterRequest) bool {
+	return (request.BackrestGCSBucket == "" && apiserver.Pgo.Cluster.BackrestGCSBucket == "")
+}
+
 // determines if any of the required S3 configuration settings (bucket, endpoint
 // and region) are missing from both the incoming request or the pgo.yaml config file
 func isMissingS3Config(request *msgs.CreateClusterRequest) bool {
@@ -2309,6 +2501,20 @@ func isMissingS3Config(request *msgs.CreateClusterRequest) bool {
 		return true
 	}
 	if request.BackrestS3Region == "" && apiserver.Pgo.Cluster.BackrestS3Region == "" {
+		return true
+	}
+	return false
+}
+
+// isMissingExistingDataSourceGCSConfig determines if any of the required GCS
+// configuration settings (bucket, endpoint, key) are missing from the
+// annotations in the pgBackRest repo secret as needed to bootstrap a cluster
+// from an existing GCS repository
+func isMissingExistingDataSourceGCSConfig(backrestRepoSecret *v1.Secret) bool {
+	switch {
+	case backrestRepoSecret.Annotations[config.ANNOTATION_GCS_BUCKET] == "":
+		return true
+	case len(backrestRepoSecret.Data[util.BackRestRepoSecretKeyAWSS3KeyGCSKey]) == 0:
 		return true
 	}
 	return false
@@ -2337,9 +2543,16 @@ func isMissingExistingDataSourceS3Config(backrestRepoSecret *v1.Secret) bool {
 // to create a new cluster
 func validateDataSourceParms(request *msgs.CreateClusterRequest) error {
 	ctx := context.TODO()
-	namespace := request.Namespace
+
 	restoreClusterName := request.PGDataSource.RestoreFrom
 	restoreOpts := request.PGDataSource.RestoreOpts
+
+	var restoreFromNamespace string
+	if request.PGDataSource.Namespace != "" {
+		restoreFromNamespace = request.PGDataSource.Namespace
+	} else {
+		restoreFromNamespace = request.Namespace
+	}
 
 	if restoreClusterName == "" && restoreOpts == "" {
 		return nil
@@ -2353,21 +2566,23 @@ func validateDataSourceParms(request *msgs.CreateClusterRequest) error {
 	}
 
 	// next verify whether or not a PVC exists for the cluster we are restoring from
-	if _, err := apiserver.Clientset.CoreV1().PersistentVolumeClaims(namespace).Get(ctx,
+	if _, err := apiserver.Clientset.CoreV1().PersistentVolumeClaims(restoreFromNamespace).Get(ctx,
 		fmt.Sprintf(util.BackrestRepoPVCName, restoreClusterName),
 		metav1.GetOptions{}); err != nil {
-		return fmt.Errorf("Unable to find PVC %s for cluster %s, cannot to restore from the "+
-			"specified data source", fmt.Sprintf(util.BackrestRepoPVCName, restoreClusterName),
-			restoreClusterName)
+		return fmt.Errorf("Unable to find PVC %s for cluster %s (namespace %s), cannot restore "+
+			"from the specified data source",
+			fmt.Sprintf(util.BackrestRepoPVCName, restoreClusterName),
+			restoreClusterName, restoreFromNamespace)
 	}
 
 	// now verify that a pgBackRest repo secret exists for the cluster we are restoring from
-	backrestRepoSecret, err := apiserver.Clientset.CoreV1().Secrets(namespace).Get(ctx,
+	backrestRepoSecret, err := apiserver.Clientset.CoreV1().Secrets(restoreFromNamespace).Get(ctx,
 		fmt.Sprintf(util.BackrestRepoSecretName, restoreClusterName), metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("Unable to find secret %s for cluster %s, cannot restore from the "+
-			"specified data source",
-			fmt.Sprintf(util.BackrestRepoSecretName, restoreClusterName), restoreClusterName)
+		return fmt.Errorf("Unable to find secret %s for cluster %s (namespace %s), cannot restore "+
+			"from the specified data source",
+			fmt.Sprintf(util.BackrestRepoSecretName, restoreClusterName),
+			restoreClusterName, restoreFromNamespace)
 	}
 
 	// next perform general validation of the restore options
@@ -2379,13 +2594,22 @@ func validateDataSourceParms(request *msgs.CreateClusterRequest) error {
 	// settings are present in backrest repo secret for the backup being restored from
 	s3Restore := backrest.S3RepoTypeCLIOptionExists(restoreOpts)
 	if s3Restore && isMissingExistingDataSourceS3Config(backrestRepoSecret) {
-		return fmt.Errorf("Secret %s is missing the S3 configuration required to restore "+
-			"from an S3 repository", backrestRepoSecret.GetName())
+		return fmt.Errorf("Secret %s (namespace %s) is missing the S3 configuration required to "+
+			"restore from an S3 repository", backrestRepoSecret.GetName(), restoreFromNamespace)
+	}
+
+	// now detect if an 'gcs' repo type was specified via the restore opts, and if
+	// so verify that gcs settings are present in backrest repo secret for the
+	// backup being restored from
+	gcsRestore := backrest.GCSRepoTypeCLIOptionExists(restoreOpts)
+	if gcsRestore && isMissingExistingDataSourceGCSConfig(backrestRepoSecret) {
+		return fmt.Errorf("Secret %s (namespace %s) is missing the GCS configuration required to "+
+			"restore from a GCS repository", backrestRepoSecret.GetName(), restoreFromNamespace)
 	}
 
 	// finally, verify that the cluster being restored from is in the proper status, and that no
 	// other clusters currently being bootstrapping from the same cluster
-	clusterList, err := apiserver.Clientset.CrunchydataV1().Pgclusters(namespace).List(ctx, metav1.ListOptions{})
+	clusterList, err := apiserver.Clientset.CrunchydataV1().Pgclusters(restoreFromNamespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("%s: %w", ErrInvalidDataSource, err)
 	}
@@ -2393,14 +2617,14 @@ func validateDataSourceParms(request *msgs.CreateClusterRequest) error {
 
 		if cl.GetName() == restoreClusterName &&
 			cl.Status.State == crv1.PgclusterStateShutdown {
-			return fmt.Errorf("Unable to restore from cluster %s because it has a %s "+
-				"status", restoreClusterName, string(cl.Status.State))
+			return fmt.Errorf("Unable to restore from cluster %s (namespace %s) because it has "+
+				"a %s status", restoreClusterName, restoreFromNamespace, string(cl.Status.State))
 		}
 
 		if cl.Spec.PGDataSource.RestoreFrom == restoreClusterName &&
 			cl.Status.State == crv1.PgclusterStateBootstrapping {
-			return fmt.Errorf("Cluster %s is currently bootstrapping from cluster %s, please "+
-				"try again once it is completes", cl.GetName(), restoreClusterName)
+			return fmt.Errorf("Cluster %s (namespace %s) is currently bootstrapping from cluster %s, please "+
+				"try again once it is completes", cl.GetName(), cl.GetNamespace(), restoreClusterName)
 		}
 	}
 
@@ -2409,7 +2633,7 @@ func validateDataSourceParms(request *msgs.CreateClusterRequest) error {
 
 func validateStandbyCluster(request *msgs.CreateClusterRequest) error {
 	switch {
-	case !strings.Contains(request.BackrestStorageType, "s3"):
+	case !(strings.Contains(request.BackrestStorageType, "s3") || strings.Contains(request.BackrestStorageType, "gcs")):
 		return errors.New("Backrest storage type 's3' must be selected in order to create a " +
 			"standby cluster")
 	case request.BackrestRepoPath == "":

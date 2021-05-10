@@ -5,7 +5,6 @@ LABEL vendor="Percona" \
     org.opencontainers.image.vendor="Percona" \
     maintainer="Percona Development <info@percona.com>"
 
-COPY redhat/licenses /licenses
 COPY redhat/atomic/help.1 /help.1
 COPY redhat/atomic/help.md /help.md
 COPY licenses /licenses
