@@ -39,11 +39,11 @@ Kubernetes-based environment:
    -  check that  the ``serverUser`` key contains your PMM Server user name
       (``admin`` by default),
    -  make sure the ``pmmserver`` key in the 
-      `deploy/secrets.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/secrets.yaml>`_
+      `deploy/pmm-secret.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/pmm-secret.yaml>`_
       secrets file contains the password specified for the PMM Server during its
       installation
 
-      .. note:: You use ``deploy/secrets.yaml`` file to *create* Secrets Object.
+      .. note:: You use ``deploy/pmm-secret.yaml`` file to *create* Secrets Object.
          The file contains all values for each key/value pair in a convenient
          plain text format. But the resulting Secrets contain passwords stored
          as base64-encoded strings. If you want to *update* password field,

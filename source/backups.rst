@@ -7,15 +7,17 @@ Operator along with creating a new PostgreSQL cluster to facilitate the usage of
 the pgBackRest features in it.
 
 The Operator usually stores PostgreSQL backups on `Amazon S3 or S3-compatible
-storage <https://en.wikipedia.org/wiki/Amazon_S3#S3_API_and_competing_services>`_ outside the Kubernetes cluster.
-But storing backups on `Persistent Volumes <https://kubernetes.io/docs/concepts/storage/persistent-volumes/>`_ inside the Kubernetes cluster is also possible. At PostgreSQL cluster creation time, you can specify a specific Storage Class
-for the pgBackRest repository. Additionally, you can also specify the type of the
-pgBackRest repository that can be used, including:
+storage <https://en.wikipedia.org/wiki/Amazon_S3#S3_API_and_competing_services>`_
+outside the Kubernetes cluster. But storing backups on `Persistent Volume <https://kubernetes.io/docs/concepts/storage/persistent-volumes/>`_
+attached to the pgBackRest Pod is also possible. At PostgreSQL cluster creation
+time, you can specify a specific Storage Class for the pgBackRest repository.
+Additionally, you can also specify the type of the pgBackRest repository that
+can be used, including:
 
-* ``posix``: Uses the storage that is provided by the Kubernetes cluster’s
+* ``local``: Uses the storage that is provided by the Kubernetes cluster’s
   Storage Class that you select,
 * ``s3``: Use Amazon S3 or an object storage system that uses the S3 protocol,
-* ``posix,s3``: Use both the storage that is provided by the Kubernetes
+* ``local,s3``: Use both the storage that is provided by the Kubernetes
   cluster’s Storage Class that you select AND Amazon S3 (or equivalent object
   storage system that uses the S3 protocol).
 
@@ -72,7 +74,14 @@ options:
   or set to ``false`` to disable it.
 
 You also need to feed pgBackRest with the AWS S3 key and the AWS S3 key secret
-stored along with other sensitive information in Kubernetes Secrets.
+stored along with other sensitive information in Kubernetes Secrets. You can do
+it by editing the ``deploy/backup/cluster1-backrest-repo-config-secret.yaml``
+configuration file and applying it as usual:
+
+.. code:: bash
+
+   kubectl apply -f deploy/backup/cluster1-backrest-repo-config-secret.yaml
+
 
 .. _backups-manual:
 
@@ -91,8 +100,7 @@ following:
 * ``parameters.pg-cluster`` is the name of the PostgreSQL cluster to back up,
   for example ``cluster1``,
 * ``parameters.podname`` is the name of the pgBackRest repository Pod, for
-  example ``cluster1-backrest-shared-repo-5f84955754-xd52d``
-
+  example ``cluster1-backrest-shared-repo-5f84955754-xd52d``.
 
 When the backup options are configured, the actual backup command is executed:
 
@@ -136,7 +144,7 @@ following:
   pgBackRest (for example, ``--type=time --target="2021-04-16 15:13:32"`` to
   perform a point-in-time-recovery),
 * ``parameters.backrest-storage-type`` the type of the pgBackRest repository,
-  (for example, ``posix``).
+  (for example, ``local``).
 
 The actual restoration process can be started as follows:
 

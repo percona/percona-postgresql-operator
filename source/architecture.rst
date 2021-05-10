@@ -3,8 +3,7 @@ Design overview
 
 The Percona Distribution for PostgreSQL Operator automates and simplifies
 deploying and managing open source PostgreSQL clusters on Kubernetes.
-The Operator is based on `Postgres Operator <https://crunchydata.github.io/postgres-operator/latest/>`_
-developed by Crunchy Data.
+The Operator is based on `CrunchyData's PostgreSQL Operator <https://crunchydata.github.io/postgres-operator/latest/>`_.
 
 .. image:: ./assets/images/pgo.png
    :align: center
@@ -12,10 +11,12 @@ developed by Crunchy Data.
 PostgreSQL containers deployed with the PostgreSQL Operator include the following components:
 
 * The `PostgreSQL <https://www.postgresql.org/>`_ database management system, including:
+
   * `PostgreSQL Additional Supplied Modules <https://www.postgresql.org/docs/current/contrib.html>`_,
   * `pgAudit <https://www.pgaudit.org/>`_ PostgreSQL auditing extension,
   * `PostgreSQL set_user Extension Module <https://github.com/pgaudit/set_user>`_,
   * `wal2json output plugin <https://github.com/eulerto/wal2json>`_,
+
 * The `pgBackRest <https://pgbackrest.org/>`_ Backup & Restore utility,
 * The `pgBouncer <http://pgbouncer.github.io/>`_ connection pooler for PostgreSQL,
 * The PostgreSQL high-availability implementation based on the `Patroni template <https://patroni.readthedocs.io/>`_,
@@ -35,11 +36,32 @@ the automatic storage provisioning to pods. If a failure occurs, the
 Container Storage Interface (CSI) should be able to re-mount storage on
 a different node.
 
-The Operator functionality extends the Kubernetes API with
-*PerconaXtraDBCluster* object, and it is implemented as a golang
-application. Each *PerconaXtraDBCluster* object maps to one separate Percona
-XtraDB Cluster setup. The Operator listens to all events on the created objects.
-When a new PerconaXtraDBCluster object is created, or an existing one undergoes
-some changes or deletion, the operator automatically
-creates/changes/deletes all needed Kubernetes objects with the
-appropriate settings to provide a proper Percona PostgreSQL Cluster operation.
+The Operator functionality extends the Kubernetes API with `Custom Resources
+Definitions <https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions>`_.
+These CRDs provide extensions to the Kubernetes API, and, in the case of the
+Operator, allow you to perform actions such as creating a PostgreSQL Cluster,
+updating PostgreSQL Cluster resource allocations, adding additional utilities to
+a PostgreSQL cluster, e.g. `pgBouncer <https://www.pgbouncer.org/>`_ for
+connection pooling and more.
+
+When a new Custom Resource is created or an existing one undergoes some changes
+or deletion, the Operator automatically creates/changes/deletes all needed
+Kubernetes objects with the appropriate settings to provide a proper Percona
+PostgreSQL Cluster operation.
+
+Following CRDs are created while the Operator installation:
+
+* ``pgclusters`` stores information required to manage a PostgreSQL cluster.
+  This includes things like the cluster name, what storage and resource classes
+  to use, which version of PostgreSQL to run, information about how to maintain
+  a high-availability cluster, etc.
+* ``pgreplicas`` stores information required to manage the replicas within a
+  PostgreSQL cluster. This includes things like the number of replicas, what
+  storage and resource classes to use, special affinity rules, etc.
+* ``pgtasks`` is a general purpose CRD that accepts a type of task that is
+  needed to run against a cluster (e.g. take a backup) and tracks the state of
+  said task through its workflow.
+* ``pgpolicies`` stores a reference to a SQL file that can be executed against
+  a PostgreSQL cluster. In the past, this was used to manage RLS policies on
+  PostgreSQL clusters.
+

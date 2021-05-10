@@ -3,9 +3,8 @@
 Install Percona Distribution for PostgreSQL on Kubernetes
 =========================================================
 
-Following steps will allow you to install Percona Distribution for PostgreSQL
-Operator and use it to manage Percona Distribution for PostgreSQL in a
-Kubernetes-based environment.
+Following steps will allow you to install the Operator and use it to manage
+Percona Distribution for PostgreSQL in a Kubernetes-based environment.
 
 #. First of all, clone the percona-postgresql-operator repository:
 
@@ -25,6 +24,9 @@ Kubernetes-based environment.
       $ kubectl create namespace pgo
       $ kubectl config set-context $(kubectl config current-context) --namespace=pgo
 
+   .. note:: To use different namespace, you should edit *all occurrences* of
+      the ``namespace: pgo`` line in both ``deploy/cr.yaml`` and
+      ``deploy/operator.yaml`` configuration files.
 
 #. Deploy the operator with the following command:
 
