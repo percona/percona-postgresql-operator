@@ -6,7 +6,7 @@ Percona certified images
 Following table presents Percona’s certified docker images to be used with the
 Percona Distribution for PostgreSQL Operator:
 
-
+      .. tabularcolumns:: |p{3.7cm}|p{11.8cm}|
       .. list-table::
          :widths: 15 50
          :header-rows: 1
