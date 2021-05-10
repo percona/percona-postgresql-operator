@@ -20,7 +20,7 @@ You can compare the Kubernetes Operator to a System Administrator who deploys
 the application and watches the Kubernetes events related to it, taking
 administrative/operational actions when needed.
 
-**Version 0.1.0 of the Percona Distribution for PostgreSQL Operator is a tech preview release and it is not recommended for production environments. **
+**Version 0.1.0 of the Percona Distribution for PostgreSQL Operator is a tech preview release and it is not recommended for production environments.**
 
 You can install *Percona Distribution for PostgreSQL Operator* on Kubernetes,
 `Google Kubernetes Engine (GKE) <https://cloud.google.com/kubernetes-engine>`_,
