@@ -33,14 +33,7 @@ Installation guide
 .. toctree::
    :maxdepth: 1
 
-   minikube
-   gke
-   eks
    kubernetes
-   custom-registry
-   broker
-   helm
-   cluster-wide
 
 Configuration and Management
 ============================
@@ -48,21 +41,9 @@ Configuration and Management
 .. toctree::
    :maxdepth: 1
 
-   users
-   storage
-   constraints
-   options
-   haproxy-conf
-   proxysql-conf
-   TLS
-   encryption
    backups
    pause
-   update
-   scaling
    monitoring
-   recovery
-   debug
 
 .. toctree::
    :maxdepth: 1
@@ -75,6 +56,4 @@ Reference
 
    operator
    images
-   api
-   faq
    Release Notes <ReleaseNotes/index>
