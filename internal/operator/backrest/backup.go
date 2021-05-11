@@ -51,6 +51,7 @@ type backrestJobTemplateFields struct {
 	PITRTarget                    string
 	PodName                       string
 	Image                         string
+	CustomLabels                  string
 	SecurityContext               string
 	PgbackrestStanza              string
 	PgbackrestDBPath              string
@@ -122,6 +123,7 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 		CommandOpts:                   task.Spec.Parameters[config.LABEL_BACKREST_OPTS],
 		PITRTarget:                    "",
 		Image:                         cluster.Spec.BackrestImage,
+		CustomLabels:                  operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 		PgbackrestStanza:              task.Spec.Parameters[config.LABEL_PGBACKREST_STANZA],
 		PgbackrestDBPath:              task.Spec.Parameters[config.LABEL_PGBACKREST_DB_PATH],
 		PgbackrestRepo1Path:           task.Spec.Parameters[config.LABEL_PGBACKREST_REPO_PATH],
