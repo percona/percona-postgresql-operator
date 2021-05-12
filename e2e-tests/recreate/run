@@ -40,6 +40,7 @@ kubectl_bin patch "pgcluster/${cluster}" --type json -p '[{"op":"add","path":"/s
 for i in $(seq 1 3); do
 	wait_deployment "${cluster}-${i}"
 done
+wait_deployment "${cluster}"
 
 kubectl_bin delete pgclusters --all
 wait_for_delete "pgcluster/${cluster}"
