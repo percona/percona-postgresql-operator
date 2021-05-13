@@ -149,7 +149,35 @@ spec:
   pgReplicas:
     hotStandby:
       size: 0
-      syncReplication: null
+#      resources:
+#        requests:
+#          cpu: "1"
+#          memory: "128Mi"
+#        limits:
+#          cpu: "1"
+#          memory: "128Mi"
+#      Storage: 
+#        accessmode: ReadWriteOnce
+#        matchLabels: ""
+#        name: ""
+#        size: 1G
+#        storageclass: ""
+#        storagetype: dynamic
+#        supplementalgroups: ""
+#      affinity:
+#        default: null
+#      labels:
+#        pg-cluster: cluster1
+#      annotations:
+#        pg-cluster: cluster1
+#      enableSyncStandby: false
+#      expose:
+#        serviceType: LoadBalancer
+#        loadBalancerSourceRanges:
+#        annotations:
+#          pg-cluster: cluster1
+#        labels: 
+#          pg-cluster: cluster1
   resources:
     memory: 128Mi
 #    cpu: 700m
