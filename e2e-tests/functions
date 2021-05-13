@@ -89,7 +89,7 @@ deploy_operator() {
 			>${tmp_dir}/operator.ini
 
 	if [ ! -z "$OPENSHIFT" ]; then
-		$sed -i -e "s#disable_fsgroup: .*#disable_fsgroup: \"true\"#g" ${tmp_dir}/operator.ini
+		$sed -i -e 's#disable_fsgroup: .*#disable_fsgroup: "true"#g' ${tmp_dir}/operator.ini
 	fi
 
 	# updating yaml itself
