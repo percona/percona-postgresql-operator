@@ -166,7 +166,8 @@ spec:
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
-      securityContext: {}
+      securityContext:
+        runAsNonRoot: true
       serviceAccount: pgo-pg
       serviceAccountName: pgo-pg
       terminationGracePeriodSeconds: 30
