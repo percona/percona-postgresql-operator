@@ -198,7 +198,7 @@ wait_job_completion() {
 		sleep 1
 		echo -n .
 		let retry+=1
-		if [ $retry -ge 420 ]; then
+		if [ $retry -ge 600 ]; then
 			kubectl_bin describe job/$job
 			kubectl_bin logs $(kubectl_bin get pods --selector=job-name=${job} -o jsonpath='{.items[0].metadata.name}')
 			kubectl_bin logs $(get_operator_pod) \
