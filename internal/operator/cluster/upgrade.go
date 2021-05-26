@@ -130,17 +130,17 @@ func AddUpgrade(clientset kubeapi.Interface, upgrade *crv1.Pgtask, namespace str
 		return
 	}
 
-	// update the unix socket directories parameter so it no longer include /crunchyadm and
-	// set any path references to the /opt/crunchy... paths
-	if err = updateClusterConfig(clientset, pgcluster, namespace); err != nil {
-		log.Errorf("error updating %s-pgha-config configmap during upgrade of cluster %s, Error: %v", pgcluster.Name, pgcluster.Name, err)
-	}
-
 	// recreate new Backrest Repo secret that was just deleted
 	recreateBackrestRepoSecret(clientset, upgradeTargetClusterName, namespace, operator.PgoNamespace)
 
 	// set proper values for the pgcluster that are updated between CR versions
 	preparePgclusterForUpgrade(pgcluster, upgrade.Spec.Parameters, oldpgoversion, currentPrimary)
+
+	// update the unix socket directories parameter so it no longer include /crunchyadm and
+	// set any path references to the /opt/crunchy... paths
+	if err = updateClusterConfig(clientset, pgcluster, namespace); err != nil {
+		log.Errorf("error updating %s-pgha-config configmap during upgrade of cluster %s, Error: %v", pgcluster.Name, pgcluster.Name, err)
+	}
 
 	// create a new workflow for this recreated cluster
 	workflowid, err := createClusterRecreateWorkflowTask(clientset, pgcluster.Name, namespace, upgrade.Spec.Parameters[config.LABEL_PGOUSER])
@@ -561,6 +561,11 @@ func preparePgclusterForUpgrade(pgcluster *crv1.Pgcluster, parameters map[string
 	}
 	delete(pgcluster.Spec.UserLabels, "service-type")
 
+	// 4.6.0 removed the "pg-pod-anti-affinity" label from user labels, as this is
+	// superfluous and handled through other processes. We can explicitly
+	// eliminate it
+	delete(pgcluster.Spec.UserLabels, "pg-pod-anti-affinity")
+
 	// 4.6.0 moved the "autofail" label to the DisableAutofail attribute. Given
 	// by default we need to start in an autofailover state, we just delete the
 	// legacy attribute
@@ -918,7 +923,18 @@ func updateClusterConfig(clientset kubeapi.Interface, pgcluster *crv1.Pgcluster,
 	// and the /opt/cpm... directories are now set under /opt/crunchy
 	if dcsConf.PostgreSQL != nil && dcsConf.PostgreSQL.Parameters != nil {
 		dcsConf.PostgreSQL.Parameters["unix_socket_directories"] = "/tmp"
-		dcsConf.PostgreSQL.Parameters["archive_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-set-env.sh && pgbackrest archive-push "%p"`
+
+		// ensure the proper archive_command is set according to the BackrestStorageTypes defined for
+		// the pgcluster
+		switch {
+		case operator.IsLocalAndS3Storage(pgcluster):
+			dcsConf.PostgreSQL.Parameters["archive_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-archive-push-local-s3.sh %p`
+		case operator.IsLocalAndGCSStorage(pgcluster):
+			dcsConf.PostgreSQL.Parameters["archive_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-archive-push-local-gcs.sh %p`
+		default:
+			dcsConf.PostgreSQL.Parameters["archive_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-set-env.sh && pgbackrest archive-push "%p"`
+		}
+
 		dcsConf.PostgreSQL.RecoveryConf["restore_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-set-env.sh && pgbackrest archive-get %f "%p"`
 	}
 
@@ -984,7 +1000,7 @@ func updatePGBackRestSSHDConfig(clientset kubernetes.Interface, repoSecret *v1.S
 				nssWrapperForceCommand))
 	}
 
-	// For versions prior to v4.7.0-beta.3, the UsePAM setting might be set to 'yes' as previously
+	// For versions prior to v4.6.2, the UsePAM setting might be set to 'yes' as previously
 	// required to workaround a known Docker issue.  Since this issue has since been resolved,
 	// we now want to ensure this setting is set to 'no'.
 	if usePAMRegex.MatchString(string(updatedRepoSecret.Data["sshd_config"])) {
