@@ -107,14 +107,20 @@ Installing the Operator
 
       $ kubectl get pods
       NAME                                              READY   STATUS    RESTARTS   AGE
-      backrest-backup-cluster1-j275w                    0/1     Completed 0          10m
-      cluster1-85486d645f-gpxzb                         1/1     Running   0          10m
-      cluster1-backrest-shared-repo-6495464548-c8wvl    1/1     Running   0          10m
-      cluster1-pgbouncer-fc45869f7-s86rf                1/1     Running   0          10m
-      pgo-deploy-rhv6k                                  0/1     Completed 0          5m
-      postgres-operator-8646c68b57-z8m62                4/4     Running   1          5m
+      backrest-backup-cluster1-4nq2x                    0/1     Completed 0          10m
+      cluster1-6c9d4f9678-qdfx2                         1/1     Running   0          10m
+      cluster1-backrest-shared-repo-7cb4dd8f8f-sh5gg    1/1     Running   0          10m
+      cluster1-pgbouncer-6cd69d8966-vlxdt               1/1     Running   0          10m
+      pgo-deploy-bp2ts                                  0/1     Completed 0          5m
+      postgres-operator-67f58bcb8c-9p4tl                4/4     Running   1          5m
 
-#. You can also deploy PosgreSQL replica at any time as follows: 
+Also, you can see the same information when browsing Pods of your cluster in Google Cloud console via the *Object Browser*:
+
+.. image:: ./assets/images/gke-quickstart-object-browser.*
+   :align: center
+
+
+#. You can also deploy PosgreSQL replica at any time as follows:
 
     .. code:: bash
 
