@@ -167,17 +167,16 @@ type PGReplicas struct {
 
 type HotStandby struct {
 	Size              int               `json:"size"`
-	Resources         Resources         `json:"resources"`
-	Storage           *PgStorageSpec    `json:"storage"`
+	Resources         *Resources        `json:"resources"`
+	VolumeSpec        *PgStorageSpec    `json:"volumeSpec"`
 	Labels            map[string]string `json:"labels"`
 	Annotations       map[string]string `json:"annotations"`
-	Affinity          *v1.NodeAffinity  `json:"affinity"`
+	Affinity          *v1.Affinity      `json:"affinity"`
 	EnableSyncStandby *bool             `json:"enableSyncStandby"`
 	Expose            Expose            `json:"expose"`
 }
 
 type Expose struct {
-	Enabled                  bool              `json:"enabled"`
 	ServiceType              v1.ServiceType    `json:"serviceType"`
 	LoadBalancerSourceRanges []string          `json:"loadBalancerSourceRanges"`
 	Annotations              map[string]string `json:"annotations"`

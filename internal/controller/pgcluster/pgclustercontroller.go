@@ -18,6 +18,7 @@ limitations under the License.
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -180,54 +182,10 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	log.Debugf("pgcluster onUpdate for cluster %s (namespace %s)", newcluster.ObjectMeta.Namespace,
 		newcluster.ObjectMeta.Name)
-	oldReplicaCount := 0
-	newReplicaCount := 0
-	var err error
-	if len(newcluster.Spec.Replicas) > 0 {
-		newReplicaCount, err = strconv.Atoi(newcluster.Spec.Replicas)
-		if err != nil {
-			log.Error("error in newcluster replicas value: " + err.Error())
-			return
-		}
-	}
-	if len(oldcluster.Spec.Replicas) > 0 {
-		oldReplicaCount, err = strconv.Atoi(oldcluster.Spec.Replicas)
-		if err != nil {
-			log.Error("error in oldCluster replicas value " + err.Error())
-			return
-		}
-	}
-	if newcluster.Spec.PGReplicas != nil {
-		newReplicaCount = newcluster.Spec.PGReplicas.HotStandby.Size
-	}
-	if oldcluster.Spec.PGReplicas != nil {
-		oldReplicaCount = oldcluster.Spec.PGReplicas.HotStandby.Size
-	}
-
-	if oldReplicaCount != newReplicaCount {
-		if newReplicaCount == 0 {
-			for i := 1; i <= oldReplicaCount; i++ {
-				newReplica := clusteroperator.GetNewReplicaObject(newcluster, i)
-				log.Infof("Deleting replica %s", newReplica.Spec.Name)
-				clusteroperator.ScaleDownBase(c.Client, &newReplica, newReplica.ObjectMeta.Namespace)
-			}
-			return
-		}
-		if newReplicaCount < oldReplicaCount {
-			for i := oldReplicaCount; i > newReplicaCount; i-- {
-				newReplica := clusteroperator.GetNewReplicaObject(newcluster, i)
-				log.Infof("Deleting replica %s", newReplica.Spec.Name)
-				clusteroperator.ScaleDownBase(c.Client, &newReplica, newReplica.Namespace)
-			}
-			return
-		}
-
-		// create a CRD for each replica
-		for i := 1; i <= newReplicaCount; i++ {
-			newReplica := clusteroperator.GetNewReplicaObject(newcluster, i)
-			log.Infof("Creating replicas %s", newReplica.Name)
-			clusteroperator.ScaleBase(c.Client, &newReplica, newcluster.ObjectMeta.Namespace)
-		}
+	err := c.updateReplicas(newcluster, oldcluster)
+	if err != nil {
+		log.Error("update replicas: " + err.Error())
+		return
 	}
 
 	// if the status of the pgcluster shows that it has been bootstrapped, then proceed with
@@ -418,6 +376,151 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		log.Error(err)
 		return
 	}
+}
+
+func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) error {
+	if reflect.DeepEqual(oldCluster.Spec.PGReplicas, newCluster.Spec.PGReplicas) {
+		return nil
+	}
+
+	oldReplicaCount := 0
+	newReplicaCount := 0
+	var err error
+	if len(newCluster.Spec.Replicas) > 0 {
+		newReplicaCount, err = strconv.Atoi(newCluster.Spec.Replicas)
+		if err != nil {
+			return fmt.Errorf("error in newcluster replicas value: %s", err)
+		}
+	}
+	if len(oldCluster.Spec.Replicas) > 0 {
+		oldReplicaCount, err = strconv.Atoi(oldCluster.Spec.Replicas)
+		if err != nil {
+			return fmt.Errorf("error in oldCluster replicas value : %s", err)
+		}
+	}
+	if newCluster.Spec.PGReplicas != nil {
+		newReplicaCount = newCluster.Spec.PGReplicas.HotStandby.Size
+	}
+	if oldCluster.Spec.PGReplicas != nil {
+		oldReplicaCount = oldCluster.Spec.PGReplicas.HotStandby.Size
+	}
+
+	if newReplicaCount == 0 {
+		for i := 1; i <= oldReplicaCount; i++ {
+			newReplica := clusteroperator.GetNewReplicaObject(newCluster, i)
+			log.Infof("Deleting replica %s", newReplica.Spec.Name)
+			clusteroperator.ScaleDownBase(c.Client, &newReplica, newReplica.ObjectMeta.Namespace)
+		}
+		return nil
+	}
+	if newReplicaCount < oldReplicaCount {
+		for i := oldReplicaCount; i > newReplicaCount; i-- {
+			newReplica := clusteroperator.GetNewReplicaObject(newCluster, i)
+			log.Infof("Deleting replica %s", newReplica.Spec.Name)
+			clusteroperator.ScaleDownBase(c.Client, &newReplica, newReplica.Namespace)
+		}
+	}
+
+	// create a CRD for each replica
+	for i := 1; i <= newReplicaCount; i++ {
+		newReplica := clusteroperator.GetNewReplicaObject(newCluster, i)
+		log.Infof("Handle replicas %s", newReplica.Name)
+		clusteroperator.ScaleBase(c.Client, &newReplica, newCluster.ObjectMeta.Namespace)
+
+		log.Infof("Handle replica %s", i)
+		if !reflect.DeepEqual(oldCluster.Spec.PGReplicas, newCluster.Spec.PGReplicas) {
+			ctx := context.TODO()
+			newReplica := clusteroperator.GetNewReplicaObject(newCluster, i)
+			if oldCluster.Spec.PGReplicas.HotStandby.Expose.ServiceType != newReplica.Spec.ServiceType {
+				log.Infof("Updating service for %s", newReplica.Name)
+				if err := clusteroperator.UpdateReplicaService(c.Client, newCluster, &newReplica); err != nil {
+					return fmt.Errorf("error in Updating service for %s : %s", newReplica.Name, err)
+				}
+			}
+
+			deployment, err := c.Client.AppsV1().Deployments(newReplica.Namespace).Get(ctx,
+				newReplica.Name, metav1.GetOptions{})
+
+			if err != nil {
+				return fmt.Errorf("could not find instance for pgreplica: %s", err)
+			}
+
+			// determine the current Pod -- this is required to stop the instance
+			pods, err := c.Client.CoreV1().Pods(deployment.Namespace).List(ctx, metav1.ListOptions{
+				FieldSelector: fields.OneTermEqualSelector("status.phase", string(v1.PodRunning)).String(),
+				LabelSelector: fields.OneTermEqualSelector(config.LABEL_DEPLOYMENT_NAME, deployment.Name).String(),
+			})
+
+			// Even if there are errors with the Pods, we will continue on updating the
+			// Deployment
+			if err != nil {
+				log.Warn(err)
+			} else if len(pods.Items) == 0 {
+				log.Infof("not shutting down PostgreSQL instance [%s] as the Pod cannot be found", deployment.Name)
+			} else {
+				// get the first pod off the items list
+				pod := pods.Items[0]
+
+				// we want to stop PostgreSQL on this instance to ensure all transactions
+				// are safely flushed before we restart
+				if err := util.StopPostgreSQLInstance(c.Client, c.Client.Config, &pod, deployment.Name); err != nil {
+					log.Warn("stop PostgreSQL instance:", err)
+				}
+			}
+
+			// apply the tolerations and update the Deployment
+			deployment.Spec.Template.Spec.Tolerations = newReplica.Spec.Tolerations
+			labels := make(map[string]string)
+			if deployment.Spec.Template.Labels != nil {
+				labels = deployment.Spec.Template.Labels
+			}
+			if newCluster.Spec.PGReplicas.HotStandby.Labels != nil {
+				for k, v := range newCluster.Spec.PGReplicas.HotStandby.Labels {
+					labels[k] = v
+				}
+			}
+			deployment.Spec.Template.Labels = labels
+
+			annotations := make(map[string]string)
+			if deployment.Spec.Template.Annotations != nil {
+				annotations = deployment.Spec.Template.Annotations
+			}
+			if newCluster.Spec.PGReplicas.HotStandby.Annotations != nil {
+				for k, v := range newCluster.Spec.PGReplicas.HotStandby.Annotations {
+					annotations[k] = v
+				}
+			}
+			deployment.Spec.Template.Annotations = annotations
+
+			if newCluster.Spec.PGReplicas.HotStandby.EnableSyncStandby != oldCluster.Spec.PGReplicas.HotStandby.EnableSyncStandby {
+				newEnvs := []v1.EnvVar{}
+				if len(deployment.Spec.Template.Spec.Containers) > 0 {
+					for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
+						if env.Name == "PGHA_SYNC_REPLICATION" {
+							env.Value = fmt.Sprint(newCluster.Spec.PGReplicas.HotStandby.EnableSyncStandby)
+						}
+						newEnvs = append(newEnvs, env)
+					}
+					deployment.Spec.Template.Spec.Containers[0].Env = newEnvs
+					if newCluster.Spec.PGReplicas.HotStandby.Resources != nil {
+						deployment.Spec.Template.Spec.Containers[0].Resources.Limits = newCluster.Spec.PGReplicas.HotStandby.Resources.Limits
+						deployment.Spec.Template.Spec.Containers[0].Resources.Requests = newCluster.Spec.PGReplicas.HotStandby.Resources.Requests
+					}
+				}
+			}
+
+			if newCluster.Spec.PGReplicas.HotStandby.Affinity != nil {
+				deployment.Spec.Template.Spec.Affinity = newCluster.Spec.PGReplicas.HotStandby.Affinity
+			}
+
+			log.Infof("Updating deployment for %s", newReplica.Name)
+			if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+				return fmt.Errorf("could not update deployment for pgreplica update: %s", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // onDelete is called when a pgcluster is deleted

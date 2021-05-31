@@ -487,7 +487,7 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 		PMMContainer: operator.GetPMMContainer(cluster, replica.Name),
 	}
 	if cluster.Spec.PGReplicas != nil {
-		updateDeploymentFromReplicaSection(&replicaDeploymentFields, cluster.Spec.PGReplicas)
+		updateDeploymentFromReplicaSection(&replicaDeploymentFields, cluster.Spec.PGReplicas, cluster)
 	}
 
 	switch replica.Spec.ReplicaStorage.StorageType {
@@ -534,13 +534,18 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 	return err
 }
 
-func updateDeploymentFromReplicaSection(replicaDeploymentFields *operator.DeploymentTemplateFields, replicas *crv1.PGReplicas) {
+func updateDeploymentFromReplicaSection(replicaDeploymentFields *operator.DeploymentTemplateFields, replicas *crv1.PGReplicas, cluster *crv1.Pgcluster) {
 	replicaDeploymentFields.SyncReplication = operator.GetSyncReplication(replicas.HotStandby.EnableSyncStandby)
 	if replicas.HotStandby.Affinity != nil {
 		replicaDeploymentFields.PodAntiAffinity = replicas.HotStandby.Affinity.String()
 	}
 	if replicas.HotStandby.Labels != nil {
-		replicaDeploymentFields.PodLabels = operator.GetLabelsFromMap(replicas.HotStandby.Labels)
+		labels := make(map[string]string)
+		labels = cluster.Spec.UserLabels
+		for k, v := range replicas.HotStandby.Labels {
+			labels[k] = v
+		}
+		replicaDeploymentFields.PodLabels = operator.GetLabelsFromMap(labels)
 	}
 	annotatioins, err := json.Marshal(replicas.HotStandby.Annotations)
 	// if there is an error, warn in our logs and return an empty string
@@ -548,8 +553,9 @@ func updateDeploymentFromReplicaSection(replicaDeploymentFields *operator.Deploy
 		log.Errorf("could not set replica annotations: %q", err)
 	}
 	replicaDeploymentFields.PodAnnotations = string(annotatioins)
-	replicaDeploymentFields.ContainerResources = operator.GetResourcesJSON(replicas.HotStandby.Resources.Requests, replicas.HotStandby.Resources.Limits)
-
+	if replicas.HotStandby.Resources != nil {
+		replicaDeploymentFields.ContainerResources = operator.GetResourcesJSON(replicas.HotStandby.Resources.Requests, replicas.HotStandby.Resources.Limits)
+	}
 }
 
 // DeleteReplica ...

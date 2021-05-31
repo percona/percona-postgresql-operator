@@ -156,7 +156,7 @@ spec:
 #        limits:
 #          cpu: "1"
 #          memory: "128Mi"
-#      Storage: 
+#      volumeSpec: 
 #        accessmode: ReadWriteOnce
 #        matchLabels: ""
 #        name: ""
@@ -167,9 +167,9 @@ spec:
 #      affinity:
 #        default: null
 #      labels:
-#        pg-cluster: cluster1
+#        pg-cluster-label: cluster1
 #      annotations:
-#        pg-cluster: cluster1
+#        pg-cluster-annot: cluster1
 #      enableSyncStandby: false
 #      expose:
 #        serviceType: LoadBalancer

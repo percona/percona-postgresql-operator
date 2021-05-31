@@ -268,9 +268,42 @@ func GetNewReplicaObject(cluster *crv1.Pgcluster, index int) crv1.Pgreplica {
 		if len(cluster.Spec.PGReplicas.HotStandby.Expose.LoadBalancerSourceRanges) > 0 {
 			newReplica.Spec.LoadBalancerRanges = cluster.Spec.PGReplicas.HotStandby.Expose.LoadBalancerSourceRanges
 		}
-		if cluster.Spec.PGReplicas.HotStandby.Storage != nil {
-			newReplica.Spec.ReplicaStorage = *cluster.Spec.PGReplicas.HotStandby.Storage
+		if cluster.Spec.PGReplicas.HotStandby.VolumeSpec != nil {
+			newReplica.Spec.ReplicaStorage = *cluster.Spec.PGReplicas.HotStandby.VolumeSpec
 		}
+		if len(cluster.Spec.PGReplicas.HotStandby.Expose.Labels) > 0 {
+			for k, v := range cluster.Spec.PGReplicas.HotStandby.Expose.Labels {
+				if k == config.LABEL_PG_CLUSTER {
+					continue
+				}
+				newReplica.Labels[k] = v
+			}
+		}
+		if len(cluster.Spec.PGReplicas.HotStandby.Expose.Annotations) > 0 {
+			if len(newReplica.Annotations) == 0 {
+				newReplica.Annotations = make(map[string]string)
+			}
+			for k, v := range cluster.Spec.PGReplicas.HotStandby.Expose.Annotations {
+				newReplica.Annotations[k] = v
+			}
+		}
+		if len(cluster.Spec.PGReplicas.HotStandby.Labels) > 0 {
+			for k, v := range cluster.Spec.PGReplicas.HotStandby.Labels {
+				if k == config.LABEL_PG_CLUSTER {
+					continue
+				}
+				newReplica.Labels[k] = v
+			}
+		}
+		if len(cluster.Spec.PGReplicas.HotStandby.Annotations) > 0 {
+			if len(newReplica.Annotations) == 0 {
+				newReplica.Annotations = make(map[string]string)
+			}
+			for k, v := range cluster.Spec.PGReplicas.HotStandby.Annotations {
+				newReplica.Annotations[k] = v
+			}
+		}
+
 	}
 	return newReplica
 }
@@ -409,6 +442,7 @@ func ScaleBase(clientset kubeapi.Interface, replica *crv1.Pgreplica, namespace s
 
 	// instantiate the replica
 	if err = scaleReplicaCreateDeployment(clientset, replica, cluster, namespace, dataVolume, walVolume, tablespaceVolumes); err != nil {
+		log.Error(err)
 		publishScaleError(namespace, replica.ObjectMeta.Labels[config.LABEL_PGOUSER], cluster)
 		return
 	}
