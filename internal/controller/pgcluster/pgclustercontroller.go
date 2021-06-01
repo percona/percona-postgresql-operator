@@ -32,6 +32,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
+	errpkg "github.com/pkg/errors"
+	"google.golang.org/protobuf/internal/errors"
 
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
@@ -389,13 +391,13 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 	if len(newCluster.Spec.Replicas) > 0 {
 		newReplicaCount, err = strconv.Atoi(newCluster.Spec.Replicas)
 		if err != nil {
-			return fmt.Errorf("error in newcluster replicas value: %s", err)
+			return errors.Wrap(err, "newcluster replicas value")
 		}
 	}
 	if len(oldCluster.Spec.Replicas) > 0 {
 		oldReplicaCount, err = strconv.Atoi(oldCluster.Spec.Replicas)
 		if err != nil {
-			return fmt.Errorf("error in oldCluster replicas value : %s", err)
+			return errors.Wrap(err, "oldCluster replicas value")
 		}
 	}
 	if newCluster.Spec.PGReplicas != nil {
@@ -427,14 +429,13 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 		log.Infof("Handle replicas %s", newReplica.Name)
 		clusteroperator.ScaleBase(c.Client, &newReplica, newCluster.ObjectMeta.Namespace)
 
-		log.Infof("Handle replica %s", i)
 		if !reflect.DeepEqual(oldCluster.Spec.PGReplicas, newCluster.Spec.PGReplicas) {
 			ctx := context.TODO()
 			newReplica := clusteroperator.GetNewReplicaObject(newCluster, i)
 			if oldCluster.Spec.PGReplicas.HotStandby.Expose.ServiceType != newReplica.Spec.ServiceType {
 				log.Infof("Updating service for %s", newReplica.Name)
 				if err := clusteroperator.UpdateReplicaService(c.Client, newCluster, &newReplica); err != nil {
-					return fmt.Errorf("error in Updating service for %s : %s", newReplica.Name, err)
+					return errpkg.Wrapf(err, "error in Updating service for %s", newReplica.Name)
 				}
 			}
 
@@ -442,7 +443,7 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 				newReplica.Name, metav1.GetOptions{})
 
 			if err != nil {
-				return fmt.Errorf("could not find instance for pgreplica: %s", err)
+				return errpkg.Wrapf(err, "could not find instance for pgreplica")
 			}
 
 			// determine the current Pod -- this is required to stop the instance
@@ -515,7 +516,7 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 
 			log.Infof("Updating deployment for %s", newReplica.Name)
 			if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-				return fmt.Errorf("could not update deployment for pgreplica update: %s", err)
+				return errpkg.Wrapf(err, "could not update deployment for pgreplica update")
 			}
 		}
 	}
