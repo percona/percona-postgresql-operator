@@ -68,6 +68,7 @@ spec:
           name: pgbouncer
           ports:
             - containerPort: 5432
+              name: pgbouncer
               protocol: TCP
           resources:
             limits:
@@ -76,9 +77,15 @@ spec:
             requests:
               cpu: "1"
               memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
+            - mountPath: /tmp
+              name: tmp
             - mountPath: /pgconf/
               name: pgbouncer-conf
       dnsPolicy: ClusterFirst
@@ -86,10 +93,15 @@ spec:
       schedulerName: default-scheduler
       securityContext:
         fsGroup: 2
+        runAsNonRoot: true
       serviceAccount: pgo-default
       serviceAccountName: pgo-default
       terminationGracePeriodSeconds: 30
       volumes:
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+          name: tmp
         - name: pgbouncer-conf
           projected:
             defaultMode: 420

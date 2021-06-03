@@ -75,22 +75,42 @@ spec:
               value: /tmp
             - name: PGBACKREST_DB_HOST
               value: some-name-required
+            - name: LD_PRELOAD
+              value: /usr/lib64/libnss_wrapper.so
+            - name: NSS_WRAPPER_PASSWD
+              value: /tmp/nss_wrapper/pgbackrest-repo/passwd
+            - name: NSS_WRAPPER_GROUP
+              value: /tmp/nss_wrapper/pgbackrest-repo/group
           imagePullPolicy: IfNotPresent
           name: database
           ports:
             - containerPort: 2022
+              name: pgbackrest
               protocol: TCP
           resources:
             requests:
               memory: 48Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
             - mountPath: /sshd
               name: sshd
               readOnly: true
+            - mountPath: /etc/ssh
+              name: ssh-config
+              readOnly: true
             - mountPath: /backrestrepo
               name: backrestrepo
+            - mountPath: /tmp
+              name: tmp
+            - mountPath: /home/pgbackrest
+              name: pgbackrest-home
+            - mountPath: /etc/pgbackrest
+              name: pgbackrest-conf
             - mountPath: /etc/pgbackrest/conf.d
               name: pgbackrest-config
       dnsPolicy: ClusterFirst
@@ -107,9 +127,28 @@ spec:
           secret:
             defaultMode: 420
             secretName: some-name-required-backrest-repo-config
+        - name: ssh-config
+          secret:
+            defaultMode: 420
+            items:
+              - key: config
+                path: ssh_config
+            secretName: some-name-required-backrest-repo-config
         - name: backrestrepo
           persistentVolumeClaim:
             claimName: some-name-required-pgbr-repo
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+          name: tmp
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 128Ki
+          name: pgbackrest-home
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 128Ki
+          name: pgbackrest-conf
         - name: pgbackrest-config
           projected:
             defaultMode: 420

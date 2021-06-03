@@ -65,6 +65,7 @@ spec:
           name: apiserver
           ports:
             - containerPort: 8443
+              name: api
               protocol: TCP
           readinessProbe:
             failureThreshold: 3
@@ -77,8 +78,15 @@ spec:
             successThreshold: 1
             timeoutSeconds: 1
           resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
         - env:
             - name: CRUNCHY_DEBUG
               value: "false"
@@ -111,6 +119,10 @@ spec:
             successThreshold: 1
             timeoutSeconds: 1
           resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
         - env:
@@ -144,8 +156,12 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             privileged: false
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
         - env:
             - name: TIMEOUT
               value: "3600"
@@ -165,8 +181,12 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             privileged: false
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -175,3 +195,8 @@ spec:
       serviceAccount: postgres-operator
       serviceAccountName: postgres-operator
       terminationGracePeriodSeconds: 30
+      volumes:
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+          name: tmp

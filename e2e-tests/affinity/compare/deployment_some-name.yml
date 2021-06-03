@@ -100,6 +100,8 @@ spec:
               value: posix
             - name: PGHA_PGBACKREST_LOCAL_S3_STORAGE
               value: "false"
+            - name: PGHA_PGBACKREST_LOCAL_GCS_STORAGE
+              value: "false"
             - name: PGHA_DATABASE
               value: some-name
             - name: PGHA_REPLICA_REINIT_ON_START_FAIL
@@ -110,6 +112,7 @@ spec:
               value: "false"
             - name: PGHA_TLS_ONLY
               value: "false"
+            - name: PGHA_PASSWORD_TYPE
             - name: PGHA_STANDBY
               value: "false"
             - name: PATRONI_KUBERNETES_NAMESPACE
@@ -130,6 +133,12 @@ spec:
               value: INFO
             - name: PGHOST
               value: /tmp
+            - name: LD_PRELOAD
+              value: /usr/lib64/libnss_wrapper.so
+            - name: NSS_WRAPPER_PASSWD
+              value: /tmp/nss_wrapper/postgres/passwd
+            - name: NSS_WRAPPER_GROUP
+              value: /tmp/nss_wrapper/postgres/group
           imagePullPolicy: IfNotPresent
           livenessProbe:
             exec:
@@ -143,8 +152,10 @@ spec:
           name: database
           ports:
             - containerPort: 5432
+              name: postgres
               protocol: TCP
             - containerPort: 8009
+              name: patroni
               protocol: TCP
           readinessProbe:
             exec:
@@ -158,6 +169,10 @@ spec:
           resources:
             requests:
               memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
@@ -172,6 +187,9 @@ spec:
             - mountPath: /sshd
               name: sshd
               readOnly: true
+            - mountPath: /etc/ssh
+              name: ssh-config
+              readOnly: true
             - mountPath: /pgconf
               name: pgconf-volume
             - mountPath: /dev/shm
@@ -180,6 +198,8 @@ spec:
               name: pgbackrest-config
             - mountPath: /etc/podinfo
               name: podinfo
+            - mountPath: /tmp
+              name: tmp
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -205,6 +225,13 @@ spec:
           secret:
             defaultMode: 420
             secretName: some-name-backrest-repo-config
+        - name: ssh-config
+          secret:
+            defaultMode: 420
+            items:
+              - key: config
+                path: ssh_config
+            secretName: some-name-backrest-repo-config
         - name: root-volume
           secret:
             defaultMode: 420
@@ -216,6 +243,10 @@ spec:
         - emptyDir:
             medium: Memory
           name: dshm
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+          name: tmp
         - name: pgbackrest-config
           projected:
             defaultMode: 420
