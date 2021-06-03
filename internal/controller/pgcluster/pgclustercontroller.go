@@ -32,8 +32,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
-	errpkg "github.com/pkg/errors"
-	"google.golang.org/protobuf/internal/errors"
+	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
@@ -435,7 +434,7 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 			if oldCluster.Spec.PGReplicas.HotStandby.Expose.ServiceType != newReplica.Spec.ServiceType {
 				log.Infof("Updating service for %s", newReplica.Name)
 				if err := clusteroperator.UpdateReplicaService(c.Client, newCluster, &newReplica); err != nil {
-					return errpkg.Wrapf(err, "error in Updating service for %s", newReplica.Name)
+					return errors.Wrapf(err, "error in Updating service for %s", newReplica.Name)
 				}
 			}
 
@@ -443,7 +442,7 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 				newReplica.Name, metav1.GetOptions{})
 
 			if err != nil {
-				return errpkg.Wrapf(err, "could not find instance for pgreplica")
+				return errors.Wrapf(err, "could not find instance for pgreplica")
 			}
 
 			// determine the current Pod -- this is required to stop the instance
@@ -516,7 +515,7 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 
 			log.Infof("Updating deployment for %s", newReplica.Name)
 			if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-				return errpkg.Wrapf(err, "could not update deployment for pgreplica update")
+				return errors.Wrap(err, "could not update deployment for pgreplica update")
 			}
 		}
 	}
