@@ -55,6 +55,7 @@ type ServiceTemplateFields struct {
 	ExporterPort string
 	ServiceType  v1.ServiceType
 	Ranges       []string
+	Annotations  map[string]string
 }
 
 // ReplicaSuffix is the suffix of the replica Service name

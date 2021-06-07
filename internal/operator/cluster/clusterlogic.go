@@ -81,6 +81,9 @@ func addClusterCreateMissingService(clientset kubernetes.Interface, cluster *crv
 	if cluster.Spec.Exporter {
 		serviceFields.ExporterPort = cluster.Spec.ExporterPort
 	}
+	if cluster.Spec.PGReplicas != nil {
+		serviceFields.Annotations = cluster.Spec.PGReplicas.HotStandby.Expose.Annotations
+	}
 
 	return CreateService(clientset, &serviceFields, namespace)
 }
@@ -349,7 +352,9 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		Tolerations:               util.GetTolerations(cl.Spec.Tolerations),
 		PMMContainer:              operator.GetPMMContainer(cl, cl.Name),
 	}
-
+	if cl.Spec.PGReplicas != nil {
+		updateDeploymentFromReplicaSection(&deploymentFields, cl.Spec.PGReplicas, cl)
+	}
 	return deploymentFields
 }
 
@@ -391,6 +396,9 @@ func scaleReplicaCreateMissingService(clientset kubernetes.Interface, replica *c
 
 	if cluster.Spec.PGBadger {
 		serviceFields.PGBadgerPort = cluster.Spec.PGBadgerPort
+	}
+	if cluster.Spec.PGReplicas != nil {
+		serviceFields.Annotations = cluster.Spec.PGReplicas.HotStandby.Expose.Annotations
 	}
 
 	return CreateService(clientset, &serviceFields, namespace)

@@ -411,6 +411,10 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 			newReplica := clusteroperator.GetNewReplicaObject(newCluster, i)
 			log.Infof("Deleting replica %s", newReplica.Spec.Name)
 			clusteroperator.ScaleDownBase(c.Client, &newReplica, newReplica.ObjectMeta.Namespace)
+			err = pvc.DeleteIfExists(c.Client, newReplica.Spec.Name, newReplica.ObjectMeta.Namespace)
+			if err != nil {
+				log.Errorf("delete pvc %s: %s", newReplica.Spec.Name, err)
+			}
 		}
 		return nil
 	}
@@ -419,6 +423,10 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 			newReplica := clusteroperator.GetNewReplicaObject(newCluster, i)
 			log.Infof("Deleting replica %s", newReplica.Spec.Name)
 			clusteroperator.ScaleDownBase(c.Client, &newReplica, newReplica.Namespace)
+			err = pvc.DeleteIfExists(c.Client, newReplica.Spec.Name, newReplica.ObjectMeta.Namespace)
+			if err != nil {
+				log.Errorf("delete pvc %s: %s", newReplica.Spec.Name, err)
+			}
 		}
 	}
 
@@ -431,12 +439,6 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 		if !reflect.DeepEqual(oldCluster.Spec.PGReplicas, newCluster.Spec.PGReplicas) {
 			ctx := context.TODO()
 			newReplica := clusteroperator.GetNewReplicaObject(newCluster, i)
-			if oldCluster.Spec.PGReplicas.HotStandby.Expose.ServiceType != newReplica.Spec.ServiceType {
-				log.Infof("Updating service for %s", newReplica.Name)
-				if err := clusteroperator.UpdateReplicaService(c.Client, newCluster, &newReplica); err != nil {
-					return errors.Wrapf(err, "error in Updating service for %s", newReplica.Name)
-				}
-			}
 
 			deployment, err := c.Client.AppsV1().Deployments(newReplica.Namespace).Get(ctx,
 				newReplica.Name, metav1.GetOptions{})
@@ -497,25 +499,28 @@ func (c *Controller) updateReplicas(newCluster, oldCluster *crv1.Pgcluster) erro
 				if len(deployment.Spec.Template.Spec.Containers) > 0 {
 					for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
 						if env.Name == "PGHA_SYNC_REPLICATION" {
-							env.Value = fmt.Sprint(newCluster.Spec.PGReplicas.HotStandby.EnableSyncStandby)
+							env.Value = fmt.Sprint(*newCluster.Spec.PGReplicas.HotStandby.EnableSyncStandby)
 						}
 						newEnvs = append(newEnvs, env)
 					}
 					deployment.Spec.Template.Spec.Containers[0].Env = newEnvs
-					if newCluster.Spec.PGReplicas.HotStandby.Resources != nil {
-						deployment.Spec.Template.Spec.Containers[0].Resources.Limits = newCluster.Spec.PGReplicas.HotStandby.Resources.Limits
-						deployment.Spec.Template.Spec.Containers[0].Resources.Requests = newCluster.Spec.PGReplicas.HotStandby.Resources.Requests
-					}
 				}
 			}
-
+			if newCluster.Spec.PGReplicas.HotStandby.Resources != nil {
+				deployment.Spec.Template.Spec.Containers[0].Resources.Limits = newCluster.Spec.PGReplicas.HotStandby.Resources.Limits
+				deployment.Spec.Template.Spec.Containers[0].Resources.Requests = newCluster.Spec.PGReplicas.HotStandby.Resources.Requests
+			}
 			if newCluster.Spec.PGReplicas.HotStandby.Affinity != nil {
 				deployment.Spec.Template.Spec.Affinity = newCluster.Spec.PGReplicas.HotStandby.Affinity
 			}
 
 			log.Infof("Updating deployment for %s", newReplica.Name)
 			if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-				return errors.Wrap(err, "could not update deployment for pgreplica update")
+				log.Errorf("could not update deployment for pgreplica update: %s", err)
+			}
+
+			if err := clusteroperator.UpdateReplicaService(c.Client, newCluster, &newReplica); err != nil {
+				log.Error(err)
 			}
 		}
 	}

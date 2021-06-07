@@ -40,6 +40,7 @@ type serviceInfo struct {
 	serviceName      string
 	serviceNamespace string
 	serviceType      v1.ServiceType
+	annotations      map[string]string
 }
 
 // CreateService ...
@@ -71,6 +72,9 @@ func CreateService(clientset kubernetes.Interface, fields *ServiceTemplateFields
 		if fields.ServiceType == v1.ServiceTypeLoadBalancer {
 			service.Spec.LoadBalancerSourceRanges = fields.Ranges
 		}
+		if fields.Annotations != nil {
+			service.Annotations = fields.Annotations
+		}
 
 		_, err = clientset.CoreV1().Services(namespace).Create(ctx, &service, metav1.CreateOptions{})
 	}
@@ -97,12 +101,20 @@ func UpdateReplicaService(clientset kubernetes.Interface, cluster *crv1.Pgcluste
 	if replica.Spec.ServiceType != "" {
 		serviceType = replica.Spec.ServiceType
 	}
-
-	return updateService(clientset, serviceInfo{
+	si := serviceInfo{
 		serviceName:      replica.Spec.ClusterName + ReplicaSuffix,
 		serviceNamespace: replica.Namespace,
 		serviceType:      serviceType,
-	})
+	}
+
+	if cluster.Spec.PGReplicas != nil {
+		if len(cluster.Spec.PGReplicas.HotStandby.Expose.ServiceType) > 0 {
+			si.serviceType = cluster.Spec.PGReplicas.HotStandby.Expose.ServiceType
+		}
+		si.annotations = cluster.Spec.PGReplicas.HotStandby.Expose.Annotations
+	}
+
+	return updateService(clientset, si)
 }
 
 // updateService does the legwork for updating a service
@@ -128,6 +140,8 @@ func updateService(clientset kubernetes.Interface, info serviceInfo) error {
 			svc.Spec.Ports[i].NodePort = 0
 		}
 	}
+
+	svc.Annotations = info.annotations
 
 	_, err = clientset.CoreV1().Services(info.serviceNamespace).Update(ctx, svc, metav1.UpdateOptions{})
 
