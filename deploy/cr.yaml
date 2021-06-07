@@ -143,9 +143,6 @@ spec:
     pgBouncer: preferred
   policies: ""
   port: "5432"
-# The number of replicas to create after a PostgreSQL primary
-# is first initialized. This only works on create
-#  replicas: "0"
   pgReplicas:
     hotStandby:
       size: 0
