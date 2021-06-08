@@ -4,6 +4,9 @@
     "metadata": {
         "name": "{{.JobName}}",
         "labels": {
+            {{ if .CustomLabels }}
+            {{ .CustomLabels }}
+            {{ end }}
             "vendor": "crunchydata",
             "pgo-sqlrunner": "true",
             "pg-cluster": "{{.ClusterName}}"
@@ -14,6 +17,9 @@
             "metadata": {
                 "name": "{{.JobName}}",
                 "labels": {
+                    {{ if .CustomLabels }}
+                    {{ .CustomLabels }}
+                    {{ end }}
                     "vendor": "crunchydata",
                     "pgo-sqlrunner": "true",
                     "pg-cluster": "{{.ClusterName}}"
@@ -21,6 +27,9 @@
             },
             "spec": {
                 "serviceAccountName": "pgo-default",
+                "securityContext": {
+                  "runAsNonRoot": true
+                },
                 {{ if .Tolerations }}
                 "tolerations": {{ .Tolerations }},
                 {{ end }}
@@ -28,6 +37,11 @@
                     {
                         "name": "sqlrunner",
                         "image": "{{.Image}}",
+                        "securityContext": {
+                          "allowPrivilegeEscalation": false,
+                          "privileged": false,
+                          "readOnlyRootFilesystem": true
+                        },
                         "command": ["/opt/crunchy/bin/uid_postgres.sh"],
                         "args": ["/opt/crunchy/bin/start.sh"],
                         "env": [

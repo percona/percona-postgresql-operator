@@ -116,6 +116,10 @@ var PgbackrestEnvVarsTemplate *template.Template
 
 const pgbackrestEnvVarsPath = "pgbackrest-env-vars.json"
 
+var PgbackrestGCSEnvVarsTemplate *template.Template
+
+const pgbackrestGCSEnvVarsPath = "pgbackrest-gcs-env-vars.json"
+
 var PgbackrestS3EnvVarsTemplate *template.Template
 
 const pgbackrestS3EnvVarsPath = "pgbackrest-s3-env-vars.json"
@@ -208,6 +212,9 @@ type ClusterStruct struct {
 	Replicas                       string
 	ServiceType                    v1.ServiceType
 	BackrestPort                   int
+	BackrestGCSBucket              string
+	BackrestGCSEndpoint            string
+	BackrestGCSKeyType             string
 	BackrestS3Bucket               string
 	BackrestS3Endpoint             string
 	BackrestS3Region               string
@@ -259,6 +266,7 @@ type PgoConfig struct {
 	BackupStorage   string
 	ReplicaStorage  string
 	BackrestStorage string
+	PGAdminStorage  string
 	Storage         map[string]StorageStruct
 	OpenShift       bool
 }
@@ -326,6 +334,10 @@ func (c *PgoConfig) Validate() error {
 		}
 		if _, ok := c.Storage[c.ReplicaStorage]; !ok {
 			return storageNotDefined("ReplicaStorage", c.ReplicaStorage)
+		}
+		if _, ok := c.Storage[c.PGAdminStorage]; !ok {
+			log.Warning("PGAdminStorage setting not set, will use PrimaryStorage setting")
+			c.Storage[c.PGAdminStorage] = c.Storage[c.PrimaryStorage]
 		}
 		if _, ok := c.Storage[c.WALStorage]; c.WALStorage != "" && !ok {
 			return storageNotDefined("WALStorage", c.WALStorage)
@@ -616,6 +628,11 @@ func (c *PgoConfig) GetConfig(clientset kubernetes.Interface, namespace string) 
 	}
 
 	PgbackrestEnvVarsTemplate, err = c.LoadTemplate(cMap, pgbackrestEnvVarsPath)
+	if err != nil {
+		return err
+	}
+
+	PgbackrestGCSEnvVarsTemplate, err = c.LoadTemplate(cMap, pgbackrestGCSEnvVarsPath)
 	if err != nil {
 		return err
 	}

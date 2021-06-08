@@ -23,6 +23,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
 	clusteroperator "github.com/percona/percona-postgresql-operator/internal/operator/cluster"
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
@@ -30,6 +31,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -261,6 +263,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			log.Errorf("could not update deployment for pgreplica update: %q", err.Error())
 		}
 	}
+
 	// get the Deployment object associated with this instance
 	deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
 		newPgreplica.Name, metav1.GetOptions{})
@@ -278,6 +281,80 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		log.Errorf("could not update deployment for pgreplica update pmm: %q", err.Error())
+	}
+
+	// handle PVC resizing, if needed
+	if oldPgreplica.Spec.ReplicaStorage.Size != newPgreplica.Spec.ReplicaStorage.Size {
+		// first check to see if the resize should occur
+		annotations := newPgreplica.ObjectMeta.GetAnnotations()
+		if annotations != nil {
+			if _, ok := annotations[config.ANNOTATION_CLUSTER_DO_NOT_RESIZE]; ok {
+				delete(newPgreplica.ObjectMeta.Annotations, config.ANNOTATION_CLUSTER_DO_NOT_RESIZE)
+				if _, err := c.Client.CrunchydataV1().Pgreplicas(newPgreplica.Namespace).Update(ctx,
+					newPgreplica, metav1.UpdateOptions{}); err != nil {
+					log.Warnf("could not remove resize annotation from pgreplica: %s", err.Error())
+				}
+				return
+			}
+		}
+
+		// if we get to this point, then we should resize the PVC
+		// validate that this resize can occur
+		if err := util.ValidatePVCResize(oldPgreplica.Spec.ReplicaStorage.Size, newPgreplica.Spec.ReplicaStorage.Size); err != nil {
+			log.Error(err)
+			return
+		}
+
+		// find the deployment
+		deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
+			newPgreplica.Name, metav1.GetOptions{})
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		// get the size -- this will not error at this point as we just validated it
+		size, _ := resource.ParseQuantity(newPgreplica.Spec.ReplicaStorage.Size)
+
+		// OK, let's now perform the resize. In this case, we need to update the value
+		// on the PVC.
+		pvc, err := c.Client.CoreV1().PersistentVolumeClaims(newPgreplica.Namespace).Get(ctx,
+			deployment.GetName(), metav1.GetOptions{})
+
+		// if we can't locate the PVC, we can't resize, and we really need to return
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		// alright, update the PVC size
+		pvc.Spec.Resources.Requests[v1.ResourceStorage] = size
+
+		// and update!
+		if _, err := c.Client.CoreV1().PersistentVolumeClaims(newPgreplica.Namespace).Update(ctx,
+			pvc, metav1.UpdateOptions{}); err != nil {
+			log.Error(err)
+			return
+		}
+
+		// update the PostgreSQL instance
+		// first, ensure it is stopped. if this errors, just warn
+		if err := clusteroperator.StopPostgreSQLInstance(c.Client, c.Client.Config, *deployment); err != nil {
+			log.Warn(err)
+		}
+
+		// scale down the deployment
+		replicas := new(int32)
+		if err := operator.ScaleDeployment(c.Client, deployment, replicas); err != nil {
+			log.Error(err)
+			return
+		}
+
+		// scale the deployment back up
+		*replicas = 1
+		if err := operator.ScaleDeployment(c.Client, deployment, replicas); err != nil {
+			log.Error(err)
+		}
 	}
 }
 

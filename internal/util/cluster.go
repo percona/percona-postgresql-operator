@@ -30,6 +30,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
@@ -43,8 +44,10 @@ type BackrestRepoConfig struct {
 	BackrestS3CA        []byte
 	BackrestS3Key       string
 	BackrestS3KeySecret string
+	BackrestGCSKey      []byte
 	ClusterName         string
 	ClusterNamespace    string
+	CustomLabels        map[string]string
 	OperatorNamespace   string
 }
 
@@ -54,6 +57,11 @@ type AWSS3Secret struct {
 	AWSS3CA        []byte
 	AWSS3Key       string
 	AWSS3KeySecret string
+}
+
+// GCSSecret is a structured representation for providing the GCS key
+type GCSSecret struct {
+	Key []byte
 }
 
 const (
@@ -77,6 +85,8 @@ const (
 	BackRestRepoSecretKeyAWSS3KeyAWSS3Key = "aws-s3-key"
 	// #nosec: G101
 	BackRestRepoSecretKeyAWSS3KeyAWSS3KeySecret = "aws-s3-key-secret"
+	// #nosec: G101
+	BackRestRepoSecretKeyAWSS3KeyGCSKey = "gcs-key"
 	// the rest are private
 	backRestRepoSecretKeyAuthorizedKeys = "authorized_keys"
 	backRestRepoSecretKeySSHConfig      = "config"
@@ -87,6 +97,10 @@ const (
 	// #nosec: G101
 	backRestRepoSecretKeySSHHostPrivateKey = "ssh_host_ed25519_key"
 )
+
+// BootstrapConfigPrefix is the format of the prefix used for the Secret containing the
+// pgBackRest configuration required to bootstrap a new cluster using a pgBackRest backup
+const BootstrapConfigPrefix = "%s-bootstrap-%s"
 
 const (
 	// SQLValidUntilAlways uses a special PostgreSQL value to ensure a password
@@ -125,7 +139,7 @@ var cmdStopPostgreSQL = []string{
 // CreateBackrestRepoSecrets creates the secrets required to manage the
 // pgBackRest repo container
 func CreateBackrestRepoSecrets(clientset kubernetes.Interface,
-	backrestRepoConfig BackrestRepoConfig) error {
+	backrestRepoConfig BackrestRepoConfig) (*v1.Secret, error) {
 	ctx := context.TODO()
 
 	// first: determine if a Secret already exists. If it does, we are going to
@@ -138,7 +152,7 @@ func CreateBackrestRepoSecrets(clientset kubernetes.Interface,
 	// only return an error if this is a **not** a not found error
 	if secretErr != nil && !kerrors.IsNotFound(secretErr) {
 		log.Error(secretErr)
-		return secretErr
+		return nil, secretErr
 	}
 
 	// determine if we need to create a new secret, i.e. this is a not found error
@@ -156,17 +170,21 @@ func CreateBackrestRepoSecrets(clientset kubernetes.Interface,
 			},
 			Data: map[string][]byte{},
 		}
+
+		for k, v := range backrestRepoConfig.CustomLabels {
+			secret.ObjectMeta.Labels[k] = v
+		}
 	}
 
 	// next, load the Operator level pgBackRest secret templates, which contain
-	// SSHD(...?) and possible S3 credentials
+	// SSHD(...?) and possible S3 or GCS credentials
 	configs, configErr := clientset.
 		CoreV1().Secrets(backrestRepoConfig.OperatorNamespace).
 		Get(ctx, config.SecretOperatorBackrestRepoConfig, metav1.GetOptions{})
 
 	if configErr != nil {
 		log.Error(configErr)
-		return configErr
+		return nil, configErr
 	}
 
 	// set the SSH/SSHD configuration, if it is not presently set
@@ -185,7 +203,7 @@ func CreateBackrestRepoSecrets(clientset kubernetes.Interface,
 
 		if keyErr != nil {
 			log.Error(keyErr)
-			return keyErr
+			return nil, keyErr
 		}
 
 		secret.Data[backRestRepoSecretKeyAuthorizedKeys] = keys.Public
@@ -224,17 +242,27 @@ func CreateBackrestRepoSecrets(clientset kubernetes.Interface,
 		secret.Data[BackRestRepoSecretKeyAWSS3KeyAWSS3KeySecret] = configs.Data[BackRestRepoSecretKeyAWSS3KeyAWSS3KeySecret]
 	}
 
-	// time to create or update the secret!
-	if newSecret {
-		_, err := clientset.CoreV1().Secrets(backrestRepoConfig.ClusterNamespace).Create(
-			ctx, secret, metav1.CreateOptions{})
-		return err
+	if len(backrestRepoConfig.BackrestGCSKey) != 0 {
+		secret.Data[BackRestRepoSecretKeyAWSS3KeyGCSKey] = backrestRepoConfig.BackrestGCSKey
 	}
 
-	_, err := clientset.CoreV1().Secrets(backrestRepoConfig.ClusterNamespace).Update(
-		ctx, secret, metav1.UpdateOptions{})
+	if len(secret.Data[BackRestRepoSecretKeyAWSS3KeyGCSKey]) == 0 &&
+		len(configs.Data[BackRestRepoSecretKeyAWSS3KeyGCSKey]) != 0 {
+		secret.Data[BackRestRepoSecretKeyAWSS3KeyGCSKey] = configs.Data[BackRestRepoSecretKeyAWSS3KeyGCSKey]
+	}
 
-	return err
+	// time to create or update the secret!
+	var repoSecret *v1.Secret
+	var err error
+	if newSecret {
+		repoSecret, err = clientset.CoreV1().Secrets(backrestRepoConfig.ClusterNamespace).Create(
+			ctx, secret, metav1.CreateOptions{})
+	} else {
+		repoSecret, err = clientset.CoreV1().Secrets(backrestRepoConfig.ClusterNamespace).Update(
+			ctx, secret, metav1.UpdateOptions{})
+	}
+
+	return repoSecret, err
 }
 
 // CreateRMDataTask is a legacy method that was moved into this file. This
@@ -257,8 +285,7 @@ func CreateRMDataTask(clientset kubeapi.Interface, cluster *crv1.Pgcluster, repl
 			},
 		},
 		Spec: crv1.PgtaskSpec{
-			Name:      taskName,
-			Namespace: cluster.Namespace,
+			Name: taskName,
 			Parameters: map[string]string{
 				config.LABEL_DELETE_DATA:    strconv.FormatBool(deleteData),
 				config.LABEL_DELETE_BACKUPS: strconv.FormatBool(deleteBackups),
@@ -267,7 +294,7 @@ func CreateRMDataTask(clientset kubeapi.Interface, cluster *crv1.Pgcluster, repl
 				config.LABEL_IS_BACKUP:      strconv.FormatBool(isBackup),
 				config.LABEL_PG_CLUSTER:     cluster.Name,
 				config.LABEL_REPLICA_NAME:   replicaName,
-				config.LABEL_PGHA_SCOPE:     cluster.ObjectMeta.GetLabels()[config.LABEL_PGHA_SCOPE],
+				config.LABEL_PGHA_SCOPE:     cluster.Name,
 				config.LABEL_RM_TOLERATIONS: GetTolerations(cluster.Spec.Tolerations),
 			},
 			TaskType: crv1.PgtaskDeleteData,
@@ -338,6 +365,33 @@ func GeneratedPasswordValidUntilDays(configuredValidUntilDays string) int {
 	return validUntilDays
 }
 
+// GetCustomLabels gets a list of the custom labels that a user set so they can
+// be applied to any non-Postgres cluster instance objects. This removes some of
+// the "system labels" that get stuck in the "UserLabels" area.
+//
+// Do **not** use this for the Postgres instance Deployments. Some of those
+// labels are needed there.
+//
+// Returns a map.
+func GetCustomLabels(cluster *crv1.Pgcluster) map[string]string {
+	labels := map[string]string{}
+
+	if cluster.Spec.UserLabels == nil {
+		return labels
+	}
+
+	for k, v := range cluster.Spec.UserLabels {
+		switch k {
+		default:
+			labels[k] = v
+		case config.LABEL_WORKFLOW_ID, config.LABEL_PGO_VERSION:
+			continue
+		}
+	}
+
+	return labels
+}
+
 // GetPrimaryPod gets the Pod of the primary PostgreSQL instance. If somehow
 // the query gets multiple pods, then the first one in the list is returned
 func GetPrimaryPod(clientset kubernetes.Interface, cluster *crv1.Pgcluster) (*v1.Pod, error) {
@@ -346,7 +400,7 @@ func GetPrimaryPod(clientset kubernetes.Interface, cluster *crv1.Pgcluster) (*v1
 	// set up the selector for the primary pod
 	selector := fmt.Sprintf("%s=%s,%s=%s",
 		config.LABEL_PG_CLUSTER, cluster.Spec.Name, config.LABEL_PGHA_ROLE, config.LABEL_PGHA_ROLE_PRIMARY)
-	namespace := cluster.Spec.Namespace
+	namespace := cluster.Namespace
 
 	// query the pods
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
@@ -363,6 +417,25 @@ func GetPrimaryPod(clientset kubernetes.Interface, cluster *crv1.Pgcluster) (*v1
 	// Grab the first pod from the list as this is presumably the primary pod
 	pod := pods.Items[0]
 	return &pod, nil
+}
+
+// GetGCSCredsFromBackrestRepoSecret retrieves the GCS credentials, i.e. the
+// key "file" from the pgBackRest Secret
+func GetGCSCredsFromBackrestRepoSecret(clientset kubernetes.Interface, namespace, clusterName string) (GCSSecret, error) {
+	ctx := context.TODO()
+	secretName := fmt.Sprintf("%s-%s", clusterName, config.LABEL_BACKREST_REPO_SECRET)
+	gcsSecret := GCSSecret{}
+
+	secret, err := clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		log.Error(err)
+		return gcsSecret, err
+	}
+
+	// get the GCS secret credentials out of the secret, and return
+	gcsSecret.Key = secret.Data[BackRestRepoSecretKeyAWSS3KeyGCSKey]
+
+	return gcsSecret, nil
 }
 
 // GetS3CredsFromBackrestRepoSecret retrieves the AWS S3 credentials, i.e. the key and key
@@ -506,6 +579,35 @@ func ValidateLabels(labels map[string]string) error {
 		if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
 			return fmt.Errorf("%w: invalid value %s: %s", ErrLabelInvalid, v, strings.Join(errs, ","))
 		}
+	}
+
+	return nil
+}
+
+// ValidatePVCResize ensures that the quantities being used in a PVC resize are
+// valid, and the resize is moving in an increasing direction
+func ValidatePVCResize(oldSize, newSize string) error {
+	// the old size might be blank. if it is, set it to 0
+	if strings.TrimSpace(oldSize) == "" {
+		oldSize = "0"
+	}
+
+	old, err := resource.ParseQuantity(oldSize)
+
+	if err != nil {
+		return fmt.Errorf("cannot resize PVC due to invalid storage size: %w", err)
+	}
+
+	new, err := resource.ParseQuantity(newSize)
+
+	if err != nil {
+		return fmt.Errorf("cannot resize PVC due to invalid storage size: %w", err)
+	}
+
+	// the new size *must* be greater than the old size
+	if new.Cmp(old) != 1 {
+		return fmt.Errorf("cannot resize PVC: new size %q is less than old size %q",
+			new.String(), old.String())
 	}
 
 	return nil

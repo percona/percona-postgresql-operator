@@ -51,6 +51,7 @@ type restorejobTemplateFields struct {
 	PgPort              string
 	NodeSelector        string
 	Tolerations         string
+	CustomLabels        string
 }
 
 // Restore ...
@@ -106,6 +107,7 @@ func Restore(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) {
 		Image:               cluster.Spec.PGImage,
 		NodeSelector:        operator.GetNodeAffinity(nodeAffinity),
 		Tolerations:         util.GetTolerations(cluster.Spec.Tolerations),
+		CustomLabels:        operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 	}
 
 	var doc2 bytes.Buffer

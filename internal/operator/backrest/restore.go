@@ -49,27 +49,6 @@ const (
 // for pgBackRest using the '--target' option
 var restoreTargetRegex = regexp.MustCompile("--target(=| +)")
 
-type BackrestRestoreJobTemplateFields struct {
-	JobName                string
-	ClusterName            string
-	WorkflowID             string
-	ToClusterPVCName       string
-	SecurityContext        string
-	CCPImagePrefix         string
-	CCPImageTag            string
-	CommandOpts            string
-	PITRTarget             string
-	PgbackrestStanza       string
-	PgbackrestDBPath       string
-	PgbackrestRepo1Path    string
-	PgbackrestRepo1Host    string
-	PgbackrestS3EnvVars    string
-	NodeSelector           string
-	Tablespaces            string
-	TablespaceVolumes      string
-	TablespaceVolumeMounts string
-}
-
 // UpdatePGClusterSpecForRestore updates the spec for pgcluster resource provided as need to
 // perform a restore
 func UpdatePGClusterSpecForRestore(clientset kubeapi.Interface, cluster *crv1.Pgcluster,
@@ -285,6 +264,14 @@ func PrepareClusterForRestore(clientset kubeapi.Interface, cluster *crv1.Pgclust
 	}
 	log.Debugf("restore workflow: set 'init' flag to 'true' for cluster %s",
 		clusterName)
+
+	// delete the "bootstrap" pgBackRest repo Secret if it exists, e.g. from a previous restore
+	// attempt
+	if err := clientset.CoreV1().Secrets(namespace).Delete(ctx,
+		fmt.Sprintf(util.BootstrapConfigPrefix, cluster.GetName(), config.LABEL_BACKREST_REPO_SECRET),
+		metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+		return nil, err
+	}
 
 	return patchedCluster, nil
 }
