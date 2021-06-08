@@ -548,8 +548,10 @@ func updateDeploymentFromReplicaSection(replicaDeploymentFields *operator.Deploy
 		replicaDeploymentFields.PodAntiAffinity = replicas.HotStandby.Affinity.String()
 	}
 	if replicas.HotStandby.Labels != nil {
-		labels := make(map[string]string)
-		labels = cluster.Spec.UserLabels
+		labels := cluster.Spec.UserLabels
+		if labels == nil {
+			labels = make(map[string]string)
+		}
 		for k, v := range replicas.HotStandby.Labels {
 			labels[k] = v
 		}
