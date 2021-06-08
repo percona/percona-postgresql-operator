@@ -568,7 +568,7 @@ func updateDeploymentFromReplicaSection(replicaDeploymentFields *operator.Deploy
 		for k, v := range replicas.HotStandby.Labels {
 			labels[k] = v
 		}
-		replicaDeploymentFields.PodLabels = operator.GetLabelsFromMap(labels)
+		replicaDeploymentFields.PodLabels = operator.GetLabelsFromMap(labels, true)
 	}
 	annotatioins, err := json.Marshal(replicas.HotStandby.Annotations)
 	// if there is an error, warn in our logs and return an empty string
