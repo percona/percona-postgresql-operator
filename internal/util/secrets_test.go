@@ -21,6 +21,8 @@ import (
 	"unicode"
 )
 
+var passwordCharExclude = ""
+
 func TestGeneratePassword(t *testing.T) {
 	// different lengths
 	for _, length := range []int{1, 2, 3, 5, 20, 200} {

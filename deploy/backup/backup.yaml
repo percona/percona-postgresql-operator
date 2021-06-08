@@ -26,6 +26,4 @@ spec:
     backrest-storage-type: ""
     job-name: cluster1-backrest-full-backup
     pg-cluster: cluster1
-# backrest repo pod name
-    podname: cluster1-backrest-shared-repo-5f84955754-xd52d
   tasktype: backrest

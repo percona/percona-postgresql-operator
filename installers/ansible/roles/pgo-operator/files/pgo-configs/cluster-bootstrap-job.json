@@ -29,6 +29,11 @@
                 "containers": [{
                     "name": "database",
                     "image": "{{.Image}}",
+                    "securityContext": {
+                      "allowPrivilegeEscalation": false,
+                      "privileged": false,
+                      "readOnlyRootFilesystem": true
+                    },
                     {{.ContainerResources}}
                     "env": [{
                         "name": "PGHA_PG_PORT",
@@ -55,6 +60,7 @@
                         "name": "PATRONI_POSTGRESQL_DATA_DIR",
                         "value": "/pgdata/{{.Name}}"
                     },
+                    {{.PgbackrestGCSEnvVars}}
                     {{.PgbackrestS3EnvVars}}
                     {{.PgbackrestEnvVars}}
                     {
@@ -72,6 +78,9 @@
                     }, {
                         "name": "PGHA_TLS_ONLY",
                         "value": "{{.TLSOnly}}"
+                    }, {
+                        "name": "PGHA_PASSWORD_TYPE",
+                        "value": "{{.PasswordType}}"
                     }, {
                         "name": "PGHA_STANDBY",
                         "value": "{{.Standby}}"
@@ -104,6 +113,15 @@
                     }, {
                         "name": "RESTORE_OPTS",
                         "value": "{{.RestoreOpts}}"
+                    }, {
+                      "name": "LD_PRELOAD",
+                      "value": "/usr/lib64/libnss_wrapper.so"
+                    }, {
+                      "name": "NSS_WRAPPER_PASSWD",
+                      "value": "/tmp/nss_wrapper/postgres/passwd"
+                    }, {
+                      "name": "NSS_WRAPPER_GROUP",
+                      "value": "/tmp/nss_wrapper/postgres/group"
                     }],
                     "volumeMounts": [{
                         "mountPath": "/pgdata",
@@ -129,11 +147,19 @@
                         "name": "sshd",
                         "readOnly": true
                     }, {
+                      "name": "ssh-config",
+                      "mountPath": "/etc/ssh",
+                      "readOnly": true
+                    }, {
                         "mountPath": "/pgconf",
                         "name": "pgconf-volume"
                     }, {
                         "mountPath": "/dev/shm",
                         "name": "dshm"
+                    },
+                    {
+                        "mountPath": "/tmp",
+                        "name": "tmp"
                     }, {
                         "mountPath": "/etc/pgbackrest/conf.d",
                         "name": "pgbackrest-config"
@@ -163,8 +189,19 @@
                 }, {
                     "name": "sshd",
                     "secret": {
-                        "secretName": "{{.RestoreFrom}}-backrest-repo-config"
+                        "secretName": "{{.ClusterName}}-bootstrap-backrest-repo-config"
                     }
+                }, {
+                    "name": "ssh-config",
+                    "secret": {
+                        "secretName": "{{.ClusterName}}-bootstrap-backrest-repo-config",
+                        "items": [
+                          {
+                             "key": "config",
+                             "path": "ssh_config"
+                          }
+                     ]
+                  }
                 },
                 {{if .TLSEnabled}}
                 {
@@ -215,10 +252,19 @@
                             }
                         ]
                     }
+                },
+                {
+                  "name": "tmp",
+                  "emptyDir": {
+                    "medium": "Memory",
+                    "sizeLimit": "16Mi"
+                  }
                 }
                 {{.TablespaceVolumes}}],
                 "affinity": {
-                    {{.NodeSelector}}
+                    {{if .NodeSelector}}
+                    "nodeAffinity": {{.NodeSelector}}
+                    {{ end }}
                     {{if and .NodeSelector .PodAntiAffinity}},{{end}}
                     {{.PodAntiAffinity}}
                 },

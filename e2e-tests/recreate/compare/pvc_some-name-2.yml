@@ -6,7 +6,6 @@ metadata:
     pv.kubernetes.io/bound-by-controller: "yes"
   labels:
     pg-cluster: some-name
-    pgremove: "true"
     vendor: crunchydata
   name: some-name-2
 spec:

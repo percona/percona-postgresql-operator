@@ -51,11 +51,13 @@ type backrestJobTemplateFields struct {
 	PITRTarget                    string
 	PodName                       string
 	Image                         string
+	CustomLabels                  string
 	SecurityContext               string
 	PgbackrestStanza              string
 	PgbackrestDBPath              string
 	PgbackrestRepo1Path           string
 	PgbackrestRepo1Type           crv1.BackrestStorageType
+	BackrestLocalAndGCSStorage    bool
 	BackrestLocalAndS3Storage     bool
 	PgbackrestS3VerifyTLS         string
 	PgbackrestRestoreVolumes      string
@@ -91,29 +93,44 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 	// is specified then this ensures that the stanza is created on the local
 	// repository only.
 	//
-	//The stanza for the S3 repo will have already been created by the cluster
+	//The stanza for the S3/GCS repo will have already been created by the cluster
 	// the standby is replicating from, and therefore does not need to be
 	// attempted again.
 	if cluster.Spec.Standby && cmd == crv1.PgtaskBackrestStanzaCreate {
 		repoType = crv1.BackrestStorageTypePosix
 	}
+	selector := fmt.Sprintf("%s=%s,%s", config.LABEL_PG_CLUSTER, cluster.Name, config.LABEL_PGO_BACKREST_REPO)
+	options := metav1.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("status.phase", string(v1.PodRunning)).String(),
+		LabelSelector: selector,
+	}
 
+	pods, err := clientset.CoreV1().Pods(cluster.Namespace).List(ctx, options)
+	if err != nil {
+		log.Errorf("error getting pods from selector %s: %s", selector, err)
+		return
+	} else if len(pods.Items) != 1 {
+		log.Error("error getting pods from selector: 0 or more than 1 pods present")
+		return
+	}
 	// create the Job to run the backrest command
 	jobFields := backrestJobTemplateFields{
 		JobName:                       task.Spec.Parameters[config.LABEL_JOB_NAME],
 		ClusterName:                   task.Spec.Parameters[config.LABEL_PG_CLUSTER],
-		PodName:                       task.Spec.Parameters[config.LABEL_POD_NAME],
+		PodName:                       pods.Items[0].Name,
 		SecurityContext:               "{}",
 		Command:                       cmd,
 		CommandOpts:                   task.Spec.Parameters[config.LABEL_BACKREST_OPTS],
 		PITRTarget:                    "",
 		Image:                         cluster.Spec.BackrestImage,
+		CustomLabels:                  operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 		PgbackrestStanza:              task.Spec.Parameters[config.LABEL_PGBACKREST_STANZA],
 		PgbackrestDBPath:              task.Spec.Parameters[config.LABEL_PGBACKREST_DB_PATH],
 		PgbackrestRepo1Path:           task.Spec.Parameters[config.LABEL_PGBACKREST_REPO_PATH],
 		PgbackrestRestoreVolumes:      "",
 		PgbackrestRestoreVolumeMounts: "",
 		PgbackrestRepo1Type:           repoType,
+		BackrestLocalAndGCSStorage:    operator.IsLocalAndGCSStorage(cluster),
 		BackrestLocalAndS3Storage:     operator.IsLocalAndS3Storage(cluster),
 		PgbackrestS3VerifyTLS:         task.Spec.Parameters[config.LABEL_BACKREST_S3_VERIFY_TLS],
 		Tolerations:                   util.GetTolerations(cluster.Spec.Tolerations),
@@ -213,7 +230,6 @@ func CreateBackup(clientset pgo.Interface, namespace, clusterName, podName strin
 
 	spec := crv1.PgtaskSpec{}
 	spec.Name = taskName
-	spec.Namespace = namespace
 
 	spec.TaskType = crv1.PgtaskBackrest
 	spec.Parameters = make(map[string]string)

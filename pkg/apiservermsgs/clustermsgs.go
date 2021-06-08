@@ -108,20 +108,27 @@ type CreateClusterRequest struct {
 	// Version of API client
 	// required: true
 	ClientVersion             string
+	PasswordType              string
 	PodAntiAffinity           string
 	PodAntiAffinityPgBackRest string
 	PodAntiAffinityPgBouncer  string
 	SyncReplication           *bool
 	BackrestConfig            string
-	BackrestS3Key             string
-	BackrestS3KeySecret       string
-	BackrestS3Bucket          string
-	BackrestS3Region          string
-	BackrestS3Endpoint        string
-	BackrestS3URIStyle        string
-	BackrestS3VerifyTLS       UpdateBackrestS3VerifyTLS
-	Standby                   bool
-	BackrestRepoPath          string
+	BackrestGCSBucket         string
+	BackrestGCSEndpoint       string
+	// BackrestGCSKey is a standard base64 encoded string that contains the
+	// information found in a GCS key (typically a JSON file)
+	BackrestGCSKey      string
+	BackrestGCSKeyType  string
+	BackrestS3Key       string
+	BackrestS3KeySecret string
+	BackrestS3Bucket    string
+	BackrestS3Region    string
+	BackrestS3Endpoint  string
+	BackrestS3URIStyle  string
+	BackrestS3VerifyTLS UpdateBackrestS3VerifyTLS
+	Standby             bool
+	BackrestRepoPath    string
 
 	// allow the user to set custom sizes for PVCs
 	// PVCSize applies to the primary/replica storage specs
@@ -263,6 +270,7 @@ type ShowClusterService struct {
 	ClusterName  string
 	Pgbouncer    bool
 	BackrestRepo bool
+	PGAdmin      bool
 }
 
 const (
@@ -434,6 +442,16 @@ type UpdateClusterRequest struct {
 	// BackrestMemoryRequest, if specified, is the value of how much RAM should
 	// be requested for the pgBackRest repository.
 	BackrestMemoryRequest string
+	// BackrestPVCSize if set updates the size of the pgBackRest PVC
+	BackrestPVCSize string
+	// CASecret is the name of the secret that contains the CA to use along with
+	// the TLS keypair for deploying a TLS-enabled PostgreSQL cluster. Provide it
+	// to either enable or update the Secret used in a TLS cluster
+	CASecret string
+	// DisableTLS, if set, will remove TLS settings from the cluster. This will
+	// override the values of CASecret, ReplicationTLSSecret, TLSSecret, and
+	// TLSOnly
+	DisableTLS bool
 	// ExporterCPULimit, if specified, is the value of the max amount of CPU
 	// to be utilized for a Crunchy Postgres Exporter instance
 	ExporterCPULimit string
@@ -468,18 +486,36 @@ type UpdateClusterRequest struct {
 	// PGBadger allows for the enabling/disabling of the pgBadger sidecar. This can
 	// cause downtime and triggers a rolling update
 	PGBadger UpdateClusterPGBadger
+	// PVC size, if set, updates the size of the data directory.
+	PVCSize string
+	// ReplicationTLSSecret is the name of the secret that contains the keypair
+	// used for having instances in a PostgreSQL cluster authenticate each another
+	// using certificate-based authentication. The CN of the certificate must
+	// either be "primaryuser" (the current name of the replication user) OR
+	// have a mapping to primaryuser in the pg_ident file. The
+	// ReplicationTLSSecret must be verifable by the certificate chain in the
+	// CASecret
+	ReplicationTLSSecret string
 	// ServiceType, if specified, will change the service type of a cluster.
 	ServiceType v1.ServiceType
 	Standby     UpdateClusterStandbyStatus
 	Startup     bool
 	Shutdown    bool
 	Tablespaces []ClusterTablespaceDetail
+	// TLSSecret is the name of the secret that contains the keypair required to
+	// deploy a TLS-enabled PostgreSQL cluster
+	TLSSecret string
 	// Tolerations allows for the adding of Pod tolerations on a PostgreSQL
 	// cluster.
 	Tolerations []v1.Toleration `json:"tolerations"`
+	// TLSOnly indicates that a PostgreSQL cluster should be deployed with only
+	// TLS connections accepted, or if it should be disabled
+	TLSOnly UpdateClusterTLSOnly
 	// TolerationsDelete  allows for the removal of Pod tolerations on a
 	// PostgreSQL cluster
 	TolerationsDelete []v1.Toleration `json:"tolerationsDelete"`
+	// WALPVCSize updates the size of the WAL PVC, if there is a WAL PVC
+	WALPVCSize string
 }
 
 // UpdateClusterResponse ...
@@ -488,6 +524,14 @@ type UpdateClusterResponse struct {
 	Results []string
 	Status
 }
+
+type UpdateClusterTLSOnly int
+
+const (
+	UpdateClusterTLSOnlyDoNothing UpdateClusterTLSOnly = iota
+	UpdateClusterTLSOnlyEnable
+	UpdateClusterTLSOnlyDisable
+)
 
 // ClusterTestRequest ...
 // swagger:model
@@ -506,6 +550,7 @@ type ClusterTestRequest struct {
 const (
 	ClusterTestInstanceTypePrimary   = "primary"
 	ClusterTestInstanceTypeReplica   = "replica"
+	ClusterTestInstanceTypePGAdmin   = "pgadmin"
 	ClusterTestInstanceTypePGBouncer = "pgbouncer"
 	ClusterTestInstanceTypeBackups   = "backups"
 	ClusterTestInstanceTypeUnknown   = "unknown"

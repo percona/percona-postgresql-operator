@@ -156,9 +156,10 @@ pipeline {
                     sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/3.3.2/yq_linux_amd64 > /usr/local/bin/yq"
                     sudo chmod +x /usr/local/bin/yq
                 '''
-                withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE')]) {
+                withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
                     sh '''
                         cp $CLOUD_SECRET_FILE ./e2e-tests/conf/cloud-secret.yml
+                        cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
                     '''
                 }
             }
@@ -304,6 +305,8 @@ pipeline {
                 runTest('init-deploy', 'sandbox')
                 runTest('scaling', 'sandbox')
                 runTest('recreate', 'sandbox')
+                runTest('affinity', 'sandbox')
+                runTest('demand-backup', 'sandbox')
                 ShutdownCluster('sandbox')
             }
         }

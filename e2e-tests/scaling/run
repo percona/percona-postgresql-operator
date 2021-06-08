@@ -9,7 +9,7 @@ test_dir=$(realpath $(dirname $0))
 create_namespace $namespace
 deploy_operator
 
-desc 'create first PSMDB cluster'
+desc 'create first cluster'
 cluster="some-name"
 kubectl_bin apply \
 	-f $conf_dir/${cluster}-secrets.yml \
@@ -34,13 +34,13 @@ run_psql \
 	"postgres:postgres_pass@${cluster}.${namespace}"
 
 for i in $(seq 1 3); do
-	replica_pod_name=$(kubectl_bin get pods --selector=replica-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')
+	replica_pod_name=$(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')
 	if [[ -z "$(grep ${replica_pod_name} ${tmp_dir}/replicas.list | grep "streaming")" ]]; then
 		echo "${replica_pod_name} is not connected or has valid data. Exiting..."
 		cat "${tmp_dir}/replicas.list"
 		exit 1
 	fi
-	replica_pod_IP=$(kubectl_bin get pods --selector=replica-name=${cluster}-${i} -o 'jsonpath={.items[0].status.podIP}')
+	replica_pod_IP=$(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].status.podIP}')
 	compare_psql_cmd \
 		"select-2" \
 		'\c myapp \\\ SELECT * from myApp;' \
@@ -51,8 +51,8 @@ desc 'Scaling down'
 
 kubectl_bin delete pgreplicas --all
 for i in $(seq 1 3); do
-	[[ -n $(kubectl_bin get pods --selector=replica-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}') ]] \
-		&& wait_for_delete "pod/$(kubectl_bin get pods --selector=replica-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')"
+	[[ -n $(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}') ]] \
+		&& wait_for_delete "pod/$(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')"
 
 	compare_kubectl "pvc/${cluster}-${i}"
 done
@@ -64,7 +64,7 @@ run_psql \
 
 if [[ $(kubectl_bin get pods --selector=name=${cluster}-replica | wc -l | grep -Eo '[0-9]+') -gt 0 && -n $(grep ${cluster} ${tmp_dir}/replicas.list) ]]; then
 	for i in $(seq 1 3); do
-		replica_pod_name=$(kubectl_bin get pods --selector=replica-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')
+		replica_pod_name=$(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')
 		if [[ -n "$(grep ${replica_pod_name} ${tmp_dir}/replicas.list | grep "streaming")" ]]; then
 			echo "${replica_pod_name} is not removed from database replication chain. Exiting..."
 			cat "${tmp_dir}/replicas.list"

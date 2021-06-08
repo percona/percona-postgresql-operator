@@ -32,6 +32,9 @@ func AddPMMSidecar(cluster *crv1.Pgcluster, name string, deployment *appsv1.Depl
 		return nil
 	}
 	container := v1.Container{}
+	if len(template) == 0 {
+		return nil
+	}
 
 	if err := json.Unmarshal([]byte(template), &container); err != nil {
 		return fmt.Errorf("error unmarshalling exporter json into Container: %w ", err)

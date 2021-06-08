@@ -645,6 +645,15 @@ execute the following command:
 pgo create cluster newcluster --restore-from=oldcluster
 ```
 
+##### Full Restore Across Namespaces
+
+To create a new PostgreSQL cluster from a backup in another namespace and restore it
+fully, you can execute the following command:
+
+```
+pgo create cluster newcluster --restore-from=oldcluster --restore-from-namespace=oldnamespace
+```
+
 ##### Point-in-time-Recovery (PITR)
 
 To create a new PostgreSQL cluster and restore it to specific point-in-time
@@ -1031,7 +1040,7 @@ There are a variety of methods available to generate these items: in fact,
 Kubernetes comes with its own [certificate management system](https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/)!
 It is up to you to decide how you want to manage this for your cluster. The
 PostgreSQL documentation also provides an example for how to
-[generate a TLS certificate](https://www.postgresql.org/docs/current/ssl-tcp.html#SSL-CERTIFICATE-CREATION)
+[generate a TLS certificate](https://blog.crunchydata.com/blog/tls-postgres-kubernetes-openssl)
 as well.
 
 To set up TLS for your PostgreSQL cluster, you have to create two [Secrets](https://kubernetes.io/docs/concepts/configuration/secret/):
@@ -1182,11 +1191,44 @@ pgo create cluster hippo \
 ```
 
 By default, the PostgreSQL Operator has each replica connect to PostgreSQL using
-a [PostgreSQL TLS mode](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS)
+a [PostgreSQL TLS mode](https://blog.crunchydata.com/blog/tls-postgres-kubernetes-openssl)
 of `verify-ca`. If you wish to perform TLS mutual authentication between
 PostgreSQL instances (i.e. certificate-based authentication with SSL mode of
 `verify-full`), you will need to create a
 [PostgreSQL custom configuration]({{< relref "/advanced/custom-configuration.md" >}}).
+
+### Add TLS to an Existing PostgreSQL Cluster
+
+You can add TLS support to an existing PostgreSQL cluster using the
+[`pgo update cluster`]({{< relref "/pgo-client/reference/pgo_update_cluster.md" >}})
+command. The following flags are used to manage TLS in a Postgres cluster,
+including:
+
+- `--disable-server-tls`: removes TLS from a cluster
+- `--disable-tls-only`: removes the TLS-only requirement from a cluster
+- `--enable-tls-only`: adds the TLS-only requirement to a cluster
+- `--server-ca-secret`: combined with `--server-tls-secret`, enables TLS in a
+cluster
+- `--server-tls-secret`: combined with `--server-ca-secret`, enables TLS in a
+cluster
+- `--replication-tls-secret`: enables certificate-based authentication between
+Postgres instances.
+
+Using the above examples, to add TLS to a PostgreSQL cluster named `hippo` and
+require TLS, you can use the following command:
+
+```
+pgo update cluster hippo \
+  --enable-tls-only \
+  --server-ca-secret=postgresql-ca \
+  --server-tls-secret=hacluster-tls-keypair
+```
+
+Conversely, you can disable TLS with the `--disable-tls` flag:
+
+```
+pgo update cluster hippo --disable-server-tls
+```
 
 ## [Custom PostgreSQL Configuration]({{< relref "/advanced/custom-configuration.md" >}})
 

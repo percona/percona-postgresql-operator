@@ -1,0 +1,38 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. ${test_dir}/../functions
+
+create_namespace $namespace
+deploy_operator
+
+cluster="some-name"
+kubectl_bin apply -f ${conf_dir}/client.yml \
+	-f ${conf_dir}/${cluster}-secrets.yml
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+
+compare_kubectl "deployment/${cluster}"
+compare_kubectl "deployment/${cluster}-backrest-shared-repo"
+
+kubectl_bin delete pgcluster ${cluster}
+sleep 30
+
+cluster="some-name-required"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' "required"
+
+compare_kubectl "deployment/${cluster}"
+compare_kubectl "deployment/${cluster}-backrest-shared-repo"
+
+kubectl_bin delete pgcluster ${cluster}
+sleep 30
+
+cluster="some-name-disabled"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' "disabled"
+
+compare_kubectl "deployment/${cluster}"
+compare_kubectl "deployment/${cluster}-backrest-shared-repo"
+
+destroy ${namespace}

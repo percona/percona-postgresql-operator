@@ -1,0 +1,117 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. ${test_dir}/../functions
+
+function prepare_n_restore {
+	local cluster=${1}
+	local storage=${2}
+	local backup_type=${3}
+	local restore_target=''
+
+	create_backup ${cluster} "initialbackup" ${backup_type}
+
+	run_psql \
+		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
+		"postgres:postgres_pass@${cluster}.${namespace}"
+
+	compare_psql_cmd \
+		"select-1" \
+		'\c myapp \\\ SELECT * from myApp;' \
+		"postgres:postgres_pass@${cluster}.${namespace}"
+
+	run_psql \
+		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' \
+		"postgres:postgres_pass@${cluster}.${namespace}"
+
+	restore_target="$(run_psql \
+		'\c myapp \\\ SELECT xmin FROM myApp WHERE id='100501';' \
+		"postgres:postgres_pass@${cluster}.${namespace}" | awk '{$1=$1;print}')"
+
+	run_psql \
+		'DROP DATABASE myapp' \
+		"postgres:postgres_pass@${cluster}.${namespace}"
+
+	run_restore ${cluster} ${backup_type} ${storage} "${restore_target}" 'xid'
+
+	compare_psql_cmd \
+		"select-1" \
+		'\c myapp \\\ SELECT * from myApp;' \
+		"postgres:postgres_pass@${cluster}.${namespace}"
+}
+
+function apply_configs {
+	local cluster=${1}
+
+	kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}'
+
+	yq w $test_dir/conf/minio-gw-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
+		| yq w - 'data[aws-s3-ca.crt]' $(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}') \
+		| kubectl_bin apply -f -
+
+	yq r $test_dir/conf/custom-config.yml \
+		| yq w - 'metadata.name' "${cluster}-custom-config" \
+		| kubectl_bin apply -f -
+
+	kubectl_bin apply \
+		-f $conf_dir/client.yml
+}
+
+function main {
+	create_namespace $namespace
+	deploy_cert_manager
+	deploy_operator
+
+	desc 'create first PSMDB cluster'
+	cluster="some-name-${RANDOM}"
+
+	deploy_miniogw
+
+	desc 'Testing backup/restore from s3'
+	apply_configs ${cluster}
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config"
+	prepare_n_restore ${cluster} "s3" "incr"
+
+	kubectl_bin delete pgcluster/${cluster}
+	sleep 30
+
+	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
+		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
+		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
+
+	sleep 30
+
+	desc 'Testing backup/restore from local'
+	apply_configs ${cluster}
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local" "${cluster}-custom-config"
+	prepare_n_restore ${cluster} "posix" "full"
+
+	kubectl_bin delete pgcluster/${cluster}
+	sleep 30
+
+	desc 'Testing backup/restore from local with storate hybrid storage'
+	apply_configs ${cluster}
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config"
+	prepare_n_restore ${cluster} "posix" "diff"
+
+	kubectl_bin delete pgcluster/${cluster}
+	sleep 30
+
+	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
+		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
+		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://operator-testing/backrestrepo/${cluster}-backrest-shared-repo"
+
+	sleep 30
+
+	desc 'Testing backup/restore from local with storate hybrid storage'
+	apply_configs ${cluster}
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config"
+	prepare_n_restore ${cluster} "s3" "diff"
+
+	destroy ${namespace}
+}
+
+main

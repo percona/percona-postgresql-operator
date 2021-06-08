@@ -39,9 +39,12 @@ pgBackRest repository that can be used, including:
 - `posix`: Uses the storage that is provided by the Kubernetes cluster's Storage
 Class that you select
 - `s3`: Use Amazon S3 or an object storage system that uses the S3 protocol
+- `gcs`: Use Google Cloud Storage (GCS)
 - `posix,s3`: Use both the storage that is provided by the Kubernetes cluster's
 Storage Class that you select AND Amazon S3 (or equivalent object storage system
 that uses the S3 protocol)
+- `posix,gcs`: Use both the storage that is provided by the Kubernetes cluster's
+Storage Class that you select and Google Cloud Storage (GCS)
 
 The pgBackRest repository consists of the following Kubernetes objects:
 
@@ -121,6 +124,9 @@ command with several flags:
 - `--restore-from`: specifies the name of a PostgreSQL cluster (either one that
 is active, or a former cluster whose pgBackRest repository still exists) to
 restore from.
+- `--restore-from-namespace` (optional): the namespace of the PostgreSQL cluster specified
+using `--restore-from` (the namespace of the cluster being created is utilized if a namespace
+is not specified using this option)
 - `--restore-opts`: used to specify additional options, similar to the ones that
 are passed into [`pgbackrest restore`](https://pgbackrest.org/command.html#command-restore).
 
@@ -143,7 +149,10 @@ pgo create cluster newcluster \
 
 Note that when using this method, the PostgreSQL Operator can only restore one
 cluster from each pgBackRest repository at a time. Using the above example, one
-can only perform one restore from `oldcluster` at a given time.
+can only perform one restore from `oldcluster` at a given time.  Additionally,
+if the cluster being utilized for restore is in another namespace than the
+cluster being created, the proper namespace can be specified using the
+`--restore-from-namespace` option.
 
 When using the restore to a new cluster method, the PostgreSQL Operator takes
 the following actions:
@@ -303,6 +312,51 @@ To enable a PostgreSQL cluster to use S3, the `--pgbackrest-storage-type` on the
 `pgo create cluster` command needs to be set to `s3` or `posix,s3`.
 
 Once configured, the `pgo backup` and `pgo restore` commands will work with S3
+similarly to the above!
+
+## Using GCS
+
+![PostgreSQL Operator pgBackRest GCS](/images/postgresql-cluster-dr-gcs.png)
+
+The PostgreSQL Operator integration with pgBackRest allows it to use the Google
+Cloud Storage (GCS) object storage system.
+
+In order to enable GCS, it is helpful to provide some of the GCS
+information prior to deploying PGO, the Postgres Operator, or updating the
+`pgo-config` ConfigMap and restarting the Postgres Operator pod.
+
+The easiest way to get started is by setting the GCS bucket name that you wish
+to use with the Postgres Operator. You can do this by editing the `Cluster`
+section of the `pgo.yaml` [configuration file](/configuration/pgo-yaml-configuration/):
+
+```yaml
+Cluster:
+  BackrestGCSBucket: my-postgresql-backups-example
+```
+
+These values can also be set on a per-cluster basis with the
+`pgo create cluster` command. The two most important ones are:
+
+
+- `--pgbackrest-gcs-bucket` - specifics the GCS bucket that should be utilized.
+If not specified, the default bucket name that you set in the `pgo.yaml`
+configuration file will be used.
+- `--pgbackrest-gcs-key` - A path to the GCS credential file on your local
+system. This will be added to the pgBackRest Secret.
+
+There are some other options that are optional, but explained below for
+completeness:
+
+- `--pgbackrest-gcs-endpoint` specifies an alternative GCS endpoint.
+- `--pgbackrest-gcs-key-type`- Either `service` or `token`, defaults to `service`.
+
+As mentioned above, GCS keys are stored in Kubernetes Secrets and are securely
+mounted to PostgreSQL clusters.
+
+To enable a PostgreSQL cluster to use GCS, the `--pgbackrest-storage-type` on the
+`pgo create cluster` command needs to be set to `gcs` or `posix,gcs`.
+
+Once configured, the `pgo backup` and `pgo restore` commands will work with GCS
 similarly to the above!
 
 ## Deleting a Backup

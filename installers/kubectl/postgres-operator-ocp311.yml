@@ -39,12 +39,15 @@ data:
     backrest_aws_s3_secret: ""
     backrest_aws_s3_uri_style: ""
     backrest_aws_s3_verify_tls: "true"
+    backrest_gcs_bucket: ""
+    backrest_gcs_endpoint: ""
+    backrest_gcs_key_type: ""
     backrest_port: "2022"
     badger: "false"
     ccp_image_prefix: "registry.developers.crunchydata.com/crunchydata"
     ccp_image_pull_secret: ""
     ccp_image_pull_secret_manifest: ""
-    ccp_image_tag: "centos8-13.2-4.6.1"
+    ccp_image_tag: "centos8-13.3-4.7.0"
     create_rbac: "true"
     crunchy_debug: "false"
     db_name: ""
@@ -60,6 +63,7 @@ data:
     delete_operator_namespace: "false"
     delete_watched_namespaces: "false"
     disable_auto_failover: "false"
+    disable_fsgroup: "true"
     reconcile_rbac: "true"
     exporterport: "9187"
     metrics: "false"
@@ -76,14 +80,14 @@ data:
     pgo_client_cert_secret: "pgo.tls"
     pgo_client_container_install: "false"
     pgo_client_install: "true"
-    pgo_client_version: "4.6.1"
+    pgo_client_version: "4.7.0"
     pgo_cluster_admin: "false"
     pgo_disable_eventing: "false"
     pgo_disable_tls: "false"
     pgo_image_prefix: "registry.developers.crunchydata.com/crunchydata"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "centos8-4.6.1"
+    pgo_image_tag: "centos8-4.7.0"
     pgo_installation_name: "devtest"
     pgo_noauth_routes: ""
     pgo_operator_namespace: "pgo"
@@ -99,6 +103,7 @@ data:
     backup_storage: "default"
     primary_storage: "default"
     replica_storage: "default"
+    pgadmin_storage: "default"
     wal_storage: ""
     storage1_name: "default"
     storage1_access_mode: "ReadWriteOnce"
@@ -160,7 +165,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: registry.developers.crunchydata.com/crunchydata/pgo-deployer:centos8-4.6.1
+          image: registry.developers.crunchydata.com/crunchydata/pgo-deployer:centos8-4.7.0
           imagePullPolicy: IfNotPresent
           env:
             - name: DEPLOY_ACTION

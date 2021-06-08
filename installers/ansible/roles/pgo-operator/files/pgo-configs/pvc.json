@@ -4,8 +4,10 @@
     "metadata": {
         "name": "{{.Name}}",
         "labels": {
+            {{ if .CustomLabels }}
+            {{ .CustomLabels }}
+            {{ end }}
             "vendor": "crunchydata",
-            "pgremove": "true",
             "pg-cluster": "{{.ClusterName}}"
         }
     },

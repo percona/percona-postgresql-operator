@@ -21,12 +21,20 @@
             },
             "spec": {
                 "serviceAccountName": "pgo-target",
+                "securityContext": {
+                  "runAsNonRoot": true
+                },
                 {{ if .Tolerations }}
                 "tolerations": {{ .Tolerations }},
                 {{ end }}
                 "containers": [{
                     "name": "rmdata",
                     "image": "{{.PGOImagePrefix}}:{{.PGOImageTag}}-pgo-rmdata",
+                    "securityContext": {
+                      "allowPrivilegeEscalation": false,
+                      "privileged": false,
+                      "readOnlyRootFilesystem": true
+                    },
                     "env": [{
                         "name": "PG_CLUSTER",
                         "value": "{{.ClusterName}}"

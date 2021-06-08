@@ -4,8 +4,12 @@
     "metadata": {
         "name": "{{.Name}}",
         "labels": {
+            {{ if .CustomLabels }}
+            {{ .CustomLabels }}
+            {{ end }}
             {{if .BootstrapCluster}}
             "pgha-bootstrap": "{{.BootstrapCluster}}",
+            "pgha-bootstrap-namespace": "{{.BootstrapNamespace}}",
             {{ end }}
             "name": "{{.Name}}",
             "pg-cluster": "{{.ClusterName}}",
@@ -32,8 +36,12 @@
                 "annotations": {{ .PodAnnotations }},
                 {{ end }}
                 "labels": {
+                    {{ if .CustomLabels }}
+                    {{ .CustomLabels }}
+                    {{ end }}
                     {{if .BootstrapCluster}}
                     "pgha-bootstrap": "{{.BootstrapCluster}}",
+                    "pgha-bootstrap-namespace": "{{.BootstrapNamespace}}",
                     {{ end }}
                     "name": "{{.Name}}",
                     "pg-cluster": "{{.ClusterName}}",
@@ -52,12 +60,19 @@
                 "containers": [{
                     "name": "database",
                     "image": "{{.Image}}",
+                    "securityContext": {
+                      "allowPrivilegeEscalation": false,
+                      "privileged": false,
+                      "readOnlyRootFilesystem": true
+                    },
                     "ports": [{
                         "containerPort": {{.SshdPort}},
-                        "protocol": "TCP"
+                        "protocol": "TCP",
+                        "name": "pgbackrest"
                     }],
                     {{.ContainerResources }}
                     "env": [
+                      {{.PgbackrestGCSEnvVars}}
                       {{.PgbackrestS3EnvVars}}
                       {
                         "name": "MODE",
@@ -90,28 +105,93 @@
                       {
                         "name": "PGBACKREST_DB_HOST",
                         "value": "{{.PGbackrestDBHost}}"
+                      },
+                      {
+                        "name": "LD_PRELOAD",
+                        "value": "/usr/lib64/libnss_wrapper.so"
+                      },
+                      {
+                        "name": "NSS_WRAPPER_PASSWD",
+                        "value": "/tmp/nss_wrapper/pgbackrest-repo/passwd"
+                      },
+                      {
+                        "name": "NSS_WRAPPER_GROUP",
+                        "value": "/tmp/nss_wrapper/pgbackrest-repo/group"
                       }
                     ],
                     "volumeMounts": [{
-                        "name": "sshd",
-                        "mountPath": "/sshd",
-                        "readOnly": true
-                    }, {
-                        "name": "backrestrepo",
-                        "mountPath": "/backrestrepo",
-                        "readOnly": false
-                    }]
+                      "name": "sshd",
+                      "mountPath": "/sshd",
+                      "readOnly": true
+                    },
+                    {
+                      "name": "ssh-config",
+                      "mountPath": "/etc/ssh",
+                      "readOnly": true
+                    },
+                    {
+                      "name": "backrestrepo",
+                      "mountPath": "/backrestrepo",
+                      "readOnly": false
+                    },
+                    {
+                      "name": "tmp",
+                      "mountPath": "/tmp"
+                    },
+                    {
+                      "name": "pgbackrest-home",
+                      "mountPath": "/home/pgbackrest"
+                    },
+                    {
+                      "name": "pgbackrest-conf",
+                      "mountPath": "/etc/pgbackrest"
+                    }
+                  ]
                 }],
                 "volumes": [{
                     "name": "sshd",
                     "secret": {
                         "secretName": "{{.SshdSecretsName}}"
                     }
-                }, {
+                },
+                {
+                  "name": "ssh-config",
+                  "secret": {
+                      "secretName": "{{.SshdSecretsName}}",
+                      "items": [
+                        {
+                           "key": "config",
+                           "path": "ssh_config"
+                        }
+                     ]
+                  }
+                },
+                {
                     "name": "backrestrepo",
                     "persistentVolumeClaim": {
                         "claimName": "{{.BackrestRepoClaimName}}"
                     }
+                },
+                {
+                  "name": "tmp",
+                  "emptyDir": {
+                    "medium": "Memory",
+                    "sizeLimit": "64Mi"
+                  }
+                },
+                {
+                  "name": "pgbackrest-home",
+                  "emptyDir": {
+                    "medium": "Memory",
+                    "sizeLimit": "128Ki"
+                  }
+                },
+                {
+                  "name": "pgbackrest-conf",
+                  "emptyDir": {
+                    "medium": "Memory",
+                    "sizeLimit": "128Ki"
+                  }
                 }],
                 "affinity": {
         {{.PodAntiAffinity}}

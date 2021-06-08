@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +50,24 @@ const (
 	postgresHAImage    = "crunchy-postgres-ha"
 	postgresGISImage   = "crunchy-postgres-gis"
 	postgresGISHAImage = "crunchy-postgres-gis-ha"
+)
+
+// nssWrapperForceCommand is the string that should be appended to the sshd_config file as
+// needed for nss_wrapper support when upgrading from versions prior to v4.7
+const nssWrapperForceCommand = `# ensure nss_wrapper env vars are set when executing commands as needed for OpenShift compatibility
+ForceCommand NSS_WRAPPER_SUBDIR=ssh . /opt/crunchy/bin/nss_wrapper_env.sh && $SSH_ORIGINAL_COMMAND`
+
+// the following regex expressions are used when upgrading the sshd_config file for a PG cluster
+var (
+	// nssWrapperRegex is the regular expression that is utilized to determine if the nss_wrapper
+	// ForceCommand setting is missing from the sshd_config (as it would be for versions prior to
+	// v4.7)
+	nssWrapperRegex = regexp.MustCompile(nssWrapperForceCommand)
+
+	// nssWrapperRegex is the regular expression that is utilized to determine if the UsePAM
+	// setting is set to 'yes' in the sshd_config (as it might be for versions up to v4.6.1,
+	// v4.5.2 and v4.4.3)
+	usePAMRegex = regexp.MustCompile(`(?im)^UsePAM\s*yes`)
 )
 
 // AddUpgrade implements the upgrade workflow in accordance with the received pgtask
@@ -111,17 +130,17 @@ func AddUpgrade(clientset kubeapi.Interface, upgrade *crv1.Pgtask, namespace str
 		return
 	}
 
-	// update the unix socket directories parameter so it no longer include /crunchyadm and
-	// set any path references to the /opt/crunchy... paths
-	if err = updateClusterConfig(clientset, pgcluster, namespace); err != nil {
-		log.Errorf("error updating %s-pgha-config configmap during upgrade of cluster %s, Error: %v", pgcluster.Name, pgcluster.Name, err)
-	}
-
 	// recreate new Backrest Repo secret that was just deleted
 	recreateBackrestRepoSecret(clientset, upgradeTargetClusterName, namespace, operator.PgoNamespace)
 
 	// set proper values for the pgcluster that are updated between CR versions
 	preparePgclusterForUpgrade(pgcluster, upgrade.Spec.Parameters, oldpgoversion, currentPrimary)
+
+	// update the unix socket directories parameter so it no longer include /crunchyadm and
+	// set any path references to the /opt/crunchy... paths
+	if err = updateClusterConfig(clientset, pgcluster, namespace); err != nil {
+		log.Errorf("error updating %s-pgha-config configmap during upgrade of cluster %s, Error: %v", pgcluster.Name, pgcluster.Name, err)
+	}
 
 	// create a new workflow for this recreated cluster
 	workflowid, err := createClusterRecreateWorkflowTask(clientset, pgcluster.Name, namespace, upgrade.Spec.Parameters[config.LABEL_PGOUSER])
@@ -404,10 +423,17 @@ func createUpgradePGHAConfigMap(clientset kubernetes.Interface, cluster *crv1.Pg
 		data[operator.PGHAConfigInitSetting] = "true"
 	}
 
-	// if a standby cluster then we want to create replicas using the S3 pgBackRest repository
-	// (and not the local in-cluster pgBackRest repository)
+	// if a standby cluster then we want to create replicas using the S3 or GCS
+	// pgBackRest repository (and not the local in-cluster pgBackRest repository)
 	if cluster.Spec.Standby {
-		data[operator.PGHAConfigReplicaBootstrapRepoType] = "s3"
+		repoType := crv1.BackrestStorageTypeS3
+
+		for _, r := range cluster.Spec.BackrestStorageTypes {
+			if r == crv1.BackrestStorageTypeGCS {
+				repoType = crv1.BackrestStorageTypeGCS
+			}
+		}
+		data[operator.PGHAConfigReplicaBootstrapRepoType] = string(repoType)
 	}
 
 	configmap := &v1.ConfigMap{
@@ -468,9 +494,18 @@ func recreateBackrestRepoSecret(clientset kubernetes.Interface, clustername, nam
 		}
 	}
 
+	var repoSecret *v1.Secret
 	if err == nil {
-		err = util.CreateBackrestRepoSecrets(clientset, config)
+		repoSecret, err = util.CreateBackrestRepoSecrets(clientset, config)
 	}
+	if err != nil {
+		log.Errorf("error generating new backrest repo secrets during pgcluster upgrade: %v", err)
+	}
+
+	if err := updatePGBackRestSSHDConfig(clientset, repoSecret, namespace); err != nil {
+		log.Errorf("error upgrading pgBackRest sshd_config: %v", err)
+	}
+
 	if err != nil {
 		log.Errorf("error generating new backrest repo secrets during pgcluster upgrade: %v", err)
 	}
@@ -525,6 +560,11 @@ func preparePgclusterForUpgrade(pgcluster *crv1.Pgcluster, parameters map[string
 		pgcluster.Spec.ServiceType = v1.ServiceType(val)
 	}
 	delete(pgcluster.Spec.UserLabels, "service-type")
+
+	// 4.6.0 removed the "pg-pod-anti-affinity" label from user labels, as this is
+	// superfluous and handled through other processes. We can explicitly
+	// eliminate it
+	delete(pgcluster.Spec.UserLabels, "pg-pod-anti-affinity")
 
 	// 4.6.0 moved the "autofail" label to the DisableAutofail attribute. Given
 	// by default we need to start in an autofailover state, we just delete the
@@ -703,7 +743,6 @@ func createClusterRecreateWorkflowTask(clientset pgo.Interface, clusterName, ns,
 
 	// create pgtask CRD
 	spec := crv1.PgtaskSpec{}
-	spec.Namespace = ns
 	spec.Name = clusterName + "-" + crv1.PgtaskWorkflowCreateClusterType
 	spec.TaskType = crv1.PgtaskWorkflow
 
@@ -884,7 +923,18 @@ func updateClusterConfig(clientset kubeapi.Interface, pgcluster *crv1.Pgcluster,
 	// and the /opt/cpm... directories are now set under /opt/crunchy
 	if dcsConf.PostgreSQL != nil && dcsConf.PostgreSQL.Parameters != nil {
 		dcsConf.PostgreSQL.Parameters["unix_socket_directories"] = "/tmp"
-		dcsConf.PostgreSQL.Parameters["archive_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-set-env.sh && pgbackrest archive-push "%p"`
+
+		// ensure the proper archive_command is set according to the BackrestStorageTypes defined for
+		// the pgcluster
+		switch {
+		case operator.IsLocalAndS3Storage(pgcluster):
+			dcsConf.PostgreSQL.Parameters["archive_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-archive-push-local-s3.sh %p`
+		case operator.IsLocalAndGCSStorage(pgcluster):
+			dcsConf.PostgreSQL.Parameters["archive_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-archive-push-local-gcs.sh %p`
+		default:
+			dcsConf.PostgreSQL.Parameters["archive_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-set-env.sh && pgbackrest archive-push "%p"`
+		}
+
 		dcsConf.PostgreSQL.RecoveryConf["restore_command"] = `source /opt/crunchy/bin/postgres-ha/pgbackrest/pgbackrest-set-env.sh && pgbackrest archive-get %f "%p"`
 	}
 
@@ -927,5 +977,43 @@ func updateClusterConfig(clientset kubeapi.Interface, pgcluster *crv1.Pgcluster,
 	}
 
 	// sync the changes to the configmap to the DCS
-	return pgoconfig.NewDCS(patchedClusterConfig, clientset, pgcluster.GetObjectMeta().GetLabels()[config.LABEL_PGHA_SCOPE]).Sync()
+	return pgoconfig.NewDCS(patchedClusterConfig, clientset, pgcluster.Name).Sync()
+}
+
+// updatePGBackRestSSHDConfig is responsible for upgrading the sshd_config file as needed across
+// operator versions to ensure proper functionality with pgBackRest
+func updatePGBackRestSSHDConfig(clientset kubernetes.Interface, repoSecret *v1.Secret,
+	namespace string) error {
+
+	ctx := context.TODO()
+	var err error
+	var secretRequiresUpdate bool
+	updatedRepoSecret := repoSecret.DeepCopy()
+
+	// For versions prior to v4.7, the 'ForceCommand' will be missing from the sshd_config as
+	// as needed for nss_wrapper support.  Therefore, check to see if the proper ForceCommand
+	// setting exists in the sshd_config, and if not, add it.
+	if !nssWrapperRegex.MatchString(string(updatedRepoSecret.Data["sshd_config"])) {
+		secretRequiresUpdate = true
+		updatedRepoSecret.Data["sshd_config"] =
+			[]byte(fmt.Sprintf("%s\n%s\n", string(updatedRepoSecret.Data["sshd_config"]),
+				nssWrapperForceCommand))
+	}
+
+	// For versions prior to v4.6.2, the UsePAM setting might be set to 'yes' as previously
+	// required to workaround a known Docker issue.  Since this issue has since been resolved,
+	// we now want to ensure this setting is set to 'no'.
+	if usePAMRegex.MatchString(string(updatedRepoSecret.Data["sshd_config"])) {
+		secretRequiresUpdate = true
+		updatedRepoSecret.Data["sshd_config"] =
+			[]byte(usePAMRegex.ReplaceAllString(string(updatedRepoSecret.Data["sshd_config"]),
+				"UsePAM no"))
+	}
+
+	if secretRequiresUpdate {
+		_, err = clientset.CoreV1().Secrets(namespace).Update(ctx, updatedRepoSecret,
+			metav1.UpdateOptions{})
+	}
+
+	return err
 }

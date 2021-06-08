@@ -33,6 +33,10 @@ var (
 	DisableMetrics bool
 	// DisablePGBadger allows a user to disable pgBadger
 	DisablePGBadger bool
+	// DisableTLS will disable TLS in a cluster
+	DisableTLS bool
+	// DisableTLSOnly will disable TLS enforcement in the cluster
+	DisableTLSOnly bool
 	// EnableLogin allows a user to enable the ability for a PostgreSQL uesr to
 	// log in
 	EnableLogin bool
@@ -40,6 +44,8 @@ var (
 	EnableMetrics bool
 	// EnablePGBadger allows a user to enbale pgBadger
 	EnablePGBadger bool
+	// EnableTLSOnly will enable TLS enforcement in the cluster
+	EnableTLSOnly bool
 	// ExpireUser sets a user to having their password expired
 	ExpireUser bool
 	// ExporterRotatePassword rotates the password for the designed PostgreSQL
@@ -98,6 +104,8 @@ func init() {
 		"Disable the metrics collection sidecar. May cause brief downtime.")
 	UpdateClusterCmd.Flags().BoolVar(&DisablePGBadger, "disable-pgbadger", false,
 		"Disable the pgBadger sidecar. May cause brief downtime.")
+	UpdateClusterCmd.Flags().BoolVar(&DisableTLS, "disable-server-tls", false, "Remove TLS from the cluster.")
+	UpdateClusterCmd.Flags().BoolVar(&DisableTLSOnly, "disable-tls-only", false, "Remove TLS enforcement for the cluster.")
 	UpdateClusterCmd.Flags().BoolVar(&EnableAutofailFlag, "enable-autofail", false, "Enables autofail capabitilies in the cluster.")
 	UpdateClusterCmd.Flags().StringVar(&MemoryRequest, "memory", "", "Set the amount of RAM to request, e.g. "+
 		"1GiB.")
@@ -114,6 +122,12 @@ func init() {
 		"the pgBackRest repository.")
 	UpdateClusterCmd.Flags().StringVar(&BackrestMemoryLimit, "pgbackrest-memory-limit", "", "Set the amount of memory to limit for "+
 		"the pgBackRest repository.")
+	UpdateClusterCmd.Flags().StringVar(&BackrestPVCSize, "pgbackrest-pvc-size", "",
+		`The size of the PVC capacity for the pgBackRest repository. Overrides the value set in the storage class. This is ignored if the storage type of "posix" is not used. Must follow the standard Kubernetes format, e.g. "10.1Gi"`)
+	UpdateClusterCmd.Flags().StringVar(&PVCSize, "pvc-size", "",
+		`The size of the PVC capacity for primary and replica PostgreSQL instances. Must follow the standard Kubernetes format, e.g. "10.1Gi"`)
+	UpdateClusterCmd.Flags().StringVar(&WALPVCSize, "wal-pvc-size", "",
+		`The size of the capacity for WAL storage, which overrides any value in the storage configuration.  Must follow the standard Kubernetes format, e.g. "10.1Gi".`)
 	UpdateClusterCmd.Flags().StringVar(&ExporterCPURequest, "exporter-cpu", "", "Set the number of millicores to request for CPU "+
 		"for the Crunchy Postgres Exporter sidecar container, e.g. \"100m\" or \"0.1\".")
 	UpdateClusterCmd.Flags().StringVar(&ExporterCPULimit, "exporter-cpu-limit", "", "Set the number of millicores to limit for CPU "+
@@ -129,6 +143,10 @@ func init() {
 	UpdateClusterCmd.Flags().BoolVar(&ExporterRotatePassword, "exporter-rotate-password", false, "Used to rotate the password for the metrics collection agent.")
 	UpdateClusterCmd.Flags().BoolVarP(&EnableStandby, "enable-standby", "", false,
 		"Enables standby mode in the cluster(s) specified.")
+	UpdateClusterCmd.Flags().BoolVar(&EnableTLSOnly, "enable-tls-only", false, "Enforce TLS on the cluster.")
+	UpdateClusterCmd.Flags().StringVar(&ReplicationTLSSecret, "replication-tls-secret", "", "The name of the secret that contains "+
+		"the TLS keypair to use for enabling certificate-based authentication between PostgreSQL instances, "+
+		"particularly for the purpose of replication. TLS must be enabled in the cluster.")
 	UpdateClusterCmd.Flags().StringVar(&ServiceType, "service-type", "", "The Service type to use for the PostgreSQL cluster. If not set, the pgo.yaml default will be used.")
 	UpdateClusterCmd.Flags().BoolVar(&Startup, "startup", false, "Restart the database cluster if it "+
 		"is currently shutdown.")
@@ -144,6 +162,12 @@ func init() {
 			"Follows the Kubernetes quantity format.\n\n"+
 			"For example, to create a tablespace with the NFS storage configuration with a PVC of size 10GiB:\n\n"+
 			"--tablespace=name=ts1:storageconfig=nfsstorage:pvcsize=10Gi")
+	UpdateClusterCmd.Flags().StringVar(&CASecret, "server-ca-secret", "", "The name of the secret that contains "+
+		"the certficate authority (CA) to use for enabling the PostgreSQL cluster to accept TLS connections. "+
+		"Must be used with \"server-tls-secret\".")
+	UpdateClusterCmd.Flags().StringVar(&TLSSecret, "server-tls-secret", "", "The name of the secret that contains "+
+		"the TLS keypair to use for enabling the PostgreSQL cluster to accept TLS connections. "+
+		"Must be used with \"server-ca-secret\"")
 	UpdateClusterCmd.Flags().StringSliceVar(&Tolerations, "toleration", []string{},
 		"Set Pod tolerations for each PostgreSQL instance in a cluster.\n"+
 			"The general format is \"key=value:Effect\"\n"+
@@ -182,7 +206,7 @@ func init() {
 	UpdateUserCmd.Flags().StringVarP(&OutputFormat, "output", "o", "", `The output format. Supported types are: "json"`)
 	UpdateUserCmd.Flags().StringVarP(&Password, "password", "", "", "Specifies the user password when updating a user password or creating a new user. If --rotate-password is set as well, --password takes precedence.")
 	UpdateUserCmd.Flags().IntVarP(&PasswordLength, "password-length", "", 0, "If no password is supplied, sets the length of the automatically generated password. Defaults to the value set on the server.")
-	UpdateUserCmd.Flags().StringVar(&PasswordType, "password-type", "md5", "The type of password hashing to use."+
+	UpdateUserCmd.Flags().StringVar(&PasswordType, "password-type", "", "The type of password hashing to use."+
 		"Choices are: (md5, scram-sha-256). This only takes effect if the password is being changed.")
 	UpdateUserCmd.Flags().BoolVar(&PasswordValidAlways, "valid-always", false, "Sets a password to never expire based on expiration time. Takes precedence over --valid-days")
 	UpdateUserCmd.Flags().BoolVar(&RotatePassword, "rotate-password", false, "Rotates the user's password with an automatically generated password. The length of the password is determine by either --password-length or the value set on the server, in that order.")

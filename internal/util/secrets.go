@@ -34,12 +34,12 @@ import (
 )
 
 // CreateSecret create the secret, user, and primary secrets
-func CreateSecret(clientset kubernetes.Interface, db, secretName, username, password, namespace string) error {
+func CreateSecret(clientset kubernetes.Interface, db, secretName, username, password, namespace string, labels map[string]string) error {
 	ctx := context.TODO()
 	secret := v1.Secret{}
 
 	secret.Name = secretName
-	secret.ObjectMeta.Labels = make(map[string]string)
+	secret.ObjectMeta.Labels = labels
 	secret.ObjectMeta.Labels["pg-cluster"] = db
 	secret.ObjectMeta.Labels[config.LABEL_VENDOR] = config.LABEL_CRUNCHY
 	secret.Data = make(map[string][]byte)
@@ -120,7 +120,8 @@ func IsPostgreSQLUserSystemAccount(username string) bool {
 func CreateUserSecret(clientset kubernetes.Interface, cluster *crv1.Pgcluster, username, password string) error {
 	secretName := crv1.UserSecretName(cluster, username)
 
-	if err := CreateSecret(clientset, cluster.Name, secretName, username, password, cluster.Namespace); err != nil {
+	if err := CreateSecret(clientset, cluster.Name, secretName, username, password,
+		cluster.Namespace, GetCustomLabels(cluster)); err != nil {
 		log.Error(err)
 		return err
 	}

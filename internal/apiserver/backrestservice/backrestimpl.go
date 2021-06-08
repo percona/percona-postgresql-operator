@@ -52,6 +52,10 @@ var (
 	pgBackRestInfoCommand = []string{"pgbackrest", "info", "--output", "json"}
 )
 
+// repoTypeFlagGCS is used for getting the pgBackRest info for a repository that
+// is stored in GCS
+var repoTypeFlagGCS = []string{"--repo1-type", "gcs"}
+
 // repoTypeFlagS3 is used for getting the pgBackRest info for a repository that
 // is stored in S3
 var repoTypeFlagS3 = []string{"--repo1-type", "s3"}
@@ -272,7 +276,7 @@ func DeleteBackup(request msgs.DeleteBackrestBackupRequest) msgs.DeleteBackrestB
 
 	// and execute. if there is an error, return it, otherwise we are done
 	if _, stderr, err := kubeapi.ExecToPodThroughAPI(apiserver.RESTConfig,
-		apiserver.Clientset, cmd, containername, podName, cluster.Spec.Namespace, nil); err != nil {
+		apiserver.Clientset, cmd, containername, podName, cluster.Namespace, nil); err != nil {
 		log.Error(stderr)
 		response.Code = msgs.Error
 		response.Msg = stderr
@@ -285,7 +289,6 @@ func getBackupParams(clusterName, taskName, action, podName, containerName, imag
 	var newInstance *crv1.Pgtask
 	spec := crv1.PgtaskSpec{}
 	spec.Name = taskName
-	spec.Namespace = ns
 
 	spec.TaskType = crv1.PgtaskBackrest
 	spec.Parameters = make(map[string]string)
@@ -303,7 +306,8 @@ func getBackupParams(clusterName, taskName, action, podName, containerName, imag
 
 	newInstance = &crv1.Pgtask{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: taskName,
+			Name:      taskName,
+			Namespace: ns,
 		},
 		Spec: spec,
 	}
@@ -405,8 +409,9 @@ func ShowBackrest(name, selector, ns string) msgs.ShowBackrestResponse {
 			return response
 		}
 
-		// so we potentially add two "pieces of detail" based on whether or not we
-		// have a local repository, a s3 repository, or both
+		// so we potentially add a few "pieces of detail" based on whether or not we
+		// have a local repository, s3 repository, or a gcs repository, or some
+		// permutation of them
 		storageTypes := c.Spec.BackrestStorageTypes
 		// if this happens to be empty, then the storage type is "posix"
 		if len(storageTypes) == 0 {
@@ -424,21 +429,19 @@ func ShowBackrest(name, selector, ns string) msgs.ShowBackrestResponse {
 
 			// get the pgBackRest info using this legacy function
 			info, err := getInfo(storageType, podname, ns, verifyTLS)
+
 			// see if the function returned successfully, and if so, unmarshal the JSON
+			// if there was an error getting the info, log that the error occurred in
+			// the API server logs and have the response added to the list.
 			if err != nil {
 				log.Error(err)
-				response.Status.Code = msgs.Error
-				response.Status.Msg = err.Error()
-
-				return response
-			}
-
-			if err := json.Unmarshal([]byte(info), &detail.Info); err != nil {
-				log.Error(err)
-				response.Status.Code = msgs.Error
-				response.Status.Msg = err.Error()
-
-				return response
+			} else {
+				if err := json.Unmarshal([]byte(info), &detail.Info); err != nil {
+					log.Error(err)
+					response.Status.Code = msgs.Error
+					response.Status.Msg = err.Error()
+					return response
+				}
 			}
 
 			// append the details to the list of items
@@ -455,12 +458,16 @@ func getInfo(storageType crv1.BackrestStorageType, podname, ns string, verifyTLS
 
 	cmd := pgBackRestInfoCommand
 
-	if storageType == crv1.BackrestStorageTypeS3 {
+	switch storageType {
+	default: // no-op
+	case crv1.BackrestStorageTypeS3:
 		cmd = append(cmd, repoTypeFlagS3...)
 
 		if !verifyTLS {
 			cmd = append(cmd, noRepoS3VerifyTLS)
 		}
+	case crv1.BackrestStorageTypeGCS:
+		cmd = append(cmd, repoTypeFlagGCS...)
 	}
 
 	output, stderr, err := kubeapi.ExecToPodThroughAPI(apiserver.RESTConfig, apiserver.Clientset, cmd, containername, podname, ns, nil)
@@ -577,7 +584,6 @@ func getRestoreParams(cluster *crv1.Pgcluster, request *msgs.RestoreRequest) (*c
 	var newInstance *crv1.Pgtask
 
 	spec := crv1.PgtaskSpec{}
-	spec.Namespace = cluster.Namespace
 	spec.Name = "backrest-restore-" + cluster.Name
 	spec.TaskType = crv1.PgtaskBackrestRestore
 	spec.Parameters = make(map[string]string)
@@ -634,7 +640,6 @@ func createRestoreWorkflowTask(cluster *crv1.Pgcluster) (string, error) {
 
 	// create pgtask CRD
 	spec := crv1.PgtaskSpec{}
-	spec.Namespace = cluster.Namespace
 	spec.Name = cluster.Name + "-" + crv1.PgtaskWorkflowBackrestRestoreType
 	spec.TaskType = crv1.PgtaskWorkflow
 

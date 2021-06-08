@@ -41,7 +41,6 @@ type Pgcluster struct {
 // PgclusterSpec is the CRD that defines a Crunchy PG Cluster Spec
 // swagger:ignore
 type PgclusterSpec struct {
-	Namespace      string `json:"namespace"`
 	Name           string `json:"name"`
 	ClusterName    string `json:"clustername"`
 	Policies       string `json:"policies"`
@@ -67,6 +66,7 @@ type PgclusterSpec struct {
 	WALStorage      PgStorageSpec
 	ReplicaStorage  PgStorageSpec
 	BackrestStorage PgStorageSpec
+	PGAdminStorage  PgStorageSpec
 
 	// Resources behaves just like the "Requests" section of a Kubernetes
 	// container definition. You can set individual items such as "cpu" and
@@ -115,6 +115,7 @@ type PgclusterSpec struct {
 	PgBouncer           PgBouncerSpec         `json:"pgBouncer"`
 	PgAdminImage        string                `json:"pgAdminImage"`
 	User                string                `json:"user"`
+	PasswordType        string                `json:"passwordType"`
 	Database            string                `json:"database"`
 	Replicas            string                `json:"replicas"`
 	Status              string                `json:"status"`
@@ -124,6 +125,9 @@ type PgclusterSpec struct {
 	PodAntiAffinity     PodAntiAffinitySpec   `json:"podAntiAffinity"`
 	SyncReplication     *bool                 `json:"syncReplication"`
 	BackrestConfig      []v1.VolumeProjection `json:"backrestConfig"`
+	BackrestGCSBucket   string                `json:"backrestGCSBucket"`
+	BackrestGCSEndpoint string                `json:"backrestGCSEndpoint"`
+	BackrestGCSKeyType  string                `json:"backrestGCSKeyType"`
 	BackrestS3Bucket    string                `json:"backrestS3Bucket"`
 	BackrestS3Region    string                `json:"backrestS3Region"`
 	BackrestS3Endpoint  string                `json:"backrestS3Endpoint"`
@@ -133,8 +137,12 @@ type PgclusterSpec struct {
 	BackrestImage       string                `json:"backrestImage"`
 	BackrestRepoImage   string                `json:"backrestRepoImage"`
 	// BackrestStorageTypes is a list of the different pgBackRest storage types
-	// to be used for this cluster. Presently, it can only accept up to local
-	// and S3, but is available to support different repo types in the future
+	// to be used for this cluster. Presently, it can only accept the following:
+	// - local
+	// - s3
+	// - gcs
+	// - local,s3
+	// - local,gcs
 	// if the array is empty, "local" ("posix") is presumed.
 	BackrestStorageTypes []BackrestStorageType    `json:"backrestStorageTypes"`
 	TablespaceMounts     map[string]PgStorageSpec `json:"tablespaceMounts"`
@@ -210,6 +218,9 @@ const (
 	// BackrestStorageTypePosix is the "posix" storage type and in the fullness
 	// of time should supercede local
 	BackrestStorageTypePosix BackrestStorageType = "posix"
+	// BackrestStorageTypeGCS is the GCS storage type for using GCS
+	// storage
+	BackrestStorageTypeGCS BackrestStorageType = "gcs"
 	// BackrestStorageTypeS3 if the S3 storage type for using S3 or S3-equivalent
 	// storage
 	BackrestStorageTypeS3 BackrestStorageType = "s3"
@@ -219,6 +230,7 @@ var BackrestStorageTypes = []BackrestStorageType{
 	BackrestStorageTypeLocal,
 	BackrestStorageTypePosix,
 	BackrestStorageTypeS3,
+	BackrestStorageTypeGCS,
 }
 
 // ClusterAnnotations provides a set of annotations that can be propagated to
@@ -271,6 +283,7 @@ const (
 // directory when bootstrapping a new PostgreSQL cluster
 // swagger:ignore
 type PGDataSourceSpec struct {
+	Namespace   string `json:"namespace"`
 	RestoreFrom string `json:"restoreFrom"`
 	RestoreOpts string `json:"restoreOpts"`
 }
@@ -486,7 +499,7 @@ func ParseBackrestStorageTypes(storageTypeStr string) ([]BackrestStorageType, er
 			return nil, fmt.Errorf("%w: %s", ErrInvalidStorageType, storageType)
 		case BackrestStorageTypePosix, BackrestStorageTypeLocal:
 			storageTypes = append(storageTypes, BackrestStorageTypePosix)
-		case BackrestStorageTypeS3:
+		case BackrestStorageTypeS3, BackrestStorageTypeGCS:
 			storageTypes = append(storageTypes, storageType)
 		}
 	}
