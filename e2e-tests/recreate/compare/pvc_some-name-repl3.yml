@@ -7,7 +7,7 @@ metadata:
   labels:
     pg-cluster: some-name
     vendor: crunchydata
-  name: some-name-2
+  name: some-name-repl3
 spec:
   accessModes:
     - ReadWriteOnce
