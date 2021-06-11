@@ -120,7 +120,7 @@ Also, you can see the same information when browsing Pods of your cluster in Goo
    :align: center
 
 
-#. You can also deploy PosgreSQL replica at any time as follows:
+#. You can also deploy PostgreSQL replica at any time as follows:
 
     .. code:: bash
 
@@ -141,4 +141,3 @@ Also, you can see the same information when browsing Pods of your cluster in Goo
       psql (13.2)
       Type "help" for help.
       pgdb=>
-
