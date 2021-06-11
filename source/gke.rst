@@ -100,8 +100,7 @@ Installing the Operator
       $ kubectl apply -f deploy/pguser-secret.yaml
       $ kubectl apply -f deploy/cr.yaml
 
-   Creation process will take some time. The process is over when both
-   operator and replica set pod have reached their Running status:
+   Creation process will take some time. The process is over when operator and PostgreSQL pods have reached their Running status:
 
    .. code:: bash
 
