@@ -424,7 +424,15 @@ func scaleReplicaCreateDeployment(clientset kubernetes.Interface,
 	labels["name"] = serviceName
 	labels[config.LABEL_PG_CLUSTER] = replica.Spec.ClusterName
 
-	cluster.Spec.UserLabels[config.LABEL_DEPLOYMENT_NAME] = replica.Spec.Name
+	image := cluster.Spec.CCPImage
+
+	// check for --ccp-image-tag at the command line
+	imageTag := cluster.Spec.CCPImageTag
+	if labels[config.LABEL_CCP_IMAGE_TAG_KEY] != "" {
+		imageTag = labels[config.LABEL_CCP_IMAGE_TAG_KEY]
+	}
+
+	labels[config.LABEL_DEPLOYMENT_NAME] = replica.Spec.Name
 
 	labels[config.LABEL_DEPLOYMENT_NAME] = replica.Spec.Name
 
