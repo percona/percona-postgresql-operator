@@ -218,8 +218,6 @@
               --serviceaccount "{{ pgo_operator_namespace }}:postgres-operator" && \
             {{ kubectl_or_oc }} label clusterrolebinding pgo-cluster-admin vendor=crunchydata
           when: pgo_cluster_admin_result.rc == 1
-
-
     - name: PGO RBAC
       tags:
         - install

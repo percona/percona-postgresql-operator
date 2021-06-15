@@ -109,41 +109,6 @@ var (
 	notlsHBAPattern = regexp.MustCompile(`^(host|hostnossl)\s+`)
 )
 
-// systemLabels is a list of the system labels that need to be copied over when
-// also applying the custom labels
-var systemLabels = []string{
-	config.LABEL_PGHA_SCOPE,
-	config.LABEL_DEPLOYMENT_NAME,
-	config.LABEL_NAME,
-	config.LABEL_PG_CLUSTER,
-	config.LABEL_POD_ANTI_AFFINITY,
-	config.LABEL_PG_DATABASE,
-	config.LABEL_PGO_VERSION,
-	config.LABEL_PGOUSER,
-	config.LABEL_VENDOR,
-	config.LABEL_WORKFLOW_ID,
-}
-
-// a group of constants that are used as part of the TLS support
-const (
-	tlsEnvVarEnabled        = "PGHA_TLS_ENABLED"
-	tlsEnvVarOnly           = "PGHA_TLS_ONLY"
-	tlsMountPathReplication = "/pgconf/tls-replication"
-	tlsMountPathServer      = "/pgconf/tls"
-	tlsVolumeReplication    = "tls-replication"
-	tlsVolumeServer         = "tls-server"
-)
-
-var (
-	// tlsHBAPattern matches the pattern of what a TLS entry looks like in the
-	// Postgres HBA file
-	tlsHBAPattern = regexp.MustCompile(`^hostssl`)
-
-	// notlsHBAPattern matches the pattern of what a regular host entry looks like
-	// in the Postgres HBA file
-	notlsHBAPattern = regexp.MustCompile(`^(host|hostnossl)\s+`)
-)
-
 // tlsHBARules is a collection of standard TLS rules that PGO adds to our HBA
 // file
 var tlsHBARules = []string{

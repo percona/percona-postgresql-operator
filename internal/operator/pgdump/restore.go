@@ -48,6 +48,8 @@ type restorejobTemplateFields struct {
 	PGRestoreOpts       string
 	PITRTarget          string
 	Image               string
+	CCPImagePrefix      string
+	CCPImageTag         string
 	PgPort              string
 	NodeSelector        string
 	Tolerations         string
