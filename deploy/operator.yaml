@@ -182,7 +182,7 @@ data:
     pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "main"
+    pgo_image_tag: "k8spg-80"
     pgo_installation_name: "devtest"
     pgo_noauth_routes: ""
     pgo_operator_namespace: "pgo"
@@ -272,7 +272,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: perconalab/percona-postgresql-operator:main-pgo-deployer
+          image: perconalab/percona-postgresql-operator:k8spg-80-pgo-deployer
           imagePullPolicy: Always
           env:
             - name: DEPLOY_ACTION
