@@ -31,6 +31,8 @@ type Interface interface {
 	Pgreplicas() PgreplicaInformer
 	// Pgtasks returns a PgtaskInformer.
 	Pgtasks() PgtaskInformer
+
+	PerconaPGClusters() PerconaPGClusterInformer
 }
 
 type version struct {
@@ -62,4 +64,9 @@ func (v *version) Pgreplicas() PgreplicaInformer {
 // Pgtasks returns a PgtaskInformer.
 func (v *version) Pgtasks() PgtaskInformer {
 	return &pgtaskInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// PerconaPGCluster returns a PgtaskInformer.
+func (v *version) PerconaPGClusters() PerconaPGClusterInformer {
+	return &perconaPGClusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

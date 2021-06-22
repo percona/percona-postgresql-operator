@@ -43,6 +43,10 @@ func (c *FakeCrunchydataV1) Pgtasks(namespace string) v1.PgtaskInterface {
 	return &FakePgtasks{c, namespace}
 }
 
+func (c *FakeCrunchydataV1) PerconaPGClusters(namespace string) v1.PerconaPGClusterInterface {
+	return &FakePerconaPGClusters{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeCrunchydataV1) RESTClient() rest.Interface {

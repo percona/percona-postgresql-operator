@@ -17,6 +17,14 @@ limitations under the License.
 
 package v1
 
+// PerconaPGClusterListerExpansion allows custom methods to be added to
+// PerconaPGClusterLister.
+type PerconaPGClusterListerExpansion interface{}
+
+// PerconaPGClusterNamespaceListerExpansion allows custom methods to be added to
+// PerconaPGClusterNamespaceLister.
+type PerconaPGClusterNamespaceListerExpansion interface{}
+
 // PgclusterListerExpansion allows custom methods to be added to
 // PgclusterLister.
 type PgclusterListerExpansion interface{}

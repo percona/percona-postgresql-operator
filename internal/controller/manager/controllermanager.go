@@ -33,6 +33,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/ns"
 	"github.com/percona/percona-postgresql-operator/internal/operator/operatorupgrade"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/pgc"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions"
 	log "github.com/sirupsen/logrus"
@@ -255,6 +256,13 @@ func (c *ControllerManager) addControllerGroup(namespace string) error {
 		PgclusterWorkerCount: *c.pgoConfig.Pgo.PGClusterWorkerCount,
 	}
 
+	perconaPGClusterController := &pgc.Controller{
+		Client:                      client,
+		Queue:                       workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		Informer:                    pgoInformerFactory.Crunchydata().V1().PerconaPGClusters(),
+		PerconaPGClusterWorkerCount: *c.pgoConfig.Pgo.PerconaPGClusterWorkerCount,
+	}
+
 	pgReplicacontroller := &pgreplica.Controller{
 		Client:               client,
 		Queue:                workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
@@ -293,6 +301,7 @@ func (c *ControllerManager) addControllerGroup(namespace string) error {
 	pgPolicycontroller.AddPGPolicyEventHandler()
 	podcontroller.AddPodEventHandler()
 	jobcontroller.AddJobEventHandler()
+	perconaPGClusterController.AddPerconaPGClusterEventHandler()
 
 	group := &controllerGroup{
 		clientset:                      client,
@@ -309,13 +318,14 @@ func (c *ControllerManager) addControllerGroup(namespace string) error {
 			kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
 			kubeInformerFactory.Batch().V1().Jobs().Informer().HasSynced,
 			kubeInformerFactoryWithRefresh.Core().V1().ConfigMaps().Informer().HasSynced,
+			pgoInformerFactory.Crunchydata().V1().PerconaPGClusters().Informer().HasSynced,
 		},
 	}
 
 	// store the controllers containing worker queues so that the queues can also be started
 	// when any informers in the controller are started
 	group.controllersWithWorkers = append(group.controllersWithWorkers,
-		pgTaskcontroller, pgClustercontroller, pgReplicacontroller, configMapController)
+		pgTaskcontroller, pgClustercontroller, pgReplicacontroller, configMapController, perconaPGClusterController)
 
 	c.controllers[namespace] = group
 

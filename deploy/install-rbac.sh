@@ -23,6 +23,7 @@ test="${PGO_CONF_DIR:?Need to set PGO_CONF_DIR env variable}"
 $PGO_CMD get crd pgclusters.crunchydata.com > /dev/null
 if [ $? -eq 1 ]; then
 	$PGO_CMD create \
+	    -f ${PGO_CONF_DIR}/crds/perconapgclusters-crd.yaml \
 		-f ${PGO_CONF_DIR}/crds/pgclusters-crd.yaml \
 		-f ${PGO_CONF_DIR}/crds/pgpolicies-crd.yaml \
 		-f ${PGO_CONF_DIR}/crds/pgreplicas-crd.yaml \

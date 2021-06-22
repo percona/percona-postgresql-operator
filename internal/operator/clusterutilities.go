@@ -129,6 +129,7 @@ type PgmonitorEnvVarsTemplateFields struct {
 	ExporterSecret string
 }
 
+/*
 type PMMTemplateFields struct {
 	Enabled               bool
 	Name                  string
@@ -139,7 +140,7 @@ type PMMTemplateFields struct {
 	PMMSecret             string
 	RootSecretName        string
 }
-
+*/
 // BootstrapJobTemplateFields defines the fields needed to populate the cluster bootstrap job
 // template
 type BootstrapJobTemplateFields struct {
@@ -441,6 +442,7 @@ func GetExporterAddon(spec crv1.PgclusterSpec) string {
 	return exporterDoc.String()
 }
 
+/*
 func GetPMMContainer(cl *crv1.Pgcluster, name string) string {
 	if !cl.Spec.PMM.Enabled {
 		return ""
@@ -471,7 +473,7 @@ func GetPMMContainer(cl *crv1.Pgcluster, name string) string {
 
 	return doc.String()
 }
-
+*/
 // consolidate with cluster.GetConfVolume
 func GetConfVolume(clientset kubernetes.Interface, cl *crv1.Pgcluster, namespace string) string {
 	ctx := context.TODO()

@@ -157,6 +157,7 @@ spec:
             - apiGroups:
                 - crunchydata.com
               resources:
+                - perconapgclusters
                 - pgclusters
                 - pgpolicies
                 - pgreplicas

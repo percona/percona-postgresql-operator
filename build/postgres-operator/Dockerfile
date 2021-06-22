@@ -36,6 +36,7 @@ COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
 COPY installers/ansible/roles/pgo-operator/files/pgo-backrest-repo /default-pgo-backrest-repo
 COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
 COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
+COPY percona/templates/cluster-deployment.json /
 
 USER 2
 

@@ -29,6 +29,7 @@ type CrunchydataV1Interface interface {
 	PgpoliciesGetter
 	PgreplicasGetter
 	PgtasksGetter
+	PerconaPGClustersGetter
 }
 
 // CrunchydataV1Client is used to interact with features provided by the crunchydata.com group.
@@ -50,6 +51,10 @@ func (c *CrunchydataV1Client) Pgreplicas(namespace string) PgreplicaInterface {
 
 func (c *CrunchydataV1Client) Pgtasks(namespace string) PgtaskInterface {
 	return newPgtasks(c, namespace)
+}
+
+func (c *CrunchydataV1Client) PerconaPGClusters(namespace string) PerconaPGClusterInterface {
+	return newPerconaPGClusters(c, namespace)
 }
 
 // NewForConfig creates a new CrunchydataV1Client for the given config.

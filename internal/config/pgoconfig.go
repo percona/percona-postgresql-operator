@@ -192,9 +192,9 @@ var BootstrapTemplate *template.Template
 
 const bootstrapTemplatePath = "cluster-bootstrap-job.json"
 
-var PMMTemplate *template.Template
+//var PMMTemplate *template.Template
 
-const pmmTemplatePath = "pmm.json"
+//const pmmTemplatePath = "pmm.json"
 
 type ClusterStruct struct {
 	CCPImagePrefix                 string
@@ -251,6 +251,7 @@ type PgoStruct struct {
 	NamespaceRefreshInterval       *int
 	NamespaceWorkerCount           *int
 	PGClusterWorkerCount           *int
+	PerconaPGClusterWorkerCount    *int
 	PGOImagePrefix                 string
 	PGOImageTag                    string
 	PGReplicaWorkerCount           *int
@@ -732,10 +733,11 @@ func (c *PgoConfig) GetConfig(clientset kubernetes.Interface, namespace string) 
 		return err
 	}
 
-	PMMTemplate, err = c.LoadTemplate(cMap, pmmTemplatePath)
-	if err != nil {
-		return err
-	}
+	/*
+		PMMTemplate, err = c.LoadTemplate(cMap, pmmTemplatePath)
+		if err != nil {
+			return err
+		}*/
 
 	return nil
 }

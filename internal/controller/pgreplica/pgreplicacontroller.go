@@ -26,6 +26,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/operator"
 	clusteroperator "github.com/percona/percona-postgresql-operator/internal/operator/cluster"
 	"github.com/percona/percona-postgresql-operator/internal/util"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/pgc"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
 
@@ -273,7 +274,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	err = clusteroperator.AddPMMSidecar(cluster, newPgreplica.Name, deployment)
+	err = pgc.UpdateDeployment(c.Client, cluster, deployment)
 	if err != nil {
 		log.Errorf("could not add pmm sidecar for pgreplica: %q", err.Error())
 		return
