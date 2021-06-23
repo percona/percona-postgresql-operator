@@ -35,7 +35,7 @@ func AddPMMSidecar(cl *crv1.PerconaPGCluster, cluster *crv1.Pgcluster, deploymen
 		return nil
 	}
 	cl.Name = deployment.Name
-	container := GetPMMContainer(cl)
+	container := GetPMMContainer(cl, cl.Name)
 	deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, container)
 
 	return nil
@@ -69,7 +69,7 @@ func HandlePMMTemplate(template []byte, cluster *crv1.PerconaPGCluster) ([]byte,
 }
 
 func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster) ([]byte, error) {
-	c := GetPMMContainer(pgc)
+	c := GetPMMContainer(pgc, pgc.Name)
 	b, err := json.Marshal(c)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal container")
@@ -77,7 +77,7 @@ func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster) ([]byte, error) {
 	return b, nil
 }
 
-func GetPMMContainer(pgc *crv1.PerconaPGCluster) v1.Container {
+func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName string) v1.Container {
 	return v1.Container{
 		Name:  "pmm-client",
 		Image: pgc.Spec.PMM.Image,
@@ -245,7 +245,7 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster) v1.Container {
 				ValueFrom: &v1.EnvVarSource{
 					SecretKeyRef: &v1.SecretKeySelector{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: pgc.Name + "-postgres-secret",
+							Name: clusterName + "-postgres-secret",
 						},
 						Key: "password",
 					},

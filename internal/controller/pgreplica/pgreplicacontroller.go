@@ -265,25 +265,6 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		}
 	}
 
-	// get the Deployment object associated with this instance
-	deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
-		newPgreplica.Name, metav1.GetOptions{})
-
-	if err != nil {
-		log.Errorf("could not find instance for pgreplica: %q", err.Error())
-		return
-	}
-
-	err = pgc.UpdateDeployment(c.Client, cluster, deployment)
-	if err != nil {
-		log.Errorf("update pgreplica deployment: %q", err.Error())
-		return
-	}
-
-	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-		log.Errorf("could not update deployment for pgreplica: %q", err.Error())
-	}
-
 	// handle PVC resizing, if needed
 	if oldPgreplica.Spec.ReplicaStorage.Size != newPgreplica.Spec.ReplicaStorage.Size {
 		// first check to see if the resize should occur
@@ -356,6 +337,23 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		if err := operator.ScaleDeployment(c.Client, deployment, replicas); err != nil {
 			log.Error(err)
 		}
+	}
+
+	// get the Deployment object associated with this instance
+	deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
+		newPgreplica.Name, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("could not find instance for pgreplica: %q", err.Error())
+		return
+	}
+
+	err = pgc.UpdateDeployment(c.Client, cluster, deployment)
+	if err != nil {
+		log.Errorf("update pgreplica deployment: %q", err.Error())
+	}
+
+	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+		log.Errorf("could not update deployment for pgreplica: %q", err.Error())
 	}
 }
 
