@@ -6,13 +6,19 @@ import (
 )
 
 // PerconaPGCluster is the CRD that defines a Percona PG Cluster
+//
+// swagger:ignore Pgcluster
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PerconaPGCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
-	Spec              PerconaPGClusterSpec `json:"spec"`
-	Status            PgclusterStatus      `json:"status,omitempty"`
+	Spec              PerconaPGClusterSpec   `json:"spec"`
+	Status            PerconaPGClusterStatus `json:"status,omitempty"`
 }
 
+// PerconaPGClusterSpec is the CRD that defines a Percona PG Cluster Spec
+// swagger:ignore
 type PerconaPGClusterSpec struct {
 	Namespace          string               `json:"namespace"`
 	Database           string               `json:"database"`
@@ -32,6 +38,11 @@ type PerconaPGClusterSpec struct {
 	PGDataSource       PGDataSource         `json:"pgDataSource"`
 	PMM                PMMSpec              `json:"pmm"`
 	Backup             Backup               `json:"backup"`
+}
+
+type PerconaPGClusterStatus struct {
+	PGCluster  PgclusterStatus
+	PGReplicas map[string]PgreplicaStatus
 }
 
 type TablespaceStorages struct {
@@ -149,6 +160,8 @@ type PMMSpec struct {
 }
 
 // PerconaPGClusterList is the CRD that defines a Percona PG Cluster List
+// swagger:ignore
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PerconaPGClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

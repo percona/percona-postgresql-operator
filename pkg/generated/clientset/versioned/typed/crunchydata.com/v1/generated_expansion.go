@@ -24,3 +24,5 @@ type PgpolicyExpansion interface{}
 type PgreplicaExpansion interface{}
 
 type PgtaskExpansion interface{}
+
+type PerconaPGClusterExpansiom interface{}
