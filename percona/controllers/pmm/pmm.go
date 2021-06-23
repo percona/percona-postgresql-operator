@@ -35,7 +35,7 @@ func AddPMMSidecar(cl *crv1.PerconaPGCluster, cluster *crv1.Pgcluster, deploymen
 		return nil
 	}
 	cl.Name = deployment.Name
-	container := GetPMMContainer(cl, cl.Name)
+	container := GetPMMContainer(cl, cluster.Name)
 	deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, container)
 
 	return nil
