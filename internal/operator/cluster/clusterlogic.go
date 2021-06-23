@@ -351,7 +351,6 @@ func getClusterDeploymentFields(clientset kubernetes.Interface,
 		CASecret:                  cl.Spec.TLS.CASecret,
 		Standby:                   cl.Spec.Standby,
 		Tolerations:               util.GetTolerations(cl.Spec.Tolerations),
-		//		PMMContainer:              operator.GetPMMContainer(cl, cl.Name),
 	}
 
 	return deploymentFields

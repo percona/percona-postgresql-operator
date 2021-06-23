@@ -243,9 +243,6 @@
                 {{ if .BadgerAddon }}
                 ,{{.BadgerAddon }}
                 {{ end }}
-                {{ if .PMMContainer }}
-                ,{{.PMMContainer }}
-                {{ end }}
                 <pmmContainer>],
                 "volumes": [{
                         "name": "pgdata",

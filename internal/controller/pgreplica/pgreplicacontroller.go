@@ -276,12 +276,12 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	err = pgc.UpdateDeployment(c.Client, cluster, deployment)
 	if err != nil {
-		log.Errorf("could not add pmm sidecar for pgreplica: %q", err.Error())
+		log.Errorf("update pgreplica deployment: %q", err.Error())
 		return
 	}
 
 	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-		log.Errorf("could not update deployment for pgreplica update pmm: %q", err.Error())
+		log.Errorf("could not update deployment for pgreplica: %q", err.Error())
 	}
 
 	// handle PVC resizing, if needed

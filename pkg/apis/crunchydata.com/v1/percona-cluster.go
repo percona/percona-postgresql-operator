@@ -5,6 +5,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// PerconaPGCluster is the CRD that defines a Percona PG Cluster
+type PerconaPGCluster struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+	Spec              PerconaPGClusterSpec `json:"spec"`
+	Status            PgclusterStatus      `json:"status,omitempty"`
+}
+
 type PerconaPGClusterSpec struct {
 	Namespace          string               `json:"namespace"`
 	Database           string               `json:"database"`
@@ -118,23 +126,7 @@ type CronJob struct {
 	Storage  string `json:"storage"`
 }
 
-// PerconaPGClusterResourcePlural ..
-const PerconaPGClusterResourcePlural = "perconapgclusters"
-
-// PerconaPGcluster is the CRD that defines a Crunchy PG Cluster
-//
-// swagger:ignore Pgcluster
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type PerconaPGCluster struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
-	Spec              PerconaPGClusterSpec `json:"spec"`
-	Status            PgclusterStatus      `json:"status,omitempty"`
-}
-
 // PerconaPgStorageSpec ...
-// swagger:ignore
 type PerconaPgStorageSpec struct {
 	Name               string `json:"name"`
 	StorageClass       string `json:"storageclass"`
@@ -145,8 +137,8 @@ type PerconaPgStorageSpec struct {
 	MatchLabels        string `json:"matchLabels"`
 }
 
-// PerconaPMMSpec contains settings for PMM
-type PerconaPMMSpec struct {
+// PMMSpec contains settings for PMM
+type PMMSpec struct {
 	Enabled    bool            `json:"enabled"`
 	Image      string          `json:"image"`
 	ServerHost string          `json:"serverHost,omitempty"`
@@ -156,9 +148,7 @@ type PerconaPMMSpec struct {
 	Limits     v1.ResourceList `json:"limits"`
 }
 
-// PerconaPGClusterList is the CRD that defines a Crunchy PG Cluster List
-// swagger:ignore
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// PerconaPGClusterList is the CRD that defines a Percona PG Cluster List
 type PerconaPGClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

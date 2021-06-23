@@ -240,9 +240,6 @@
                 {{ if .BadgerAddon }}
                 ,{{.BadgerAddon }}
                 {{ end }}
-                {{ if .PMMContainer }}
-                ,{{.PMMContainer }}
-                {{ end }}
                 ],
                 "volumes": [{
                         "name": "pgdata",
