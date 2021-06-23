@@ -2,6 +2,8 @@ package pgc
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"strconv"
@@ -356,6 +358,62 @@ func (c *Controller) handleStatuses() error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Controller) reconcileStatuses() {
+	fmt.Println("handle statuses")
+	for {
+		err := c.handleStatuses()
+		if err != nil {
+			fmt.Printf("handle statuses: %s", err)
+			log.Error(errors.Wrap(err, "handle statuses"))
+		}
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (c *Controller) handleStatuses() error {
+	ctx := context.TODO()
+	ns, err := c.Client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "get ns list")
+	}
+	for _, n := range ns.Items {
+		perconaPGClusters, err := c.Client.CrunchydataV1().PerconaPGClusters(n.Name).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return errors.Wrap(err, "get percona clusters list")
+		}
+		for _, p := range perconaPGClusters.Items {
+			replStatuses := make(map[string]crv1.PgreplicaStatus)
+			selector := config.LABEL_PG_CLUSTER + "=" + p.Name
+			pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(n.Name).List(ctx, metav1.ListOptions{LabelSelector: selector})
+			if err != nil {
+				return errors.Wrap(err, "get pgReplicas list")
+			}
+			for _, repl := range pgReplicas.Items {
+				replStatuses[repl.Name] = repl.Status
+			}
+			pgCluster, err := c.Client.CrunchydataV1().Pgclusters(n.Name).Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				return errors.Wrap(err, "get pgCluster")
+			}
+			patch, err := json.Marshal(map[string]interface{}{
+				"status": crv1.PerconaPGClusterStatus{
+					PGCluster:  pgCluster.Status,
+					PGReplicas: replStatuses,
+				},
+			})
+			if err != nil {
+				return errors.Wrap(err, "marshal percona status")
+			}
+			_, err = c.Client.CrunchydataV1().PerconaPGClusters(p.Namespace).
+				Patch(ctx, p.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+			if err != nil {
+				return errors.Wrap(err, "patch percona status")
+			}
+		}
+	}
 	return nil
 }
 
