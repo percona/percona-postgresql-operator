@@ -212,7 +212,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	oldCluster := oldObj.(*crv1.PerconaPGCluster)
 	newCluster := newObj.(*crv1.PerconaPGCluster)
-	fmt.Println(oldCluster.CreationTimestamp.Minute(), newCluster.CreationTimestamp.Minute())
+
 	if reflect.DeepEqual(oldCluster.Spec, newCluster.Spec) {
 		return
 	}
@@ -225,24 +225,26 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	keyParts := strings.Split(key, "/")
 	keyNamespace := keyParts[0]
 
-	cl, err := c.Client.CrunchydataV1().Pgclusters(keyNamespace).Get(ctx, oldCluster.Name, metav1.GetOptions{})
+	oldPGCluster, err := c.Client.CrunchydataV1().Pgclusters(oldCluster.Namespace).Get(ctx, oldCluster.Name, metav1.GetOptions{})
 	if err != nil {
-		log.Errorf("update pgcluster resource: %s", err)
+		log.Errorf("get old pgcluster resource: %s", err)
+		return
 	}
 
-	cluster := getPGCLuster(newCluster)
-	cluster.ResourceVersion = cl.ResourceVersion
+	pgCluster := getPGCLuster(newCluster)
+	pgCluster.ResourceVersion = oldPGCluster.ResourceVersion
 	if oldCluster.Spec.PMM.Enabled != newCluster.Spec.PMM.Enabled {
-		if cluster.Annotations == nil {
-			cluster.Annotations = make(map[string]string)
+		if pgCluster.Annotations == nil {
+			pgCluster.Annotations = make(map[string]string)
 		}
 		pmmString := fmt.Sprintln(newCluster.Spec.PMM)
 		hash := fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
-		cluster.Annotations["pmm-sidecar"] = hash
+		pgCluster.Annotations["pmm-sidecar"] = hash
 	}
-	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, &cluster, metav1.UpdateOptions{})
+	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, &pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		log.Errorf("update pgcluster resource: %s", err)
+		return
 	}
 
 	err = replica.Update(c.Client, newCluster, oldCluster)
@@ -256,6 +258,7 @@ func (c *Controller) onDelete(obj interface{}) {
 	ctx := context.TODO()
 	fmt.Println("the type is:", reflect.TypeOf(obj))
 
+	// TODO: this object trick should be rework
 	clusterObj, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
 		log.Errorln("delete cluster: object is not DeletedFinalStateUnknown")
@@ -273,7 +276,7 @@ func (c *Controller) onDelete(obj interface{}) {
 	}
 }
 
-// AddPGClusterEventHandler adds the pgcluster event handler to the pgcluster informer
+// AddPerconaPGClusterEventHandler adds the pgcluster event handler to the pgcluster informer
 func (c *Controller) AddPerconaPGClusterEventHandler() {
 	c.Informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onAdd,
