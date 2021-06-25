@@ -18,6 +18,7 @@ limitations under the License.
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -214,6 +215,23 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		}
 	}
 
+	// get the Deployment object associated with this instance
+	deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
+		newPgreplica.Name, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("could not find instance for pgreplica: %q", err.Error())
+		return
+	}
+
+	err = pgc.UpdateDeployment(c.Client, cluster, deployment)
+	if err != nil {
+		log.Errorf("update pgreplica deployment: %q", err.Error())
+	}
+	fmt.Println(deployment.Spec.Template.Annotations)
+	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+		log.Errorf("could not update deployment for pgreplica: %q", err.Error())
+	}
+
 	// if the service type changed, updated on the instance
 	// if there is an error, log but continue
 	if oldPgreplica.Spec.ServiceType != newPgreplica.Spec.ServiceType {
@@ -336,23 +354,6 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		if err := operator.ScaleDeployment(c.Client, deployment, replicas); err != nil {
 			log.Error(err)
 		}
-	}
-
-	// get the Deployment object associated with this instance
-	deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
-		newPgreplica.Name, metav1.GetOptions{})
-	if err != nil {
-		log.Errorf("could not find instance for pgreplica: %q", err.Error())
-		return
-	}
-
-	err = pgc.UpdateDeployment(c.Client, cluster, deployment)
-	if err != nil {
-		log.Errorf("update pgreplica deployment: %q", err.Error())
-	}
-
-	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-		log.Errorf("could not update deployment for pgreplica: %q", err.Error())
 	}
 }
 

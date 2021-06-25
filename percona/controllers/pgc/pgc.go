@@ -407,6 +407,7 @@ func (c *Controller) handleStatuses() error {
 			if err != nil {
 				return errors.Wrap(err, "marshal percona status")
 			}
+
 			_, err = c.Client.CrunchydataV1().PerconaPGClusters(p.Namespace).
 				Patch(ctx, p.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 			if err != nil {

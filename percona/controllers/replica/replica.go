@@ -400,3 +400,45 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 
 	return nil
 }
+
+func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+	fmt.Println("update annotations")
+	if cl.Spec.PGReplicas == nil {
+		return
+	}
+	if cl.Spec.PGReplicas.HotStandby.Size == 0 {
+		return
+	}
+	if cl.Spec.PGReplicas.HotStandby.Annotations == nil {
+		return
+	}
+	if deployment.Spec.Template.Annotations == nil {
+		deployment.Spec.Template.Annotations = make(map[string]string)
+	}
+	for k, v := range cl.Spec.PGReplicas.HotStandby.Annotations {
+		deployment.Spec.Template.Annotations[k] = v
+	}
+
+	return
+}
+
+func UpdateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+	fmt.Println("update labels")
+	if cl.Spec.PGReplicas == nil {
+		return
+	}
+	if cl.Spec.PGReplicas.HotStandby.Size == 0 {
+		return
+	}
+	if cl.Spec.PGReplicas.HotStandby.Labels == nil {
+		return
+	}
+	if deployment.Spec.Template.Labels == nil {
+		deployment.Spec.Template.Labels = make(map[string]string)
+	}
+	for k, v := range cl.Spec.PGReplicas.HotStandby.Labels {
+		deployment.Spec.Template.Labels[k] = v
+	}
+
+	return
+}
