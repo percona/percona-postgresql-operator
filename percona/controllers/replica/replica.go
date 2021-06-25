@@ -22,7 +22,7 @@ func Create(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
 
 	for i := 1; i <= cluster.Spec.PGReplicas.HotStandby.Size; i++ {
-		replica := getNewReplicaObject(cluster, i)
+		replica := getNewReplicaObject(cluster, &crv1.Pgreplica{}, i)
 		_, err := clientset.CrunchydataV1().Pgreplicas(cluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "create replica %s", replica.Name)
@@ -73,19 +73,23 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 	}
 
 	for i := 1; i <= newReplicaCount; i++ {
-		replica := getNewReplicaObject(newCluster, i)
-		oldReplica, err := clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Get(ctx, replica.Name, metav1.GetOptions{})
+		replicaName := getReplicaName(oldCluster, i)
+		oldReplica, err := clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Get(ctx, replicaName, metav1.GetOptions{})
 		if err != nil {
+			replica := getNewReplicaObject(newCluster, &crv1.Pgreplica{}, i)
 			_, err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
 			if err != nil {
 				return errors.Wrapf(err, "create replica %s", replica.Name)
 			}
 			continue
 		}
-		if reflect.DeepEqual(oldReplica.Spec, replica.Spec) {
+		replica := getNewReplicaObject(newCluster, oldReplica, i)
+		if reflect.DeepEqual(newCluster.Spec.PGReplicas.HotStandby, oldCluster.Spec.PGReplicas.HotStandby) {
 			continue
 		}
+
 		replica.ResourceVersion = oldReplica.ResourceVersion
+		replica.Status = oldReplica.Status
 		_, err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Update(ctx, replica, metav1.UpdateOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "update replica %s", replica.Name)
@@ -104,7 +108,7 @@ func getReplicaName(cluster *crv1.PerconaPGCluster, index int) string {
 	return cluster.Name + "-repl" + strconv.Itoa(index)
 }
 
-func getNewReplicaObject(cluster *crv1.PerconaPGCluster, index int) *crv1.Pgreplica {
+func getNewReplicaObject(cluster *crv1.PerconaPGCluster, replica *crv1.Pgreplica, index int) *crv1.Pgreplica {
 	if cluster.Spec.PGReplicas == nil {
 		return nil
 	}
@@ -112,14 +116,14 @@ func getNewReplicaObject(cluster *crv1.PerconaPGCluster, index int) *crv1.Pgrepl
 	labels[config.LABEL_PG_CLUSTER] = cluster.Name
 	labels[config.LABEL_NAME] = cluster.Name + "-repl" + strconv.Itoa(index)
 	labels["pgouser"] = "admin"
-	if cluster.Spec.PGReplicas.HotStandby.Expose.Labels != nil {
-		for k, v := range cluster.Spec.PGReplicas.HotStandby.Expose.Labels {
+	if cluster.Spec.PGReplicas.HotStandby.Labels != nil {
+		for k, v := range cluster.Spec.PGReplicas.HotStandby.Labels {
 			labels[k] = v
 		}
 	}
 	annotations := make(map[string]string)
-	if cluster.Spec.PGReplicas.HotStandby.Expose.Annotations != nil {
-		for k, v := range cluster.Spec.PGReplicas.HotStandby.Expose.Annotations {
+	if cluster.Spec.PGReplicas.HotStandby.Annotations != nil {
+		for k, v := range cluster.Spec.PGReplicas.HotStandby.Annotations {
 			annotations[k] = v
 		}
 	}
@@ -139,57 +143,33 @@ func getNewReplicaObject(cluster *crv1.PerconaPGCluster, index int) *crv1.Pgrepl
 			MatchLabels:        cluster.Spec.PGReplicas.HotStandby.VolumeSpec.MatchLabels,
 		}
 	}
-	spec := crv1.PgreplicaSpec{
-		Name:           labels[config.LABEL_NAME],
-		ReplicaStorage: storage,
-		UserLabels:     cluster.Spec.UserLabels,
-		ClusterName:    cluster.Name,
+
+	replica.ObjectMeta.Name = labels[config.LABEL_NAME]
+	replica.ObjectMeta.Namespace = cluster.Namespace
+	if replica.ObjectMeta.Labels == nil {
+		replica.ObjectMeta.Labels = make(map[string]string)
+	}
+	for k, v := range labels {
+		replica.ObjectMeta.Labels[k] = v
+	}
+	if replica.ObjectMeta.Annotations == nil {
+		replica.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for k, v := range annotations {
+		replica.ObjectMeta.Annotations[k] = v
 	}
 	if cluster.Spec.PGReplicas.HotStandby.Affinity != nil {
-		spec.NodeAffinity = cluster.Spec.PGReplicas.HotStandby.Affinity.NodeAffinity
+		replica.Spec.NodeAffinity = cluster.Spec.PGReplicas.HotStandby.Affinity.NodeAffinity
 	}
-	newReplica := &crv1.Pgreplica{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      labels[config.LABEL_NAME],
-			Namespace: cluster.Namespace,
-			Labels:    labels,
-		},
-		Spec: spec,
-	}
-
+	replica.Spec.Name = labels[config.LABEL_NAME]
+	replica.Spec.ReplicaStorage = storage
+	replica.Spec.UserLabels = cluster.Spec.UserLabels
+	replica.Spec.ClusterName = cluster.Name
 	if len(cluster.Spec.PGReplicas.HotStandby.Expose.ServiceType) > 0 {
-		newReplica.Spec.ServiceType = cluster.Spec.PGReplicas.HotStandby.Expose.ServiceType
+		replica.Spec.ServiceType = cluster.Spec.PGReplicas.HotStandby.Expose.ServiceType
 	}
 
-	if len(cluster.Spec.PGReplicas.HotStandby.Expose.Labels) > 0 {
-		for k, v := range cluster.Spec.PGReplicas.HotStandby.Expose.Labels {
-			if k == config.LABEL_PG_CLUSTER {
-				continue
-			}
-			newReplica.Labels[k] = v
-		}
-	}
-
-	if len(cluster.Spec.PGReplicas.HotStandby.Labels) > 0 {
-		for k, v := range cluster.Spec.PGReplicas.HotStandby.Labels {
-			if k == config.LABEL_PG_CLUSTER {
-				continue
-			}
-			newReplica.Labels[k] = v
-		}
-	}
-	/*
-		if len(cluster.Spec.PGReplicas.HotStandby.Annotations) > 0 {
-			if len(newReplica.Annotations) == 0 {
-				newReplica.Annotations = make(map[string]string)
-			}
-			for k, v := range cluster.Spec.PGReplicas.HotStandby.Annotations {
-				newReplica.Annotations[k] = v
-			}
-		}
-	*/
-
-	return newReplica
+	return replica
 }
 
 func createOrUpdateReplicaService(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
@@ -278,7 +258,7 @@ func getReplicaServiceName(clusterName string) string {
 	return fmt.Sprintf("%s-replica", clusterName)
 }
 
-func UpdateResources(cl *crv1.PerconaPGCluster, cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
+func UpdateResources(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) error {
 	if cl.Spec.PGReplicas == nil {
 		return nil
 	}
@@ -295,4 +275,46 @@ func UpdateResources(cl *crv1.PerconaPGCluster, cluster *crv1.Pgcluster, deploym
 		}
 	}
 	return nil
+}
+
+func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+	fmt.Println("update annotations")
+	if cl.Spec.PGReplicas == nil {
+		return
+	}
+	if cl.Spec.PGReplicas.HotStandby.Size == 0 {
+		return
+	}
+	if cl.Spec.PGReplicas.HotStandby.Annotations == nil {
+		return
+	}
+	if deployment.Spec.Template.Annotations == nil {
+		deployment.Spec.Template.Annotations = make(map[string]string)
+	}
+	for k, v := range cl.Spec.PGReplicas.HotStandby.Annotations {
+		deployment.Spec.Template.Annotations[k] = v
+	}
+
+	return
+}
+
+func UpdateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+	fmt.Println("update labels")
+	if cl.Spec.PGReplicas == nil {
+		return
+	}
+	if cl.Spec.PGReplicas.HotStandby.Size == 0 {
+		return
+	}
+	if cl.Spec.PGReplicas.HotStandby.Labels == nil {
+		return
+	}
+	if deployment.Spec.Template.Labels == nil {
+		deployment.Spec.Template.Labels = make(map[string]string)
+	}
+	for k, v := range cl.Spec.PGReplicas.HotStandby.Labels {
+		deployment.Spec.Template.Labels[k] = v
+	}
+
+	return
 }

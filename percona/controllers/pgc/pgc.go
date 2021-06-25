@@ -71,9 +71,9 @@ func (c *Controller) onAdd(obj interface{}) {
 
 	config.DeploymentTemplate = t
 
-	cluster := getPGCLuster(newCluster)
+	cluster := getPGCLuster(newCluster, &crv1.Pgcluster{})
 
-	_, err = c.Client.CrunchydataV1().Pgclusters(newCluster.Namespace).Create(ctx, &cluster, metav1.CreateOptions{})
+	_, err = c.Client.CrunchydataV1().Pgclusters(newCluster.Namespace).Create(ctx, cluster, metav1.CreateOptions{})
 	if err != nil {
 		log.Errorf("create pgcluster resource: %s", err)
 	}
@@ -87,84 +87,115 @@ func (c *Controller) onAdd(obj interface{}) {
 
 }
 
-func getPGCLuster(pgc *crv1.PerconaPGCluster) crv1.Pgcluster {
+func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
 	metaAnnotations := map[string]string{
 		"current-primary": pgc.Name,
+	}
+	if cluster.Annotations != nil {
+		for k, v := range cluster.Annotations {
+			metaAnnotations[k] = v
+		}
+	}
+	if pgc.Annotations != nil {
+		for k, v := range pgc.Annotations {
+			metaAnnotations[k] = v
+		}
+	}
+	pgoVersion := "0.1.0"
+	version, ok := pgc.Labels["pgo-version"]
+	if ok {
+		pgoVersion = version
+	}
+	pgoUser := "admin"
+	user, ok := pgc.Labels["pgouser"]
+	if ok {
+		pgoUser = user
 	}
 	metaLabels := map[string]string{
 		"crunchy-pgha-scope": pgc.Name,
 		"deployment-name":    pgc.Name,
 		"name":               pgc.Name,
 		"pg-cluster":         pgc.Name,
-		"pgo-version":        "0.1.0",
-		"pgouser":            "admin",
+		"pgo-version":        pgoVersion,
+		"pgouser":            pgoUser,
+	}
+	if cluster.Labels != nil {
+		for k, v := range cluster.Labels {
+			metaLabels[k] = v
+		}
+	}
+	userLabels := make(map[string]string)
+	if pgc.Labels != nil {
+		for k, v := range pgc.Labels {
+			userLabels[k] = v
+		}
+		for k, v := range pgc.Spec.UserLabels {
+			userLabels[k] = v
+		}
 	}
 	syncReplication := false
 	if pgc.Spec.PGReplicas != nil {
 		syncReplication = pgc.Spec.PGReplicas.HotStandby.EnableSyncStandby
 	}
-	return crv1.Pgcluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: metaAnnotations,
-			Labels:      metaLabels,
-			Name:        pgc.Name,
-			Namespace:   pgc.Spec.Namespace,
+	cluster.Annotations = metaAnnotations
+	cluster.Labels = metaLabels
+	cluster.Name = pgc.Name
+	cluster.Namespace = pgc.Namespace
+	cluster.Spec.BackrestStorage = crv1.PgStorageSpec{
+		AccessMode:  "ReadWriteOnce",
+		Size:        "1G",
+		StorageType: "dynamic",
+	}
+	cluster.Spec.PrimaryStorage = crv1.PgStorageSpec{
+		AccessMode:  "ReadWriteOnce",
+		Size:        "1G",
+		StorageType: "dynamic",
+	}
+	cluster.Spec.ReplicaStorage = crv1.PgStorageSpec{
+		AccessMode:  "ReadWriteOnce",
+		Size:        "1G",
+		StorageType: "dynamic",
+	}
+	cluster.Spec.BackrestResources = v1.ResourceList{
+		v1.ResourceMemory: resource.MustParse("48Mi"),
+	}
+	cluster.Spec.BackrestS3VerifyTLS = "true"
+	cluster.Spec.ClusterName = pgc.Name
+	cluster.Spec.PGImage = pgc.Spec.PGPrimary.Image
+	cluster.Spec.BackrestImage = "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest"
+	cluster.Spec.BackrestRepoImage = "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo"
+	cluster.Spec.DisableAutofail = false
+	cluster.Spec.Name = pgc.Name
+	cluster.Spec.Database = pgc.Spec.Database
+	cluster.Spec.PGBadger = false
+	cluster.Spec.PgBouncer = crv1.PgBouncerSpec{
+		Image:    "perconalab/percona-postgresql-operator:main-ppg13-pgbouncer",
+		Replicas: 1,
+		Resources: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("128Mi"),
+			v1.ResourceCPU:    resource.MustParse("1"),
 		},
-		Spec: crv1.PgclusterSpec{
-			BackrestStorage: crv1.PgStorageSpec{
-				AccessMode:  "ReadWriteOnce",
-				Size:        "1G",
-				StorageType: "dynamic",
-			},
-			PrimaryStorage: crv1.PgStorageSpec{
-				AccessMode:  "ReadWriteOnce",
-				Size:        "1G",
-				StorageType: "dynamic",
-			},
-			ReplicaStorage: crv1.PgStorageSpec{
-				AccessMode:  "ReadWriteOnce",
-				Size:        "1G",
-				StorageType: "dynamic",
-			},
-			BackrestResources: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("48Mi"),
-			},
-			BackrestS3VerifyTLS: "true",
-			ClusterName:         pgc.Name,
-			PGImage:             pgc.Spec.PGPrimary.Image,
-			BackrestImage:       "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest",
-			BackrestRepoImage:   "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo",
-			DisableAutofail:     false,
-			Name:                pgc.Name,
-			Database:            pgc.Spec.Database,
-			PGBadger:            false,
-			PgBouncer: crv1.PgBouncerSpec{
-				Image:    "perconalab/percona-postgresql-operator:main-ppg13-pgbouncer",
-				Replicas: 1,
-				Resources: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("128Mi"),
-					v1.ResourceCPU:    resource.MustParse("1"),
-				},
-				Limits: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("512Mi"),
-					v1.ResourceCPU:    resource.MustParse("2"),
-				},
-			},
-			PGOImagePrefix: "perconalab/percona-postgresql-operator",
-			PodAntiAffinity: crv1.PodAntiAffinitySpec{
-				Default:    "preferred",
-				PgBackRest: "preferred",
-				PgBouncer:  "preferred",
-			},
-			Port: pgc.Spec.Port,
-			Resources: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("128Mi"),
-			},
-			User:            pgc.Spec.User,
-			UserLabels:      pgc.Spec.UserLabels,
-			SyncReplication: &syncReplication,
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("512Mi"),
+			v1.ResourceCPU:    resource.MustParse("2"),
 		},
 	}
+	cluster.Spec.PGOImagePrefix = "perconalab/percona-postgresql-operator"
+	cluster.Spec.PodAntiAffinity = crv1.PodAntiAffinitySpec{
+		Default:    "preferred",
+		PgBackRest: "preferred",
+		PgBouncer:  "preferred",
+	}
+	cluster.Spec.Port = pgc.Spec.Port
+	cluster.Spec.Resources = v1.ResourceList{
+		v1.ResourceMemory: resource.MustParse("128Mi"),
+	}
+	cluster.Spec.User = pgc.Spec.User
+	cluster.Spec.UserLabels = pgc.Spec.UserLabels
+	cluster.Spec.SyncReplication = &syncReplication
+	cluster.Spec.UserLabels = userLabels
+
+	return cluster
 }
 
 // RunWorker is a long-running function that will continually call the
@@ -257,6 +288,7 @@ func (c *Controller) handleStatuses() error {
 			if err != nil {
 				return errors.Wrap(err, "marshal percona status")
 			}
+
 			_, err = c.Client.CrunchydataV1().PerconaPGClusters(p.Namespace).
 				Patch(ctx, p.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 			if err != nil {
@@ -292,9 +324,8 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	pgCluster := getPGCLuster(newCluster)
-	pgCluster.ResourceVersion = oldPGCluster.ResourceVersion
-	pgCluster.Status = oldPGCluster.Status
+	pgCluster := getPGCLuster(newCluster, oldPGCluster)
+
 	if oldCluster.Spec.PMM.Enabled != newCluster.Spec.PMM.Enabled {
 		if pgCluster.Annotations == nil {
 			pgCluster.Annotations = make(map[string]string)
@@ -303,7 +334,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		hash := fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
 		pgCluster.Annotations["pmm-sidecar"] = hash
 	}
-	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, &pgCluster, metav1.UpdateOptions{})
+	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		log.Errorf("update pgcluster resource: %s", err)
 		return
@@ -360,14 +391,16 @@ func UpdateDeployment(clientset kubeapi.Interface, cluster *crv1.Pgcluster, depl
 	if err != nil {
 		return errors.Wrap(err, "get perconapgcluster resource: %s")
 	}
-
+	replica.UpdateAnnotations(cl, deployment)
+	replica.UpdateLabels(cl, deployment)
 	err = pmm.AddPMMSidecar(cl, cluster, deployment)
 	if err != nil {
 		return errors.Wrap(err, "add pmm resources: %s")
 	}
-	err = replica.UpdateResources(cl, cluster, deployment)
+	err = replica.UpdateResources(cl, deployment)
 	if err != nil {
 		return errors.Wrap(err, "update replica resources resource: %s")
 	}
+
 	return nil
 }
