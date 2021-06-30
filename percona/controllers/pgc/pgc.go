@@ -364,12 +364,17 @@ func (c *Controller) handleStatuses() error {
 func (c *Controller) reconcileStatuses() {
 	fmt.Println("handle statuses")
 	for {
-		err := c.handleStatuses()
-		if err != nil {
-			fmt.Printf("handle statuses: %s", err)
-			log.Error(errors.Wrap(err, "handle statuses"))
+		select {
+		case <-stopCh:
+			return
+		default:
+			err := c.handleStatuses()
+			if err != nil {
+				fmt.Printf("handle statuses: %s", err)
+				log.Error(errors.Wrap(err, "handle statuses"))
+			}
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(10 * time.Second)
 	}
 }
 

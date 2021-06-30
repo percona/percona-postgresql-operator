@@ -274,7 +274,6 @@ func getReplicaServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, e
 	if err != nil {
 		return &corev1.Service{}, errors.Wrap(err, "parse port")
 	}
-
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        replicaName,
@@ -402,7 +401,6 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 }
 
 func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
-	fmt.Println("update annotations")
 	if cl.Spec.PGReplicas == nil {
 		return
 	}
@@ -423,7 +421,6 @@ func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment)
 }
 
 func UpdateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
-	fmt.Println("update labels")
 	if cl.Spec.PGReplicas == nil {
 		return
 	}
