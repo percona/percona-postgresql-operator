@@ -28,7 +28,7 @@ func Create(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
 			return errors.Wrapf(err, "create replica %s", replica.Name)
 		}
 	}
-	log.Println("Handle service update")
+
 	err := createOrUpdateReplicaService(clientset, cluster)
 	if err != nil {
 		return errors.Wrap(err, "handle replica service")
@@ -112,21 +112,15 @@ func getNewReplicaObject(cluster *crv1.PerconaPGCluster, replica *crv1.Pgreplica
 	if cluster.Spec.PGReplicas == nil {
 		return nil
 	}
-	labels := make(map[string]string)
-	labels[config.LABEL_PG_CLUSTER] = cluster.Name
-	labels[config.LABEL_NAME] = cluster.Name + "-repl" + strconv.Itoa(index)
-	labels["pgouser"] = "admin"
-	if cluster.Spec.PGReplicas.HotStandby.Labels != nil {
-		for k, v := range cluster.Spec.PGReplicas.HotStandby.Labels {
-			labels[k] = v
-		}
+	labels := map[string]string{
+		config.LABEL_PG_CLUSTER: cluster.Name,
+		config.LABEL_NAME:       cluster.Name + "-repl" + strconv.Itoa(index),
+		"pgouser":               "admin",
 	}
-	annotations := make(map[string]string)
-	if cluster.Spec.PGReplicas.HotStandby.Annotations != nil {
-		for k, v := range cluster.Spec.PGReplicas.HotStandby.Annotations {
-			annotations[k] = v
-		}
+	for k, v := range cluster.Spec.PGReplicas.HotStandby.Labels {
+		labels[k] = v
 	}
+
 	storage := crv1.PgStorageSpec{}
 	if cluster.Spec.PGReplicas.HotStandby.VolumeSpec != nil {
 		storageName := getReplicaName(cluster, index)
@@ -147,15 +141,16 @@ func getNewReplicaObject(cluster *crv1.PerconaPGCluster, replica *crv1.Pgreplica
 	replica.ObjectMeta.Name = labels[config.LABEL_NAME]
 	replica.ObjectMeta.Namespace = cluster.Namespace
 	if replica.ObjectMeta.Labels == nil {
-		replica.ObjectMeta.Labels = make(map[string]string)
-	}
-	for k, v := range labels {
-		replica.ObjectMeta.Labels[k] = v
+		replica.ObjectMeta.Labels = labels
+	} else {
+		for k, v := range labels {
+			replica.ObjectMeta.Labels[k] = v
+		}
 	}
 	if replica.ObjectMeta.Annotations == nil {
 		replica.ObjectMeta.Annotations = make(map[string]string)
 	}
-	for k, v := range annotations {
+	for k, v := range cluster.Spec.PGReplicas.HotStandby.Annotations {
 		replica.ObjectMeta.Annotations[k] = v
 	}
 	if cluster.Spec.PGReplicas.HotStandby.Affinity != nil {
@@ -181,16 +176,18 @@ func createOrUpdateReplicaService(clientset kubeapi.Interface, cluster *crv1.Per
 
 	oldSvc, err := clientset.CoreV1().Services(cluster.Namespace).Get(ctx, getReplicaServiceName(cluster.Name), metav1.GetOptions{})
 	if err != nil {
-		_, err = clientset.CoreV1().Services(cluster.Namespace).Create(ctx, &service, metav1.CreateOptions{})
+		_, err = clientset.CoreV1().Services(cluster.Namespace).Create(ctx, service, metav1.CreateOptions{})
 		if err != nil {
 			return errors.Wrap(err, "create replica service")
 		}
 		return nil
 	}
-
+	if reflect.DeepEqual(service.Spec, oldSvc.Spec) {
+		return nil
+	}
 	service.ResourceVersion = oldSvc.ResourceVersion
 	service.Spec.ClusterIP = oldSvc.Spec.ClusterIP
-	_, err = clientset.CoreV1().Services(cluster.Namespace).Update(ctx, &service, metav1.UpdateOptions{})
+	_, err = clientset.CoreV1().Services(cluster.Namespace).Update(ctx, service, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update replica service")
 	}
@@ -198,33 +195,27 @@ func createOrUpdateReplicaService(clientset kubeapi.Interface, cluster *crv1.Per
 	return nil
 }
 
-func getReplicaServiceObject(cluster *crv1.PerconaPGCluster) (corev1.Service, error) {
+func getReplicaServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, error) {
 	replicaName := getReplicaServiceName(cluster.Name)
 	labels := map[string]string{
 		"name":       replicaName,
 		"pg-cluster": cluster.Name,
 	}
-	if cluster.Spec.PGReplicas.HotStandby.Expose.Labels != nil {
-		for k, v := range cluster.Spec.PGReplicas.HotStandby.Expose.Labels {
-			labels[k] = v
-		}
+
+	for k, v := range cluster.Spec.PGReplicas.HotStandby.Expose.Labels {
+		labels[k] = v
 	}
-	annotations := make(map[string]string)
-	if cluster.Spec.PGReplicas.HotStandby.Expose.Annotations != nil {
-		for k, v := range cluster.Spec.PGReplicas.HotStandby.Expose.Annotations {
-			annotations[k] = v
-		}
-	}
+
 	port, err := strconv.Atoi(cluster.Spec.Port)
 	if err != nil {
-		return corev1.Service{}, errors.Wrap(err, "parse port")
+		return &corev1.Service{}, errors.Wrap(err, "parse port")
 	}
-	return corev1.Service{
+	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        replicaName,
 			Namespace:   cluster.Namespace,
 			Labels:      labels,
-			Annotations: annotations,
+			Annotations: cluster.Spec.PGReplicas.HotStandby.Expose.Annotations,
 		},
 		Spec: corev1.ServiceSpec{
 			Type: cluster.Spec.PGReplicas.HotStandby.Expose.ServiceType,
@@ -278,7 +269,6 @@ func UpdateResources(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) e
 }
 
 func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
-	fmt.Println("update annotations")
 	if cl.Spec.PGReplicas == nil {
 		return
 	}
@@ -299,7 +289,6 @@ func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment)
 }
 
 func UpdateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
-	fmt.Println("update labels")
 	if cl.Spec.PGReplicas == nil {
 		return
 	}

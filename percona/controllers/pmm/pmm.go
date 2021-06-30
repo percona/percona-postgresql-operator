@@ -62,7 +62,7 @@ func HandlePMMTemplate(template []byte, cluster *crv1.PerconaPGCluster) ([]byte,
 	}
 	pmmContainerBytes, err := GetPMMContainerJSON(cluster)
 	if err != nil {
-		errors.Wrap(err, "get pmm container json: %s")
+		return nil, errors.Wrap(err, "get pmm container json: %s")
 	}
 
 	return bytes.Replace(template, []byte("<pmmContainer>"), append([]byte(", "), pmmContainerBytes...), -1), nil

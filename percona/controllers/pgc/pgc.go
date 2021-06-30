@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -35,38 +36,38 @@ type Controller struct {
 	Queue                       workqueue.RateLimitingInterface
 	Informer                    informers.PerconaPGClusterInformer
 	PerconaPGClusterWorkerCount int
+	deploymentTemplateData      []byte
 }
 
 const (
 	deploymentTemplateName = "cluster-deployment.json"
 	templatePath           = "/"
+	defaultPGOVersion      = "0.1.0"
 )
 
 // onAdd is called when a pgcluster is added
 func (c *Controller) onAdd(obj interface{}) {
 	ctx := context.TODO()
 	key, err := cache.MetaNamespaceKeyFunc(obj)
-	if err == nil {
-		log.Debugf("percona cluster putting key in queue %s", key)
-		c.Queue.Add(key)
+	if err != nil {
+		log.Printf("get key %s", err)
 	}
+	log.Debugf("percona cluster putting key in queue %s", key)
 
+	c.Queue.Add(key)
+	defer c.Queue.Done(key)
 	newCluster := obj.(*crv1.PerconaPGCluster)
-	fmt.Println("My name is", newCluster.Name)
 
-	templateData, err := ioutil.ReadFile(templatePath + deploymentTemplateName)
+	templateData, err := pmm.HandlePMMTemplate(c.deploymentTemplateData, newCluster)
 	if err != nil {
-		fmt.Printf("new template data: %s", err)
-	}
-
-	templateData, err = pmm.HandlePMMTemplate(templateData, newCluster)
-	if err != nil {
-		fmt.Printf("handle pmm template data: %s", err)
+		log.Printf("handle pmm template data: %s", err)
+		return
 	}
 
 	t, err := template.New(deploymentTemplateName).Parse(string(templateData))
 	if err != nil {
-		fmt.Printf("new template: %s", err)
+		log.Errorf("new template: %s", err)
+		return
 	}
 
 	config.DeploymentTemplate = t
@@ -84,7 +85,7 @@ func (c *Controller) onAdd(obj interface{}) {
 			log.Errorf("create pgreplicas: %s", err)
 		}
 	}
-
+	c.Queue.Forget(key)
 }
 
 func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
@@ -101,7 +102,8 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 			metaAnnotations[k] = v
 		}
 	}
-	pgoVersion := "0.1.0"
+
+	pgoVersion := defaultPGOVersion
 	version, ok := pgc.Labels["pgo-version"]
 	if ok {
 		pgoVersion = version
@@ -134,8 +136,10 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 		}
 	}
 	syncReplication := false
+	replicas := ""
 	if pgc.Spec.PGReplicas != nil {
 		syncReplication = pgc.Spec.PGReplicas.HotStandby.EnableSyncStandby
+		replicas = strconv.Itoa(pgc.Spec.PGReplicas.HotStandby.Size)
 	}
 	cluster.Annotations = metaAnnotations
 	cluster.Labels = metaLabels
@@ -194,6 +198,7 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.UserLabels = pgc.Spec.UserLabels
 	cluster.Spec.SyncReplication = &syncReplication
 	cluster.Spec.UserLabels = userLabels
+	cluster.Spec.Replicas = replicas
 
 	return cluster
 }
@@ -204,10 +209,14 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 func (c *Controller) RunWorker(stopCh <-chan struct{}, doneCh chan<- struct{}) {
 	go c.waitForShutdown(stopCh)
 
-	go c.reconcileStatuses()
+	go c.reconcileStatuses(stopCh)
 
-	for c.processNextItem() {
+	deploymentTemplateData, err := ioutil.ReadFile(templatePath + deploymentTemplateName)
+	if err != nil {
+		log.Printf("new template data: %s", err)
+		return
 	}
+	c.deploymentTemplateData = deploymentTemplateData
 
 	log.Debug("perconapgcluster Contoller: worker queue has been shutdown, writing to the done channel")
 	doneCh <- struct{}{}
@@ -220,37 +229,19 @@ func (c *Controller) waitForShutdown(stopCh <-chan struct{}) {
 	log.Debug("perconapgcluster Contoller: received stop signal, worker queue told to shutdown")
 }
 
-func (c *Controller) processNextItem() bool {
-	// Wait until there is a new item in the working queue
-	key, quit := c.Queue.Get()
-	if quit {
-		return false
-	}
-
-	log.Debugf("working on %s", key.(string))
-	keyParts := strings.Split(key.(string), "/")
-	keyNamespace := keyParts[0]
-	keyResourceName := keyParts[1]
-
-	log.Debugf("cluster add queue got key ns=[%s] resource=[%s]", keyNamespace, keyResourceName)
-
-	// Tell the queue that we are done with processing this key. This unblocks the key for other workers
-	// This allows safe parallel processing because two pods with the same key are never processed in
-	// parallel.
-	defer c.Queue.Done(key)
-
-	return true
-}
-
-func (c *Controller) reconcileStatuses() {
-	fmt.Println("handle statuses")
+func (c *Controller) reconcileStatuses(stopCh <-chan struct{}) {
 	for {
-		err := c.handleStatuses()
-		if err != nil {
-			fmt.Printf("handle statuses: %s", err)
-			log.Error(errors.Wrap(err, "handle statuses"))
+		select {
+		case <-stopCh:
+			return
+		default:
+			err := c.handleStatuses()
+			if err != nil {
+				fmt.Printf("handle statuses: %s", err)
+				log.Error(errors.Wrap(err, "handle statuses"))
+			}
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -344,12 +335,12 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if err != nil {
 		log.Errorf("update pgreplicas: %s", err)
 	}
+
 }
 
 // onDelete is called when a pgcluster is deleted
 func (c *Controller) onDelete(obj interface{}) {
 	ctx := context.TODO()
-	fmt.Println("the type is:", reflect.TypeOf(obj))
 
 	// TODO: this object trick should be rework
 	clusterObj, ok := obj.(cache.DeletedFinalStateUnknown)
