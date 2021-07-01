@@ -6,8 +6,11 @@ metadata:
   generation: 1
   labels:
     crunchy-pgbouncer: "true"
+    crunchy-pgha-scope: some-name
+    deployment-name: some-name
     name: some-name-pgbouncer
     pg-cluster: some-name
+    pgouser: admin
     service-name: some-name-pgbouncer
     vendor: crunchydata
   name: some-name-pgbouncer
@@ -32,9 +35,12 @@ spec:
     metadata:
       labels:
         crunchy-pgbouncer: "true"
+        crunchy-pgha-scope: some-name
+        deployment-name: some-name
         name: some-name-pgbouncer
         pg-cluster: some-name
         pg-pod-anti-affinity: preferred
+        pgouser: admin
         service-name: some-name-pgbouncer
         vendor: crunchydata
     spec:

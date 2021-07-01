@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -136,10 +135,8 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 		}
 	}
 	syncReplication := false
-	replicas := ""
 	if pgc.Spec.PGReplicas != nil {
 		syncReplication = pgc.Spec.PGReplicas.HotStandby.EnableSyncStandby
-		replicas = strconv.Itoa(pgc.Spec.PGReplicas.HotStandby.Size)
 	}
 	cluster.Annotations = metaAnnotations
 	cluster.Labels = metaLabels
@@ -198,7 +195,6 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.UserLabels = pgc.Spec.UserLabels
 	cluster.Spec.SyncReplication = &syncReplication
 	cluster.Spec.UserLabels = userLabels
-	cluster.Spec.Replicas = replicas
 
 	return cluster
 }
@@ -325,6 +321,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		hash := fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
 		pgCluster.Annotations["pmm-sidecar"] = hash
 	}
+
 	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		log.Errorf("update pgcluster resource: %s", err)

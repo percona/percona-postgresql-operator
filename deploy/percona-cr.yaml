@@ -28,14 +28,14 @@ spec:
     pmmSecret: cluster1-pmm-secret
   pgReplicas:
     hotStandby:
-      size: 2
-      resources:
-        requests:
-          cpu: "1"
-          memory: "128Mi"
-        limits:
-          cpu: "1"
-          memory: "128Mi"
+      size: 0
+#      resources:
+#        requests:
+#          cpu: "1"
+#          memory: "128Mi"
+#        limits:
+#          cpu: "1"
+#          memory: "128Mi"
       volumeSpec: 
         accessmode: ReadWriteOnce
         matchLabels: ""
@@ -45,15 +45,15 @@ spec:
         supplementalgroups: ""
 #      affinity:
 #        default: null
-      labels:
-        pg-cluster-label: cluster1
-      annotations:
-        pg-cluster-annot: cluster1-1
+#      labels:
+#        pg-cluster-label: cluster1
+#      annotations:
+#        pg-cluster-annot: cluster1-1
 #      enableSyncStandby: false
       expose:
-        serviceType: LoadBalancer
+        serviceType: ClusterIP
 #        loadBalancerSourceRanges:
-        annotations:
-          pg-cluster-annot: cluster1
-        labels: 
-          pg-cluster-label: cluster1
+#        annotations:
+#          pg-cluster-annot: cluster1
+#        labels: 
+#          pg-cluster-label: cluster1

@@ -3,7 +3,6 @@ package replica
 import (
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 	"strconv"
 
@@ -96,7 +95,7 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 		}
 
 	}
-	log.Println("Handle service update")
+
 	err = createOrUpdateReplicaService(clientset, newCluster)
 	if err != nil {
 		return errors.Wrap(err, "handle replica service")

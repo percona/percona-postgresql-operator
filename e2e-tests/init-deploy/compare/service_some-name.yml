@@ -2,8 +2,11 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
+    crunchy-pgha-scope: some-name
+    deployment-name: some-name
     name: some-name
     pg-cluster: some-name
+    pgouser: admin
     vendor: crunchydata
   name: some-name
 spec:
