@@ -5,9 +5,12 @@ metadata:
     deployment.kubernetes.io/revision: "1"
   generation: 2
   labels:
+    crunchy-pgha-scope: some-name
+    deployment-name: some-name
     name: some-name-backrest-shared-repo
     pg-cluster: some-name
     pgo-backrest-repo: "true"
+    pgouser: admin
     service-name: some-name-backrest-shared-repo
     vendor: crunchydata
   name: some-name-backrest-shared-repo
@@ -33,10 +36,13 @@ spec:
       annotations:
         keep-data: "false"
       labels:
+        crunchy-pgha-scope: some-name
+        deployment-name: some-name
         name: some-name-backrest-shared-repo
         pg-cluster: some-name
         pg-pod-anti-affinity: preferred
         pgo-backrest-repo: "true"
+        pgouser: admin
         service-name: some-name-backrest-shared-repo
         vendor: crunchydata
     spec:
