@@ -31,6 +31,7 @@ type PerconaPGClusterSpec struct {
 	Standby            bool                 `json:"standby"`
 	TlSOnly            bool                 `json:"tlsOnly"`
 	DisableAutofail    bool                 `json:"disableAutofail"`
+	KeepData           bool                 `json:"keepData"`
 	PGPrimary          PGPrimary            `json:"pgPrimary"`
 	PGReplicas         *PGReplicas          `json:"pgReplicas"`
 	Badger             Badger               `json:"badger"`
@@ -112,13 +113,14 @@ type Resources struct {
 }
 
 type Backup struct {
-	Image          string             `json:"image"`
-	ServiceAccount string             `json:"serviceAccount"`
-	Resources      Resources          `json:"resources"`
-	VolumeSpec     *PgStorageSpec     `json:"volumeSpec"`
-	VerifyTLS      bool               `json:"verifyTLS"`
-	Storages       map[string]Storage `json:"storages"`
-	Schedule       []CronJob          `json:"schedule"`
+	Image             string             `json:"image"`
+	BackrestRepoImage string             `json:"backrestRepoImage"`
+	ServiceAccount    string             `json:"serviceAccount"`
+	Resources         Resources          `json:"resources"`
+	VolumeSpec        *PgStorageSpec     `json:"volumeSpec"`
+	VerifyTLS         bool               `json:"verifyTLS"`
+	Storages          map[string]Storage `json:"storages"`
+	Schedule          []CronJob          `json:"schedule"`
 }
 
 type Storage struct {

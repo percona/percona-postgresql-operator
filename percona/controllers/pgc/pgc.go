@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -21,8 +22,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
@@ -101,6 +100,11 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 			metaAnnotations[k] = v
 		}
 	}
+	specAnnotationsGlobal := make(map[string]string)
+	for k, v := range cluster.Spec.Annotations.Global {
+		specAnnotationsGlobal[k] = v
+	}
+	specAnnotationsGlobal["keep-data"] = strconv.FormatBool(pgc.Spec.KeepData)
 
 	pgoVersion := defaultPGOVersion
 	version, ok := pgc.Labels["pgo-version"]
@@ -120,23 +124,21 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 		"pgo-version":        pgoVersion,
 		"pgouser":            pgoUser,
 	}
-	if cluster.Labels != nil {
-		for k, v := range cluster.Labels {
-			metaLabels[k] = v
-		}
+
+	for k, v := range cluster.Labels {
+		metaLabels[k] = v
 	}
+	for k, v := range pgc.Labels {
+		metaLabels[k] = v
+	}
+
 	userLabels := make(map[string]string)
-	if pgc.Labels != nil {
-		for k, v := range pgc.Labels {
-			userLabels[k] = v
-		}
-		for k, v := range pgc.Spec.UserLabels {
-			userLabels[k] = v
-		}
+	for k, v := range pgc.Spec.UserLabels {
+		userLabels[k] = v
 	}
-	syncReplication := false
+	var syncReplication *bool
 	if pgc.Spec.PGReplicas != nil {
-		syncReplication = pgc.Spec.PGReplicas.HotStandby.EnableSyncStandby
+		syncReplication = &pgc.Spec.PGReplicas.HotStandby.EnableSyncStandby
 	}
 	cluster.Annotations = metaAnnotations
 	cluster.Labels = metaLabels
@@ -157,30 +159,22 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 		Size:        "1G",
 		StorageType: "dynamic",
 	}
-	cluster.Spec.BackrestResources = v1.ResourceList{
-		v1.ResourceMemory: resource.MustParse("48Mi"),
-	}
+
 	cluster.Spec.BackrestS3VerifyTLS = "true"
 	cluster.Spec.ClusterName = pgc.Name
 	cluster.Spec.PGImage = pgc.Spec.PGPrimary.Image
-	cluster.Spec.BackrestImage = "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest"
-	cluster.Spec.BackrestRepoImage = "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo"
+	cluster.Spec.BackrestImage = pgc.Spec.Backup.Image
+	cluster.Spec.BackrestRepoImage = pgc.Spec.Backup.BackrestRepoImage
+	cluster.Spec.BackrestResources = pgc.Spec.Backup.Resources.Requests
+	cluster.Spec.BackrestLimits = pgc.Spec.Backup.Resources.Limits
 	cluster.Spec.DisableAutofail = false
 	cluster.Spec.Name = pgc.Name
 	cluster.Spec.Database = pgc.Spec.Database
 	cluster.Spec.PGBadger = false
-	cluster.Spec.PgBouncer = crv1.PgBouncerSpec{
-		Image:    "perconalab/percona-postgresql-operator:main-ppg13-pgbouncer",
-		Replicas: 1,
-		Resources: v1.ResourceList{
-			v1.ResourceMemory: resource.MustParse("128Mi"),
-			v1.ResourceCPU:    resource.MustParse("1"),
-		},
-		Limits: v1.ResourceList{
-			v1.ResourceMemory: resource.MustParse("512Mi"),
-			v1.ResourceCPU:    resource.MustParse("2"),
-		},
-	}
+	cluster.Spec.PgBouncer.Image = pgc.Spec.PGBouncer.Image
+	cluster.Spec.PgBouncer.Replicas = pgc.Spec.PGBouncer.Size
+	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests
+	cluster.Spec.PgBouncer.Limits = pgc.Spec.PGBouncer.Resources.Limits
 	cluster.Spec.PGOImagePrefix = "perconalab/percona-postgresql-operator"
 	cluster.Spec.PodAntiAffinity = crv1.PodAntiAffinitySpec{
 		Default:    "preferred",
@@ -188,13 +182,14 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 		PgBouncer:  "preferred",
 	}
 	cluster.Spec.Port = pgc.Spec.Port
-	cluster.Spec.Resources = v1.ResourceList{
-		v1.ResourceMemory: resource.MustParse("128Mi"),
-	}
+	cluster.Spec.Resources = pgc.Spec.PGPrimary.Resources.Requests
+	cluster.Spec.Limits = pgc.Spec.PGPrimary.Resources.Limits
 	cluster.Spec.User = pgc.Spec.User
 	cluster.Spec.UserLabels = pgc.Spec.UserLabels
-	cluster.Spec.SyncReplication = &syncReplication
+	cluster.Spec.SyncReplication = syncReplication
 	cluster.Spec.UserLabels = userLabels
+	cluster.Spec.Annotations.Global = specAnnotationsGlobal
+	cluster.Spec.Tolerations = pgc.Spec.PGPrimary.Tolerations
 
 	return cluster
 }
@@ -266,6 +261,9 @@ func (c *Controller) handleStatuses() error {
 			if err != nil {
 				return errors.Wrap(err, "get pgCluster")
 			}
+			if reflect.DeepEqual(p.Status.PGCluster, pgCluster.Status) && reflect.DeepEqual(p.Status.PGReplicas, replStatuses) {
+				return nil
+			}
 			patch, err := json.Marshal(map[string]interface{}{
 				"status": crv1.PerconaPGClusterStatus{
 					PGCluster:  pgCluster.Status,
@@ -283,6 +281,7 @@ func (c *Controller) handleStatuses() error {
 			}
 		}
 	}
+
 	return nil
 }
 

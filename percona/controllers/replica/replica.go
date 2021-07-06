@@ -19,7 +19,9 @@ import (
 
 func Create(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-
+	if cluster.Spec.PGReplicas.HotStandby.Size == 0 {
+		return nil
+	}
 	for i := 1; i <= cluster.Spec.PGReplicas.HotStandby.Size; i++ {
 		replica := getNewReplicaObject(cluster, &crv1.Pgreplica{}, i)
 		_, err := clientset.CrunchydataV1().Pgreplicas(cluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
@@ -49,6 +51,17 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 	}
 	if oldCluster.Spec.PGReplicas != nil {
 		oldReplicaCount = oldCluster.Spec.PGReplicas.HotStandby.Size
+	}
+
+	if newReplicaCount > 0 {
+		err = createOrUpdateReplicaService(clientset, newCluster)
+		if err != nil {
+			return errors.Wrap(err, "handle replica service")
+		}
+	}
+
+	if oldReplicaCount == newReplicaCount {
+		return nil
 	}
 
 	if newReplicaCount == 0 {
@@ -96,10 +109,6 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 
 	}
 
-	err = createOrUpdateReplicaService(clientset, newCluster)
-	if err != nil {
-		return errors.Wrap(err, "handle replica service")
-	}
 	return nil
 }
 
