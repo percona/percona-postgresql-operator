@@ -234,12 +234,10 @@ apply_cluster() {
 		| yq w - 'spec.database' ${name} \
 		| yq w - 'spec.name' ${name} \
 		| yq w - 'spec.user' ${name} \
+		| yq w - 'spec.pgPrimary.image' ${IMAGE_PG_HA} \
+		| yq w - 'spec.backup.image' ${IMAGE_BACKREST} \
+		| yq w - 'spec.backup.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
 			>"${tmp_dir}/percona-cr.yaml"
-#		| yq w - 'spec.pgImage' ${IMAGE_PG_HA} \
-#		| yq w - 'spec.backrestImage' ${IMAGE_BACKREST} \
-#		| yq w - 'spec.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
-#		| yq w - 'spec.pgBadgerImage' ${IMAGE_PGBADGER} \
-#		| yq d - 'spec.pgBouncer' \
 
 
 	case ${podAntiAffinity} in
@@ -367,7 +365,7 @@ wait_deployment() {
 	set +o xtrace
 	retry=0
 	echo -n $name
-	until [ "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.readyReplicas}')" ]; do
+	until [ "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.availableReplicas}')" ]; do
 		sleep 1
 		echo -n .
 		let retry+=1

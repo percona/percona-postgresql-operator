@@ -33,6 +33,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-data: "false"
       labels:
         crunchy-pgbouncer: "true"
         crunchy-pgha-scope: some-name
