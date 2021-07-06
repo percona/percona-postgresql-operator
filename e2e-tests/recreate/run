@@ -14,7 +14,7 @@ kubectl_bin apply \
 	-f $conf_dir/${cluster}-secrets.yml \
 	-f $conf_dir/client.yml
 
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml"
 
 desc 'enabling pgbouncer'
 

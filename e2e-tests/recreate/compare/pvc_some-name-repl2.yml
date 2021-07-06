@@ -5,11 +5,7 @@ metadata:
     pv.kubernetes.io/bind-completed: "yes"
     pv.kubernetes.io/bound-by-controller: "yes"
   labels:
-    crunchy-pgha-scope: some-name
-    deployment-name: some-name
-    name: some-name
     pg-cluster: some-name
-    pgouser: admin
     vendor: crunchydata
   name: some-name-repl2
 spec:

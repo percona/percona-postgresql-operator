@@ -1,0 +1,165 @@
+Priority:     0
+Node:         gke-max-23890-default-pool-61907bb2-8lmh/10.156.15.212
+Start Time:   Mon, 05 Jul 2021 20:36:48 +0300
+Labels:       crunchy-pgha-scope=some-name
+              deployment-name=some-name
+              name=some-name
+              pg-cluster=some-name
+              pg-pod-anti-affinity=preferred
+              pgo-pg-database=true
+              pgo-version=0.1.0
+              pgouser=admin
+              pod-template-hash=6955f4ffb7
+              role=promoted
+              service-name=some-name
+              vendor=crunchydata
+Annotations:  keep-data: false
+              status:
+                {"conn_url":"postgres://10.8.20.98:5432/postgres","api_url":"http://10.8.20.98:8009/patroni","state":"starting","role":"replica","version"...
+Status:       Running
+IP:           10.8.20.98
+IPs:
+  IP:           10.8.20.98
+Controlled By:  ReplicaSet/some-name-6955f4ffb7
+Containers:
+  database:
+    Container ID:   docker://3f92b50a5273144e46a88c6f952481893c770266b70cc608bea657f63bb47a16
+    Image:          perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
+    Image ID:       docker-pullable://perconalab/percona-postgresql-operator@sha256:e7582ce70ce779405a35e1af4f3a24b237ac25022476fabdf0dcb60d813a4d88
+    Ports:          5432/TCP, 8009/TCP
+    Host Ports:     0/TCP, 0/TCP
+    State:          Running
+      Started:      Mon, 05 Jul 2021 20:37:06 +0300
+    Ready:          False
+    Restart Count:  0
+    Requests:
+      memory:   128Mi
+    Liveness:   exec [/opt/crunchy/bin/postgres-ha/health/pgha-liveness.sh] delay=30s timeout=10s period=15s #success=1 #failure=3
+    Readiness:  exec [/opt/crunchy/bin/postgres-ha/health/pgha-readiness.sh] delay=15s timeout=1s period=10s #success=1 #failure=3
+    Environment:
+      MODE:                               postgres
+      PGHA_PG_PORT:                       5432
+      PGHA_USER:                          postgres
+      PGHA_INIT:                          <set to the key 'init' of config map 'some-name-pgha-config'>  Optional: false
+      PATRONI_POSTGRESQL_DATA_DIR:        /pgdata/some-name
+      PGBACKREST_STANZA:                  db
+      PGBACKREST_REPO1_HOST:              some-name-backrest-shared-repo
+      BACKREST_SKIP_CREATE_STANZA:        true
+      PGHA_PGBACKREST:                    true
+      PGBACKREST_REPO1_PATH:              /backrestrepo/some-name-backrest-shared-repo
+      PGBACKREST_DB_PATH:                 /pgdata/some-name
+      ENABLE_SSHD:                        true
+      PGBACKREST_LOG_PATH:                /tmp
+      PGBACKREST_PG1_SOCKET_PATH:         /tmp
+      PGBACKREST_PG1_PORT:                5432
+      PGBACKREST_REPO1_TYPE:              posix
+      PGHA_PGBACKREST_LOCAL_S3_STORAGE:   false
+      PGHA_PGBACKREST_LOCAL_GCS_STORAGE:  false
+      PGHA_DATABASE:                      some-name
+      PGHA_REPLICA_REINIT_ON_START_FAIL:  true
+      PGHA_SYNC_REPLICATION:              false
+      PGHA_TLS_ENABLED:                   false
+      PGHA_TLS_ONLY:                      false
+      PGHA_PASSWORD_TYPE:
+      PGHA_STANDBY:                       false
+      PATRONI_KUBERNETES_NAMESPACE:       recreate-24302 (v1:metadata.namespace)
+      PATRONI_KUBERNETES_SCOPE_LABEL:     crunchy-pgha-scope
+      PATRONI_SCOPE:                       (v1:metadata.labels['crunchy-pgha-scope'])
+      PATRONI_KUBERNETES_LABELS:          {vendor: "crunchydata"}
+      PATRONI_LOG_LEVEL:                  INFO
+      PGHOST:                             /tmp
+      LD_PRELOAD:                         /usr/lib64/libnss_wrapper.so
+      NSS_WRAPPER_PASSWD:                 /tmp/nss_wrapper/postgres/passwd
+      NSS_WRAPPER_GROUP:                  /tmp/nss_wrapper/postgres/group
+    Mounts:
+      /dev/shm from dshm (rw)
+      /etc/pgbackrest/conf.d from pgbackrest-config (rw)
+      /etc/podinfo from podinfo (rw)
+      /etc/ssh from ssh-config (ro)
+      /pgconf from pgconf-volume (rw)
+      /pgconf/pgreplicator from primary-volume (rw)
+      /pgconf/pgsuper from root-volume (rw)
+      /pgconf/pguser from user-volume (rw)
+      /pgdata from pgdata (rw)
+      /sshd from sshd (ro)
+      /tmp from tmp (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from pgo-pg-token-rmqmp (ro)
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             False
+  ContainersReady   False
+  PodScheduled      True
+Volumes:
+  pgdata:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  some-name
+    ReadOnly:   false
+  user-volume:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  some-name-some-name-secret
+    Optional:    false
+  primary-volume:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  some-name-primaryuser-secret
+    Optional:    false
+  sshd:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  some-name-backrest-repo-config
+    Optional:    false
+  ssh-config:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  some-name-backrest-repo-config
+    Optional:    false
+  root-volume:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  some-name-postgres-secret
+    Optional:    false
+  report:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     Memory
+    SizeLimit:  64Mi
+  dshm:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     Memory
+    SizeLimit:  <unset>
+  tmp:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     Memory
+    SizeLimit:  16Mi
+  pgbackrest-config:
+    Type:                Projected (a volume that contains injected data from multiple sources)
+    ConfigMapName:       some-name-config-backrest
+    ConfigMapOptional:   0xc000a0b348
+    SecretName:          some-name-config-backrest
+    SecretOptionalName:  0xc000a0b349
+  pgconf-volume:
+    Type:               Projected (a volume that contains injected data from multiple sources)
+    ConfigMapName:      some-name-pgha-config
+    ConfigMapOptional:  0xc000a0b36d
+  podinfo:
+    Type:  DownwardAPI (a volume populated by information about the pod)
+    Items:
+      limits.cpu -> cpu_limit
+      requests.cpu -> cpu_request
+      limits.memory -> mem_limit
+      requests.memory -> mem_request
+      metadata.labels -> labels
+      metadata.annotations -> annotations
+  pgo-pg-token-rmqmp:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  pgo-pg-token-rmqmp
+    Optional:    false
+QoS Class:       Burstable
+Node-Selectors:  <none>
+Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                 node.kubernetes.io/unreachable:NoExecute for 300s
+Events:
+  Type     Reason                  Age                   From                                               Message
+  ----     ------                  ----                  ----                                               -------
+  Normal   Scheduled               5m                    default-scheduler                                  Successfully assigned recreate-24302/some-name-6955f4ffb7-zvvvp to gke-max-23890-default-pool-61907bb2-8lmh
+  Normal   SuccessfulAttachVolume  4m52s                 attachdetach-controller                            AttachVolume.Attach succeeded for volume "pvc-bdf17d71-f2a8-4ea7-bd52-24a55d87c493"
+  Normal   Pulled                  4m42s                 kubelet, gke-max-23890-default-pool-61907bb2-8lmh  Container image "perconalab/percona-postgresql-operator:main-ppg13-postgres-ha" already present on machine
+  Normal   Created                 4m42s                 kubelet, gke-max-23890-default-pool-61907bb2-8lmh  Created container database
+  Normal   Started                 4m42s                 kubelet, gke-max-23890-default-pool-61907bb2-8lmh  Started container database
+  Warning  Unhealthy               19s (x22 over 3m49s)  kubelet, gke-max-23890-default-pool-61907bb2-8lmh  Readiness probe failed:
