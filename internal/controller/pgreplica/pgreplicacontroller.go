@@ -18,7 +18,6 @@ limitations under the License.
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -227,7 +226,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if err != nil {
 		log.Errorf("update pgreplica deployment: %q", err.Error())
 	}
-	fmt.Println(deployment.Spec.Template.Annotations)
+
 	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		log.Errorf("could not update deployment for pgreplica: %q", err.Error())
 	}

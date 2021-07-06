@@ -191,19 +191,12 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PGOImagePrefix = "perconalab/percona-postgresql-operator"
 	if len(pgc.Spec.PGPrimary.AntiAffinityType) == 0 {
 		pgc.Spec.PGPrimary.AntiAffinityType = "preferred"
-	}
 	if len(pgc.Spec.Backup.AntiAffinityType) == 0 {
 		pgc.Spec.Backup.AntiAffinityType = "preferred"
 	}
 	if len(pgc.Spec.PGBouncer.AntiAffinityType) == 0 {
 		pgc.Spec.PGBouncer.AntiAffinityType = "preferred"
 	}
-	cluster.Spec.PodAntiAffinity = crv1.PodAntiAffinitySpec{
-		Default:    pgc.Spec.PGPrimary.AntiAffinityType,
-		PgBackRest: pgc.Spec.Backup.AntiAffinityType,
-		PgBouncer:  pgc.Spec.PGBouncer.AntiAffinityType,
-	}
-	cluster.Spec.Port = pgc.Spec.Port
 	cluster.Spec.Resources = pgc.Spec.PGPrimary.Resources.Requests
 	cluster.Spec.Limits = pgc.Spec.PGPrimary.Resources.Limits
 	cluster.Spec.User = pgc.Spec.User
@@ -403,6 +396,9 @@ func (c *Controller) handleStatuses() error {
 			if err != nil {
 				return errors.Wrap(err, "get pgCluster")
 			}
+			if reflect.DeepEqual(p.Status.PGCluster, pgCluster.Status) && reflect.DeepEqual(p.Status.PGReplicas, replStatuses) {
+				return nil
+			}
 			patch, err := json.Marshal(map[string]interface{}{
 				"status": crv1.PerconaPGClusterStatus{
 					PGCluster:  pgCluster.Status,
@@ -420,6 +416,7 @@ func (c *Controller) handleStatuses() error {
 			}
 		}
 	}
+
 	return nil
 }
 
