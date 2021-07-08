@@ -274,6 +274,7 @@ func getReplicaServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, e
 	if err != nil {
 		return &corev1.Service{}, errors.Wrap(err, "parse port")
 	}
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        replicaName,
@@ -400,7 +401,7 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 	return nil
 }
 
-func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+func updateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	if cl.Spec.PGReplicas == nil {
 		return
 	}
@@ -420,7 +421,7 @@ func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment)
 	return
 }
 
-func UpdateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+func updateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	if cl.Spec.PGReplicas == nil {
 		return
 	}
@@ -438,4 +439,33 @@ func UpdateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	}
 
 	return
+}
+
+func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) error {
+	ctx := context.TODO()
+	deployment, err := clientset.AppsV1().Deployments(replica.Namespace).Get(ctx,
+		replica.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "could not find deployment for pgreplica %s", replica.Name)
+
+	}
+	cl, err := clientset.CrunchydataV1().PerconaPGClusters(replica.Namespace).Get(ctx, replica.Spec.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrap(err, "get perconapgcluster resource")
+	}
+	updateAnnotations(cl, deployment)
+	updateLabels(cl, deployment)
+	err = pmm.AddPMMSidecar(cl, replica.Spec.ClusterName, deployment)
+	if err != nil {
+		return errors.Wrap(err, "add pmm resources: %s")
+	}
+	err = updateResources(cl, deployment)
+	if err != nil {
+		return errors.Wrap(err, "update replica resources resource: %s")
+	}
+	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)
+	}
+
+	return nil
 }

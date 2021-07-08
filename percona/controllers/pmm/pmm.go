@@ -43,13 +43,18 @@ func AddOrRemovePMMSidecar(cl *crv1.PerconaPGCluster, clusterName string, deploy
 
 func removePMMSidecar(deployment *appsv1.Deployment) {
 	// first, find the container entry in the list of containers and remove it
+	removed := false
 	containers := []v1.Container{}
 	for _, c := range deployment.Spec.Template.Spec.Containers {
 		// skip if this is the PMM container
 		if c.Name == pmmContainerName {
+			removed = true
 			continue
 		}
 		containers = append(containers, c)
+	}
+	if !removed {
+		return
 	}
 
 	deployment.Spec.Template.Spec.Containers = containers

@@ -430,7 +430,6 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if reflect.DeepEqual(oldCluster.Spec, newCluster.Spec) {
 		return
 	}
-
 	key, err := cache.MetaNamespaceKeyFunc(newObj)
 	if err == nil {
 		log.Debugf("percona cluster putting key in queue %s", key)
@@ -489,7 +488,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			log.Errorf("could not update deployment for pgcluster: %q", err.Error())
 		}
 	}
-
+	fmt.Println("update pgcluster resource")
 	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		log.Errorf("update pgcluster resource: %s", err)
