@@ -380,9 +380,13 @@ func (c *Controller) handleStatuses() error {
 	for _, n := range ns.Items {
 		perconaPGClusters, err := c.Client.CrunchydataV1().PerconaPGClusters(n.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
-			return errors.Wrap(err, "get percona clusters list")
+			return nil
 		}
 		for _, p := range perconaPGClusters.Items {
+			pgCluster, err := c.Client.CrunchydataV1().Pgclusters(n.Name).Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				return errors.Wrap(err, "get pgCluster")
+			}
 			replStatuses := make(map[string]crv1.PgreplicaStatus)
 			selector := config.LABEL_PG_CLUSTER + "=" + p.Name
 			pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(n.Name).List(ctx, metav1.ListOptions{LabelSelector: selector})
@@ -392,25 +396,21 @@ func (c *Controller) handleStatuses() error {
 			for _, repl := range pgReplicas.Items {
 				replStatuses[repl.Name] = repl.Status
 			}
-			pgCluster, err := c.Client.CrunchydataV1().Pgclusters(n.Name).Get(ctx, p.Name, metav1.GetOptions{})
-			if err != nil {
-				return errors.Wrap(err, "get pgCluster")
-			}
 			if reflect.DeepEqual(p.Status.PGCluster, pgCluster.Status) && reflect.DeepEqual(p.Status.PGReplicas, replStatuses) {
 				return nil
 			}
-			patch, err := json.Marshal(map[string]interface{}{
-				"status": crv1.PerconaPGClusterStatus{
-					PGCluster:  pgCluster.Status,
-					PGReplicas: replStatuses,
-				},
-			})
-			if err != nil {
-				return errors.Wrap(err, "marshal percona status")
+
+			value := crv1.PerconaPGClusterStatus{
+				PGCluster:  pgCluster.Status,
+				PGReplicas: replStatuses,
 			}
 
+			patch, err := kubeapi.NewJSONPatch().Replace("status")(value).Bytes()
+			if err != nil {
+				return errors.Wrap(err, "create patch bytes")
+			}
 			_, err = c.Client.CrunchydataV1().PerconaPGClusters(p.Namespace).
-				Patch(ctx, p.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+				Patch(ctx, p.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 			if err != nil {
 				return errors.Wrap(err, "patch percona status")
 			}
