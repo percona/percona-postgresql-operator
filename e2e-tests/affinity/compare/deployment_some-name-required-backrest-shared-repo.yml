@@ -30,6 +30,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-data: "false"
       labels:
         name: some-name-required-backrest-shared-repo
         pg-cluster: some-name-required
@@ -117,8 +119,11 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext:
-        fsGroup: 26
-        runAsNonRoot: true
+        fsGroup: 1001
+        supplementalGroups:
+          - 1001
+          - 1002
+          - 1003
       serviceAccount: pgo-default
       serviceAccountName: pgo-default
       terminationGracePeriodSeconds: 30
