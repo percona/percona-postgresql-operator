@@ -280,20 +280,16 @@ apply_cluster() {
 			;;
 		's3')
 			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' ${BUCKET} \
-				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
+				| yq w - 'spec.backrestS3Endpoint' 's3.amazonaws.com' \
 				| yq w - 'spec.backrestS3Region' 'us-east-1' \
-				| yq w - 'spec.backrestS3URIStyle' 'path' \
-				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
 				| yq w - 'spec.backrestStorageTypes[0]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		'local,s3')
 			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' ${BUCKET} \
-				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
+				| yq w - 'spec.backrestS3Endpoint' 's3.amazonaws.com' \
 				| yq w - 'spec.backrestS3Region' 'us-east-1' \
-				| yq w - 'spec.backrestS3URIStyle' 'path' \
-				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
 				| yq w - 'spec.backrestStorageTypes[0]' 'local' \
 				| yq w - 'spec.backrestStorageTypes[1]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"

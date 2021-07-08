@@ -47,9 +47,10 @@ function apply_configs {
 	local cluster=${1}
 
 	set +x
-	yq w $test_dir/conf/minio-gw-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
-		| yq w - 'data[aws-s3-ca.crt]' $(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.tls\.crt}') \
-		| yq w - 'data[gcs-key]' $(kubectl_bin get secret/minio-gw-gcs-secret -o jsonpath='{.data.credentials\.json}') \
+	yq w $test_dir/conf/backrest-repo-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
+		| yq w - 'data[aws-s3-key]' $(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_ACCESS_KEY_ID') \
+		| yq w - 'data[aws-s3-key-secret]' $(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_SECRET_ACCESS_KEY') \
+		| yq w - 'data[gcs-key]' $(yq r ${conf_dir}/cloud-secret-minio-gw.yml 'stringData."credentials.json"' | base64) \
 		| kubectl_bin apply -f -
 	set -x
 	yq r $test_dir/conf/custom-config.yml \
@@ -68,8 +69,6 @@ function main {
 	desc 'create first PSMDB cluster'
 	cluster="some-name-${RANDOM}"
 
-	deploy_miniogw
-
 	desc 'Testing backup/restore from s3'
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config"
@@ -77,10 +76,8 @@ function main {
 
 	kubectl_bin delete pgcluster/${cluster}
 	sleep 30
-
-	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
-		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
-		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://${BUCKET}/backrestrepo/${cluster}-backrest-shared-repo"
+	apply_configs ${cluster}
+	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --overrides='{"spec":{"containers":[{"image":"perconalab/awscli","name":"awscli","command":["/usr/bin/aws"],"args":["s3","rm","--recursive","'"s3://${BUCKET}/backrestrepo/${cluster}-backrest-shared-repo"'"],"env":[{"name":"AWS_ACCESS_KEY_ID","valueFrom":{"secretKeyRef":{"name":"'"${cluster}-backrest-repo-config"'","key":"aws-s3-key"}}},{"name":"AWS_SECRET_ACCESS_KEY","valueFrom":{"secretKeyRef":{"name":"'"${cluster}-backrest-repo-config"'","key":"aws-s3-key-secret"}}}]}]}}'
 
 	sleep 30
 
@@ -92,10 +89,7 @@ function main {
 	kubectl_bin delete pgcluster/${cluster}
 	sleep 30
 
-	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
-		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
-		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://${BUCKET}/backrestrepo/${cluster}-backrest-shared-repo"
-
+	gsutil rm -r gs://${BUCKET}/backrestrepo/${cluster}-backrest-shared-repo
 	sleep 30
 
 	desc 'Testing backup/restore from local'
@@ -112,11 +106,6 @@ function main {
 	prepare_n_restore ${cluster} "posix" "diff"
 
 	kubectl_bin delete pgcluster/${cluster}
-	sleep 30
-
-	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
-		/usr/bin/env AWS_ACCESS_KEY_ID=minio_root AWS_SECRET_ACCESS_KEY=minio_password AWS_DEFAULT_REGION=us-east-1 \
-		/usr/bin/aws --no-verify-ssl --endpoint-url https://minio-gateway-svc:9000 s3 rm --recursive "s3://${BUCKET}/backrestrepo/${cluster}-backrest-shared-repo"
 
 	sleep 30
 
