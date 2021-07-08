@@ -26,16 +26,16 @@ func UpdatePMMSidecar(clientset kubeapi.Interface, cluster *crv1.Pgcluster, depl
 		return errors.Wrap(err, "get perconapgcluster resource: %s")
 	}
 
-	return AddPMMSidecar(cl, cluster, deployment)
+	return AddPMMSidecar(cl, cluster.Name, deployment)
 }
 
-func AddPMMSidecar(cl *crv1.PerconaPGCluster, cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
+func AddPMMSidecar(cl *crv1.PerconaPGCluster, clusterName string, deployment *appsv1.Deployment) error {
 	removePMMSidecar(deployment)
 	if !cl.Spec.PMM.Enabled {
 		return nil
 	}
 	cl.Name = deployment.Name
-	container := GetPMMContainer(cl, cluster.Name)
+	container := GetPMMContainer(cl, clusterName)
 	deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, container)
 
 	return nil
@@ -43,14 +43,19 @@ func AddPMMSidecar(cl *crv1.PerconaPGCluster, cluster *crv1.Pgcluster, deploymen
 
 func removePMMSidecar(deployment *appsv1.Deployment) {
 	// first, find the container entry in the list of containers and remove it
+	removed := false
 	containers := []v1.Container{}
 	for _, c := range deployment.Spec.Template.Spec.Containers {
 		// skip if this is the PMM container
 		if c.Name == pmmContainerName {
+			removed = true
 			continue
 		}
 
 		containers = append(containers, c)
+	}
+	if !removed {
+		return
 	}
 
 	deployment.Spec.Template.Spec.Containers = containers
@@ -74,6 +79,7 @@ func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal container")
 	}
+
 	return b, nil
 }
 

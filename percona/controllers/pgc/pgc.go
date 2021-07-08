@@ -21,7 +21,6 @@ import (
 	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
@@ -295,6 +294,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if reflect.DeepEqual(oldCluster.Spec, newCluster.Spec) {
 		return
 	}
+	fmt.Println("updating started")
 	key, err := cache.MetaNamespaceKeyFunc(newObj)
 	if err == nil {
 		log.Debugf("percona cluster putting key in queue %s", key)
@@ -303,7 +303,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	keyParts := strings.Split(key, "/")
 	keyNamespace := keyParts[0]
-
+	fmt.Println("get old pgcluster resource")
 	oldPGCluster, err := c.Client.CrunchydataV1().Pgclusters(oldCluster.Namespace).Get(ctx, oldCluster.Name, metav1.GetOptions{})
 	if err != nil {
 		log.Errorf("get old pgcluster resource: %s", err)
@@ -313,25 +313,42 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	pgCluster := getPGCLuster(newCluster, oldPGCluster)
 
 	if oldCluster.Spec.PMM.Enabled != newCluster.Spec.PMM.Enabled {
-		if pgCluster.Annotations == nil {
-			pgCluster.Annotations = make(map[string]string)
+		if pgCluster.Spec.Annotations.Global == nil {
+			pgCluster.Spec.Annotations.Global = make(map[string]string)
 		}
 		pmmString := fmt.Sprintln(newCluster.Spec.PMM)
 		hash := fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
-		pgCluster.Annotations["pmm-sidecar"] = hash
+		pgCluster.Spec.Annotations.Global["pmm-sidecar"] = hash
 	}
-
+	fmt.Println("update pgcluster resource")
 	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		log.Errorf("update pgcluster resource: %s", err)
 		return
 	}
-
+	if !reflect.DeepEqual(oldCluster.Spec.PMM, newCluster.Spec.PMM) {
+		fmt.Println("get pgcluster deployment")
+		deployment, err := c.Client.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
+			pgCluster.Name, metav1.GetOptions{})
+		if err != nil {
+			log.Errorf("could not find instance for pgcluster: %q", err.Error())
+			return
+		}
+		fmt.Println("update pmm")
+		err = pmm.UpdatePMMSidecar(c.Client, pgCluster, deployment)
+		if err != nil {
+			log.Errorf("update pmm sidecar: %q", err.Error())
+		}
+		fmt.Println("update pmm deployment")
+		if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+			log.Errorf("could not update deployment for pgcluster: %q", err.Error())
+		}
+	}
+	fmt.Println("update replicas")
 	err = replica.Update(c.Client, newCluster, oldCluster)
 	if err != nil {
 		log.Errorf("update pgreplicas: %s", err)
 	}
-
 }
 
 // onDelete is called when a pgcluster is deleted
@@ -370,24 +387,4 @@ func (c *Controller) AddPerconaPGClusterEventHandler() {
 // WorkerCount returns the worker count for the controller
 func (c *Controller) WorkerCount() int {
 	return c.PerconaPGClusterWorkerCount
-}
-
-func UpdateDeployment(clientset kubeapi.Interface, cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
-	ctx := context.TODO()
-	cl, err := clientset.CrunchydataV1().PerconaPGClusters(cluster.Namespace).Get(ctx, cluster.Name, metav1.GetOptions{})
-	if err != nil {
-		return errors.Wrap(err, "get perconapgcluster resource: %s")
-	}
-	replica.UpdateAnnotations(cl, deployment)
-	replica.UpdateLabels(cl, deployment)
-	err = pmm.AddPMMSidecar(cl, cluster, deployment)
-	if err != nil {
-		return errors.Wrap(err, "add pmm resources: %s")
-	}
-	err = replica.UpdateResources(cl, deployment)
-	if err != nil {
-		return errors.Wrap(err, "update replica resources resource: %s")
-	}
-
-	return nil
 }

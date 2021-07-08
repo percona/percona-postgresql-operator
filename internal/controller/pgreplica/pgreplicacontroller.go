@@ -26,7 +26,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/operator"
 	clusteroperator "github.com/percona/percona-postgresql-operator/internal/operator/cluster"
 	"github.com/percona/percona-postgresql-operator/internal/util"
-	"github.com/percona/percona-postgresql-operator/percona/controllers/pgc"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
 
@@ -213,23 +212,6 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		if err != nil {
 			log.Errorf("ERROR updating pgreplica status: %s", err.Error())
 		}
-	}
-
-	// get the Deployment object associated with this instance
-	deployment, err := c.Client.AppsV1().Deployments(newPgreplica.Namespace).Get(ctx,
-		newPgreplica.Name, metav1.GetOptions{})
-	if err != nil {
-		log.Errorf("could not find instance for pgreplica: %q", err.Error())
-		return
-	}
-
-	err = pgc.UpdateDeployment(c.Client, cluster, deployment)
-	if err != nil {
-		log.Errorf("update pgreplica deployment: %q", err.Error())
-	}
-
-	if _, err := c.Client.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-		log.Errorf("could not update deployment for pgreplica: %q", err.Error())
 	}
 
 	// if the service type changed, updated on the instance

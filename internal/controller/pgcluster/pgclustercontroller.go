@@ -29,7 +29,6 @@ import (
 	clusteroperator "github.com/percona/percona-postgresql-operator/internal/operator/cluster"
 	"github.com/percona/percona-postgresql-operator/internal/operator/pvc"
 	"github.com/percona/percona-postgresql-operator/internal/util"
-	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
 
@@ -296,8 +295,6 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			log.Errorf("could not update pgbadger sidecar: %q", err.Error())
 		}
 	}
-
-	rollingUpdateFuncs = append(rollingUpdateFuncs, pmm.UpdatePMMSidecar)
 
 	// see if any of the resource values have changed for the database or exporter container,
 	// if so, update them

@@ -2,12 +2,14 @@ package replica
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"reflect"
 	"strconv"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	"github.com/pkg/errors"
@@ -36,11 +38,9 @@ func Create(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
 	}
 	return nil
 }
+
 func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	if reflect.DeepEqual(oldCluster.Spec.PGReplicas, newCluster.Spec.PGReplicas) {
-		return nil
-	}
 
 	oldReplicaCount := 0
 	newReplicaCount := 0
@@ -58,10 +58,6 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 		if err != nil {
 			return errors.Wrap(err, "handle replica service")
 		}
-	}
-
-	if oldReplicaCount == newReplicaCount {
-		return nil
 	}
 
 	if newReplicaCount == 0 {
@@ -96,17 +92,21 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 			continue
 		}
 		replica := getNewReplicaObject(newCluster, oldReplica, i)
-		if reflect.DeepEqual(newCluster.Spec.PGReplicas.HotStandby, oldCluster.Spec.PGReplicas.HotStandby) {
-			continue
-		}
 
 		replica.ResourceVersion = oldReplica.ResourceVersion
 		replica.Status = oldReplica.Status
+
+		err = updateDeployment(clientset, replica)
+		if err != nil {
+			return errors.Wrapf(err, "update replica deployment%s", replica.Name)
+		}
+		if reflect.DeepEqual(newCluster.Spec.PGReplicas.HotStandby, oldCluster.Spec.PGReplicas.HotStandby) {
+			continue
+		}
 		_, err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Update(ctx, replica, metav1.UpdateOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "update replica %s", replica.Name)
 		}
-
 	}
 
 	return nil
@@ -161,6 +161,11 @@ func getNewReplicaObject(cluster *crv1.PerconaPGCluster, replica *crv1.Pgreplica
 	for k, v := range cluster.Spec.PGReplicas.HotStandby.Annotations {
 		replica.ObjectMeta.Annotations[k] = v
 	}
+
+	pmmString := fmt.Sprintln(cluster.Spec.PMM)
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
+	replica.ObjectMeta.Annotations["pmm-sidecar"] = hash
+
 	if cluster.Spec.PGReplicas.HotStandby.Affinity != nil {
 		replica.Spec.NodeAffinity = cluster.Spec.PGReplicas.HotStandby.Affinity.NodeAffinity
 	}
@@ -218,6 +223,7 @@ func getReplicaServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, e
 	if err != nil {
 		return &corev1.Service{}, errors.Wrap(err, "parse port")
 	}
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        replicaName,
@@ -257,7 +263,7 @@ func getReplicaServiceName(clusterName string) string {
 	return fmt.Sprintf("%s-replica", clusterName)
 }
 
-func UpdateResources(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) error {
+func updateResources(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) error {
 	if cl.Spec.PGReplicas == nil {
 		return nil
 	}
@@ -273,10 +279,11 @@ func UpdateResources(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) e
 			deployment.Spec.Template.Spec.Containers[k].Resources.Requests = cl.Spec.PGReplicas.HotStandby.Resources.Requests
 		}
 	}
+
 	return nil
 }
 
-func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+func updateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	if cl.Spec.PGReplicas == nil {
 		return
 	}
@@ -296,7 +303,7 @@ func UpdateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment)
 	return
 }
 
-func UpdateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+func updateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	if cl.Spec.PGReplicas == nil {
 		return
 	}
@@ -314,4 +321,33 @@ func UpdateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	}
 
 	return
+}
+
+func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) error {
+	ctx := context.TODO()
+	deployment, err := clientset.AppsV1().Deployments(replica.Namespace).Get(ctx,
+		replica.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "could not find deployment for pgreplica %s", replica.Name)
+
+	}
+	cl, err := clientset.CrunchydataV1().PerconaPGClusters(replica.Namespace).Get(ctx, replica.Spec.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrap(err, "get perconapgcluster resource")
+	}
+	updateAnnotations(cl, deployment)
+	updateLabels(cl, deployment)
+	err = pmm.AddPMMSidecar(cl, replica.Spec.ClusterName, deployment)
+	if err != nil {
+		return errors.Wrap(err, "add pmm resources: %s")
+	}
+	err = updateResources(cl, deployment)
+	if err != nil {
+		return errors.Wrap(err, "update replica resources resource: %s")
+	}
+	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)
+	}
+
+	return nil
 }
