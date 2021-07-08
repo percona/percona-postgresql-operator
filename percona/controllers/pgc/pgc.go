@@ -363,7 +363,6 @@ func (c *Controller) reconcileStatuses() {
 		default:
 			err := c.handleStatuses()
 			if err != nil {
-				fmt.Printf("handle statuses: %s", err)
 				log.Error(errors.Wrap(err, "handle statuses"))
 			}
 			time.Sleep(5 * time.Second)
