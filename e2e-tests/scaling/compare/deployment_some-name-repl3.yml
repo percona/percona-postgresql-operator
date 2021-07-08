@@ -11,7 +11,6 @@ metadata:
     pg-cluster: some-name
     pgo-pg-database: "true"
     pgo-version: 0.1.0
-    pgouser: admin
     service-name: some-name-replica
     vendor: crunchydata
   name: some-name-repl3
@@ -32,6 +31,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-data: "false"
       labels:
         crunchy-pgha-scope: some-name
         deployment-name: some-name-repl3
@@ -40,7 +41,6 @@ spec:
         pg-pod-anti-affinity: preferred
         pgo-pg-database: "true"
         pgo-version: 0.1.0
-        pgouser: admin
         vendor: crunchydata
     spec:
       affinity:
