@@ -45,7 +45,8 @@ function prepare_n_restore {
 
 function apply_configs {
 	local cluster=${1}
-
+	ls ${conf_dir}/cloud-secret.yml
+	ls ${conf_dir}/cloud-secret-minio-gw.yml
 	set +x
 	yq w $test_dir/conf/backrest-repo-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
 		| yq w - 'data[aws-s3-key]' $(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_ACCESS_KEY_ID') \
