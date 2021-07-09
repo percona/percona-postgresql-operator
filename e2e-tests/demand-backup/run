@@ -45,12 +45,13 @@ function prepare_n_restore {
 
 function apply_configs {
 	local cluster=${1}
-	ls ${conf_dir}/cloud-secret.yml
-	ls ${conf_dir}/cloud-secret-minio-gw.yml
+	ls -alh ${conf_dir}/cloud-secret-minio-gw.yml
+	yq r ${conf_dir}/cloud-secret-minio-gw.yml 'stringData.MINIO_ROOT_USER'
 	set +x
 	yq w $test_dir/conf/backrest-repo-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
 		| yq w - 'data[aws-s3-key]' $(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_ACCESS_KEY_ID') \
 		| yq w - 'data[aws-s3-key-secret]' $(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_SECRET_ACCESS_KEY') \
+		| yq w - 'data[gcs-key]' $(yq r ${conf_dir}/cloud-secret-minio-gw.yml 'stringData."credentials.json"' | base64) \
 		| kubectl_bin apply -f -
 	set -x
 	yq r $test_dir/conf/custom-config.yml \
