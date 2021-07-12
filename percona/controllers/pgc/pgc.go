@@ -158,7 +158,6 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 		StorageType: "dynamic",
 	}
 
-	cluster.Spec.BackrestS3VerifyTLS = "true"
 	cluster.Spec.ClusterName = pgc.Name
 	cluster.Spec.PGImage = pgc.Spec.PGPrimary.Image
 	cluster.Spec.BackrestImage = pgc.Spec.Backup.Image
@@ -174,10 +173,19 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests
 	cluster.Spec.PgBouncer.Limits = pgc.Spec.PGBouncer.Resources.Limits
 	cluster.Spec.PGOImagePrefix = "perconalab/percona-postgresql-operator"
+	if len(pgc.Spec.PGPrimary.AntiAffinityType) == 0 {
+		pgc.Spec.PGPrimary.AntiAffinityType = "preferred"
+	}
+	if len(pgc.Spec.Backup.AntiAffinityType) == 0 {
+		pgc.Spec.Backup.AntiAffinityType = "preferred"
+	}
+	if len(pgc.Spec.PGBouncer.AntiAffinityType) == 0 {
+		pgc.Spec.PGBouncer.AntiAffinityType = "preferred"
+	}
 	cluster.Spec.PodAntiAffinity = crv1.PodAntiAffinitySpec{
-		Default:    "preferred",
-		PgBackRest: "preferred",
-		PgBouncer:  "preferred",
+		Default:    pgc.Spec.PGPrimary.AntiAffinityType,
+		PgBackRest: pgc.Spec.Backup.AntiAffinityType,
+		PgBouncer:  pgc.Spec.PGBouncer.AntiAffinityType,
 	}
 	cluster.Spec.Port = pgc.Spec.Port
 	cluster.Spec.Resources = pgc.Spec.PGPrimary.Resources.Requests
@@ -188,6 +196,18 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.UserLabels = userLabels
 	cluster.Spec.Annotations.Global = specAnnotationsGlobal
 	cluster.Spec.Tolerations = pgc.Spec.PGPrimary.Tolerations
+	s, ok := pgc.Spec.Backup.Storages["s3"]
+	if ok {
+		cluster.Spec.BackrestS3Bucket = s.Bucket
+		cluster.Spec.BackrestS3Endpoint = s.EndpointURL
+		cluster.Spec.BackrestS3Region = s.Region
+		cluster.Spec.BackrestS3URIStyle = s.URIStyle
+		cluster.Spec.BackrestS3VerifyTLS = strconv.FormatBool(s.VerifyTLS)
+	}
+	cluster.Spec.BackrestStorageTypes = pgc.Spec.Backup.StorageTypes
+	cluster.Spec.PGDataSource.Namespace = pgc.Spec.PGDataSource.Namespace
+	cluster.Spec.PGDataSource.RestoreFrom = pgc.Spec.PGDataSource.RestoreFrom
+	cluster.Spec.PGDataSource.RestoreOpts = pgc.Spec.PGDataSource.RestoreOpts
 
 	return cluster
 }
@@ -309,14 +329,18 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	}
 
 	pgCluster := getPGCLuster(newCluster, oldPGCluster)
-
+	var oldPMMHash, newPMMHash string
+	val, ok := oldPGCluster.Spec.Annotations.Global["pmm-sidecar"]
+	if ok {
+		oldPMMHash = val
+	}
 	if oldCluster.Spec.PMM.Enabled != newCluster.Spec.PMM.Enabled {
 		if pgCluster.Spec.Annotations.Global == nil {
 			pgCluster.Spec.Annotations.Global = make(map[string]string)
 		}
 		pmmString := fmt.Sprintln(newCluster.Spec.PMM)
-		hash := fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
-		pgCluster.Spec.Annotations.Global["pmm-sidecar"] = hash
+		newPMMHash = fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
+		pgCluster.Spec.Annotations.Global["pmm-sidecar"] = newPMMHash
 	}
 
 	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
@@ -324,7 +348,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		log.Errorf("update pgcluster resource: %s", err)
 		return
 	}
-	if !reflect.DeepEqual(oldCluster.Spec.PMM, newCluster.Spec.PMM) {
+	if oldPMMHash != newPMMHash {
 		deployment, err := c.Client.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
 			pgCluster.Name, metav1.GetOptions{})
 		if err != nil {
@@ -381,4 +405,13 @@ func (c *Controller) AddPerconaPGClusterEventHandler() {
 // WorkerCount returns the worker count for the controller
 func (c *Controller) WorkerCount() int {
 	return c.PerconaPGClusterWorkerCount
+}
+
+func GetPodAntiAffinity(cluster *crv1.Pgcluster, deploymentType crv1.PodAntiAffinityDeployment, podAntiAffinityType crv1.PodAntiAffinityType) string {
+	switch deploymentType {
+	case crv1.PodAntiAffinityDeploymentDefault:
+	case crv1.PodAntiAffinityDeploymentPgBouncer:
+	case crv1.PodAntiAffinityDeploymentPgBackRest:
+	}
+	return ""
 }

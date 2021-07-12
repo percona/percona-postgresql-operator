@@ -337,9 +337,9 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 	}
 	updateAnnotations(cl, deployment)
 	updateLabels(cl, deployment)
-	err = pmm.AddPMMSidecar(cl, replica.Spec.ClusterName, deployment)
+	err = pmm.AddOrRemovePMMSidecar(cl, replica.Spec.ClusterName, deployment)
 	if err != nil {
-		return errors.Wrap(err, "add pmm resources: %s")
+		return errors.Wrap(err, "add or remove pmm sidecar: %s")
 	}
 	err = updateResources(cl, deployment)
 	if err != nil {

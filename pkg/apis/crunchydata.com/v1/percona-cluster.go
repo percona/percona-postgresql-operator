@@ -58,14 +58,16 @@ type Badger struct {
 }
 
 type PgBouncer struct {
-	Image     string    `json:"image"`
-	Size      int32     `json:"size"`
-	Resources Resources `json:"resources"`
-	TLSSecret string    `json:"tlsSecret"`
-	Expose    Expose    `json:"expose"`
+	Image            string              `json:"image"`
+	Size             int32               `json:"size"`
+	Resources        Resources           `json:"resources"`
+	TLSSecret        string              `json:"tlsSecret"`
+	Expose           Expose              `json:"expose"`
+	AntiAffinityType PodAntiAffinityType `json:"antiAffinityType"`
 }
 
 type PGDataSource struct {
+	Namespace   string `json:"namespace"`
 	RestoreFrom string `json:"restoreFrom"`
 	RestoreOpts string `json:"restoreOpts"`
 }
@@ -78,6 +80,7 @@ type PGPrimary struct {
 	Labels             map[string]string    `json:"labels"`
 	Annotations        map[string]string    `json:"annotations"`
 	Affinity           v1.Affinity          `json:"affinity"`
+	AntiAffinityType   PodAntiAffinityType  `json:"antiAffinityType"`
 	ImagePullPolicy    string               `json:"imagePullPolicy"`
 	Tolerations        []v1.Toleration      `json:"tolerations"`
 	NodeSelector       string               `json:"nodeSelector"`
@@ -113,22 +116,25 @@ type Resources struct {
 }
 
 type Backup struct {
-	Image             string             `json:"image"`
-	BackrestRepoImage string             `json:"backrestRepoImage"`
-	ServiceAccount    string             `json:"serviceAccount"`
-	Resources         Resources          `json:"resources"`
-	VolumeSpec        *PgStorageSpec     `json:"volumeSpec"`
-	VerifyTLS         bool               `json:"verifyTLS"`
-	Storages          map[string]Storage `json:"storages"`
-	Schedule          []CronJob          `json:"schedule"`
+	Image             string                `json:"image"`
+	BackrestRepoImage string                `json:"backrestRepoImage"`
+	ServiceAccount    string                `json:"serviceAccount"`
+	Resources         Resources             `json:"resources"`
+	VolumeSpec        *PgStorageSpec        `json:"volumeSpec"`
+	Storages          map[string]Storage    `json:"storages"`
+	Schedule          []CronJob             `json:"schedule"`
+	StorageTypes      []BackrestStorageType `json:"storageTypes"`
+	AntiAffinityType  PodAntiAffinityType   `json:"antiAffinityType"`
 }
 
 type Storage struct {
 	Type        string `json:"type"`
 	Bucket      string `json:"bucket"`
 	Region      string `json:"region"`
-	EndpointUrl string `json:"endpointUrl"`
+	EndpointURL string `json:"endpointUrl"`
 	KeyType     string `json:"keyType"`
+	URIStyle    string `json:"uriStyle"`
+	VerifyTLS   bool   `json:"verifyTLS"`
 }
 
 type CronJob struct {
