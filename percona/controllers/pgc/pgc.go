@@ -406,12 +406,3 @@ func (c *Controller) AddPerconaPGClusterEventHandler() {
 func (c *Controller) WorkerCount() int {
 	return c.PerconaPGClusterWorkerCount
 }
-
-func GetPodAntiAffinity(cluster *crv1.Pgcluster, deploymentType crv1.PodAntiAffinityDeployment, podAntiAffinityType crv1.PodAntiAffinityType) string {
-	switch deploymentType {
-	case crv1.PodAntiAffinityDeploymentDefault:
-	case crv1.PodAntiAffinityDeploymentPgBouncer:
-	case crv1.PodAntiAffinityDeploymentPgBackRest:
-	}
-	return ""
-}
