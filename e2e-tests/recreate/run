@@ -38,7 +38,8 @@ for repl in $(seq 1 3); do
 done
 
 desc 'Restart the cluster'
-kubectl_bin patch "pgcluster/${cluster}" --type json -p '[{"op":"add","path":"/spec/annotations/global/keep-data","value":"true"}]'
+kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"add","path":"/spec/keepData","value":true}]'
+sleep 30
 for i in $(seq 1 3); do
     sleep 15
 	wait_deployment "${cluster}-repl${i}"
