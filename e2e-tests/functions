@@ -328,7 +328,7 @@ apply_cluster() {
 	if [[ ${restore_from} != "false" ]]; then
 		yq w "${tmp_dir}/percona-cr.yaml" 'spec.pgDataSource.restoreFrom' "${restore_from}" \
 			>"${tmp_dir}/cr.restore.yaml"
-		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
+		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/percona-cr.yaml"
 		if [[ ${restore_opts} != "false" ]]; then
 			yq w --style=single "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreOpts' "${restore_opts}" \
 				>"${tmp_dir}/cr.restore.yaml"
