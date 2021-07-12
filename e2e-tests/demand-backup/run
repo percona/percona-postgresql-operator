@@ -72,10 +72,10 @@ function main {
 
 	desc 'Testing backup/restore from s3'
 	apply_configs ${cluster}
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" "s3" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "s3" "incr"
 
-	kubectl_bin delete pgcluster/${cluster}
+	kubectl_bin delete perconapgcluster/${cluster}
 	sleep 30
 
 	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
@@ -86,15 +86,15 @@ function main {
 
 	desc 'Testing backup/restore from local'
 	apply_configs ${cluster}
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local" "${cluster}-custom-config"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" "local" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "posix" "full"
 
-	kubectl_bin delete pgcluster/${cluster}
+	kubectl_bin delete perconapgcluster/${cluster}
 	sleep 30
 
 	desc 'Testing backup/restore from local with storate hybrid storage'
 	apply_configs ${cluster}
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percna-cr.yaml" "local,s3" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "posix" "diff"
 
 	kubectl_bin delete pgcluster/${cluster}
@@ -108,7 +108,7 @@ function main {
 
 	desc 'Testing backup/restore from local with storate hybrid storage'
 	apply_configs ${cluster}
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" "local,s3" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "s3" "diff"
 
 	destroy ${namespace}

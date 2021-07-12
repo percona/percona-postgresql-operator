@@ -242,23 +242,23 @@ apply_cluster() {
 
 	case ${podAntiAffinity} in
 		'preferred')
-			yq w ${tmp_dir}/percona-cr.yaml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
-				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
-				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+			yq w ${tmp_dir}/percona-cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
 			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/percona-cr.yaml
 			;;
 		'required')
-			yq w ${tmp_dir}/percona-cr.yaml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
-				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
-				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+			yq w ${tmp_dir}/percona-cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
 			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/percona-cr.yaml
 			;;
 		'disabled')
-			yq w ${tmp_dir}/percona-cr.yaml 'spec.podAntiAffinity.default' ${podAntiAffinity} \
-				| yq w - 'spec.podAntiAffinity.pgBackRest' ${podAntiAffinity} \
-				| yq w - 'spec.podAntiAffinity.pgBouncer' ${podAntiAffinity} \
+			yq w ${tmp_dir}/percona-cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
 			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/percona-cr.yaml
 			;;
@@ -270,23 +270,23 @@ apply_cluster() {
 			yq w -i "${tmp_dir}/percona-cr.yaml" 'spec.backrestStorageTypes[0]' 'local'
 			;;
 		's3')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
-				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
-				| yq w - 'spec.backrestS3Region' 'us-east-1' \
-				| yq w - 'spec.backrestS3URIStyle' 'path' \
-				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
-				| yq w - 'spec.backrestStorageTypes[0]' 's3' \
+			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' "operator-testing" \
+				| yq w - 'spec.backup.storages[s3].endpointUrl' 'minio-gateway-svc:9000' \
+				| yq w - 'spec.backup.storages[s3].region' 'us-east-1' \
+				| yq w - 'spec.backup.storages[s3].uriStyle' 'path' \
+				| yq w - 'spec.backup.storages[s3].verifyTLS' 'false' \
+				| yq w - 'spec.backup.storageTypes[0]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
 		'local,s3')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
-				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
-				| yq w - 'spec.backrestS3Region' 'us-east-1' \
-				| yq w - 'spec.backrestS3URIStyle' 'path' \
-				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
-				| yq w - 'spec.backrestStorageTypes[0]' 'local' \
-				| yq w - 'spec.backrestStorageTypes[1]' 's3' \
+			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' "operator-testing" \
+				| yq w - 'spec.backup.storages[s3].endpointUrl' 'minio-gateway-svc:9000' \
+				| yq w - 'spec.backup.storages[s3].region' 'us-east-1' \
+				| yq w - 'spec.backup.storages[s3].uriStyle' 'path' \
+				| yq w - 'spec.backup.storages[s3].verifyTLS' 'false' \
+				| yq w - 'spec.backup.storageTypes[0]' 'local' \
+				| yq w - 'spec.backup.storageTypes[1]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
@@ -296,7 +296,7 @@ apply_cluster() {
 	if [[ ${restore_from} != "false" ]]; then
 		yq w "${tmp_dir}/percona-cr.yaml" 'spec.pgDataSource.restoreFrom' "${restore_from}" \
 			>"${tmp_dir}/cr.restore.yaml"
-		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
+		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/percona-cr.yaml"
 		if [[ ${restore_opts} != "false" ]]; then
 			yq w --style=single "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreOpts' "${restore_opts}" \
 				>"${tmp_dir}/cr.restore.yaml"

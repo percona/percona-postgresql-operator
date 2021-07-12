@@ -119,11 +119,8 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext:
-        fsGroup: 1001
-        supplementalGroups:
-          - 1001
-          - 1002
-          - 1003
+        fsGroup: 26
+        runAsNonRoot: true
       serviceAccount: pgo-default
       serviceAccountName: pgo-default
       terminationGracePeriodSeconds: 30
