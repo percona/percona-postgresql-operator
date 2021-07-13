@@ -102,7 +102,7 @@ function main {
 
 	desc 'Testing backup/restore from local with storage hybrid storage, posix'
 	apply_configs ${cluster}
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percna-cr.yaml" "local,s3" "${cluster}-custom-config"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" "local,s3" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "posix" "diff"
 
 	kubectl_bin delete perconapgcluster/${cluster}
