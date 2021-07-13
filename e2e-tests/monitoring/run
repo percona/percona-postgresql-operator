@@ -1,0 +1,108 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. ${test_dir}/../functions
+
+function get_metric_values() {
+	local metric=$1
+	local instance=$2
+	local user_pass=$3
+	local start=$($date -u "+%s" -d "-1 minute")
+	local end=$($date -u "+%s")
+	local endpoint=$(get_service_endpoint monitoring-service)
+
+	curl -s -k "https://${user_pass}@$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
+		| jq '.data.result[0].values[][1]' \
+		| grep '^"[0-9]'
+
+}
+
+function get_qan20_values() {
+	local instance=$1
+	local user_pass=$2
+	local start=$($date -u "+%Y-%m-%dT%H:%M:%S" -d "-30 minute")
+	local end=$($date -u "+%Y-%m-%dT%H:%M:%S")
+	local endpoint=$(get_service_endpoint monitoring-service)
+
+	cat >payload.json <<EOF
+{
+   "columns":[
+      "load",
+      "num_queries",
+      "query_time"
+   ],
+   "first_seen": false,
+   "group_by": "queryid",
+   "include_only_fields": [],
+   "keyword": "",
+   "labels": [
+       {
+           "key": "cluster",
+           "value": ["postgresql"]
+   }],
+   "limit": 10,
+   "offset": 0,
+   "order_by": "-load",
+   "main_metric": "load",
+   "period_start_from": "$($date -u -d '-12 hour' '+%Y-%m-%dT%H:%M:%S%:z')",
+   "period_start_to": "$($date -u '+%Y-%m-%dT%H:%M:%S%:z')"
+}
+EOF
+
+	curl -s -k -XPOST -d @payload.json "https://${user_pass}@$endpoint/v0/qan/GetReport" \
+		| jq '.rows[].sparkline'
+	rm -f payload.json
+}
+
+create_namespace $namespace
+deploy_operator
+deploy_helm $namespace
+
+desc 'create first PSMDB cluster'
+cluster="some-name"
+kubectl_bin apply \
+	-f $conf_dir/${cluster}-secrets.yml \
+	-f $conf_dir/client.yml
+
+desc 'install PMM Server'
+platform=kubernetes
+helm del --purge monitoring || :
+if [ ! -z "$OPENSHIFT" ]; then
+    platform=openshift
+    oc create sa pmm-server
+    oc adm policy add-scc-to-user privileged -z pmm-server
+    if [ -n "$OPERATOR_NS" ]; then
+        oc create clusterrolebinding pmm-pxc-operator-cluster-wide --clusterrole=percona-xtradb-cluster-operator --serviceaccount=$namespace:pmm-server
+        oc patch clusterrole/percona-xtradb-cluster-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' ${OPERATOR_NS:+-n $OPERATOR_NS}
+    else
+        oc create rolebinding pmm-pxc-operator-namespace-only --role percona-xtradb-cluster-operator --serviceaccount=$namespace:pmm-server
+        oc patch role/percona-xtradb-cluster-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]'
+    fi
+    retry 10 60 helm install monitoring --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-2.16.0.tgz
+else
+	helm install monitoring --set platform=$platform https://percona-charts.storage.googleapis.com/pmm-server-2.16.0.tgz
+fi
+
+spinup_pgcluster "${cluster}" "${test_dir}/conf/percona-cr.yaml"
+
+desc 'compare deployment'
+compare_kubectl "deployment/${cluster}"
+
+desc 'check metrics'
+get_metric_values node_boot_time_seconds $cluster admin:admin
+desc 'check qan20 metrics'
+get_qan20_values $cluster admin:admin
+
+if [[ -n "${OPENSHIFT}" ]]; then
+    oc adm policy remove-scc-from-user privileged -z pmm-server
+    if [ -n "$OPERATOR_NS" ]; then
+        oc delete clusterrolebinding pmm-pxc-operator-cluster-wide
+    else
+        oc delete rolebinding pmm-pxc-operator-namespace-only
+    fi
+fi
+helm delete monitoring
+destroy $namespace
