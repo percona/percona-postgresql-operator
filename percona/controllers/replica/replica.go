@@ -9,6 +9,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/operator/pvc"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
@@ -67,6 +68,16 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 			if err != nil {
 				return errors.Wrapf(err, "delete replica %s", replicaName)
 			}
+			if !newCluster.Spec.KeepData {
+				err = pvc.DeleteIfExists(clientset, replicaName, oldCluster.ObjectMeta.Namespace)
+				if err != nil {
+					return errors.Wrapf(err, "delete replica %s pvc", replicaName)
+				}
+			}
+		}
+		err = clientset.CoreV1().Services(newCluster.Namespace).Delete(ctx, getReplicaServiceName(newCluster.Name), metav1.DeleteOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "delete replicas service")
 		}
 		return nil
 	}
@@ -76,6 +87,12 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 			err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Delete(ctx, replicaName, metav1.DeleteOptions{})
 			if err != nil {
 				return errors.Wrapf(err, "delete replica %s", replicaName)
+			}
+			if !newCluster.Spec.KeepData {
+				err = pvc.DeleteIfExists(clientset, replicaName, oldCluster.ObjectMeta.Namespace)
+				if err != nil {
+					return errors.Wrapf(err, "delete replica %s pvc", replicaName)
+				}
 			}
 		}
 	}
