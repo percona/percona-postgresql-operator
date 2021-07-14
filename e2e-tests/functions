@@ -19,6 +19,8 @@ IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg13-pgbackrest"}
 IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg13-pgbackrest-repo"}
 IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg13-pgbadger"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
+BUCKET=${BUCKET:-"pg-operator-testing"}
+PGO_K8S_NAME=${PGO_K8S_NAME}
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
 date=$(which gdate || which date)
@@ -178,7 +180,7 @@ wait_job_completion() {
 
 	retry=0
 	set +o xtrace
-	until kubectl get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
+	until KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
 		sleep 1
 		echo -n .
 		let retry+=1
@@ -271,24 +273,33 @@ apply_cluster() {
 		'local')
 			yq w -i "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'local'
 			;;
+		'gcs')
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'gcs' \
+				| yq w - 'spec.backrestGCSBucket' ${BUCKET} \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
 		's3')
-			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
-				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' ${BUCKET} \
+				| yq w - 'spec.backrestS3Endpoint' 's3.amazonaws.com' \
 				| yq w - 'spec.backrestS3Region' 'us-east-1' \
-				| yq w - 'spec.backrestS3URIStyle' 'path' \
-				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
 				| yq w - 'spec.backrestStorageTypes[0]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		'local,s3')
-			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' "operator-testing" \
-				| yq w - 'spec.backrestS3Endpoint' 'minio-gateway-svc:9000' \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' ${BUCKET} \
+				| yq w - 'spec.backrestS3Endpoint' 's3.amazonaws.com' \
 				| yq w - 'spec.backrestS3Region' 'us-east-1' \
-				| yq w - 'spec.backrestS3URIStyle' 'path' \
-				| yq w --style=single - 'spec.backrestS3VerifyTLS' 'false' \
 				| yq w - 'spec.backrestStorageTypes[0]' 'local' \
 				| yq w - 'spec.backrestStorageTypes[1]' 's3' \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
+		'local,gcs')
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'local' \
+				| yq w - 'spec.backrestStorageTypes[1]' 'gcs' \
+				| yq w - 'spec.backrestGCSBucket' ${BUCKET} \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
@@ -319,7 +330,7 @@ kubectl_bin() {
 	local exit_status=0
 	local timeout=4
 	for i in $(seq 0 2); do
-		kubectl "$@" 1>"$LAST_OUT" 2>"$LAST_ERR"
+		KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl "$@" 1>"$LAST_OUT" 2>"$LAST_ERR"
 		exit_status=$?
 		[[ ${-/x/} != $- ]] && echo "--- $i stdout" | cat - "$LAST_OUT" >&$BASH_XTRACEFD
 		[[ ${-/x/} != $- ]] && echo "--- $i stderr" | cat - "$LAST_ERR" >&$BASH_XTRACEFD
