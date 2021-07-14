@@ -164,7 +164,7 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.BackrestRepoImage = pgc.Spec.Backup.BackrestRepoImage
 	cluster.Spec.BackrestResources = pgc.Spec.Backup.Resources.Requests
 	cluster.Spec.BackrestLimits = pgc.Spec.Backup.Resources.Limits
-	cluster.Spec.DisableAutofail = false
+	cluster.Spec.DisableAutofail = pgc.Spec.DisableAutofail
 	cluster.Spec.Name = pgc.Name
 	cluster.Spec.Database = pgc.Spec.Database
 	cluster.Spec.PGBadger = pgc.Spec.PGBadger.Enabled
@@ -210,6 +210,13 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PGDataSource.Namespace = pgc.Spec.PGDataSource.Namespace
 	cluster.Spec.PGDataSource.RestoreFrom = pgc.Spec.PGDataSource.RestoreFrom
 	cluster.Spec.PGDataSource.RestoreOpts = pgc.Spec.PGDataSource.RestoreOpts
+	cluster.Spec.ServiceType = pgc.Spec.PGPrimary.Expose.ServiceType
+	cluster.Spec.TLSOnly = pgc.Spec.TlSOnly
+	cluster.Spec.Standby = pgc.Spec.Standby
+	cluster.Spec.Shutdown = pgc.Spec.Pause
+	cluster.Spec.TablespaceMounts = pgc.Spec.TablespaceStorages
+	cluster.Spec.WALStorage = pgc.Spec.WalStorage
+	cluster.Spec.PGDataSource = pgc.Spec.PGDataSource
 
 	return cluster
 }
