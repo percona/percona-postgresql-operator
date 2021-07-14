@@ -131,8 +131,8 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName string) v1.Containe
 			},
 		},
 		Resources: v1.ResourceRequirements{
-			Limits:   pgc.Spec.PMM.Limits,
-			Requests: pgc.Spec.PMM.Resources,
+			Limits:   pgc.Spec.PMM.Resources.Limits,
+			Requests: pgc.Spec.PMM.Resources.Requests,
 		},
 		Env: []v1.EnvVar{
 			{
