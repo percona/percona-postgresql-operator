@@ -34,7 +34,7 @@ type PerconaPGClusterSpec struct {
 	KeepData           bool                 `json:"keepData"`
 	PGPrimary          PGPrimary            `json:"pgPrimary"`
 	PGReplicas         *PGReplicas          `json:"pgReplicas"`
-	Badger             Badger               `json:"badger"`
+	PGBadger           Badger               `json:"pgBadger"`
 	PGBouncer          PgBouncer            `json:"pgBouncer"`
 	PGDataSource       PGDataSource         `json:"pgDataSource"`
 	PMM                PMMSpec              `json:"pmm"`

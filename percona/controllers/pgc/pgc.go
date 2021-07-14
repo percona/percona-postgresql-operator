@@ -167,7 +167,9 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.DisableAutofail = false
 	cluster.Spec.Name = pgc.Name
 	cluster.Spec.Database = pgc.Spec.Database
-	cluster.Spec.PGBadger = false
+	cluster.Spec.PGBadger = pgc.Spec.PGBadger.Enabled
+	cluster.Spec.PGBadgerImage = pgc.Spec.PGBadger.Image
+	cluster.Spec.PGBadgerPort = strconv.Itoa(pgc.Spec.PGBadger.Port)
 	cluster.Spec.PgBouncer.Image = pgc.Spec.PGBouncer.Image
 	cluster.Spec.PgBouncer.Replicas = pgc.Spec.PGBouncer.Size
 	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests

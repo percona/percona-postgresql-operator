@@ -78,3 +78,7 @@ spec:
 #          pg-cluster-annot: cluster1
 #        labels: 
 #          pg-cluster-label: cluster1
+#  pgBadger:
+#    enabled: false
+#    image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
+#    port: 1111
