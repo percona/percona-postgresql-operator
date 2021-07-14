@@ -84,6 +84,16 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 			if err != nil {
 				return errors.Wrapf(err, "delete replica %s", getReplicaName(oldCluster, i))
 			}
+			if !newCluster.Spec.KeepData {
+				err = pvc.DeleteIfExists(clientset, replicaName, oldCluster.ObjectMeta.Namespace)
+				if err != nil {
+					return errors.Wrapf(err, "delete replica %s pvc", replicaName)
+				}
+			}
+		}
+		err = clientset.CoreV1().Services(newCluster.Namespace).Delete(ctx, getReplicaServiceName(newCluster.Name), metav1.DeleteOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "delete replicas service")
 		}
 		err = clientset.CoreV1().Services(newCluster.Namespace).Delete(ctx, getReplicaServiceName(newCluster.Name), metav1.DeleteOptions{})
 		if err != nil {
@@ -96,6 +106,12 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 			err = deleteReplica(clientset, oldCluster, newCluster, i)
 			if err != nil {
 				return errors.Wrapf(err, "delete replica %s", getReplicaName(oldCluster, i))
+			}
+			if !newCluster.Spec.KeepData {
+				err = pvc.DeleteIfExists(clientset, replicaName, oldCluster.ObjectMeta.Namespace)
+				if err != nil {
+					return errors.Wrapf(err, "delete replica %s pvc", replicaName)
+				}
 			}
 		}
 	}
