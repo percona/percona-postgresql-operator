@@ -35,7 +35,11 @@ void pushArtifactFile(String FILE_NAME) {
         """
     }
 }
-
+void installRpms() {
+    sh '''
+        sudo yum install -y jq | true
+    '''
+}
 void popArtifactFile(String FILE_NAME) {
     echo "Try to get $FILE_NAME file from S3!"
 
@@ -142,6 +146,7 @@ pipeline {
                         }
                     }
                 }
+                installRpms()
                 sh '''
                     if [ ! -d $HOME/google-cloud-sdk/bin ]; then
                         rm -rf $HOME/google-cloud-sdk
