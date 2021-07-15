@@ -21,6 +21,7 @@ IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg13-pgbadger"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 BUCKET=${BUCKET:-"pg-operator-testing"}
 PGO_K8S_NAME=${PGO_K8S_NAME}
+
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
 date=$(which gdate || which date)

@@ -107,6 +107,7 @@ if ( env.CHANGE_URL ) {
 
 pipeline {
     environment {
+        CLEAN_NAMESPACE = 1
         CLOUDSDK_CORE_DISABLE_PROMPTS = 1
         GIT_SHORT_COMMIT = sh(script: 'git describe --always --dirty', , returnStdout: true).trim()
         VERSION = "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}"
