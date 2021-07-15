@@ -16,6 +16,12 @@ spec:
   namespace: pgo
   port: "5432"
   user: pguser
+#  disableAutofail: false
+#  tlsOnly: false
+#  standby: false
+#  pause: false
+#  tablespaceStorage:
+#  walStorage:
   userLabels:
     pgo-version: "0.1.0"
   pgPrimary:
@@ -44,6 +50,19 @@ spec:
         requests:
           memory: "48Mi"
         limits: {}
+#    volumeSpec:
+#      size: "1G"
+#      accessmode: ReadWriteOnce
+#      storagetype: dynamic
+#    storages:
+#      s3:
+#        endpointUrl: minio-gateway-svc:9000
+#        region: us-east-1
+#        uriStyle: path
+#        verifyTLS: false
+#    storageTypes: [
+#      "s3"
+#    ]      
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
     size: 1
@@ -66,11 +85,8 @@ spec:
 #          memory: "128Mi"
       volumeSpec: 
         accessmode: ReadWriteOnce
-        matchLabels: ""
         size: 1G
-        storageclass: ""
         storagetype: dynamic
-        supplementalgroups: ""
 #      affinity:
 #        default: null
 #      labels:
