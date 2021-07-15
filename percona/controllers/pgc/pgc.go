@@ -17,11 +17,13 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controllers/replica"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
-	"github.com/pkg/errors"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -67,6 +69,12 @@ func (c *Controller) onAdd(obj interface{}) {
 	}
 
 	config.DeploymentTemplate = t
+
+	err = createOrUpdatePrimaryService(c.Client, newCluster)
+	if err != nil {
+		log.Errorf("handle primary service on create")
+		return
+	}
 
 	cluster := getPGCLuster(newCluster, &crv1.Pgcluster{})
 
@@ -331,6 +339,14 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	keyParts := strings.Split(key, "/")
 	keyNamespace := keyParts[0]
 
+	if !reflect.DeepEqual(oldCluster.Spec.PGPrimary.Expose, newCluster.Spec.PGPrimary.Expose) {
+		err = createOrUpdatePrimaryService(c.Client, newCluster)
+		if err != nil {
+			log.Errorf("handle primary service on update")
+			return
+		}
+	}
+
 	oldPGCluster, err := c.Client.CrunchydataV1().Pgclusters(oldCluster.Namespace).Get(ctx, oldCluster.Name, metav1.GetOptions{})
 	if err != nil {
 		log.Errorf("get old pgcluster resource: %s", err)
@@ -414,4 +430,84 @@ func (c *Controller) AddPerconaPGClusterEventHandler() {
 // WorkerCount returns the worker count for the controller
 func (c *Controller) WorkerCount() int {
 	return c.PerconaPGClusterWorkerCount
+}
+
+func createOrUpdatePrimaryService(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	service, err := getPrimaryServiceObject(cluster)
+	if err != nil {
+		return errors.Wrap(err, "get primary service object")
+	}
+
+	oldSvc, err := clientset.CoreV1().Services(cluster.Namespace).Get(ctx, cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		_, err = clientset.CoreV1().Services(cluster.Namespace).Create(ctx, service, metav1.CreateOptions{})
+		if err != nil {
+			return errors.Wrap(err, "create primary service")
+		}
+		return nil
+	}
+	if reflect.DeepEqual(service.Spec, oldSvc.Spec) {
+		return nil
+	}
+	service.ResourceVersion = oldSvc.ResourceVersion
+	service.Spec.ClusterIP = oldSvc.Spec.ClusterIP
+	_, err = clientset.CoreV1().Services(cluster.Namespace).Update(ctx, service, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update primary service")
+	}
+
+	return nil
+}
+
+func getPrimaryServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, error) {
+
+	labels := map[string]string{
+		"name":       cluster.Name,
+		"pg-cluster": cluster.Name,
+	}
+
+	for k, v := range cluster.Spec.PGPrimary.Expose.Labels {
+		labels[k] = v
+	}
+
+	port, err := strconv.Atoi(cluster.Spec.Port)
+	if err != nil {
+		return &corev1.Service{}, errors.Wrap(err, "parse port")
+	}
+	svcType := corev1.ServiceTypeClusterIP
+	if len(cluster.Spec.PGPrimary.Expose.ServiceType) > 0 {
+		svcType = cluster.Spec.PGPrimary.Expose.ServiceType
+	}
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        cluster.Name,
+			Namespace:   cluster.Namespace,
+			Labels:      labels,
+			Annotations: cluster.Spec.PGPrimary.Expose.Annotations,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: svcType,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "sshd",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       2022,
+					TargetPort: intstr.FromInt(2022),
+				},
+				{
+					Name:       "postgres",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       int32(port),
+					TargetPort: intstr.FromInt(port),
+				},
+			},
+			Selector: map[string]string{
+				"pg-cluster": cluster.Name,
+				"role":       "master",
+			},
+			SessionAffinity:          corev1.ServiceAffinityNone,
+			LoadBalancerSourceRanges: cluster.Spec.PGPrimary.Expose.LoadBalancerSourceRanges,
+		},
+	}, nil
 }

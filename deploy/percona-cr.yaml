@@ -24,6 +24,13 @@ spec:
         requests:
           memory: "128Mi"
     tolerations: []
+#    expose:
+#      serviceType: ClusterIP
+#      loadBalancerSourceRanges:
+#      annotations:
+#        pg-cluster-annot: cluster1
+#      labels: 
+#        pg-cluster-label: cluster1
   pmm:
     enabled: false
     image: percona/pmm-client:2.15.1
