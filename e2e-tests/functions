@@ -279,6 +279,14 @@ apply_cluster() {
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
+		'gcs+'*)
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'gcs' \
+				| yq w - 'spec.backrestGCSBucket' ${BUCKET} \
+				| yq w - 'spec.backrestRepoPath' "/backrestrepo/${backup//'gcs+'/}-backrest-shared-repo" \
+				| yq w - 'spec.standby' true \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
 		's3')
 			yq w "${tmp_dir}/cr.yaml" 'spec.backrestS3Bucket' ${BUCKET} \
 				| yq w - 'spec.backrestS3Endpoint' 's3.amazonaws.com' \
@@ -493,9 +501,11 @@ spinup_pgcluster() {
 
 	desc 'create fresh PG cluster'
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity}
-
 	wait_deployment "${cluster}-backrest-shared-repo"
 	wait_deployment "${cluster}"
+	# Exiting since we are running cluster in stanby mode
+	[[ ${backup} == 'gcs+'* ]] && return
+
 	wait_job_completion "${cluster}-stanza-create" 'false'
 	wait_job_completion "backrest-backup-${cluster}"
 
