@@ -4,7 +4,6 @@ metadata:
   labels:
     name: some-name
     pg-cluster: some-name
-    vendor: crunchydata
   name: some-name
 spec:
   ports:

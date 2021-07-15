@@ -2,15 +2,15 @@ apiVersion: crunchydata.com/v1
 kind: PerconaPGCluster
 metadata:
   annotations:
-    current-primary: cluster1
+    current-primary: some-name
   labels:
-    crunchy-pgha-scope: cluster1
-    deployment-name: cluster1
-    name: cluster1
-    pg-cluster: cluster1
+    crunchy-pgha-scope: some-name
+    deployment-name: some-name
+    name: some-name
+    pg-cluster: some-name
     pgo-version: 0.1.0
     pgouser: admin
-  name: cluster1
+  name: some-name
 spec:
   database: pgdb
   namespace: pgo
@@ -59,11 +59,8 @@ spec:
 #          memory: "128Mi"
       volumeSpec: 
         accessmode: ReadWriteOnce
-        matchLabels: ""
         size: 1G
-        storageclass: ""
         storagetype: dynamic
-        supplementalgroups: ""
 #      affinity:
 #        default: null
 #      labels:

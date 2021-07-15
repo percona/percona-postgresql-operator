@@ -2,8 +2,6 @@ package pgc
 
 import (
 	"context"
-	"crypto/md5"
-	"fmt"
 	"io/ioutil"
 	"reflect"
 	"strconv"
@@ -150,22 +148,9 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Labels = metaLabels
 	cluster.Name = pgc.Name
 	cluster.Namespace = pgc.Namespace
-	cluster.Spec.BackrestStorage = crv1.PgStorageSpec{
-		AccessMode:  "ReadWriteOnce",
-		Size:        "1G",
-		StorageType: "dynamic",
-	}
-	cluster.Spec.PrimaryStorage = crv1.PgStorageSpec{
-		AccessMode:  "ReadWriteOnce",
-		Size:        "1G",
-		StorageType: "dynamic",
-	}
-	cluster.Spec.ReplicaStorage = crv1.PgStorageSpec{
-		AccessMode:  "ReadWriteOnce",
-		Size:        "1G",
-		StorageType: "dynamic",
-	}
-
+	cluster.Spec.BackrestStorage = getStorage(pgc.Spec.Backup.VolumeSpec)
+	cluster.Spec.PrimaryStorage = getStorage(pgc.Spec.PGPrimary.VolumeSpec)
+	cluster.Spec.ReplicaStorage = getStorage(pgc.Spec.PGReplicas.HotStandby.VolumeSpec)
 	cluster.Spec.ClusterName = pgc.Name
 	cluster.Spec.PGImage = pgc.Spec.PGPrimary.Image
 	cluster.Spec.BackrestImage = pgc.Spec.Backup.Image
@@ -227,6 +212,36 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PGDataSource = pgc.Spec.PGDataSource
 
 	return cluster
+}
+
+func getStorage(storageSpec *crv1.PgStorageSpec) crv1.PgStorageSpec {
+	newStorage := crv1.PgStorageSpec{
+		AccessMode:  "ReadWriteOnce",
+		Size:        "1G",
+		StorageType: "dynamic",
+	}
+	if storageSpec == nil {
+		return newStorage
+	}
+
+	if len(storageSpec.AccessMode) > 0 {
+		newStorage.AccessMode = storageSpec.AccessMode
+	}
+
+	if len(storageSpec.Size) > 0 {
+		newStorage.Size = storageSpec.Size
+	}
+
+	if len(storageSpec.StorageType) > 0 {
+		newStorage.StorageType = storageSpec.StorageType
+	}
+
+	newStorage.Name = storageSpec.Name
+	newStorage.StorageClass = storageSpec.StorageClass
+	newStorage.SupplementalGroups = storageSpec.SupplementalGroups
+	newStorage.MatchLabels = storageSpec.MatchLabels
+
+	return newStorage
 }
 
 // RunWorker is a long-running function that will continually call the
@@ -354,26 +369,13 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	}
 
 	pgCluster := getPGCLuster(newCluster, oldPGCluster)
-	var oldPMMHash, newPMMHash string
-	val, ok := oldPGCluster.Spec.Annotations.Global["pmm-sidecar"]
-	if ok {
-		oldPMMHash = val
-	}
-	if oldCluster.Spec.PMM.Enabled != newCluster.Spec.PMM.Enabled {
-		if pgCluster.Spec.Annotations.Global == nil {
-			pgCluster.Spec.Annotations.Global = make(map[string]string)
-		}
-		pmmString := fmt.Sprintln(newCluster.Spec.PMM)
-		newPMMHash = fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
-		pgCluster.Spec.Annotations.Global["pmm-sidecar"] = newPMMHash
+
+	err = replica.Update(c.Client, newCluster, oldCluster)
+	if err != nil {
+		log.Errorf("update pgreplicas: %s", err)
 	}
 
-	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
-	if err != nil {
-		log.Errorf("update pgcluster resource: %s", err)
-		return
-	}
-	if oldPMMHash != newPMMHash {
+	if !reflect.DeepEqual(oldCluster.Spec.PMM, newCluster.Spec.PMM) {
 		deployment, err := c.Client.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
 			pgCluster.Name, metav1.GetOptions{})
 		if err != nil {
@@ -388,9 +390,11 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			log.Errorf("could not update deployment for pgcluster: %q", err.Error())
 		}
 	}
-	err = replica.Update(c.Client, newCluster, oldCluster)
+
+	_, err = c.Client.CrunchydataV1().Pgclusters(keyNamespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
-		log.Errorf("update pgreplicas: %s", err)
+		log.Errorf("update pgcluster resource: %s", err)
+		return
 	}
 }
 

@@ -68,20 +68,20 @@ type PGDataSource struct {
 }
 
 type PGPrimary struct {
-	Image              string               `json:"image"`
-	Customconfig       string               `json:"customconfig"`
-	Resources          Resources            `json:"resources"`
-	VolumeSpec         PerconaPgStorageSpec `json:"volumeSpec"`
-	Labels             map[string]string    `json:"labels"`
-	Annotations        map[string]string    `json:"annotations"`
-	Affinity           v1.Affinity          `json:"affinity"`
-	AntiAffinityType   PodAntiAffinityType  `json:"antiAffinityType"`
-	ImagePullPolicy    string               `json:"imagePullPolicy"`
-	Tolerations        []v1.Toleration      `json:"tolerations"`
-	NodeSelector       string               `json:"nodeSelector"`
-	RuntimeClassName   string               `json:"runtimeClassName"`
-	PodSecurityContext string               `json:"podSecurityContext"`
-	Expose             Expose               `json:"expose"`
+	Image              string              `json:"image"`
+	Customconfig       string              `json:"customconfig"`
+	Resources          Resources           `json:"resources"`
+	VolumeSpec         *PgStorageSpec      `json:"volumeSpec"`
+	Labels             map[string]string   `json:"labels"`
+	Annotations        map[string]string   `json:"annotations"`
+	Affinity           v1.Affinity         `json:"affinity"`
+	AntiAffinityType   PodAntiAffinityType `json:"antiAffinityType"`
+	ImagePullPolicy    string              `json:"imagePullPolicy"`
+	Tolerations        []v1.Toleration     `json:"tolerations"`
+	NodeSelector       string              `json:"nodeSelector"`
+	RuntimeClassName   string              `json:"runtimeClassName"`
+	PodSecurityContext string              `json:"podSecurityContext"`
+	Expose             Expose              `json:"expose"`
 }
 
 type PGReplicas struct {
@@ -138,17 +138,6 @@ type CronJob struct {
 	Keep     int64  `json:"keep"`
 	Type     string `json:"type"`
 	Storage  string `json:"storage"`
-}
-
-// PerconaPgStorageSpec ...
-type PerconaPgStorageSpec struct {
-	Name               string `json:"name"`
-	StorageClass       string `json:"storageclass"`
-	AccessMode         string `json:"accessmode"`
-	Size               string `json:"size"`
-	StorageType        string `json:"storagetype"`
-	SupplementalGroups string `json:"supplementalgroups"`
-	MatchLabels        string `json:"matchLabels"`
 }
 
 // PMMSpec contains settings for PMM

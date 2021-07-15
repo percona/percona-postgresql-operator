@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
@@ -14,6 +16,7 @@ import (
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,18 +28,31 @@ func Create(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
 	if cluster.Spec.PGReplicas.HotStandby.Size == 0 {
 		return nil
 	}
+	err := createOrUpdateReplicaService(clientset, cluster)
+	if err != nil {
+		return errors.Wrap(err, "handle replica service")
+	}
 	for i := 1; i <= cluster.Spec.PGReplicas.HotStandby.Size; i++ {
 		replica := getNewReplicaObject(cluster, &crv1.Pgreplica{}, i)
 		_, err := clientset.CrunchydataV1().Pgreplicas(cluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "create replica %s", replica.Name)
 		}
+		for i := 0; i <= 30; i++ {
+			time.Sleep(5 * time.Second)
+			dep, err := clientset.AppsV1().Deployments(cluster.Namespace).Get(ctx,
+				replica.Name, metav1.GetOptions{})
+
+			if err != nil {
+				log.Info(errors.Wrapf(err, "get deployment %s", replica.Name))
+			}
+			if dep.Status.UnavailableReplicas == 0 {
+				fmt.Println(replica.Name, "ready")
+				break
+			}
+		}
 	}
 
-	err := createOrUpdateReplicaService(clientset, cluster)
-	if err != nil {
-		return errors.Wrap(err, "handle replica service")
-	}
 	return nil
 }
 
@@ -62,17 +78,10 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 	}
 
 	if newReplicaCount == 0 {
-		for i := 1; i <= oldReplicaCount; i++ {
-			replicaName := getReplicaName(oldCluster, i)
-			err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Delete(ctx, replicaName, metav1.DeleteOptions{})
+		for i := oldReplicaCount; i >= 1; i-- {
+			err = deleteReplica(clientset, oldCluster, newCluster, i)
 			if err != nil {
-				return errors.Wrapf(err, "delete replica %s", replicaName)
-			}
-			if !newCluster.Spec.KeepData {
-				err = pvc.DeleteIfExists(clientset, replicaName, oldCluster.ObjectMeta.Namespace)
-				if err != nil {
-					return errors.Wrapf(err, "delete replica %s pvc", replicaName)
-				}
+				return errors.Wrapf(err, "delete replica %s", getReplicaName(oldCluster, i))
 			}
 		}
 		err = clientset.CoreV1().Services(newCluster.Namespace).Delete(ctx, getReplicaServiceName(newCluster.Name), metav1.DeleteOptions{})
@@ -83,21 +92,14 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 	}
 	if newReplicaCount < oldReplicaCount {
 		for i := oldReplicaCount; i > newReplicaCount; i-- {
-			replicaName := getReplicaName(oldCluster, i)
-			err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Delete(ctx, replicaName, metav1.DeleteOptions{})
+			err = deleteReplica(clientset, oldCluster, newCluster, i)
 			if err != nil {
-				return errors.Wrapf(err, "delete replica %s", replicaName)
-			}
-			if !newCluster.Spec.KeepData {
-				err = pvc.DeleteIfExists(clientset, replicaName, oldCluster.ObjectMeta.Namespace)
-				if err != nil {
-					return errors.Wrapf(err, "delete replica %s pvc", replicaName)
-				}
+				return errors.Wrapf(err, "delete replica %s", getReplicaName(oldCluster, i))
 			}
 		}
 	}
 
-	for i := 1; i <= newReplicaCount; i++ {
+	for i := newReplicaCount; i >= 1; i-- {
 		replicaName := getReplicaName(oldCluster, i)
 		oldReplica, err := clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Get(ctx, replicaName, metav1.GetOptions{})
 		if err != nil {
@@ -117,16 +119,54 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 		if err != nil {
 			return errors.Wrapf(err, "update replica deployment%s", replica.Name)
 		}
-		if reflect.DeepEqual(newCluster.Spec.PGReplicas.HotStandby, oldCluster.Spec.PGReplicas.HotStandby) {
-			continue
+		if !reflect.DeepEqual(newCluster.Spec.PGReplicas.HotStandby, oldCluster.Spec.PGReplicas.HotStandby) {
+			_, err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Update(ctx, replica, metav1.UpdateOptions{})
+			if err != nil {
+				return errors.Wrapf(err, "update replica %s", replica.Name)
+			}
 		}
-		_, err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Update(ctx, replica, metav1.UpdateOptions{})
-		if err != nil {
-			return errors.Wrapf(err, "update replica %s", replica.Name)
+
+		for i := 0; i <= 30; i++ {
+			time.Sleep(5 * time.Second)
+			dep, err := clientset.AppsV1().Deployments(newCluster.Namespace).Get(ctx,
+				replicaName, metav1.GetOptions{})
+			if err != nil {
+				log.Info(errors.Wrapf(err, "get deployment %s", replica.Name))
+			}
+			if dep.Status.UnavailableReplicas == 0 {
+				break
+			}
 		}
 	}
 
 	return nil
+}
+
+func deleteReplica(clientset kubeapi.Interface, oldCluster, newCluster *crv1.PerconaPGCluster, i int) error {
+	ctx := context.TODO()
+	replicaName := getReplicaName(oldCluster, i)
+	err := clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Delete(ctx, replicaName, metav1.DeleteOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "delete replica %s", replicaName)
+	}
+	if !newCluster.Spec.KeepData {
+		err = pvc.DeleteIfExists(clientset, replicaName, oldCluster.ObjectMeta.Namespace)
+		if err != nil {
+			return errors.Wrapf(err, "delete replica %s pvc", replicaName)
+		}
+	}
+	for i := 0; i <= 30; i++ {
+		_, err := clientset.AppsV1().Deployments(newCluster.Namespace).Get(ctx,
+			replicaName, metav1.GetOptions{})
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				return nil
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	return errors.Errorf("Can't delete replica %s", replicaName)
 }
 
 func getReplicaName(cluster *crv1.PerconaPGCluster, index int) string {
