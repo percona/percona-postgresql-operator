@@ -53,20 +53,10 @@ func (c *Controller) onAdd(obj interface{}) {
 	c.Queue.Add(key)
 	defer c.Queue.Done(key)
 	newCluster := obj.(*crv1.PerconaPGCluster)
-
-	templateData, err := pmm.HandlePMMTemplate(c.deploymentTemplateData, newCluster)
+	err = c.updateTemplate(newCluster)
 	if err != nil {
-		log.Printf("handle pmm template data: %s", err)
-		return
+		log.Errorf("update deployment template: %s", err)
 	}
-
-	t, err := template.New(deploymentTemplateName).Parse(string(templateData))
-	if err != nil {
-		log.Errorf("new template: %s", err)
-		return
-	}
-
-	config.DeploymentTemplate = t
 
 	err = createOrUpdatePrimaryService(c.Client, newCluster)
 	if err != nil {
@@ -88,6 +78,22 @@ func (c *Controller) onAdd(obj interface{}) {
 		}
 	}
 	c.Queue.Forget(key)
+}
+
+func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster) error {
+	templateData, err := pmm.HandlePMMTemplate(c.deploymentTemplateData, newCluster)
+	if err != nil {
+		return errors.Wrap(err, "handle pmm template data")
+	}
+
+	t, err := template.New(deploymentTemplateName).Parse(string(templateData))
+	if err != nil {
+		return errors.Wrap(err, "parse template")
+	}
+
+	config.DeploymentTemplate = t
+
+	return nil
 }
 
 func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
@@ -353,6 +359,11 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	keyParts := strings.Split(key, "/")
 	keyNamespace := keyParts[0]
+
+	err = c.updateTemplate(newCluster)
+	if err != nil {
+		log.Errorf("update deployment template: %s", err)
+	}
 
 	if !reflect.DeepEqual(oldCluster.Spec.PGPrimary.Expose, newCluster.Spec.PGPrimary.Expose) {
 		err = createOrUpdatePrimaryService(c.Client, newCluster)

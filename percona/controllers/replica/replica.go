@@ -2,7 +2,6 @@ package replica
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -218,10 +217,6 @@ func getNewReplicaObject(cluster *crv1.PerconaPGCluster, replica *crv1.Pgreplica
 	for k, v := range cluster.Spec.PGReplicas.HotStandby.Annotations {
 		replica.ObjectMeta.Annotations[k] = v
 	}
-
-	pmmString := fmt.Sprintln(cluster.Spec.PMM)
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(pmmString)))
-	replica.ObjectMeta.Annotations["pmm-sidecar"] = hash
 
 	if cluster.Spec.PGReplicas.HotStandby.Affinity != nil {
 		replica.Spec.NodeAffinity = cluster.Spec.PGReplicas.HotStandby.Affinity.NodeAffinity
