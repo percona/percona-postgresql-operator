@@ -337,6 +337,16 @@ pipeline {
                     TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${URI_BASE}-pgo-apiserver`\r\n\r\nimage: `${URI_BASE}-pgo-event`\r\n\r\nimage: `${URI_BASE}-pgo-rmdata`\r\n\r\nimage: `${URI_BASE}-pgo-scheduler`\r\n\r\nimage: `${URI_BASE}-postgres-operator`\r\n\r\nimage: `${URI_BASE}-pgo-deployer`\r\n"
                     pullRequest.comment(TestsReport)
 
+                    withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
+                        sh '''
+                            source $HOME/google-cloud-sdk/path.bash.inc
+                            gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+                            gcloud config set project $GCP_PROJECT
+                            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-sandbox $CLUSTER_NAME-upstream || true
+                            sudo docker rmi -f \$(sudo docker images -q) || true
+                            sudo rm -rf $HOME/google-cloud-sdk
+                        '''
+                    }
                 }
             }
             sh '''
