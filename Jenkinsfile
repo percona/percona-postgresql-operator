@@ -310,7 +310,7 @@ pipeline {
                 runTest('affinity', 'sandbox')
                 runTest('demand-backup', 'sandbox')
                 CreateCluster('upstream')
-                runTest('data-migration', 'sandbox')
+                runTest('data-migration-gcs', 'sandbox')
                 ShutdownCluster('sandbox')
                 ShutdownCluster('upstream')
             }
