@@ -23,7 +23,7 @@ spec:
 #  pgDataSource:
 #    restoreFrom: ""
 #    restoreOpts: ""
-#  tablespaceStorage:
+#  tablespaceStorages:
 #    lake:
 #      volumeSpec:
 #        size: 1G
@@ -104,7 +104,7 @@ spec:
         cpu: "2"
         memory: "512Mi"
     expose:
-      serviceType: LoadBalancer
+      serviceType: ClusterIP
 #      loadBalancerSourceRanges:
 #      annotations:
 #        pg-cluster-annot: cluster1
@@ -115,8 +115,8 @@ spec:
       size: 0
       resources:
         requests:
-          cpu: "1"
-          memory: "228Mi"
+#          cpu: "1"
+          memory: "128Mi"
 #        limits:
 #          cpu: "1"
 #          memory: "128Mi"
