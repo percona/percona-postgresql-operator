@@ -157,6 +157,8 @@ pipeline {
 
                     sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/3.3.2/yq_linux_amd64 > /usr/local/bin/yq"
                     sudo chmod +x /usr/local/bin/yq
+
+                    sudo yum install -y jq
                 '''
                 withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
                     sh '''
@@ -166,11 +168,49 @@ pipeline {
                 }
             }
         }
-        stage('Build docker image') {
+        stage('Check for operator source file changes'){
+            environment {
+                FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile'", , returnStdout: true).trim()
+                GIT_PREV_SHORT_COMMIT = sh(script: 'git describe --always HEAD~1', , returnStdout: true).trim()
+            }
             when {
-                expression {
-                    !skipBranchBulds
+                expression { return env.FILES_CHANGED == null }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    sh '''
+                        URI_BASE=perconalab/percona-postgresql-operator:$VERSION
+                        docker_uri_base_file='./results/docker/URI_BASE'
+                        mkdir -p $(dirname ${docker_uri_base_file})
+                        echo ${URI_BASE} > "${docker_uri_base_file}"
+                            sg docker -c "
+                                docker login -u '${USER}' -p '${PASS}'
+                                export IMAGE=\$URI_BASE
+                                export TARGET_TAG=$GIT_BRANCH-$GIT_PREV_SHORT_COMMIT
+                                if [[ -z \\$(curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT) ]]; then
+                                    export TARGET_TAG=main
+                                fi
+
+                                for app in "pgo-apiserver" "pgo-event" "pgo-rmdata" "pgo-scheduler" "postgres-operator" "pgo-deployer"; do
+                                    docker pull perconalab/percona-postgresql-operator:\\$TARGET_TAG-\\${app}
+                                    docker tag perconalab/percona-postgresql-operator:\\$TARGET_TAG-\\${app} \\${IMAGE}-\\${app}
+                                    docker push \\${IMAGE}-\\${app}
+                                done
+                                docker logout
+                            "
+                        sudo rm -rf ./build
+                    '''
                 }
+                stash includes: 'results/docker/URI_BASE', name: 'URI_BASE'
+                archiveArtifacts 'results/docker/URI_BASE'
+            }
+        }
+        stage('Build docker image') {
+            environment {
+                FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile'", , returnStdout: true).trim()
+            }
+            when {
+                expression { return env.FILES_CHANGED != null }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {

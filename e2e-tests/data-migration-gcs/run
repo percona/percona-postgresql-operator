@@ -39,6 +39,8 @@ function create_pgo_k8s {
 function main {
 	if [[ -n ${PGO_K8S_NAME} ]]; then
 		export TARGET_CONFIG="/tmp/${PGO_K8S_NAME}"
+		cleanup_rbac
+		kubectl_bin delete namespace pgo || true
 	else
 		pgo_k8s_name=$(create_pgo_k8s)
 		export TARGET_CONFIG="/tmp/${pgo_k8s_name}"
@@ -60,12 +62,12 @@ function main {
 	yq r -d0 ${conf_dir}/cloud-secret-minio-gw.yml 'stringData."credentials.json"' >${PGO_HOME}/gcs-credentials.json
 	set -x
 	pgo_cluster_name="some-name-${RANDOM}"
-		PATH="${PGO_HOME}/.pgo/pgo:$PATH" \
-		PGOUSER="${PGO_HOME}/.pgo/pgo/pgouser" \
-		PGO_CA_CERT="${PGO_HOME}/.pgo/pgo/client.crt" \
-		PGO_CLIENT_CERT="${PGO_HOME}/.pgo/pgo/client.crt" \
-		PGO_CLIENT_KEY="${PGO_HOME}/.pgo/pgo/client.key" \
-		pgo create cluster "${pgo_cluster_name}" \
+	PATH="${PGO_HOME}/.pgo/pgo:$PATH" \
+	PGOUSER="${PGO_HOME}/.pgo/pgo/pgouser" \
+	PGO_CA_CERT="${PGO_HOME}/.pgo/pgo/client.crt" \
+	PGO_CLIENT_CERT="${PGO_HOME}/.pgo/pgo/client.crt" \
+	PGO_CLIENT_KEY="${PGO_HOME}/.pgo/pgo/client.key" \
+	pgo create cluster "${pgo_cluster_name}" \
 		--apiserver-url https://127.0.0.1:8443 \
 		--namespace pgo \
 		--password-superuser=postgres_pass \
