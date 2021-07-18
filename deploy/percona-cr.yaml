@@ -16,22 +16,44 @@ spec:
   namespace: pgo
   port: "5432"
   user: pguser
-#  disableAutofail: false
-#  tlsOnly: false
-#  standby: false
-#  pause: false
+  disableAutofail: false
+  tlsOnly: false
+  standby: false
+  pause: false
+#  pgDataSource:
+#    restoreFrom: ""
+#    restoreOpts: ""
 #  tablespaceStorage:
+#    lake:
+#      volumeSpec:
+#        size: 1G
+#        accessmode: ReadWriteOnce
+#        storagetype: dynamic
+#        storageclass: "standard"
+#        matchLabels: ""
 #  walStorage:
+#    volumeSpec:
+#      size: 1G
+#      accessmode: ReadWriteOnce
+#      storagetype: dynamic
+#      storageclass: "standard"
+#      matchLabels: ""
   userLabels:
     pgo-version: "0.1.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
     resources:
-        requests:
-          memory: "128Mi"
+      requests:
+        memory: "128Mi"
     tolerations: []
-#    expose:
-#      serviceType: ClusterIP
+    volumeSpec:
+      size: 1G
+      accessmode: ReadWriteOnce
+      storagetype: dynamic
+      storageclass: "standard"
+#      matchLabels: ""
+    expose:
+      serviceType: ClusterIP
 #      loadBalancerSourceRanges:
 #      annotations:
 #        pg-cluster-annot: cluster1
@@ -43,17 +65,25 @@ spec:
     serverHost: monitoring-service
     serverUser: admin
     pmmSecret: cluster1-pmm-secret
+    resources:
+      requests:
+        memory: 200M
+        cpu: 500m
   backup:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
     backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
     resources:
-        requests:
-          memory: "48Mi"
-        limits: {}
-#    volumeSpec:
-#      size: "1G"
-#      accessmode: ReadWriteOnce
-#      storagetype: dynamic
+      requests:
+        memory: "48Mi"
+#      limits:
+#        cpu: "1"
+#        memory: "64Mi"
+    volumeSpec:
+      size: 1G
+      accessmode: ReadWriteOnce
+      storagetype: dynamic
+      storageclass: "standard"
+#      matchLabels: ""
 #    storages:
 #      s3:
 #        endpointUrl: minio-gateway-svc:9000
@@ -62,38 +92,47 @@ spec:
 #        verifyTLS: false
 #    storageTypes: [
 #      "s3"
-#    ]      
+#    ]
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
     size: 1
     resources:
-        requests:
-          cpu: "1"
-          memory: "128Mi"
-        limits:
-          cpu: "2"
-          memory: "512Mi"
+      requests:
+        cpu: "1"
+        memory: "128Mi"
+      limits:
+        cpu: "2"
+        memory: "512Mi"
+    expose:
+      serviceType: LoadBalancer
+#      loadBalancerSourceRanges:
+#      annotations:
+#        pg-cluster-annot: cluster1
+#      labels:
+#        pg-cluster-label: cluster1
   pgReplicas:
     hotStandby:
       size: 0
-#      resources:
-#        requests:
-#          cpu: "1"
-#          memory: "128Mi"
+      resources:
+        requests:
+          cpu: "1"
+          memory: "228Mi"
 #        limits:
 #          cpu: "1"
 #          memory: "128Mi"
-      volumeSpec: 
+      volumeSpec:
         accessmode: ReadWriteOnce
         size: 1G
         storagetype: dynamic
+        storageclass: "standard"
+#        matchLabels: ""
 #      affinity:
 #        default: null
 #      labels:
 #        pg-cluster-label: cluster1
 #      annotations:
 #        pg-cluster-annot: cluster1-1
-#      enableSyncStandby: false
+      enableSyncStandby: false
       expose:
         serviceType: ClusterIP
 #        loadBalancerSourceRanges:
@@ -101,7 +140,7 @@ spec:
 #          pg-cluster-annot: cluster1
 #        labels: 
 #          pg-cluster-label: cluster1
-#  pgBadger:
-#    enabled: false
-#    image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
-#    port: 1111
+  pgBadger:
+    enabled: false
+    image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
+    port: 10000
