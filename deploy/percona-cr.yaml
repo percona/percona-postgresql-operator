@@ -115,8 +115,8 @@ spec:
       size: 0
       resources:
         requests:
-          cpu: "1"
-          memory: "228Mi"
+#          cpu: "1"
+          memory: "128Mi"
 #        limits:
 #          cpu: "1"
 #          memory: "128Mi"

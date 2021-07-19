@@ -35,10 +35,14 @@ type Controller struct {
 	deploymentTemplateData      []byte
 }
 
+type ServiceType string
+
 const (
 	deploymentTemplateName = "cluster-deployment.json"
 	templatePath           = "/"
 	defaultPGOVersion      = "0.1.0"
+	PGPrimaryServiceType   = ServiceType("primary")
+	PGBouncerServiceType   = ServiceType("bouncer")
 )
 
 // onAdd is called when a pgcluster is added
@@ -58,12 +62,18 @@ func (c *Controller) onAdd(obj interface{}) {
 		log.Errorf("update deployment template: %s", err)
 	}
 
-	err = createOrUpdatePrimaryService(c.Client, newCluster)
+	err = createOrUpdateService(c.Client, newCluster, PGPrimaryServiceType)
 	if err != nil {
-		log.Errorf("handle primary service on create")
+		log.Errorf("handle primary service on create: %s", err)
 		return
 	}
-
+	if newCluster.Spec.PGBouncer.Size > 0 {
+		err = createOrUpdateService(c.Client, newCluster, PGBouncerServiceType)
+		if err != nil {
+			log.Errorf("handle bouncer service on create: %s", err)
+			return
+		}
+	}
 	cluster := getPGCLuster(newCluster, &crv1.Pgcluster{})
 
 	_, err = c.Client.CrunchydataV1().Pgclusters(newCluster.Namespace).Create(ctx, cluster, metav1.CreateOptions{})
@@ -213,8 +223,13 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.TLSOnly = pgc.Spec.TlSOnly
 	cluster.Spec.Standby = pgc.Spec.Standby
 	cluster.Spec.Shutdown = pgc.Spec.Pause
-	cluster.Spec.TablespaceMounts = pgc.Spec.TablespaceStorages
-	cluster.Spec.WALStorage = pgc.Spec.WalStorage
+	if cluster.Spec.TablespaceMounts == nil {
+		cluster.Spec.TablespaceMounts = make(map[string]crv1.PgStorageSpec)
+	}
+	for k, v := range pgc.Spec.TablespaceStorages {
+		cluster.Spec.TablespaceMounts[k] = v.VolumeSpec
+	}
+	cluster.Spec.WALStorage = pgc.Spec.WalStorage.VolumeSpec
 	cluster.Spec.PGDataSource = pgc.Spec.PGDataSource
 
 	return cluster
@@ -366,13 +381,21 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	}
 
 	if !reflect.DeepEqual(oldCluster.Spec.PGPrimary.Expose, newCluster.Spec.PGPrimary.Expose) {
-		err = createOrUpdatePrimaryService(c.Client, newCluster)
+		err = createOrUpdateService(c.Client, newCluster, PGPrimaryServiceType)
 		if err != nil {
-			log.Errorf("handle primary service on update")
+			log.Errorf("handle primary service on update: %s", err)
 			return
 		}
 	}
-
+	if !reflect.DeepEqual(oldCluster.Spec.PGBouncer.Expose, newCluster.Spec.PGBouncer.Expose) {
+		if newCluster.Spec.PGBouncer.Size > 0 {
+			err = createOrUpdateService(c.Client, newCluster, PGBouncerServiceType)
+			if err != nil {
+				log.Errorf("handle bouncer service on update: %s", err)
+				return
+			}
+		}
+	}
 	oldPGCluster, err := c.Client.CrunchydataV1().Pgclusters(oldCluster.Namespace).Get(ctx, oldCluster.Name, metav1.GetOptions{})
 	if err != nil {
 		log.Errorf("get old pgcluster resource: %s", err)
@@ -447,18 +470,28 @@ func (c *Controller) WorkerCount() int {
 	return c.PerconaPGClusterWorkerCount
 }
 
-func createOrUpdatePrimaryService(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
+func createOrUpdateService(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster, svcType ServiceType) error {
 	ctx := context.TODO()
-	service, err := getPrimaryServiceObject(cluster)
-	if err != nil {
-		return errors.Wrap(err, "get primary service object")
+	var service *corev1.Service
+	switch svcType {
+	case PGPrimaryServiceType:
+		svc, err := getPrimaryServiceObject(cluster)
+		if err != nil {
+			return errors.Wrap(err, "get primary service object")
+		}
+		service = svc
+	case PGBouncerServiceType:
+		svc, err := getPGBouncerServiceObject(cluster)
+		if err != nil {
+			return errors.Wrap(err, "get pgBouncer service object")
+		}
+		service = svc
 	}
-
-	oldSvc, err := clientset.CoreV1().Services(cluster.Namespace).Get(ctx, cluster.Name, metav1.GetOptions{})
+	oldSvc, err := clientset.CoreV1().Services(cluster.Namespace).Get(ctx, service.Name, metav1.GetOptions{})
 	if err != nil {
 		_, err = clientset.CoreV1().Services(cluster.Namespace).Create(ctx, service, metav1.CreateOptions{})
 		if err != nil {
-			return errors.Wrap(err, "create primary service")
+			return errors.Wrapf(err, "create service %s", svcType)
 		}
 		return nil
 	}
@@ -469,14 +502,13 @@ func createOrUpdatePrimaryService(clientset kubeapi.Interface, cluster *crv1.Per
 	service.Spec.ClusterIP = oldSvc.Spec.ClusterIP
 	_, err = clientset.CoreV1().Services(cluster.Namespace).Update(ctx, service, metav1.UpdateOptions{})
 	if err != nil {
-		return errors.Wrap(err, "update primary service")
+		return errors.Wrapf(err, "update service %s", svcType)
 	}
 
 	return nil
 }
 
 func getPrimaryServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, error) {
-
 	labels := map[string]string{
 		"name":       cluster.Name,
 		"pg-cluster": cluster.Name,
@@ -523,6 +555,51 @@ func getPrimaryServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, e
 			},
 			SessionAffinity:          corev1.ServiceAffinityNone,
 			LoadBalancerSourceRanges: cluster.Spec.PGPrimary.Expose.LoadBalancerSourceRanges,
+		},
+	}, nil
+}
+
+func getPGBouncerServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, error) {
+	svcName := cluster.Name + "-pgbouncer"
+	labels := map[string]string{
+		"name":       svcName,
+		"pg-cluster": cluster.Name,
+	}
+
+	for k, v := range cluster.Spec.PGBouncer.Expose.Labels {
+		labels[k] = v
+	}
+
+	port, err := strconv.Atoi(cluster.Spec.Port)
+	if err != nil {
+		return &corev1.Service{}, errors.Wrap(err, "parse port")
+	}
+	svcType := corev1.ServiceTypeClusterIP
+	if len(cluster.Spec.PGBouncer.Expose.ServiceType) > 0 {
+		svcType = cluster.Spec.PGBouncer.Expose.ServiceType
+	}
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        svcName,
+			Namespace:   cluster.Namespace,
+			Labels:      labels,
+			Annotations: cluster.Spec.PGBouncer.Expose.Annotations,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: svcType,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "postgres",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       int32(port),
+					TargetPort: intstr.FromInt(port),
+				},
+			},
+			Selector: map[string]string{
+				"service-name": svcName,
+			},
+			SessionAffinity:          corev1.ServiceAffinityNone,
+			LoadBalancerSourceRanges: cluster.Spec.PGBouncer.Expose.LoadBalancerSourceRanges,
 		},
 	}, nil
 }
