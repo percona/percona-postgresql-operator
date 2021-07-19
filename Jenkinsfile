@@ -110,10 +110,12 @@ pipeline {
         CLEAN_NAMESPACE = 1
         CLOUDSDK_CORE_DISABLE_PROMPTS = 1
         GIT_SHORT_COMMIT = sh(script: 'git describe --always --dirty', , returnStdout: true).trim()
+        GIT_PREV_SHORT_COMMIT = sh(script: 'git describe --always HEAD~1', , returnStdout: true).trim()
         VERSION = "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}"
         CLUSTER_NAME = sh(script: "echo jenkins-pgo-${GIT_SHORT_COMMIT} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
         PGO_K8S_NAME = "${env.CLUSTER_NAME}-upstream"
         AUTHOR_NAME  = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
+        FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' || true", , returnStdout: true).trim()
     }
     agent {
         label 'docker'
@@ -160,6 +162,10 @@ pipeline {
 
                     sudo yum install -y jq
                 '''
+                script {
+                    env.IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $VERSION | head -1', , returnStdout: true).trim()
+                    env.PREVIOUS_IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT | head -1', , returnStdout: true).trim()
+                }
                 withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
                     sh '''
                         cp $CLOUD_SECRET_FILE ./e2e-tests/conf/cloud-secret.yml
@@ -168,13 +174,13 @@ pipeline {
                 }
             }
         }
-        stage('Check for operator source file changes'){
-            environment {
-                FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' || true", , returnStdout: true).trim()
-                GIT_PREV_SHORT_COMMIT = sh(script: 'git describe --always HEAD~1', , returnStdout: true).trim()
-            }
+        stage('Retag previous commit images if possible'){
             when {
-                expression { return env.FILES_CHANGED == null }
+                allOf {
+                    expression { env.FILES_CHANGED == null }
+                    expression { env.IMAGE_EXISTS == null }
+                    expression { env.PREVIOUS_IMAGE_EXISTS != null }
+                }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
@@ -186,14 +192,10 @@ pipeline {
                             sg docker -c "
                                 docker login -u '${USER}' -p '${PASS}'
                                 export IMAGE=\$URI_BASE
-                                export TARGET_TAG=$GIT_BRANCH-$GIT_PREV_SHORT_COMMIT
-                                if [[ -z \\$(curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT) ]]; then
-                                    export TARGET_TAG=main
-                                fi
 
                                 for app in "pgo-apiserver" "pgo-event" "pgo-rmdata" "pgo-scheduler" "postgres-operator" "pgo-deployer"; do
-                                    docker pull perconalab/percona-postgresql-operator:\\$TARGET_TAG-\\${app}
-                                    docker tag perconalab/percona-postgresql-operator:\\$TARGET_TAG-\\${app} \\${IMAGE}-\\${app}
+                                    docker pull perconalab/percona-postgresql-operator:$GIT_BRANCH-$GIT_PREV_SHORT_COMMIT-\\${app}
+                                    docker tag perconalab/percona-postgresql-operator:$GIT_BRANCH-$GIT_PREV_SHORT_COMMIT-\\${app} \\${IMAGE}-\\${app}
                                     docker push \\${IMAGE}-\\${app}
                                 done
                                 docker logout
@@ -206,11 +208,15 @@ pipeline {
             }
         }
         stage('Build docker image') {
-            environment {
-                FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' || true", , returnStdout: true).trim()
-            }
             when {
-                expression { return env.FILES_CHANGED != null }
+                anyOf {
+                    expression { env.FILES_CHANGED != null }
+                    allOf {
+                        expression { env.FILES_CHANGED == null }
+                        expression { env.IMAGE_EXISTS == null }
+                        expression { env.PREVIOUS_IMAGE_EXISTS == null }
+                    }
+                }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
@@ -228,6 +234,25 @@ pipeline {
                         sudo rm -rf ./build
                     '''
                 }
+                stash includes: 'results/docker/URI_BASE', name: 'URI_BASE'
+                archiveArtifacts 'results/docker/URI_BASE'
+            }
+        }
+        stage('Save dummy URI_BASE') {
+            when {
+                allOf {
+                    expression { env.FILES_CHANGED == null }
+                    expression { env.IMAGE_EXISTS != null }
+                }
+            }
+            steps {
+                sh '''
+                        URI_BASE=perconalab/percona-postgresql-operator:$VERSION
+                        docker_uri_base_file='./results/docker/URI_BASE'
+                        mkdir -p $(dirname ${docker_uri_base_file})
+                        echo ${URI_BASE} > "${docker_uri_base_file}"
+                        sudo rm -rf ./build
+                    '''
                 stash includes: 'results/docker/URI_BASE', name: 'URI_BASE'
                 archiveArtifacts 'results/docker/URI_BASE'
             }
@@ -398,7 +423,7 @@ pipeline {
                             source $HOME/google-cloud-sdk/path.bash.inc
                             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                             gcloud config set project $GCP_PROJECT
-                            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-sandbox $CLUSTER_NAME-upstream $CLUSTER_NAME-backups $CLUSTER_NAME-migration || true
+                            gcloud container clusters list --format='csv[no-heading](name)' --filter $CLUSTER_NAME | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
                             sudo docker rmi -f \$(sudo docker images -q) || true
                             sudo rm -rf $HOME/google-cloud-sdk
                         '''
