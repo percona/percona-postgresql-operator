@@ -170,7 +170,7 @@ pipeline {
         }
         stage('Check for operator source file changes'){
             environment {
-                FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile'", , returnStdout: true).trim()
+                FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' || true", , returnStdout: true).trim()
                 GIT_PREV_SHORT_COMMIT = sh(script: 'git describe --always HEAD~1', , returnStdout: true).trim()
             }
             when {
@@ -207,7 +207,7 @@ pipeline {
         }
         stage('Build docker image') {
             environment {
-                FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile'", , returnStdout: true).trim()
+                FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' || true", , returnStdout: true).trim()
             }
             when {
                 expression { return env.FILES_CHANGED != null }
