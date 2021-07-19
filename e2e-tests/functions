@@ -19,6 +19,7 @@ IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg13-pgbackrest"}
 IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg13-pgbackrest-repo"}
 IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg13-pgbadger"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
+BUCKET=${BUCKET:-"pg-operator-testing"}
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
 date=$(which gdate || which date)
@@ -269,9 +270,15 @@ apply_cluster() {
 		'local')
 			yq w -i "${tmp_dir}/percona-cr.yaml" 'spec.backrestStorageTypes[0]' 'local'
 			;;
+		'gcs')
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'gcs' \
+				| yq w - 'spec.backrestGCSBucket' ${BUCKET} \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
 		's3')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' "operator-testing" \
-				| yq w - 'spec.backup.storages[s3].endpointUrl' 'minio-gateway-svc:9000' \
+			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' ${BUCKET} \
+				| yq w - 'spec.backup.storages[s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[s3].region' 'us-east-1' \
 				| yq w - 'spec.backup.storages[s3].uriStyle' 'path' \
 				| yq w - 'spec.backup.storages[s3].verifyTLS' 'false' \
@@ -280,13 +287,20 @@ apply_cluster() {
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
 		'local,s3')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' "operator-testing" \
-				| yq w - 'spec.backup.storages[s3].endpointUrl' 'minio-gateway-svc:9000' \
+			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' ${BUCKET} \
+				| yq w - 'spec.backup.storages[s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[s3].region' 'us-east-1' \
 				| yq w - 'spec.backup.storages[s3].uriStyle' 'path' \
 				| yq w - 'spec.backup.storages[s3].verifyTLS' 'false' \
 				| yq w - 'spec.backup.storageTypes[0]' 'local' \
 				| yq w - 'spec.backup.storageTypes[1]' 's3' \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
+			;;
+		'local,gcs')
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'local' \
+				| yq w - 'spec.backup.storageTypess[1]' 'gcs' \
+				| yq w - 'spec.backup.storages[s3].bucket' ${BUCKET} \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
