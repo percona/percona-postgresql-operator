@@ -45,7 +45,7 @@ function main {
 		pgo_k8s_name=$(create_pgo_k8s)
 		export TARGET_CONFIG="/tmp/${pgo_k8s_name}"
 	fi
-
+	desc "Starting upstream up"
 	kubectl_bin create namespace pgo
 	kubectl_bin config set-context $(kubectl_bin config current-context) --namespace="pgo"
 	kubectl_bin apply -f https://raw.githubusercontent.com/CrunchyData/postgres-operator/v4.7.0/installers/kubectl/postgres-operator.yml
@@ -82,6 +82,7 @@ function main {
 	wait_job_completion "backrest-backup-${pgo_cluster_name}"
 	kill ${PROXY_PID}
 
+	desc "Switching to percona pg"
 	unset TARGET_CONFIG
 
 	create_namespace $namespace
@@ -94,6 +95,7 @@ function main {
 	apply_configs "${cluster}"
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "gcs+${pgo_cluster_name}"
 
+	desc "Switching to upstream"
 	[[ -n ${PGO_K8S_NAME} ]] && export TARGET_CONFIG="/tmp/${PGO_K8S_NAME}" || export TARGET_CONFIG="/tmp/${pgo_k8s_name}"
 
 	run_psql \
@@ -104,10 +106,12 @@ function main {
 		"postgres:postgres_pass@${pgo_cluster_name}.pgo"
 	sleep 60
 
+	desc "Switching to percona pg"
 	unset TARGET_CONFIG
 
 	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:postgres_pass@${cluster}.${namespace}"
 
+	desc "Switching to upstream"
 	[[ -n ${PGO_K8S_NAME} ]] && export TARGET_CONFIG="/tmp/${PGO_K8S_NAME}" || export TARGET_CONFIG="/tmp/${pgo_k8s_name}"
 
 	run_psql \
@@ -116,6 +120,8 @@ function main {
 
 	sleep 60
 	kubectl_bin delete pgcluster --all
+
+	desc "Switching to percona pg"
 	unset TARGET_CONFIG
 
 	compare_psql_cmd "select-2" '\c myapp \\\ SELECT * from myApp;' "postgres:postgres_pass@${cluster}.${namespace}"
