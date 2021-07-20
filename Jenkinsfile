@@ -106,7 +106,7 @@ if ( env.CHANGE_URL ) {
 }
 def FILES_CHANGED = null
 def IMAGE_EXISTS = null
-def REVIOUS_IMAGE_EXISTS = null
+def PREVIOUS_IMAGE_EXISTS = null
 
 pipeline {
     environment {
@@ -179,11 +179,13 @@ pipeline {
         }
         stage('Retag previous commit images if possible'){
             when {
-                allOf {
-                    expression { FILES_CHANGED == null }
-                    expression { IMAGE_EXISTS == null }
-                    expression { PREVIOUS_IMAGE_EXISTS != null }
+                anyOf {
                     expression { !skipBranchBulds }
+                    allOf {
+                        expression { FILES_CHANGED == null }
+                        expression { IMAGE_EXISTS == null }
+                        expression { PREVIOUS_IMAGE_EXISTS != null }
+                    }
                 }
             }
             steps {
@@ -213,21 +215,18 @@ pipeline {
         }
         stage('Build docker image') {
             when {
-                allOf {
-                    anyOf {
-                        allOf {
-                            expression { FILES_CHANGED != null }
-                            expression { IMAGE_EXISTS == null }
-                        }
-                        allOf {
-                            expression { FILES_CHANGED == null }
-                            expression { IMAGE_EXISTS == null }
-                            expression { PREVIOUS_IMAGE_EXISTS == null }
-                        }
-                    }
+                anyOf {
                     expression { !skipBranchBulds }
+                    allOf {
+                        expression { FILES_CHANGED != null }
+                        expression { IMAGE_EXISTS == null }
+                    }
+                    allOf {
+                        expression { FILES_CHANGED == null }
+                        expression { IMAGE_EXISTS == null }
+                        expression { PREVIOUS_IMAGE_EXISTS == null }
+                    }
                 }
-
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
@@ -251,10 +250,12 @@ pipeline {
         }
         stage('Save dummy URI_BASE') {
             when {
-                allOf {
-                    expression { FILES_CHANGED == null }
-                    expression { IMAGE_EXISTS != null }
+                anyOf {
                     expression { !skipBranchBulds }
+                    allOf {
+                        expression { FILES_CHANGED == null }
+                        expression { IMAGE_EXISTS != null }
+                    }
                 }
             }
             steps {
