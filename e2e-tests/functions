@@ -271,10 +271,10 @@ apply_cluster() {
 			yq w -i "${tmp_dir}/percona-cr.yaml" 'spec.backrestStorageTypes[0]' 'local'
 			;;
 		'gcs')
-			yq w "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'gcs' \
-				| yq w - 'spec.backrestGCSBucket' ${BUCKET} \
+			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storageTypes[0]' 'gcs' \
+				| yq w - 'spec.backup.storages[s3].bucket' ${BUCKET} \
 					>"${tmp_dir}/cr.backup.yaml"
-			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
 		's3')
 			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' ${BUCKET} \
