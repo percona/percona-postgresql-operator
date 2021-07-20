@@ -126,14 +126,16 @@ type Backup struct {
 	AntiAffinityType  PodAntiAffinityType   `json:"antiAffinityType"`
 }
 
+type StorageType string
+
 type Storage struct {
-	Type        string `json:"type"`
-	Bucket      string `json:"bucket"`
-	Region      string `json:"region"`
-	EndpointURL string `json:"endpointUrl"`
-	KeyType     string `json:"keyType"`
-	URIStyle    string `json:"uriStyle"`
-	VerifyTLS   bool   `json:"verifyTLS"`
+	Type        StorageType `json:"type"`
+	Bucket      string      `json:"bucket"`
+	Region      string      `json:"region"`
+	EndpointURL string      `json:"endpointUrl"`
+	KeyType     string      `json:"keyType"`
+	URIStyle    string      `json:"uriStyle"`
+	VerifyTLS   bool        `json:"verifyTLS"`
 }
 
 type CronJob struct {

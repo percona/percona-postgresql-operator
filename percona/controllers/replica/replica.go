@@ -315,15 +315,15 @@ func getReplicaServiceName(clusterName string) string {
 	return fmt.Sprintf("%s-replica", clusterName)
 }
 
-func updateResources(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) error {
+func updateResources(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	if cl.Spec.PGReplicas == nil {
-		return nil
+		return
 	}
 	if cl.Spec.PGReplicas.HotStandby.Size == 0 {
-		return nil
+		return
 	}
 	if cl.Spec.PGReplicas.HotStandby.Resources == nil {
-		return nil
+		return
 	}
 	for k := range deployment.Spec.Template.Spec.Containers {
 		if deployment.Spec.Template.Spec.Containers[k].Name == "database" {
@@ -332,7 +332,7 @@ func updateResources(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) e
 		}
 	}
 
-	return nil
+	return
 }
 
 func updateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
@@ -393,10 +393,8 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 	if err != nil {
 		return errors.Wrap(err, "add or remove pmm sidecar: %s")
 	}
-	err = updateResources(cl, deployment)
-	if err != nil {
-		return errors.Wrap(err, "update replica resources resource: %s")
-	}
+	updateResources(cl, deployment)
+
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)
 	}

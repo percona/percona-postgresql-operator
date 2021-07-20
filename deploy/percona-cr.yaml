@@ -85,7 +85,8 @@ spec:
       storageclass: "standard"
 #      matchLabels: ""
 #    storages:
-#      s3:
+#      my-s3:
+#        type: s3     
 #        endpointUrl: minio-gateway-svc:9000
 #        region: us-east-1
 #        uriStyle: path

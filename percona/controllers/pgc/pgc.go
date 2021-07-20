@@ -43,6 +43,8 @@ const (
 	defaultPGOVersion      = "0.1.0"
 	PGPrimaryServiceType   = ServiceType("primary")
 	PGBouncerServiceType   = ServiceType("bouncer")
+	S3StorageType          = crv1.StorageType("s3")
+	GCSStorageType         = crv1.StorageType("gcs")
 )
 
 // onAdd is called when a pgcluster is added
@@ -60,6 +62,7 @@ func (c *Controller) onAdd(obj interface{}) {
 	err = c.updateTemplate(newCluster)
 	if err != nil {
 		log.Errorf("update deployment template: %s", err)
+		return
 	}
 
 	err = createOrUpdateService(c.Client, newCluster, PGPrimaryServiceType)
@@ -207,13 +210,19 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.UserLabels = userLabels
 	cluster.Spec.Annotations.Global = specAnnotationsGlobal
 	cluster.Spec.Tolerations = pgc.Spec.PGPrimary.Tolerations
-	s, ok := pgc.Spec.Backup.Storages["s3"]
-	if ok {
-		cluster.Spec.BackrestS3Bucket = s.Bucket
-		cluster.Spec.BackrestS3Endpoint = s.EndpointURL
-		cluster.Spec.BackrestS3Region = s.Region
-		cluster.Spec.BackrestS3URIStyle = s.URIStyle
-		cluster.Spec.BackrestS3VerifyTLS = strconv.FormatBool(s.VerifyTLS)
+	for _, s := range pgc.Spec.Backup.Storages {
+		switch s.Type {
+		case S3StorageType:
+			cluster.Spec.BackrestS3Bucket = s.Bucket
+			cluster.Spec.BackrestS3Endpoint = s.EndpointURL
+			cluster.Spec.BackrestS3Region = s.Region
+			cluster.Spec.BackrestS3URIStyle = s.URIStyle
+			cluster.Spec.BackrestS3VerifyTLS = strconv.FormatBool(s.VerifyTLS)
+		case GCSStorageType:
+			cluster.Spec.BackrestGCSBucket = s.Bucket
+			cluster.Spec.BackrestGCSEndpoint = s.EndpointURL
+			cluster.Spec.BackrestGCSKeyType = s.KeyType
+		}
 	}
 	cluster.Spec.BackrestStorageTypes = pgc.Spec.Backup.StorageTypes
 	cluster.Spec.PGDataSource.Namespace = pgc.Spec.PGDataSource.Namespace
@@ -314,7 +323,10 @@ func (c *Controller) handleStatuses() error {
 	}
 	for _, n := range ns.Items {
 		perconaPGClusters, err := c.Client.CrunchydataV1().PerconaPGClusters(n.Name).List(ctx, metav1.ListOptions{})
-		if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			return errors.Wrap(err, "list perconapgclusters")
+		} else if err != nil {
+			// there is no perconapgclusters, so no need to continue
 			return nil
 		}
 		for _, p := range perconaPGClusters.Items {
@@ -491,7 +503,7 @@ func createOrUpdateService(clientset kubeapi.Interface, cluster *crv1.PerconaPGC
 	if err != nil {
 		_, err = clientset.CoreV1().Services(cluster.Namespace).Create(ctx, service, metav1.CreateOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "create service %s", svcType)
+			return errors.Wrapf(err, "create service %s", service.Name)
 		}
 		return nil
 	}

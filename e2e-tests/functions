@@ -268,28 +268,31 @@ apply_cluster() {
 
 	case ${backup} in
 		'local')
-			yq w -i "${tmp_dir}/percona-cr.yaml" 'spec.backrestStorageTypes[0]' 'local'
+			yq w -i "${tmp_dir}/percona-cr.yaml" 'spec.backup.storageTypes[0]' 'local'
 			;;
 		'gcs')
 			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storageTypes[0]' 'gcs' \
-				| yq w - 'spec.backup.storages[s3].bucket' ${BUCKET} \
+			    | yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
+				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
 		's3')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' ${BUCKET} \
-				| yq w - 'spec.backup.storages[s3].endpointUrl' 's3.amazonaws.com' \
-				| yq w - 'spec.backup.storages[s3].region' 'us-east-1' \
-				| yq w - 'spec.backup.storages[s3].uriStyle' 'path' \
+			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
+			    | yq w - 'spec.backup.storages[my-s3].type' 's3' \
+				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
+				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
+				| yq w - 'spec.backup.storages[my-s3].uriStyle' 'path' \
 				| yq w - 'spec.backup.storageTypes[0]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
 		'local,s3')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[s3].bucket' ${BUCKET} \
-				| yq w - 'spec.backup.storages[s3].endpointUrl' 's3.amazonaws.com' \
-				| yq w - 'spec.backup.storages[s3].region' 'us-east-1' \
-				| yq w - 'spec.backup.storages[s3].uriStyle' 'path' \
+			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
+			    | yq w - 'spec.backup.storages[my-s3].type' 's3' \
+				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
+				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
+				| yq w - 'spec.backup.storages[my-s3].uriStyle' 'path' \
 				| yq w - 'spec.backup.storageTypes[0]' 'local' \
 				| yq w - 'spec.backup.storageTypes[1]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
@@ -297,8 +300,9 @@ apply_cluster() {
 			;;
 		'local,gcs')
 			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'local' \
+			    | yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
+				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 				| yq w - 'spec.backup.storageTypess[1]' 'gcs' \
-				| yq w - 'spec.backup.storages[s3].bucket' ${BUCKET} \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
