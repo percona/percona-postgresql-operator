@@ -83,7 +83,7 @@ function main {
 
 	desc 'Testing backup/restore from gcs'
 	apply_configs ${cluster}
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "gcs" "${cluster}-custom-config"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" "gcs" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "gcs" "incr"
 
 	kubectl_bin delete perconapgcluster/${cluster}
