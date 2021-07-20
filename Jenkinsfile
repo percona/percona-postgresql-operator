@@ -7,7 +7,7 @@ void CreateCluster(String CLUSTER_PREFIX) {
             source $HOME/google-cloud-sdk/path.bash.inc
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
-            gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_PREFIX} --cluster-version=1.18 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_PREFIX} --no-enable-autoupgrade
+            gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_PREFIX} --cluster-version=1.20 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_PREFIX} --no-enable-autoupgrade
             kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com
         """
    }
@@ -183,6 +183,7 @@ pipeline {
                     expression { FILES_CHANGED == null }
                     expression { IMAGE_EXISTS == null }
                     expression { PREVIOUS_IMAGE_EXISTS != null }
+                    expression { !skipBranchBulds }
                 }
             }
             steps {
@@ -212,17 +213,21 @@ pipeline {
         }
         stage('Build docker image') {
             when {
-                anyOf {
-                    allOf {
-                        expression { FILES_CHANGED != null }
-                        expression { IMAGE_EXISTS == null }
+                allOf {
+                    anyOf {
+                        allOf {
+                            expression { FILES_CHANGED != null }
+                            expression { IMAGE_EXISTS == null }
+                        }
+                        allOf {
+                            expression { FILES_CHANGED == null }
+                            expression { IMAGE_EXISTS == null }
+                            expression { PREVIOUS_IMAGE_EXISTS == null }
+                        }
                     }
-                    allOf {
-                        expression { FILES_CHANGED == null }
-                        expression { IMAGE_EXISTS == null }
-                        expression { PREVIOUS_IMAGE_EXISTS == null }
-                    }
+                    expression { !skipBranchBulds }
                 }
+
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
@@ -249,6 +254,7 @@ pipeline {
                 allOf {
                     expression { FILES_CHANGED == null }
                     expression { IMAGE_EXISTS != null }
+                    expression { !skipBranchBulds }
                 }
             }
             steps {
