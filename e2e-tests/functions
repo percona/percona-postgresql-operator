@@ -291,7 +291,7 @@ apply_cluster() {
 				| yq w - 'spec.standby' true \
 				| yq d - 'spec.pgBouncer' \
 					>"${tmp_dir}/cr.backup.yaml"
-			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
 		's3')
 			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
