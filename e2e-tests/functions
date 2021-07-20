@@ -281,7 +281,6 @@ apply_cluster() {
 				| yq w - 'spec.backup.storages[s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[s3].region' 'us-east-1' \
 				| yq w - 'spec.backup.storages[s3].uriStyle' 'path' \
-				| yq w - 'spec.backup.storages[s3].verifyTLS' 'false' \
 				| yq w - 'spec.backup.storageTypes[0]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
@@ -291,7 +290,6 @@ apply_cluster() {
 				| yq w - 'spec.backup.storages[s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[s3].region' 'us-east-1' \
 				| yq w - 'spec.backup.storages[s3].uriStyle' 'path' \
-				| yq w - 'spec.backup.storages[s3].verifyTLS' 'false' \
 				| yq w - 'spec.backup.storageTypes[0]' 'local' \
 				| yq w - 'spec.backup.storageTypes[1]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
@@ -379,7 +377,7 @@ wait_deployment() {
 	set +o xtrace
 	retry=0
 	echo -n $name
-	until [ "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.availableReplicas}')" ]; do
+	until [ "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.readyReplicas}')" ]; do
 		sleep 1
 		echo -n .
 		let retry+=1
