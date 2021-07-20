@@ -104,6 +104,9 @@ def skipBranchBulds = true
 if ( env.CHANGE_URL ) {
     skipBranchBulds = false
 }
+def FILES_CHANGED = null
+def IMAGE_EXISTS = null
+def REVIOUS_IMAGE_EXISTS = null
 
 pipeline {
     environment {
@@ -115,7 +118,6 @@ pipeline {
         CLUSTER_NAME = sh(script: "echo jenkins-pgo-${GIT_SHORT_COMMIT} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
         PGO_K8S_NAME = "${env.CLUSTER_NAME}-upstream"
         AUTHOR_NAME  = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
-        FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' || true", , returnStdout: true).trim()
     }
     agent {
         label 'docker'
@@ -163,8 +165,9 @@ pipeline {
                     sudo yum install -y jq
                 '''
                 script {
-                    env.IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $VERSION | head -1', , returnStdout: true).trim()
-                    env.PREVIOUS_IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT | head -1', , returnStdout: true).trim()
+                    FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' || true", , returnStdout: true).trim() ?: null
+                    IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $VERSION | head -1', , returnStdout: true).trim() ?: null
+                    PREVIOUS_IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT | head -1', , returnStdout: true).trim() ?: null
                 }
                 withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
                     sh '''
@@ -177,9 +180,9 @@ pipeline {
         stage('Retag previous commit images if possible'){
             when {
                 allOf {
-                    expression { env.FILES_CHANGED == null }
-                    expression { env.IMAGE_EXISTS == null }
-                    expression { env.PREVIOUS_IMAGE_EXISTS != null }
+                    expression { FILES_CHANGED == null }
+                    expression { IMAGE_EXISTS == null }
+                    expression { PREVIOUS_IMAGE_EXISTS != null }
                 }
             }
             steps {
@@ -210,11 +213,14 @@ pipeline {
         stage('Build docker image') {
             when {
                 anyOf {
-                    expression { env.FILES_CHANGED != null }
                     allOf {
-                        expression { env.FILES_CHANGED == null }
-                        expression { env.IMAGE_EXISTS == null }
-                        expression { env.PREVIOUS_IMAGE_EXISTS == null }
+                        expression { FILES_CHANGED != null }
+                        expression { IMAGE_EXISTS == null }
+                    }
+                    allOf {
+                        expression { FILES_CHANGED == null }
+                        expression { IMAGE_EXISTS == null }
+                        expression { PREVIOUS_IMAGE_EXISTS == null }
                     }
                 }
             }
@@ -241,8 +247,8 @@ pipeline {
         stage('Save dummy URI_BASE') {
             when {
                 allOf {
-                    expression { env.FILES_CHANGED == null }
-                    expression { env.IMAGE_EXISTS != null }
+                    expression { FILES_CHANGED == null }
+                    expression { IMAGE_EXISTS != null }
                 }
             }
             steps {
