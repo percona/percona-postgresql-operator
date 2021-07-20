@@ -475,10 +475,8 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 	if err != nil {
 		return errors.Wrap(err, "add or remove pmm sidecar: %s")
 	}
-	err = updateResources(cl, deployment)
-	if err != nil {
-		return errors.Wrap(err, "update replica resources resource: %s")
-	}
+	updateResources(cl, deployment)
+
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)
 	}
