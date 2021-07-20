@@ -179,7 +179,7 @@ pipeline {
         }
         stage('Retag previous commit images if possible'){
             when {
-                anyOf {
+                allOf {
                     expression { !skipBranchBulds }
                     allOf {
                         expression { FILES_CHANGED == null }
@@ -215,7 +215,7 @@ pipeline {
         }
         stage('Build docker image') {
             when {
-                anyOf {
+                allOf {
                     expression { !skipBranchBulds }
                     allOf {
                         expression { FILES_CHANGED != null }
@@ -250,7 +250,7 @@ pipeline {
         }
         stage('Save dummy URI_BASE') {
             when {
-                anyOf {
+                allOf {
                     expression { !skipBranchBulds }
                     allOf {
                         expression { FILES_CHANGED == null }
