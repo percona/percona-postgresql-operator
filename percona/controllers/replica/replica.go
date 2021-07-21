@@ -31,6 +31,9 @@ func Create(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
 	if err != nil {
 		return errors.Wrap(err, "handle replica service")
 	}
+	if cluster.Spec.PGReplicas == nil {
+		return nil
+	}
 	for i := 1; i <= cluster.Spec.PGReplicas.HotStandby.Size; i++ {
 		replica := getNewReplicaObject(cluster, &crv1.Pgreplica{}, i)
 		_, err := clientset.CrunchydataV1().Pgreplicas(cluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
@@ -46,7 +49,6 @@ func Create(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
 				log.Info(errors.Wrapf(err, "get deployment %s", replica.Name))
 			}
 			if dep.Status.UnavailableReplicas == 0 {
-				fmt.Println(replica.Name, "ready")
 				break
 			}
 		}
@@ -173,9 +175,6 @@ func getReplicaName(cluster *crv1.PerconaPGCluster, index int) string {
 }
 
 func getNewReplicaObject(cluster *crv1.PerconaPGCluster, replica *crv1.Pgreplica, index int) *crv1.Pgreplica {
-	if cluster.Spec.PGReplicas == nil {
-		return nil
-	}
 	labels := map[string]string{
 		config.LABEL_PG_CLUSTER: cluster.Name,
 		config.LABEL_NAME:       cluster.Name + "-repl" + strconv.Itoa(index),

@@ -246,33 +246,24 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 }
 
 func getStorage(storageSpec *crv1.PgStorageSpec) crv1.PgStorageSpec {
-	newStorage := crv1.PgStorageSpec{
-		AccessMode:  "ReadWriteOnce",
-		Size:        "1G",
-		StorageType: "dynamic",
-	}
 	if storageSpec == nil {
-		return newStorage
+		return crv1.PgStorageSpec{
+			AccessMode:  "ReadWriteOnce",
+			Size:        "1G",
+			StorageType: "dynamic",
+		}
+	}
+	if len(storageSpec.AccessMode) == 0 {
+		storageSpec.AccessMode = "ReadWriteOnce"
+	}
+	if len(storageSpec.Size) == 0 {
+		storageSpec.Size = "1G"
+	}
+	if len(storageSpec.StorageType) == 0 {
+		storageSpec.StorageType = "dynamic"
 	}
 
-	if len(storageSpec.AccessMode) > 0 {
-		newStorage.AccessMode = storageSpec.AccessMode
-	}
-
-	if len(storageSpec.Size) > 0 {
-		newStorage.Size = storageSpec.Size
-	}
-
-	if len(storageSpec.StorageType) > 0 {
-		newStorage.StorageType = storageSpec.StorageType
-	}
-
-	newStorage.Name = storageSpec.Name
-	newStorage.StorageClass = storageSpec.StorageClass
-	newStorage.SupplementalGroups = storageSpec.SupplementalGroups
-	newStorage.MatchLabels = storageSpec.MatchLabels
-
-	return newStorage
+	return *storageSpec
 }
 
 // RunWorker is a long-running function that will continually call the
@@ -508,11 +499,11 @@ func createOrUpdateService(clientset kubeapi.Interface, cluster *crv1.PerconaPGC
 		}
 		return nil
 	}
+	service.Spec.ClusterIP = oldSvc.Spec.ClusterIP
 	if reflect.DeepEqual(service.Spec, oldSvc.Spec) {
 		return nil
 	}
 	service.ResourceVersion = oldSvc.ResourceVersion
-	service.Spec.ClusterIP = oldSvc.Spec.ClusterIP
 	_, err = clientset.CoreV1().Services(cluster.Namespace).Update(ctx, service, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "update service %s", svcType)
