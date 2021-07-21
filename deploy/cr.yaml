@@ -126,7 +126,7 @@ spec:
 # bootstrapping operation, for example, point-in-time-recovery options
 # https://pgbackrest.org/command.html#command-restore
     restoreOpts: ""
-#####################################################
+######################################################
   pgoimageprefix: perconalab/percona-postgresql-operator
   podAntiAffinity:
     default: preferred
