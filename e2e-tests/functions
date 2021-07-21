@@ -20,6 +20,8 @@ IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg13-pgbackrest-
 IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg13-pgbadger"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 BUCKET=${BUCKET:-"pg-operator-testing"}
+PGO_K8S_NAME=${PGO_K8S_NAME}
+
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
 date=$(which gdate || which date)
@@ -37,6 +39,11 @@ if oc get projects; then
 	OPENSHIFT=4
 fi
 
+cleanup_rbac() {
+	kubectl_bin delete clusterrolebindings pgo-cluster-role pgo-deployer-cr || true
+	kubectl_bin delete clusterroles pgo-cluster-role pgo-deployer-cr || true
+}
+
 create_namespace() {
 	local namespace="$1"
 	local skip_clean_namespace="$2"
@@ -46,8 +53,7 @@ create_namespace() {
 			| egrep -v "^kube-|^default|Terminating|openshift|^NAME" \
 			| awk '{print$1}' \
 			| xargs kubectl delete ns &
-		kubectl delete clusterrolebindings pgo-cluster-role pgo-deployer-cr || true
-		kubectl_bin delete clusterroles pgo-cluster-role pgo-deployer-cr || true
+		cleanup_rbac
 	fi
 
 	if [ -n "${OPENSHIFT}" ]; then
@@ -179,7 +185,7 @@ wait_job_completion() {
 
 	retry=0
 	set +o xtrace
-	until kubectl get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
+	until KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
 		sleep 1
 		echo -n .
 		let retry+=1
@@ -277,6 +283,14 @@ apply_cluster() {
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
+		'gcs+'*)
+			yq w "${tmp_dir}/cr.yaml" 'spec.backrestStorageTypes[0]' 'gcs' \
+				| yq w - 'spec.backrestGCSBucket' ${BUCKET} \
+				| yq w - 'spec.backrestRepoPath' "/backrestrepo/${backup//'gcs+'/}-backrest-shared-repo" \
+				| yq w - 'spec.standby' true \
+					>"${tmp_dir}/cr.backup.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
+			;;
 		's3')
 			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
 			    | yq w - 'spec.backup.storages[my-s3].type' 's3' \
@@ -333,7 +347,7 @@ kubectl_bin() {
 	local exit_status=0
 	local timeout=4
 	for i in $(seq 0 2); do
-		kubectl "$@" 1>"$LAST_OUT" 2>"$LAST_ERR"
+		KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl "$@" 1>"$LAST_OUT" 2>"$LAST_ERR"
 		exit_status=$?
 		[[ ${-/x/} != $- ]] && echo "--- $i stdout" | cat - "$LAST_OUT" >&$BASH_XTRACEFD
 		[[ ${-/x/} != $- ]] && echo "--- $i stderr" | cat - "$LAST_ERR" >&$BASH_XTRACEFD
@@ -496,9 +510,11 @@ spinup_pgcluster() {
 
 	desc 'create fresh PG cluster'
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity}
-
 	wait_deployment "${cluster}-backrest-shared-repo"
 	wait_deployment "${cluster}"
+	# Exiting since we are running cluster in stanby mode
+	[[ ${backup} == 'gcs+'* ]] && return
+
 	wait_job_completion "${cluster}-stanza-create" 'false'
 	wait_job_completion "backrest-backup-${cluster}"
 
