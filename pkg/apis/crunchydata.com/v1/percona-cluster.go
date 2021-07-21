@@ -124,6 +124,7 @@ type Backup struct {
 	Schedule          []CronJob             `json:"schedule"`
 	StorageTypes      []BackrestStorageType `json:"storageTypes"`
 	AntiAffinityType  PodAntiAffinityType   `json:"antiAffinityType"`
+	RepoPath          string                `json:"repoPath"`
 }
 
 type StorageType string

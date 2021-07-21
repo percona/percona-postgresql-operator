@@ -224,6 +224,7 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 			cluster.Spec.BackrestGCSKeyType = s.KeyType
 		}
 	}
+	cluster.Spec.BackrestRepoPath = pgc.Spec.Backup.RepoPath
 	cluster.Spec.BackrestStorageTypes = pgc.Spec.Backup.StorageTypes
 	cluster.Spec.PGDataSource.Namespace = pgc.Spec.PGDataSource.Namespace
 	cluster.Spec.PGDataSource.RestoreFrom = pgc.Spec.PGDataSource.RestoreFrom

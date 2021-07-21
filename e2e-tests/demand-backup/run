@@ -109,7 +109,7 @@ function main {
 
 	sleep 30
 
-	desc 'Testing backup/restore from local with storage hybrid storage, s3'
+	desc 'Testing backup/restore from local with storage hybrid storage, gcs'
 	apply_configs ${cluster}
 
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" "local,gcs" "${cluster}-custom-config"
