@@ -13,7 +13,7 @@ metadata:
   name: cluster1
   namespace: pgo
 spec:
-####################################################
+#####################################################
   BackrestStorage:
     accessmode: ReadWriteOnce
     matchLabels: ""
