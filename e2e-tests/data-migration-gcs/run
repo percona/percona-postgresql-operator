@@ -126,7 +126,7 @@ function main {
 
 	compare_psql_cmd "select-2" '\c myapp \\\ SELECT * from myApp;' "postgres:postgres_pass@${cluster}.${namespace}"
 
-	kubectl_bin patch "pgcluster/${cluster}" \
+	kubectl_bin patch "perconapgcluster/${cluster}" \
 		--type json \
 		-p='[{"op":"replace","path":"/spec/standby","value":false}]'
 
