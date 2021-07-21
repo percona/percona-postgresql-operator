@@ -299,7 +299,7 @@ apply_cluster() {
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
 			;;
 		'local,gcs')
-			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'local' \
+			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storageTypes[0]' 'local' \
 			    | yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
 				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 				| yq w - 'spec.backup.storageTypess[1]' 'gcs' \
