@@ -119,7 +119,7 @@ function main {
 		"postgres:postgres_pass@${pgo_cluster_name}.pgo"
 
 	sleep 60
-	kubectl_bin delete perconapgcluster --all
+	kubectl_bin delete pgcluster --all
 
 	desc "Switching to percona pg"
 	unset TARGET_CONFIG
