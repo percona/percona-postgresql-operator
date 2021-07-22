@@ -12,7 +12,7 @@ deploy_operator
 cluster="some-name"
 kubectl_bin apply -f ${conf_dir}/client.yml \
 	-f ${conf_dir}/${cluster}-secrets.yml
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml"
 
 compare_kubectl "deployment/${cluster}"
 compare_kubectl "deployment/${cluster}-backrest-shared-repo"
@@ -21,7 +21,7 @@ kubectl_bin delete pgcluster ${cluster}
 sleep 30
 
 cluster="some-name-required"
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' "required"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" '' '' "required"
 
 compare_kubectl "deployment/${cluster}"
 compare_kubectl "deployment/${cluster}-backrest-shared-repo"
@@ -30,7 +30,7 @@ kubectl_bin delete pgcluster ${cluster}
 sleep 30
 
 cluster="some-name-disabled"
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' "disabled"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" '' '' "disabled"
 
 compare_kubectl "deployment/${cluster}"
 compare_kubectl "deployment/${cluster}-backrest-shared-repo"

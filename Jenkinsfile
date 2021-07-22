@@ -165,7 +165,7 @@ pipeline {
                     sudo yum install -y jq
                 '''
                 script {
-                    FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' || true", , returnStdout: true).trim() ?: null
+                    FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' | head -1", , returnStdout: true).trim() ?: null
                     IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $VERSION | head -1', , returnStdout: true).trim() ?: null
                     PREVIOUS_IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT | head -1', , returnStdout: true).trim() ?: null
                 }
@@ -217,14 +217,16 @@ pipeline {
             when {
                 allOf {
                     expression { !skipBranchBulds }
-                    allOf {
-                        expression { FILES_CHANGED != null }
-                        expression { IMAGE_EXISTS == null }
-                    }
-                    allOf {
-                        expression { FILES_CHANGED == null }
-                        expression { IMAGE_EXISTS == null }
-                        expression { PREVIOUS_IMAGE_EXISTS == null }
+                    anyOf {
+                        allOf {
+                            expression { FILES_CHANGED != null }
+                            expression { IMAGE_EXISTS == null }
+                        }
+                        allOf {
+                            expression { FILES_CHANGED == null }
+                            expression { IMAGE_EXISTS == null }
+                            expression { PREVIOUS_IMAGE_EXISTS == null }
+                        }
                     }
                 }
             }
@@ -252,10 +254,7 @@ pipeline {
             when {
                 allOf {
                     expression { !skipBranchBulds }
-                    allOf {
-                        expression { FILES_CHANGED == null }
-                        expression { IMAGE_EXISTS != null }
-                    }
+                    expression { IMAGE_EXISTS != null }
                 }
             }
             steps {
@@ -388,6 +387,7 @@ pipeline {
                         runTest('scaling', 'sandbox')
                         runTest('recreate', 'sandbox')
                         runTest('affinity', 'sandbox')
+                        runTest('monitoring', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }

@@ -4,7 +4,6 @@ metadata:
   labels:
     name: some-name-pgbouncer
     pg-cluster: some-name
-    vendor: crunchydata
   name: some-name-pgbouncer
 spec:
   externalTrafficPolicy: Cluster

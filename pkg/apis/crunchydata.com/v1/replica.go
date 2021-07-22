@@ -51,7 +51,6 @@ type PgreplicaSpec struct {
 	// Tolerations are an optional list of Pod toleration rules that are applied
 	// to the PostgreSQL instance.
 	Tolerations []v1.Toleration `json:"tolerations"`
-	PMM         PMMSpec         `json:"pmm"`
 }
 
 // PgreplicaList ...

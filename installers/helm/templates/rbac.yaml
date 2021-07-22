@@ -118,6 +118,7 @@ rules:
   - apiGroups:
       - crunchydata.com
     resources:
+      - perconapgclusters
       - pgclusters
       - pgreplicas
       - pgpolicies

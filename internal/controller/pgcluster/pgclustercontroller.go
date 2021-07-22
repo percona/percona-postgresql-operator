@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
@@ -296,10 +297,6 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		}
 	}
 
-	if !reflect.DeepEqual(oldcluster.Spec.PMM, newcluster.Spec.PMM) {
-		rollingUpdateFuncs = append(rollingUpdateFuncs, clusteroperator.UpdatePMMSidecar)
-	}
-
 	// see if any of the resource values have changed for the database or exporter container,
 	// if so, update them
 	if !reflect.DeepEqual(oldcluster.Spec.Resources, newcluster.Spec.Resources) ||
@@ -531,9 +528,17 @@ func (c *Controller) onDelete(obj interface{}) {
 	}
 
 	// determine if the data directory or backups should be kept
-	keepBackups := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_BACKUPS)
-	keepData := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_DATA)
-
+	_, keepBackups := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_BACKUPS)
+	value, keepDataExist := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_DATA)
+	keepData := false
+	if keepDataExist {
+		keepDataValue, err := strconv.ParseBool(value)
+		if err != nil {
+			log.Error("parse kepp-data value to bool")
+			return
+		}
+		keepData = keepDataValue
+	}
 	// create the deletion job. this will delete any data and backups for this
 	// cluster
 	if err := util.CreateRMDataTask(c.Client, cluster, "", !keepBackups, !keepData, false, false); err != nil {
@@ -542,16 +547,16 @@ func (c *Controller) onDelete(obj interface{}) {
 }
 
 // isAnnotationExists cheks if annotation exists or not
-func isAnnotationExists(cluster *crv1.Pgcluster, key string) (isAnnotation bool) {
-	_, isAnnotation = cluster.Spec.Annotations.Backrest[key]
+func isAnnotationExists(cluster *crv1.Pgcluster, key string) (value string, isAnnotation bool) {
+	value, isAnnotation = cluster.Spec.Annotations.Backrest[key]
 	if isAnnotation {
 		return
 	}
-	_, isAnnotation = cluster.Spec.Annotations.Postgres[key]
+	value, isAnnotation = cluster.Spec.Annotations.Postgres[key]
 	if isAnnotation {
 		return
 	}
-	_, isAnnotation = cluster.Spec.Annotations.Global[key]
+	value, isAnnotation = cluster.Spec.Annotations.Global[key]
 	return
 }
 

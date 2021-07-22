@@ -15,15 +15,17 @@ kubectl_bin apply \
 	-f $conf_dir/${cluster}-secrets.yml \
 	-f $conf_dir/client.yml
 
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml"
 
 desc 'scaling up'
+kubectl_bin patch "perconapgcluster/some-name" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": 3}]'
+sleep 10
 for i in $(seq 1 3); do
-	create_replica ${cluster} ${i}
-	wait_deployment "${cluster}-${i}"
-	compare_kubectl "deployment/${cluster}-${i}"
+#	create_replica ${cluster} ${i}
+	wait_deployment "${cluster}-repl${i}"
+	compare_kubectl "deployment/${cluster}-repl${i}"
 done
-
+sleep 10
 run_psql \
 	'SELECT usename,application_name,client_addr,state from pg_stat_replication' \
 	"postgres:postgres_pass@${cluster}.${namespace}" \
@@ -32,15 +34,15 @@ run_psql \
 run_psql \
 	'\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
 	"postgres:postgres_pass@${cluster}.${namespace}"
-
+sleep 15
 for i in $(seq 1 3); do
-	replica_pod_name=$(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')
+	replica_pod_name=$(kubectl_bin get pods --selector=deployment-name=${cluster}-repl${i} -o 'jsonpath={.items[0].metadata.name}')
 	if [[ -z "$(grep ${replica_pod_name} ${tmp_dir}/replicas.list | grep "streaming")" ]]; then
 		echo "${replica_pod_name} is not connected or has valid data. Exiting..."
 		cat "${tmp_dir}/replicas.list"
 		exit 1
 	fi
-	replica_pod_IP=$(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].status.podIP}')
+	replica_pod_IP=$(kubectl_bin get pods --selector=deployment-name=${cluster}-repl${i} -o 'jsonpath={.items[0].status.podIP}')
 	compare_psql_cmd \
 		"select-2" \
 		'\c myapp \\\ SELECT * from myApp;' \
@@ -49,12 +51,12 @@ done
 
 desc 'Scaling down'
 
-kubectl_bin delete pgreplicas --all
+kubectl_bin patch "perconapgcluster/some-name" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": 0}]'
+sleep 10
 for i in $(seq 1 3); do
-	[[ -n $(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}') ]] \
-		&& wait_for_delete "pod/$(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')"
+	[[ -n $(kubectl_bin get pods --selector=deployment-name=${cluster}-repl${i} -o 'jsonpath={.items[0].metadata.name}') ]] \
+		&& wait_for_delete "pod/$(kubectl_bin get pods --selector=deployment-name=${cluster}-repl${i} -o 'jsonpath={.items[0].metadata.name}')"
 
-	compare_kubectl "pvc/${cluster}-${i}"
 done
 
 run_psql \
@@ -64,7 +66,7 @@ run_psql \
 
 if [[ $(kubectl_bin get pods --selector=name=${cluster}-replica | wc -l | grep -Eo '[0-9]+') -gt 0 && -n $(grep ${cluster} ${tmp_dir}/replicas.list) ]]; then
 	for i in $(seq 1 3); do
-		replica_pod_name=$(kubectl_bin get pods --selector=deployment-name=${cluster}-${i} -o 'jsonpath={.items[0].metadata.name}')
+		replica_pod_name=$(kubectl_bin get pods --selector=deployment-name=${cluster}-repl${i} -o 'jsonpath={.items[0].metadata.name}')
 		if [[ -n "$(grep ${replica_pod_name} ${tmp_dir}/replicas.list | grep "streaming")" ]]; then
 			echo "${replica_pod_name} is not removed from database replication chain. Exiting..."
 			cat "${tmp_dir}/replicas.list"

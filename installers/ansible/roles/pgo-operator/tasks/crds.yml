@@ -58,3 +58,18 @@
     when: crds_result.rc == 1
     ignore_errors: no
     no_log: false
+
+- name: PerconaPGCluster CRD
+  tags:
+    - install
+  block:
+  - name: Check if PerconaPGCluster CRD Is Installed
+    shell: "{{ kubectl_or_oc }} get crd perconapgclusters.crunchydata.com"
+    register: crds_result
+    failed_when: false
+
+  - name: Create PerconaPGClusters CRD
+    command: "{{ kubectl_or_oc }} create -f {{ role_path }}/files/crds/perconapgclusters-crd.yaml"
+    when: crds_result.rc == 1
+    ignore_errors: no
+    no_log: false

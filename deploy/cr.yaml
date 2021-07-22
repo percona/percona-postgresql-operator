@@ -78,15 +78,6 @@ spec:
   pgImage: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
   backrestImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
   backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
-  pmm:
-    enabled: false
-    image: percona/pmm-client:2.15.1
-    serverHost: monitoring-service
-    serverUser: admin
-    pmmSecret: cluster1-pmm-secret
-    resources:
-      cpu: 700m
-      memory: 1Gi
 # references a custom ConfigMap to use when bootstrapping a PostgreSQL cluster
   customconfig: ""
 # name of a database that the PostgreSQL user can log into after the PostgreSQL cluster is created.
@@ -135,7 +126,7 @@ spec:
 # bootstrapping operation, for example, point-in-time-recovery options
 # https://pgbackrest.org/command.html#command-restore
     restoreOpts: ""
-#####################################################
+######################################################
   pgoimageprefix: perconalab/percona-postgresql-operator
   podAntiAffinity:
     default: preferred

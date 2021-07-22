@@ -463,6 +463,16 @@ func initializeControllerWorkerCounts() {
 			*Pgo.Pgo.NamespaceWorkerCount)
 	}
 
+	if Pgo.Pgo.PerconaPGClusterWorkerCount == nil {
+		log.Debugf("PerconaPGClusterWorkerCount not set, defaulting to %d worker(s)",
+			config.DefaultPGClusterWorkerCount)
+		defaultVal := int(config.DefaultPGClusterWorkerCount)
+		Pgo.Pgo.PerconaPGClusterWorkerCount = &defaultVal
+	} else {
+		log.Debugf("PerconaPGClusterWorkerCount is set, using %d worker(s)",
+			*Pgo.Pgo.PerconaPGClusterWorkerCount)
+	}
+
 	if Pgo.Pgo.PGClusterWorkerCount == nil {
 		log.Debugf("PGClusterWorkerCount not set, defaulting to %d worker(s)",
 			config.DefaultPGClusterWorkerCount)

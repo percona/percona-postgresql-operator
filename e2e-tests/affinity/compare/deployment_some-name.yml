@@ -32,6 +32,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-data: "false"
       labels:
         crunchy-pgha-scope: some-name
         deployment-name: some-name
@@ -204,8 +206,11 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext:
-        fsGroup: 26
-        runAsNonRoot: true
+        fsGroup: 1001
+        supplementalGroups:
+          - 1001
+          - 1002
+          - 1003
       serviceAccount: pgo-pg
       serviceAccountName: pgo-pg
       terminationGracePeriodSeconds: 30
