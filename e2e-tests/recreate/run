@@ -14,7 +14,7 @@ kubectl_bin apply \
 	-f $conf_dir/${cluster}-secrets.yml \
 	-f $conf_dir/client.yml
 
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
 desc 'enabling pgbouncer'
 
@@ -71,7 +71,7 @@ sleep 30
 
 kubectl_bin apply \
 	-f $conf_dir/${cluster}-secrets.yml
-apply_cluster "${src_dir}/deploy/percona-cr.yaml" ${cluster}
+apply_cluster "${src_dir}/deploy/cr.yaml" ${cluster}
 wait_cluster_consistency ${cluster}
 sleep 20
 compare_psql_cmd \

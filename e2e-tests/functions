@@ -244,67 +244,67 @@ apply_cluster() {
 		| yq w - 'spec.pgPrimary.image' ${IMAGE_PG_HA} \
 		| yq w - 'spec.backup.image' ${IMAGE_BACKREST} \
 		| yq w - 'spec.backup.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
-			>"${tmp_dir}/percona-cr.yaml"
+			>"${tmp_dir}/cr.yaml"
 
 
 	case ${podAntiAffinity} in
 		'preferred')
-			yq w ${tmp_dir}/percona-cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
 				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
 				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
-			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/percona-cr.yaml
+			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
 		'required')
-			yq w ${tmp_dir}/percona-cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
 				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
 				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
-			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/percona-cr.yaml
+			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
 		'disabled')
-			yq w ${tmp_dir}/percona-cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
 				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
 				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
-			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/percona-cr.yaml
+			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
 		*) ;;
 	esac
 
 	case ${backup} in
 		'local')
-			yq w -i "${tmp_dir}/percona-cr.yaml" 'spec.backup.storageTypes[0]' 'local'
+			yq w -i "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'local'
 			;;
 		'gcs')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storageTypes[0]' 'gcs' \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'gcs' \
 			    | yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
 				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 					>"${tmp_dir}/cr.backup.yaml"
-			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		'gcs+'*)
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storageTypes[0]' 'gcs' \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'gcs' \
 			    | yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
 				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 				| yq w - 'spec.backup.repoPath' "/backrestrepo/${backup//'gcs+'/}-backrest-shared-repo" \
 				| yq w - 'spec.standby' true \
 				| yq d - 'spec.pgBouncer' \
 					>"${tmp_dir}/cr.backup.yaml"
-			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		's3')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
 			    | yq w - 'spec.backup.storages[my-s3].type' 's3' \
 				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
 				| yq w - 'spec.backup.storages[my-s3].uriStyle' 'path' \
 				| yq w - 'spec.backup.storageTypes[0]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
-			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		'local,s3')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
 			    | yq w - 'spec.backup.storages[my-s3].type' 's3' \
 				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
@@ -312,35 +312,35 @@ apply_cluster() {
 				| yq w - 'spec.backup.storageTypes[0]' 'local' \
 				| yq w - 'spec.backup.storageTypes[1]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
-			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		'local,gcs')
-			yq w "${tmp_dir}/percona-cr.yaml" 'spec.backup.storageTypes[0]' 'local' \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'local' \
 			    | yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
 				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 				| yq w - 'spec.backup.storageTypes[1]' 'gcs' \
 					>"${tmp_dir}/cr.backup.yaml"
-			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/percona-cr.yaml"
+			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		*) ;;
 	esac
 
 	if [[ ${restore_from} != "false" ]]; then
-		yq w "${tmp_dir}/percona-cr.yaml" 'spec.pgDataSource.restoreFrom' "${restore_from}" \
+		yq w "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreFrom' "${restore_from}" \
 			>"${tmp_dir}/cr.restore.yaml"
-		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/percona-cr.yaml"
+		mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
 		if [[ ${restore_opts} != "false" ]]; then
 			yq w --style=single "${tmp_dir}/cr.yaml" 'spec.pgDataSource.restoreOpts' "${restore_opts}" \
 				>"${tmp_dir}/cr.restore.yaml"
-			mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/percona-cr.yaml"
+			mv "${tmp_dir}/cr.restore.yaml" "${tmp_dir}/cr.yaml"
 		fi
 	fi
 
 	if [[ ${custom_config} != "false" ]]; then
-		yq w -i "${tmp_dir}/percona-cr.yaml" 'spec.customconfig' ${custom_config}
+		yq w -i "${tmp_dir}/cr.yaml" 'spec.customconfig' ${custom_config}
 	fi
 
-	kubectl_bin apply -f "${tmp_dir}/percona-cr.yaml"
+	kubectl_bin apply -f "${tmp_dir}/cr.yaml"
 }
 
 kubectl_bin() {

@@ -86,7 +86,7 @@ else
 	helm install monitoring --set platform=$platform https://percona-charts.storage.googleapis.com/pmm-server-2.16.0.tgz
 fi
 
-spinup_pgcluster "${cluster}" "${test_dir}/conf/percona-cr.yaml"
+spinup_pgcluster "${cluster}" "${test_dir}/conf/cr.yaml"
 
 desc 'compare deployment'
 compare_kubectl "deployment/${cluster}"
