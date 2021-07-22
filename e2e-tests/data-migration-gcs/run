@@ -129,7 +129,7 @@ function main {
 	kubectl_bin patch "perconapgcluster/${cluster}" \
 		--type json \
 		-p='[{"op":"replace","path":"/spec/standby","value":false}]'
-
+    sleep 30
 	wait_job_completion "backrest-backup-${cluster}"
 
 	[[ -n ${pgo_k8s_name} ]] && gcloud container clusters delete --zone=europe-west3-b "${pgo_k8s_name}" --quiet
