@@ -316,7 +316,7 @@ apply_cluster() {
 			;;
 		'local,gcs')
 			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'local' \
-			    | yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
+				| yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
 				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 				| yq w - 'spec.backup.storageTypes[1]' 'gcs' \
 					>"${tmp_dir}/cr.backup.yaml"
