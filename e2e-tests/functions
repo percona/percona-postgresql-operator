@@ -295,7 +295,7 @@ apply_cluster() {
 			;;
 		's3')
 			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
-			    | yq w - 'spec.backup.storages[my-s3].type' 's3' \
+				| yq w - 'spec.backup.storages[my-s3].type' 's3' \
 				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
 				| yq w - 'spec.backup.storages[my-s3].uriStyle' 'path' \
