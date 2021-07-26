@@ -35,9 +35,9 @@ type FakePgpolicies struct {
 	ns   string
 }
 
-var pgpoliciesResource = schema.GroupVersionResource{Group: "crunchydata.com", Version: "v1", Resource: "pgpolicies"}
+var pgpoliciesResource = schema.GroupVersionResource{Group: "pg.percona.com", Version: "v1", Resource: "pgpolicies"}
 
-var pgpoliciesKind = schema.GroupVersionKind{Group: "crunchydata.com", Version: "v1", Kind: "Pgpolicy"}
+var pgpoliciesKind = schema.GroupVersionKind{Group: "pg.percona.com", Version: "v1", Kind: "Pgpolicy"}
 
 // Get takes name of the pgpolicy, and returns the corresponding pgpolicy object, and an error if there is any.
 func (c *FakePgpolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *crunchydatacomv1.Pgpolicy, err error) {

@@ -51,7 +51,7 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=crunchydata.com, Version=v1
+	// Group=pg.percona.com, Version=v1
 	case v1.SchemeGroupVersion.WithResource("pgclusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Crunchydata().V1().Pgclusters().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("pgpolicies"):
