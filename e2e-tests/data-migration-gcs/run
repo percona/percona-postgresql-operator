@@ -93,7 +93,7 @@ function main {
 	cluster="some-name-${RANDOM}"
 
 	apply_configs "${cluster}"
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml" "gcs+${pgo_cluster_name}"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "gcs+${pgo_cluster_name}"
 
 	desc "Switching to upstream"
 	[[ -n ${PGO_K8S_NAME} ]] && export TARGET_CONFIG="/tmp/${PGO_K8S_NAME}" || export TARGET_CONFIG="/tmp/${pgo_k8s_name}"
