@@ -91,4 +91,26 @@ for r in $(seq 1 3); do
 	check_replica "${cluster}-repl${r}" "${cluster}" "select-2"
 done
 
+master_container=$(kubectl_bin get pods --selector=role=master,service-name=some-name,pg-cluster=some-name -o 'jsonpath={.items[].metadata.name}')
+
+kubectl_bin get configmap/${cluster}-pgha-config -o yaml \
+	| yq r - 'data[some-name-dcs-config]' \
+	| yq w - 'postgresql.parameters.jit' false \
+		>"${tmp_dir}/${cluster}-pgha-config.patch"
+
+kubectl_bin get configmap/${cluster}-pgha-config -o yaml \
+	| yq w - 'data[some-name-dcs-config]' "$(cat ${tmp_dir}/${cluster}-pgha-config.patch)" \
+	| kubectl_bin apply -f -
+
+CONF_MAP_JIT="$(kubectl_bin get configmap/${cluster}-pgha-config -o yaml \
+				| yq r - 'data[some-name-dcs-config]' \
+				| yq r - 'postgresql.parameters.jit')"
+
+PATRONI_JIT="$(kubectl_bin exec ${master_container} -- \
+				bash -c 'patronictl show-config | grep jit | grep -Eo "'"true|false"'" ')"
+
+if [[ ${CONF_MAP_JIT} != ${PATRONI_JIT} ]]; then
+	echo "Dynamic config update is not applied to cluster. Exiting..."
+	exit 1
+fi
 destroy $namespace
