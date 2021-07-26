@@ -28,7 +28,7 @@ and more.
 
 == USAGE
 For more information on the PostgreSQL Operator, see the official
-[PostgreSQL Operator Documentation](https://access.crunchydata.com/documentation/postgres-operator/)
+[PostgreSQL Operator Documentation](https://access.pg.percona.com/documentation/postgres-operator/)
 
 == LABELS
 The starter container includes the following LABEL settings:
@@ -37,7 +37,7 @@ That atomic command runs the Docker command set in this label:
 
 `Name=`
 
-The registry location and name of the image. For example, Name="registry.developers.crunchydata.com/crunchydata/postgres-operator".
+The registry location and name of the image. For example, Name="registry.developers.pg.percona.com/crunchydata/postgres-operator".
 
 `Version=`
 

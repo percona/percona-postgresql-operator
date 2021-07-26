@@ -46,7 +46,7 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
 
 * **Connection Pooling**
 
-    Use [pgBouncer](https://access.crunchydata.com/documentation/postgres-operator/latest/tutorial/pgbouncer/) for connection pooling
+    Use [pgBouncer](https://access.pg.percona.com/documentation/postgres-operator/latest/tutorial/pgbouncer/) for connection pooling
 
 * **Affinity and Tolerations**
 
