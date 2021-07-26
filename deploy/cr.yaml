@@ -8,7 +8,7 @@ metadata:
     deployment-name: cluster1
     name: cluster1
     pg-cluster: cluster1
-    pgo-version: 0.1.0
+    pgo-version: 0.2.0
     pgouser: admin
   name: cluster1
 spec:
@@ -39,7 +39,7 @@ spec:
 #      storageclass: "standard"
 #      matchLabels: ""
   userLabels:
-    pgo-version: "0.1.0"
+    pgo-version: "0.2.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
     resources:
