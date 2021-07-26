@@ -82,7 +82,7 @@
         },
         {
             "apiGroups": [
-                "crunchydata.com"
+                "pg.percona.com"
             ],
             "resources": [
                 "pgclusters",

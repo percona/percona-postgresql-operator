@@ -125,4 +125,4 @@ form:
     description: |-
       Only one instance of Crunchy PostgreSQL Operator is necessary per Kubernetes cluster.
 
-      If you have further questions, contact us at <a href="mailto:info@crunchydata.com">info@crunchydata.com</a>.
+      If you have further questions, contact us at <a href="mailto:info@pg.percona.com">info@pg.percona.com</a>.

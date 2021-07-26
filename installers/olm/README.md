@@ -5,7 +5,7 @@ The integration centers around a [ClusterServiceVersion][olm-csv] [manifest](./p
 that gets packaged for OperatorHub. Changes there are accepted only if they pass all the [scorecard][]
 tests. Consult the [technical requirements][hub-contrib] when making changes.
 
-[crunchy-data]: https://www.crunchydata.com
+[crunchy-data]: https://www.pg.percona.com
 [hub-contrib]: https://github.com/operator-framework/community-operators/blob/master/docs/contributing.md
 [hub-listing]: https://operatorhub.io/operator/postgresql
 [olm-csv]: https://github.com/operator-framework/operator-lifecycle-manager/blob/master/doc/design/building-your-csv.md

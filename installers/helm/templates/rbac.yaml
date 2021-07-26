@@ -116,7 +116,7 @@ rules:
       - delete
       - list
   - apiGroups:
-      - crunchydata.com
+      - pg.percona.com
     resources:
       - perconapgclusters
       - pgclusters

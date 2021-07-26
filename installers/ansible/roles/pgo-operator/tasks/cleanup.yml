@@ -246,8 +246,8 @@
 
 - name: Delete Custom Resource Definitions
   shell: |
-    {{ kubectl_or_oc }} delete crds pgclusters.crunchydata.com \
-        pgpolicies.crunchydata.com pgreplicas.crunchydata.com pgtasks.crunchydata.com
+    {{ kubectl_or_oc }} delete crds pgclusters.pg.percona.com \
+        pgpolicies.pg.percona.com pgreplicas.pg.percona.com pgtasks.pg.percona.com
   ignore_errors: yes
   no_log: false
   when: not multi_operator_env|bool

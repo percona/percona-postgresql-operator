@@ -5,7 +5,7 @@ The integration centers around a container [image](./Dockerfile) that contains a
 [schema](./schema.yaml) and an [Application][k8s-app] [manifest](./application.yaml).
 Consult the [technical requirements][gcp-k8s-requirements] when making changes.
 
-[crunchy-data]: https://www.crunchydata.com
+[crunchy-data]: https://www.pg.percona.com
 [k8s-app]: https://github.com/kubernetes-sigs/application/
 [gcp-k8s]: https://cloud.google.com/marketplace/docs/kubernetes-apps/
 [gcp-k8s-requirements]: https://cloud.google.com/marketplace/docs/partners/kubernetes-solutions/create-app-package

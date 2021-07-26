@@ -2,9 +2,9 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: pgclusters.crunchydata.com
+  name: pgclusters.pg.percona.com
 spec:
-  group: crunchydata.com
+  group: pg.percona.com
   names:
     kind: Pgcluster
     listKind: PgclusterList
@@ -36,9 +36,9 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: pgpolicies.crunchydata.com
+  name: pgpolicies.pg.percona.com
 spec:
-  group: crunchydata.com
+  group: pg.percona.com
   names:
     kind: Pgpolicy
     listKind: PgpolicyList
@@ -57,9 +57,9 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: pgreplicas.crunchydata.com
+  name: pgreplicas.pg.percona.com
 spec:
-  group: crunchydata.com
+  group: pg.percona.com
   names:
     kind: Pgreplica
     listKind: PgreplicaList
@@ -78,9 +78,9 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: pgtasks.crunchydata.com
+  name: pgtasks.pg.percona.com
 spec:
-  group: crunchydata.com
+  group: pg.percona.com
   names:
     kind: Pgtask
     listKind: PgtaskList

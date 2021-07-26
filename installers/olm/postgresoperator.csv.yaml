@@ -5,7 +5,7 @@ metadata:
   name: 'postgresoperator.v${PGO_VERSION}'
   annotations:
     certified: 'false'
-    support: crunchydata.com
+    support: pg.percona.com
 
     # The following affect how the package is indexed at OperatorHub.io:
     # https://operatorhub.io/?category=Database
@@ -40,12 +40,12 @@ spec:
   version: '${PGO_VERSION}'
   links:
     - name: Crunchy Data
-      url: https://www.crunchydata.com/
+      url: https://www.pg.percona.com/
     - name: Documentation
-      url: 'https://access.crunchydata.com/documentation/postgres-operator/'
+      url: 'https://access.pg.percona.com/documentation/postgres-operator/'
   maintainers:
     - name: Crunchy Data
-      email: info@crunchydata.com
+      email: info@pg.percona.com
 
   minKubeVersion: 1.11.0
   maturity: stable
@@ -155,7 +155,7 @@ spec:
                 - delete
                 - deletecollection
             - apiGroups:
-                - crunchydata.com
+                - pg.percona.com
               resources:
                 - perconapgclusters
                 - pgclusters

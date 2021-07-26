@@ -21,7 +21,7 @@ serviceAccount:
 # =====================
 # Configuration Options
 # More info for these options can be found in the docs
-# https://access.crunchydata.com/documentation/postgres-operator/latest/installation/configuration/
+# https://access.pg.percona.com/documentation/postgres-operator/latest/installation/configuration/
 # =====================
 archive_mode: "true"
 archive_timeout: "60"
@@ -37,7 +37,7 @@ backrest_gcs_endpoint: ""
 backrest_gcs_key_type: ""
 backrest_port: "2022"
 badger: "false"
-ccp_image_prefix: "registry.developers.crunchydata.com/crunchydata"
+ccp_image_prefix: "registry.developers.pg.percona.com/crunchydata"
 ccp_image_pull_secret: ""
 ccp_image_pull_secret_manifest: ""
 ccp_image_tag: "centos8-13.3-4.7.0"
@@ -76,7 +76,7 @@ pgo_client_version: "4.7.0"
 pgo_cluster_admin: "false"
 pgo_disable_eventing: "false"
 pgo_disable_tls: "false"
-pgo_image_prefix: "registry.developers.crunchydata.com/crunchydata"
+pgo_image_prefix: "registry.developers.pg.percona.com/crunchydata"
 pgo_image_pull_secret: ""
 pgo_image_pull_secret_manifest: ""
 pgo_image_tag: "centos8-4.7.0"

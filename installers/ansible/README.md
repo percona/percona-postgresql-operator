@@ -9,7 +9,7 @@ Latest Release: 0.2.0
 ## General
 
 This repository contains Ansible Roles for deploying PGO: the Postgres Operator
-from [Crunchy Data](https://www.crunchydata.com) for Kubernetes and OpenShift.
+from [Crunchy Data](https://www.pg.percona.com) for Kubernetes and OpenShift.
 
 See the [official documentation for more information](https://crunchydata.github.io/postgres-operator/stable/)
 on installing Crunchy PostgreSQL Operator.

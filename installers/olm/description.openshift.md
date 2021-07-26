@@ -28,19 +28,19 @@ providing the essential features you need to keep your PostgreSQL clusters up an
 
 and much more!
 
-[disaster-recovery]: https://access.crunchydata.com/documentation/postgres-operator/latest/architecture/disaster-recovery/
-[high-availability]: https://access.crunchydata.com/documentation/postgres-operator/latest/architecture/high-availability/
-[high-availability-node-affinity]: https://access.crunchydata.com/documentation/postgres-operator/latest/architecture/high-availability/#node-affinity
-[high-availability-tolerations]: https://access.crunchydata.com/documentation/postgres-operator/latest/architecture/high-availability/#tolerations
-[pgo-create-cluster]: https://access.crunchydata.com/documentation/postgres-operator/latest/pgo-client/reference/pgo_create_cluster/
-[pgo-task-tls]: https://access.crunchydata.com/documentation/postgres-operator/latest/tutorial/tls/
-[provisioning]: https://access.crunchydata.com/documentation/postgres-operator/latest/architecture/provisioning/
+[disaster-recovery]: https://access.pg.percona.com/documentation/postgres-operator/latest/architecture/disaster-recovery/
+[high-availability]: https://access.pg.percona.com/documentation/postgres-operator/latest/architecture/high-availability/
+[high-availability-node-affinity]: https://access.pg.percona.com/documentation/postgres-operator/latest/architecture/high-availability/#node-affinity
+[high-availability-tolerations]: https://access.pg.percona.com/documentation/postgres-operator/latest/architecture/high-availability/#tolerations
+[pgo-create-cluster]: https://access.pg.percona.com/documentation/postgres-operator/latest/pgo-client/reference/pgo_create_cluster/
+[pgo-task-tls]: https://access.pg.percona.com/documentation/postgres-operator/latest/tutorial/tls/
+[provisioning]: https://access.pg.percona.com/documentation/postgres-operator/latest/architecture/provisioning/
 
 [k8s-anti-affinity]: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#inter-pod-affinity-and-anti-affinity
 [k8s-nodes]: https://kubernetes.io/docs/concepts/architecture/nodes/
 
 [pgBackRest]: https://www.pgbackrest.org
-[pgBouncer]: https://access.crunchydata.com/documentation/postgres-operator/latest/tutorial/pgbouncer/
+[pgBouncer]: https://access.pg.percona.com/documentation/postgres-operator/latest/tutorial/pgbouncer/
 [pgMonitor]: https://github.com/CrunchyData/pgmonitor
 
 ## Pre-Installation
@@ -111,7 +111,7 @@ oc -n pgo scale --replicas 1 deployment/postgres-operator
 
 For a guide on how to perform many of the daily functions of the PostgreSQL Operator, we recommend that you read the [Postgres Operator tutorial][pgo-tutorial]
 
-[pgo-tutorial]: https://access.crunchydata.com/documentation/postgres-operator/latest/tutorial/create-cluster/
+[pgo-tutorial]: https://access.pg.percona.com/documentation/postgres-operator/latest/tutorial/create-cluster/
 
 However, the below guide will show you how to create a Postgres cluster from a custom resource or from using the `pgo-client`.
 
@@ -142,10 +142,10 @@ export pgo_cluster_name=hippo
 # this variable is the namespace the cluster is being deployed into
 export cluster_namespace=pgo
 # this variable is set to the location of your image repository
-export cluster_image_prefix=registry.developers.crunchydata.com/crunchydata
+export cluster_image_prefix=registry.developers.pg.percona.com/crunchydata
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -240,7 +240,7 @@ psql -h localhost -U "${pgo_cluster_username}" "${pgo_cluster_name}"
 Once the PostgreSQL Operator is installed in your OpenShift cluster, you will need to do a few things
 to use the [PostgreSQL Operator Client][pgo-client].
 
-[pgo-client]: https://access.crunchydata.com/documentation/postgres-operator/latest/pgo-client/
+[pgo-client]: https://access.pg.percona.com/documentation/postgres-operator/latest/pgo-client/
 
 Install the first set of client credentials and download the `pgo` binary and client certificates.
 

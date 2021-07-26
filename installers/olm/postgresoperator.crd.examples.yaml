@@ -1,5 +1,5 @@
 ---
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations: { current-primary: 'hippo' }
@@ -52,7 +52,7 @@ spec:
     pgo-version: '${PGO_VERSION}'
 
 ---
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgreplica
 metadata:
   name: example
@@ -60,7 +60,7 @@ spec: {}
 status: {}
 
 ---
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgpolicy
 metadata:
   name: example
@@ -68,7 +68,7 @@ spec: {}
 status: {}
 
 ---
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgtask
 metadata:
   name: example

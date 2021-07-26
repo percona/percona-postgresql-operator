@@ -9,7 +9,7 @@ Latest Release: 4.7.0
 ## General
 
 This repository contains Ansible Roles for deploying the metrics stack for PGO,
-the Postgres Operator from [Crunchy Data](https://www.crunchydata.com).
+the Postgres Operator from [Crunchy Data](https://www.pg.percona.com).
 
-See the [PGO documentation](https://access.crunchydata.com/documentation/postgres-operator/)
+See the [PGO documentation](https://access.pg.percona.com/documentation/postgres-operator/)
 for more information.

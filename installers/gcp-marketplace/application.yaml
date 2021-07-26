@@ -20,8 +20,8 @@ spec:
     version: '${PGO_VERSION}'
     maintainers:
       - name: Crunchy Data
-        url: https://www.crunchydata.com/
-        email: info@crunchydata.com
+        url: https://www.pg.percona.com/
+        email: info@pg.percona.com
     keywords:
       - postgres
       - postgresql
@@ -31,9 +31,9 @@ spec:
       - crunchy data
     links:
       - description: Crunchy PostgreSQL for Kubernetes
-        url: https://www.crunchydata.com/products/crunchy-postgresql-for-kubernetes/
+        url: https://www.pg.percona.com/products/crunchy-postgresql-for-kubernetes/
       - description: Documentation
-        url: 'https://access.crunchydata.com/documentation/postgres-operator/${PGO_VERSION}'
+        url: 'https://access.pg.percona.com/documentation/postgres-operator/${PGO_VERSION}'
       - description: GitHub
         url: https://github.com/CrunchyData/postgres-operator
 

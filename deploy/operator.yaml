@@ -103,7 +103,7 @@ rules:
       - delete
       - list
   - apiGroups:
-      - crunchydata.com
+      - pg.percona.com
     resources:
       - perconapgclusters
       - pgclusters
@@ -124,7 +124,7 @@ data:
     # =====================
     # Configuration Options
     # More info for these options can be found in the docs
-    # https://access.crunchydata.com/documentation/postgres-operator/latest/installation/configuration/
+    # https://access.pg.percona.com/documentation/postgres-operator/latest/installation/configuration/
     # =====================
     archive_mode: "true"
     archive_timeout: "60"

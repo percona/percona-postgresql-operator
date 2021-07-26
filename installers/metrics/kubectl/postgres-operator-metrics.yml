@@ -88,7 +88,7 @@ data:
     # =====================
     # Configuration Options
     # More info for these options can be found in the docs
-    # https://access.crunchydata.com/documentation/postgres-operator/latest/installation/metrics/metrics-configuration/
+    # https://access.pg.percona.com/documentation/postgres-operator/latest/installation/metrics/metrics-configuration/
     # =====================
     alertmanager_custom_config: ""
     alertmanager_custom_rules_config: ""
@@ -165,7 +165,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-metrics-deploy
-          image: registry.developers.crunchydata.com/crunchydata/pgo-deployer:centos8-4.7.0
+          image: registry.developers.pg.percona.com/crunchydata/pgo-deployer:centos8-4.7.0
           imagePullPolicy: IfNotPresent
           env:
             - name: DEPLOY_ACTION

@@ -1,5 +1,5 @@
 # https://github.com/openshift/console/tree/master/frontend/packages/operator-lifecycle-manager/src/components/descriptors
-- name: pgclusters.crunchydata.com
+- name: pgclusters.pg.percona.com
   kind: Pgcluster
   version: v1
   displayName: Postgres Primary Cluster Member
@@ -112,7 +112,7 @@
       x-descriptors:
         - 'urn:alm:descriptor:text'
 
-- name: pgreplicas.crunchydata.com
+- name: pgreplicas.pg.percona.com
   kind: Pgreplica
   version: v1
   displayName: Postgres Replica Cluster Member
@@ -145,7 +145,7 @@
       x-descriptors:
         - 'urn:alm:descriptor:text'
 
-- name: pgpolicies.crunchydata.com
+- name: pgpolicies.pg.percona.com
   kind: Pgpolicy
   version: v1
   displayName: Postgres SQL Policy
@@ -175,7 +175,7 @@
       x-descriptors:
         - 'urn:alm:descriptor:text'
 
-- name: pgtasks.crunchydata.com
+- name: pgtasks.pg.percona.com
   kind: Pgtask
   version: v1
   displayName: Postgres workflow task
