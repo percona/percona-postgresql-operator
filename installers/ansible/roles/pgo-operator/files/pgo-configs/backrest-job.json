@@ -48,7 +48,6 @@
                 "containers": [{
                     "name": "backrest",
                     "image": "{{.Image}}",
-
                     "securityContext": {
                       "allowPrivilegeEscalation": false,
                       "privileged": false,

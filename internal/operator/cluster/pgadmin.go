@@ -52,6 +52,8 @@ type pgAdminTemplateFields struct {
 	Name           string
 	ClusterName    string
 	Image          string
+	CCPImagePrefix string
+	CCPImageTag    string
 	CustomLabels   string
 	DisableFSGroup bool
 	Port           string
@@ -408,6 +410,9 @@ func createPgAdminDeployment(clientset kubernetes.Interface, cluster *crv1.Pgclu
 		Name:           pgAdminDeploymentName,
 		ClusterName:    cluster.Name,
 		Image:          cluster.Spec.PgAdminImage,
+		CCPImagePrefix: util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
+		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
+			operator.Pgo.Cluster.CCPImageTag),
 		CustomLabels:   operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 		DisableFSGroup: operator.Pgo.DisableFSGroup(),
 		Port:           defPgAdminPort,
