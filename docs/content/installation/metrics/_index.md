@@ -34,7 +34,7 @@ for additional details.
 By leveraging the various installation methods described in this section, the PostgreSQL Operator
 Metrics infrastructure can be deployed alongside the PostgreSQL Operator.  There are several
 different ways to install and deploy the
-[PostgreSQL Operator Monitoring infrastructure](https://www.crunchydata.com/developers/download-postgres/containers/postgres-operator)
+[PostgreSQL Operator Monitoring infrastructure](https://www.pg.percona.com/developers/download-postgres/containers/postgres-operator)
 based upon your use case.
 
 For the vast majority of use cases, we recommend using the

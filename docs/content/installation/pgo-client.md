@@ -32,7 +32,7 @@ The following will setup the `pgo` client to be used on a Linux or macOS system.
 ### Installing the Client
 
 First, download the `pgo` client from the
-[GitHub official releases](https://github.com/CrunchyData/postgres-operator/releases). Crunchy Enterprise Customers can download the pgo binaries from https://access.crunchydata.com/ on the downloads page.
+[GitHub official releases](https://github.com/CrunchyData/postgres-operator/releases). Crunchy Enterprise Customers can download the pgo binaries from https://access.pg.percona.com/ on the downloads page.
 
 Next, install `pgo` in `/usr/local/bin` by running the following:
 

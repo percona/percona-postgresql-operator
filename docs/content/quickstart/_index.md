@@ -216,7 +216,7 @@ The `primaryuser` is the used for replication and [high availability]({{< relref
 
 ### Connecting via `psql`
 
-Let's see how we can connect to `hippo` using [`psql`](https://www.postgresql.org/docs/current/app-psql.html), the command-line tool for accessing PostgreSQL. Ensure you have [installed the `psql` client](https://www.crunchydata.com/developers/download-postgres/binaries/postgresql12).
+Let's see how we can connect to `hippo` using [`psql`](https://www.postgresql.org/docs/current/app-psql.html), the command-line tool for accessing PostgreSQL. Ensure you have [installed the `psql` client](https://www.pg.percona.com/developers/download-postgres/binaries/postgresql12).
 
 PGO, the Postgres Operator, creates a service with the same name as the cluster. See for yourself! Get a list of all of the Services available in the `pgo` namespace:
 

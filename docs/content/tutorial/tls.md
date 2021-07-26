@@ -15,7 +15,7 @@ There are three items that are required to enable TLS in your PostgreSQL cluster
 - A TLS private key
 - A TLS certificate
 
-There are a variety of methods available to generate these items: in fact, Kubernetes comes with its own [certificate management system](https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/)! It is up to you to decide how you want to manage this for your cluster. The PostgreSQL documentation also provides an example for how to [generate a TLS certificate](https://blog.crunchydata.com/blog/tls-postgres-kubernetes-openssl) as well.
+There are a variety of methods available to generate these items: in fact, Kubernetes comes with its own [certificate management system](https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/)! It is up to you to decide how you want to manage this for your cluster. The PostgreSQL documentation also provides an example for how to [generate a TLS certificate](https://blog.pg.percona.com/blog/tls-postgres-kubernetes-openssl) as well.
 
 To set up TLS for your PostgreSQL cluster, you have to create two [Secrets](https://kubernetes.io/docs/concepts/configuration/secret/): one that contains the CA certificate, and the other that contains the server TLS key pair.
 
@@ -125,7 +125,7 @@ By default, the PostgreSQL Operator has each replica connect to PostgreSQL using
 
 ## Add TLS to an Existing PostgreSQL Cluster
 
-You can add TLS to an existing PostgreSQL cluster using the [`pgo update cluster`]({{< relref "/pgo-client/reference/pgo_update_cluster.md" >}}) or by modifying the `pgclusters.crunchydata.com` custom resource directly. `pgo update cluster` provides several flags for TLS management, including:
+You can add TLS to an existing PostgreSQL cluster using the [`pgo update cluster`]({{< relref "/pgo-client/reference/pgo_update_cluster.md" >}}) or by modifying the `pgclusters.pg.percona.com` custom resource directly. `pgo update cluster` provides several flags for TLS management, including:
 
 - `--disable-server-tls`: removes TLS from a cluster
 - `--disable-tls-only`: removes the TLS-only requirement from a cluster

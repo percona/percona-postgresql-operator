@@ -65,7 +65,7 @@ export pgo_cluster_name=hippo
 export cluster_namespace=pgo
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -106,7 +106,7 @@ spec:
     supplementalgroups: ""
   annotations: {}
   ccpimage: crunchy-postgres-ha
-  ccpimageprefix: registry.developers.crunchydata.com/crunchydata
+  ccpimageprefix: registry.developers.pg.percona.com/crunchydata
   ccpimagetag: {{< param centosBase >}}-{{< param postgresVersion >}}-{{< param operatorVersion >}}
   clustername: ${pgo_cluster_name}
   database: ${pgo_cluster_name}
@@ -117,7 +117,7 @@ spec:
     restoreFrom: ""
     restoreOpts: ""
   pgbadgerport: "10000"
-  pgoimageprefix: registry.developers.crunchydata.com/crunchydata
+  pgoimageprefix: registry.developers.pg.percona.com/crunchydata
   podAntiAffinity:
     default: preferred
     pgBackRest: preferred
@@ -237,7 +237,7 @@ unset backrest_s3_key_secret
 With the Secrets in place. It is now time to create the PostgreSQL cluster.
 
 The below manifest references the Secrets created in the previous step to add a
-custom resource to the `pgclusters.crunchydata.com` custom resource definition.
+custom resource to the `pgclusters.pg.percona.com` custom resource definition.
 There are some additions in this example specifically for storing backups in S3.
 
 ```
@@ -252,7 +252,7 @@ export backrest_s3_endpoint=s3.region-name.amazonaws.com
 export backrest_s3_region=region-name
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -300,7 +300,7 @@ spec:
   backrestS3URIStyle: ""
   backrestS3VerifyTLS: ""
   ccpimage: crunchy-postgres-ha
-  ccpimageprefix: registry.developers.crunchydata.com/crunchydata
+  ccpimageprefix: registry.developers.pg.percona.com/crunchydata
   ccpimagetag: {{< param centosBase >}}-{{< param postgresVersion >}}-{{< param operatorVersion >}}
   clustername: ${pgo_cluster_name}
   database: ${pgo_cluster_name}
@@ -311,7 +311,7 @@ spec:
     restoreFrom: ""
     restoreOpts: ""
   pgbadgerport: "10000"
-  pgoimageprefix: registry.developers.crunchydata.com/crunchydata
+  pgoimageprefix: registry.developers.pg.percona.com/crunchydata
   podAntiAffinity:
     default: preferred
     pgBackRest: preferred
@@ -359,7 +359,7 @@ unset backrest_gcs_key
 With the Secrets in place. It is now time to create the PostgreSQL cluster.
 
 The below manifest references the Secrets created in the previous step to add a
-custom resource to the `pgclusters.crunchydata.com` custom resource definition.
+custom resource to the `pgclusters.pg.percona.com` custom resource definition.
 There are some additions in this example specifically for storing backups in
 GCS.
 
@@ -373,7 +373,7 @@ export cluster_namespace=pgo
 export backrest_gcs_bucket=your-bucket
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -417,7 +417,7 @@ spec:
   - gcs
   backrestGCSBucket: ${backrest_gcs_bucket}
   ccpimage: crunchy-postgres-ha
-  ccpimageprefix: registry.developers.crunchydata.com/crunchydata
+  ccpimageprefix: registry.developers.pg.percona.com/crunchydata
   ccpimagetag: {{< param centosBase >}}-{{< param postgresVersion >}}-{{< param operatorVersion >}}
   clustername: ${pgo_cluster_name}
   database: ${pgo_cluster_name}
@@ -428,7 +428,7 @@ spec:
     restoreFrom: ""
     restoreOpts: ""
   pgbadgerport: "10000"
-  pgoimageprefix: registry.developers.crunchydata.com/crunchydata
+  pgoimageprefix: registry.developers.pg.percona.com/crunchydata
   podAntiAffinity:
     default: preferred
     pgBackRest: preferred
@@ -464,7 +464,7 @@ There are two Secrets that need to be created:
 1. A Secret containing the certificate authority (CA). You may only need to create this Secret once, as a CA certificate can be shared amongst your clusters.
 2. A Secret that contains the TLS private key & certificate.
 
-This assumes that you have already [generated your TLS certificates](https://blog.crunchydata.com/blog/tls-postgres-kubernetes-openssl) where the CA is named `ca.crt` and the server key and certificate are named `server.key` and `server.crt` respectively.
+This assumes that you have already [generated your TLS certificates](https://blog.pg.percona.com/blog/tls-postgres-kubernetes-openssl) where the CA is named `ca.crt` and the server key and certificate are named `server.key` and `server.crt` respectively.
 
 Substitute the correct values for your environment into the environmental variables in the example below:
 
@@ -497,7 +497,7 @@ export pgo_cluster_name=hippo
 export cluster_namespace=pgo
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -538,7 +538,7 @@ spec:
     supplementalgroups: ""
   annotations: {}
   ccpimage: crunchy-postgres-ha
-  ccpimageprefix: registry.developers.crunchydata.com/crunchydata
+  ccpimageprefix: registry.developers.pg.percona.com/crunchydata
   ccpimagetag: {{< param centosBase >}}-{{< param postgresVersion >}}-{{< param operatorVersion >}}
   clustername: ${pgo_cluster_name}
   database: ${pgo_cluster_name}
@@ -549,7 +549,7 @@ spec:
     restoreFrom: ""
     restoreOpts: ""
   pgbadgerport: "10000"
-  pgoimageprefix: registry.developers.crunchydata.com/crunchydata
+  pgoimageprefix: registry.developers.pg.percona.com/crunchydata
   podAntiAffinity:
     default: preferred
     pgBackRest: preferred
@@ -570,7 +570,7 @@ kubectl apply -f "${pgo_cluster_name}-pgcluster.yaml"
 ### Modify a Cluster
 
 There following modification operations are supported on the
-`pgclusters.crunchydata.com` custom resource definition:
+`pgclusters.pg.percona.com` custom resource definition:
 
 #### Modify Resource Requests & Limits
 
@@ -587,7 +587,7 @@ export pgo_cluster_name=hippo
 # this variable is the namespace the cluster is being deployed into
 export cluster_namespace=pgo
 
-kubectl edit pgclusters.crunchydata.com -n "${cluster_namespace}" "${pgo_cluster_name}"
+kubectl edit pgclusters.pg.percona.com -n "${cluster_namespace}" "${pgo_cluster_name}"
 ```
 
 This will open up your editor. Find the `resources` block, and have it read as
@@ -614,7 +614,7 @@ together and not mix and match, i.e.
 
 Once you have created a PostgreSQL cluster, you may want to add a replica to
 create a high-availability environment. Replicas are added and removed using the
-`pgreplicas.crunchydata.com` custom resource definition. Each replica must have
+`pgreplicas.pg.percona.com` custom resource definition. Each replica must have
 a unique name, e.g. `hippo-rpl1` could be one unique replica for a PostgreSQL
 cluster.
 
@@ -631,7 +631,7 @@ export pgo_cluster_replica_suffix=rpl1
 export cluster_namespace=pgo
 
 cat <<-EOF > "${pgo_cluster_name}-${pgo_cluster_replica_suffix}-pgreplica.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgreplica
 metadata:
   labels:
@@ -678,7 +678,7 @@ and how you can resize the PVCs.
 
 To resize the PVC that stores the PostgreSQL data directory across the entire
 cluster, you will need to edit the `size` attribute of the `PrimaryStorage`
-section of the `pgclusters.crunchydata.com` custom resource.
+section of the `pgclusters.pg.percona.com` custom resource.
 
 The PVC resize process for a cluster uses a [rolling update]({{< relref "/architecture/high-availability/_index.md">}}#rolling-updates)
 to apply the size changes. During the process, each Deployment is scaled down
@@ -688,7 +688,7 @@ and back to allow for the PVC resize to take effect.
 
 To resize the PVC that stores the backups managed by pgBackRest, you will need to
 edit the `size` attribute of the `BackrestStorage` section of the
-`pgclusters.crunchydata.com` custom resource.
+`pgclusters.pg.percona.com` custom resource.
 
 The Postgres Operator will apply the PVC size change and scale the pgBackRest
 Deployment down and back up.
@@ -696,7 +696,7 @@ Deployment down and back up.
 #### Resize a single PostgreSQL instance / read-only replica
 
 To resize the PVC for a read-only replica, you can edit the `size` attribute
-of the `ReplicaStorage` portion of the `pgreplicas.crunchydata.com` custom
+of the `ReplicaStorage` portion of the `pgreplicas.pg.percona.com` custom
 resource.
 
 Note that if a subsequent action resizes the PVCs for all of the instances in a
@@ -710,7 +710,7 @@ Deployment down and back up.
 
 To resize the optional PVC that can be used to store WAL archives, you can edit
 the `size` attribute of the `WALStorage` section of the
-`pgclusters.crunchydata.com` custom resource.
+`pgclusters.pg.percona.com` custom resource.
 
 The PVC resize process for a cluster uses a [rolling update]({{< relref "/architecture/high-availability/_index.md">}}#rolling-updates)
 to apply the size changes. During the process, each Deployment is scaled down
@@ -720,7 +720,7 @@ and back up to allow for the PVC resize to take effect.
 
 If you have deployed [pgAdmin 4]({{< relref "/architecture/pgadmin4.md" >}}) and
 need to resize its PVC, you can edit the `size` attribute of the `PGAdmin`
-section of the `pgclusters.crunchydata.com` custom resource.
+section of the `pgclusters.pg.percona.com` custom resource.
 
 The PVC resize process for a cluster uses a [rolling update]({{< relref "/architecture/high-availability/_index.md">}}#rolling-updates)
 to apply the size changes. During the process, the pgAdmin 4 Deployment is
@@ -730,7 +730,7 @@ scaled down and back up to allow for the PVC resize to take effect.
 
 To enable the [monitoring]({{< relref "/architecture/monitoring.md">}})
 (aka metrics) sidecar using the `crunchy-postgres-exporter` container, you need
-to set the `exporter` attribute in `pgclusters.crunchydata.com` custom resource.
+to set the `exporter` attribute in `pgclusters.pg.percona.com` custom resource.
 
 ### Add a Tablespace
 
@@ -738,8 +738,8 @@ Tablespaces can be added during the lifetime of a PostgreSQL cluster (tablespace
 
 To add a tablespace, you need to add an entry to the `tablespaceMounts` section
 of a custom entry, where the key is the name of the tablespace (unique to the
-`pgclusters.crunchydata.com` custom resource entry) and the value is a storage
-configuration as defined in the `pgclusters.crunchydata.com` section above.
+`pgclusters.pg.percona.com` custom resource entry) and the value is a storage
+configuration as defined in the `pgclusters.pg.percona.com` section above.
 
 For example, to add a tablespace named `lake` to our `hippo` cluster, we can
 open up the editor with the following code:
@@ -750,7 +750,7 @@ export pgo_cluster_name=hippo
 # this variable is the namespace the cluster is being deployed into
 export cluster_namespace=pgo
 
-kubectl edit pgclusters.crunchydata.com -n "${cluster_namespace}" "${pgo_cluster_name}"
+kubectl edit pgclusters.pg.percona.com -n "${cluster_namespace}" "${pgo_cluster_name}"
 ```
 
 and add an entry to the `tablespaceMounts` block that looks similar to this,
@@ -772,7 +772,7 @@ tablespaceMounts:
 [pgBouncer](https://www.pgbouncer.org/) is a PostgreSQL connection pooler and
 state manager that can be useful for high-availability setups as well as
 managing overall performance of a PostgreSQL cluster. A pgBouncer deployment for
-a PostgreSQL cluster can be fully managed from a `pgclusters.crunchydata.com`
+a PostgreSQL cluster can be fully managed from a `pgclusters.pg.percona.com`
 custom resource.
 
 For example, to add a pgBouncer deployment to our `hippo` cluster with two
@@ -784,7 +784,7 @@ export pgo_cluster_name=hippo
 # this variable is the namespace the cluster is being deployed into
 export cluster_namespace=pgo
 
-kubectl edit pgclusters.crunchydata.com -n "${cluster_namespace}" "${pgo_cluster_name}"
+kubectl edit pgclusters.pg.percona.com -n "${cluster_namespace}" "${pgo_cluster_name}"
 ```
 
 And modify the `pgBouncer` block to look like this:
@@ -807,7 +807,7 @@ pgBouncer:
 ### Start / Stop a Cluster
 
 A PostgreSQL cluster can be start and stopped by toggling the `shutdown`
-parameter in a `pgclusters.crunchydata.com` custom resource. Setting `shutdown`
+parameter in a `pgclusters.pg.percona.com` custom resource. Setting `shutdown`
 to `true` will stop a PostgreSQL cluster, whereas a value of `false` will make
 a cluster available. This affects all of the associated instances of a
 PostgreSQL cluster.
@@ -817,7 +817,7 @@ PostgreSQL cluster.
 Kubernetes [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
 can be managed for PostgreSQL, pgBackRest, and pgBouncer Deployments, as well as
 being able to apply Annotations across all three. This is done via the
-`annotations` block in the `pgclusters.crunchydata.com` custom resource
+`annotations` block in the `pgclusters.pg.percona.com` custom resource
 definition. For example, to apply Annotations in the `hippo` cluster, some that
 are global, some that are specific to each Deployment type, you could do the
 following.
@@ -830,7 +830,7 @@ export pgo_cluster_name=hippo
 # this variable is the namespace the cluster is being deployed into
 export cluster_namespace=pgo
 
-kubectl edit pgclusters.crunchydata.com -n "${cluster_namespace}" "${pgo_cluster_name}"
+kubectl edit pgclusters.pg.percona.com -n "${cluster_namespace}" "${pgo_cluster_name}"
 ```
 
 In the `hippo` specification, add the annotations block similar to this (note,
@@ -870,7 +870,7 @@ cluster. These objects include:
 - Services
 
 The custom labels can be managed through the `userlabels` attribute on the
-`pgclusters.crunchydata.com` custom resource spec.
+`pgclusters.pg.percona.com` custom resource spec.
 
 For example, if I want to add a custom label to all of the objects within my
 Postgres cluster with a key of `favorite` and a value of `hippo`, you would
@@ -884,9 +884,9 @@ spec:
 
 ### Delete a PostgreSQL Cluster
 
-A PostgreSQL cluster can be deleted by simply deleting the `pgclusters.crunchydata.com` resource.
+A PostgreSQL cluster can be deleted by simply deleting the `pgclusters.pg.percona.com` resource.
 
-It is possible to keep both the PostgreSQL data directory as well as the pgBackRest backup repository when using this method by setting the following annotations on the `pgclusters.crunchydata.com` custom resource:
+It is possible to keep both the PostgreSQL data directory as well as the pgBackRest backup repository when using this method by setting the following annotations on the `pgclusters.pg.percona.com` custom resource:
 
 - `keep-backups`: indicates to keep the pgBackRest PVC when deleting the cluster.
 - `keep-data`: indicates to keep the PostgreSQL data PVC when deleting the cluster.
@@ -896,17 +896,17 @@ It is possible to keep both the PostgreSQL data directory as well as the pgBackR
 There are several PostgreSQL Operator Custom Resource Definitions (CRDs) that
 are installed in order for the PostgreSQL Operator to successfully function:
 
-- `pgclusters.crunchydata.com`: Stores information required to manage a
+- `pgclusters.pg.percona.com`: Stores information required to manage a
 PostgreSQL cluster. This includes things like the cluster name, what storage and
 resource classes to use, which version of PostgreSQL to run, information about
 how to maintain a high-availability cluster, etc.
-- `pgreplicas.crunchydata.com`: Stores information required to manage the
+- `pgreplicas.pg.percona.com`: Stores information required to manage the
 replicas within a PostgreSQL cluster. This includes things like the number of
 replicas, what storage and resource classes to use, special affinity rules, etc.
-- `pgtasks.crunchydata.com`: A general purpose CRD that accepts a type of task
+- `pgtasks.pg.percona.com`: A general purpose CRD that accepts a type of task
 that is needed to run against a cluster (e.g. take a backup) and tracks the
 state of said task through its workflow.
-- `pgpolicies.crunchydata.com`: Stores a reference to a SQL file that can be
+- `pgpolicies.pg.percona.com`: Stores a reference to a SQL file that can be
 executed against a PostgreSQL cluster. In the past, this was used to manage RLS
 policies on PostgreSQL clusters.
 
@@ -921,9 +921,9 @@ happens when a new Custom Resource is created.
 Custom Resource, and by extension the objects it manages, when the attribute is
 updated.
 
-### `pgclusters.crunchydata.com`
+### `pgclusters.pg.percona.com`
 
-The `pgclusters.crunchydata.com` Custom Resource Definition is the fundamental
+The `pgclusters.pg.percona.com` Custom Resource Definition is the fundamental
 definition of a PostgreSQL cluster. Most attributes only affect the deployment
 of a PostgreSQL cluster at the time the PostgreSQL cluster is created. Some
 attributes can be modified during the lifetime of the PostgreSQL cluster and
@@ -948,7 +948,7 @@ make changes, as described below.
 | BackrestStorage | `create` | A specification that gives information about the storage attributes for the pgBackRest repository, which stores backups and archives, of the PostgreSQL cluster. For details, please see the `Storage Specification` section below. This is required. |
 | backrestStorageTypes | `create` | An optional parameter that takes an array of different repositories types that can be used to store pgBackRest backups. Choices are `posix` and `s3`. If nothing is specified, it defaults to `posix`. (`local`, equivalent to `posix`, is available for backwards compatibility).|
 | ccpimage | `create` | The name of the PostgreSQL container image to use, e.g. `crunchy-postgres-ha` or `crunchy-postgres-ha-gis`. |
-| ccpimageprefix | `create` | If provided, the image prefix (or registry) of the PostgreSQL container image, e.g. `registry.developers.crunchydata.com/crunchydata`. The default is to use the image prefix set in the PostgreSQL Operator configuration. |
+| ccpimageprefix | `create` | If provided, the image prefix (or registry) of the PostgreSQL container image, e.g. `registry.developers.pg.percona.com/crunchydata`. The default is to use the image prefix set in the PostgreSQL Operator configuration. |
 | ccpimagetag | `create` | The tag of the PostgreSQL container image to use, e.g. `{{< param centosBase >}}-{{< param postgresVersion >}}-{{< param operatorVersion >}}`. |
 | clustername | `create` | The name of the PostgreSQL cluster, e.g. `hippo`. This is used to group PostgreSQL instances (primary, replicas) together. |
 | customconfig | `create` | If specified, references a custom ConfigMap to use when bootstrapping a PostgreSQL cluster. For the shape of this file, please see the section on [Custom Configuration]({{< relref "/advanced/custom-configuration.md" >}}) |
@@ -960,15 +960,15 @@ make changes, as described below.
 | exporterResources | `create`, `update` | Specify the container resource requests that the `crunchy-postgres-exporter` sidecar uses when it is deployed with a PostgreSQL instance. Follows the [Kubernetes definitions of resource requests](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container). |
 | limits | `create`, `update` | Specify the container resource limits that the PostgreSQL cluster should use. Follows the [Kubernetes definitions of resource limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container). |
 | name | `create` | The name of the PostgreSQL instance that is the primary. On creation, this should be set to be the same as `ClusterName`. |
-| nodeAffinity | `create` | Sets the [node affinity rules](/architecture/high-availability/#node-affinity) for the PostgreSQL cluster and associated PostgreSQL instances. Can be overridden on a per-instance (`pgreplicas.crunchydata.com`) basis. Please see the `Node Affinity Specification` section below. |
+| nodeAffinity | `create` | Sets the [node affinity rules](/architecture/high-availability/#node-affinity) for the PostgreSQL cluster and associated PostgreSQL instances. Can be overridden on a per-instance (`pgreplicas.pg.percona.com`) basis. Please see the `Node Affinity Specification` section below. |
 | passwordType | `create`, `update` | If set, provides the Postgres password type that is used for creating Postgres users that are managed by PGO. Can be either `md5` or `scram-sha-256`. |
 | pgBadger | `create`,`update` | If `true`, deploys the `crunchy-pgbadger` sidecar for query analysis. |
 | pgbadgerport | `create` | If the `PGBadger` label is set, then this specifies the port that the pgBadger sidecar runs on (e.g. `10000`) |
 | pgBouncer | `create`, `update` | If specified, defines the attributes to use for the pgBouncer connection pooling deployment that can be used in conjunction with this PostgreSQL cluster. Please see the specification defined below. |
 | pgDataSource | `create` | Used to indicate if a PostgreSQL cluster should bootstrap its data from a pgBackRest repository. This uses the PostgreSQL Data Source Specification, described below. |
-| pgoimageprefix | `create` | If provided, the image prefix (or registry) of any PostgreSQL Operator images that are used for jobs, e.g. `registry.developers.crunchydata.com/crunchydata`. The default is to use the image prefix set in the PostgreSQL Operator configuration. |
+| pgoimageprefix | `create` | If provided, the image prefix (or registry) of any PostgreSQL Operator images that are used for jobs, e.g. `registry.developers.pg.percona.com/crunchydata`. The default is to use the image prefix set in the PostgreSQL Operator configuration. |
 | podAntiAffinity | `create` | A required section. Sets the [pod anti-affinity rules]({{< relref "/architecture/high-availability/_index.md#how-the-crunchy-postgresql-operator-uses-pod-anti-affinity" >}}) for the PostgreSQL cluster and associated deployments. Please see the `Pod Anti-Affinity Specification` section below. |
-| policies | `create` | If provided, a comma-separated list referring to `pgpolicies.crunchydata.com.Spec.Name` that should be run once the PostgreSQL primary is first initialized. |
+| policies | `create` | If provided, a comma-separated list referring to `pgpolicies.pg.percona.com.Spec.Name` that should be run once the PostgreSQL primary is first initialized. |
 | port | `create` | The port that PostgreSQL will run on, e.g. `5432`. |
 | ReplicaStorage | `create` | A specification that gives information about the storage attributes for any replicas in the PostgreSQL cluster. For details, please see the `Storage Specification` section below. This will likely be changed in the future based on the nature of the high-availability system, but presently it is still required that you set it. It is recommended you use similar settings to that of `PrimaryStorage`. |
 | replicas | `create` | The number of replicas to create after a PostgreSQL primary is first initialized. This only works on create; to scale a cluster after it is initialized, please use the [`pgo scale`]({{< relref "/pgo-client/reference/pgo_scale.md" >}}) command. |
@@ -995,7 +995,7 @@ attribute and how it works.
 |-----------|--------|-------------|
 | accessmode | `create` | The name of the Kubernetes Persistent Volume [Access Mode](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes) to use. |
 | matchLabels | `create` | Only used with `StorageType` of `create`, used to match a particular subset of provisioned Persistent Volumes. |
-| name | `create` | Only needed for `PrimaryStorage` in `pgclusters.crunchydata.com`.Used to identify the name of the PostgreSQL cluster. Should match `ClusterName`. |
+| name | `create` | Only needed for `PrimaryStorage` in `pgclusters.pg.percona.com`.Used to identify the name of the PostgreSQL cluster. Should match `ClusterName`. |
 | size | `create`, `update` | The size of the [Persistent Volume Claim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims) (PVC). Must use a Kubernetes resource value, e.g. `20Gi`. |
 | storageclass | `create` | The name of the Kubernetes [StorageClass](https://kubernetes.io/docs/concepts/storage/storage-classes/) to use. |
 | storagetype | `create` | Set to `create` if storage is provisioned (e.g. using `hostpath`). Set to `dynamic` if using a dynamic storage provisioner, e.g. via a `StorageClass`. |
@@ -1013,7 +1013,7 @@ documentation.
 
 | Attribute | Action | Description |
 |-----------|--------|-------------|
-| default | `create` | The default pod anti-affinity to use for all PostgreSQL instances managed in a given PostgreSQL cluster. Can be overridden on a per-instance basis with the `pgreplicas.crunchydata.com` custom resource. |
+| default | `create` | The default pod anti-affinity to use for all PostgreSQL instances managed in a given PostgreSQL cluster. Can be overridden on a per-instance basis with the `pgreplicas.pg.percona.com` custom resource. |
 
 ##### Pod Anti-Affinity Specification
 
@@ -1075,7 +1075,7 @@ a PostgreSQL cluster to help with failover scenarios too.
 
 ##### Annotations Specification
 
-The `pgcluster.crunchydata.com` specification contains a block that allows for
+The `pgcluster.pg.percona.com` specification contains a block that allows for
 custom [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
 to be applied to the Deployments that are managed by the PostgreSQL Operator,
 including:
@@ -1094,9 +1094,9 @@ different deployment groups.
 | pgBouncer | `create`, `update` | Specify annotations that are only applied to the pgBouncer deployments |
 | postgres | `create`, `update` | Specify annotations that are only applied to the PostgreSQL deployments |
 
-### `pgreplicas.crunchydata.com`
+### `pgreplicas.pg.percona.com`
 
-The `pgreplicas.crunchydata.com` Custom Resource Definition contains information
+The `pgreplicas.pg.percona.com` Custom Resource Definition contains information
 pertaning to the structure of PostgreSQL replicas associated within a PostgreSQL
 cluster. All of the attributes only affect the replica when it is created.
 
@@ -1107,7 +1107,7 @@ cluster. All of the attributes only affect the replica when it is created.
 | clustername | `create` | The name of the PostgreSQL cluster, e.g. `hippo`. This is used to group PostgreSQL instances (primary, replicas) together. |
 | name | `create` | The name of this PostgreSQL replica. It should be unique within a `ClusterName`. |
 | nodeAffinity | `create` | Sets the [node affinity rules]({{< relref "/architecture/high-availability/_index.md#node-affinity" >}}) for this PostgreSQL instance. Follows the [Kubernetes standard format for setting node affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity). |
-| replicastorage | `create` | A specification that gives information about the storage attributes for any replicas in the PostgreSQL cluster. For details, please see the `Storage Specification` section in the `pgclusters.crunchydata.com` description. This will likely be changed in the future based on the nature of the high-availability system, but presently it is still required that you set it. It is recommended you use similar settings to that of `PrimaryStorage`. |
-| serviceType | `create`, `update` | Sets the Kubernetes [Service](https://kubernetes.io/docs/concepts/services-networking/service/) type to use for this particular instance. If not set, defaults to the value in the related `pgclusters.crunchydata.com` custom resource. |
+| replicastorage | `create` | A specification that gives information about the storage attributes for any replicas in the PostgreSQL cluster. For details, please see the `Storage Specification` section in the `pgclusters.pg.percona.com` description. This will likely be changed in the future based on the nature of the high-availability system, but presently it is still required that you set it. It is recommended you use similar settings to that of `PrimaryStorage`. |
+| serviceType | `create`, `update` | Sets the Kubernetes [Service](https://kubernetes.io/docs/concepts/services-networking/service/) type to use for this particular instance. If not set, defaults to the value in the related `pgclusters.pg.percona.com` custom resource. |
 | userlabels | `create` | A set of key-value string pairs that are used as a sort of "catch-all" as well as a way to add custom labels to clusters. This will disappear at some point. |
 | tolerations | `create`,`update` | Any array of Kubernetes [Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/). Please refer to the [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) for how to set this field. |

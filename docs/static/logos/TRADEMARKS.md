@@ -79,7 +79,7 @@ You may use the Word Marks and the Logos in themes, personas, or skins to show y
 
 #### 5.2.1 Distributing unmodified software
 
-You may use the Word Marks and Logos to distribute executable code if you make the code from official Project source code using the procedure for creating an executable found at [https://access.crunchydata.com/documentation/postgres-operator/latest/installation/](https://access.crunchydata.com/documentation/postgres-operator/latest/installation/).
+You may use the Word Marks and Logos to distribute executable code if you make the code from official Project source code using the procedure for creating an executable found at [https://access.pg.percona.com/documentation/postgres-operator/latest/installation/](https://access.pg.percona.com/documentation/postgres-operator/latest/installation/).
 
 #### 5.3 Unpermitted uses we consider infringing
 
@@ -134,10 +134,10 @@ If you are using our Marks in a way described in the sections entitled "Permitte
 
 ### 7.2 What to do when you see abuse
 
-If you are aware of a confusing use or misuse of the Marks, we would appreciate you bringing it to our attention. Please contact us at [trademarks@crunchydata.com](mailto:trademarks@crunchydata.com) so we can investigate it further.
+If you are aware of a confusing use or misuse of the Marks, we would appreciate you bringing it to our attention. Please contact us at [trademarks@pg.percona.com](mailto:trademarks@pg.percona.com) so we can investigate it further.
 
 ### 7.3 Where to get further information
 
-If you have questions, wish to speak about using our Marks in ways the Policy doesn’t address, or see abuse of our Marks, please send an email to [trademarks@crunchydata.com](mailto:trademarks@crunchydata.com).
+If you have questions, wish to speak about using our Marks in ways the Policy doesn’t address, or see abuse of our Marks, please send an email to [trademarks@pg.percona.com](mailto:trademarks@pg.percona.com).
 
 We based these guidelines on the Model Trademark Guidelines, available at [http://www.modeltrademarkguidelines.org](http://www.modeltrademarkguidelines.org), used under a Creative Commons Attribution 3.0 Unported license: [https://creativecommons.org/licenses/by/3.0/deed.en_US](https://creativecommons.org/licenses/by/3.0/deed.en_US).

@@ -26,17 +26,17 @@ that allow for the management of PostgreSQL clusters.
 
 The Custom Resource Definitions include:
 
-- `pgclusters.crunchydata.com`: Stores information required to manage a
+- `pgclusters.pg.percona.com`: Stores information required to manage a
 PostgreSQL cluster. This includes things like the cluster name, what storage and
 resource classes to use, which version of PostgreSQL to run, information about
 how to maintain a high-availability cluster, etc.
-- `pgreplicas.crunchydata.com`: Stores information required to manage the
+- `pgreplicas.pg.percona.com`: Stores information required to manage the
 replicas within a PostgreSQL cluster. This includes things like the number of
 replicas, what storage and resource classes to use, special affinity rules, etc.
-- `pgtasks.crunchydata.com`: A general purpose CRD that accepts a type of task
+- `pgtasks.pg.percona.com`: A general purpose CRD that accepts a type of task
 that is needed to run against a cluster (e.g. take a backup) and tracks the
 state of said task through its workflow.
-- `pgpolicies.crunchydata.com`: Stores a reference to a SQL file that can be
+- `pgpolicies.pg.percona.com`: Stores a reference to a SQL file that can be
 executed against a PostgreSQL cluster. In the past, this was used to manage RLS
 policies on PostgreSQL clusters.
 
@@ -163,7 +163,7 @@ accessing the Kubernetes Pods to perform given actions.
 
 
 For a detailed analysis, please see
-[Using Kubernetes Deployments for Running PostgreSQL](https://info.crunchydata.com/blog/using-kubernetes-deployments-for-running-postgresql).
+[Using Kubernetes Deployments for Running PostgreSQL](https://info.pg.percona.com/blog/using-kubernetes-deployments-for-running-postgresql).
 
 # Additional Architecture Information
 

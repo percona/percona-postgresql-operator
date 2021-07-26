@@ -8,14 +8,14 @@ draft: false
 
  <img width="25%" src="logos/pgo.svg" alt="PGO: The Postgres Operator from Crunchy Data" />
 
-## Run [Cloud Native PostgreSQL on Kubernetes](https://www.crunchydata.com/products/crunchy-postgresql-for-kubernetes/) with PGO: The [Postgres Operator](https://github.com/CrunchyData/postgres-operator) from [Crunchy Data](https://www.crunchydata.com/)!
+## Run [Cloud Native PostgreSQL on Kubernetes](https://www.pg.percona.com/products/crunchy-postgresql-for-kubernetes/) with PGO: The [Postgres Operator](https://github.com/CrunchyData/postgres-operator) from [Crunchy Data](https://www.pg.percona.com/)!
 
 Latest Release: {{< param operatorVersion >}}
 
-[PGO](https://www.crunchydata.com/developers/download-postgres/containers/postgres-operator),
+[PGO](https://www.pg.percona.com/developers/download-postgres/containers/postgres-operator),
 the [Postgres Operator](https://github.com/CrunchyData/postgres-operator)
-developed by [Crunchy Data](https://crunchydata.com/) and included in
-[Crunchy PostgreSQL for Kubernetes](https://www.crunchydata.com/products/crunchy-postgresql-for-kubernetes/),
+developed by [Crunchy Data](https://pg.percona.com/) and included in
+[Crunchy PostgreSQL for Kubernetes](https://www.pg.percona.com/products/crunchy-postgresql-for-kubernetes/),
 automates and simplifies deploying and managing open source PostgreSQL clusters
 on Kubernetes.
 
@@ -151,9 +151,9 @@ In addition to the above, the geospatially enhanced PostgreSQL + PostGIS contain
 
 Additional containers that are not directly integrated with the PostgreSQL Operator but can work alongside it include:
 
-- [pgPool II](https://access.crunchydata.com/documentation/crunchy-postgres-containers/latest/container-specifications/crunchy-pgpool/)
-- [pg_upgrade](https://access.crunchydata.com/documentation/crunchy-postgres-containers/latest/container-specifications/crunchy-upgrade/)
-- [pgBench](https://access.crunchydata.com/documentation/crunchy-postgres-containers/latest/container-specifications/crunchy-pgbench/)
+- [pgPool II](https://access.pg.percona.com/documentation/crunchy-postgres-containers/latest/container-specifications/crunchy-pgpool/)
+- [pg_upgrade](https://access.pg.percona.com/documentation/crunchy-postgres-containers/latest/container-specifications/crunchy-upgrade/)
+- [pgBench](https://access.pg.percona.com/documentation/crunchy-postgres-containers/latest/container-specifications/crunchy-pgbench/)
 
 For more information about which versions of the PostgreSQL Operator include which components, please visit the [compatibility]({{< relref "configuration/compatibility.md" >}}) section of the documentation.
 

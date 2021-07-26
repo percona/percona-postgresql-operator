@@ -11,7 +11,7 @@ The PostgreSQL Operator orchestrates a series of PostgreSQL and PostgreSQL relat
 
 ### PostgreSQL Server, Tools, and Extensions
 
-* **PostgreSQL** (crunchy-postgres-ha).  PostgreSQL database server.  The crunchy-postgres container image is unmodified, open source PostgreSQL packaged and maintained by Crunchy Data. The container supports PostgreSQL tools by running in different modes, more information on running modes can be found in the [Crunchy Container](https://access.crunchydata.com/documentation/crunchy-postgres-containers/latest/) documentation. The PostgreSQL operator uses the following running modes:
+* **PostgreSQL** (crunchy-postgres-ha).  PostgreSQL database server.  The crunchy-postgres container image is unmodified, open source PostgreSQL packaged and maintained by Crunchy Data. The container supports PostgreSQL tools by running in different modes, more information on running modes can be found in the [Crunchy Container](https://access.pg.percona.com/documentation/crunchy-postgres-containers/latest/) documentation. The PostgreSQL operator uses the following running modes:
 
     - **pgdump** (MODE: pgdump) running in pgdump mode, the image executes either a pg_dump or pg_dumpall database backup against another PostgreSQL database.
     - **pgrestore** (MODE: pgrestore) running in pgrestore mode, the image provides a means of performing a restore of a dump from pg_dump or pg_dumpall via psql or pg_restore to a PostgreSQL container database.

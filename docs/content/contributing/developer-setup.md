@@ -37,9 +37,9 @@ Variable | Example | Description
 
 ```shell
 cd $PGOROOT
-curl https://api.developers.crunchydata.com/downloads/repo/rpm-centos/postgresql12/crunchypg12.repo > conf/crunchypg12.repo
-curl https://api.developers.crunchydata.com/downloads/repo/rpm-centos/postgresql11/crunchypg11.repo > conf/crunchypg11.repo
-curl https://api.developers.crunchydata.com/downloads/gpg/RPM-GPG-KEY-crunchydata-dev > conf/RPM-GPG-KEY-crunchydata-dev
+curl https://api.developers.pg.percona.com/downloads/repo/rpm-centos/postgresql12/crunchypg12.repo > conf/crunchypg12.repo
+curl https://api.developers.pg.percona.com/downloads/repo/rpm-centos/postgresql11/crunchypg11.repo > conf/crunchypg11.repo
+curl https://api.developers.pg.percona.com/downloads/gpg/RPM-GPG-KEY-crunchydata-dev > conf/RPM-GPG-KEY-crunchydata-dev
 ```
 
 # Building
@@ -71,7 +71,7 @@ make generate
 ```
 
 Therefore, in the event that a Custom Resource defined within the PostgreSQL Operator API
-(`$PGOROOT/pkg/apis/crunchydata.com`) is updated, the `verify-codegen` target will indicate that
+(`$PGOROOT/pkg/apis/pg.percona.com`) is updated, the `verify-codegen` target will indicate that
 an update is needed, and the `update-codegen` target should then be utilized to generate the
 updated code prior to compiling.
 

@@ -50,7 +50,7 @@ This includes various PostgreSQL settings, e.g. those that should be applied to
 files such as `postgresql.conf`, `pg_hba.conf` and `pg_ident.conf`, as well as
 tuning parameters for the High Availability features included in each cluster.
 The various configuration settings available can be
-[found here](https://access.crunchydata.com/documentation/patroni/latest/settings/index.html#settings)
+[found here](https://access.pg.percona.com/documentation/patroni/latest/settings/index.html#settings)
 
 The *setup.sql* file is a SQL file that is executed following the initialization
 of a new PostgreSQL cluster, specifically after *initdb* is run when the database
@@ -77,7 +77,7 @@ and avoid defining a global configMap.
 
 ## Create a PostgreSQL Cluster With Custom Configuration
 
-The PostgreSQL Operator allows for a PostgreSQL cluster to be created with a customized configuration. To do this, one must create a ConfigMap with an entry called `postgres-ha.yaml` that contains the custom configuration. The custom configuration follows the [Patorni YAML format](https://access.crunchydata.com/documentation/patroni/latest/settings/). Note that parameters that are placed in the `bootstrap` section are applied once during cluster initialization. Editing these values in a working cluster require following the [Modifying PostgreSQL Cluster Configuration](#modifying-postgresql-cluster-configuration) section.
+The PostgreSQL Operator allows for a PostgreSQL cluster to be created with a customized configuration. To do this, one must create a ConfigMap with an entry called `postgres-ha.yaml` that contains the custom configuration. The custom configuration follows the [Patorni YAML format](https://access.pg.percona.com/documentation/patroni/latest/settings/). Note that parameters that are placed in the `bootstrap` section are applied once during cluster initialization. Editing these values in a working cluster require following the [Modifying PostgreSQL Cluster Configuration](#modifying-postgresql-cluster-configuration) section.
 
 For example, let's say we want to create a PostgreSQL cluster with `shared_buffers` set to `2GB`, `max_connections` set to `30` and `password_encryption` set to `scram-sha-256`. We would create a configuration file that looks similar to:
 
@@ -131,7 +131,7 @@ section above will also be included when the ConfigMap is populated.
 
 The various configuration settings available for modifying and updating
 and cluster's configuration can be
-[found here](https://access.crunchydata.com/documentation/patroni/latest/settings/index.html#settings).
+[found here](https://access.pg.percona.com/documentation/patroni/latest/settings/index.html#settings).
 Please proceed with caution when modiying configuration, especially those settings
 applied by default by Operator.  Certain settings are required for normal operation
 of the Operator and the PostgreSQL clusters it creates, and altering these
@@ -153,7 +153,7 @@ ConfigMap in a configuration named `<clusterName>-dcs-config`, while the local
 database configurations are stored in one or more configurations named
 `<serverName>-local-config` (with one local configuration for the primary and each
 replica within the cluster).  Please note that
-[as described here](https://access.crunchydata.com/documentation/patroni/latest/dynamic_configuration/),
+[as described here](https://access.pg.percona.com/documentation/patroni/latest/dynamic_configuration/),
 certain settings can only be applied via the DCS to ensure they are uniform among
 the primary and all replicas within the cluster.
 
@@ -261,7 +261,7 @@ The various key/value pairs provided within the `parameters` section result in t
 configuration of the same settings within the `postgresql.conf` file.  Please note that
 settings applied locally to a database server take precedence over those set via the DCS (with the
 exception being those that must be set via the DCS, as
-[described here](https://access.crunchydata.com/documentation/patroni/latest/dynamic_configuration/)).
+[described here](https://access.pg.percona.com/documentation/patroni/latest/dynamic_configuration/)).
 
 Also, please note that `pg_hba` and `pg_ident` sections exist to update both the `pg_hba.conf` and
 `pg_ident.conf` PostgreSQL configuration files as needed.

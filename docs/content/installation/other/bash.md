@@ -217,7 +217,7 @@ created previously.
 
 ## `pgo` client Installation
 
-Most users will work with the Operator using the `pgo` client.  That tool is downloaded from the GitHub Releases page for the Operator (https://github.com/crunchydata/postgres-operator/releases). Crunchy Data customers can download the `pgo` binaries from https://access.crunchydata.com/ on the downloads page.
+Most users will work with the Operator using the `pgo` client.  That tool is downloaded from the GitHub Releases page for the Operator (https://github.com/crunchydata/postgres-operator/releases). Crunchy Data customers can download the `pgo` binaries from https://access.pg.percona.com/ on the downloads page.
 
 The `pgo` client is provided in Mac, Windows, and Linux binary formats,
 download the appropriate client to your local laptop or workstation to work

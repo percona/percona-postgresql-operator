@@ -289,7 +289,7 @@ instance, which coul risk data loss in a failover scenario. Issues a warning at
 Not attending to this can lead to out-of-disk errors.
 - `PGXIDWraparound`: Indicates that a PostgreSQL instance is nearing transaction
 ID wraparound. Issues a warning at 50% and goes critical at 75%. It's important
-that you [vacuum your database](https://info.crunchydata.com/blog/managing-transaction-id-wraparound-in-postgresql)
+that you [vacuum your database](https://info.pg.percona.com/blog/managing-transaction-id-wraparound-in-postgresql)
 to prevent this.
 - `PGEmergencyVacuum`: Indicates that autovacuum is not running or cannot keep
 up with ongoing changes, i.e. it's past its "freeze" age.  Issues a warning at

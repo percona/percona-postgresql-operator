@@ -18,7 +18,7 @@ uptime requirements.
 As of this writing, federation in Kubernetes is still in ongoing development
 and is something we monitor with intense interest. As Kubernetes federation
 continues to mature, we wanted to provide a way to deploy PostgreSQL clusters
-managed by the [PostgreSQL Operator](https://www.crunchydata.com/developers/download-postgres/containers/postgres-operator)
+managed by the [PostgreSQL Operator](https://www.pg.percona.com/developers/download-postgres/containers/postgres-operator)
 that can span multiple Kubernetes clusters. This can be accomplished with a
 few environmental setups:
 

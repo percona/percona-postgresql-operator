@@ -172,7 +172,7 @@ pgo update cluster hippo \
   --toleration=zone-east:NoSchedule-
 ```
 
-You can also add or edit tolerations directly on the `pgclusters.crunchydata.com` custom resource and the PostgreSQL Operator will roll out the changes to the appropriate instances.
+You can also add or edit tolerations directly on the `pgclusters.pg.percona.com` custom resource and the PostgreSQL Operator will roll out the changes to the appropriate instances.
 
 ## Customize PostgreSQL Configuration
 

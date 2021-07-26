@@ -101,7 +101,7 @@ source ~/.bashrc
 
 The [`pgo` client](/pgo-client/) provides a helpful command-line interface to perform key operations on a PGO Deployment, such as creating a PostgreSQL cluster.
 
-The `pgo` client can be downloaded from GitHub [Releases](https://github.com/crunchydata/postgres-operator/releases) (subscribers can download it from the [Crunchy Data Customer Portal](https://access.crunchydata.com)).
+The `pgo` client can be downloaded from GitHub [Releases](https://github.com/crunchydata/postgres-operator/releases) (subscribers can download it from the [Crunchy Data Customer Portal](https://access.pg.percona.com)).
 
 Note that the `pgo` client's version must match the deployed version of PGO. For example, if you have deployed version {{< param operatorVersion >}} of the PostgreSQL Operator, you must use the `pgo` for {{< param operatorVersion >}}.
 

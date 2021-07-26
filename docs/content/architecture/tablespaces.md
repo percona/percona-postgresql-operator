@@ -156,7 +156,7 @@ following this procedure:
   you wish to remove, you can delete this tablespace from the PostgreSQL cluster
   using the `DROP TABLESPACE` command.
 1. As a Kubernetes user who can modify Deployments and edit an entry in the
-  pgclusters.crunchydata.com CRD in the Namespace that the PostgreSQL cluster is
+  pgclusters.pg.percona.com CRD in the Namespace that the PostgreSQL cluster is
   in:
   1. For each Deployment that represents a PostgreSQL instance in the cluster
   (i.e. `kubectl -n <TARGET_NAMESPACE> get deployments --selector=pgo-pg-database=true,pg-cluster=<CLUSTER_NAME>`),

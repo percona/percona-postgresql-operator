@@ -31,7 +31,7 @@ Operator.
 | `backrest_gcs_key_type` |  |  | Set to configure the *key type* used by pgBackRest with Google Cloud Storage (GCS) for backups and restoration. Can be `service` or `token`. Defaults to `service`. |
 | `backrest_port` | 2022 | **Required** | Defines the port where pgBackRest will run. |
 | `badger` | false | **Required** | Set to true enable pgBadger capabilities on all newly created clusters. This can be disabled by the client. |
-| `ccp_image_prefix` | registry.developers.crunchydata.com/crunchydata | **Required** | Configures the image prefix used when creating containers from Crunchy Container Suite. |
+| `ccp_image_prefix` | registry.developers.pg.percona.com/crunchydata | **Required** | Configures the image prefix used when creating containers from Crunchy Container Suite. |
 | `ccp_image_pull_secret` |  |  | Name of a Secret containing credentials for container image registries. |
 | `ccp_image_pull_secret_manifest` |  |  | Provide a path to the Secret manifest to be installed in each namespace. (optional) |
 | `ccp_image_tag` | {{< param centosBase >}}-{{< param postgresVersion >}}-{{< param operatorVersion >}} | **Required** | Configures the image tag (version) used when creating containers from Crunchy Container Suite. |
@@ -69,7 +69,7 @@ Operator.
 | `pgo_cluster_admin` | false | **Required** | Determines whether or not the cluster-admin role is assigned to the PGO service account. Must be true to enable PGO namespace & role creation when installing in OpenShift. |
 | `pgo_disable_eventing` | false |  | Set to configure whether or not eventing should be enabled for the Crunchy PostgreSQL Operator installation. |
 | `pgo_disable_tls` | false |  | Set to configure whether or not TLS should be enabled for the Crunchy PostgreSQL Operator apiserver. |
-| `pgo_image_prefix` | registry.developers.crunchydata.com/crunchydata | **Required** | Configures the image prefix used when creating containers for the Crunchy PostgreSQL Operator (apiserver, operator, scheduler..etc). |
+| `pgo_image_prefix` | registry.developers.pg.percona.com/crunchydata | **Required** | Configures the image prefix used when creating containers for the Crunchy PostgreSQL Operator (apiserver, operator, scheduler..etc). |
 | `pgo_image_pull_secret` |  |  | Name of a Secret containing credentials for container image registries. |
 | `pgo_image_pull_secret_manifest` |  |  | Provide a path to the Secret manifest to be installed in each namespace. (optional) |
 | `pgo_image_tag` | {{< param centosBase >}}-{{< param operatorVersion >}} | **Required** | Configures the image tag used when creating containers for the Crunchy PostgreSQL Operator (apiserver, operator, scheduler..etc) |

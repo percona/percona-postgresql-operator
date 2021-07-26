@@ -22,5 +22,5 @@ The playbooks provided allow users to:
 ## Resources
 
 * [Ansible](https://www.ansible.com/)
-* [Crunchy Data](https://www.crunchydata.com/)
+* [Crunchy Data](https://www.pg.percona.com/)
 * [Crunchy Data PostgreSQL Operator Project](https://github.com/CrunchyData/postgres-operator)
