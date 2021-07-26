@@ -40,7 +40,7 @@ type ServiceType string
 const (
 	deploymentTemplateName = "cluster-deployment.json"
 	templatePath           = "/"
-	defaultPGOVersion      = "0.1.0"
+	defaultPGOVersion      = "0.2.0"
 	PGPrimaryServiceType   = ServiceType("primary")
 	PGBouncerServiceType   = ServiceType("bouncer")
 	S3StorageType          = crv1.StorageType("s3")
