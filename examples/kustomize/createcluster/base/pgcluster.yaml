@@ -1,4 +1,4 @@
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -45,7 +45,7 @@ spec:
     pgBouncer: {}
     postgres: {}
   ccpimage: crunchy-postgres-ha
-  ccpimageprefix: registry.developers.crunchydata.com/crunchydata
+  ccpimageprefix: registry.developers.pg.percona.com/crunchydata
   ccpimagetag: centos8-13.3-4.7.0
   clustername: hippo
   customconfig: ""
@@ -60,7 +60,7 @@ spec:
     restoreFrom: ""
     restoreOpts: ""
   pgbadgerport: "10000"
-  pgoimageprefix: registry.developers.crunchydata.com/crunchydata
+  pgoimageprefix: registry.developers.pg.percona.com/crunchydata
   podAntiAffinity:
     default: preferred
     pgBackRest: preferred

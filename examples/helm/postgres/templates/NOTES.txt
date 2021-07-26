@@ -51,4 +51,4 @@ If you need to log in as the PostgreSQL superuser, you can do so with the follow
 
 More information about the custom resource workflow the docs can be found here:
 
-    https://access.crunchydata.com/documentation/postgres-operator/latest/custom-resources/
+    https://access.pg.percona.com/documentation/postgres-operator/latest/custom-resources/

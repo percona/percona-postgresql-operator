@@ -12,7 +12,7 @@ in a namespace called `pgo`.
 Install the latest [kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/) version available.  Kustomise is availble in kubectl but it will not be the latest version.
 
 ## Documenation
-Please see the [documentation](https://access.crunchydata.com/documentation/postgres-operator/latest/custom-resources/) for more guidance using custom resources.
+Please see the [documentation](https://access.pg.percona.com/documentation/postgres-operator/latest/custom-resources/) for more guidance using custom resources.
 
 ## Example set up and execution
 Navigate to the createcluster directory under the examples/kustomize directory
@@ -34,7 +34,7 @@ You will see these items are created after running the above command
 ```
 secret/hippo-hippo-secret created
 secret/hippo-postgres-secret created
-pgcluster.crunchydata.com/hippo created
+pgcluster.pg.percona.com/hippo created
 ```
 You may need to wait a few seconds depending on the resources you have allocated to you kubernetes set up for the Crunchy PostgreSQL cluster to become available.
 
@@ -71,7 +71,7 @@ You will see these items are created after running the above command
 ```
 secret/dev-hippo-hippo-secret created
 secret/dev-hippo-postgres-secret created
-pgcluster.crunchydata.com/dev-hippo created
+pgcluster.pg.percona.com/dev-hippo created
 ```
 After the cluster is finished creating lets take a look at the cluster with the Crunchy PostgreSQL Operator
 ```
@@ -104,8 +104,8 @@ You will see these items are created after running the above command
 ```
 secret/staging-hippo-hippo-secret created
 secret/staging-hippo-postgres-secret created
-pgcluster.crunchydata.com/staging-hippo created
-pgreplica.crunchydata.com/staging-hippo-rpl1 created
+pgcluster.pg.percona.com/staging-hippo created
+pgreplica.pg.percona.com/staging-hippo-rpl1 created
 ```
 After the cluster is finished creating lets take a look at the cluster with the crunchy postgreSQL operator
 ```
@@ -146,7 +146,7 @@ You will see these items are created after running the above command
 ```
 secret/prod-hippo-hippo-secret created
 secret/prod-hippo-postgres-secret created
-pgcluster.crunchydata.com/prod-hippo created
+pgcluster.pg.percona.com/prod-hippo created
 ```
 After the cluster is finished creating lets take a look at the cluster with the crunchy postgreSQL operator
 ```

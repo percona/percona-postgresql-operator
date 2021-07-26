@@ -8,7 +8,7 @@ password: W4tch0ut4hippo$
 # diskSize: 5Gi
 # monitoring: true
 # ha: true
-# imagePrefix: registry.developers.crunchydata.com/crunchydata
+# imagePrefix: registry.developers.pg.percona.com/crunchydata
 # image: crunchy-postgres-ha
 # imageTag: centos8-13.3-4.7.0
 # memory: 1Gi

@@ -1,4 +1,4 @@
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -27,7 +27,7 @@ spec:
     size: {{ .Values.diskSize | default "1Gi" | quote }}
     storagetype: dynamic
   ccpimage: {{ .Values.image | default "crunchy-postgres-ha" | quote }}
-  ccpimageprefix: {{ .Values.imagePrefix | default "registry.developers.crunchydata.com/crunchydata" | quote }}
+  ccpimageprefix: {{ .Values.imagePrefix | default "registry.developers.pg.percona.com/crunchydata" | quote }}
   ccpimagetag: {{ .Values.imageTag | default "centos8-13.3-4.7.0" | quote }}
   clustername: {{ .Values.name | quote }}
   database: {{ .Values.name | quote }}
@@ -44,7 +44,7 @@ spec:
     restoreFrom: ""
     restoreOpts: ""
   pgbadgerport: "10000"
-  pgoimageprefix: {{ .Values.imagePrefix | default "registry.developers.crunchydata.com/crunchydata" | quote }}
+  pgoimageprefix: {{ .Values.imagePrefix | default "registry.developers.pg.percona.com/crunchydata" | quote }}
   podAntiAffinity:
     default: preferred
     pgBackRest: preferred
