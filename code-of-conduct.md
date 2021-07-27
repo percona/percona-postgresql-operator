@@ -1,4 +1,4 @@
-# Percona PostgreSQL Operator Code of Conduct
+# Percona Distribution for PostgreSQL Operator Code of Conduct
 
 All Percona Products follow the [Percona Community Code of Conduct](https://github.com/percona/community/blob/main/content/contribute/coc.md).
 
