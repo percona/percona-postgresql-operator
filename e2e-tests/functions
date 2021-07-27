@@ -39,9 +39,30 @@ if oc get projects; then
 	OPENSHIFT=4
 fi
 
+KUBE_VERSION=$(kubectl version -o json | jq -r '.serverVersion.major + "." + .serverVersion.minor' | $sed -r 's/[^0-9.]+//g')
+
+HELM_VERSION=$(helm version -c | $sed -re 's/.*SemVer:"([^"]+)".*/\1/; s/.*\bVersion:"([^"]+)".*/\1/')
+if [ "${HELM_VERSION:0:2}" == "v2" ]; then
+	HELM_ARGS="--name"
+fi
+
+version_gt() {
+	# return true if kubernetes version equal or greater than desired
+	if [ $(echo "${KUBE_VERSION} >= $1" | bc -l) -eq 1 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 cleanup_rbac() {
-	kubectl_bin delete clusterrolebindings pgo-cluster-role pgo-deployer-cr || true
-	kubectl_bin delete clusterroles pgo-cluster-role pgo-deployer-cr || true
+	kubectl_bin delete clusterrolebindings \
+		pgo-cluster-role pgo-deployer-cr \
+		chaos-mesh-chaos-controller-manager-cluster-level || true
+	kubectl_bin delete clusterroles \
+		pgo-cluster-role pgo-deployer-cr \
+		chaos-mesh-chaos-controller-manager-target-namespace \
+		chaos-mesh-chaos-controller-manager-cluster-level|| true
 }
 
 create_namespace() {
@@ -54,6 +75,9 @@ create_namespace() {
 			| awk '{print$1}' \
 			| xargs kubectl delete ns &
 		cleanup_rbac
+		kubectl delete MutatingWebhookConfiguration/chaos-mesh-mutation \
+			ValidatingWebhookConfiguration/chaos-mesh-validation \
+			ValidatingWebhookConfiguration/validate-auth || true
 	fi
 
 	if [ -n "${OPENSHIFT}" ]; then
@@ -531,7 +555,7 @@ spinup_pgcluster() {
 		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
 		"postgres:postgres_pass@${cluster}.${namespace}"
 	run_psql \
-		'\c myapp \\\ GRANT SELECT ON myApp to "some-name";GRANT USAGE ON SCHEMA public TO "some-name";' \
+		'\c myapp \\\ GRANT SELECT,INSERT ON myApp to "some-name";GRANT USAGE ON SCHEMA public TO "some-name";' \
 		"postgres:postgres_pass@${cluster}.${namespace}"
 	sleep 10
 }
@@ -762,4 +786,28 @@ deploy_helm() {
 	helm repo add percona https://percona-charts.storage.googleapis.com/
 	helm repo add minio https://helm.min.io/
 	helm repo update
+}
+
+deploy_chaos_mesh() {
+	local chaos_mesh_ns=$1
+
+	desc 'install chaos-mesh'
+	local old_cm_namespace=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}')
+	if [ "${old_cm_namespace}" != "NAMESPACE" ]; then
+		helm del chaos-mesh --namespace ${old_cm_namespace} || :
+	fi
+	helm repo add chaos-mesh https://charts.chaos-mesh.org
+	if version_gt "1.19"; then
+		helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${chaos_mesh_ns} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version v2.0.0 --set clusterScoped=false --set controllerManager.targetNamespace=${chaos_mesh_ns}
+	else
+		helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${chaos_mesh_ns} --set dashboard.create=false --version v2.0.0 --set clusterScoped=false --set controllerManager.targetNamespace=${chaos_mesh_ns}
+	fi
+	sleep 10
+}
+
+destroy_chaos_mesh() {
+	local chaos_mesh_ns=$1
+
+	desc 'destroy chaos-mesh'
+	helm del chaos-mesh --namespace ${chaos_mesh_ns} || :
 }

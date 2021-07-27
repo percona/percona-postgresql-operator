@@ -1,0 +1,86 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. "${test_dir}"/../functions
+
+kill_pod() {
+	local pod=$1
+
+	cat $conf_dir/chaos-pod-kill.yml \
+		| yq w - "metadata.name" "chaos-cluster-pod-kill-$RANDOM" \
+		| yq w - "metadata.namespace" "$namespace" \
+		| yq w - "spec.selector.pods.$namespace[0]" "$pod" \
+		| kubectl_bin apply -f -
+	sleep 5
+}
+
+failure_pod() {
+	local pod=$1
+
+	cat $conf_dir/chaos-pod-failure.yml \
+		| yq w - "metadata.name" "chaos-cluster-pod-failure-$RANDOM" \
+		| yq w - "metadata.namespace" "$namespace" \
+		| yq w - "spec.selector.pods.$namespace[0]" "$pod" \
+		| kubectl_bin apply -f -
+	sleep 10
+}
+
+network_loss() {
+	local pod=$1
+
+	cat $conf_dir/chaos-network-loss.yml \
+		| yq w - "metadata.name" "chaos-cluster-network-loss-$RANDOM" \
+		| yq w - "metadata.namespace" "$namespace" \
+		| yq w - "spec.selector.pods.$namespace[0]" "$pod" \
+		| kubectl_bin apply -f -
+}
+
+main() {
+	create_namespace $namespace
+	deploy_operator
+	deploy_chaos_mesh $namespace
+
+	desc 'start cluster'
+	cluster="some-name"
+	kubectl_bin apply -f $conf_dir/client.yml
+
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+
+	master_pod="$(kubectl_bin get pods --selector=role=master,service-name=${cluster},pg-cluster=${cluster} -o 'jsonpath={.items[].metadata.name}')"
+	kill_pod "${master_pod}"
+	wait_deployment "${cluster}"
+	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
+
+	failure_pod  "${master_pod}"
+	sleep 30
+	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
+
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": 2}]'
+	sleep 5
+	wait_deployment "${cluster}-repl1"
+	wait_deployment "${cluster}-repl2"
+
+	replica_pod="$(kubectl_bin get pods --selector=role=replica,service-name=${cluster}-replica,pg-cluster=${cluster},deployment-name=${cluster}-repl1 -o 'jsonpath={.items[].metadata.name}')"
+	kill_pod "${replica_pod}"
+	run_psql '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
+	compare_psql_cmd "select-2" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
+	wait_deployment "${cluster}-repl1"
+	repl1_pod_ip=$(kubectl get pods --selector=role=replica,service-name=${cluster}-replica,pg-cluster=${cluster},deployment-name=${cluster}-repl1 -o 'jsonpath={.items[].status.podIP}')
+	compare_psql_cmd "select-2" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${repl1_pod_ip//\./-}.${namespace}" '' ".pod.cluster.local"
+
+	network_loss "${replica_pod}"
+	run_psql '\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
+	compare_psql_cmd "select-3" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
+	sleep 10
+	repl1_pod_ip=$(kubectl get pods --selector=role=replica,service-name=${cluster}-replica,pg-cluster=${cluster},deployment-name=${cluster}-repl1 -o 'jsonpath={.items[].status.podIP}')
+	compare_psql_cmd "select-3" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${repl1_pod_ip//\./-}.${namespace}" '' ".pod.cluster.local"
+
+
+	destroy_chaos_mesh $namespace
+	destroy "$namespace"
+}
+
+main
