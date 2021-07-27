@@ -103,11 +103,11 @@ kubectl_bin get configmap/${cluster}-pgha-config -o yaml \
 	| kubectl_bin apply -f -
 
 CONF_MAP_JIT="$(kubectl_bin get configmap/${cluster}-pgha-config -o yaml \
-				| yq r - 'data[some-name-dcs-config]' \
-				| yq r - 'postgresql.parameters.jit')"
+	| yq r - 'data[some-name-dcs-config]' \
+	| yq r - 'postgresql.parameters.jit')"
 
 PATRONI_JIT="$(kubectl_bin exec ${master_container} -- \
-				bash -c 'patronictl show-config | grep jit | grep -Eo "'"true|false"'" ')"
+	bash -c 'patronictl show-config | grep jit | grep -Eo "'"true|false"'" ')"
 
 if [[ ${CONF_MAP_JIT} != ${PATRONI_JIT} ]]; then
 	echo "Dynamic config update is not applied to cluster. Exiting..."
