@@ -71,9 +71,10 @@ func CreateOrUpdate(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster,
 func Delete(clientset kubeapi.Interface, namespace, serviceName string) error {
 	ctx := context.TODO()
 	err := clientset.CoreV1().Services(namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
-	if err != nil && strings.Contains(err.Error(), "not found") {
+	if err != nil && !strings.Contains(err.Error(), "not found") {
 		return errors.Wrapf(err, "delete replicas service")
 	}
+
 	return nil
 }
 
