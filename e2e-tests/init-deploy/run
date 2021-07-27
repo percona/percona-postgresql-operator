@@ -15,7 +15,7 @@ kubectl_bin apply \
 	-f $conf_dir/${cluster}-secrets.yml \
 	-f $conf_dir/client.yml
 
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/percona-cr.yaml"
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
 compare_kubectl "deployment/postgres-operator"
 compare_kubectl "deployment/${cluster}"
