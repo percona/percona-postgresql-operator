@@ -137,7 +137,7 @@ The following steps will quickly make the Operator up and running with cloud nat
 
 ## Design overview
 
-![Percona Distribution for PostgreSQL Operator](operator.png)
+![Percona Distribution for PostgreSQL Operator](operator.svg)
 
 PostgreSQL containers deployed with Percona Distribution for PostgreSQL Operator include the following components:
 
