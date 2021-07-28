@@ -114,10 +114,11 @@ Installing the Operator
       pgo-deploy-bp2ts                                  0/1     Completed 0          5m
       postgres-operator-67f58bcb8c-9p4tl                4/4     Running   1          5m
 
-Also, you can see the same information when browsing Pods of your cluster in Google Cloud console via the *Object Browser*:
+   Also, you can see the same information when browsing Pods of your cluster in
+   Google Cloud console via the *Object Browser*:
 
-.. image:: ./assets/images/gke-quickstart-object-browser.*
-   :align: center
+   .. image:: ./assets/images/gke-quickstart-object-browser.*
+      :align: center
 
 #. Check connectivity to newly created cluster
 
