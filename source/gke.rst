@@ -119,13 +119,6 @@ Also, you can see the same information when browsing Pods of your cluster in Goo
 .. image:: ./assets/images/gke-quickstart-object-browser.*
    :align: center
 
-
-#. You can also deploy PostgreSQL replica at any time as follows:
-
-    .. code:: bash
-
-       $ kubectl apply -f ./deploy/cr-pgreplica.yaml
-
 #. Check connectivity to newly created cluster
 
    .. code:: bash
