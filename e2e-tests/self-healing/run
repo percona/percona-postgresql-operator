@@ -78,6 +78,9 @@ main() {
 	repl1_pod_ip=$(kubectl get pods --selector=role=replica,service-name=${cluster}-replica,pg-cluster=${cluster},deployment-name=${cluster}-repl1 -o 'jsonpath={.items[].status.podIP}')
 	compare_psql_cmd "select-3" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${repl1_pod_ip//\./-}.${namespace}" '' ".pod.cluster.local"
 
+	kubectl delete NetworkChaos --all
+	kubectl delete PodChaos --all
+	sleep 5
 	destroy_chaos_mesh $namespace
 	destroy "$namespace"
 }
