@@ -118,6 +118,7 @@ pipeline {
         CLUSTER_NAME = sh(script: "echo jenkins-pgo-${GIT_SHORT_COMMIT} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
         PGO_K8S_NAME = "${env.CLUSTER_NAME}-upstream"
         AUTHOR_NAME  = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
+        ECR = "119175775298.dkr.ecr.us-east-1.amazonaws.com"
     }
     agent {
         label 'docker'
@@ -197,12 +198,15 @@ pipeline {
                         echo ${URI_BASE} > "${docker_uri_base_file}"
                             sg docker -c "
                                 docker login -u '${USER}' -p '${PASS}'
+                                aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR
                                 export IMAGE=\$URI_BASE
 
                                 for app in "pgo-apiserver" "pgo-event" "pgo-rmdata" "pgo-scheduler" "postgres-operator" "pgo-deployer"; do
                                     docker pull perconalab/percona-postgresql-operator:$GIT_BRANCH-$GIT_PREV_SHORT_COMMIT-\\${app}
                                     docker tag perconalab/percona-postgresql-operator:$GIT_BRANCH-$GIT_PREV_SHORT_COMMIT-\\${app} \\${IMAGE}-\\${app}
+                                    docker tag perconalab/percona-postgresql-operator:$GIT_BRANCH-$GIT_PREV_SHORT_COMMIT-\\${app} $ECR/\\${IMAGE}-\\${app}
                                     docker push \\${IMAGE}-\\${app}
+                                    docker push $ECR/\\${IMAGE}-\\${app}
                                 done
                                 docker logout
                             "
@@ -239,6 +243,7 @@ pipeline {
                         echo ${URI_BASE} > "${docker_uri_base_file}"
                             sg docker -c "
                                 docker login -u '${USER}' -p '${PASS}'
+                                aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR
                                 export IMAGE=\$URI_BASE
                                 ./e2e-tests/build
                                 docker logout

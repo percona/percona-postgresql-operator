@@ -9,7 +9,7 @@ test_dir=$(realpath $(dirname $0))
 create_namespace $namespace
 deploy_operator
 
-desc 'create first PSMDB cluster'
+desc 'create first PG cluster'
 cluster="some-name"
 kubectl_bin apply \
 	-f $conf_dir/${cluster}-secrets.yml \
@@ -23,21 +23,56 @@ compare_kubectl "deployment/${cluster}-backrest-shared-repo"
 compare_kubectl "service/postgres-operator"
 compare_kubectl "service/${cluster}"
 compare_kubectl "service/${cluster}-backrest-shared-repo"
+compare_kubectl "deployment/${cluster}-pgbouncer"
+compare_kubectl "service/${cluster}-pgbouncer"
 
 desc 'checking essential users access'
 
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:postgres_pass@${cluster}.${namespace}"
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}.${namespace}"
 
-desc 'enabling pgbouncer'
-
-enable_pgBouncer ${cluster}
-
-wait_deployment "${cluster}-pgbouncer"
 compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
 
-compare_kubectl "deployment/${cluster}-pgbouncer"
-compare_kubectl "service/${cluster}-pgbouncer"
+if [[ -n $(which aws) ]]; then
+	desc "Starting to test private registry"
+
+	kubectl delete PerconaPGCluster --ignore-not-found --all
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+	kubectl delete --ignore-not-found "deployment/postgres-operator"
+	wait_for_delete "deployment/postgres-operator"
+
+	kubectl delete --ignore-not-found "job/pgo-deploy"
+	wait_for_delete "job/pgo-deploy"
+
+	kubectl delete sa pgo-deployer-sa pgo-default postgres-operator --ignore-not-found
+
+	set +x
+	kubectl create secret docker-registry ecr \
+		--docker-server="${ECR}" \
+		--docker-username=AWS \
+		--docker-password="$(aws ecr get-login-password)"
+	set -x
+
+	export IMAGE_BASE="${ECR}/${IMAGE_BASE}"
+	export IMAGE_URI_BASE="${IMAGE_BASE}:${GIT_BRANCH}"
+	export IMAGE_APISERVER="${IMAGE_URI_BASE}-pgo-apiserver"
+	export IMAGE_PGOEVENT="${IMAGE_URI_BASE}-pgo-event"
+	export IMAGE_RMDATA="${IMAGE_URI_BASE}-pgo-rmdata"
+	export IMAGE_SCHEDULER="${IMAGE_URI_BASE}-pgo-scheduler"
+	export IMAGE_OPERATOR="${IMAGE_URI_BASE}-postgres-operator"
+	export IMAGE_DEPLOYER="${IMAGE_URI_BASE}-pgo-deployer"
+	export IMAGE_PGBOUNCER="${IMAGE_BASE}:main-ppg13-pgbouncer"
+	export IMAGE_PG_HA="${IMAGE_BASE}:main-ppg13-postgres-ha"
+	export IMAGE_BACKREST="${IMAGE_BASE}:main-ppg13-pgbackrest"
+	export IMAGE_BACKREST_REPO="${IMAGE_BASE}:main-ppg13-pgbackrest-repo"
+	export IMAGE_PGBADGER="${IMAGE_BASE}:main-ppg13-pgbadger"
+
+	deploy_operator "ecr"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+
+fi
 
 destroy $namespace
