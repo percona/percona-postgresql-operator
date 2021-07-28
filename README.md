@@ -1,10 +1,10 @@
-# Percona Kubernetes Operator for PostgreSQL
+# Percona Distribution for PostgreSQL Operator
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## Introduction
 
-Percona Kubernetes Operator for PostgreSQL automates and simplifies deploying and managing open source PostgreSQL clusters on Kubernetes. Percona Kubernetes Operator for PostgreSQL is based on [Postgres Operator](https://crunchydata.github.io/postgres-operator/latest/) developed by Crunchy Data.
+Percona Distribution for PostgreSQL Operator automates and simplifies deploying and managing open source PostgreSQL clusters on Kubernetes. Percona Distribution for PostgreSQL Operator is based on [Postgres Operator](https://crunchydata.github.io/postgres-operator/latest/) developed by Crunchy Data.
 
 Whether you need to get a simple PostgreSQL cluster up and running, need to deploy a high availability, fault tolerant cluster in production, or are running your own database-as-a-service, the Operator provides the essential features you need to keep your clusters healthy:
 
@@ -58,7 +58,7 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
 
 * **Backup to S3**
 
-    Store your backups in Amazon S3 or any object storage system that supports the S3 protocol. The PostgreSQL Operator can backup, restore, and create new clusters from these backups.
+    Store your backups in Amazon S3 or any object storage system that supports the S3 protocol. The Operator can backup, restore, and create new clusters from these backups.
 
 * **Multi-Namespace Support**
 
@@ -137,9 +137,9 @@ The following steps will quickly make the Operator up and running with cloud nat
 
 ## Design overview
 
-![Percona Kubernetes Operator for PostgreSQL](operator.png)
+![Percona Distribution for PostgreSQL Operator](operator.svg)
 
-PostgreSQL containers deployed with the PostgreSQL Operator include the following components:
+PostgreSQL containers deployed with Percona Distribution for PostgreSQL Operator include the following components:
 
 * [PostgreSQL](https://www.postgresql.org/)
   * [PostgreSQL Contrib Modules](https://www.postgresql.org/docs/current/contrib.html)
@@ -152,7 +152,7 @@ PostgreSQL containers deployed with the PostgreSQL Operator include the followin
 * [pg_stat_monitor](https://github.com/percona/pg_stat_monitor/)
 * LLVM (for JIT compilation)
 
-PostgreSQL Operator Monitoring involves the following components:
+Percona Distribution for PostgreSQL Operator Monitoring involves the following components:
 
 * [pmm-server](https://www.percona.com/doc/percona-monitoring-and-management/2.x/details/architecture.html#pmm-server)
 * [pmm-client](https://www.percona.com/doc/percona-monitoring-and-management/2.x/details/architecture.html#pmm-client)
