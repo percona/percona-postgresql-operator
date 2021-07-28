@@ -2,6 +2,7 @@ package pgc
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"strings"
@@ -19,8 +20,10 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -284,4 +287,51 @@ func (c *Controller) AddPerconaPGClusterEventHandler() {
 // WorkerCount returns the worker count for the controller
 func (c *Controller) WorkerCount() int {
 	return c.PerconaPGClusterWorkerCount
+}
+
+func PrepareForRestore(clientset *kubeapi.Client, clusterName, namespace string) error {
+	ctx := context.TODO()
+	err := deleteDabasePods(clientset, clusterName, namespace)
+	if err != nil {
+		log.Error("get pods: %s", err.Error())
+	}
+	// Delete the DCS and leader ConfigMaps.  These will be recreated during the restore.
+	configMaps := []string{
+		fmt.Sprintf("%s-config", clusterName),
+		fmt.Sprintf("%s-leader", clusterName),
+	}
+	for _, c := range configMaps {
+		if err := clientset.CoreV1().ConfigMaps(namespace).
+			Delete(ctx, c, metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteDabasePods(clientset *kubeapi.Client, clusterName, namespace string) error {
+	ctx := context.TODO()
+	pgInstances, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s,%s", config.LABEL_PG_CLUSTER, clusterName,
+			config.LABEL_PG_DATABASE),
+	})
+	if err != nil {
+		log.Error("get pods: %s", err.Error())
+	}
+	if pgInstances == nil {
+		return nil
+	}
+	// Wait for all primary and replica pods to be removed.
+	if err := wait.Poll(time.Second/4, time.Minute*3, func() (bool, error) {
+		for _, deployment := range pgInstances.Items {
+			if _, err := clientset.AppsV1().Deployments(namespace).
+				Get(ctx, deployment.GetName(), metav1.GetOptions{}); err == nil || !kerrors.IsNotFound(err) {
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		return err
+	}
+	return nil
 }
