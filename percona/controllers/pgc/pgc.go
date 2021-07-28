@@ -322,16 +322,18 @@ func deleteDabasePods(clientset *kubeapi.Client, clusterName, namespace string) 
 		return nil
 	}
 	// Wait for all primary and replica pods to be removed.
-	if err := wait.Poll(time.Second/4, time.Minute*3, func() (bool, error) {
-		for _, deployment := range pgInstances.Items {
-			if _, err := clientset.AppsV1().Deployments(namespace).
-				Get(ctx, deployment.GetName(), metav1.GetOptions{}); err == nil || !kerrors.IsNotFound(err) {
+	err = wait.Poll(time.Second/4, time.Minute*3, func() (bool, error) {
+		for _, pods := range pgInstances.Items {
+			if _, err := clientset.CoreV1().Pods(namespace).
+				Get(ctx, pods.GetName(), metav1.GetOptions{}); err == nil || !kerrors.IsNotFound(err) {
 				return false, nil
 			}
 		}
 		return true, nil
-	}); err != nil {
-		return err
+	})
+	if err != nil {
+		return errors.Wrap(err, "wait pods termination")
 	}
+
 	return nil
 }
