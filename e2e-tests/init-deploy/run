@@ -53,7 +53,7 @@ if [[ -n $(which aws) ]]; then
 	kubectl create secret docker-registry ecr \
 		--docker-server="${ECR}" \
 		--docker-username=AWS \
-		--docker-password="$(aws ecr get-login-password)"
+		--docker-password="$(aws ecr get-login-password --region us-east-1)"
 	set -x
 
 	export IMAGE_BASE="${ECR}/${IMAGE_BASE}"
