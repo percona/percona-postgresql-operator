@@ -296,7 +296,7 @@ func PrepareForRestore(clientset *kubeapi.Client, clusterName, namespace string)
 	ctx := context.TODO()
 	err := deleteDatabasePods(clientset, clusterName, namespace)
 	if err != nil {
-		log.Error("get pods: %s", err.Error())
+		log.Errorf("get pods: %s", err.Error())
 	}
 	// Delete the DCS and leader ConfigMaps.  These will be recreated during the restore.
 	configMaps := []string{
@@ -318,7 +318,7 @@ func deleteDatabasePods(clientset *kubeapi.Client, clusterName, namespace string
 		LabelSelector: fmt.Sprintf("%s=%s,%s", config.LABEL_PG_CLUSTER, clusterName,
 			config.LABEL_PG_DATABASE),
 	})
-	if err != nil {
+	if err != nil && !kerrors.IsNotFound(err) {
 		return errors.Wrap(err, "get pods")
 	}
 	if pgInstances == nil {
