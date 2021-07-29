@@ -18,18 +18,18 @@ build_image() {
 	local app=${1}
 	local tag=${2}
 	local push=${3}
-	until docker ps;
-		do sleep 1;
+	until docker ps; do
+			sleep 1;
 	done
 	export GO_LDFLAGS="-w -s -trimpath $GO_LDFLAGS"
 	pushd ${src_dir}
-		docker build \
-			--build-arg GIT_COMMIT=$GIT_COMMIT \
-			--build-arg GIT_BRANCH=$GIT_BRANCH \
-			--build-arg GO_LDFLAGS="$GO_LDFLAGS" \
-			--squash \
-			--no-cache \
-			-t "${tag}" -f build/${app}/Dockerfile .
+	docker build \
+		--build-arg GIT_COMMIT=$GIT_COMMIT \
+		--build-arg GIT_BRANCH=$GIT_BRANCH \
+		--build-arg GO_LDFLAGS="$GO_LDFLAGS" \
+		--squash \
+		--no-cache \
+		-t "${tag}" -f build/${app}/Dockerfile .
 	popd
 
 	if [[ ${push} == 'true' ]]; then
@@ -44,13 +44,13 @@ build_image() {
 main() {
 	export IMAGE
 
-	if [[ -n $* ]]; then    # if app is set, build it
+	if [[ -n $* ]]; then # if app is set, build it
 		for arg in ${@}; do
 			[[ ${STANDALONE_APPS_TO_BUILD[*]} =~ (^|[[:space:]])"${arg}"($|[[:space:]]) ]] \
-			&& build_image "${arg}" "${IMAGE}-${arg}" "${PUSH_TO_REGISTRY}" \
-			|| echo "${arg} is not allowed"
+				&& build_image "${arg}" "${IMAGE}-${arg}" "${PUSH_TO_REGISTRY}" \
+				|| echo "${arg} is not allowed"
 		done
-	else                    # build all apps
+	else # build all apps
 		for app in ${STANDALONE_APPS_TO_BUILD[@]}; do
 			set +x
 			echo
