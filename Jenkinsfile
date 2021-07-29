@@ -190,7 +190,7 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER'), [$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'AMI/OVF', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
                     sh '''
                         URI_BASE=perconalab/percona-postgresql-operator:$VERSION
                         docker_uri_base_file='./results/docker/URI_BASE'
@@ -235,7 +235,7 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER'),[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'AMI/OVF', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
                     sh '''
                         URI_BASE=perconalab/percona-postgresql-operator:$VERSION
                         docker_uri_base_file='./results/docker/URI_BASE'
@@ -388,7 +388,9 @@ pipeline {
                 stage('E2E Basic tests') {
                     steps {
                         CreateCluster('sandbox')
-                        runTest('init-deploy', 'sandbox')
+                        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'AMI/OVF', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                            runTest('init-deploy', 'sandbox')
+                        }
                         runTest('scaling', 'sandbox')
                         runTest('recreate', 'sandbox')
                         runTest('affinity', 'sandbox')
