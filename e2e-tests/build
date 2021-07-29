@@ -15,52 +15,52 @@ STANDALONE_APPS_TO_BUILD=(pgo-apiserver pgo-event pgo-rmdata pgo-scheduler postg
 ECR=${ECR:-"119175775298.dkr.ecr.us-east-1.amazonaws.com"}
 
 build_image() {
-    local app=${1}
-    local tag=${2}
-    local push=${3}
-    until docker ps;
-        do sleep 1;
-    done
-    export GO_LDFLAGS="-w -s -trimpath $GO_LDFLAGS"
-    pushd ${src_dir}
-        docker build \
-            --build-arg GIT_COMMIT=$GIT_COMMIT \
-            --build-arg GIT_BRANCH=$GIT_BRANCH \
-            --build-arg GO_LDFLAGS="$GO_LDFLAGS" \
-            --squash \
-            --no-cache \
-            -t "${tag}" -f build/${app}/Dockerfile .
-    popd
+	local app=${1}
+	local tag=${2}
+	local push=${3}
+	until docker ps;
+		do sleep 1;
+	done
+	export GO_LDFLAGS="-w -s -trimpath $GO_LDFLAGS"
+	pushd ${src_dir}
+		docker build \
+			--build-arg GIT_COMMIT=$GIT_COMMIT \
+			--build-arg GIT_BRANCH=$GIT_BRANCH \
+			--build-arg GO_LDFLAGS="$GO_LDFLAGS" \
+			--squash \
+			--no-cache \
+			-t "${tag}" -f build/${app}/Dockerfile .
+	popd
 
-    if [[ ${push} == 'true' ]]; then
-        docker push "${tag}"
-        docker tag "${tag}" "${ECR}/${tag}"
-        docker push "${ECR}/${tag}" || :
-    else
-        echo "Skipping image push to repo..."
-    fi
+	if [[ ${push} == 'true' ]]; then
+		docker push "${tag}"
+		docker tag "${tag}" "${ECR}/${tag}"
+		docker push "${ECR}/${tag}" || :
+	else
+		echo "Skipping image push to repo..."
+	fi
 }
 
 main() {
-    export IMAGE
+	export IMAGE
 
-    if [[ -n $* ]]; then    # if app is set, build it
-        for arg in ${@}; do
-            [[ ${STANDALONE_APPS_TO_BUILD[*]} =~ (^|[[:space:]])"${arg}"($|[[:space:]]) ]] \
-            && build_image "${arg}" "${IMAGE}-${arg}" "${PUSH_TO_REGISTRY}" \
-            || echo "${arg} is not allowed"
-        done
-    else                    # build all apps
-        for app in ${STANDALONE_APPS_TO_BUILD[@]}; do
-            set +x
-            echo
-            echo ": Building ${app} image"
-            echo
-            set -x
+	if [[ -n $* ]]; then    # if app is set, build it
+		for arg in ${@}; do
+			[[ ${STANDALONE_APPS_TO_BUILD[*]} =~ (^|[[:space:]])"${arg}"($|[[:space:]]) ]] \
+			&& build_image "${arg}" "${IMAGE}-${arg}" "${PUSH_TO_REGISTRY}" \
+			|| echo "${arg} is not allowed"
+		done
+	else                    # build all apps
+		for app in ${STANDALONE_APPS_TO_BUILD[@]}; do
+			set +x
+			echo
+			echo ": Building ${app} image"
+			echo
+			set -x
 
-            build_image "${app}" "${IMAGE}-${app}" "${PUSH_TO_REGISTRY}"
-        done
-    fi
+			build_image "${app}" "${IMAGE}-${app}" "${PUSH_TO_REGISTRY}"
+		done
+	fi
 }
 
 main $@

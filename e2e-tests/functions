@@ -113,7 +113,7 @@ deploy_operator() {
 		| yq w -d'3' - 'subjects[0].namespace' ${namespace} \
 		| yq w -d'4' - 'spec.template.spec.containers[0].image' ${IMAGE_DEPLOYER} \
 		| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
-		>${tmp_dir}/operator.yaml
+			>${tmp_dir}/operator.yaml
 
 	if [[ -n ${pull_secret_name} ]]; then
 		yq w -i -d'0' "${tmp_dir}/operator.yaml" 'imagePullSecrets[0].name' "${pull_secret_name}"
