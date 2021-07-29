@@ -3,7 +3,7 @@ WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
 COPY . .
 
-RUN GOBIN="$(pwd -P)/hack/tools" ./hack/update-codegen.sh
+#RUN GOBIN="$(pwd -P)/hack/tools" ./hack/update-codegen.sh
 
 ARG GIT_COMMIT
 ARG GIT_BRANCH

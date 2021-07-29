@@ -65,7 +65,7 @@ export pgo_cluster_name=hippo
 export cluster_namespace=pgo
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -252,7 +252,7 @@ export backrest_s3_endpoint=s3.region-name.amazonaws.com
 export backrest_s3_region=region-name
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -373,7 +373,7 @@ export cluster_namespace=pgo
 export backrest_gcs_bucket=your-bucket
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -497,7 +497,7 @@ export pgo_cluster_name=hippo
 export cluster_namespace=pgo
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:
@@ -631,7 +631,7 @@ export pgo_cluster_replica_suffix=rpl1
 export cluster_namespace=pgo
 
 cat <<-EOF > "${pgo_cluster_name}-${pgo_cluster_replica_suffix}-pgreplica.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgreplica
 metadata:
   labels:

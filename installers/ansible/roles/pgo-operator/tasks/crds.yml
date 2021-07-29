@@ -4,7 +4,7 @@
     - install
   block:
   - name: Check if PGCluster CRD Is Installed
-    shell: "{{ kubectl_or_oc }} get crd pgclusters.crunchydata.com"
+    shell: "{{ kubectl_or_oc }} get crd pgclusters.pg.percona.com"
     register: crds_result
     failed_when: false
 
@@ -19,7 +19,7 @@
     - install
   block:
   - name: Check if PGPolicies CRD Is Installed
-    shell: "{{ kubectl_or_oc }} get crd pgpolicies.crunchydata.com"
+    shell: "{{ kubectl_or_oc }} get crd pgpolicies.pg.percona.com"
     register: crds_result
     failed_when: false
 
@@ -34,7 +34,7 @@
     - install
   block:
   - name: Check if PGReplicas CRD Is Installed
-    shell: "{{ kubectl_or_oc }} get crd pgreplicas.crunchydata.com"
+    shell: "{{ kubectl_or_oc }} get crd pgreplicas.pg.percona.com"
     register: crds_result
     failed_when: false
 
@@ -49,7 +49,7 @@
     - install
   block:
   - name: Check if PGTasks CRD Is Installed
-    shell: "{{ kubectl_or_oc }} get crd pgtasks.crunchydata.com"
+    shell: "{{ kubectl_or_oc }} get crd pgtasks.pg.percona.com"
     register: crds_result
     failed_when: false
 
@@ -64,7 +64,7 @@
     - install
   block:
   - name: Check if PerconaPGCluster CRD Is Installed
-    shell: "{{ kubectl_or_oc }} get crd perconapgclusters.crunchydata.com"
+    shell: "{{ kubectl_or_oc }} get crd perconapgclusters.pg.percona.com"
     register: crds_result
     failed_when: false
 
