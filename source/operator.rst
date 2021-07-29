@@ -3,6 +3,61 @@
 `Custom Resource options <operator.html#operator-custom-resource-options>`_
 ===============================================================================
 
+The Operator is configured via the spec section of the
+`deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`_ file.
+
+The metadata part of this file contains the following keys:
+
+* ``name`` (``cluster1`` by default) sets the name of your Percona Distribution
+  for PostgreSQL Cluster; it should include only `URL-compatible characters <https://datatracker.ietf.org/doc/html/rfc3986#section-2.3>`_, not exceed 22 characters, start with an alphabetic character, and end with an alphanumeric character;
+
+The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-mongodb-operator/blob/main/deploy/cr.yaml>`_ file contains the following sections:
+
+.. list-table::
+   :widths: 15 15 16 54
+   :header-rows: 1
+
+   * - Key
+     - Value type
+     - Default
+     - Description
+
+   * - pause
+     - boolean
+     - ``false``
+     - Pause/resume: setting it to ``true`` gracefully stops the cluster, and
+       setting it to ``false`` after shut down starts the cluster back.
+
+   * - pgPrimary
+     - :ref:`subdoc<operator-pgprimary-section>`
+     -
+     - PostgreSQL primary instance section
+
+   * - pmm
+     - :ref:`subdoc<operator-pmm-section>`
+     - 
+     - Percona Monitoring and Management section
+
+   * - backup
+     - :ref:`subdoc<operator=backup-section>`
+     - 
+     - Percona Server for MongoDB backups section
+
+   * - pgBouncer
+     - :ref:`subdoc<operator-pgprimary-section>`
+     -
+     - The `pgBouncer <http://pgbouncer.github.io/>`__ connection pooler section
+
+   * - pgReplicas
+     - :ref:`subdoc<operator-pgreplicas-section>`
+     -
+     - Section required to manage the replicas within a PostgreSQL cluster
+
+   * - pgBadger
+     - :ref:`subdoc<operator-pgbadger-section>`
+     -
+     - The `pgBadger <https://github.com/darold/pgbadger>`__ PostgreSQL log analyzer section
+
 .. tabularcolumns:: |p{2cm}|p{13.6cm}|
 
 +-----------------+-------------------------------------------------------------------------------------------+
