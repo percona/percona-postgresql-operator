@@ -291,7 +291,7 @@ func (c *Controller) WorkerCount() int {
 
 func PrepareForRestore(clientset *kubeapi.Client, clusterName, namespace string) error {
 	ctx := context.TODO()
-	err := deleteDabasePods(clientset, clusterName, namespace)
+	err := deleteDatabasePods(clientset, clusterName, namespace)
 	if err != nil {
 		log.Error("get pods: %s", err.Error())
 	}
@@ -309,14 +309,14 @@ func PrepareForRestore(clientset *kubeapi.Client, clusterName, namespace string)
 	return nil
 }
 
-func deleteDabasePods(clientset *kubeapi.Client, clusterName, namespace string) error {
+func deleteDatabasePods(clientset *kubeapi.Client, clusterName, namespace string) error {
 	ctx := context.TODO()
 	pgInstances, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s,%s", config.LABEL_PG_CLUSTER, clusterName,
 			config.LABEL_PG_DATABASE),
 	})
 	if err != nil {
-		log.Error("get pods: %s", err.Error())
+		return errors.Wrap(err, "get pods")
 	}
 	if pgInstances == nil {
 		return nil
