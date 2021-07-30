@@ -20,6 +20,8 @@ spec:
   tlsOnly: false
   standby: false
   pause: false
+#  keepData: true
+#  keepBackups: true
 #  pgDataSource:
 #    restoreFrom: ""
 #    restoreOpts: ""
