@@ -7,14 +7,14 @@ commonLabels:
 
 patchesJson6902:
   - target:
-      group: crunchydata.com
+      group: pg.percona.com
       version: v1
       namespace: pgo
       kind: Pgcluster
       name: dev-hippo
     path: devhippo.json
   - target:
-      group: crunchydata.com
+      group: pg.percona.com
       version: v1
       namespace: pgo
       kind: Pgcluster

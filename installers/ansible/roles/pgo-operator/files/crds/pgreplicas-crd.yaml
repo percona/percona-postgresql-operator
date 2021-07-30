@@ -2,9 +2,9 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: pgreplicas.crunchydata.com
+  name: pgreplicas.pg.percona.com
 spec:
-  group: crunchydata.com
+  group: pg.percona.com
   names:
     kind: Pgreplica
     listKind: PgreplicaList

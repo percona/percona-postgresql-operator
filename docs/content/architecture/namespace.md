@@ -218,7 +218,7 @@ rules:
       - delete
       - deletecollection
   - apiGroups:
-      - crunchydata.com
+      - pg.percona.com
     resources:
       - pgclusters
       - pgpolicies
@@ -330,7 +330,7 @@ rules:
     - delete
     - deletecollection
 - apiGroups:
-    - crunchydata.com
+    - pg.percona.com
   resources:
     - pgclusters
     - pgpolicies

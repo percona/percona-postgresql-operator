@@ -145,7 +145,7 @@ export cluster_namespace=pgo
 export cluster_image_prefix=registry.developers.crunchydata.com/crunchydata
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: Pgcluster
 metadata:
   annotations:

@@ -35,9 +35,9 @@ type FakePerconaPGClusters struct {
 	ns   string
 }
 
-var perconapgclustersResource = schema.GroupVersionResource{Group: "crunchydata.com", Version: "v1", Resource: "pgclusters"}
+var perconapgclustersResource = schema.GroupVersionResource{Group: "pg.percona.com", Version: "v1", Resource: "pgclusters"}
 
-var perconapgclustersKind = schema.GroupVersionKind{Group: "crunchydata.com", Version: "v1", Kind: "Pgcluster"}
+var perconapgclustersKind = schema.GroupVersionKind{Group: "pg.percona.com", Version: "v1", Kind: "Pgcluster"}
 
 // Get takes name of the pgcluster, and returns the corresponding pgcluster object, and an error if there is any.
 func (c *FakePerconaPGClusters) Get(ctx context.Context, name string, options v1.GetOptions) (result *crunchydatacomv1.PerconaPGCluster, err error) {
