@@ -1,4 +1,4 @@
-apiVersion: crunchydata.com/v1
+apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   annotations:
@@ -20,6 +20,8 @@ spec:
   tlsOnly: false
   standby: false
   pause: false
+#  keepData: true
+#  keepBackups: true
 #  pgDataSource:
 #    restoreFrom: ""
 #    restoreOpts: ""
@@ -145,3 +147,4 @@ spec:
     enabled: false
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
     port: 10000
+#

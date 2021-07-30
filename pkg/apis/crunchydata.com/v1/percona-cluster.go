@@ -32,6 +32,7 @@ type PerconaPGClusterSpec struct {
 	TlSOnly            bool                  `json:"tlsOnly"`
 	DisableAutofail    bool                  `json:"disableAutofail"`
 	KeepData           bool                  `json:"keepData"`
+	KeepBackups        bool                  `json:"keepBackups"`
 	PGPrimary          PGPrimary             `json:"pgPrimary"`
 	PGReplicas         *PGReplicas           `json:"pgReplicas"`
 	PGBadger           Badger                `json:"pgBadger"`

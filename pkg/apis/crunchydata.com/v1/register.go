@@ -31,7 +31,7 @@ var (
 
 // GroupName is the group name used in this package.
 // const GroupName = "cr.client-go.k8s.io"
-const GroupName = "crunchydata.com"
+const GroupName = "pg.percona.com"
 
 // SchemeGroupVersion is the group version used to register these objects.
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}

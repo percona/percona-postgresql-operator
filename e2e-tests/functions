@@ -21,6 +21,7 @@ IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg13-pgbadger"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 BUCKET=${BUCKET:-"pg-operator-testing"}
 PGO_K8S_NAME=${PGO_K8S_NAME}
+ECR=${ECR:-"119175775298.dkr.ecr.us-east-1.amazonaws.com"}
 
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
@@ -111,13 +112,21 @@ desc() {
 
 deploy_operator() {
 	desc 'start operator'
+	local pull_secret_name=${1}
 
 	# modifing ini structure from configMap
 	yq r -d'2' ${src_dir}/deploy/operator.yaml 'data[values.yaml]' \
-		| $sed -e "s#namespace: .*#namespace: ${namespace}#g" \
-		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: ${namespace}#g" \
+		| $sed -e "s#namespace: .*#namespace: \"${namespace}\"#g" \
+		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: \"${namespace}\"#g" \
 		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: $(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)#g" \
+		| $sed -e "s#ccp_image_prefix: .*#ccp_image_prefix: \"${IMAGE_BASE}\"#g" \
+		| $sed -e "s#pgo_image_prefix: .*#pgo_image_prefix: \"${IMAGE_BASE}\"#g" \
 			>${tmp_dir}/operator.ini
+
+	if [[ -n ${pull_secret_name} ]]; then
+		$sed -i ${tmp_dir}/operator.ini -e "s#ccp_image_pull_secret: .*#ccp_image_pull_secret: \"${pull_secret_name}\"#g"
+		$sed -i ${tmp_dir}/operator.ini -e "s#pgo_image_pull_secret: .*#pgo_image_pull_secret: \"${pull_secret_name}\"#g"
+	fi
 
 	if [ -n "$OPENSHIFT" ]; then
 		$sed -i -e 's#disable_fsgroup: .*#disable_fsgroup: "true"#g' ${tmp_dir}/operator.ini
@@ -128,7 +137,13 @@ deploy_operator() {
 		| yq w -d'3' - 'subjects[0].namespace' ${namespace} \
 		| yq w -d'4' - 'spec.template.spec.containers[0].image' ${IMAGE_DEPLOYER} \
 		| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
-		| kubectl_bin apply -f -
+			>${tmp_dir}/operator.yaml
+
+	if [[ -n ${pull_secret_name} ]]; then
+		yq w -i -d'0' "${tmp_dir}/operator.yaml" 'imagePullSecrets[0].name' "${pull_secret_name}"
+		yq w -i -d'4' "${tmp_dir}/operator.yaml" 'spec.template.spec.imagePullSecrets[0].name' "${pull_secret_name}"
+	fi
+	kubectl_bin apply -f ${tmp_dir}/operator.yaml
 
 	wait_job_completion "pgo-deploy"
 
@@ -517,22 +532,7 @@ spinup_pgcluster() {
 
 	desc 'create first PG cluster'
 
-	yq r -d0 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d1 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-postgres-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d2 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-primaryuser-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d3 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-${cluster}-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
+	create_user_secrets "${cluster}"
 
 	desc 'create fresh PG cluster'
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity}
@@ -558,6 +558,27 @@ spinup_pgcluster() {
 		'\c myapp \\\ GRANT SELECT,INSERT ON myApp to "some-name";GRANT USAGE ON SCHEMA public TO "some-name";' \
 		"postgres:postgres_pass@${cluster}.${namespace}"
 	sleep 10
+}
+
+	sleep 10
+	local cluster=$1
+
+	yq r -d0 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d1 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-postgres-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d2 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-primaryuser-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d3 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-${cluster}-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
 }
 
 wait_cluster_consistency() {
@@ -710,7 +731,7 @@ create_backup() {
 	local bckp_prefix=${2}
 	local bckp_type=${3:-"full"}
 
-	yq w ${test_dir}/conf/backup.yml 'metadata.labels.pg-cluster' "${cluster}" \
+	yq w ${conf_dir}/backup.yml 'metadata.labels.pg-cluster' "${cluster}" \
 		| yq w - 'metadata.name' "${bckp_prefix}-${cluster}" \
 		| yq w - 'spec.name' "${bckp_prefix}-${cluster}" \
 		| yq w - 'spec.namespace' "${namespace}" \
@@ -747,6 +768,12 @@ run_restore() {
 	fi
 
 	kubectl apply -f ${tmp_dir}/restore.yml
+
+	wait_bootstap_completeness ${cluster}
+}
+
+wait_bootstap_completeness() {
+	local cluster=$1
 
 	wait_job_completion "${cluster}-bootstrap"
 	wait_deployment "${cluster}-backrest-shared-repo"

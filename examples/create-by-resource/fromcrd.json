@@ -1,5 +1,5 @@
 {
-  "apiVersion": "crunchydata.com/v1",
+  "apiVersion":  "pg.percona.com/v1",
   "kind": "Pgcluster",
   "metadata": {
     "annotations": {

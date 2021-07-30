@@ -1,0 +1,57 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. ${test_dir}/../functions
+
+create_pgcluster_clone_from() {
+	local cluster=$1
+
+	create_user_secrets "${cluster}-clone"
+	apply_cluster "${src_dir}/deploy/cr.yaml" "${cluster}-clone" "local" "${cluster}"
+	wait_bootstap_completeness "${cluster}-clone"
+}
+
+main() {
+	create_namespace $namespace
+	deploy_operator
+
+	desc 'create first PG cluster'
+
+	cluster="some-name"
+	kubectl_bin apply \
+		-f $conf_dir/${cluster}-secrets.yml \
+		-f $conf_dir/client.yml
+
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+	create_backup "${cluster}" "fulldata" "full"
+
+	desc 'create clone from live cluster'
+
+	create_pgcluster_clone_from "${cluster}"
+	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-clone-pgbouncer.${namespace}"
+
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"add","path":"/spec/keepBackups","value":true}]'
+	sleep 30
+	wait_deployment "${cluster}"
+	sleep 30
+
+	desc 'remove both clusters'
+
+	kubectl delete perconapgclusters --all
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+	wait_for_delete "deployment/${cluster}-clone"
+	wait_for_delete "deployment/${cluster}-clone-backrest-shared-repo"
+
+	desc 'start clone from backup only'
+
+	create_pgcluster_clone_from "${cluster}"
+	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-clone-pgbouncer.${namespace}"
+
+	destroy $namespace
+}
+
+main
