@@ -521,7 +521,7 @@ spinup_pgcluster() {
 	sleep 10
 }
 
-create_user_secrets() {
+	sleep 10
 	local cluster=$1
 
 	yq r -d0 $conf_dir/some-name-secrets.yml \
