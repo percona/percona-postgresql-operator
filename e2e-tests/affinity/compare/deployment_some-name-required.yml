@@ -33,6 +33,7 @@ spec:
   template:
     metadata:
       annotations:
+        keep-backups: "false"
         keep-data: "false"
       labels:
         crunchy-pgha-scope: some-name-required
