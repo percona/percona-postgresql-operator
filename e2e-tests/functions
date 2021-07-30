@@ -21,6 +21,7 @@ IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg13-pgbadger"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 BUCKET=${BUCKET:-"pg-operator-testing"}
 PGO_K8S_NAME=${PGO_K8S_NAME}
+ECR=${ECR:-"119175775298.dkr.ecr.us-east-1.amazonaws.com"}
 
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
@@ -87,13 +88,21 @@ desc() {
 
 deploy_operator() {
 	desc 'start operator'
+	local pull_secret_name=${1}
 
 	# modifing ini structure from configMap
 	yq r -d'2' ${src_dir}/deploy/operator.yaml 'data[values.yaml]' \
-		| $sed -e "s#namespace: .*#namespace: ${namespace}#g" \
-		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: ${namespace}#g" \
+		| $sed -e "s#namespace: .*#namespace: \"${namespace}\"#g" \
+		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: \"${namespace}\"#g" \
 		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: $(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)#g" \
+		| $sed -e "s#ccp_image_prefix: .*#ccp_image_prefix: \"${IMAGE_BASE}\"#g" \
+		| $sed -e "s#pgo_image_prefix: .*#pgo_image_prefix: \"${IMAGE_BASE}\"#g" \
 			>${tmp_dir}/operator.ini
+
+	if [[ -n ${pull_secret_name} ]]; then
+		$sed -i ${tmp_dir}/operator.ini -e "s#ccp_image_pull_secret: .*#ccp_image_pull_secret: \"${pull_secret_name}\"#g"
+		$sed -i ${tmp_dir}/operator.ini -e "s#pgo_image_pull_secret: .*#pgo_image_pull_secret: \"${pull_secret_name}\"#g"
+	fi
 
 	if [ -n "$OPENSHIFT" ]; then
 		$sed -i -e 's#disable_fsgroup: .*#disable_fsgroup: "true"#g' ${tmp_dir}/operator.ini
@@ -104,7 +113,13 @@ deploy_operator() {
 		| yq w -d'3' - 'subjects[0].namespace' ${namespace} \
 		| yq w -d'4' - 'spec.template.spec.containers[0].image' ${IMAGE_DEPLOYER} \
 		| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
-		| kubectl_bin apply -f -
+			>${tmp_dir}/operator.yaml
+
+	if [[ -n ${pull_secret_name} ]]; then
+		yq w -i -d'0' "${tmp_dir}/operator.yaml" 'imagePullSecrets[0].name' "${pull_secret_name}"
+		yq w -i -d'4' "${tmp_dir}/operator.yaml" 'spec.template.spec.imagePullSecrets[0].name' "${pull_secret_name}"
+	fi
+	kubectl_bin apply -f ${tmp_dir}/operator.yaml
 
 	wait_job_completion "pgo-deploy"
 
