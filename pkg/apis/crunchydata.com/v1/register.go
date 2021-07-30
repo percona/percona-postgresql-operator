@@ -57,6 +57,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PgpolicyList{},
 		&Pgtask{},
 		&PgtaskList{},
+		&PerconaPGCluster{},
+		&PerconaPGClusterList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

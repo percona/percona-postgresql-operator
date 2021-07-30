@@ -21,6 +21,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	backrestoperator "github.com/percona/percona-postgresql-operator/internal/operator/backrest"
 	clusteroperator "github.com/percona/percona-postgresql-operator/internal/operator/cluster"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/pgc"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	log "github.com/sirupsen/logrus"
@@ -49,6 +50,11 @@ func (c *Controller) handleBackrestRestore(task *crv1.Pgtask) {
 
 	backrestoperator.UpdatePGClusterSpecForRestore(c.Client, cluster, task)
 	log.Debugf("pgtask Controller: finished updating %s spec for restore", clusterName)
+
+	err = pgc.PrepareForRestore(c.Client, clusterName, namespace)
+	if err != nil {
+		log.Errorf("prepare for restore: %s", err.Error())
+	}
 
 	if err := clusteroperator.AddClusterBootstrap(c.Client, cluster); err != nil {
 		log.Errorf("pgtask Controller: %s", err.Error())

@@ -60,7 +60,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Crunchydata().V1().Pgreplicas().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("pgtasks"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Crunchydata().V1().Pgtasks().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("perconapgcluster"):
+	case v1.SchemeGroupVersion.WithResource("perconapgclusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Crunchydata().V1().PerconaPGClusters().Informer()}, nil
 
 	}

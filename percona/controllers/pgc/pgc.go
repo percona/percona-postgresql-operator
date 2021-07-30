@@ -2,6 +2,7 @@ package pgc
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"strings"
@@ -19,8 +20,10 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -155,25 +158,33 @@ func (c *Controller) handleStatuses() error {
 			return nil
 		}
 		for _, p := range perconaPGClusters.Items {
+			pgClusterStatus := crv1.PgclusterStatus{}
+			replStatuses := make(map[string]crv1.PgreplicaStatus)
 			pgCluster, err := c.Client.CrunchydataV1().Pgclusters(n.Name).Get(ctx, p.Name, metav1.GetOptions{})
-			if err != nil {
+			if err != nil && !strings.Contains(err.Error(), "not found") {
 				return errors.Wrap(err, "get pgCluster")
 			}
-			replStatuses := make(map[string]crv1.PgreplicaStatus)
+			if pgCluster != nil {
+				pgClusterStatus = pgCluster.Status
+			}
+
 			selector := config.LABEL_PG_CLUSTER + "=" + p.Name
 			pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(n.Name).List(ctx, metav1.ListOptions{LabelSelector: selector})
-			if err != nil {
+			if err != nil && !strings.Contains(err.Error(), "not found") {
 				return errors.Wrap(err, "get pgReplicas list")
 			}
-			for _, repl := range pgReplicas.Items {
-				replStatuses[repl.Name] = repl.Status
+			if pgReplicas != nil {
+				for _, repl := range pgReplicas.Items {
+					replStatuses[repl.Name] = repl.Status
+				}
 			}
+
 			if reflect.DeepEqual(p.Status.PGCluster, pgCluster.Status) && reflect.DeepEqual(p.Status.PGReplicas, replStatuses) {
 				return nil
 			}
 
 			value := crv1.PerconaPGClusterStatus{
-				PGCluster:  pgCluster.Status,
+				PGCluster:  pgClusterStatus,
 				PGReplicas: replStatuses,
 			}
 
@@ -203,13 +214,13 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	err := c.updateTemplate(newCluster)
 	if err != nil {
-		log.Errorf("update deployment template: %s", err)
+		log.Errorf("update perconapgcluster: update deployment template: %s", err)
 	}
 
 	if !reflect.DeepEqual(oldCluster.Spec.PGPrimary.Expose, newCluster.Spec.PGPrimary.Expose) {
 		err = service.CreateOrUpdate(c.Client, newCluster, service.PGPrimaryServiceType)
 		if err != nil {
-			log.Errorf("handle primary service on update: %s", err)
+			log.Errorf("update perconapgcluster: handle primary service on update: %s", err)
 			return
 		}
 	}
@@ -217,7 +228,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		if newCluster.Spec.PGBouncer.Size > 0 {
 			err = service.CreateOrUpdate(c.Client, newCluster, service.PGBouncerServiceType)
 			if err != nil {
-				log.Errorf("handle bouncer service on update: %s", err)
+				log.Errorf("update perconapgcluster: handle bouncer service on update: %s", err)
 				return
 			}
 		}
@@ -225,40 +236,35 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 
 	primary, err := pgcluster.IsPrimary(c.Client, oldCluster)
 	if err != nil {
-		log.Errorf("update pgreplicas: check is pgcluster primary: %s", err)
+		log.Errorf("update perconapgcluster: check is pgcluster primary: %s", err)
 	}
 
 	if primary {
 		err = pgreplica.Update(c.Client, newCluster, oldCluster)
 		if err != nil {
-			log.Errorf("update pgreplicas: update pgreplica: %s", err)
+			log.Errorf("update perconapgcluster: update pgreplica: %s", err)
 		}
 		err = pgcluster.Update(c.Client, newCluster, oldCluster)
 		if err != nil {
-			log.Errorf("update pgcluster: update pgcluster: %s", err)
+			log.Errorf("update perconapgcluster: update pgcluster: %s", err)
 			return
 		}
 		return
 	}
 	err = pgcluster.Update(c.Client, newCluster, oldCluster)
 	if err != nil {
-		log.Errorf("update pgcluster: update pgcluster: %s", err)
+		log.Errorf("update perconapgcluster: update pgcluster: %s", err)
 		return
 	}
 	err = pgreplica.Update(c.Client, newCluster, oldCluster)
 	if err != nil {
-		log.Errorf("update pgreplicas: update pgreplica: %s", err)
+		log.Errorf("update perconapgcluster: update pgreplica: %s", err)
 	}
 }
 
 // onDelete is called when a pgcluster is deleted
 func (c *Controller) onDelete(obj interface{}) {
-	clusterObj, ok := obj.(cache.DeletedFinalStateUnknown)
-	if !ok {
-		log.Errorln("delete cluster: object is not DeletedFinalStateUnknown")
-		return
-	}
-	cluster, ok := clusterObj.Obj.(*crv1.PerconaPGCluster)
+	cluster, ok := obj.(*crv1.PerconaPGCluster)
 	if !ok {
 		log.Errorln("delete cluster: object is not PerconaPGCluster")
 		return
@@ -284,4 +290,53 @@ func (c *Controller) AddPerconaPGClusterEventHandler() {
 // WorkerCount returns the worker count for the controller
 func (c *Controller) WorkerCount() int {
 	return c.PerconaPGClusterWorkerCount
+}
+
+func PrepareForRestore(clientset *kubeapi.Client, clusterName, namespace string) error {
+	ctx := context.TODO()
+	err := deleteDatabasePods(clientset, clusterName, namespace)
+	if err != nil {
+		log.Errorf("get pods: %s", err.Error())
+	}
+	// Delete the DCS and leader ConfigMaps.  These will be recreated during the restore.
+	configMaps := []string{
+		fmt.Sprintf("%s-config", clusterName),
+		fmt.Sprintf("%s-leader", clusterName),
+	}
+	for _, c := range configMaps {
+		if err := clientset.CoreV1().ConfigMaps(namespace).
+			Delete(ctx, c, metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteDatabasePods(clientset *kubeapi.Client, clusterName, namespace string) error {
+	ctx := context.TODO()
+	pgInstances, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s,%s", config.LABEL_PG_CLUSTER, clusterName,
+			config.LABEL_PG_DATABASE),
+	})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrap(err, "get pods")
+	}
+	if pgInstances == nil {
+		return nil
+	}
+	// Wait for all primary and replica pods to be removed.
+	err = wait.Poll(time.Second/4, time.Minute*3, func() (bool, error) {
+		for _, pods := range pgInstances.Items {
+			if _, err := clientset.CoreV1().Pods(namespace).
+				Get(ctx, pods.GetName(), metav1.GetOptions{}); err == nil || !kerrors.IsNotFound(err) {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "wait pods termination")
+	}
+
+	return nil
 }
