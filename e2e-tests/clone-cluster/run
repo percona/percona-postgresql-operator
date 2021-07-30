@@ -6,7 +6,6 @@ set -o xtrace
 test_dir=$(realpath $(dirname $0))
 . ${test_dir}/../functions
 
-
 create_pgcluster_clone_from() {
 	local cluster=$1
 
