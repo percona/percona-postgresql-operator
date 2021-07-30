@@ -20,9 +20,9 @@ $PGO_CMD --namespace=$PGO_OPERATOR_NAMESPACE delete pgpolicies --all
 $PGO_CMD --namespace=$PGO_OPERATOR_NAMESPACE delete pgtasks --all
 
 $PGO_CMD --namespace=$PGO_OPERATOR_NAMESPACE delete crd \
-	pgreplicas.crunchydata.com \
-	pgclusters.crunchydata.com \
-	pgpolicies.crunchydata.com \
-	pgtasks.crunchydata.com
+	pgreplicas.pg.percona.com \
+	pgclusters.pg.percona.com \
+	pgpolicies.pg.percona.com \
+	pgtasks.pg.percona.com
 
 $PGO_CMD --namespace=$PGO_OPERATOR_NAMESPACE delete jobs --selector=pgrmdata=true
