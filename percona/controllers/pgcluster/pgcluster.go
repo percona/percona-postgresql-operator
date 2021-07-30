@@ -117,7 +117,8 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	for k, v := range cluster.Spec.Annotations.Global {
 		specAnnotationsGlobal[k] = v
 	}
-	specAnnotationsGlobal["keep-data"] = strconv.FormatBool(pgc.Spec.KeepData)
+	specAnnotationsGlobal[config.ANNOTATION_CLUSTER_KEEP_DATA] = strconv.FormatBool(pgc.Spec.KeepData)
+	specAnnotationsGlobal[config.ANNOTATION_CLUSTER_KEEP_BACKUPS] = strconv.FormatBool(pgc.Spec.KeepBackups)
 
 	pgoVersion := defaultPGOVersion
 	version, ok := pgc.Labels["pgo-version"]
