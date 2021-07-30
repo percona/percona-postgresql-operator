@@ -7,6 +7,6 @@ spec:
   action: loss
   mode: one
   loss:
-    loss: "25"
+    loss: "100"
     correlation: "25"
-  duration: "10s"
+  duration: "60s"

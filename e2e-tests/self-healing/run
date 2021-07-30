@@ -38,6 +38,33 @@ network_loss() {
 		| kubectl_bin apply -f -
 }
 
+get_pod_by_role() {
+	local cluster=${1}
+	local role=${2}
+	local parameter=${3}
+	local replica_sfx=${4}
+
+	local deployment_name=''
+	if [[ -z ${replica_sfx} && "${role}" == 'master' ]]; then
+		deployment_name="${cluster}"
+		service_name="${cluster}"
+	else
+		deployment_name="${cluster}-${replica_sfx}"
+		service_name="${cluster}-replica"
+	fi
+
+	case ${parameter} in
+		'name')
+			local jsonpath="{.items[].metadata.name}"
+			;;
+		'IP')
+			local jsonpath="{.items[].status.podIP}"
+			;;
+	esac
+
+	echo "$(kubectl_bin get pods --selector=role=${role},service-name=${service_name},pg-cluster=${cluster},deployment-name=${deployment_name} -o 'jsonpath='${jsonpath}'')"
+}
+
 main() {
 	create_namespace $namespace
 	deploy_operator
@@ -49,12 +76,11 @@ main() {
 
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
-	master_pod="$(kubectl_bin get pods --selector=role=master,service-name=${cluster},pg-cluster=${cluster} -o 'jsonpath={.items[].metadata.name}')"
-	kill_pod "${master_pod}"
+	kill_pod "$(get_pod_by_role ${cluster} master name)"
 	wait_deployment "${cluster}"
 	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
 
-	failure_pod "${master_pod}"
+	failure_pod "$(get_pod_by_role ${cluster} master name)"
 	sleep 30
 	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
 
@@ -63,19 +89,18 @@ main() {
 	wait_deployment "${cluster}-repl1"
 	wait_deployment "${cluster}-repl2"
 
-	replica_pod="$(kubectl_bin get pods --selector=role=replica,service-name=${cluster}-replica,pg-cluster=${cluster},deployment-name=${cluster}-repl1 -o 'jsonpath={.items[].metadata.name}')"
-	kill_pod "${replica_pod}"
+	kill_pod "$(get_pod_by_role ${cluster} replica name repl1)"
 	run_psql '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
 	compare_psql_cmd "select-2" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
 	wait_deployment "${cluster}-repl1"
-	repl1_pod_ip=$(kubectl get pods --selector=role=replica,service-name=${cluster}-replica,pg-cluster=${cluster},deployment-name=${cluster}-repl1 -o 'jsonpath={.items[].status.podIP}')
+	repl1_pod_ip="$(get_pod_by_role ${cluster} replica IP repl1)"
 	compare_psql_cmd "select-2" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${repl1_pod_ip//\./-}.${namespace}" '' ".pod.cluster.local"
 
-	network_loss "${replica_pod}"
+	network_loss "$(get_pod_by_role ${cluster} replica name repl1)"
 	run_psql '\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
 	compare_psql_cmd "select-3" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
-	sleep 10
-	repl1_pod_ip=$(kubectl get pods --selector=role=replica,service-name=${cluster}-replica,pg-cluster=${cluster},deployment-name=${cluster}-repl1 -o 'jsonpath={.items[].status.podIP}')
+	sleep 60
+	repl1_pod_ip="$(get_pod_by_role ${cluster} replica IP repl1)"
 	compare_psql_cmd "select-3" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${repl1_pod_ip//\./-}.${namespace}" '' ".pod.cluster.local"
 
 	kubectl delete NetworkChaos --all
