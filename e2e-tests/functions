@@ -508,22 +508,7 @@ spinup_pgcluster() {
 
 	desc 'create first PG cluster'
 
-	yq r -d0 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d1 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-postgres-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d2 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-primaryuser-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d3 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-${cluster}-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
+	create_user_secrets "${cluster}"
 
 	desc 'create fresh PG cluster'
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity}
@@ -549,6 +534,27 @@ spinup_pgcluster() {
 		'\c myapp \\\ GRANT SELECT ON myApp to "some-name";GRANT USAGE ON SCHEMA public TO "some-name";' \
 		"postgres:postgres_pass@${cluster}.${namespace}"
 	sleep 10
+}
+
+	sleep 10
+	local cluster=$1
+
+	yq r -d0 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d1 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-postgres-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d2 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-primaryuser-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
+	yq r -d3 $conf_dir/some-name-secrets.yml \
+		| yq w - 'metadata.name' "${cluster}-${cluster}-secret" \
+		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+		| kubectl_bin apply -f -
 }
 
 wait_cluster_consistency() {
@@ -701,7 +707,7 @@ create_backup() {
 	local bckp_prefix=${2}
 	local bckp_type=${3:-"full"}
 
-	yq w ${test_dir}/conf/backup.yml 'metadata.labels.pg-cluster' "${cluster}" \
+	yq w ${conf_dir}/backup.yml 'metadata.labels.pg-cluster' "${cluster}" \
 		| yq w - 'metadata.name' "${bckp_prefix}-${cluster}" \
 		| yq w - 'spec.name' "${bckp_prefix}-${cluster}" \
 		| yq w - 'spec.namespace' "${namespace}" \
@@ -738,6 +744,12 @@ run_restore() {
 	fi
 
 	kubectl apply -f ${tmp_dir}/restore.yml
+
+	wait_bootstap_completeness ${cluster}
+}
+
+wait_bootstap_completeness() {
+	local cluster=$1
 
 	wait_job_completion "${cluster}-bootstrap"
 	wait_deployment "${cluster}-backrest-shared-repo"
