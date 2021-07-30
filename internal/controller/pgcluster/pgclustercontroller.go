@@ -528,7 +528,16 @@ func (c *Controller) onDelete(obj interface{}) {
 	}
 
 	// determine if the data directory or backups should be kept
-	_, keepBackups := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_BACKUPS)
+	kbValue, keepBackupsExsist := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_BACKUPS)
+	keepBackups := false
+	if keepBackupsExsist {
+		keepBackupsValue, err := strconv.ParseBool(kbValue)
+		if err != nil {
+			log.Error("parse kepp-backups value to bool")
+			return
+		}
+		keepBackups = keepBackupsValue
+	}
 	value, keepDataExist := isAnnotationExists(cluster, config.ANNOTATION_CLUSTER_KEEP_DATA)
 	keepData := false
 	if keepDataExist {
