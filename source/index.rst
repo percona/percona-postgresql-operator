@@ -34,6 +34,7 @@ Installation guide
    :maxdepth: 1
 
    kubernetes
+   gke
 
 Configuration and Management
 ============================

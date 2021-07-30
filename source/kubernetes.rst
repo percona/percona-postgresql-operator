@@ -56,12 +56,6 @@ Percona Distribution for PostgreSQL in a Kubernetes-based environment.
       pgo-deploy-rhv6k                                  0/1     Completed 0          5m
       postgres-operator-8646c68b57-z8m62                4/4     Running   1          5m
 
-#. You can also deploy PosgreSQL replica at any time as follows: 
-
-    .. code:: bash
-
-       $ kubectl apply -f ./deploy/cr-pgreplica.yaml
-
 #. Check connectivity to newly created cluster
 
    .. code:: bash
