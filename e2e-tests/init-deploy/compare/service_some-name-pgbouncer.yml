@@ -6,7 +6,6 @@ metadata:
     pg-cluster: some-name
   name: some-name-pgbouncer
 spec:
-  externalTrafficPolicy: Cluster
   ports:
     - name: postgres
       port: 5432
@@ -15,4 +14,4 @@ spec:
   selector:
     service-name: some-name-pgbouncer
   sessionAffinity: None
-  type: LoadBalancer
+  type: ClusterIP
