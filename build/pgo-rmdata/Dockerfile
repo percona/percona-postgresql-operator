@@ -19,6 +19,9 @@ RUN mkdir -p build/_output/bin \
                ./cmd/pgo-rmdata \
     && cp -r build/_output/bin/pgo-rmdata /usr/local/bin/pgo-rmdata
 
+RUN ./bin/license_aggregator.sh; \
+	cp -r ./licenses /licenses
+
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 LABEL name="Data removal wrapper for Percona Postgres Operator" \
@@ -33,6 +36,7 @@ COPY redhat/atomic/help.md /help.md
 COPY licenses /licenses
 
 COPY --from=go_builder /usr/local/bin/pgo-rmdata /usr/local/bin
+COPY --from=go_builder /licenses /licenses
 COPY bin/pgo-rmdata/ /usr/local/bin
 
 USER 2

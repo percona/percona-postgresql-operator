@@ -19,6 +19,9 @@ RUN mkdir -p build/_output/bin \
                ./cmd/postgres-operator \
     && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator
 
+RUN ./bin/license_aggregator.sh; \
+	cp -r ./licenses /licenses
+
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 LABEL name="Percona Postgres Operator" \
@@ -33,6 +36,7 @@ COPY redhat/atomic/help.md /help.md
 COPY licenses /licenses
 
 COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
+COPY --from=go_builder /licenses /licenses
 COPY installers/ansible/roles/pgo-operator/files/pgo-backrest-repo /default-pgo-backrest-repo
 COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
 COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml

@@ -17,6 +17,8 @@ RUN mkdir -p build/_output/bin \
                ./cmd/apiserver \
     && cp -r build/_output/bin/apiserver /usr/local/bin/apiserver
 
+RUN ./bin/license_aggregator.sh; \
+    cp -r ./licenses /licenses
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 
@@ -29,7 +31,6 @@ LABEL name="Percona Postgres Operator API server" \
 COPY redhat/licenses /licenses
 COPY redhat/atomic/help.1 /help.1
 COPY redhat/atomic/help.md /help.md
-COPY licenses /licenses
 
 RUN set -ex; \
     microdnf -y install \
@@ -37,6 +38,7 @@ RUN set -ex; \
 	microdnf -y clean all
 
 COPY --from=go_builder /usr/local/bin/apiserver /usr/local/bin
+COPY --from=go_builder /licenses /licenses
 COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
 COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
 
