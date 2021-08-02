@@ -19,6 +19,9 @@ RUN mkdir -p build/_output/bin \
 			   ./cmd/pgo-scheduler \
 	&& cp -r build/_output/bin/pgo-scheduler /usr/local/bin/pgo-scheduler
 
+RUN ./bin/license_aggregator.sh; \
+	cp -r ./licenses /licenses
+
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 LABEL name="Percona Postgres Operator task scheduler" \
@@ -30,7 +33,6 @@ LABEL name="Percona Postgres Operator task scheduler" \
 COPY redhat/licenses /licenses
 COPY redhat/atomic/help.1 /help.1
 COPY redhat/atomic/help.md /help.md
-COPY licenses /licenses
 
 RUN set -ex; \
 	mkdir -p /opt/cpm/bin /opt/cpm/conf /pgo-config /configs; \
@@ -44,6 +46,7 @@ RUN set -ex; \
 	microdnf -y clean all
 
 COPY --from=go_builder /usr/local/bin/pgo-scheduler /opt/cpm/bin
+COPY --from=go_builder /licenses /licenses
 COPY bin/pgo-scheduler /opt/cpm/bin
 COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
 COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
