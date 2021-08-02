@@ -395,6 +395,7 @@ pipeline {
                         runTest('recreate', 'sandbox')
                         runTest('affinity', 'sandbox')
                         runTest('monitoring', 'sandbox')
+                        runTest('self-healing', 'sandbox')
                         runTest('clone-cluster', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
