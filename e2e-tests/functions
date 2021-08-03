@@ -119,8 +119,8 @@ deploy_operator() {
 		| $sed -e "s#namespace: .*#namespace: \"${namespace}\"#g" \
 		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: \"${namespace}\"#g" \
 		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: $(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)#g" \
-		| $sed -e "s#ccp_image_prefix: .*#ccp_image_prefix: \"${IMAGE_BASE}\"#g" \
-		| $sed -e "s#pgo_image_prefix: .*#pgo_image_prefix: \"${IMAGE_BASE}\"#g" \
+		| $sed -e "s#ccp_image_prefix: .*#ccp_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"#g" \
+		| $sed -e "s#pgo_image_prefix: .*#pgo_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"#g" \
 			>${tmp_dir}/operator.ini
 
 	if [[ -n ${pull_secret_name} ]]; then
