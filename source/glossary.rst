@@ -11,6 +11,8 @@ The Operator options glossary
 
       :ref:`pgPrimary.volumeSpec.accessmode<pgprimary-volumespec-accessmode>`
 
+      :ref:`pgReplicas.REPLICA_NAME.volumeSpec.accessmode<pgreplicas-volumespec-accessmode>`
+
       :ref:`walStorage.volumeSpec.accessmode<walstorage-volumespec-accessmode>`
 
    annotations
@@ -19,6 +21,9 @@ The Operator options glossary
 
       :ref:`pgBouncer.expose.annotations<pgbouncer-expose-annotations>`
 
+      :ref:`pgReplicas.REPLICA_NAME.expose.annotations<pgreplicas-expose-annotations>`
+
+      :ref:`pgReplicas.REPLICA_NAME.annotations<pgreplicas-annotations>`
 
    backrestRepoImage
 
@@ -35,6 +40,10 @@ The Operator options glossary
       :ref:`pgBouncer.resources.limits.cpu<pgbouncer-resources-limits-cpu>`
 
       :ref:`pgBouncer.resources.requests.cpu<pgbouncer-resources-requests-cpu>`
+
+      :ref:`pgReplicas.REPLICA_NAME.resources.limits.cpu<pgreplicas-resources-limits-cpu>`
+
+      :ref:`pgReplicas.REPLICA_NAME.resources.requests.cpu<pgreplicas-resources-requests-cpu>`
 
       :ref:`pmm.resources.requests.cpu<pmm-resources-requests-cpu>`
 
@@ -84,11 +93,17 @@ The Operator options glossary
 
       :ref:`pgBouncer.expose.labels<pgbouncer-expose-labels>`
 
+      :ref:`pgReplicas.REPLICA_NAME.expose.labels<pgreplicas-expose-labels>`
+
+      :ref:`pgReplicas.REPLICA_NAME.labels<pgreplicas-expose-labels>`
+
    loadBalancerSourceRanges
 
      ..
 
       :ref:`pgBouncer.expose.loadBalancerSourceRanges<pgbouncer-expose-loadbalancersourceranges>`
+
+      :ref:`pgReplicas.REPLICA_NAME.expose.loadBalancerSourceRanges<pgreplicas-expose-loadbalancersourceranges>`
 
    matchLabels
 
@@ -97,6 +112,8 @@ The Operator options glossary
       :ref:`backup.volumeSpec.matchLabels<backup-volumespec-matchlabels>`
 
       :ref:`pgPrimary.volumeSpec.matchLabels<pgprimary-volumespec-matchlabels>`
+
+      :ref:`pgReplicas.REPLICA_NAME.volumeSpec.matchLabels<pgreplicas-volumespec-matchlabels>`
 
       :ref:`walStorage.volumeSpec.matchLabels<walstorage-volumespec-matchlabels>`
 
@@ -111,6 +128,10 @@ The Operator options glossary
       :ref:`pgBouncer.resources.limits.memory<pgbouncer-resources-limits-memory>`
 
       :ref:`pgBouncer.resources.requests.memory<pgbouncer-resources-requests-memory>`
+
+      :ref:`pgReplicas.REPLICA_NAME.resources.limits.memory<pgreplicas-resources-limits-memory>`
+
+      :ref:`pgReplicas.REPLICA_NAME.resources.requests.memory<pgreplicas-resources-requests-memory>`
 
       :ref:`pmm.resources.requests.memory<pmm-resources-requests-memory>`
 
@@ -170,6 +191,8 @@ The Operator options glossary
 
       :ref:`pgBouncer.expose.serviceType<pgbouncer-expose-servicetype>`
 
+      :ref:`pgReplicas.REPLICA_NAME.expose.serviceType<pgreplicas-expose-servicetype>`
+
    serverUser
 
      ..
@@ -184,8 +207,11 @@ The Operator options glossary
 
       :ref:`pgPrimary.volumeSpec.size<pgprimary-volumespec-size>`
 
-      :ref:`walStorage.volumeSpec.size<walstorage-volumespec-size>`
+      :ref:`pgReplicas.REPLICA_NAME.size<pgreplicas-size>`
 
+      :ref:`pgReplicas.REPLICA_NAME.volumeSpec.size<pgreplicas-volumespec-size>`
+
+      :ref:`walStorage.volumeSpec.size<walstorage-volumespec-size>`
 
    standby
 
@@ -201,6 +227,8 @@ The Operator options glossary
 
       :ref:`pgPrimary.volumeSpec.storageclass<pgprimary-volumespec-storageclass>`
 
+      :ref:`pgReplicas.REPLICA_NAME.volumeSpec.storageclass<pgreplicas-volumespec-storageclass>`
+
       :ref:`walStorage.volumeSpec.storageclass<walstorage-volumespec-storageclass>`
 
    storagetype
@@ -210,6 +238,8 @@ The Operator options glossary
       :ref:`backup.volumeSpec.storagetype<backup-volumespec-storagetype>`
 
       :ref:`pgPrimary.volumeSpec.storagetype<pgprimary-volumespec-storagetype>`
+
+      :ref:`pgReplicas.REPLICA_NAME.volumeSpec.storagetype<pgreplicas-volumespec-storagetype>`
 
       :ref:`walStorage.volumeSpec.storagetype<walstorage-volumespec-storagetype>`
 
@@ -229,7 +259,7 @@ The Operator options glossary
 
      ..
 
-      :ref:`backup.storages.s3.<storage-name>.uriStyle<backup-storages-s3-uristyle>`
+      :ref:`backup.storages.s3.STORAGE_NAME.uriStyle<backup-storages-s3-uristyle>`
 
    user
 
@@ -241,4 +271,4 @@ The Operator options glossary
 
      ..
 
-      :ref:`backup.storages.s3.<storage-name>.verifyTLS<backup-storages-s3-verifytls>`
+      :ref:`backup.storages.s3.STORAGE_NAME.verifyTLS<backup-storages-s3-verifytls>`
