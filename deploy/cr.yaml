@@ -31,14 +31,14 @@ spec:
 #        size: 1G
 #        accessmode: ReadWriteOnce
 #        storagetype: dynamic
-#        storageclass: "standard"
+#        storageclass: ""
 #        matchLabels: ""
 #  walStorage:
 #    volumeSpec:
 #      size: 1G
 #      accessmode: ReadWriteOnce
 #      storagetype: dynamic
-#      storageclass: "standard"
+#      storageclass: ""
 #      matchLabels: ""
   userLabels:
     pgo-version: "0.2.0"
@@ -52,14 +52,14 @@ spec:
       size: 1G
       accessmode: ReadWriteOnce
       storagetype: dynamic
-      storageclass: "standard"
+      storageclass: ""
 #      matchLabels: ""
     expose:
       serviceType: ClusterIP
 #      loadBalancerSourceRanges:
 #      annotations:
 #        pg-cluster-annot: cluster1
-#      labels: 
+#      labels:
 #        pg-cluster-label: cluster1
   pmm:
     enabled: false
@@ -84,11 +84,11 @@ spec:
       size: 1G
       accessmode: ReadWriteOnce
       storagetype: dynamic
-      storageclass: "standard"
+      storageclass: ""
 #      matchLabels: ""
 #    storages:
 #      my-s3:
-#        type: s3     
+#        type: s3
 #        endpointUrl: minio-gateway-svc:9000
 #        region: us-east-1
 #        uriStyle: path
@@ -127,7 +127,7 @@ spec:
         accessmode: ReadWriteOnce
         size: 1G
         storagetype: dynamic
-        storageclass: "standard"
+        storageclass: ""
 #        matchLabels: ""
 #      affinity:
 #        default: null
@@ -141,7 +141,7 @@ spec:
 #        loadBalancerSourceRanges:
 #        annotations:
 #          pg-cluster-annot: cluster1
-#        labels: 
+#        labels:
 #          pg-cluster-label: cluster1
   pgBadger:
     enabled: false
