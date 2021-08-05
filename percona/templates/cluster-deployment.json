@@ -33,10 +33,7 @@
                 }
             },
             "spec": {
-                "securityContext": {
-                    "fsGroup": 1001,
-                    "supplementalGroups": [1001, 1002, 1003]
-                },
+                "securityContext": {{.SecurityContext}},
                 "serviceAccountName": "pgo-pg",
                 {{ if .Tolerations }}
                 "tolerations": {{ .Tolerations }},
