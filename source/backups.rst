@@ -81,6 +81,54 @@ configuration file and applying it as usual:
 
    kubectl apply -f deploy/backup/cluster1-backrest-repo-config-secret.yaml
 
+.. _backups.gcs:
+
+Use Google Cloud Storage for backups
+------------------------------------
+
+You can configure `Google Cloud Storage <https://cloud.google.com/storage>`_ as
+an object store for backups similarly to :ref:`S3 storage<backups.configure>`,
+but with an additional step. The Operator will need your service account key
+to access storage.
+
+#. Create your service account key following the `official Google Cloud instructions <https://cloud.google.com/iam/docs/creating-managing-service-account-keys>`_.
+
+#. Export this key from your Google Cloud account.
+
+   .. |rarr|   unicode:: U+02192 .. RIGHTWARDS ARROW
+
+   You can find your key in the Google Cloud console (select *IAM & Admin*
+   |rarr| *Service Accounts* in the left menu panel, then click your account and
+   open the *KEYS* tab):
+
+   .. image:: ./assets/images/gcs-service-account.svg
+      :align: center
+
+   Click the *ADD KEY* button, chose *Create new key* and chose *JSON* as a key
+   type. These actions will result in downloading a file in JSON format with
+   your new private key and related information.
+
+#. Now you should use a base64-encoded version of this file and to create the `Kubernetes Secret <https://kubernetes.io/docs/concepts/configuration/secret/>`_. You can encode
+   the file with the ``base64 <filename>`` command. When done, create the
+   following yaml file with your cluster name and base64-encoded file contents:
+
+   .. code:: yaml
+
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: <cluster-name>-backrest-repo-config
+      type: Opaque
+      data:
+        gcs-key: <base64-encoded-json-file-contents>
+
+   When done, create the secret as follows:
+   
+   .. code:: bash
+
+      kubectl apply -f ./my-gcs-account-secret.yaml
+
+#. Now proceed with :ref:`backups.configure` as usual.
 
 .. _backups-manual:
 
