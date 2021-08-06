@@ -31,14 +31,14 @@ spec:
 #        size: 1G
 #        accessmode: ReadWriteOnce
 #        storagetype: dynamic
-#        storageclass: "standard"
+#        storageclass: ""
 #        matchLabels: ""
 #  walStorage:
 #    volumeSpec:
 #      size: 1G
 #      accessmode: ReadWriteOnce
 #      storagetype: dynamic
-#      storageclass: "standard"
+#      storageclass: ""
 #      matchLabels: ""
   userLabels:
     pgo-version: "0.2.0"
@@ -52,7 +52,7 @@ spec:
       size: 1G
       accessmode: ReadWriteOnce
       storagetype: dynamic
-      storageclass: "standard"
+      storageclass: ""
 #      matchLabels: ""
     expose:
       serviceType: ClusterIP
@@ -84,7 +84,7 @@ spec:
       size: 1G
       accessmode: ReadWriteOnce
       storagetype: dynamic
-      storageclass: "standard"
+      storageclass: ""
 #      matchLabels: ""
 #    storages:
 #      my-s3:
@@ -127,7 +127,7 @@ spec:
         accessmode: ReadWriteOnce
         size: 1G
         storagetype: dynamic
-        storageclass: "standard"
+        storageclass: ""
 #        matchLabels: ""
 #      affinity:
 #        default: null

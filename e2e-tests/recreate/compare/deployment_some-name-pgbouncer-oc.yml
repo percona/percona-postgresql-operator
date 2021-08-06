@@ -30,6 +30,9 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-backups: "false"
+        keep-data: "false"
       labels:
         crunchy-pgbouncer: "true"
         name: some-name-pgbouncer
