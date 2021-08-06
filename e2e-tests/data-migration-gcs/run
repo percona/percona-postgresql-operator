@@ -62,6 +62,16 @@ function main {
 	yq r -d0 ${conf_dir}/cloud-secret-minio-gw.yml 'stringData."credentials.json"' >${PGO_HOME}/gcs-credentials.json
 	set -x
 	pgo_cluster_name="some-name-${RANDOM}"
+
+	case "$(echo ${IMAGE_PG_HA} | grep -Eo 'ppg[0-9]+')" in
+	'ppg12')
+		ccpImageTag='centos8-12.7-4.7.0'
+		;;
+	'ppg13')
+		ccpImageTag='centos8-13.3-4.7.0'
+		;;
+	esac
+
 	PATH="${PGO_HOME}/.pgo/pgo:$PATH" \
 	PGOUSER="${PGO_HOME}/.pgo/pgo/pgouser" \
 	PGO_CA_CERT="${PGO_HOME}/.pgo/pgo/client.crt" \
@@ -75,6 +85,7 @@ function main {
 		--password=opensourcehippo \
 		--pgbackrest-gcs-bucket "${BUCKET}" \
 		--pgbackrest-gcs-key "${PGO_HOME}/gcs-credentials.json" \
+		--ccp-image-tag "${ccpImageTag}" \
 		--pgbackrest-storage-type gcs
 	wait_deployment "${pgo_cluster_name}-backrest-shared-repo"
 	wait_deployment "${pgo_cluster_name}"
