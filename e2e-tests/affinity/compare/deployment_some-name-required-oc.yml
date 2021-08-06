@@ -32,6 +32,9 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-backups: "false"
+        keep-data: "false"
       labels:
         crunchy-pgha-scope: some-name-required
         deployment-name: some-name-required
