@@ -190,11 +190,9 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext:
-        fsGroup: 1001
+        fsGroup: 26
         supplementalGroups:
           - 1001
-          - 1002
-          - 1003
       serviceAccount: pgo-pg
       serviceAccountName: pgo-pg
       terminationGracePeriodSeconds: 30

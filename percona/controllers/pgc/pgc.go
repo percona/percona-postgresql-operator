@@ -42,7 +42,7 @@ type Controller struct {
 const (
 	deploymentTemplateName = "cluster-deployment.json"
 	templatePath           = "/"
-	defaultSecurityContext = `{"fsGroup": 1001,"supplementalGroups": [1001, 1002, 1003]}`
+	defaultSecurityContext = `{"fsGroup": 26,"supplementalGroups": [1001]}`
 )
 
 // onAdd is called when a pgcluster is added
@@ -349,6 +349,9 @@ func deleteDatabasePods(clientset *kubeapi.Client, clusterName, namespace string
 
 func handleSecurityContextTemplate(template []byte, cluster *crv1.PerconaPGCluster) ([]byte, error) {
 	if cluster.Spec.SecurityContext == nil {
+		if cluster.Spec.DisableFSGroup {
+			return bytes.Replace(template, []byte("<securityContext>"), []byte(`{"supplementalGroups": [1001]}`), -1), nil
+		}
 		return bytes.Replace(template, []byte("<securityContext>"), []byte(defaultSecurityContext), -1), nil
 	}
 	securityContextBytes, err := getSecurityContextJSON(cluster)
@@ -360,5 +363,8 @@ func handleSecurityContextTemplate(template []byte, cluster *crv1.PerconaPGClust
 }
 
 func getSecurityContextJSON(cluster *crv1.PerconaPGCluster) ([]byte, error) {
+	if cluster.Spec.DisableFSGroup && cluster.Spec.SecurityContext != nil {
+		cluster.Spec.SecurityContext.FSGroup = nil
+	}
 	return json.Marshal(cluster.Spec.SecurityContext)
 }

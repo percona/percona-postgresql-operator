@@ -260,12 +260,7 @@ func updateAnnotations(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment)
 	if cl.Spec.PGReplicas.HotStandby.Annotations == nil {
 		return
 	}
-	if deployment.Spec.Template.Annotations == nil {
-		deployment.Spec.Template.Annotations = make(map[string]string)
-	}
-	for k, v := range cl.Spec.PGReplicas.HotStandby.Annotations {
-		deployment.Spec.Template.Annotations[k] = v
-	}
+	dplmnt.UpdateSpecTemplateAnnotations(cl.Spec.PGReplicas.HotStandby.Annotations, deployment)
 
 	return
 }
@@ -280,12 +275,7 @@ func updateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	if cl.Spec.PGReplicas.HotStandby.Labels == nil {
 		return
 	}
-	if deployment.Spec.Template.Labels == nil {
-		deployment.Spec.Template.Labels = make(map[string]string)
-	}
-	for k, v := range cl.Spec.PGReplicas.HotStandby.Labels {
-		deployment.Spec.Template.Labels[k] = v
-	}
+	dplmnt.UpdateSpecTemplateLabels(cl.Spec.PGReplicas.HotStandby.Labels, deployment)
 
 	return
 }
@@ -309,7 +299,7 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 		return errors.Wrap(err, "add or remove pmm sidecar: %s")
 	}
 	updateResources(cl, deployment)
-	dplmnt.UpdateSpecTemplaeSpecSecurityContext(cl, deployment)
+	dplmnt.UpdateSpecTemplateSpecSecurityContext(cl, deployment)
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)
 	}

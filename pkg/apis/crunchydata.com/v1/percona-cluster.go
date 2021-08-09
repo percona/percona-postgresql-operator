@@ -41,6 +41,7 @@ type PerconaPGClusterSpec struct {
 	PMM                PMMSpec                `json:"pmm"`
 	Backup             Backup                 `json:"backup"`
 	SecurityContext    *v1.PodSecurityContext `json:"securityContext"`
+	DisableFSGroup     bool                   `json:"disableFSGroup"`
 }
 
 type PerconaPGClusterStatus struct {

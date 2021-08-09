@@ -6,9 +6,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 )
 
-func UpdateSpecTemplaeSpecSecurityContext(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
+func UpdateSpecTemplateSpecSecurityContext(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	if cl.Spec.SecurityContext == nil {
 		return
+	}
+	if cl.Spec.DisableFSGroup {
+		cl.Spec.SecurityContext.FSGroup = nil
 	}
 	deployment.Spec.Template.Spec.SecurityContext = cl.Spec.SecurityContext
 }

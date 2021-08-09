@@ -53,7 +53,7 @@ func Update(clientset kubeapi.Interface, newPerocnaPGCluster, oldPerocnaPGCluste
 			return errors.Wrap(err, "update pmm sidecar")
 		}
 	}
-	dplmnt.UpdateSpecTemplaeSpecSecurityContext(newPerocnaPGCluster, deployment)
+	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerocnaPGCluster, deployment)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "could not update deployment")
