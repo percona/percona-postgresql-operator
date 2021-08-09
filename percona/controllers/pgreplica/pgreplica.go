@@ -10,6 +10,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/operator/pvc"
+	dplmnt "github.com/percona/percona-postgresql-operator/percona/controllers/deployment"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/service"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
@@ -308,7 +309,7 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 		return errors.Wrap(err, "add or remove pmm sidecar: %s")
 	}
 	updateResources(cl, deployment)
-
+	dplmnt.UpdateSpecTemplaeSpecSecurityContext(cl, deployment)
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)
 	}

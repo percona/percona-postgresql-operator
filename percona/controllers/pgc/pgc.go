@@ -1,7 +1,9 @@
 package pgc
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"reflect"
@@ -40,6 +42,7 @@ type Controller struct {
 const (
 	deploymentTemplateName = "cluster-deployment.json"
 	templatePath           = "/"
+	defaultSecurityContext = `{"fsGroup": 1001,"supplementalGroups": [1001, 1002, 1003]}`
 )
 
 // onAdd is called when a pgcluster is added
@@ -91,7 +94,10 @@ func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster) error {
 	if err != nil {
 		return errors.Wrap(err, "handle pmm template data")
 	}
-
+	templateData, err = handleSecurityContextTemplate(templateData, newCluster)
+	if err != nil {
+		return errors.Wrap(err, "handle security context template data")
+	}
 	t, err := template.New(deploymentTemplateName).Parse(string(templateData))
 	if err != nil {
 		return errors.Wrap(err, "parse template")
@@ -339,4 +345,20 @@ func deleteDatabasePods(clientset *kubeapi.Client, clusterName, namespace string
 	}
 
 	return nil
+}
+
+func handleSecurityContextTemplate(template []byte, cluster *crv1.PerconaPGCluster) ([]byte, error) {
+	if cluster.Spec.SecurityContext == nil {
+		return bytes.Replace(template, []byte("<securityContext>"), []byte(defaultSecurityContext), -1), nil
+	}
+	securityContextBytes, err := getSecurityContextJSON(cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "get security context json: %s")
+	}
+
+	return bytes.Replace(template, []byte("<securityContext>"), securityContextBytes, -1), nil
+}
+
+func getSecurityContextJSON(cluster *crv1.PerconaPGCluster) ([]byte, error) {
+	return json.Marshal(cluster.Spec.SecurityContext)
 }
