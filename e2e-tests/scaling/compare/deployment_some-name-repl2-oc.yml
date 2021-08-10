@@ -6,21 +6,21 @@ metadata:
   generation: 1
   labels:
     crunchy-pgha-scope: some-name
-    deployment-name: some-name-2
+    deployment-name: some-name-repl2
     name: some-name-replica
     pg-cluster: some-name
     pgo-pg-database: "true"
     pgo-version: 0.2.0
     service-name: some-name-replica
     vendor: crunchydata
-  name: some-name-2
+  name: some-name-repl2
 spec:
   progressDeadlineSeconds: 600
   replicas: 1
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      deployment-name: some-name-2
+      deployment-name: some-name-repl2
       pg-cluster: some-name
       pgo-pg-database: "true"
       vendor: crunchydata
@@ -31,9 +31,12 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-backups: "false"
+        keep-data: "false"
       labels:
         crunchy-pgha-scope: some-name
-        deployment-name: some-name-2
+        deployment-name: some-name-repl2
         name: some-name-replica
         pg-cluster: some-name
         pg-pod-anti-affinity: preferred
@@ -68,7 +71,7 @@ spec:
             - name: PGHA_USER
               value: postgres
             - name: PATRONI_POSTGRESQL_DATA_DIR
-              value: /pgdata/some-name-2
+              value: /pgdata/some-name-repl2
             - name: PGBACKREST_STANZA
               value: db
             - name: PGBACKREST_REPO1_HOST
@@ -80,7 +83,7 @@ spec:
             - name: PGBACKREST_REPO1_PATH
               value: /backrestrepo/some-name-backrest-shared-repo
             - name: PGBACKREST_DB_PATH
-              value: /pgdata/some-name-2
+              value: /pgdata/some-name-repl2
             - name: ENABLE_SSHD
               value: "true"
             - name: PGBACKREST_LOG_PATH
@@ -197,14 +200,15 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext:
-        runAsNonRoot: true
+        supplementalGroups:
+          - 1001
       serviceAccount: pgo-pg
       serviceAccountName: pgo-pg
       terminationGracePeriodSeconds: 30
       volumes:
         - name: pgdata
           persistentVolumeClaim:
-            claimName: some-name-2
+            claimName: some-name-repl2
         - name: user-volume
           secret:
             defaultMode: 420
