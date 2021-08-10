@@ -2,8 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    deployment.kubernetes.io/revision: "1"
-  generation: 1
+    deployment.kubernetes.io/revision: "2"
+  generation: 2
   labels:
     crunchy-pgbouncer: "true"
     name: some-name-pgbouncer
@@ -30,6 +30,9 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-backups: "false"
+        keep-data: "false"
       labels:
         crunchy-pgbouncer: "true"
         name: some-name-pgbouncer

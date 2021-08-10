@@ -147,4 +147,6 @@ spec:
     enabled: false
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
     port: 10000
-#
+#  securityContext:
+#    fsGroup: 1001
+#    supplementalGroups: [1001, 1002, 1003]
