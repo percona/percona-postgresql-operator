@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"github.com/percona/percona-postgresql-operator/internal/operator"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -10,7 +11,7 @@ func UpdateSpecTemplateSpecSecurityContext(cl *crv1.PerconaPGCluster, deployment
 	if cl.Spec.SecurityContext == nil {
 		return
 	}
-	if cl.Spec.DisableFSGroup {
+	if operator.Pgo.DisableFSGroup() {
 		cl.Spec.SecurityContext.FSGroup = nil
 	}
 	deployment.Spec.Template.Spec.SecurityContext = cl.Spec.SecurityContext

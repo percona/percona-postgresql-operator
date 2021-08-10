@@ -13,6 +13,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgreplica"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
@@ -349,7 +350,7 @@ func deleteDatabasePods(clientset *kubeapi.Client, clusterName, namespace string
 
 func handleSecurityContextTemplate(template []byte, cluster *crv1.PerconaPGCluster) ([]byte, error) {
 	if cluster.Spec.SecurityContext == nil {
-		if cluster.Spec.DisableFSGroup {
+		if operator.Pgo.DisableFSGroup() {
 			return bytes.Replace(template, []byte("<securityContext>"), []byte(`{"supplementalGroups": [1001]}`), -1), nil
 		}
 		return bytes.Replace(template, []byte("<securityContext>"), []byte(defaultSecurityContext), -1), nil
@@ -363,7 +364,7 @@ func handleSecurityContextTemplate(template []byte, cluster *crv1.PerconaPGClust
 }
 
 func getSecurityContextJSON(cluster *crv1.PerconaPGCluster) ([]byte, error) {
-	if cluster.Spec.DisableFSGroup && cluster.Spec.SecurityContext != nil {
+	if operator.Pgo.DisableFSGroup() && cluster.Spec.SecurityContext != nil {
 		cluster.Spec.SecurityContext.FSGroup = nil
 	}
 	return json.Marshal(cluster.Spec.SecurityContext)
