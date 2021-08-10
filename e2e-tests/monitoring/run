@@ -90,8 +90,8 @@ get_metric_values node_boot_time_seconds $cluster admin:admin
 desc 'check qan20 metrics'
 get_qan20_values $cluster admin:admin
 
-if [[ -n "${OPENSHIFT}" ]]; then
-    oc adm policy remove-scc-from-user privileged -z pmm-server
+if [[ -n ${OPENSHIFT} ]]; then
+	oc adm policy remove-scc-from-user privileged -z pmm-server
 fi
 helm delete monitoring
 destroy $namespace
