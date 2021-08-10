@@ -30,18 +30,18 @@ function get_qan20_values() {
 	cat >payload.json <<EOF
 {
    "columns":[
-      "load",
-      "num_queries",
-      "query_time"
+	  "load",
+	  "num_queries",
+	  "query_time"
    ],
    "first_seen": false,
    "group_by": "queryid",
    "include_only_fields": [],
    "keyword": "",
    "labels": [
-       {
-           "key": "cluster",
-           "value": ["postgresql"]
+	   {
+		   "key": "cluster",
+		   "value": ["postgresql"]
    }],
    "limit": 10,
    "offset": 0,
@@ -90,7 +90,7 @@ get_metric_values node_boot_time_seconds $cluster admin:admin
 desc 'check qan20 metrics'
 get_qan20_values $cluster admin:admin
 
-if [[ -n ${OPENSHIFT} ]]; then
+if [[ -n "${OPENSHIFT}" ]]; then
 	oc adm policy remove-scc-from-user privileged -z pmm-server
 fi
 helm delete monitoring
