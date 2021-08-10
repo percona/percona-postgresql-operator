@@ -1,6 +1,8 @@
 Providing Backups
 =================
 
+.. _backups.pgbackrest:
+
 The Operator uses the open source `pgBackRest <https://pgbackrest.org/>`_ backup
 and restore utility. A special *pgBackRest repository* is created by the
 Operator along with creating a new PostgreSQL cluster to facilitate the usage of
@@ -20,6 +22,8 @@ can be used, including:
 * ``local,s3``: Use both the storage that is provided by the Kubernetes
   cluster’s Storage Class that you select AND Amazon S3 (or equivalent object
   storage system that uses the S3 protocol).
+
+.. _backups.pgbackrest.repository:
 
 The pgBackRest repository consists of the following Kubernetes objects:
 

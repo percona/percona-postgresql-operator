@@ -105,21 +105,21 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgprimary-image:                                                                         |
+|                 | .. _pgprimary-image:                                                                      |
 |                 |                                                                                           |
-| **Key**         | `pgPrimary.image <operator.html#pgprimary-image>`_                                                |
+| **Key**         | `pgPrimary.image <operator.html#pgprimary-image>`_                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-postgres-ha``                         |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The Docker image of the                                                                   |
+| **Description** | The Docker image of the PostgreSQL Primary instance                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgprimary-volumespec-size:                                                                  |
+|                 | .. _pgprimary-volumespec-size:                                                            |
 |                 |                                                                                           |
-| **Key**         | `pgPrimary.volumeSpec.size <operator.html#pgprimary-volumespec-size>`_                                |
+| **Key**         | `pgPrimary.volumeSpec.size <operator.html#pgprimary-volumespec-size>`_                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -127,13 +127,13 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
 |                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
-|                 | persistentvolumeclaims>`_ size for the PostgreSQL cluster primary storage                 |
+|                 | persistentvolumeclaims>`_ size for the PostgreSQL Primary storage                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgprimary-volumespec-accessmode:                                                            |
+|                 | .. _pgprimary-volumespec-accessmode:                                                      |
 |                 |                                                                                           |
-| **Key**         | `pgPrimary.volumeSpec.accessmode <operator.html#pgprimary-volumespec-accessmode>`_                    |
+| **Key**         | `pgPrimary.volumeSpec.accessmode <operator.html#pgprimary-volumespec-accessmode>`_        |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -141,25 +141,25 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
 |                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
-|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL cluster primary storage        |
+|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL Primary storage                |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgprimary-volumespec-storagetype:                                                           |
+|                 | .. _pgprimary-volumespec-storagetype:                                                     |
 |                 |                                                                                           |
-| **Key**         | `pgPrimary.volumeSpec.storagetype <operator.html#pgprimary-volumespec-storagetype>`_                  |
+| **Key**         | `pgPrimary.volumeSpec.storagetype <operator.html#pgprimary-volumespec-storagetype>`_      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``dynamic``                                                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the PostgreSQL cluster primary storage: ``create`` (by default) or ``dynamic``    |
+| **Description** | Type of the PostgreSQL Primary storage: ``create`` (by default) or ``dynamic``            |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgprimary-volumespec-storageclass:                                                          |
+|                 | .. _pgprimary-volumespec-storageclass:                                                    |
 |                 |                                                                                           |
-| **Key**         | `pgPrimary.volumeSpec.storageclass <operator.html#pgprimary-volumespec-storageclass>`_                |
+| **Key**         | `pgPrimary.volumeSpec.storageclass <operator.html#pgprimary-volumespec-storageclass>`_    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -167,14 +167,14 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | Optionally sets the `Kubernetes storage class                                             |
 |                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
-|                 | PostgreSQL cluster primary storage `PersistentVolumeClaim                                 |
+|                 | PostgreSQL Primary storage `PersistentVolumeClaim                                         |
 |                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgprimary-volumespec-matchlabels:                                                           |
+|                 | .. _pgprimary-volumespec-matchlabels:                                                     |
 |                 |                                                                                           |
-| **Key**         | `pgPrimary.volumeSpec.matchLabels <operator.html#pgprimary-volumespec-matchlabels>`_                  |
+| **Key**         | `pgPrimary.volumeSpec.matchLabels <operator.html#pgprimary-volumespec-matchlabels>`_      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -196,9 +196,9 @@ file contains configuration options for PostgreSQL `write-ahead logging <https:/
 .. tabularcolumns:: |p{2cm}|p{13.6cm}|
 
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-volumespec-size:                                                                      |
+|                 | .. _walstorage-volumespec-size:                                                           |
 |                 |                                                                                           |
-| **Key**         | `walStorage.volumeSpec.size <operator.html#walstorage-volumespec-size>`_                                        |
+| **Key**         | `walStorage.volumeSpec.size <operator.html#walstorage-volumespec-size>`_                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -206,13 +206,13 @@ file contains configuration options for PostgreSQL `write-ahead logging <https:/
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
 |                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
-|                 | persistentvolumeclaims>`_ size for the PostgreSQL write-ahead log storage                 |
+|                 | persistentvolumeclaims>`_ size for the PostgreSQL Write-ahead Log storage                 |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-volumespec-accessmode:                                                                |
+|                 | .. _walstorage-volumespec-accessmode:                                                     |
 |                 |                                                                                           |
-| **Key**         | `walStorage.volumeSpec.accessmode <operator.html#walstorage-volumespec-accessmode>`_                            |
+| **Key**         | `walStorage.volumeSpec.accessmode <operator.html#walstorage-volumespec-accessmode>`_      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -220,25 +220,25 @@ file contains configuration options for PostgreSQL `write-ahead logging <https:/
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
 |                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
-|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL write-ahead log storage        |
+|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL Write-ahead Log storage        |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _walstorage-storagetype:                                                               |
 |                 |                                                                                           |
-| **Key**         | `walStorage.volumeSpec.storagetype <operator.html#walstorage-storagetype>`_                          |
+| **Key**         | `walStorage.volumeSpec.storagetype <operator.html#walstorage-storagetype>`_               |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``dynamic``                                                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the PostgreSQL write-ahead log storage: ``create`` (by default) or ``dynamic``    |
+| **Description** | Type of the PostgreSQL Write-ahead Log storage: ``create`` (by default) or ``dynamic``    |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-volumespec-storageclass:                                                              |
+|                 | .. _walstorage-volumespec-storageclass:                                                   |
 |                 |                                                                                           |
-| **Key**         | `walStorage.volumeSpec.storageclass <operator.html#walstorage-storageclass>`_                        |
+| **Key**         | `walStorage.volumeSpec.storageclass <operator.html#walstorage-storageclass>`_             |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -246,14 +246,14 @@ file contains configuration options for PostgreSQL `write-ahead logging <https:/
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | Optionally sets the `Kubernetes storage class                                             |
 |                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
-|                 | PostgreSQL write-ahead log storage `PersistentVolumeClaim                                 |
+|                 | PostgreSQL Write-ahead Log storage `PersistentVolumeClaim                                 |
 |                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-volumespec-matchlabels:                                                               |
+|                 | .. _walstorage-volumespec-matchlabels:                                                    |
 |                 |                                                                                           |
-| **Key**         | `walStorage.volumeSpec.matchLabels <operator.html#walstorage-volumespec-matchlabels>`_                          |
+| **Key**         | `walStorage.volumeSpec.matchLabels <operator.html#walstorage-volumespec-matchlabels>`_    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -278,33 +278,33 @@ Percona Distribution for PostgreSQL backups.
 .. tabularcolumns:: |p{2cm}|p{13.6cm}|
 
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-image:                                                                   |
+|                 | .. _backup-image:                                                                         |
 |                 |                                                                                           |
-| **Key**         | `backup.image <operator.html#backup-backrestimage>`_                                       |
+| **Key**         | `backup.image <operator.html#backup-backrestimage>`_                                      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbackrest``                          |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The Docker image of the                                                                   |
+| **Description** | The Docker image for :ref:`pgBackRest<backups.pgbackrest>`                                |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-backrestrepoimage:                                                               |
+|                 | .. _backup-backrestrepoimage:                                                             |
 |                 |                                                                                           |
-| **Key**         | `backup.backrestRepoImage <operator.html#backup-backrestrepoimage>`_                               |
+| **Key**         | `backup.backrestRepoImage <operator.html#backup-backrestrepoimage>`_                      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo``                     |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The Docker image of the                                                                   |
+| **Description** | The Docker image for the :ref:`BackRest repository<backups.pgbackrest.repository>`        |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-resources-requests-memory:                                                        |
+|                 | .. _backup-resources-requests-memory:                                                     |
 |                 |                                                                                           |
-| **Key**         | `backup.resources.requests.memory <operator.html#backup-resources-requests-memory>`_                 |
+| **Key**         | `backup.resources.requests.memory <operator.html#backup-resources-requests-memory>`_      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -317,9 +317,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-resources-limits-cpu:                                                                  |
+|                 | .. _backup-resources-limits-cpu:                                                          |
 |                 |                                                                                           |
-| **Key**         | `backup.resources.limits.cpu <operator.html#backup-resources-limits-cpu>`_                                     |
+| **Key**         | `backup.resources.limits.cpu <operator.html#backup-resources-limits-cpu>`_                |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -333,7 +333,7 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _backup-resources-limits-memory:                                                       |
 |                 |                                                                                           |
-| **Key**         | `backup.resources.limits.memory <operator.html#backup-resources-limits-memory>`_                 |
+| **Key**         | `backup.resources.limits.memory <operator.html#backup-resources-limits-memory>`_          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -346,9 +346,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-volumespec-size:                                                                 |
+|                 | .. _backup-volumespec-size:                                                               |
 |                 |                                                                                           |
-| **Key**         | `backup.volumeSpec.size <operator.html#backup-volumespec-size>`_                              |
+| **Key**         | `backup.volumeSpec.size <operator.html#backup-volumespec-size>`_                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -360,9 +360,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-volumespec-accessmode:                                                           |
+|                 | .. _backup-volumespec-accessmode:                                                         |
 |                 |                                                                                           |
-| **Key**         | `backup.volumeSpec.accessmode <operator.html#backup-volumespec-accessmode>`_                  |
+| **Key**         | `backup.volumeSpec.accessmode <operator.html#backup-volumespec-accessmode>`_              |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -374,9 +374,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-volumespec-storagetype:                                                          |
+|                 | .. _backup-volumespec-storagetype:                                                        |
 |                 |                                                                                           |
-| **Key**         | `backup.volumeSpec.storagetype <operator.html#backup-volumespec-storagetype>`_                |
+| **Key**         | `backup.volumeSpec.storagetype <operator.html#backup-volumespec-storagetype>`_            |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -386,9 +386,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-volumespec-storageclass:                                                         |
+|                 | .. _backup-volumespec-storageclass:                                                       |
 |                 |                                                                                           |
-| **Key**         | `backup.volumeSpec.storageclass <operator.html#backup-volumespec-storageclass>`_              |
+| **Key**         | `backup.volumeSpec.storageclass <operator.html#backup-volumespec-storageclass>`_          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -401,9 +401,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-volumespec-matchlabels:                                                          |
+|                 | .. _backup-volumespec-matchlabels:                                                        |
 |                 |                                                                                           |
-| **Key**         | `backup.volumeSpec.matchLabels <operator.html#backup-volumespec-matchlabels>`_                |
+| **Key**         | `backup.volumeSpec.matchLabels <operator.html#backup-volumespec-matchlabels>`_            |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -426,9 +426,10 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-storages-s3-endpointurl:                                                              |
+|                 | .. _backup-storages-s3-endpointurl:                                                       |
 |                 |                                                                                           |
-| **Key**         | `backup.storages.s3.<storage-name>.endpointURL <operator.html#backup-storages-s3-endpointurl>`_                             |
+| **Key**         | `backup.storages.s3.<storage-name>.endpointURL                                            |
+|                 | <operator.html#backup-storages-s3-endpointurl>`_                                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -439,9 +440,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-storages-s3-region:                                                                |
+|                 | .. _backup-storages-s3-region:                                                            |
 |                 |                                                                                           |
-| **Key**         | `backup.storages.s3.<storage-name>.region <operator.html#backup-storages-s3-region>`_                                 |
+| **Key**         | `backup.storages.s3.<storage-name>.region <operator.html#backup-storages-s3-region>`_     |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | boolean                                                                                   |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -452,9 +453,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-storages-s3-uristyle:                                                              |
+|                 | .. _backup-storages-s3-uristyle:                                                          |
 |                 |                                                                                           |
-| **Key**         | `backup.storages.s3.<storage-name>.uriStyle <operator.html#backup-storages-s3-uristyle>`_                             |
+| **Key**         | `backup.storages.s3.<storage-name>.uriStyle <operator.html#backup-storages-s3-uristyle>`_ |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -464,9 +465,10 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-storages-s3-verifytls:                                                             |
+|                 | .. _backup-storages-s3-verifytls:                                                         |
 |                 |                                                                                           |
-| **Key**         | `backup.storages.s3.<storage-name>.verifyTLS <operator.html#backup-storages-s3-verifytls>`_                           |
+| **Key**         | `backup.storages.s3.<storage-name>.verifyTLS                                              |
+|                 | <operator.html#backup-storages-s3-verifytls>`_                                            |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | boolean                                                                                   |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -514,7 +516,8 @@ file contains configuration options for Percona Monitoring and Management.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``percona/pmm-client:{{{pmm2recommended}}}``                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | PMM client Docker image to use                                                            |
+| **Description** | `Percona Monitoring and Management (PMM) Client <https://www.percona.com/doc/             |
+|                 | percona-monitoring-and-management/2.x/details/architecture.html#pmm-client>`_ Docker image|
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -558,9 +561,9 @@ file contains configuration options for Percona Monitoring and Management.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pmm-resources-requests-memory:                                                                 |
+|                 | .. _pmm-resources-requests-memory:                                                        |
 |                 |                                                                                           |
-| **Key**         | `pmm.resources.requests.memory <operator.html#pmm-resources-requests-memory>`_                              |
+| **Key**         | `pmm.resources.requests.memory <operator.html#pmm-resources-requests-memory>`_            |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -573,9 +576,9 @@ file contains configuration options for Percona Monitoring and Management.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pmm-resources-requests-cpu:                                                                    |
+|                 | .. _pmm-resources-requests-cpu:                                                           |
 |                 |                                                                                           |
-| **Key**         | `pmm.resources.requests.cpu <operator.html#pmm-resources-requests-cpu>`_                                    |
+| **Key**         | `pmm.resources.requests.cpu <operator.html#pmm-resources-requests-cpu>`_                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -597,21 +600,21 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 .. tabularcolumns:: |p{2cm}|p{13.6cm}|
 
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-image:                                                                            |
+|                 | .. _pgbouncer-image:                                                                      |
 |                 |                                                                                           |
-| **Key**         | `pgBouncer.image <operator.html#pgbouncer-image>`_                                                    |
+| **Key**         | `pgBouncer.image <operator.html#pgbouncer-image>`_                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbouncer``                           |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | pgBouncer Docker image to use                                                             |
+| **Description** | Docker image for the `pgBouncer <http://pgbouncer.github.io/>`__ connection pooler        |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-size:                                                                  |
+|                 | .. _pgbouncer-size:                                                                       |
 |                 |                                                                                           |
-| **Key**         | `pgBouncer.size <operator.html#pgbouncer-size>`_                                |
+| **Key**         | `pgBouncer.size <operator.html#pgbouncer-size>`_                                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -621,7 +624,7 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-resources-requests-cpu:                                                                  |
+|                 | .. _pgbouncer-resources-requests-cpu:                                                     |
 |                 |                                                                                           |
 | **Key**         | `pgBouncer.resources.requests.cpu <operator.html#pgbouncer-resources-requests-cpu>`_      |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -635,7 +638,7 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-resources-requests-memory:                                                        |
+|                 | .. _pgbouncer-resources-requests-memory:                                                  |
 |                 |                                                                                           |
 | **Key**         | `pgBouncer.resources.requests.memory <operator.html#pgbouncer-resources-requests-memory>`_|
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -652,11 +655,11 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _pgbouncer-resources-limits-cpu:                                                       |
 |                 |                                                                                           |
-| **Key**         | `pgBouncer.resources.limits.cpu <operator.html#pgbouncer-resources-limits-cpu>`_                 |
+| **Key**         | `pgBouncer.resources.limits.cpu <operator.html#pgbouncer-resources-limits-cpu>`_          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``2``                                                                                  |
+| **Example**     | ``2``                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | `Kubernetes CPU limits                                                                    |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
@@ -664,9 +667,9 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-resources-limits-memory:                                                       |
+|                 | .. _pgbouncer-resources-limits-memory:                                                    |
 |                 |                                                                                           |
-| **Key**         | `pgBouncer.resources.limits.memory <operator.html#pgbouncer-resources-limits-memory>`_                 |
+| **Key**         | `pgBouncer.resources.limits.memory <operator.html#pgbouncer-resources-limits-memory>`_    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -679,9 +682,9 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-expose-servicetype:                                                                 |
+|                 | .. _pgbouncer-expose-servicetype:                                                         |
 |                 |                                                                                           |
-| **Key**         | `pgBouncer.expose.serviceType <operator.html#pgbouncer-expose-servicetype>`_                              |
+| **Key**         | `pgBouncer.expose.serviceType <operator.html#pgbouncer-expose-servicetype>`_              |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -693,22 +696,23 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-expose-loadbalancersourceranges:                                                    |
+|                 | .. _pgbouncer-expose-loadbalancersourceranges:                                            |
 |                 |                                                                                           |
-| **Key**         | `pgBouncer.expose.loadBalancerSourceRanges <operator.html#pgbouncer-expose-loadbalancersourceranges>`_    |
+| **Key**         | `pgBouncer.expose.loadBalancerSourceRanges                                                |
+|                 | <operator.html#pgbouncer-expose-loadbalancersourceranges>`_                               |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                            |
+| **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The range of client IP addresses from which the load balancer should be reachable         |
 |                 | (if not set, there is no limitations)                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-expose-annotations:                                                                 |
+|                 | .. _pgbouncer-expose-annotations:                                                         |
 |                 |                                                                                           |
-| **Key**         | `pgBouncer.expose.annotations <operator.html#pgbouncer-expose-annotations>`_                              |
+| **Key**         | `pgBouncer.expose.annotations <operator.html#pgbouncer-expose-annotations>`_              |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | label                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -720,9 +724,9 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbouncer-expose-labels:                                                                      |
+|                 | .. _pgbouncer-expose-labels:                                                              |
 |                 |                                                                                           |
-| **Key**         | `pgBouncer.expose.labels <operator.html#pgbouncer-expose-labels>`_                                        |
+| **Key**         | `pgBouncer.expose.labels <operator.html#pgbouncer-expose-labels>`_                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | label                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -741,9 +745,9 @@ The ``pgReplicas`` section in the `deploy/cr.yaml <https://github.com/percona/pe
 file stores information required to manage the replicas within a PostgreSQL cluster.
 
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-size:                                                                  |
+|                 | .. _pgreplicas-size:                                                                      |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.size <operator.html#pgreplicas-size>`_                                |
+| **Key**         | `pgReplicas.<replica-name>.size <operator.html#pgreplicas-size>`_                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -753,9 +757,10 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-resources-requests-cpu:                                                                  |
+|                 | .. _pgreplicas-resources-requests-cpu:                                                    |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.resources.requests.cpu <operator.html#pgreplicas-resources-requests-cpu>`_      |
+| **Key**         | `pgReplicas.<replica-name>.resources.requests.cpu                                         |
+|                 | <operator.html#pgreplicas-resources-requests-cpu>`_                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -767,9 +772,10 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-resources-requests-memory:                                                        |
+|                 | .. _pgreplicas-resources-requests-memory:                                                 |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.resources.requests.memory <operator.html#pgreplicas-resources-requests-memory>`_|
+| **Key**         | `pgReplicas.<replica-name>.resources.requests.memory                                      |
+|                 | <operator.html#pgreplicas-resources-requests-memory>`_                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -778,27 +784,29 @@ file stores information required to manage the replicas within a PostgreSQL clus
 | **Description** | The `Kubernetes memory requests                                                           |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
 |                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
-|                 | for a PostgreSQL Replica container                                                                 |
+|                 | for a PostgreSQL Replica container                                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-resources-limits-cpu:                                                       |
+|                 | .. _pgreplicas-resources-limits-cpu:                                                      |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.resources.limits.cpu <operator.html#pgreplicas-resources-limits-cpu>`_                 |
+| **Key**         | `pgReplicas.<replica-name>.resources.limits.cpu                                           |
+|                 | <operator.html#pgreplicas-resources-limits-cpu>`_                                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``2``                                                                                  |
+| **Example**     | ``2``                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | `Kubernetes CPU limits                                                                    |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
-|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a PostgreSQL Replica container           |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a PostgreSQL Replica container  |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-resources-limits-memory:                                                       |
+|                 | .. _pgreplicas-resources-limits-memory:                                                   |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.resources.limits.memory <operator.html#pgreplicas-resources-limits-memory>`_                 |
+| **Key**         | `pgReplicas.<replica-name>.resources.limits.memory                                        |
+|                 | <operator.html#pgreplicas-resources-limits-memory>`_                                      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -811,9 +819,10 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-volumespec-accessmode:                                                            |
+|                 | .. _pgreplicas-volumespec-accessmode:                                                     |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.volumeSpec.accessmode <operator.html#pgreplicas-volumespec-accessmode>`_                    |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.accessmode                                          |
+|                 | <operator.html#pgreplicas-volumespec-accessmode>`_                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -825,9 +834,9 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-volumespec-size:                                                                  |
+|                 | .. _pgreplicas-volumespec-size:                                                           |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.volumeSpec.size <operator.html#pgreplicas-volumespec-size>`_                                |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.size <operator.html#pgreplicas-volumespec-size>`_   |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -839,9 +848,10 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-volumespec-storagetype:                                                           |
+|                 | .. _pgreplicas-volumespec-storagetype:                                                    |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.volumeSpec.storagetype <operator.html#pgreplicas-volumespec-storagetype>`_                  |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.storagetype                                         |
+|                 | <operator.html#pgreplicas-volumespec-storagetype>`_                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -851,13 +861,14 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-volumespec-storageclass:                                                          |
+|                 | .. _pgreplicas-volumespec-storageclass:                                                   |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.volumeSpec.storageclass <operator.html#pgreplicas-volumespec-storageclass>`_                |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.storageclass                                        |
+|                 | <operator.html#pgreplicas-volumespec-storageclass>`_                                      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``"standard"``                                                                                    |
+| **Example**     | ``standard``                                                                              |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | Optionally sets the `Kubernetes storage class                                             |
 |                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
@@ -866,9 +877,10 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-volumespec-matchlabels:                                                           |
+|                 | .. _pgreplicas-volumespec-matchlabels:                                                    |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.volumeSpec.matchLabels <operator.html#pgreplicas-volumespec-matchlabels>`_                  |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.matchLabels                                         |
+|                 | <operator.html#pgreplicas-volumespec-matchlabels>`_                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -879,9 +891,9 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-labels:                                                                      |
+|                 | .. _pgreplicas-labels:                                                                    |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.labels <operator.html#pgbouncer-labels>`_        |
+| **Key**         | `pgReplicas.<replica-name>.labels <operator.html#pgbouncer-labels>`_                      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | label                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -892,13 +904,13 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-annotations:                                                                 |
+|                 | .. _pgreplicas-annotations:                                                               |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.annotations <operator.html#pgreplicas-annotations>`_                              |
+| **Key**         | `pgReplicas.<replica-name>.annotations <operator.html#pgreplicas-annotations>`_           |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | label                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``pg-cluster-annot: cluster1-1``                                                            |
+| **Example**     | ``pg-cluster-annot: cluster1-1``                                                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Kubernetes annotations                                                               |
 |                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>`_        |
@@ -906,9 +918,10 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-expose-servicetype:                                                                 |
+|                 | .. _pgreplicas-expose-servicetype:                                                        |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.expose.serviceType <operator.html#pgreplicas-expose-servicetype>`_                              |
+| **Key**         | `pgReplicas.<replica-name>.expose.serviceType                                             |
+|                 | <operator.html#pgreplicas-expose-servicetype>`_                                           |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -920,22 +933,24 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-expose-loadbalancersourceranges:                                                    |
+|                 | .. _pgreplicas-expose-loadbalancersourceranges:                                           |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.expose.loadBalancerSourceRanges <operator.html#pgreplicas-expose-loadbalancersourceranges>`_    |
+| **Key**         | `pgReplicas.<replica-name>.expose.loadBalancerSourceRanges                                |
+|                 | <operator.html#pgreplicas-expose-loadbalancersourceranges>`_                              |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                            |
+| **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The range of client IP addresses from which the load balancer should be reachable         |
 |                 | (if not set, there is no limitations)                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-expose-annotations:                                                                 |
+|                 | .. _pgreplicas-expose-annotations:                                                        |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.expose.annotations <operator.html#pgreplicas-expose-annotations>`_                              |
+| **Key**         | `pgReplicas.<replica-name>.expose.annotations                                             |
+|                 | <operator.html#pgreplicas-expose-annotations>`_                                           |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | label                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -947,7 +962,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-expose-labels:                                                                      |
+|                 | .. _pgreplicas-expose-labels:                                                             |
 |                 |                                                                                           |
 | **Key**         | `pgReplicas.<replica-name>.expose.labels <operator.html#pgbouncer-expose-labels>`_        |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -970,9 +985,9 @@ file contains configuration options for the `pgBadger PostgreSQL log analyzer <h
 .. tabularcolumns:: |p{2cm}|p{13.6cm}|
 
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbadger-enabled:                                                                          |
+|                 | .. _pgbadger-enabled:                                                                     |
 |                 |                                                                                           |
-| **Key**         | `pgBadger.enabled <operator.html#pgbadger-enabled>`_                                                |
+| **Key**         | `pgBadger.enabled <operator.html#pgbadger-enabled>`_                                      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | boolean                                                                                   |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -983,21 +998,21 @@ file contains configuration options for the `pgBadger PostgreSQL log analyzer <h
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbadger-image:                                                                            |
+|                 | .. _pgbadger-image:                                                                       |
 |                 |                                                                                           |
-| **Key**         | `pgBadger.image <operator.html#pgbadger-image>`_                                                    |
+| **Key**         | `pgBadger.image <operator.html#pgbadger-image>`_                                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbadger``                            |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | pgBadger Docker image to use                                                            |
+| **Description** | `pgBadger PostgreSQL log analyzer <https://github.com/darold/pgbadger>`__ Docker image    |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbadger-serverhost:                                                                       |
+|                 | .. _pgbadger-serverhost:                                                                  |
 |                 |                                                                                           |
-| **Key**         | `pgBadger.port <operator.html#pgbadger-port>`_                                          |
+| **Key**         | `pgBadger.port <operator.html#pgbadger-port>`_                                            |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -1005,196 +1020,4 @@ file contains configuration options for the `pgBadger PostgreSQL log analyzer <h
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The port number for pgBadger                                                              |
 +-----------------+-------------------------------------------------------------------------------------------+
-
-
-
-
-
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-shutdown:                                                                        |
-|                 |                                                                                           |
-| **Key**         | `shutdown <operator.html#spec-shutdown>`_                                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | boolean                                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``false``                                                                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Pause/resume: setting it to ``true`` gracefully stops the cluster, and setting it to      |
-|                 | ``false`` after shut down starts the cluster                                              |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-standby:                                                                         |
-|                 |                                                                                           |
-| **Key**         | `standby <operator.html#spec-standby>`_                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | boolean                                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``false``                                                                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | If ``true``, indicates that the PostgreSQL cluster is a *standby* cluster, i.e. it is in  |
-|                 | read-only mode                                                                            |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-pgprimary-name:                                                                  |
-|                 |                                                                                           |
-| **Key**         | `pgPrimary.name <operator.html#spec-pgprimary-name>`_                                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``cluster1``                                                                              |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The PostgreSQL cluster primary storage name                                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-pgprimary-supplementalgroups:                                                    |
-|                 |                                                                                           |
-| **Key**         | `pgPrimary.supplementalgroups <operator.html#spec-pgprimary-supplementalgroups>`_    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Supplemental groups for the PostgreSQL cluster primary storage                            |
-+-----------------+-------------------------------------------------------------------------------------------+
-
-|                 | .. _walstorage-name:                                                                      |
-|                 |                                                                                           |
-| **Key**         | `walStorage.volumeSpec.name <operator.html#walstorage-name>`_                                        |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The PostgreSQL write-ahead log storage name                                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-supplementalgroups:                                                        |
-|                 |                                                                                           |
-| **Key**         | `walStorage.volumeSpec.supplementalgroups <operator.html#walstorage-supplementalgroups>`_            |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Supplemental groups for the PostgreSQL write-ahead log storage                            |
-+-----------------+-------------------------------------------------------------------------------------------+
-
-
-
-
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-customconfig:                                                                    |
-|                 |                                                                                           |
-| **Key**         | `customconfig <operator.html#spec-customconfig>`_                                         |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Custom ConfigMap to use when bootstrapping a PostgreSQL cluster                           |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-nodeaffinity-default:                                                            |
-|                 |                                                                                           |
-| **Key**         | `nodeAffinity.advanced <operator.html#spec-nodeaffinity-default>`_                        |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | subdoc                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``null``                                                                                  |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `The Kubernetes Pod Affinity                                                              |
-|                 | <https://kubernetes.io/docs/concepts/configuration/assign-pod-node/                       |
-|                 | #affinity-and-anti-affinity>`_ constraint                                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 |                                                                                           |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrestconfig:                                                                  |
-|                 |                                                                                           |
-| **Key**         | `backrestConfig <operator.html#spec-backrestconfig>`_                                     |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | subdoc                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``null``                                                                                  |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Optional references to pgBackRest configuration files                                     |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrestrepopath:                                                                |
-|                 |                                                                                           |
-| **Key**         | `backrestRepoPath <operator.html#spec-backrestrepopath>`_                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Optional reference to the location of the pgBackRest repository                           |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrests3bucket:                                                                |
-|                 |                                                                                           |
-| **Key**         | `backrestS3Bucket <operator.html#spec-backrests3bucket>`_                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Amazon S3 bucket <https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html>`_|
-|                 | name for backups                                                                          |
-+-----------------+-------------------------------------------------------------------------------------------+
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-name:                                                                 |
-|                 |                                                                                           |
-| **Key**         | `BackrestStorage.name <operator.html#backreststorage-name>`_                              |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The pgBackRest Storage name                                                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-supplementalgroups:                                                   |
-|                 |                                                                                           |
-| **Key**         | `BackrestStorage.supplementalgroups <operator.html#backreststorage-supplementalgroups>`_  |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Supplemental groups for the pgBackRest Storage                                            |
-+-----------------+-------------------------------------------------------------------------------------------+
-
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-supplementalgroups:                                                    |
-|                 |                                                                                           |
-| **Key**         | `ReplicaStorage.supplementalgroups <operator.html#replicastorage-supplementalgroups>`_    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Supplemental groups for the PostgreSQL Replica storage                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-name:                                                                  |
-|                 |                                                                                           |
-| **Key**         | `ReplicaStorage.name <operator.html#replicastorage-name>`_                                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The PostgreSQL Replica storage name                                                       |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-
 
