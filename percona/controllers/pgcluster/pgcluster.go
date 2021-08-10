@@ -8,6 +8,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	dplmnt "github.com/percona/percona-postgresql-operator/percona/controllers/deployment"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
@@ -41,22 +42,22 @@ func Update(clientset kubeapi.Interface, newPerocnaPGCluster, oldPerocnaPGCluste
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
 	pgCluster := getPGCLuster(newPerocnaPGCluster, oldPGCluster)
-
+	deployment, err := clientset.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
+		pgCluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrap(err, "could not find instance")
+	}
 	if !reflect.DeepEqual(oldPerocnaPGCluster.Spec.PMM, newPerocnaPGCluster.Spec.PMM) {
-		deployment, err := clientset.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
-			pgCluster.Name, metav1.GetOptions{})
-		if err != nil {
-			return errors.Wrap(err, "could not find instance")
-		}
 		err = pmm.UpdatePMMSidecar(clientset, pgCluster, deployment)
 		if err != nil {
 			return errors.Wrap(err, "update pmm sidecar")
 		}
-		if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "could not update deployment")
-		}
 	}
+	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerocnaPGCluster, deployment)
 
+	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+		return errors.Wrap(err, "could not update deployment")
+	}
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerocnaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update pgcluster resource")

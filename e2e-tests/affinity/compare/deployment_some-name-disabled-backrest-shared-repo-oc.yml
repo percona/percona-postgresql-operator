@@ -30,6 +30,9 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        keep-backups: "false"
+        keep-data: "false"
       labels:
         name: some-name-disabled-backrest-shared-repo
         pg-cluster: some-name-disabled
