@@ -521,6 +521,8 @@ compare_kubectl() {
 		| yq d - 'metadata.ownerReferences.*.apiVersion' \
 		| yq d - '**.controller-uid' \
 		| yq d - '**.preemptionPolicy' \
+		| yq d - '**.ipFamilies' \
+		| yq d - '**.ipFamilyPolicy' \
 			>${new_result}
 
 	diff -u ${expected_result} ${new_result}
