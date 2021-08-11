@@ -28,7 +28,7 @@ Installation
 
    .. code:: bash
 
-      $ helm install my-operator percona/postgres-operator --version {{{release}}}
+      $ helm install my-operator percona/pg-operator --version {{{release}}}
 
    The ``my-operator`` parameter in the above example is the name of `a new release object <https://helm.sh/docs/intro/using_helm/#three-big-concepts>`_ 
    which is created for the Operator when you install its Helm chart (use any
