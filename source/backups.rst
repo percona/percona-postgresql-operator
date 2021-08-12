@@ -12,7 +12,7 @@ outside the Kubernetes cluster. But storing backups on `Persistent Volume <https
 attached to the pgBackRest Pod is also possible. At PostgreSQL cluster creation
 time, you can specify a specific Storage Class for the pgBackRest repository.
 Additionally, you can also specify the type of the pgBackRest repository that
-can be used, including:
+can be used in the ``backup.storageTypes`` option:
 
 * ``local``: Uses the storage that is provided by the Kubernetes cluster’s
   Storage Class that you select,
@@ -20,12 +20,16 @@ can be used, including:
 * ``local,s3``: Use both the storage that is provided by the Kubernetes
   cluster’s Storage Class that you select AND Amazon S3 (or equivalent object
   storage system that uses the S3 protocol).
+* ``gcs``: Use Google Cloud Storage,
+* ``local,gcs``: Use both the storage that is provided by the Kubernetes
+  cluster’s Storage Class that you select AND Google Cloud Storage.
 
 The pgBackRest repository consists of the following Kubernetes objects:
 
 * A Deployment,
 * A Secret that contains information that is specific to the PostgreSQL cluster
   that it is deployed with (e.g. SSH keys, AWS S3 keys, etc.),
+* A Pod with a number of supporting scripts,
 * A Service.
 
 The PostgreSQL primary is automatically configured to use the
@@ -48,29 +52,32 @@ Backup retention can be controlled by the following pgBackRest options:
 * ``--repo1-retention-archive`` how many sets of write-ahead log archives to
   retain alongside the full and differential backups that are retained.
 
+You can set both backups type and retention policy when :ref:`backups-manual`.
+
+Also you should first configure the backup storage in the ``deploy/cr.yaml``
+configuration file to have backups enabled.
+
 .. _backups.configure:
 
-Configuring the backup storage
-------------------------------
-
-To have backups enabled, the user should first configure the backup storage
-in the ``deploy/cr.yaml`` configuration file.
+Configuring the S3-compatible backup storage
+--------------------------------------------
 
 In order to use S3-compatible storage for backups you need to provide some
 S3-related information, such as proper S3 bucket name, endpoint, etc. This
 information can be passed to pgBackRest via the following ``deploy/cr.yaml``
-options:
+options in the ``backup.storages`` subsection:
 
-* ``BackrestS3Bucket`` specifies the AWS S3 bucket that should be utilized,
+* ``bucket`` specifies the AWS S3 bucket that should be utilized,
   for example ``my-postgresql-backups-example``,
-* ``BackrestS3Endpoint`` specifies the S3 endpoint that should be utilized,
+* ``endpointUrl`` specifies the S3 endpoint that should be utilized,
   for example ``s3.amazonaws.com``,
-* ``BackrestS3Region`` specifies the AWS S3 region that should be utilized,
+* ``region`` specifies the AWS S3 region that should be utilized,
   for example ``us-east-1``,
-* ``BackrestS3URIStyle`` specifies whether ``host`` or ``path`` style URIs
+* ``uriStyle`` specifies whether ``host`` or ``path`` style URIs
   should be utilized,
-* ``BackrestS3VerifyTLS`` should be set to ``true`` to enable TLS verification
-  or set to ``false`` to disable it.
+* ``verifyTLS`` should be set to ``true`` to enable TLS verification
+  or set to ``false`` to disable it,
+* ``type`` should be set to ``s3``.
 
 You also need to feed pgBackRest with the AWS S3 key and the AWS S3 key secret
 stored along with other sensitive information in Kubernetes Secrets. You can do
@@ -87,9 +94,16 @@ Use Google Cloud Storage for backups
 ------------------------------------
 
 You can configure `Google Cloud Storage <https://cloud.google.com/storage>`_ as
-an object store for backups similarly to :ref:`S3 storage<backups.configure>`,
-but with an additional step. The Operator will need your service account key
-to access storage.
+an object store for backups similarly to :ref:`S3 storage<backups.configure>`.
+
+Set the following ``deploy/cr.yaml`` options in the ``backup.storages``
+subsection:
+
+* ``bucket`` should contain the proper bucket name,
+
+* ``type`` should be set to ``gcs``.
+
+The Operator will also need your service account key to access storage.
 
 #. Create your service account key following the `official Google Cloud instructions <https://cloud.google.com/iam/docs/creating-managing-service-account-keys>`_.
 
@@ -145,9 +159,7 @@ following:
   will be passed to pgBackRest, for example
   ``--type=full --repo1-retention-full=5``,
 * ``parameters.pg-cluster`` is the name of the PostgreSQL cluster to back up,
-  for example ``cluster1``,
-* ``parameters.podname`` is the name of the pgBackRest repository Pod, for
-  example ``cluster1-backrest-shared-repo-5f84955754-xd52d``.
+  for example ``cluster1``.
 
 When the backup options are configured, the actual backup command is executed:
 
