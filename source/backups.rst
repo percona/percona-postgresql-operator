@@ -6,9 +6,10 @@ and restore utility. A special *pgBackRest repository* is created by the
 Operator along with creating a new PostgreSQL cluster to facilitate the usage of
 the pgBackRest features in it.
 
-The Operator usually stores PostgreSQL backups on `Amazon S3 or S3-compatible
+The Operator can store PostgreSQL backups on Amazon S3, `any S3-compatible
 storage <https://en.wikipedia.org/wiki/Amazon_S3#S3_API_and_competing_services>`_
-outside the Kubernetes cluster. But storing backups on `Persistent Volume <https://kubernetes.io/docs/concepts/storage/persistent-volumes/>`_
+and `Google Cloud Storage <https://cloud.google.com/storage>`_ outside the 
+Kubernetes cluster. Storing backups on `Persistent Volume <https://kubernetes.io/docs/concepts/storage/persistent-volumes/>`_
 attached to the pgBackRest Pod is also possible. At PostgreSQL cluster creation
 time, you can specify a specific Storage Class for the pgBackRest repository.
 Additionally, you can also specify the type of the pgBackRest repository that
