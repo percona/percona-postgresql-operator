@@ -71,6 +71,9 @@ spec:
       requests:
         memory: 200M
         cpu: 500m
+#      limits:
+#        cpu: "1"
+#        memory: "400M"
   backup:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
     backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
@@ -96,6 +99,7 @@ spec:
 #    storageTypes: [
 #      "s3"
 #    ]
+#    repoPath: ""
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
     size: 1
