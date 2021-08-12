@@ -35,6 +35,7 @@ Installation guide
 
    kubernetes
    gke
+   helm
 
 Configuration and Management
 ============================
