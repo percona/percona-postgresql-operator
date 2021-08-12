@@ -90,14 +90,11 @@ spec:
       storageclass: ""
 #      matchLabels: ""
 #    storages:
-#      my-s3:
-#        type: s3
-#        endpointUrl: minio-gateway-svc:9000
-#        region: us-east-1
-#        uriStyle: path
-#        verifyTLS: false
+#      my-gcs:
+#        type: gcs
+#        bucket: some-gcs-bucket
 #    storageTypes: [
-#      "s3"
+#      "gcs"
 #    ]
 #    repoPath: ""
   pgBouncer:
