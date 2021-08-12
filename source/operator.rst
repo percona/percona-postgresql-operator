@@ -46,7 +46,7 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
    * - backup
      - :ref:`subdoc<operator-backup-section>`
      - 
-     - Percona Server for MongoDB backups section
+     - Section to configure backups and pgBackRest
 
    * - pgBouncer
      - :ref:`subdoc<operator-pgprimary-section>`
@@ -1020,4 +1020,3 @@ file contains configuration options for the `pgBadger PostgreSQL log analyzer <h
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The port number for pgBadger                                                              |
 +-----------------+-------------------------------------------------------------------------------------------+
-
