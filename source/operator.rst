@@ -4,14 +4,14 @@
 ===============================================================================
 
 The Cluster is configured via the
-`deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`_ file.
+`deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__ file.
 
 The metadata part of this file contains the following keys:
 
 * ``name`` (``cluster1`` by default) sets the name of your Percona Distribution
   for PostgreSQL Cluster; it should include only `URL-compatible characters <https://datatracker.ietf.org/doc/html/rfc3986#section-2.3>`_, not exceed 22 characters, start with an alphabetic character, and end with an alphanumeric character;
 
-The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-mongodb-operator/blob/main/deploy/cr.yaml>`_ file contains the following sections:
+The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__ file contains the following sections:
 
 .. list-table::
    :widths: 15 15 16 54
@@ -27,11 +27,6 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
      - ``false``
      - Pause/resume: setting it to ``true`` gracefully stops the cluster, and
        setting it to ``false`` after shut down starts the cluster back.
-
-   * - pgPrimary
-     - :ref:`subdoc<operator-pgprimary-section>`
-     -
-     - PostgreSQL primary instance section
 
    * - walStorage
      - :ref:`subdoc<operator-walstorage-section>`
@@ -49,7 +44,7 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
      - Section to configure backups and pgBackRest
 
    * - pgBouncer
-     - :ref:`subdoc<operator-pgprimary-section>`
+     - :ref:`subdoc<operator-pgbouncer-section>`
      -
      - The `pgBouncer <http://pgbouncer.github.io/>`__ connection pooler section
 
@@ -102,6 +97,31 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The name of the PostgreSQL instance that is the primary; on creation, this should be set  |
 |                 | to be the same as ``clustername``                                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgdatasource-restorefrom:                                                             |
+|                 |                                                                                           |
+| **Key**         | `pgDataSource.restoreFrom <operator.html#pgdatasource-restorefrom>`_                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The name of a data source PostgreSQL cluster, which is used                               |
+|                 | to :ref:`restore backup to a a new cluster<backups-restore>`                              |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgdatasource-restoreopts:                                                             |
+|                 |                                                                                           |
+| **Key**         | `pgDataSource.restoreOpts <operator.html#pgdatasource-restoreopts>`_                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Custom pgBackRest options to :ref:`restore backup to a a new cluster<backups-restore>`    |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -183,16 +203,16 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | A PostgreSQL Primary storage `label selector                                              |
-|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__             |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 
-.. _operator.walstorage-section:
+.. _operator-walstorage-section:
 
 `Write-ahead Log Storage Section <operator.html#operator-walstorage-section>`_
 --------------------------------------------------------------------------------
 
-The ``walStorage`` section in the `deploy/cr.yaml <https://github.com/percona/percona-xtradb-cluster-operator/blob/main/deploy/cr.yaml>`__
+The ``walStorage`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
 file contains configuration options for PostgreSQL `write-ahead logging <https://www.postgresql.org/docs/current/wal-intro.html>`_.
 
 .. tabularcolumns:: |p{2cm}|p{13.6cm}|
@@ -226,9 +246,9 @@ file contains configuration options for PostgreSQL `write-ahead logging <https:/
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-storagetype:                                                               |
+|                 | .. _walstorage-volumespec-storagetype:                                                    |
 |                 |                                                                                           |
-| **Key**         | `walStorage.volumeSpec.storagetype <operator.html#walstorage-storagetype>`_               |
+| **Key**         | `walStorage.volumeSpec.storagetype <operator.html#walstorage-volumespec-storagetype>`_    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -264,18 +284,18 @@ file contains configuration options for PostgreSQL `write-ahead logging <https:/
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | A PostgreSQL Write-ahead Log storage `label selector                                      |
-|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__             |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 
 
-.. _operator.backup-section:
+.. _operator-backup-section:
 
 `Backup Section <operator.html#operator-backup-section>`_
 --------------------------------------------------------------------------------
 
 The ``backup`` section in the
-`deploy/cr.yaml <https://github.com/percona/percona-xtradb-cluster-operator/blob/main/deploy/cr.yaml>`__
+`deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
 file contains the following configuration options for the regular
 Percona Distribution for PostgreSQL backups.
 
@@ -416,7 +436,7 @@ Percona Distribution for PostgreSQL backups.
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | A pgBackRest storage `label selector                                                      |
-|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__             |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -455,7 +475,8 @@ Percona Distribution for PostgreSQL backups.
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Amazon S3 bucket <https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html>`_|
-|                 | or `Google Cloud Storage bucket <https://cloud.google.com/storage/docs/key-terms#buckets`_|
+|                 | or                                                                                        |
+|                 |`Google Cloud Storage bucket <https://cloud.google.com/storage/docs/key-terms#buckets>`_   |
 |                 | name used for backups                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
@@ -523,7 +544,7 @@ Percona Distribution for PostgreSQL backups.
 | **Description** | Custom path for pgBackRest repository backups                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
 
-.. _operator.pmm-section:
+.. _operator-pmm-section:
 
 `PMM Section <operator.html#operator-pmm-section>`_
 --------------------------------------------------------------------------------
@@ -658,7 +679,7 @@ file contains configuration options for Percona Monitoring and Management.
 |                 | for a PMM container                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
 
-.. _operator.pgbouncer-section:
+.. _operator-pgbouncer-section:
 
 `pgBouncer Section <operator.html#operator-pgbouncer-section>`_
 --------------------------------------------------------------------------------
@@ -805,13 +826,15 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 |                 | for the pgBouncer Service                                                                 |
 +-----------------+-------------------------------------------------------------------------------------------+
 
-.. _operator.pgreplicas-section:
+.. _operator-pgreplicas-section:
 
 `pgReplicas Section <operator.html#operator-pgreplicas-section>`_
 --------------------------------------------------------------------------------
 
 The ``pgReplicas`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
 file stores information required to manage the replicas within a PostgreSQL cluster.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
 
 +-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _pgreplicas-size:                                                                      |
@@ -958,7 +981,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | A PostgreSQL Replica storage `label selector                                              |
-|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__             |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -1045,7 +1068,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 |                 | for the PostgreSQL Replica Service                                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 
-.. _operator.pgbadger-section:
+.. _operator-pgbadger-section:
 
 `pgBadger Section <operator.html#operator-pgbadger-section>`_
 --------------------------------------------------------------------------------
@@ -1081,7 +1104,7 @@ file contains configuration options for the `pgBadger PostgreSQL log analyzer <h
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgbadger-serverhost:                                                                  |
+|                 | .. _pgbadger-port:                                                                        |
 |                 |                                                                                           |
 | **Key**         | `pgBadger.port <operator.html#pgbadger-port>`_                                            |
 +-----------------+-------------------------------------------------------------------------------------------+
