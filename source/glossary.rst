@@ -79,7 +79,7 @@ The Operator options glossary
 
      ..
 
-      :ref:`backup.storages.s3.STORAGE_NAME.endpointUrl<backup-storages-s3-endpointurl>`
+      :ref:`backup.storages.STORAGE_NAME.endpointUrl<backup-storages-endpointurl>`
 
    image
 
@@ -175,7 +175,7 @@ The Operator options glossary
 
      ..
 
-      :ref:`backup.storages.s3.STORAGE_NAME.region<backup-storages-s3-region>`
+      :ref:`backup.storages.STORAGE_NAME.region<backup-storages-region>`
 
    repoPath
 
@@ -281,7 +281,7 @@ The Operator options glossary
 
      ..
 
-      :ref:`backup.storages.s3.STORAGE_NAME.uriStyle<backup-storages-s3-uristyle>`
+      :ref:`backup.storages.STORAGE_NAME.uriStyle<backup-storages-uristyle>`
 
    user
 
@@ -293,4 +293,4 @@ The Operator options glossary
 
      ..
 
-      :ref:`backup.storages.s3.STORAGE_NAME.verifyTLS<backup-storages-s3-verifytls>`
+      :ref:`backup.storages.STORAGE_NAME.verifyTLS<backup-storages-verifytls>`
