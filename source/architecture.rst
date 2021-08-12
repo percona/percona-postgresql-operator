@@ -5,7 +5,7 @@ The Percona Distribution for PostgreSQL Operator automates and simplifies
 deploying and managing open source PostgreSQL clusters on Kubernetes.
 The Operator is based on `CrunchyData's PostgreSQL Operator <https://crunchydata.github.io/postgres-operator/latest/>`_.
 
-.. image:: ./assets/images/pgo.png
+.. image:: ./assets/images/pgo.svg
    :align: center
 
 PostgreSQL containers deployed with the PostgreSQL Operator include the following components:
@@ -27,7 +27,7 @@ To provide high availability the Operator involves `node affinity <https://kuber
 to run PostgreSQL Cluster instances on separate worker nodes if possible. If
 some node fails, the Pod with it is automatically re-created on another node.
 
-.. image:: ./assets/images/operator.png
+.. image:: ./assets/images/operator.svg
    :align: center
 
 To provide data storage for stateful applications, Kubernetes uses

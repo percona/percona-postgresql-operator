@@ -3,82 +3,68 @@
 `Custom Resource options <operator.html#operator-custom-resource-options>`_
 ===============================================================================
 
+The Cluster is configured via the
+`deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`_ file.
+
+The metadata part of this file contains the following keys:
+
+* ``name`` (``cluster1`` by default) sets the name of your Percona Distribution
+  for PostgreSQL Cluster; it should include only `URL-compatible characters <https://datatracker.ietf.org/doc/html/rfc3986#section-2.3>`_, not exceed 22 characters, start with an alphabetic character, and end with an alphanumeric character;
+
+The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-mongodb-operator/blob/main/deploy/cr.yaml>`_ file contains the following sections:
+
+.. list-table::
+   :widths: 15 15 16 54
+   :header-rows: 1
+
+   * - Key
+     - Value type
+     - Default
+     - Description
+
+   * - pause
+     - boolean
+     - ``false``
+     - Pause/resume: setting it to ``true`` gracefully stops the cluster, and
+       setting it to ``false`` after shut down starts the cluster back.
+
+   * - pgPrimary
+     - :ref:`subdoc<operator-pgprimary-section>`
+     -
+     - PostgreSQL primary instance section
+
+   * - walStorage
+     - :ref:`subdoc<operator-walstorage-section>`
+     -
+     - Write-ahead Log Storage Section
+
+   * - pmm
+     - :ref:`subdoc<operator-pmm-section>`
+     - 
+     - Percona Monitoring and Management section
+
+   * - backup
+     - :ref:`subdoc<operator-backup-section>`
+     - 
+     - Section to configure backups and pgBackRest
+
+   * - pgBouncer
+     - :ref:`subdoc<operator-pgprimary-section>`
+     -
+     - The `pgBouncer <http://pgbouncer.github.io/>`__ connection pooler section
+
+   * - pgReplicas
+     - :ref:`subdoc<operator-pgreplicas-section>`
+     -
+     - Section required to manage the replicas within a PostgreSQL cluster
+
+   * - pgBadger
+     - :ref:`subdoc<operator-pgbadger-section>`
+     -
+     - The `pgBadger <https://github.com/darold/pgbadger>`__ PostgreSQL log analyzer section
+
 .. tabularcolumns:: |p{2cm}|p{13.6cm}|
 
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-clustername:                                                                     |
-|                 |                                                                                           |
-| **Key**         | `clustername <operator.html#spec-clustername>`_                                           |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``cluster1``                                                                              |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The name assigned to the PostgreSQL cluster to group PostgreSQL instances (primary,       |
-|                 | replicas) together.                                                                       |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-name:                                                                            |
-|                 |                                                                                           |
-| **Key**         | `name <operator.html#spec-name>`_                                                         |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``cluster1``                                                                              |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The name of the PostgreSQL instance that is the primary; on creation, this should be set  |
-|                 | to be the same as ``clustername``                                                         |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-pgimage:                                                                         |
-|                 |                                                                                           |
-| **Key**         | `pgImage <operator.html#spec-pgimage>`_                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-postgres-ha``                         |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The Docker image of the                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrestimage:                                                                   |
-|                 |                                                                                           |
-| **Key**         | `backrestImage <operator.html#spec-backrestimage>`_                                       |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbackrest``                          |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The Docker image of the                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrestrepoimage:                                                               |
-|                 |                                                                                           |
-| **Key**         | `backrestRepoImage <operator.html#spec-backrestrepoimage>`_                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo``                     |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The Docker image of the                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-customconfig:                                                                    |
-|                 |                                                                                           |
-| **Key**         | `customconfig <operator.html#spec-customconfig>`_                                         |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Custom ConfigMap to use when bootstrapping a PostgreSQL cluster                           |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _spec-database:                                                                        |
 |                 |                                                                                           |
@@ -106,59 +92,223 @@
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-nodeaffinity-default:                                                            |
+|                 | .. _spec-name:                                                                            |
 |                 |                                                                                           |
-| **Key**         | `nodeAffinity.advanced <operator.html#spec-nodeaffinity-default>`_                        |
+| **Key**         | `name <operator.html#spec-name>`_                                                         |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | subdoc                                                                                    |
+| **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``null``                                                                                  |
+| **Example**     | ``cluster1``                                                                              |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `The Kubernetes Pod Affinity                                                              |
-|                 | <https://kubernetes.io/docs/concepts/configuration/assign-pod-node/                       |
-|                 | #affinity-and-anti-affinity>`_ constraint                                                 |
+| **Description** | The name of the PostgreSQL instance that is the primary; on creation, this should be set  |
+|                 | to be the same as ``clustername``                                                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrestconfig:                                                                  |
+|                 | .. _pgprimary-image:                                                                      |
 |                 |                                                                                           |
-| **Key**         | `backrestConfig <operator.html#spec-backrestconfig>`_                                     |
+| **Key**         | `pgPrimary.image <operator.html#pgprimary-image>`_                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | subdoc                                                                                    |
+| **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``null``                                                                                  |
+| **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-postgres-ha``                         |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Optional references to pgBackRest configuration files                                     |
+| **Description** | The Docker image of the PostgreSQL Primary instance                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrestlimits:                                                                  |
+|                 | .. _pgprimary-volumespec-size:                                                            |
 |                 |                                                                                           |
-| **Key**         | `backrestLimits <operator.html#spec-backrestlimits>`_                                     |
+| **Key**         | `pgPrimary.volumeSpec.size <operator.html#pgprimary-volumespec-size>`_                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | subdoc                                                                                    |
+| **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     |                                                                                           |
+| **Example**     | ``1G``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** |                                                                                           |
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
+|                 | persistentvolumeclaims>`_ size for the PostgreSQL Primary storage                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrestrepopath:                                                                |
+|                 | .. _pgprimary-volumespec-accessmode:                                                      |
 |                 |                                                                                           |
-| **Key**         | `backrestRepoPath <operator.html#spec-backrestrepopath>`_                                 |
+| **Key**         | `pgPrimary.volumeSpec.accessmode <operator.html#pgprimary-volumespec-accessmode>`_        |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``ReadWriteOnce``                                                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
+|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL Primary storage                |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-volumespec-storagetype:                                                     |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.volumeSpec.storagetype <operator.html#pgprimary-volumespec-storagetype>`_      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``dynamic``                                                                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Type of the PostgreSQL Primary storage provisioning: ``create`` (the default variant;     |
+|                 | used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a dynamic        |
+|                 | storage provisioner, e.g. via a StorageClass)                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-volumespec-storageclass:                                                    |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.volumeSpec.storageclass <operator.html#pgprimary-volumespec-storageclass>`_    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Optional reference to the location of the pgBackRest repository                           |
+| **Description** | Optionally sets the `Kubernetes storage class                                             |
+|                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
+|                 | PostgreSQL Primary storage `PersistentVolumeClaim                                         |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrestresources-memory:                                                        |
+|                 | .. _pgprimary-volumespec-matchlabels:                                                     |
 |                 |                                                                                           |
-| **Key**         | `backrestResources.memory <operator.html#spec-backrestresources-memory>`_                 |
+| **Key**         | `pgPrimary.volumeSpec.matchLabels <operator.html#pgprimary-volumespec-matchlabels>`_      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | A PostgreSQL Primary storage `label selector                                              |
+|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
++-----------------+-------------------------------------------------------------------------------------------+
+
+
+.. _operator.walstorage-section:
+
+`Write-ahead Log Storage Section <operator.html#operator-walstorage-section>`_
+--------------------------------------------------------------------------------
+
+The ``walStorage`` section in the `deploy/cr.yaml <https://github.com/percona/percona-xtradb-cluster-operator/blob/main/deploy/cr.yaml>`__
+file contains configuration options for PostgreSQL `write-ahead logging <https://www.postgresql.org/docs/current/wal-intro.html>`_.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _walstorage-volumespec-size:                                                           |
+|                 |                                                                                           |
+| **Key**         | `walStorage.volumeSpec.size <operator.html#walstorage-volumespec-size>`_                  |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``1G``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
+|                 | persistentvolumeclaims>`_ size for the PostgreSQL Write-ahead Log storage                 |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _walstorage-volumespec-accessmode:                                                     |
+|                 |                                                                                           |
+| **Key**         | `walStorage.volumeSpec.accessmode <operator.html#walstorage-volumespec-accessmode>`_      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``ReadWriteOnce``                                                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
+|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL Write-ahead Log storage        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _walstorage-storagetype:                                                               |
+|                 |                                                                                           |
+| **Key**         | `walStorage.volumeSpec.storagetype <operator.html#walstorage-storagetype>`_               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``dynamic``                                                                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Type of the PostgreSQL Write-ahead Log storage provisioning: ``create`` (the default      |
+|                 | variant; used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a       |
+|                 | dynamic storage provisioner, e.g. via a StorageClass)                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _walstorage-volumespec-storageclass:                                                   |
+|                 |                                                                                           |
+| **Key**         | `walStorage.volumeSpec.storageclass <operator.html#walstorage-storageclass>`_             |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Optionally sets the `Kubernetes storage class                                             |
+|                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
+|                 | PostgreSQL Write-ahead Log storage `PersistentVolumeClaim                                 |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _walstorage-volumespec-matchlabels:                                                    |
+|                 |                                                                                           |
+| **Key**         | `walStorage.volumeSpec.matchLabels <operator.html#walstorage-volumespec-matchlabels>`_    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | A PostgreSQL Write-ahead Log storage `label selector                                      |
+|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
++-----------------+-------------------------------------------------------------------------------------------+
+
+
+
+.. _operator.backup-section:
+
+`Backup Section <operator.html#operator-backup-section>`_
+--------------------------------------------------------------------------------
+
+The ``backup`` section in the
+`deploy/cr.yaml <https://github.com/percona/percona-xtradb-cluster-operator/blob/main/deploy/cr.yaml>`__
+file contains the following configuration options for the regular
+Percona Distribution for PostgreSQL backups.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-image:                                                                         |
+|                 |                                                                                           |
+| **Key**         | `backup.image <operator.html#backup-backrestimage>`_                                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbackrest``                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The Docker image for :ref:`pgBackRest<backups.pgbackrest>`                                |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-backrestrepoimage:                                                             |
+|                 |                                                                                           |
+| **Key**         | `backup.backrestRepoImage <operator.html#backup-backrestrepoimage>`_                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo``                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The Docker image for the :ref:`BackRest repository<backups.pgbackrest.repository>`        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-resources-requests-memory:                                                     |
+|                 |                                                                                           |
+| **Key**         | `backup.resources.requests.memory <operator.html#backup-resources-requests-memory>`_      |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -171,135 +321,38 @@
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrests3bucket:                                                                |
+|                 | .. _backup-resources-limits-cpu:                                                          |
 |                 |                                                                                           |
-| **Key**         | `backrestS3Bucket <operator.html#spec-backrests3bucket>`_                                 |
+| **Key**         | `backup.resources.limits.cpu <operator.html#backup-resources-limits-cpu>`_                |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
+| **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
+| **Example**     | ``1``                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Amazon S3 bucket <https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html>`_|
-|                 | name for backups                                                                          |
+| **Description** | `Kubernetes CPU limits                                                                    |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a pgBackRest container          |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrests3endpoint:                                                              |
+|                 | .. _backup-resources-limits-memory:                                                       |
 |                 |                                                                                           |
-| **Key**         | `backrestS3Endpoint <operator.html#spec-backrests3endpoint>`_                             |
+| **Key**         | `backup.resources.limits.memory <operator.html#backup-resources-limits-memory>`_          |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
+| **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
+| **Example**     | ``64Mi``                                                                                  |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The endpoint URL of the S3-compatible storage to be used for backups (not needed for the  |
-|                 | original Amazon S3 cloud)                                                                 |
+| **Description** | The `Kubernetes memory limits                                                             |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
+|                 | for a pgBackRest container                                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrests3region:                                                                |
+|                 | .. _backup-volumespec-size:                                                               |
 |                 |                                                                                           |
-| **Key**         | `backrestS3Region <operator.html#spec-backrests3region>`_                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | boolean                                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `AWS region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ to use for   |
-|                 | Amazon and all S3-compatible storages                                                     |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrests3uristyle:                                                              |
-|                 |                                                                                           |
-| **Key**         | `backrestS3URIStyle <operator.html#spec-backrests3uristyle>`_                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Optional parameter that specifies if pgBackRest should use the path or host S3 URI style  |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-backrests3verifytls:                                                             |
-|                 |                                                                                           |
-| **Key**         | `backrestS3VerifyTLS <operator.html#spec-backrests3verifytls>`_                           |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | boolean                                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``false``                                                                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Enables or disables TLS verification for pgBackRest                                       |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-shutdown:                                                                        |
-|                 |                                                                                           |
-| **Key**         | `shutdown <operator.html#spec-shutdown>`_                                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | boolean                                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``false``                                                                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Pause/resume: setting it to ``true`` gracefully stops the cluster, and setting it to      |
-|                 | ``false`` after shut down starts the cluster                                              |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _spec-standby:                                                                         |
-|                 |                                                                                           |
-| **Key**         | `standby <operator.html#spec-standby>`_                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | boolean                                                                                   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``false``                                                                                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | If ``true``, indicates that the PostgreSQL cluster is a *standby* cluster, i.e. it is in  |
-|                 | read-only mode                                                                            |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-accessmode:                                                           |
-|                 |                                                                                           |
-| **Key**         | `BackrestStorage.accessmode <operator.html#backreststorage-accessmode>`_                  |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``ReadWriteOnce``                                                                         |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
-|                 | #persistentvolumeclaims>`_ access modes for the pgBackRest Storage                        |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-matchlabels:                                                          |
-|                 |                                                                                           |
-| **Key**         | `BackrestStorage.matchLabels <operator.html#backreststorage-matchlabels>`_                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-name:                                                                 |
-|                 |                                                                                           |
-| **Key**         | `BackrestStorage.name <operator.html#backreststorage-name>`_                              |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The pgBackRest Storage name                                                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-size:                                                                 |
-|                 |                                                                                           |
-| **Key**         | `BackrestStorage.size <operator.html#backreststorage-size>`_                              |
+| **Key**         | `backup.volumeSpec.size <operator.html#backup-volumespec-size>`_                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -311,9 +364,37 @@
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-storageclass:                                                         |
+|                 | .. _backup-volumespec-accessmode:                                                         |
 |                 |                                                                                           |
-| **Key**         | `BackrestStorage.storageclass <operator.html#backreststorage-storageclass>`_              |
+| **Key**         | `backup.volumeSpec.accessmode <operator.html#backup-volumespec-accessmode>`_              |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``ReadWriteOnce``                                                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
+|                 | #persistentvolumeclaims>`_ access modes for the pgBackRest Storage                        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-volumespec-storagetype:                                                        |
+|                 |                                                                                           |
+| **Key**         | `backup.volumeSpec.storagetype <operator.html#backup-volumespec-storagetype>`_            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``dynamic``                                                                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Type of the pgBackRest storage provisioning: ``create`` (the default                      |
+|                 | variant; used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a       |
+|                 | dynamic storage provisioner, e.g. via a StorageClass)                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-volumespec-storageclass:                                                       |
+|                 |                                                                                           |
+| **Key**         | `backup.volumeSpec.storageclass <operator.html#backup-volumespec-storageclass>`_          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -326,299 +407,132 @@
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-storagetype:                                                          |
+|                 | .. _backup-volumespec-matchlabels:                                                        |
 |                 |                                                                                           |
-| **Key**         | `BackrestStorage.storagetype <operator.html#backreststorage-storagetype>`_                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``dynamic``                                                                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the pgBackRest Storage: ``create`` (by default) or ``dynamic``                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backreststorage-supplementalgroups:                                                   |
-|                 |                                                                                           |
-| **Key**         | `BackrestStorage.supplementalgroups <operator.html#backreststorage-supplementalgroups>`_  |
+| **Key**         | `backup.volumeSpec.matchLabels <operator.html#backup-volumespec-matchlabels>`_            |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Supplemental groups for the pgBackRest Storage                                            |
+| **Description** | A pgBackRest storage `label selector                                                      |
+|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _primarystorage-accessmode:                                                            |
+|                 | .. _backup-storages-type:                                                                 |
 |                 |                                                                                           |
-| **Key**         | `PrimaryStorage.accessmode <operator.html#primarystorage-accessmode>`_                    |
+| **Key**         | `backup.storages.<storage-name>.type <operator.html#backup-storages-type>`_               |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``ReadWriteOnce``                                                                         |
+| **Example**     | ``s3``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
-|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL cluster primary storage        |
+| **Description** | Type of the storage used for backups                                                      |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _primarystorage-matchlabels:                                                           |
+|                 | .. _backup-storages-endpointurl:                                                          |
 |                 |                                                                                           |
-| **Key**         | `PrimaryStorage.matchLabels <operator.html#primarystorage-matchlabels>`_                  |
+| **Key**         | `backup.storages.<storage-name>.endpointURL                                               |
+|                 | <operator.html#backup-storages-endpointurl>`_                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
+| **Example**     | ``minio-gateway-svc:9000``                                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _primarystorage-name:                                                                  |
-|                 |                                                                                           |
-| **Key**         | `PrimaryStorage.name <operator.html#primarystorage-name>`_                                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``cluster1``                                                                              |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The PostgreSQL cluster primary storage name                                               |
+| **Description** | The endpoint URL of the S3-compatible storage to be used for backups (not needed for the  |
+|                 | original Amazon S3 cloud)                                                                 |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _primarystorage-size:                                                                  |
+|                 | .. _backup-storages-bucket:                                                               |
 |                 |                                                                                           |
-| **Key**         | `PrimaryStorage.size <operator.html#primarystorage-size>`_                                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | int                                                                                       |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``1G``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
-|                 | persistentvolumeclaims>`_ size for the PostgreSQL cluster primary storage                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _primarystorage-storageclass:                                                          |
-|                 |                                                                                           |
-| **Key**         | `PrimaryStorage.storageclass <operator.html#primarystorage-storageclass>`_                |
+| **Key**         | `backup.storages.<storage-name>.bucket <operator.html#backup-storages-bucket>`_           |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Optionally sets the `Kubernetes storage class                                             |
-|                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
-|                 | PostgreSQL cluster primary storage `PersistentVolumeClaim                                 |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
+| **Description** | The `Amazon S3 bucket <https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html>`_|
+|                 | or `Google Cloud Storage bucket <https://cloud.google.com/storage/docs/key-terms#buckets`_|
+|                 | name used for backups                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _primarystorage-storagetype:                                                           |
+|                 | .. _backup-storages-region:                                                               |
 |                 |                                                                                           |
-| **Key**         | `PrimaryStorage.storagetype <operator.html#primarystorage-storagetype>`_                  |
+| **Key**         | `backup.storages.<storage-name>.region <operator.html#backup-storages-region>`_           |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | boolean                                                                                   |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``us-east-1``                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `AWS region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ to use for   |
+|                 | Amazon and all S3-compatible storages                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-storages-uristyle:                                                             |
+|                 |                                                                                           |
+| **Key**         | `backup.storages.<storage-name>.uriStyle <operator.html#backup-storages-uristyle>`_       |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``dynamic``                                                                               |
+| **Example**     | ``path``                                                                                  |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the PostgreSQL cluster primary storage: ``create`` (by default) or ``dynamic``    |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _primarystorage-supplementalgroups:                                                    |
-|                 |                                                                                           |
-| **Key**         | `PrimaryStorage.supplementalgroups <operator.html#primarystorage-supplementalgroups>`_    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Supplemental groups for the PostgreSQL cluster primary storage                            |
+| **Description** | Optional parameter that specifies if pgBackRest should use the path or host S3 URI style  |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-accessmode:                                                            |
+|                 | .. _backup-storages-verifytls:                                                            |
 |                 |                                                                                           |
-| **Key**         | `ReplicaStorage.accessmode <operator.html#replicastorage-accessmode>`_                    |
+| **Key**         | `backup.storages.<storage-name>.verifyTLS                                                 |
+|                 | <operator.html#backup-storages-verifytls>`_                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
+| **Value**       | boolean                                                                                   |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``ReadWriteOnce``                                                                         |
+| **Example**     | ``false``                                                                                 |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
-|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL Replica storage                |
+| **Description** | Enables or disables TLS verification for pgBackRest                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-matchlabels:                                                           |
+|                 | .. _backup-storagetypes:                                                                  |
 |                 |                                                                                           |
-| **Key**         | `ReplicaStorage.matchLabels <operator.html#replicastorage-matchlabels>`_                  |
+| **Key**         | `backup.storageTypes                                                                      |
+|                 | <operator.html#backup-storagetypes>`_                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
+| **Value**       | array                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
+| **Example**     | ``[ "s3" ]``                                                                              |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-name:                                                                  |
-|                 |                                                                                           |
-| **Key**         | `ReplicaStorage.name <operator.html#replicastorage-name>`_                                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The PostgreSQL Replica storage name                                                       |
+| **Description** | The backup storage types for the pgBackRest repository                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-size:                                                                  |
+|                 | .. _backup-repopath:                                                                      |
 |                 |                                                                                           |
-| **Key**         | `ReplicaStorage.size <operator.html#replicastorage-size>`_                                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | int                                                                                       |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``1G``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
-|                 | persistentvolumeclaims>`_ size for the PostgreSQL Replica storage                         |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-storageclass:                                                          |
-|                 |                                                                                           |
-| **Key**         | `ReplicaStorage.storageclass <operator.html#replicastorage-storageclass>`_                |
+| **Key**         | `backup.repoPath                                                                          |
+|                 | <operator.html#backup-repopath>`_                                                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Optionally sets the `Kubernetes storage class                                             |
-|                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
-|                 | PostgreSQL Replica storage `PersistentVolumeClaim                                         |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
+| **Description** | Custom path for pgBackRest repository backups                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-storagetype:                                                           |
-|                 |                                                                                           |
-| **Key**         | `ReplicaStorage.storagetype <operator.html#replicastorage-storagetype>`_                  |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``dynamic``                                                                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the PostgreSQL Replica storage: ``create`` (by default) or ``dynamic``            |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _replicastorage-supplementalgroups:                                                    |
-|                 |                                                                                           |
-| **Key**         | `ReplicaStorage.supplementalgroups <operator.html#replicastorage-supplementalgroups>`_    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Supplemental groups for the PostgreSQL Replica storage                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-accessmode:                                                                |
-|                 |                                                                                           |
-| **Key**         | `WALStorage.accessmode <operator.html#walstorage-accessmode>`_                            |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``ReadWriteOnce``                                                                         |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
-|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL write-ahead log storage        |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-matchlabels:                                                               |
-|                 |                                                                                           |
-| **Key**         | `WALStorage.matchLabels <operator.html#walstorage-matchlabels>`_                          |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-name:                                                                      |
-|                 |                                                                                           |
-| **Key**         | `WALStorage.name <operator.html#walstorage-name>`_                                        |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The PostgreSQL write-ahead log storage name                                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-size:                                                                      |
-|                 |                                                                                           |
-| **Key**         | `WALStorage.size <operator.html#walstorage-size>`_                                        |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | int                                                                                       |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``1G``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
-|                 | persistentvolumeclaims>`_ size for the PostgreSQL write-ahead log storage                 |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-storageclass:                                                              |
-|                 |                                                                                           |
-| **Key**         | `WALStorage.storageclass <operator.html#walstorage-storageclass>`_                        |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Optionally sets the `Kubernetes storage class                                             |
-|                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
-|                 | PostgreSQL write-ahead log storage `PersistentVolumeClaim                                 |
-|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-storagetype:                                                               |
-|                 |                                                                                           |
-| **Key**         | `WALStorage.storagetype <operator.html#walstorage-storagetype>`_                          |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``dynamic``                                                                               |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the PostgreSQL write-ahead log storage: ``create`` (by default) or ``dynamic``    |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _walstorage-supplementalgroups:                                                        |
-|                 |                                                                                           |
-| **Key**         | `WALStorage.supplementalgroups <operator.html#walstorage-supplementalgroups>`_            |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Supplemental groups for the PostgreSQL write-ahead log storage                            |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
+
+.. _operator.pmm-section:
+
+`PMM Section <operator.html#operator-pmm-section>`_
+--------------------------------------------------------------------------------
+
+The ``pmm`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
+file contains configuration options for Percona Monitoring and Management.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
 +-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _pmm-enabled:                                                                          |
 |                 |                                                                                           |
@@ -642,7 +556,8 @@
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``percona/pmm-client:{{{pmm2recommended}}}``                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | PMM client Docker image to use                                                            |
+| **Description** | `Percona Monitoring and Management (PMM) Client <https://www.percona.com/doc/             |
+|                 | percona-monitoring-and-management/2.x/details/architecture.html#pmm-client>`_ Docker image|
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -686,13 +601,13 @@
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pmm-resources-memory:                                                                 |
+|                 | .. _pmm-resources-requests-memory:                                                        |
 |                 |                                                                                           |
-| **Key**         | `pmm.resources.memory <operator.html#pmm-resources-memory>`_                              |
+| **Key**         | `pmm.resources.requests.memory <operator.html#pmm-resources-requests-memory>`_            |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``1Gi``                                                                                   |
+| **Example**     | ``200M``                                                                                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Kubernetes memory requests                                                           |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
@@ -701,16 +616,478 @@
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pmm-resources-cpu:                                                                    |
+|                 | .. _pmm-resources-requests-cpu:                                                           |
 |                 |                                                                                           |
-| **Key**         | `pmm.resources.cpu <operator.html#pmm-resources-cpu>`_                                    |
+| **Key**         | `pmm.resources.requests.cpu <operator.html#pmm-resources-requests-cpu>`_                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``700m``                                                                                  |
+| **Example**     | ``500m``                                                                                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | `Kubernetes CPU requests                                                                  |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
 |                 | #resource-requests-and-limits-of-pod-and-container>`_ for a PMM container                 |
 +-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pmm-resources-limits-cpu:                                                             |
+|                 |                                                                                           |
+| **Key**         | `pmm.resources.limits.cpu <operator.html#pmm-resources-limits-cpu>`_                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``500m``                                                                                  |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes CPU limits                                                                    |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a PMM container                 |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pmm-resources-limits-memory:                                                          |
+|                 |                                                                                           |
+| **Key**         | `pmm.resources.limits.memory <operator.html#pmm-resources-limits-memory>`_                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``200M``                                                                                  |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes memory limits                                                             |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
+|                 | for a PMM container                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
 
+.. _operator.pgbouncer-section:
+
+`pgBouncer Section <operator.html#operator-pgbouncer-section>`_
+--------------------------------------------------------------------------------
+
+The ``pgBouncer`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
+file contains configuration options for the `pgBouncer <http://pgbouncer.github.io/>`__ connection pooler for PostgreSQL.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-image:                                                                      |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.image <operator.html#pgbouncer-image>`_                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbouncer``                           |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Docker image for the `pgBouncer <http://pgbouncer.github.io/>`__ connection pooler        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-size:                                                                       |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.size <operator.html#pgbouncer-size>`_                                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``1G``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The number of the pgBouncer Pods to provide connection pooling                            |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-resources-requests-cpu:                                                     |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.resources.requests.cpu <operator.html#pgbouncer-resources-requests-cpu>`_      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``1``                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes CPU requests                                                                  |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a pgBouncer container           |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-resources-requests-memory:                                                  |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.resources.requests.memory <operator.html#pgbouncer-resources-requests-memory>`_|
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``128Mi``                                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes memory requests                                                           |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
+|                 | for a pgBouncer container                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-resources-limits-cpu:                                                       |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.resources.limits.cpu <operator.html#pgbouncer-resources-limits-cpu>`_          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``2``                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes CPU limits                                                                    |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a pgBouncer container           |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-resources-limits-memory:                                                    |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.resources.limits.memory <operator.html#pgbouncer-resources-limits-memory>`_    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``512Mi``                                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes memory limits                                                             |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
+|                 | for a pgBouncer container                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-expose-servicetype:                                                         |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.expose.serviceType <operator.html#pgbouncer-expose-servicetype>`_              |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``ClusterIP``                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Specifies the type of `Kubernetes Service                                                 |
+|                 | <https://kubernetes.io/docs/concepts/services-networking/service/                         |
+|                 | #publishing-services-service-types>`_ for pgBouncer                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-expose-loadbalancersourceranges:                                            |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.expose.loadBalancerSourceRanges                                                |
+|                 | <operator.html#pgbouncer-expose-loadbalancersourceranges>`_                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``"10.0.0.0/8"``                                                                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The range of client IP addresses from which the load balancer should be reachable         |
+|                 | (if not set, there is no limitations)                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-expose-annotations:                                                         |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.expose.annotations <operator.html#pgbouncer-expose-annotations>`_              |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | label                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``pg-cluster-annot: cluster1``                                                            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes annotations                                                               |
+|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>`_        |
+|                 | metadata for pgBouncer                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-expose-labels:                                                              |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.expose.labels <operator.html#pgbouncer-expose-labels>`_                        |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | label                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``pg-cluster-label: cluster1``                                                            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Set `labels <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_ |
+|                 | for the pgBouncer Service                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+
+.. _operator.pgreplicas-section:
+
+`pgReplicas Section <operator.html#operator-pgreplicas-section>`_
+--------------------------------------------------------------------------------
+
+The ``pgReplicas`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
+file stores information required to manage the replicas within a PostgreSQL cluster.
+
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-size:                                                                      |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.size <operator.html#pgreplicas-size>`_                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``1G``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The number of the PostgreSQL Replica Pods                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-resources-requests-cpu:                                                    |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.resources.requests.cpu                                         |
+|                 | <operator.html#pgreplicas-resources-requests-cpu>`_                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``1``                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes CPU requests                                                                  |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a PostgreSQL Replica container  |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-resources-requests-memory:                                                 |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.resources.requests.memory                                      |
+|                 | <operator.html#pgreplicas-resources-requests-memory>`_                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``128Mi``                                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes memory requests                                                           |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
+|                 | for a PostgreSQL Replica container                                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-resources-limits-cpu:                                                      |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.resources.limits.cpu                                           |
+|                 | <operator.html#pgreplicas-resources-limits-cpu>`_                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``2``                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes CPU limits                                                                    |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a PostgreSQL Replica container  |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-resources-limits-memory:                                                   |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.resources.limits.memory                                        |
+|                 | <operator.html#pgreplicas-resources-limits-memory>`_                                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``512Mi``                                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes memory limits                                                             |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
+|                 | for a PostgreSQL Replica container                                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-volumespec-accessmode:                                                     |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.accessmode                                          |
+|                 | <operator.html#pgreplicas-volumespec-accessmode>`_                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``ReadWriteOnce``                                                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
+|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL Replica storage                |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-volumespec-size:                                                           |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.size <operator.html#pgreplicas-volumespec-size>`_   |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``1G``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
+|                 | persistentvolumeclaims>`_ size for the PostgreSQL Replica storage                         |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-volumespec-storagetype:                                                    |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.storagetype                                         |
+|                 | <operator.html#pgreplicas-volumespec-storagetype>`_                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``dynamic``                                                                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Type of the PostgreSQL Replica storage provisioning: ``create`` (the default              |
+|                 | variant; used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a       |
+|                 | dynamic storage provisioner, e.g. via a StorageClass)                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-volumespec-storageclass:                                                   |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.storageclass                                        |
+|                 | <operator.html#pgreplicas-volumespec-storageclass>`_                                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``standard``                                                                              |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Optionally sets the `Kubernetes storage class                                             |
+|                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
+|                 | PostgreSQL Replica storage `PersistentVolumeClaim                                         |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-volumespec-matchlabels:                                                    |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.volumeSpec.matchLabels                                         |
+|                 | <operator.html#pgreplicas-volumespec-matchlabels>`_                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | A PostgreSQL Replica storage `label selector                                              |
+|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-labels:                                                                    |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.labels <operator.html#pgbouncer-labels>`_                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | label                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``pg-cluster-label: cluster1``                                                            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Set `labels <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_ |
+|                 | for PostgreSQL Replica Pods                                                               |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-annotations:                                                               |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.annotations <operator.html#pgreplicas-annotations>`_           |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | label                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``pg-cluster-annot: cluster1-1``                                                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes annotations                                                               |
+|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>`_        |
+|                 | metadata for PostgreSQL Replica                                                           |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-expose-servicetype:                                                        |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.expose.serviceType                                             |
+|                 | <operator.html#pgreplicas-expose-servicetype>`_                                           |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``ClusterIP``                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Specifies the type of `Kubernetes Service                                                 |
+|                 | <https://kubernetes.io/docs/concepts/services-networking/service/                         |
+|                 | #publishing-services-service-types>`_ for for PostgreSQL Replica                          |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-expose-loadbalancersourceranges:                                           |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.expose.loadBalancerSourceRanges                                |
+|                 | <operator.html#pgreplicas-expose-loadbalancersourceranges>`_                              |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``"10.0.0.0/8"``                                                                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The range of client IP addresses from which the load balancer should be reachable         |
+|                 | (if not set, there is no limitations)                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-expose-annotations:                                                        |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.expose.annotations                                             |
+|                 | <operator.html#pgreplicas-expose-annotations>`_                                           |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | label                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``pg-cluster-annot: cluster1``                                                            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes annotations                                                               |
+|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>`_        |
+|                 | metadata for PostgreSQL Replica                                                           |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgreplicas-expose-labels:                                                             |
+|                 |                                                                                           |
+| **Key**         | `pgReplicas.<replica-name>.expose.labels <operator.html#pgbouncer-expose-labels>`_        |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | label                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``pg-cluster-label: cluster1``                                                            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Set `labels <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_ |
+|                 | for the PostgreSQL Replica Service                                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+
+.. _operator.pgbadger-section:
+
+`pgBadger Section <operator.html#operator-pgbadger-section>`_
+--------------------------------------------------------------------------------
+
+The ``pgBadger`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
+file contains configuration options for the `pgBadger PostgreSQL log analyzer <https://github.com/darold/pgbadger>`__.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbadger-enabled:                                                                     |
+|                 |                                                                                           |
+| **Key**         | `pgBadger.enabled <operator.html#pgbadger-enabled>`_                                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | boolean                                                                                   |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``false``                                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Enables or disables the                                                                   |
+|                 | `pgBadger PostgreSQL log analyzer <https://github.com/darold/pgbadger>`__                 |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbadger-image:                                                                       |
+|                 |                                                                                           |
+| **Key**         | `pgBadger.image <operator.html#pgbadger-image>`_                                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbadger``                            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `pgBadger PostgreSQL log analyzer <https://github.com/darold/pgbadger>`__ Docker image    |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbadger-serverhost:                                                                  |
+|                 |                                                                                           |
+| **Key**         | `pgBadger.port <operator.html#pgbadger-port>`_                                            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     |  ``10000``                                                                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The port number for pgBadger                                                              |
++-----------------+-------------------------------------------------------------------------------------------+
