@@ -31,6 +31,12 @@ The Operator options glossary
 
       :ref:`backup.backrestRepoImage<backup-backrestrepoimage>`
 
+   bucket
+
+     ..
+
+      :ref:`backup.storages.<STORAGE_NAME>.bucket<backup-storages-bucket>`
+
    cpu
 
      ..
