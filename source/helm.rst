@@ -58,11 +58,10 @@ any of the Operator's :ref:`operator.custom-resource-options`.
 
 The following example will deploy a Percona Distribution for PostgreSQL Cluster
 in the ``pgdb`` namespace, with enabled `Percona Monitoring and Management (PMM) <https://www.percona.com/doc/percona-monitoring-and-management/2.x/index.html>`_
-and 20 Gi storage:
+and 20 Gi storage for a Primary PostgreSQL node:
 
 .. code:: bash
 
    $ helm install my-db percona/pg-db --namespace pgdb \
      --set pgPrimary.volumeSpec.size=20Gi \
      --set pmm.enabled=true
-
