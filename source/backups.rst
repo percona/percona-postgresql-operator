@@ -176,7 +176,7 @@ The Operator supports the ability to perform a full restore on a PostgreSQL
 cluster as well as a point-in-time-recovery. There are two types of ways to
 restore a cluster:
 
-* restore to a new cluster using the ``--restore-from`` option,
+* restore to a new cluster using the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` option (and possibly, :ref:`pgDataSource.restoreOpts<pgdatasource-restoreopts>` for custom pgBackRest options),
 * restore in-place, to an existing cluster (note that this is destructive).
 
 Restoring to a new PostgreSQL cluster allows you to take a backup and create a
