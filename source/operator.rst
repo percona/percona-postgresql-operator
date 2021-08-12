@@ -3,7 +3,7 @@
 `Custom Resource options <operator.html#operator-custom-resource-options>`_
 ===============================================================================
 
-The Operator is configured via the spec section of the
+The Cluster is configured via the
 `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`_ file.
 
 The metadata part of this file contains the following keys:
@@ -153,7 +153,9 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``dynamic``                                                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the PostgreSQL Primary storage: ``create`` (by default) or ``dynamic``            |
+| **Description** | Type of the PostgreSQL Primary storage provisioning: ``create`` (the default variant;     |
+|                 | used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a dynamic        |
+|                 | storage provisioner, e.g. via a StorageClass)                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -180,8 +182,8 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-server-
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
+| **Description** | A PostgreSQL Primary storage `label selector                                              |
+|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 
@@ -232,7 +234,9 @@ file contains configuration options for PostgreSQL `write-ahead logging <https:/
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``dynamic``                                                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the PostgreSQL Write-ahead Log storage: ``create`` (by default) or ``dynamic``    |
+| **Description** | Type of the PostgreSQL Write-ahead Log storage provisioning: ``create`` (the default      |
+|                 | variant; used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a       |
+|                 | dynamic storage provisioner, e.g. via a StorageClass)                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -259,8 +263,8 @@ file contains configuration options for PostgreSQL `write-ahead logging <https:/
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
+| **Description** | A PostgreSQL Write-ahead Log storage `label selector                                      |
+|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 
@@ -382,7 +386,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``dynamic``                                                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the pgBackRest Storage: ``create`` (by default) or ``dynamic``                    |
+| **Description** | Type of the pgBackRest storage provisioning: ``create`` (the default                      |
+|                 | variant; used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a       |
+|                 | dynamic storage provisioner, e.g. via a StorageClass)                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -409,8 +415,8 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
+| **Description** | A pgBackRest storage `label selector                                                      |
+|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -426,10 +432,10 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-storages-s3-endpointurl:                                                       |
+|                 | .. _backup-storages-endpointurl:                                                          |
 |                 |                                                                                           |
-| **Key**         | `backup.storages.s3.<storage-name>.endpointURL                                            |
-|                 | <operator.html#backup-storages-s3-endpointurl>`_                                          |
+| **Key**         | `backup.storages.<storage-name>.endpointURL                                               |
+|                 | <operator.html#backup-storages-endpointurl>`_                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -440,9 +446,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-storages-s3-region:                                                            |
+|                 | .. _backup-storages-region:                                                               |
 |                 |                                                                                           |
-| **Key**         | `backup.storages.s3.<storage-name>.region <operator.html#backup-storages-s3-region>`_     |
+| **Key**         | `backup.storages.<storage-name>.region <operator.html#backup-storages-region>`_           |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | boolean                                                                                   |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -453,9 +459,9 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-storages-s3-uristyle:                                                          |
+|                 | .. _backup-storages-uristyle:                                                             |
 |                 |                                                                                           |
-| **Key**         | `backup.storages.s3.<storage-name>.uriStyle <operator.html#backup-storages-s3-uristyle>`_ |
+| **Key**         | `backup.storages.<storage-name>.uriStyle <operator.html#backup-storages-uristyle>`_       |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -465,10 +471,10 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _backup-storages-s3-verifytls:                                                         |
+|                 | .. _backup-storages-verifytls:                                                            |
 |                 |                                                                                           |
-| **Key**         | `backup.storages.s3.<storage-name>.verifyTLS                                              |
-|                 | <operator.html#backup-storages-s3-verifytls>`_                                            |
+| **Key**         | `backup.storages.<storage-name>.verifyTLS                                                 |
+|                 | <operator.html#backup-storages-verifytls>`_                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | boolean                                                                                   |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -703,7 +709,7 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
+| **Example**     | ``"10.0.0.0/8"``                                                                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The range of client IP addresses from which the load balancer should be reachable         |
 |                 | (if not set, there is no limitations)                                                     |
@@ -732,8 +738,8 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``pg-cluster-label: cluster1``                                                            |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
+| **Description** | Set `labels <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_ |
+|                 | for the pgBouncer Service                                                                 |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator.pgreplicas-section:
@@ -857,7 +863,9 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``dynamic``                                                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Type of the PostgreSQL Replica storage: ``create`` (by default) or ``dynamic``            |
+| **Description** | Type of the PostgreSQL Replica storage provisioning: ``create`` (the default              |
+|                 | variant; used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a       |
+|                 | dynamic storage provisioner, e.g. via a StorageClass)                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -886,8 +894,8 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
+| **Description** | A PostgreSQL Replica storage `label selector                                              |
+|                 | https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__              |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -899,8 +907,8 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``pg-cluster-label: cluster1``                                                            |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
+| **Description** | Set `labels <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_ |
+|                 | for PostgreSQL Replica Pods                                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -940,7 +948,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``""``                                                                                    |
+| **Example**     | ``"10.0.0.0/8"``                                                                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The range of client IP addresses from which the load balancer should be reachable         |
 |                 | (if not set, there is no limitations)                                                     |
@@ -970,8 +978,8 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``pg-cluster-label: cluster1``                                                            |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | `Labels are key-value pairs attached to objects                                           |
-|                 | <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_             |
+| **Description** | Set `labels <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_ |
+|                 | for the PostgreSQL Replica Service                                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator.pgbadger-section:
