@@ -45,6 +45,8 @@ The Operator options glossary
 
       :ref:`pgReplicas.REPLICA_NAME.resources.requests.cpu<pgreplicas-resources-requests-cpu>`
 
+      :ref:`pmm.resources.limits.cpu<pmm-resources-requests-cpu>`
+
       :ref:`pmm.resources.requests.cpu<pmm-resources-requests-cpu>`
 
    database
@@ -133,6 +135,8 @@ The Operator options glossary
 
       :ref:`pgReplicas.REPLICA_NAME.resources.requests.memory<pgreplicas-resources-requests-memory>`
 
+      :ref:`pmm.resources.limits.memory<pmm-resources-requests-memory>`
+
       :ref:`pmm.resources.requests.memory<pmm-resources-requests-memory>`
 
    namespace
@@ -166,6 +170,12 @@ The Operator options glossary
      ..
 
       :ref:`backup.storages.s3.STORAGE_NAME.region<backup-storages-s3-region>`
+
+   repoPath
+
+     ..
+
+      :ref:`backup.repoPath<backup-repopath>`
 
    restoreFrom
 
@@ -242,6 +252,12 @@ The Operator options glossary
       :ref:`pgReplicas.REPLICA_NAME.volumeSpec.storagetype<pgreplicas-volumespec-storagetype>`
 
       :ref:`walStorage.volumeSpec.storagetype<walstorage-volumespec-storagetype>`
+
+   storageTypes
+
+     ..
+
+      :ref:`backup.storageTypes<backup-storagetypes>`_
 
    tlsOnly
 
