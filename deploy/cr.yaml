@@ -92,6 +92,7 @@ spec:
 #    storages:
 #      my-s3:
 #        type: s3
+#        bucket: some-bucket
 #        endpointUrl: minio-gateway-svc:9000
 #        region: us-east-1
 #        uriStyle: path
