@@ -476,7 +476,7 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Amazon S3 bucket <https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html>`_|
 |                 | or                                                                                        |
-|                 |`Google Cloud Storage bucket <https://cloud.google.com/storage/docs/key-terms#buckets>`_   |
+|                 | `Google Cloud Storage bucket <https://cloud.google.com/storage/docs/key-terms#buckets>`_  |
 |                 | name used for backups                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
