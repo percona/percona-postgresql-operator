@@ -71,6 +71,9 @@ spec:
       requests:
         memory: 200M
         cpu: 500m
+#      limits:
+#        cpu: "1"
+#        memory: "400M"
   backup:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
     backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
@@ -87,15 +90,13 @@ spec:
       storageclass: ""
 #      matchLabels: ""
 #    storages:
-#      my-s3:
-#        type: s3
-#        endpointUrl: minio-gateway-svc:9000
-#        region: us-east-1
-#        uriStyle: path
-#        verifyTLS: false
+#      my-gcs:
+#        type: gcs
+#        bucket: some-gcs-bucket
 #    storageTypes: [
-#      "s3"
+#      "gcs"
 #    ]
+#    repoPath: ""
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
     size: 1
@@ -115,7 +116,7 @@ spec:
 #        pg-cluster-label: cluster1
   pgReplicas:
     hotStandby:
-      size: 0
+      size: 2
       resources:
         requests:
 #          cpu: "1"

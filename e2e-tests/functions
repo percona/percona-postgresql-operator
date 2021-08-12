@@ -283,6 +283,8 @@ apply_cluster() {
 		| yq w - 'spec.pgPrimary.image' ${IMAGE_PG_HA} \
 		| yq w - 'spec.backup.image' ${IMAGE_BACKREST} \
 		| yq w - 'spec.backup.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
+		| yq w - 'spec.pgBadger.image' ${IMAGE_PGBADGER} \
+		| yq w - 'spec.pgBouncer.image' ${IMAGE_PGBOUNCER} \
 			>"${tmp_dir}/cr.yaml"
 
 
@@ -519,6 +521,8 @@ compare_kubectl() {
 		| yq d - 'metadata.ownerReferences.*.apiVersion' \
 		| yq d - '**.controller-uid' \
 		| yq d - '**.preemptionPolicy' \
+		| yq d - '**.ipFamilies' \
+		| yq d - '**.ipFamilyPolicy' \
 			>${new_result}
 
 	diff -u ${expected_result} ${new_result}
