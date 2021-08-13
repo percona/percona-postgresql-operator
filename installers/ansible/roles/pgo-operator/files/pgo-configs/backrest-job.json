@@ -47,8 +47,12 @@
                 {{ end }}
                 "containers": [{
                     "name": "backrest",
+<<<<<<< HEAD
                     "image": "{{.Image}}",
 
+=======
+                    "image": "{{.CCPImagePrefix}}/crunchy-pgbackrest:{{.CCPImageTag}}",
+>>>>>>> v4.7.1
                     "securityContext": {
                       "allowPrivilegeEscalation": false,
                       "privileged": false,

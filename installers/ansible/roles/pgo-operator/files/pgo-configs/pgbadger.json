@@ -1,6 +1,10 @@
 {
     "name": "pgbadger",
+<<<<<<< HEAD
     "image": "{{.Image}}",
+=======
+    "image": "{{.CCPImagePrefix}}/crunchy-pgbadger:{{.CCPImageTag}}",
+>>>>>>> v4.7.1
     "securityContext": {
         "allowPrivilegeEscalation": false,
         "privileged": false,

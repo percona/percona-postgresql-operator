@@ -36,7 +36,11 @@
                 "containers": [
                     {
                         "name": "sqlrunner",
+<<<<<<< HEAD
                         "image": "{{.Image}}",
+=======
+                        "image": "{{.CCPImagePrefix}}/crunchy-postgres-ha:{{.CCPImageTag}}",
+>>>>>>> v4.7.1
                         "securityContext": {
                           "allowPrivilegeEscalation": false,
                           "privileged": false,

@@ -48,7 +48,11 @@
         },
         "containers": [{
           "name": "pgadminweb",
+<<<<<<< HEAD
           "image": "{{.Image}}",
+=======
+          "image": "{{.CCPImagePrefix}}/crunchy-pgadmin4:{{.CCPImageTag}}",
+>>>>>>> v4.7.1
           "securityContext": {
             "allowPrivilegeEscalation": false,
             "privileged": false,

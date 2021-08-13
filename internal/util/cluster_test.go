@@ -20,8 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+<<<<<<< HEAD
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+=======
+	"github.com/crunchydata/postgres-operator/internal/config"
+	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
+>>>>>>> v4.7.1
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"

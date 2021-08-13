@@ -33,9 +33,13 @@
                         "image": "{% if pgo_apiserver_image | default('') != '' %}{{ pgo_apiserver_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-apiserver
                                 {%- endif %}",
+<<<<<<< HEAD
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
                                           {%- else %}IfNotPresent
                                           {%- endif %}",
+=======
+                        "imagePullPolicy": "IfNotPresent",
+>>>>>>> v4.7.1
                         "securityContext": {
                           "allowPrivilegeEscalation": false,
                           "privileged": false,
@@ -127,9 +131,13 @@
                         "image": "{% if pgo_image | default('') != '' %}{{ pgo_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-postgres-operator
                                 {%- endif %}",
+<<<<<<< HEAD
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
                                           {%- else %}IfNotPresent
                                           {%- endif %}",
+=======
+                        "imagePullPolicy": "IfNotPresent",
+>>>>>>> v4.7.1
                         "securityContext": {
                           "allowPrivilegeEscalation": false,
                           "privileged": false,
@@ -242,9 +250,13 @@
                                 "name": "tmp"
                             }
                         ],
+<<<<<<< HEAD
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
                                           {%- else %}IfNotPresent
                                           {%- endif %}"
+=======
+                        "imagePullPolicy": "IfNotPresent"
+>>>>>>> v4.7.1
                     }, {
                         "name": "event",
                         "image": "{% if pgo_event_image | default('') != '' %}{{ pgo_event_image }}
@@ -275,9 +287,13 @@
                                 "name": "tmp"
                             }
                         ],
+<<<<<<< HEAD
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
                                           {%- else %}IfNotPresent
                                           {%- endif %}"
+=======
+                        "imagePullPolicy": "IfNotPresent"
+>>>>>>> v4.7.1
                     }
                 ],
                 "volumes": [
