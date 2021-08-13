@@ -47,6 +47,15 @@ Contributions to the source tree should follow the workflow described below:
 4. When the reviewer makes some comments, address any feedback that comes and update the pull request.
 5. When your contribution is accepted, your pull request will be approved and merged to the main branch.
 
+### 3. Contributing to documentation
+
+The workflow for documentation is similar. Please take into account a few things:
+
+1. All documentation is written using the [Sphinx engine markup language](https://www.sphinx-doc.org/). Sphinx allows easy publishing of various output formats such as HTML, LaTeX (for PDF), ePub, Texinfo, etc.
+2. We store the documentation as *.rst files in the [pgo-docs](https://github.com/percona/percona-postgresql-operator/tree/pgo-docs) branch of the Operator GitHub repository. The documentation is licensed under the [Attribution 4.0 International license (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+
+After [installing Sphinx](https://www.sphinx-doc.org/en/master/usage/installation.html) you can use `make html` or `make latexpdf` commands having the documentation branch as your current directory to build HTML and PDF versions of the documentation respectively.
+
 ## Code review
 
 Your contribution will be reviewed by other developers contributing to the project. The more complex your changes are, the more experts will be involved. You will receive feedback and recommendations directly on your pull request on GitHub, so keep an eye on your submission and be prepared to make further amendments. The developers might even provide some concrete suggestions on modifying your code to match the project’s expectations better.
