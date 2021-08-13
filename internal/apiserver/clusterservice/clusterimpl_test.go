@@ -18,15 +18,9 @@ limitations under the License.
 import (
 	"testing"
 
-<<<<<<< HEAD
 	"github.com/percona/percona-postgresql-operator/internal/apiserver"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	msgs "github.com/percona/percona-postgresql-operator/pkg/apiservermsgs"
-=======
-	"github.com/crunchydata/postgres-operator/internal/apiserver"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
-	msgs "github.com/crunchydata/postgres-operator/pkg/apiservermsgs"
->>>>>>> v4.7.1
 )
 
 func TestIsMissingGCSConfig(t *testing.T) {

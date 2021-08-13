@@ -28,11 +28,7 @@
                 {{ end }}
                 "containers": [{
                     "name": "database",
-<<<<<<< HEAD
                     "image": "{{.Image}}",
-=======
-                    "image": "{{.CCPImagePrefix}}/{{.CCPImage}}:{{.CCPImageTag}}",
->>>>>>> v4.7.1
                     "securityContext": {
                       "allowPrivilegeEscalation": false,
                       "privileged": false,

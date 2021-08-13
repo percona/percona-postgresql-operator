@@ -955,22 +955,6 @@ func CreateCluster(request *msgs.CreateClusterRequest, ns, pgouser string) msgs.
 			return resp
 		}
 
-<<<<<<< HEAD
-		// if a GCS key is provided, we need to base64 decode it
-		backrestGCSKey := []byte{}
-		if request.BackrestGCSKey != "" {
-			// try to decode the string
-			backrestGCSKey, err = base64.StdEncoding.DecodeString(request.BackrestGCSKey)
-
-			if err != nil {
-				resp.Status.Code = msgs.Error
-				resp.Status.Msg = fmt.Sprintf("could not decode GCS key: %s", err.Error())
-				return resp
-			}
-		}
-
-		// set up the secret for the cluster that contains the pgBackRest
-=======
 		// attempt to retrieves the custom CA, assuming it has the name
 		// "aws-s3-ca.crt"
 		backrestS3CACert = backrestSecret.Data[util.BackRestRepoSecretKeyAWSS3KeyAWSS3CACert]
@@ -1005,7 +989,6 @@ func CreateCluster(request *msgs.CreateClusterRequest, ns, pgouser string) msgs.
 	case kubeapi.IsNotFound(err):
 		// The pgBackRest repo config secret was not found, create it.
 		// Set up the secret for the cluster that contains the pgBackRest
->>>>>>> v4.7.1
 		// information
 		secret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1016,20 +999,11 @@ func CreateCluster(request *msgs.CreateClusterRequest, ns, pgouser string) msgs.
 					config.LABEL_PGO_BACKREST_REPO: "true",
 				},
 			},
-<<<<<<< HEAD
-			Data: map[string][]byte{
-				util.BackRestRepoSecretKeyAWSS3KeyAWSS3CACert:    backrestS3CACert,
-				util.BackRestRepoSecretKeyAWSS3KeyAWSS3Key:       []byte(request.BackrestS3Key),
-				util.BackRestRepoSecretKeyAWSS3KeyAWSS3KeySecret: []byte(request.BackrestS3KeySecret),
-				util.BackRestRepoSecretKeyAWSS3KeyGCSKey:         backrestGCSKey,
-			},
-=======
 			Data: s3Credentials,
 		}
 
 		for k, v := range util.GetCustomLabels(newInstance) {
 			secret.ObjectMeta.Labels[k] = v
->>>>>>> v4.7.1
 		}
 
 		for k, v := range util.GetCustomLabels(newInstance) {

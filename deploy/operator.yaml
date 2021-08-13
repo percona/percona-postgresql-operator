@@ -34,6 +34,7 @@ rules:
       - get
       - create
       - delete
+      - patch
   - apiGroups:
       - ''
     resources:
@@ -45,6 +46,7 @@ rules:
       - create
       - delete
       - list
+      - patch
   - apiGroups:
       - ''
     resources:
@@ -135,6 +137,9 @@ data:
     backrest_aws_s3_secret: ""
     backrest_aws_s3_uri_style: ""
     backrest_aws_s3_verify_tls: "true"
+    backrest_gcs_bucket: ""
+    backrest_gcs_endpoint: ""
+    backrest_gcs_key_type: ""
     backrest_port: "2022"
     badger: "false"
     ccp_image_prefix: "perconalab/percona-postgresql-operator"
@@ -162,7 +167,6 @@ data:
     metrics: "false"
     namespace: "pgo"
     namespace_mode: "dynamic"
-    pgadmin_storage: "default"
     pgbadgerport: "10000"
     pgo_add_os_ca_store: "false"
     pgo_admin_password: "examplepassword"
@@ -174,7 +178,7 @@ data:
     pgo_client_cert_secret: "pgo.tls"
     pgo_client_container_install: "false"
     pgo_client_install: "false"
-    pgo_client_version: "4.6.2"
+    pgo_client_version: "4.7.1"
     pgo_cluster_admin: "false"
     pgo_disable_eventing: "false"
     pgo_disable_tls: "false"
@@ -182,7 +186,7 @@ data:
     pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "main"
+    pgo_image_tag: "centos8-4.7.1"
     pgo_installation_name: "devtest"
     pgo_noauth_routes: ""
     pgo_operator_namespace: "pgo"
@@ -198,6 +202,7 @@ data:
     backup_storage: "default"
     primary_storage: "default"
     replica_storage: "default"
+    pgadmin_storage: "default"
     wal_storage: ""
     storage1_name: "default"
     storage1_access_mode: "ReadWriteOnce"
@@ -280,8 +285,6 @@ spec:
           volumeMounts:
             - name: deployer-conf
               mountPath: "/conf"
-      imagePullSecrets:
-        - name: ""
       volumes:
         - name: deployer-conf
           configMap:

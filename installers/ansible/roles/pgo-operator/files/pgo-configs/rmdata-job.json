@@ -29,11 +29,7 @@
                 {{ end }}
                 "containers": [{
                     "name": "rmdata",
-<<<<<<< HEAD
                     "image": "{{.PGOImagePrefix}}:{{.PGOImageTag}}-pgo-rmdata",
-=======
-                    "image": "{{.PGOImagePrefix}}/pgo-rmdata:{{.PGOImageTag}}",
->>>>>>> v4.7.1
                     "securityContext": {
                       "allowPrivilegeEscalation": false,
                       "privileged": false,
