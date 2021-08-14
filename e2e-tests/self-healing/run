@@ -42,16 +42,6 @@ get_pod_by_role() {
 	local cluster=${1}
 	local role=${2}
 	local parameter=${3}
-	local replica_sfx=${4}
-
-	local deployment_name=''
-	if [[ -z ${replica_sfx} && "${role}" == 'master' ]]; then
-		deployment_name="${cluster}"
-		service_name="${cluster}"
-	else
-		deployment_name="${cluster}-${replica_sfx}"
-		service_name="${cluster}-replica"
-	fi
 
 	case ${parameter} in
 		'name')
@@ -62,7 +52,7 @@ get_pod_by_role() {
 			;;
 	esac
 
-	echo "$(kubectl_bin get pods --selector=role=${role},service-name=${service_name},pg-cluster=${cluster},deployment-name=${deployment_name} -o 'jsonpath='${jsonpath}'')"
+	echo "$(kubectl_bin get pods --selector=role=${role},pg-cluster=${cluster} -o 'jsonpath='${jsonpath}'')"
 }
 
 main() {
