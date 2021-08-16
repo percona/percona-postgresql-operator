@@ -82,19 +82,12 @@ $PGO_APISERVER_URL/showclusters
 curl --cacert $PGO_CA_CERT --key $PGO_CLIENT_KEY --cert $PGO_CA_CERT -u \
 admin:examplepassword -H "Content-Type:application/json" --insecure -X \
 POST --data \
-<<<<<<< HEAD
-  '{"ClientVersion":"4.7.0",
-=======
   '{"ClientVersion":"4.7.1",
 $PGO_APISERVER_URL/clustersdelete
 
   Schemes: http, https
   BasePath: /
-<<<<<<< HEAD
-  Version: 4.7.0
-=======
   Version: 4.7.1
->>>>>>> v4.7.1
   License: Apache 2.0 http://www.apache.org/licenses/LICENSE-2.0
   Contact: Crunchy Data<info@crunchydata.com> https://www.crunchydata.com/
 

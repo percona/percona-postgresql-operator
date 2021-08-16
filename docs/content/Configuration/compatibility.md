@@ -12,29 +12,7 @@ version dependencies between the two projects. Below are the operator releases a
 
 | Operator Release   |      Container Release      | Postgres | PgBackrest Version
 |:----------|:-------------|:------------|:--------------
-<<<<<<< HEAD
 | 0.1.0 | 0.1.0  | 13.2 | 2.31 |
-=======
-| 4.7.1 | 4.7.1  | 13.3 | 2.33 |
-|||12.7|2.33|
-|||11.12|2.33|
-|||10.17|2.33|
-|||9.6.22|2.33|
-||||
-| 4.7.0 | 4.7.0  | 13.3 | 2.33 |
-|||12.7|2.33|
-|||11.12|2.33|
-|||10.17|2.33|
-|||9.6.22|2.33|
-||||
-| 4.6.2 | 4.6.2  | 13.2 | 2.31 |
-|||12.6|2.31|
-|||11.11|2.31|
-|||10.16|2.31|
-|||9.6.21|2.31|
-||||
-| 4.6.1 | 4.6.1  | 13.2 | 2.31 |
->>>>>>> v4.7.1
 |||12.6|2.31|
 
 Features sometimes are added into the underlying Crunchy Containers

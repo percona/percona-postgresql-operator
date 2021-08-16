@@ -186,7 +186,7 @@ data:
     pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "centos8-4.7.1"
+    pgo_image_tag: "main"
     pgo_installation_name: "devtest"
     pgo_noauth_routes: ""
     pgo_operator_namespace: "pgo"
