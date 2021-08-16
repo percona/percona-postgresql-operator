@@ -63,6 +63,8 @@ type pgBouncerTemplateFields struct {
 	CASecret                  string
 	ClusterName               string
 	Image                     string
+	CCPImagePrefix            string
+	CCPImageTag               string
 	CustomLabels              string
 	DisableFSGroup            bool
 	Port                      string
@@ -567,9 +569,12 @@ func createPgBouncerDeployment(clientset kubernetes.Interface, cluster *crv1.Pgc
 
 	// get the fields that will be substituted in the pgBouncer template
 	fields := pgBouncerTemplateFields{
-		Name:               pgbouncerDeploymentName,
-		ClusterName:        cluster.Name,
-		Image:              cluster.Spec.PgBouncer.Image,
+		Name:           pgbouncerDeploymentName,
+		ClusterName:    cluster.Name,
+		Image:          cluster.Spec.PgBouncer.Image,
+		CCPImagePrefix: util.GetValueOrDefault(cluster.Spec.CCPImagePrefix, operator.Pgo.Cluster.CCPImagePrefix),
+		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
+			operator.Pgo.Cluster.CCPImageTag),
 		CustomLabels:       operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 		DisableFSGroup:     operator.Pgo.DisableFSGroup(),
 		Port:               cluster.Spec.Port,

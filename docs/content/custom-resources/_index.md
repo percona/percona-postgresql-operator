@@ -345,7 +345,7 @@ The below code will help you set up this Secret.
 pgo_cluster_name=hippo
 # this variable is the namespace the cluster is being deployed into
 cluster_namespace=pgo
-# the following variables are your S3 key and key secret
+# this variable is your GCS credential
 backrest_gcs_key=/path/to/your/gcs/credential.json
 
 kubectl -n "${cluster_namespace}" create secret generic "${pgo_cluster_name}-backrest-repo-config" \
@@ -373,7 +373,7 @@ export cluster_namespace=pgo
 export backrest_gcs_bucket=your-bucket
 
 cat <<-EOF > "${pgo_cluster_name}-pgcluster.yaml"
-apiVersion: pg.percona.com/v1
+apiVersion: crunchydata.com/v1
 kind: Pgcluster
 metadata:
   annotations:

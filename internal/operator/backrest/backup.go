@@ -51,6 +51,8 @@ type backrestJobTemplateFields struct {
 	PITRTarget                    string
 	PodName                       string
 	Image                         string
+	CCPImagePrefix                string
+	CCPImageTag                   string
 	CustomLabels                  string
 	SecurityContext               string
 	PgbackrestStanza              string
@@ -115,14 +117,17 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 	}
 	// create the Job to run the backrest command
 	jobFields := backrestJobTemplateFields{
-		JobName:                       task.Spec.Parameters[config.LABEL_JOB_NAME],
-		ClusterName:                   task.Spec.Parameters[config.LABEL_PG_CLUSTER],
-		PodName:                       pods.Items[0].Name,
-		SecurityContext:               "{}",
-		Command:                       cmd,
-		CommandOpts:                   task.Spec.Parameters[config.LABEL_BACKREST_OPTS],
-		PITRTarget:                    "",
-		Image:                         cluster.Spec.BackrestImage,
+		JobName:         task.Spec.Parameters[config.LABEL_JOB_NAME],
+		ClusterName:     task.Spec.Parameters[config.LABEL_PG_CLUSTER],
+		PodName:         pods.Items[0].Name,
+		SecurityContext: "{}",
+		Command:         cmd,
+		CommandOpts:     task.Spec.Parameters[config.LABEL_BACKREST_OPTS],
+		PITRTarget:      "",
+		Image:           cluster.Spec.BackrestImage,
+		CCPImagePrefix:  util.GetValueOrDefault(task.Spec.Parameters[config.LABEL_IMAGE_PREFIX], operator.Pgo.Cluster.CCPImagePrefix),
+		CCPImageTag: util.GetValueOrDefault(util.GetStandardImageTag(cluster.Spec.CCPImage, cluster.Spec.CCPImageTag),
+			operator.Pgo.Cluster.CCPImageTag),
 		CustomLabels:                  operator.GetLabelsFromMap(util.GetCustomLabels(cluster), false),
 		PgbackrestStanza:              task.Spec.Parameters[config.LABEL_PGBACKREST_STANZA],
 		PgbackrestDBPath:              task.Spec.Parameters[config.LABEL_PGBACKREST_DB_PATH],
