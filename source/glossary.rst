@@ -35,13 +35,11 @@ The Operator options glossary
 
      ..
 
-      :ref:`backup.storages.<STORAGE_NAME>.bucket<backup-storages-bucket>`
+      :ref:`backup.storages.STORAGE_NAME.bucket<backup-storages-bucket>`
 
    cpu
 
      ..
-
-      :ref:`backup.resources.requests.cpu<backup-resources-requests-cpu>`
 
       :ref:`pgBouncer.resources.limits.cpu<pgbouncer-resources-limits-cpu>`
 
@@ -145,18 +143,6 @@ The Operator options glossary
 
       :ref:`pmm.resources.requests.memory<pmm-resources-requests-memory>`
 
-   namespace
-
-     ..
-
-      :ref:`namespace<namespace>`
-
-   pause
-
-     ..
-
-      :ref:`pause<pause>`
-
    pmmSecret
 
      ..
@@ -168,8 +154,6 @@ The Operator options glossary
      ..
 
       :ref:`pgBadger.port<pgbadger-port>`
-
-      :ref:`port<port>`
 
    region
 
@@ -199,7 +183,7 @@ The Operator options glossary
 
      ..
 
-      :ref:`pmm.serverHost<pmm-serverhost>
+      :ref:`pmm.serverHost<pmm-serverhost>`
 
    serviceType
 
@@ -229,12 +213,6 @@ The Operator options glossary
 
       :ref:`walStorage.volumeSpec.size<walstorage-volumespec-size>`
 
-   standby
-
-     ..
-
-      :ref:`standby<standby>`
-
    storageclass
 
      ..
@@ -263,13 +241,7 @@ The Operator options glossary
 
      ..
 
-      :ref:`backup.storageTypes<backup-storagetypes>`_
-
-   tlsOnly
-
-     ..
-
-      :ref:`tlsOnly<tlsonly>`
+      :ref:`backup.storageTypes<backup-storagetypes>`
 
    type
 
@@ -282,12 +254,6 @@ The Operator options glossary
      ..
 
       :ref:`backup.storages.STORAGE_NAME.uriStyle<backup-storages-uristyle>`
-
-   user
-
-     ..
-
-      :ref:`user<user>`
 
    verifyTLS
 

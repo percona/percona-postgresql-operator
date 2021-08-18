@@ -17,7 +17,7 @@ New Features and Improvements
   Resource options in the :ref:`documentation<operator.custom-resource-options>`
   and review the default  ``deploy/cr.yaml`` configuration file on `GitHub <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`_.
 * :jirabug:`K8SPG-53`: Merged upstream `CrunchyData Operator v4.7.0 <https://github.com/CrunchyData/postgres-operator/releases/tag/v4.7.0>`_
-  made it possible to use :ref:`Google Cloud Storage as an object store for backups<backups.gcs>`_
+  made it possible to use :ref:`Google Cloud Storage as an object store for backups<backups.gcs>`
   without using third-party tools
 * :jirabug:`K8SPG-42`: There is no need to specify the name of the pgBackrest
   Pod in the backup manifest anymore as it is detected automatically by the
