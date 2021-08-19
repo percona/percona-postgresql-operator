@@ -41,7 +41,9 @@ Kubernetes-based environment:
    -  make sure the ``pmmserver`` key in the 
       `deploy/pmm-secret.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/pmm-secret.yaml>`_
       secrets file contains the password specified for the PMM Server during its
-      installation
+      installation.
+
+      Apply changes with the ``kubectl apply -f deploy/pmm-secret.yaml`` command.
 
       .. note:: You use ``deploy/pmm-secret.yaml`` file to *create* Secrets Object.
          The file contains all values for each key/value pair in a convenient
@@ -50,14 +52,13 @@ Kubernetes-based environment:
          you'll need to encode the value into base64 format. To do this, you can
          run ``echo -n "password" | base64`` in your local shell to get valid
          values. For example, setting the PMM Server user's password to 
-         `new_password`` in the ``my-cluster-name-secrets`` object can be done
+         `new_password`` in the ``cluster1-pmm-secret`` object can be done
          with the following command:
 
          .. code:: bash
 
             kubectl patch secret/cluster1-pmm-secret -p '{"data":{"pmmserver": '$(echo -n new_password | base64)'}}'
 
-   Apply changes with the ``kubectl apply -f deploy/secrets.yaml`` command.
 
    When done, apply the edited ``deploy/cr.yaml`` file:
 
@@ -75,4 +76,4 @@ Kubernetes-based environment:
 
 #. Now you can access PMM via *https* in a web browser, with the
    login/password authentication, and the browser is configured to show
-   Percona Server for PostgreSQL metrics.
+   Percona Distribution for PostgreSQL metrics.
