@@ -15,6 +15,9 @@ import (
 
 func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
+	if newCluster == nil {
+		return nil
+	}
 	if oldCluster != nil && !reflect.DeepEqual(newCluster.Spec.Backup.Schedule, oldCluster.Spec.Backup.Schedule) {
 		for _, schedule := range oldCluster.Spec.Backup.Schedule {
 			cmName := newCluster.Name + "-" + schedule.Name
@@ -23,9 +26,6 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 				return errors.Wrapf(err, "delete config map %s", cmName)
 			}
 		}
-	}
-	if newCluster == nil {
-		return nil
 	}
 	for _, schedule := range newCluster.Spec.Backup.Schedule {
 		storage, ok := newCluster.Spec.Backup.Storages[schedule.Storage]
