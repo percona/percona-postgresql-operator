@@ -84,10 +84,24 @@ options in the ``backup.storages`` subsection:
   or set to ``false`` to disable it,
 * ``type`` should be set to ``s3``.
 
-You also need to feed pgBackRest with the AWS S3 key and the AWS S3 key secret
-stored along with other sensitive information in Kubernetes Secrets. You can do
-it by editing the ``deploy/backup/cluster1-backrest-repo-config-secret.yaml``
-configuration file and applying it as usual:
+You also need to supply pgBackRest with base64-encoded AWS S3 key and AWS S3 key
+secret stored along with other sensitive information in `Kubernetes Secrets <https://kubernetes.io/docs/concepts/configuration/secret/>`_
+(e.g. encoding needed data with the ``echo "string-to-encode" | base64`` command).
+Edit the ``deploy/backup/cluster1-backrest-repo-config-secret.yaml``
+configuration file: set there proper cluster name, AWS S3 key, and key secret:
+
+   .. code:: yaml
+
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: <cluster-name>-backrest-repo-config
+      type: Opaque
+      data:
+        aws-s3-key: <base64-encoded-AWS-S3-key>
+        aws-s3-key-secret: <base64-encoded-AWS-S3-key-secret>
+
+When done, create the secret as follows:
 
 .. code:: bash
 
