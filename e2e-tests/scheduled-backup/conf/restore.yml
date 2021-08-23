@@ -1,0 +1,25 @@
+apiVersion: pg.percona.com/v1
+kind: Pgtask
+metadata:
+  labels:
+    pg-cluster: some-name
+    pgouser: admin
+  name: backrest-restore-some-name
+spec:
+  name: backrest-restore-some-name
+  namespace: pgo
+  parameters:
+    backrest-pitr-target: ''
+    backrest-restore-from-cluster: some-name
+    backrest-restore-opts: ''
+    backrest-storage-type: s3
+  status: ''
+  storagespec:
+    accessmode: ''
+    matchLabels: ''
+    name: ''
+    size: ''
+    storageclass: ''
+    storagetype: ''
+    supplementalgroups: ''
+  tasktype: restore
