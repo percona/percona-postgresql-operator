@@ -102,37 +102,13 @@ The variety of different Storage Classes available for Kubernetes is too wide to
 
 ## Installation
 
-The following steps will quickly make the Operator up and running with cloud native PostgreSQL:
+Quickly make the Operator up and running with cloud native PostgreSQL includes
+two main steps:
 
-1. Clone the percona-postgresql-operator repository:
+* Deploy the operator from `deploy/operator.yaml`
+* Deploy the database cluster itself from `deploy/cr.yaml`
 
-    ```
-    $ git clone -b  v0.1.0 https://github.com/percona/percona-postgresql-operator
-    $ cd percona-postgresql-operator
-    ```
-
-2. Create the ``pgo`` Namespace for the Operator:
-
-    ```
-    $ kubectl create namespace pgo
-    ```
-
-3. Deploy the operator with the following command:
-
-    ```
-    $ kubectl apply -f ./deploy/operator.yaml
-    ```
-
-4. Percona Server for PostgreSQL cluster can be created with the following command:
-
-    ```
-    $ kubectl apply -f ./deploy/cr.yaml
-    ```
-
-5. You can also deploy PosgreSQL replica at any time as follows: 
-
-    ```
-    $ kubectl apply -f ./deploy/cr-pgreplica.yaml
+See full installation instructions with examples and various advanced cases on [percona.com](https://www.percona.com/doc/kubernetes-operator-for-postgresql/index.html#installation-guide).
     ```
 
 ## Design overview
