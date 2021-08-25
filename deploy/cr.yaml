@@ -11,9 +11,9 @@ metadata:
     pgo-version: 0.2.0
     pgouser: admin
   name: cluster1
+  namespace: pgo
 spec:
   database: pgdb
-  namespace: pgo
   port: "5432"
   user: pguser
   disableAutofail: false
@@ -46,6 +46,7 @@ spec:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
     resources:
       requests:
+        cpu: 1
         memory: "128Mi"
     tolerations: []
     volumeSpec:
@@ -79,6 +80,7 @@ spec:
     backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
     resources:
       requests:
+        cpu: 50m
         memory: "48Mi"
 #      limits:
 #        cpu: "1"
@@ -119,7 +121,7 @@ spec:
       size: 2
       resources:
         requests:
-#          cpu: "1"
+          cpu: "1"
           memory: "128Mi"
 #        limits:
 #          cpu: "1"
