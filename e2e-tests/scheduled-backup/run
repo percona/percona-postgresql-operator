@@ -69,11 +69,38 @@ function main {
 
 	desc 'Testing backup/restore from s3'
 	apply_configs ${cluster}
-	spinup_pgcluster "${cluster}" "${test_dir}/conf/cr.yaml" "s3" "${cluster}-custom-config"
-	sleep 400
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config" "false" "true" "full"
+	sleep 420
 	restore ${cluster} "s3" "full"
 
+	kubectl_bin delete perconapgcluster/${cluster}
+	sleep 60
 
+    cluster="some-name-${RANDOM}"
+	apply_configs ${cluster}
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config" "false" "true" "diff"
+	sleep 420
+	restore ${cluster} "s3" "diff"
+
+	kubectl_bin delete perconapgcluster/${cluster}
+	sleep 60
+
+
+    cluster="some-name-${RANDOM}"
+	apply_configs ${cluster}
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config" "false" "true" "incr"
+	sleep 420
+	restore ${cluster} "s3" "incr"
+
+	kubectl_bin delete perconapgcluster/${cluster}
+	sleep 60
+
+    desc 'Testing backup/restore from s3, local'
+	cluster="some-name-${RANDOM}"
+	apply_configs ${cluster}
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config" "false" "true" "full"
+	sleep 420
+	restore ${cluster} "s3" "full"
 
 	destroy ${namespace}
 }

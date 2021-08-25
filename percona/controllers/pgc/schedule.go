@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -18,15 +19,21 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 	if newCluster == nil {
 		return nil
 	}
+	equal := true
 	if oldCluster != nil && !reflect.DeepEqual(newCluster.Spec.Backup.Schedule, oldCluster.Spec.Backup.Schedule) {
-		for _, schedule := range oldCluster.Spec.Backup.Schedule {
-			cmName := newCluster.Name + "-" + schedule.Name
-			err := c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Delete(ctx, cmName, metav1.DeleteOptions{})
-			if err != nil {
-				return errors.Wrapf(err, "delete config map %s", cmName)
-			}
+		equal = false
+	}
+	if equal {
+		return nil
+	}
+	for _, schedule := range oldCluster.Spec.Backup.Schedule {
+		cmName := newCluster.Name + "-" + schedule.Name
+		err := c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Delete(ctx, cmName, metav1.DeleteOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "delete config map %s", cmName)
 		}
 	}
+
 	for _, schedule := range newCluster.Spec.Backup.Schedule {
 		storage, ok := newCluster.Spec.Backup.Storages[schedule.Storage]
 		if !ok {
@@ -64,7 +71,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 			Data: data,
 		}
 		_, err = c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Create(ctx, &scheduleConfigMap, metav1.CreateOptions{})
-		if err != nil {
+		if err != nil && !kerrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "create config map")
 		}
 	}
