@@ -109,7 +109,6 @@ two main steps:
 * Deploy the database cluster itself from `deploy/cr.yaml`
 
 See full installation instructions with examples and various advanced cases on [percona.com](https://www.percona.com/doc/kubernetes-operator-for-postgresql/index.html#installation-guide).
-    ```
 
 ## Design overview
 
