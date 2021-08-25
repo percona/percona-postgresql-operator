@@ -267,7 +267,7 @@ apply_cluster() {
 	local restore_opts=${5:-"false"}
 	local custom_config=${6:-"false"}
 	local podAntiAffinity=${7}
-	local schedule=${8:="false"}
+	local schedule=${8}
 	local schedule_type=${9}
 
 	yq w "${path}" 'metadata.namespace' ${namespace} \
@@ -563,7 +563,7 @@ spinup_pgcluster() {
 	local backup=${3:-"false"}
 	local custom_config=${4:-"false"}
 	local podAntiAffinity=${5}
-    local schedule=${6:="false"}
+    local schedule=${6}
 	local schedule_type=${7}
 	desc 'create first PG cluster'
 
