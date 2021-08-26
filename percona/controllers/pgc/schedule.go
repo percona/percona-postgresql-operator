@@ -48,13 +48,12 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 	for _, scheduleJob := range newCluster.Spec.Backup.Schedule {
 		cmName := newCluster.Name + "-" + scheduleJob.Name
 		oldSchedule, ok := sm[cmName]
+		sm[cmName] = s{scheduleJob, create}
 		if ok && reflect.DeepEqual(scheduleJob, oldSchedule.job) {
 			sm[cmName] = s{oldSchedule.job, keep}
 		} else if ok {
 			sm[cmName] = s{oldSchedule.job, update}
 		}
-		sm[cmName] = s{scheduleJob, create}
-
 	}
 
 	for name, s := range sm {
