@@ -590,7 +590,7 @@ wait_cluster_consistency() {
 	cluster_name=${1}
 	retry=0
 
-	until [[ "$(kubectl_bin get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "pgcluster Initialized" ]]; do
+	until [[ "$(kubectl_bin get perconapgclusters.pg.percona.com "${cluster_name}" -o jsonpath='{.status.PGCluster.state}')" == "pgcluster Initialized" ]]; do
 		let retry+=1
 		if [ $retry -ge 16 ]; then
 			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster

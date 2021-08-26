@@ -37,7 +37,7 @@ compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-
 if [[ -n $(which aws) ]]; then
 	desc "Starting to test private registry"
 
-	kubectl delete PerconaPGCluster --ignore-not-found --all
+	kubectl delete perconapgcluster.pg.percona.com --ignore-not-found --all
 	wait_for_delete "deployment/${cluster}"
 	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
 
