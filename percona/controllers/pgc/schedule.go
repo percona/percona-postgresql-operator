@@ -14,67 +14,113 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type actionType string
+type s struct {
+	job    crv1.CronJob
+	action actionType
+}
+
+var (
+	keep   actionType = "keep"
+	delete actionType = "delete"
+	update actionType = "update"
+	create actionType = "create"
+)
+
 func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
 	if newCluster == nil {
 		return nil
 	}
-	equal := true
-	if oldCluster != nil && !reflect.DeepEqual(newCluster.Spec.Backup.Schedule, oldCluster.Spec.Backup.Schedule) {
-		equal = false
-	}
-	if equal {
+	if oldCluster != nil && reflect.DeepEqual(newCluster.Spec.Backup.Schedule, oldCluster.Spec.Backup.Schedule) {
 		return nil
 	}
-	for _, schedule := range oldCluster.Spec.Backup.Schedule {
-		cmName := newCluster.Name + "-" + schedule.Name
-		err := c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Delete(ctx, cmName, metav1.DeleteOptions{})
-		if err != nil {
-			return errors.Wrapf(err, "delete config map %s", cmName)
-		}
+	if oldCluster == nil {
+		oldCluster = &crv1.PerconaPGCluster{}
 	}
 
-	for _, schedule := range newCluster.Spec.Backup.Schedule {
-		storage, ok := newCluster.Spec.Backup.Storages[schedule.Storage]
-		if !ok {
-			return errors.Errorf("invalid storage name: %s", schedule.Storage)
+	sm := make(map[string]s)
+	for _, schedule := range oldCluster.Spec.Backup.Schedule {
+		cmName := newCluster.Name + "-" + schedule.Name
+		sm[cmName] = s{schedule, delete}
+	}
+
+	for _, scheduleJob := range newCluster.Spec.Backup.Schedule {
+		cmName := newCluster.Name + "-" + scheduleJob.Name
+		oldSchedule, ok := sm[cmName]
+		if ok && reflect.DeepEqual(scheduleJob, oldSchedule.job) {
+			sm[cmName] = s{oldSchedule.job, keep}
+		} else if ok {
+			sm[cmName] = s{oldSchedule.job, update}
 		}
-		schedule := scheduler.ScheduleTemplate{
-			Name:      schedule.Name,
-			Schedule:  schedule.Schedule,
-			Type:      "pgbackrest",
-			Cluster:   newCluster.Name,
-			Namespace: newCluster.Namespace,
-			PGBackRest: scheduler.PGBackRest{
-				Type:        schedule.Type,
-				StorageType: string(storage.Type),
-				Deployment:  newCluster.Name,
-				Container:   "database",
-			},
-		}
-		cmSchedule, err := json.Marshal(schedule)
-		if err != nil {
-			return errors.Wrap(err, "masrshal schedule template")
-		}
-		data := map[string]string{
-			"schedule": string(cmSchedule),
-		}
-		scheduleConfigMap := v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: newCluster.Name + "-" + schedule.Name,
-				Labels: map[string]string{
-					"crunchy-scheduler": "true",
-					"pg-cluster":        newCluster.Name,
-				},
-				Namespace: newCluster.Namespace,
-			},
-			Data: data,
-		}
-		_, err = c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Create(ctx, &scheduleConfigMap, metav1.CreateOptions{})
-		if err != nil && !kerrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "create config map")
+		sm[cmName] = s{scheduleJob, create}
+
+	}
+
+	for name, s := range sm {
+		switch s.action {
+		case create:
+			scheduleConfigMap, err := getScheduleConfigMap(name, s, newCluster)
+			if err != nil {
+				return errors.Wrap(err, "get schedule config map")
+			}
+			_, err = c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Create(ctx, scheduleConfigMap, metav1.CreateOptions{})
+			if err != nil && !kerrors.IsAlreadyExists(err) {
+				return errors.Wrap(err, "create config map")
+			}
+		case delete:
+			err := c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Delete(ctx, name, metav1.DeleteOptions{})
+			if err != nil {
+				return errors.Wrapf(err, "delete config map %s", name)
+			}
+		case update:
+			scheduleConfigMap, err := getScheduleConfigMap(name, s, newCluster)
+			if err != nil {
+				return errors.Wrap(err, "get schedule config map")
+			}
+			_, err = c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Update(ctx, scheduleConfigMap, metav1.UpdateOptions{})
+			if err != nil {
+				return errors.Wrap(err, "update config map")
+			}
 		}
 	}
 
 	return nil
+}
+func getScheduleConfigMap(name string, schedule s, newCluster *crv1.PerconaPGCluster) (*v1.ConfigMap, error) {
+	storage, ok := newCluster.Spec.Backup.Storages[schedule.job.Storage]
+	if !ok {
+		return nil, errors.Errorf("invalid storage name: %s", schedule.job.Storage)
+	}
+	scheduleTemp := scheduler.ScheduleTemplate{
+		Name:      schedule.job.Name,
+		Schedule:  schedule.job.Schedule,
+		Type:      "pgbackrest",
+		Cluster:   newCluster.Name,
+		Namespace: newCluster.Namespace,
+		PGBackRest: scheduler.PGBackRest{
+			Type:        schedule.job.Type,
+			StorageType: string(storage.Type),
+			Deployment:  newCluster.Name,
+			Container:   "database",
+		},
+	}
+	cmSchedule, err := json.Marshal(scheduleTemp)
+	if err != nil {
+		return nil, errors.Wrap(err, "masrshal schedule template")
+	}
+	data := map[string]string{
+		"schedule": string(cmSchedule),
+	}
+	return &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"crunchy-scheduler": "true",
+				"pg-cluster":        newCluster.Name,
+			},
+			Namespace: newCluster.Namespace,
+		},
+		Data: data,
+	}, nil
 }
