@@ -20,26 +20,6 @@ spec:
   tlsOnly: false
   standby: false
   pause: false
-#  keepData: true
-#  keepBackups: true
-#  pgDataSource:
-#    restoreFrom: ""
-#    restoreOpts: ""
-#  tablespaceStorages:
-#    lake:
-#      volumeSpec:
-#        size: 1G
-#        accessmode: ReadWriteOnce
-#        storagetype: dynamic
-#        storageclass: ""
-#        matchLabels: ""
-#  walStorage:
-#    volumeSpec:
-#      size: 1G
-#      accessmode: ReadWriteOnce
-#      storagetype: dynamic
-#      storageclass: ""
-#      matchLabels: ""
   userLabels:
     pgo-version: "0.2.0"
   pgPrimary:
@@ -97,11 +77,11 @@ spec:
 #      "gcs"
 #    ]
 #    repoPath: ""
-#    schedule:
-#      - name: "schedule-backup"
-#        schedule: "*/10 * * * *"
-#        type: full
-#        storage: my-gcs
+    schedule:
+      - name: "sch-backup"
+        schedule: "*/5 * * * *"
+        type: full
+        storage: my-s3
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
     size: 1
@@ -121,7 +101,7 @@ spec:
 #        pg-cluster-label: cluster1
   pgReplicas:
     hotStandby:
-      size: 2
+      size: 0
       resources:
         requests:
 #          cpu: "1"

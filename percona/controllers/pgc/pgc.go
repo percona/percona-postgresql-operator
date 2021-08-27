@@ -87,6 +87,12 @@ func (c *Controller) onAdd(obj interface{}) {
 			log.Errorf("create pgreplicas: %s", err)
 		}
 	}
+
+	err = c.handleScheduleBackup(newCluster, nil)
+	if err != nil {
+		log.Errorf("handle schedule: %s", err)
+	}
+
 	c.Queue.Forget(key)
 }
 
@@ -240,7 +246,10 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			}
 		}
 	}
-
+	err = c.handleScheduleBackup(newCluster, oldCluster)
+	if err != nil {
+		log.Errorf("update perconapgcluster: handle schedule: %s", err)
+	}
 	primary, err := pgcluster.IsPrimary(c.Client, oldCluster)
 	if err != nil {
 		log.Errorf("update perconapgcluster: check is pgcluster primary: %s", err)
@@ -276,10 +285,9 @@ func (c *Controller) onDelete(obj interface{}) {
 		log.Errorln("delete cluster: object is not PerconaPGCluster")
 		return
 	}
-
 	err := pgcluster.Delete(c.Client, cluster)
 	if err != nil {
-		log.Errorf("delete pgcluster: %s", err)
+		log.Errorf("delete cluster: %s", err)
 	}
 }
 
