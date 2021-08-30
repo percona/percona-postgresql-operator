@@ -58,7 +58,7 @@ main() {
 	wait_deployments_removal "${cluster}-replica" 2
 
 	network_loss "$(get_operator_pod)"
-	wait_deployment "postgres-operator"       # Operator deployment won't be ready until network loss will be over and kube API become available
+	wait_deployment "postgres-operator" # Operator deployment won't be ready until network loss will be over and kube API become available
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"replace","path":"/spec/pgReplicas/hotStandby/size","value":0}]'
 	wait_deployments_removal "${cluster}-replica" 0
 
