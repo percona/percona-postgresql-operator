@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strconv"
 
 	"github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler/scheduler"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
@@ -52,7 +53,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 		if ok && reflect.DeepEqual(scheduleJob, oldSchedule.job) {
 			sm[cmName] = s{oldSchedule.job, keep}
 		} else if ok {
-			sm[cmName] = s{oldSchedule.job, update}
+			sm[cmName] = s{scheduleJob, update}
 		}
 	}
 
@@ -103,6 +104,15 @@ func getScheduleConfigMap(name string, schedule s, newCluster *crv1.PerconaPGClu
 			Deployment:  newCluster.Name,
 			Container:   "database",
 		},
+	}
+	if schedule.job.Keep > 0 {
+		keepStr := strconv.FormatInt(schedule.job.Keep, 10)
+		switch schedule.job.Type {
+		case "full":
+			scheduleTemp.PGBackRest.Options = "--repo1-retention-full=" + keepStr
+		case "diff":
+			scheduleTemp.PGBackRest.Options = "--repo1-retention-diff=" + keepStr
+		}
 	}
 	cmSchedule, err := json.Marshal(scheduleTemp)
 	if err != nil {

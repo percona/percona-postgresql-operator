@@ -93,9 +93,6 @@ spec:
 #      my-gcs:
 #        type: gcs
 #        bucket: some-gcs-bucket
-#    storageTypes: [
-#      "gcs"
-#    ]
 #    repoPath: ""
 #    schedule:
 #      - name: "schedule-backup"
