@@ -6,48 +6,16 @@ set -o xtrace
 test_dir=$(realpath $(dirname $0))
 . "${test_dir}"/../functions
 
-kill_pod() {
-	local pod=$1
-
-	cat $conf_dir/chaos-pod-kill.yml \
-		| yq w - "metadata.name" "chaos-cluster-pod-kill-$RANDOM" \
-		| yq w - "metadata.namespace" "$namespace" \
-		| yq w - "spec.selector.pods.$namespace[0]" "$pod" \
-		| kubectl_bin apply -f -
-	sleep 5
-}
-
-failure_pod() {
-	local pod=$1
-
-	cat $conf_dir/chaos-pod-failure.yml \
-		| yq w - "metadata.name" "chaos-cluster-pod-failure-$RANDOM" \
-		| yq w - "metadata.namespace" "$namespace" \
-		| yq w - "spec.selector.pods.$namespace[0]" "$pod" \
-		| kubectl_bin apply -f -
-	sleep 10
-}
-
-network_loss() {
-	local pod=$1
-
-	cat $conf_dir/chaos-network-loss.yml \
-		| yq w - "metadata.name" "chaos-cluster-network-loss-$RANDOM" \
-		| yq w - "metadata.namespace" "$namespace" \
-		| yq w - "spec.selector.pods.$namespace[0]" "$pod" \
-		| kubectl_bin apply -f -
-}
-
 get_operator_pod() {
-    echo $(kubectl_bin get pods --selector=name=postgres-operator -o jsonpath={'.items[].metadata.name'})
+	echo $(kubectl_bin get pods --selector=name=postgres-operator -o jsonpath={'.items[].metadata.name'})
 }
 
 wait_deployments_removal() {
-    local name=${1}
-    local target_size=${2}
-    set +o xtrace
+	local name=${1}
+	local target_size=${2}
+
+	set +o xtrace
 	retry=0
-	echo -n $pod
 	until [[ $(kubectl_bin get deployments --selector=name=${name} -o jsonpath='{.items}' | jq length) == ${target_size} ]]; do
 		sleep 1
 		echo -n .
@@ -80,9 +48,19 @@ main() {
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
 	kill_pod "$(get_operator_pod)"
-    kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"replace","path":"/spec/pgReplicas/hotStandby/size","value":0}]'
-    wait_deployments_removal "${cluster}-replica" 0
+	wait_deployment "postgres-operator"
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"replace","path":"/spec/pgReplicas/hotStandby/size","value":0}]'
+	wait_deployments_removal "${cluster}-replica" 0
 
+	failure_pod "$(get_operator_pod)"
+	wait_deployment "postgres-operator"
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"replace","path":"/spec/pgReplicas/hotStandby/size","value":2}]'
+	wait_deployments_removal "${cluster}-replica" 2
+
+	network_loss "$(get_operator_pod)"
+	wait_deployment "postgres-operator"       # Operator deployment won't be ready until network loss will be over and kube API become available
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"replace","path":"/spec/pgReplicas/hotStandby/size","value":0}]'
+	wait_deployments_removal "${cluster}-replica" 0
 
 	kubectl delete NetworkChaos --all
 	kubectl delete PodChaos --all
