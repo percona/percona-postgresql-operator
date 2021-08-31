@@ -267,6 +267,8 @@ apply_cluster() {
 	local restore_opts=${5:-"false"}
 	local custom_config=${6:-"false"}
 	local podAntiAffinity=${7}
+	local schedule=${8}
+	local schedule_type=${9}
 
 	yq w "${path}" 'metadata.namespace' ${namespace} \
 		| yq w - 'spec.namespace' ${namespace} \
@@ -314,19 +316,14 @@ apply_cluster() {
 	esac
 
 	case ${backup} in
-		'local')
-			yq w -i "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'local'
-			;;
 		'gcs')
-			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'gcs' \
-				| yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-gcs].type' 'gcs' \
 				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		'gcs+'*)
-			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'gcs' \
-				| yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-gcs].type' 'gcs' \
 				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
 				| yq w - 'spec.backup.repoPath' "/backrestrepo/${backup//'gcs+'/}-backrest-shared-repo" \
 				| yq w - 'spec.standby' true \
@@ -340,8 +337,19 @@ apply_cluster() {
 				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
 				| yq w - 'spec.backup.storages[my-s3].uriStyle' 'path' \
-				| yq w - 'spec.backup.storageTypes[0]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
+			if [[ ${schedule} == "true" ]]; then
+				yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
+				| yq w - 'spec.backup.storages[my-s3].type' 's3' \
+				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
+				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
+				| yq w - 'spec.backup.storages[my-s3].uriStyle' 'path' \
+				| yq w - 'spec.backup.schedule[0].name' 'sch-backup' \
+				| yq w - 'spec.backup.schedule[0].schedule' '*/5 * * * *' \
+				| yq w - 'spec.backup.schedule[0].type' ${schedule_type} \
+				| yq w - 'spec.backup.schedule[0].storage' 'my-s3' \
+					>"${tmp_dir}/cr.backup.yaml"
+			fi
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		'local,s3')
@@ -350,16 +358,24 @@ apply_cluster() {
 				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
 				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
 				| yq w - 'spec.backup.storages[my-s3].uriStyle' 'path' \
-				| yq w - 'spec.backup.storageTypes[0]' 'local' \
-				| yq w - 'spec.backup.storageTypes[1]' 's3' \
 					>"${tmp_dir}/cr.backup.yaml"
+			if [[ ${schedule} == "true" ]]; then
+				yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-s3].bucket' ${BUCKET} \
+				| yq w - 'spec.backup.storages[my-s3].type' 's3' \
+				| yq w - 'spec.backup.storages[my-s3].endpointUrl' 's3.amazonaws.com' \
+				| yq w - 'spec.backup.storages[my-s3].region' 'us-east-1' \
+				| yq w - 'spec.backup.storages[my-s3].uriStyle' 'path' \
+				| yq w - 'spec.backup.schedule[0].name' 'sch-backup' \
+				| yq w - 'spec.backup.schedule[0].schedule' '*/5 * * * *' \
+				| yq w - 'spec.backup.schedule[0].type' ${schedule_type} \
+				| yq w - 'spec.backup.schedule[0].storage' 'my-s3' \
+					>"${tmp_dir}/cr.backup.yaml"
+			fi
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
 		'local,gcs')
-			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storageTypes[0]' 'local' \
-				| yq w - 'spec.backup.storages[my-gcs].type' 'gcs' \
+			yq w "${tmp_dir}/cr.yaml" 'spec.backup.storages[my-gcs].type' 'gcs' \
 				| yq w - 'spec.backup.storages[my-gcs].bucket' ${BUCKET} \
-				| yq w - 'spec.backup.storageTypes[1]' 'gcs' \
 					>"${tmp_dir}/cr.backup.yaml"
 			mv "${tmp_dir}/cr.backup.yaml" "${tmp_dir}/cr.yaml"
 			;;
@@ -534,13 +550,14 @@ spinup_pgcluster() {
 	local backup=${3:-"false"}
 	local custom_config=${4:-"false"}
 	local podAntiAffinity=${5}
-
+    local schedule=${6}
+	local schedule_type=${7}
 	desc 'create first PG cluster'
 
 	create_user_secrets "${cluster}"
 
 	desc 'create fresh PG cluster'
-	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity}
+	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type}
 	wait_deployment "${cluster}-backrest-shared-repo"
 	wait_deployment "${cluster}"
 	# Exiting since we are running cluster in stanby mode

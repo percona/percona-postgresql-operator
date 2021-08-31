@@ -404,6 +404,7 @@ pipeline {
                     steps {
                         CreateCluster('backups')
                         runTest('demand-backup', 'backups')
+                        runTest('scheduled-backup', 'backups')
                         ShutdownCluster('backups')
                     }
                 }

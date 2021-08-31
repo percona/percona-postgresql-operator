@@ -203,7 +203,11 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.UserLabels = userLabels
 	cluster.Spec.Annotations.Global = specAnnotationsGlobal
 	cluster.Spec.Tolerations = pgc.Spec.PGPrimary.Tolerations
+	storageMap := map[crv1.BackrestStorageType]crv1.BackrestStorageType{
+		crv1.BackrestStorageTypeLocal: crv1.BackrestStorageTypeLocal,
+	}
 	for _, s := range pgc.Spec.Backup.Storages {
+		storageMap[crv1.BackrestStorageType(s.Type)] = crv1.BackrestStorageType(s.Type)
 		switch s.Type {
 		case S3StorageType:
 			cluster.Spec.BackrestS3Bucket = s.Bucket
@@ -217,8 +221,12 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 			cluster.Spec.BackrestGCSKeyType = s.KeyType
 		}
 	}
+	storageTypes := []crv1.BackrestStorageType{}
+	for _, t := range storageMap {
+		storageTypes = append(storageTypes, t)
+	}
+	cluster.Spec.BackrestStorageTypes = storageTypes
 	cluster.Spec.BackrestRepoPath = pgc.Spec.Backup.RepoPath
-	cluster.Spec.BackrestStorageTypes = pgc.Spec.Backup.StorageTypes
 	cluster.Spec.PGDataSource.Namespace = pgc.Spec.PGDataSource.Namespace
 	cluster.Spec.PGDataSource.RestoreFrom = pgc.Spec.PGDataSource.RestoreFrom
 	cluster.Spec.PGDataSource.RestoreOpts = pgc.Spec.PGDataSource.RestoreOpts
