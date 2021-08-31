@@ -161,7 +161,6 @@ The Operator will also need your service account key to access storage.
 
       kubectl apply -f ./my-gcs-account-secret.yaml
 
-#. Now proceed with :ref:`backups.configure` as usual.
 
 .. _backups-manual:
 
@@ -185,6 +184,14 @@ When the backup options are configured, the actual backup command is executed:
 .. code:: bash
 
    kubectl apply -f deploy/backup/backup.yaml
+
+If you want to delete the backup you need to delete pgtask object and the corresponding job itself:
+
+.. code:: bash
+
+   kubectl delete -f deploy/backup/backup.yaml
+   kubectl delete jobs cluster1-backrest-full-backup
+
 
 .. _backups-restore:
 
