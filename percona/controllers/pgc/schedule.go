@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -21,7 +20,7 @@ type s struct {
 	action actionType
 }
 
-var (
+const (
 	keep   actionType = "keep"
 	delete actionType = "delete"
 	update actionType = "update"
@@ -65,7 +64,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 				return errors.Wrap(err, "get schedule config map")
 			}
 			_, err = c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Create(ctx, scheduleConfigMap, metav1.CreateOptions{})
-			if err != nil && !kerrors.IsAlreadyExists(err) {
+			if err != nil {
 				return errors.Wrap(err, "create config map")
 			}
 		case delete:
@@ -90,7 +89,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 func getScheduleConfigMap(name string, schedule s, newCluster *crv1.PerconaPGCluster) (*v1.ConfigMap, error) {
 	storage, ok := newCluster.Spec.Backup.Storages[schedule.job.Storage]
 	if !ok {
-		return nil, errors.Errorf("invalid storage name: %s", schedule.job.Storage)
+		return nil, errors.Errorf("invalid storage name '%s' in schedule '%s'", schedule.job.Storage, schedule.job.Name)
 	}
 	scheduleTemp := scheduler.ScheduleTemplate{
 		Name:      schedule.job.Name,

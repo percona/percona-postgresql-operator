@@ -94,11 +94,12 @@ spec:
 #        type: gcs
 #        bucket: some-gcs-bucket
 #    repoPath: ""
-#    schedule:
-#      - name: "schedule-backup"
-#        schedule: "*/10 * * * *"
-#        type: full
-#        storage: my-gcs
+    schedule:
+      - name: "sat-night-backup"
+        schedule: "0 0 * * 6"
+        keep: 3
+        type: full
+        storage: local
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
     size: 1
