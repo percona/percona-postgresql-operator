@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi8/ubi-minimal AS ubi8
 
 LABEL name="Percona Postgres Operator Deployer" \
       vendor="Percona" \

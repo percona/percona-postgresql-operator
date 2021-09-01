@@ -22,7 +22,7 @@ RUN mkdir -p build/_output/bin \
 RUN ./bin/license_aggregator.sh; \
 	cp -r ./licenses /licenses
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi8/ubi-minimal AS ubi8
 
 LABEL name="Percona Postgres Operator" \
       vendor="Percona" \
