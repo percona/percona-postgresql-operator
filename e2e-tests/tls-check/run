@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. ${test_dir}/../functions
+
+create_namespace $namespace
+deploy_operator
+
+desc 'create first cluster'
+cluster="some-name"
+kubectl_bin apply \
+	-f $conf_dir/${cluster}-secrets.yml \
+	-f ${src_dir}/deploy/ssl-secrets.yaml \
+	-f $conf_dir/client.yml
+
+spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "" "" "" "" "" "true"
+compare_psql_cmd "select-1" \
+	'SELECT datname,usename, ssl FROM pg_stat_ssl JOIN pg_stat_activity ON pg_stat_ssl.pid = pg_stat_activity.pid' \
+	"postgres:postgres_pass@${cluster}.${namespace}" 
+
+destroy $namespace
