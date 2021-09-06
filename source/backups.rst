@@ -107,7 +107,7 @@ When done, create the secret as follows:
 
    kubectl apply -f deploy/backup/cluster1-backrest-repo-config-secret.yaml
 
-Create the cluster as follows:
+Finally, create or update the cluster:
 
    .. code:: bash
 
@@ -125,9 +125,6 @@ In order to use Google Cloud Storage (GCS) for backups you need to provide some
 GCS-related information, such as a proper GCS bucket name. This
 information can be passed to ``pgBackRest`` via the following options in the
 ``backup.storages`` subsection of the ``deploy/cr.yaml`` configuration file:
-
-Set the following ``deploy/cr.yaml`` options in the ``backup.storages``
-subsection:
 
 * ``bucket`` should contain the proper bucket name,
 
@@ -172,7 +169,7 @@ The Operator will also need your service account key to access storage.
 
       kubectl apply -f ./my-gcs-account-secret.yaml
 
-#. Create the cluster as follows:
+#. Finally, create or update the cluster:
 
    .. code:: bash
 
@@ -186,8 +183,7 @@ Making on-demand backup
 To make an on-demand backup, the user should use a backup configuration file.
 The example of the backup configuration file is `deploy/backup/backup.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/backup.yaml>`_.
 
-The most important keys in the parameters section of this file are the
-following:
+The following keys are most important in the parameters section of this file:
 
 * ``parameters.backrest-opts`` is the string with command line options which
   will be passed to pgBackRest, for example
@@ -195,7 +191,7 @@ following:
 * ``parameters.pg-cluster`` is the name of the PostgreSQL cluster to back up,
   for example ``cluster1``.
 
-When the backup options are configured, the actual backup command is executed:
+When the backup options are configured, execute the actual backup command:
 
 .. code:: bash
 
@@ -240,8 +236,7 @@ To restore the previously saved backup the user should use a *backup restore*
 configuration file. The example of the backup configuration file is
 `deploy/backup/restore.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_.
 
-The most important keys in the parameters section of this file are the
-following:
+The following keys are the most important in the parameters section of this file:
 
 * ``parameters.backrest-restore-from-cluster`` specifies the name of a
   PostgreSQL cluster which will be restored. This includes stopping the database and
@@ -259,9 +254,11 @@ The actual restoration process can be started as follows:
 
       kubectl apply -f deploy/backup/restore.yaml
 
-To create a new PostgreSQL cluster from either the active  one, or a former cluster in
-which pgBackRest repository still exists,  use the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` 
-option. Let's create a new cluster e.g. ``cluster2`` from existing ``cluster1``.
+To create a new PostgreSQL cluster from either the active  one, or a former cluster
+whose pgBackRest repository still exists,  use the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` 
+option. 
+
+The following example will create a new cluster named ``cluster2`` from an existing one named``cluster1``.
 
 #. First, create the ``cluster2-config-secrets.yaml`` configuration file with the following content:
 
@@ -311,8 +308,8 @@ option. Let's create a new cluster e.g. ``cluster2`` from existing ``cluster1``.
 
 #. Edit the ``deploy/cr.yaml`` configuration file:
 
- * Set a new cluster name e.g. ``cluster2``
- * Set the option :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` to ``cluster1``
+   * set a new cluster name (``cluster2``),
+   * set the option :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` to ``cluster1``.
 
 Create the cluster as follows:
 
