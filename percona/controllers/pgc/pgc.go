@@ -254,7 +254,19 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if err != nil {
 		log.Errorf("update perconapgcluster: check is pgcluster primary: %s", err)
 	}
-
+	if _, ok := newCluster.Annotations["updateuser"]; ok {
+		updateUserPassword(c.Client, "postgres", "test1", &crv1.Pgcluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      newCluster.Name,
+				Namespace: newCluster.Namespace,
+			},
+			Spec: crv1.PgclusterSpec{
+				Name:         newCluster.Name,
+				PasswordType: "md5",
+				Port:         newCluster.Spec.Port,
+			},
+		})
+	}
 	if primary {
 		err = pgreplica.Update(c.Client, newCluster, oldCluster)
 		if err != nil {
