@@ -155,14 +155,16 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	var syncReplication *bool
 	if pgc.Spec.PGReplicas != nil {
 		syncReplication = &pgc.Spec.PGReplicas.HotStandby.EnableSyncStandby
+		cluster.Spec.ReplicaStorage = getStorage(pgc.Spec.PGReplicas.HotStandby.VolumeSpec)
 	}
 	cluster.Annotations = metaAnnotations
 	cluster.Labels = metaLabels
 	cluster.Name = pgc.Name
 	cluster.Namespace = pgc.Namespace
-	cluster.Spec.BackrestStorage = getStorage(pgc.Spec.Backup.VolumeSpec)
+	if pgc.Spec.Backup.VolumeSpec != nil {
+		cluster.Spec.BackrestStorage = getStorage(pgc.Spec.Backup.VolumeSpec)
+	}
 	cluster.Spec.PrimaryStorage = getStorage(pgc.Spec.PGPrimary.VolumeSpec)
-	cluster.Spec.ReplicaStorage = getStorage(pgc.Spec.PGReplicas.HotStandby.VolumeSpec)
 	cluster.Spec.ClusterName = pgc.Name
 	cluster.Spec.PGImage = pgc.Spec.PGPrimary.Image
 	cluster.Spec.BackrestImage = pgc.Spec.Backup.Image
