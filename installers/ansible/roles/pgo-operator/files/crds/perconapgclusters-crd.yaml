@@ -26,8 +26,12 @@ spec:
             pgbadgerport: { type: string }
             PrimaryStorage: { type: object }
             port: { type: string }
+            spec: { type: object }
             userlabels: { type: object }
+          type: object
         status:
           properties:
             state: { type: string }
             message: { type: string }
+          type: object
+      type: object

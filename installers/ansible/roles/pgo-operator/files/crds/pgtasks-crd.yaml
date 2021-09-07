@@ -4,6 +4,8 @@ kind: CustomResourceDefinition
 metadata:
   name: pgtasks.pg.percona.com
 spec:
+  conversion:
+    strategy: None
   group: pg.percona.com
   names:
     kind: Pgtask
