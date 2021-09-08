@@ -161,9 +161,7 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Labels = metaLabels
 	cluster.Name = pgc.Name
 	cluster.Namespace = pgc.Namespace
-	if pgc.Spec.Backup.VolumeSpec != nil {
-		cluster.Spec.BackrestStorage = getStorage(pgc.Spec.Backup.VolumeSpec)
-	}
+	cluster.Spec.BackrestStorage = getStorage(pgc.Spec.Backup.VolumeSpec)
 	cluster.Spec.PrimaryStorage = getStorage(pgc.Spec.PGPrimary.VolumeSpec)
 	cluster.Spec.ClusterName = pgc.Name
 	cluster.Spec.PGImage = pgc.Spec.PGPrimary.Image
