@@ -319,7 +319,7 @@ Create the cluster as follows:
 Delete a previously saved backup
 --------------------------------------------------
 
-If you want to delete some backup, you need to delete both the ``pgtask`` object and the corresponding job itself. Deletion of the backup object can be done using the same YAML file which was used for the manual backup creation:  
+If you want to delete some backup, you need to delete both the ``pgtask`` object and the corresponding job itself. Deletion of the backup object can be done using the same YAML file which was used for the on-demand backup:  
 
 .. code:: bash
 
