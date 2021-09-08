@@ -105,13 +105,13 @@ When done, create the secret as follows:
 
 .. code:: bash
 
-   kubectl apply -f deploy/backup/cluster1-backrest-repo-config-secret.yaml
+   $ kubectl apply -f deploy/backup/cluster1-backrest-repo-config-secret.yaml
 
 Finally, create or update the cluster:
 
-   .. code:: bash
+.. code:: bash
 
-      kubectl apply -f deploy/cr.yaml
+   $ kubectl apply -f deploy/cr.yaml
 
 .. _backups.gcs:
 
@@ -167,13 +167,13 @@ The Operator will also need your service account key to access storage.
 
    .. code:: bash
 
-      kubectl apply -f ./my-gcs-account-secret.yaml
+      $ kubectl apply -f ./my-gcs-account-secret.yaml
 
 #. Finally, create or update the cluster:
 
    .. code:: bash
 
-      kubectl apply -f deploy/cr.yaml
+      $ kubectl apply -f deploy/cr.yaml
 
 .. _backups-manual:
 
@@ -195,21 +195,18 @@ When the backup options are configured, execute the actual backup command:
 
 .. code:: bash
 
-   kubectl apply -f deploy/backup/backup.yaml
+   $ kubectl apply -f deploy/backup/backup.yaml
 
-To get list of all existing backups in pgBackrest repo, use the following command:
+.. _backups-list:
+
+List existing backups
+--------------------------------------------------
+
+To get list of all existing backups in the pgBackrest repo, use the following command:
 
 .. code:: bash
 
-   kubectl exec <name-of-backrest-shared-repo-pod>  -it -- pgbackrest info
-
-If you want to delete the backup, you need to delete both the ``pgtask`` object and the corresponding job itself:
-
-.. code:: bash
-
-   kubectl delete -f deploy/backup/backup.yaml
-   kubectl delete jobs cluster1-backrest-full-backup
-
+   $ kubectl exec <name-of-backrest-shared-repo-pod>  -it -- pgbackrest info
 
 .. _backups-restore:
 
@@ -252,7 +249,7 @@ The actual restoration process can be started as follows:
 
    .. code:: bash
 
-      kubectl apply -f deploy/backup/restore.yaml
+      $ kubectl apply -f deploy/backup/restore.yaml
 
 To create a new PostgreSQL cluster from either the active  one, or a former cluster
 whose pgBackRest repository still exists,  use the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` 
@@ -304,7 +301,7 @@ The following example will create a new cluster named ``cluster2`` from an exist
 
    .. code:: bash
 
-      kubectl apply -f ./cluster2-config-secrets.yaml
+      $ kubectl apply -f ./cluster2-config-secrets.yaml
 
 #. Edit the ``deploy/cr.yaml`` configuration file:
 
@@ -315,4 +312,21 @@ Create the cluster as follows:
 
    .. code:: bash
 
-      kubectl apply -f deploy/cr.yaml
+      $ kubectl apply -f deploy/cr.yaml
+
+.. _backups-delete:
+
+Delete a previously saved backup
+--------------------------------------------------
+
+If you want to delete some backup, you need to delete both the ``pgtask`` object and the corresponding job itself. Deletion of the backup object can be done using the same YAML file which was used for the manual backup creation:  
+
+.. code:: bash
+
+   $ kubectl delete -f deploy/backup/backup.yaml
+
+Deletion of the job which corresponds to the backup can be done using ``kubectl delete jobs`` command with the backup name:
+
+.. code:: bash
+
+   $ kubectl delete jobs cluster1-backrest-full-backup
