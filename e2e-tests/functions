@@ -560,7 +560,7 @@ spinup_pgcluster() {
 	local backup=${3:-"false"}
 	local custom_config=${4:-"false"}
 	local podAntiAffinity=${5:-"false"}
-    local schedule=${6:-"false"}
+	local schedule=${6:-"false"}
 	local schedule_type=${7:-"false"}
 	local tls_enabled=${8:-"false"}
 	desc 'create first PG cluster'
