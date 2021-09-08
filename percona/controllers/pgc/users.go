@@ -22,7 +22,7 @@ const (
 	sqlPasswordClause = `PASSWORD %s`
 )
 
-func updateUser(clientset kubeapi.Interface, username, password string, cluster *crv1.Pgcluster) {
+func updateUserPassword(clientset kubeapi.Interface, username, password string, cluster *crv1.Pgcluster) {
 	ctx := context.TODO()
 
 	// first, find the primary Pod
