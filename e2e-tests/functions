@@ -399,12 +399,12 @@ apply_cluster() {
 	fi
 
 	if [[ ${tls_enabled} == "true" ]]; then
-			yq w "${tmp_dir}/cr.yaml" 'spec.tlsOnly' true \
-		 	    | yq w - 'spec.sslCA' 'cluster1-ssl-ca' \
-                | yq w - 'spec.sslSecretName' 'cluster1-ssl-keypair' \
-                | yq w - 'spec.sslReplicationSecretName' 'cluster1-ssl-keypair' \
-					>"${tmp_dir}/cr.tls.yaml"
-			mv "${tmp_dir}/cr.tls.yaml" "${tmp_dir}/cr.yaml"
+		yq w "${tmp_dir}/cr.yaml" 'spec.tlsOnly' true \
+			| yq w - 'spec.sslCA' 'cluster1-ssl-ca' \
+			| yq w - 'spec.sslSecretName' 'cluster1-ssl-keypair' \
+			| yq w - 'spec.sslReplicationSecretName' 'cluster1-ssl-keypair' \
+				>"${tmp_dir}/cr.tls.yaml"
+		mv "${tmp_dir}/cr.tls.yaml" "${tmp_dir}/cr.yaml"
 	fi
 
 	kubectl_bin apply -f "${tmp_dir}/cr.yaml"
