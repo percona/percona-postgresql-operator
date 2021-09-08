@@ -105,7 +105,13 @@ When done, create the secret as follows:
 
 .. code:: bash
 
-   kubectl apply -f deploy/backup/cluster1-backrest-repo-config-secret.yaml
+   $ kubectl apply -f deploy/backup/cluster1-backrest-repo-config-secret.yaml
+
+Finally, create or update the cluster:
+
+.. code:: bash
+
+   $ kubectl apply -f deploy/cr.yaml
 
 .. _backups.gcs:
 
@@ -115,8 +121,10 @@ Use Google Cloud Storage for backups
 You can configure `Google Cloud Storage <https://cloud.google.com/storage>`_ as
 an object store for backups similarly to :ref:`S3 storage<backups.configure>`.
 
-Set the following ``deploy/cr.yaml`` options in the ``backup.storages``
-subsection:
+In order to use Google Cloud Storage (GCS) for backups you need to provide some
+GCS-related information, such as a proper GCS bucket name. This
+information can be passed to ``pgBackRest`` via the following options in the
+``backup.storages`` subsection of the ``deploy/cr.yaml`` configuration file:
 
 * ``bucket`` should contain the proper bucket name,
 
@@ -156,12 +164,16 @@ The Operator will also need your service account key to access storage.
         gcs-key: <base64-encoded-json-file-contents>
 
    When done, create the secret as follows:
-   
+
    .. code:: bash
 
-      kubectl apply -f ./my-gcs-account-secret.yaml
+      $ kubectl apply -f ./my-gcs-account-secret.yaml
 
-#. Now proceed with :ref:`backups.configure` as usual.
+#. Finally, create or update the cluster:
+
+   .. code:: bash
+
+      $ kubectl apply -f deploy/cr.yaml
 
 .. _backups-manual:
 
@@ -171,8 +183,7 @@ Making on-demand backup
 To make an on-demand backup, the user should use a backup configuration file.
 The example of the backup configuration file is `deploy/backup/backup.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/backup.yaml>`_.
 
-The most important keys in the parameters section of this file are the
-following:
+The following keys are most important in the parameters section of this file:
 
 * ``parameters.backrest-opts`` is the string with command line options which
   will be passed to pgBackRest, for example
@@ -180,11 +191,22 @@ following:
 * ``parameters.pg-cluster`` is the name of the PostgreSQL cluster to back up,
   for example ``cluster1``.
 
-When the backup options are configured, the actual backup command is executed:
+When the backup options are configured, execute the actual backup command:
 
 .. code:: bash
 
-   kubectl apply -f deploy/backup/backup.yaml
+   $ kubectl apply -f deploy/backup/backup.yaml
+
+.. _backups-list:
+
+List existing backups
+--------------------------------------------------
+
+To get list of all existing backups in the pgBackrest repo, use the following command:
+
+.. code:: bash
+
+   $ kubectl exec <name-of-backrest-shared-repo-pod>  -it -- pgbackrest info
 
 .. _backups-restore:
 
@@ -211,12 +233,11 @@ To restore the previously saved backup the user should use a *backup restore*
 configuration file. The example of the backup configuration file is
 `deploy/backup/restore.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_.
 
-The most important keys in the parameters section of this file are the
-following:
+The following keys are the most important in the parameters section of this file:
 
 * ``parameters.backrest-restore-from-cluster`` specifies the name of a
-  PostgreSQL cluster (either one that is active, or a former cluster whose
-  pgBackRest repository still exists) to restore from (for example,
+  PostgreSQL cluster which will be restored. This includes stopping the database and
+  recreating a new primary with the restored data (for example,
   ``cluster1``),
 * ``parameters.backrest-restore-opts`` specifies additional options for
   pgBackRest (for example, ``--type=time --target="2021-04-16 15:13:32"`` to
@@ -228,5 +249,84 @@ The actual restoration process can be started as follows:
 
    .. code:: bash
 
-      kubectl apply -f deploy/backup/restore.yaml
+      $ kubectl apply -f deploy/backup/restore.yaml
 
+To create a new PostgreSQL cluster from either the active  one, or a former cluster
+whose pgBackRest repository still exists,  use the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` 
+option. 
+
+The following example will create a new cluster named ``cluster2`` from an existing one named``cluster1``.
+
+#. First, create the ``cluster2-config-secrets.yaml`` configuration file with the following content:
+
+   .. code:: yaml
+
+      apiVersion: v1
+      data:
+        password: <base64-encoded-password-for-pguser->
+        username: <base64-encoded-pguser-user-name>
+      kind: Secret
+      metadata:
+        labels:
+          pg-cluster: cluster2
+          vendor: crunchydata
+        name: cluster2-pguser-secret
+      type: Opaque
+      ---
+      apiVersion: v1
+      data:
+        password: <base64-encoded-password-for-primaryuser>
+        username: <base64-encoded-primaryuser-user-name>
+      kind: Secret
+      metadata:
+        labels:
+          pg-cluster: cluster2
+          vendor: crunchydata
+        name: cluster2-primaryuser-secret
+      type: Opaque
+      ---
+      apiVersion: v1
+      data:
+        password: <base64-encoded-password-for-postgres-user>
+        username: <base64-encoded-pguser-postgres-name>
+      kind: Secret
+      metadata:
+        labels:
+          pg-cluster: cluster2
+          vendor: crunchydata
+        name: cluster2-postgres-secret
+      type: Opaque
+
+#. When done, create the secrets as follows:
+
+   .. code:: bash
+
+      $ kubectl apply -f ./cluster2-config-secrets.yaml
+
+#. Edit the ``deploy/cr.yaml`` configuration file:
+
+   * set a new cluster name (``cluster2``),
+   * set the option :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` to ``cluster1``.
+
+Create the cluster as follows:
+
+   .. code:: bash
+
+      $ kubectl apply -f deploy/cr.yaml
+
+.. _backups-delete:
+
+Delete a previously saved backup
+--------------------------------------------------
+
+If you want to delete some backup, you need to delete both the ``pgtask`` object and the corresponding job itself. Deletion of the backup object can be done using the same YAML file which was used for the on-demand backup:  
+
+.. code:: bash
+
+   $ kubectl delete -f deploy/backup/backup.yaml
+
+Deletion of the job which corresponds to the backup can be done using ``kubectl delete jobs`` command with the backup name:
+
+.. code:: bash
+
+   $ kubectl delete jobs cluster1-backrest-full-backup
