@@ -3,22 +3,74 @@
 set -o errexit
 set -o xtrace
 
-test_dir=$(realpath $(dirname $0))
-. ${test_dir}/../functions
+compare_psql() {
+	local command_id="$1"
+	local command="$2"
+	local uri="$3"
+	local sslmode="$4"
 
-create_namespace $namespace
-deploy_operator
+	local expected_result=${test_dir}/compare/${command_id}.sql
 
-desc 'create first cluster'
-cluster="some-name"
-kubectl_bin apply \
-	-f $conf_dir/${cluster}-secrets.yml \
-	-f ${src_dir}/deploy/ssl-secrets.yaml \
-	-f $conf_dir/client.yml
 
-spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "" "" "" "" "" "true"
-compare_psql_cmd "select-1" \
-	'SELECT datname,usename, ssl FROM pg_stat_ssl JOIN pg_stat_activity ON pg_stat_ssl.pid = pg_stat_activity.pid' \
-	"postgres:postgres_pass@${cluster}.${namespace}" 
+	run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
+		>$tmp_dir/${command_id}.sql
+	if [ ! -s "$tmp_dir/${command_id}.sql" ]; then
+		sleep 20
+		run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
+			>$tmp_dir/${command_id}.sql
+	fi
+	diff -u $expected_result $tmp_dir/${command_id}.sql
+}
 
-destroy $namespace
+run_psql_ssl() {
+	local command="$1"
+	local uri="$2"
+	local driver=${3:-postgres}
+	local suffix=${4:-.svc.cluster.local}
+	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+    local sslmode="$5"
+
+	kubectl_bin exec ${client_container} -- \
+		bash -c "printf '$command\n' | psql --set=sslmode=$sslmode --set=sslrootcert=/etc/tls/ca.crt -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix"
+}
+
+main() {
+	test_dir=$(realpath $(dirname $0))
+	. ${test_dir}/../functions
+
+	create_namespace $namespace
+	deploy_operator
+
+	desc 'create first cluster'
+	cluster="some-name"
+	kubectl create secret generic cluster1-ssl-ca --from-file=ca.crt=${test_dir}/conf/ca.crt
+	kubectl create secret tls cluster1-ssl-keypair --cert=${test_dir}/conf/server.crt --key=${test_dir}/conf/server.key
+	kubectl_bin apply \
+		-f $conf_dir/${cluster}-secrets.yml \
+		-f ${test_dir}/conf/client.yml
+		
+
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "" "" "" "" "" "true"
+
+	compare_psql "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}" "require"
+	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "require"
+	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "verify-ca"
+	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "verify-full"
+
+	kubectl_bin delete perconapgclusters --all
+	wait_for_delete "pgcluster/${cluster}"
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "" "" "" "" "" "true"
+
+	compare_psql "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}" "require"
+	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "require"
+	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "verify-ca"
+	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "verify-full"
+
+	desc 'done'
+	destroy $namespace
+}
+
+main
