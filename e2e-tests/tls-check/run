@@ -69,7 +69,6 @@ main() {
 	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "verify-ca"
 	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "verify-full"
 
-	desc 'done'
 	destroy $namespace
 }
 

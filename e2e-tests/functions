@@ -399,12 +399,12 @@ apply_cluster() {
 	fi
 
 	if [[ ${tls_enabled} == "true" ]]; then
-			yq w "${tmp_dir}/cr.yaml" 'spec.tlsOnly' true \
-		 	    | yq w - 'spec.sslCA' 'cluster1-ssl-ca' \
-                | yq w - 'spec.sslSecretName' 'cluster1-ssl-keypair' \
-                | yq w - 'spec.sslReplicationSecretName' 'cluster1-ssl-keypair' \
-					>"${tmp_dir}/cr.tls.yaml"
-			mv "${tmp_dir}/cr.tls.yaml" "${tmp_dir}/cr.yaml"
+		yq w "${tmp_dir}/cr.yaml" 'spec.tlsOnly' true \
+			| yq w - 'spec.sslCA' 'cluster1-ssl-ca' \
+			| yq w - 'spec.sslSecretName' 'cluster1-ssl-keypair' \
+			| yq w - 'spec.sslReplicationSecretName' 'cluster1-ssl-keypair' \
+				>"${tmp_dir}/cr.tls.yaml"
+		mv "${tmp_dir}/cr.tls.yaml" "${tmp_dir}/cr.yaml"
 	fi
 
 	kubectl_bin apply -f "${tmp_dir}/cr.yaml"
@@ -560,7 +560,7 @@ spinup_pgcluster() {
 	local backup=${3:-"false"}
 	local custom_config=${4:-"false"}
 	local podAntiAffinity=${5:-"false"}
-    local schedule=${6:-"false"}
+	local schedule=${6:-"false"}
 	local schedule_type=${7:-"false"}
 	local tls_enabled=${8:-"false"}
 	desc 'create first PG cluster'
