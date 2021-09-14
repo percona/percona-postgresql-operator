@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
@@ -62,6 +64,51 @@ func Update(clientset kubeapi.Interface, newPerocnaPGCluster, oldPerocnaPGCluste
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerocnaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update pgcluster resource")
+	}
+
+	return nil
+}
+
+func UpdatePgBouncer(clientset *kubeapi.Client, newPerocnaPGCluster, oldPerocnaPGCluster *crv1.PerconaPGCluster) error {
+	if oldPerocnaPGCluster.Spec.TlSOnly == newPerocnaPGCluster.Spec.TlSOnly {
+		return nil
+	}
+
+	err := changeBouncerSize(clientset, newPerocnaPGCluster, oldPerocnaPGCluster, 0)
+	if err != nil {
+		return errors.Wrap(err, "change bouncer size to 0")
+	}
+
+	ctx := context.TODO()
+	for i := 0; i <= 30; i++ {
+		time.Sleep(5 * time.Second)
+		_, err := clientset.AppsV1().Deployments(newPerocnaPGCluster.Namespace).Get(ctx,
+			newPerocnaPGCluster.Name+"-pgbouncer", metav1.GetOptions{})
+		if err != nil && strings.Contains(err.Error(), "not found") {
+			break
+		}
+
+	}
+
+	err = changeBouncerSize(clientset, newPerocnaPGCluster, oldPerocnaPGCluster, oldPerocnaPGCluster.Spec.PGBouncer.Size)
+	if err != nil {
+		return errors.Wrap(err, "change bouncer size")
+	}
+
+	return nil
+}
+
+func changeBouncerSize(clientset *kubeapi.Client, newPerocnaPGCluster, oldPerocnaPGCluster *crv1.PerconaPGCluster, size int32) error {
+	ctx := context.TODO()
+	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerocnaPGCluster.Namespace).Get(ctx, oldPerocnaPGCluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get old pgcluster resource")
+	}
+	newPGCluster := getPGCLuster(newPerocnaPGCluster, oldPGCluster)
+	newPGCluster.Spec.PgBouncer.Replicas = size
+	_, err = clientset.CrunchydataV1().Pgclusters(oldPGCluster.Namespace).Update(ctx, newPGCluster, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update pgcluster")
 	}
 
 	return nil
