@@ -22,7 +22,7 @@ spec:
           - "100500"
           volumeMounts:
             - name: ca
-              mountPath: "/etc/tls"
+              mountPath: "/tmp/tls"
       volumes:
       - name: ca
         secret:
