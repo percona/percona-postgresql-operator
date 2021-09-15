@@ -11,7 +11,6 @@ compare_psql() {
 
 	local expected_result=${test_dir}/compare/${command_id}.sql
 
-
 	run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
 		>$tmp_dir/${command_id}.sql
 	if [ ! -s "$tmp_dir/${command_id}.sql" ]; then
