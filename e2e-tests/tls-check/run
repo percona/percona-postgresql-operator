@@ -48,7 +48,6 @@ main() {
 	kubectl_bin apply \
 		-f $conf_dir/${cluster}-secrets.yml \
 		-f ${test_dir}/conf/client.yml
-		
 
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "" "" "" "" "" "false"
 	compare_psql "select-2" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}" "verify-ca"
