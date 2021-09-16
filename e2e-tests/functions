@@ -269,6 +269,7 @@ apply_cluster() {
 	local podAntiAffinity=${7}
 	local schedule=${8}
 	local schedule_type=${9}
+	local tls_enabled=${10}
 
 	yq w "${path}" 'metadata.namespace' ${namespace} \
 		| yq w - 'spec.namespace' ${namespace} \
@@ -395,6 +396,15 @@ apply_cluster() {
 
 	if [[ ${custom_config} != "false" ]]; then
 		yq w -i "${tmp_dir}/cr.yaml" 'spec.customconfig' ${custom_config}
+	fi
+
+	if [[ ${tls_enabled} == "true" ]]; then
+		yq w "${tmp_dir}/cr.yaml" 'spec.tlsOnly' true \
+			| yq w - 'spec.sslCA' 'cluster1-ssl-ca' \
+			| yq w - 'spec.sslSecretName' 'cluster1-ssl-keypair' \
+			| yq w - 'spec.sslReplicationSecretName' 'cluster1-ssl-keypair' \
+				>"${tmp_dir}/cr.tls.yaml"
+		mv "${tmp_dir}/cr.tls.yaml" "${tmp_dir}/cr.yaml"
 	fi
 
 	kubectl_bin apply -f "${tmp_dir}/cr.yaml"
@@ -549,15 +559,16 @@ spinup_pgcluster() {
 	local config=$2
 	local backup=${3:-"false"}
 	local custom_config=${4:-"false"}
-	local podAntiAffinity=${5}
-    local schedule=${6}
-	local schedule_type=${7}
+	local podAntiAffinity=${5:-"false"}
+	local schedule=${6:-"false"}
+	local schedule_type=${7:-"false"}
+	local tls_enabled=${8:-"false"}
 	desc 'create first PG cluster'
 
 	create_user_secrets "${cluster}"
 
 	desc 'create fresh PG cluster'
-	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type}
+	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type} ${tls_enabled}
 	wait_deployment "${cluster}-backrest-shared-repo"
 	wait_deployment "${cluster}"
 	# Exiting since we are running cluster in stanby mode

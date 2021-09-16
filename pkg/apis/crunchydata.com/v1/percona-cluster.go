@@ -20,27 +20,30 @@ type PerconaPGCluster struct {
 // PerconaPGClusterSpec is the CRD that defines a Percona PG Cluster Spec
 // swagger:ignore
 type PerconaPGClusterSpec struct {
-	Namespace          string                 `json:"namespace"`
-	Database           string                 `json:"database"`
-	User               string                 `json:"user"`
-	Port               string                 `json:"port"`
-	UserLabels         map[string]string      `json:"userLabels"`
-	WalStorage         PVCStorage             `json:"walStorage"`
-	TablespaceStorages map[string]PVCStorage  `json:"tablespaceStorages"`
-	Pause              bool                   `json:"pause"`
-	Standby            bool                   `json:"standby"`
-	TlSOnly            bool                   `json:"tlsOnly"`
-	DisableAutofail    bool                   `json:"disableAutofail"`
-	KeepData           bool                   `json:"keepData"`
-	KeepBackups        bool                   `json:"keepBackups"`
-	PGPrimary          PGPrimary              `json:"pgPrimary"`
-	PGReplicas         *PGReplicas            `json:"pgReplicas"`
-	PGBadger           Badger                 `json:"pgBadger"`
-	PGBouncer          PgBouncer              `json:"pgBouncer"`
-	PGDataSource       PGDataSourceSpec       `json:"pgDataSource"`
-	PMM                PMMSpec                `json:"pmm"`
-	Backup             Backup                 `json:"backup"`
-	SecurityContext    *v1.PodSecurityContext `json:"securityContext"`
+	Namespace                string                 `json:"namespace"`
+	Database                 string                 `json:"database"`
+	User                     string                 `json:"user"`
+	Port                     string                 `json:"port"`
+	UserLabels               map[string]string      `json:"userLabels"`
+	WalStorage               PVCStorage             `json:"walStorage"`
+	TablespaceStorages       map[string]PVCStorage  `json:"tablespaceStorages"`
+	Pause                    bool                   `json:"pause"`
+	Standby                  bool                   `json:"standby"`
+	TlSOnly                  bool                   `json:"tlsOnly"`
+	DisableAutofail          bool                   `json:"disableAutofail"`
+	KeepData                 bool                   `json:"keepData"`
+	KeepBackups              bool                   `json:"keepBackups"`
+	PGPrimary                PGPrimary              `json:"pgPrimary"`
+	PGReplicas               *PGReplicas            `json:"pgReplicas"`
+	PGBadger                 Badger                 `json:"pgBadger"`
+	PGBouncer                PgBouncer              `json:"pgBouncer"`
+	PGDataSource             PGDataSourceSpec       `json:"pgDataSource"`
+	PMM                      PMMSpec                `json:"pmm"`
+	Backup                   Backup                 `json:"backup"`
+	SecurityContext          *v1.PodSecurityContext `json:"securityContext"`
+	SSLCA                    string                 `json:"sslCA"`
+	SSLSecretName            string                 `json:"sslSecretName"`
+	SSLReplicationSecretName string                 `json:"sslReplicationSecretName"`
 }
 
 type PerconaPGClusterStatus struct {

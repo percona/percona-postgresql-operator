@@ -20,6 +20,9 @@ spec:
   tlsOnly: false
   standby: false
   pause: false
+#  sslCA: cluster1-ssl-ca
+#  sslSecretName: cluster1-ssl-keypair
+#  sslReplicationSecretName: cluster1-ssl-keypair
 #  keepData: true
 #  keepBackups: true
 #  pgDataSource:

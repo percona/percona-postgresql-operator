@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
@@ -14,6 +15,7 @@ import (
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	"github.com/pkg/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,11 +26,11 @@ const (
 	GCSStorageType    = crv1.StorageType("gcs")
 )
 
-func Create(clientset kubeapi.Interface, newPerocnaPGCluster *crv1.PerconaPGCluster) error {
+func Create(clientset kubeapi.Interface, newPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	cluster := getPGCLuster(newPerocnaPGCluster, &crv1.Pgcluster{})
+	cluster := getPGCLuster(newPerconaPGCluster, &crv1.Pgcluster{})
 
-	_, err := clientset.CrunchydataV1().Pgclusters(newPerocnaPGCluster.Namespace).Create(ctx, cluster, metav1.CreateOptions{})
+	_, err := clientset.CrunchydataV1().Pgclusters(newPerconaPGCluster.Namespace).Create(ctx, cluster, metav1.CreateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "create pgcluster resource")
 	}
@@ -36,30 +38,30 @@ func Create(clientset kubeapi.Interface, newPerocnaPGCluster *crv1.PerconaPGClus
 	return nil
 }
 
-func Update(clientset kubeapi.Interface, newPerocnaPGCluster, oldPerocnaPGCluster *crv1.PerconaPGCluster) error {
+func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerocnaPGCluster.Namespace).Get(ctx, oldPerocnaPGCluster.Name, metav1.GetOptions{})
+	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Get(ctx, oldPerconaPGCluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	pgCluster := getPGCLuster(newPerocnaPGCluster, oldPGCluster)
+	pgCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
 	deployment, err := clientset.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
 		pgCluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "could not find instance")
 	}
-	if !reflect.DeepEqual(oldPerocnaPGCluster.Spec.PMM, newPerocnaPGCluster.Spec.PMM) {
+	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PMM, newPerconaPGCluster.Spec.PMM) {
 		err = pmm.UpdatePMMSidecar(clientset, pgCluster, deployment)
 		if err != nil {
 			return errors.Wrap(err, "update pmm sidecar")
 		}
 	}
-	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerocnaPGCluster, deployment)
+	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "could not update deployment")
 	}
-	_, err = clientset.CrunchydataV1().Pgclusters(oldPerocnaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
+	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update pgcluster resource")
 	}
@@ -67,9 +69,54 @@ func Update(clientset kubeapi.Interface, newPerocnaPGCluster, oldPerocnaPGCluste
 	return nil
 }
 
-func Delete(clientset kubeapi.Interface, perocnaPGCluster *crv1.PerconaPGCluster) error {
+func UpdatePgBouncer(clientset *kubeapi.Client, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
+	if oldPerconaPGCluster.Spec.TlSOnly == newPerconaPGCluster.Spec.TlSOnly {
+		return nil
+	}
+
+	err := changeBouncerSize(clientset, newPerconaPGCluster, oldPerconaPGCluster, 0)
+	if err != nil {
+		return errors.Wrap(err, "change bouncer size to 0")
+	}
+
 	ctx := context.TODO()
-	err := clientset.CrunchydataV1().Pgclusters(perocnaPGCluster.Namespace).Delete(ctx, perocnaPGCluster.Name, metav1.DeleteOptions{})
+	for i := 0; i <= 30; i++ {
+		time.Sleep(5 * time.Second)
+		_, err := clientset.AppsV1().Deployments(newPerconaPGCluster.Namespace).Get(ctx,
+			newPerconaPGCluster.Name+"-pgbouncer", metav1.GetOptions{})
+		if err != nil && kerrors.IsNotFound(err) {
+			break
+		}
+
+	}
+
+	err = changeBouncerSize(clientset, newPerconaPGCluster, oldPerconaPGCluster, oldPerconaPGCluster.Spec.PGBouncer.Size)
+	if err != nil {
+		return errors.Wrap(err, "change bouncer size")
+	}
+
+	return nil
+}
+
+func changeBouncerSize(clientset *kubeapi.Client, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster, size int32) error {
+	ctx := context.TODO()
+	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Get(ctx, oldPerconaPGCluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get old pgcluster resource")
+	}
+	newPGCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
+	newPGCluster.Spec.PgBouncer.Replicas = size
+	_, err = clientset.CrunchydataV1().Pgclusters(oldPGCluster.Namespace).Update(ctx, newPGCluster, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update pgcluster")
+	}
+
+	return nil
+}
+
+func Delete(clientset kubeapi.Interface, perconaPGCluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	err := clientset.CrunchydataV1().Pgclusters(perconaPGCluster.Namespace).Delete(ctx, perconaPGCluster.Name, metav1.DeleteOptions{})
 	if err != nil {
 		return errors.Wrap(err, "delete pgcluster resource")
 	}
@@ -77,18 +124,18 @@ func Delete(clientset kubeapi.Interface, perocnaPGCluster *crv1.PerconaPGCluster
 	return nil
 }
 
-func IsPrimary(clientset kubeapi.Interface, perocnaPGCluster *crv1.PerconaPGCluster) (bool, error) {
+func IsPrimary(clientset kubeapi.Interface, perconaPGCluster *crv1.PerconaPGCluster) (bool, error) {
 	ctx := context.TODO()
 
 	selector := fmt.Sprintf("%s=%s",
-		"deployment-name", perocnaPGCluster.Name)
+		"deployment-name", perconaPGCluster.Name)
 
-	pods, err := clientset.CoreV1().Pods(perocnaPGCluster.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+	pods, err := clientset.CoreV1().Pods(perconaPGCluster.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return false, err
 	}
 	if len(pods.Items) == 0 {
-		return false, errors.Errorf("no pods for deployment %s", perocnaPGCluster.Name)
+		return false, errors.Errorf("no pods for deployment %s", perconaPGCluster.Name)
 	}
 	primaryField, ok := pods.Items[0].GetLabels()[config.LABEL_PGHA_ROLE]
 	if !ok {
@@ -242,6 +289,10 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	}
 	cluster.Spec.WALStorage = pgc.Spec.WalStorage.VolumeSpec
 	cluster.Spec.PGDataSource = pgc.Spec.PGDataSource
+	cluster.Spec.TLS.CASecret = pgc.Spec.SSLCA
+	cluster.Spec.TLS.TLSSecret = pgc.Spec.SSLSecretName
+	cluster.Spec.TLS.ReplicationTLSSecret = pgc.Spec.SSLReplicationSecretName
+	cluster.Spec.PgBouncer.TLSSecret = pgc.Spec.SSLSecretName
 
 	return cluster
 }

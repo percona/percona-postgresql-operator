@@ -259,22 +259,28 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		err = pgreplica.Update(c.Client, newCluster, oldCluster)
 		if err != nil {
 			log.Errorf("update perconapgcluster: update pgreplica: %s", err)
+			return
 		}
 		err = pgcluster.Update(c.Client, newCluster, oldCluster)
 		if err != nil {
 			log.Errorf("update perconapgcluster: update pgcluster: %s", err)
 			return
 		}
-		return
+	} else {
+		err = pgcluster.Update(c.Client, newCluster, oldCluster)
+		if err != nil {
+			log.Errorf("update perconapgcluster: update pgcluster: %s", err)
+			return
+		}
+		err = pgreplica.Update(c.Client, newCluster, oldCluster)
+		if err != nil {
+			log.Errorf("update perconapgcluster: update pgreplica: %s", err)
+			return
+		}
 	}
-	err = pgcluster.Update(c.Client, newCluster, oldCluster)
+	err = pgcluster.UpdatePgBouncer(c.Client, newCluster, oldCluster)
 	if err != nil {
-		log.Errorf("update perconapgcluster: update pgcluster: %s", err)
-		return
-	}
-	err = pgreplica.Update(c.Client, newCluster, oldCluster)
-	if err != nil {
-		log.Errorf("update perconapgcluster: update pgreplica: %s", err)
+		log.Errorf("update perconapgcluster: update pgbouncer: %s", err)
 	}
 }
 
