@@ -111,11 +111,13 @@ desc() {
 }
 
 deploy_operator() {
-	desc 'start operator'
 	local pull_secret_name=${1}
+	local operator_manifest=${2:-"${src_dir}/deploy/operator.yaml"}
+
+	desc 'start operator'
 
 	# modifing ini structure from configMap
-	yq r -d'2' ${src_dir}/deploy/operator.yaml 'data[values.yaml]' \
+	yq r -d'2' "${operator_manifest}" 'data[values.yaml]' \
 		| $sed -e "s#namespace: .*#namespace: \"${namespace}\"#g" \
 		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: \"${namespace}\"#g" \
 		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: $(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)#g" \
@@ -133,7 +135,7 @@ deploy_operator() {
 	fi
 
 	# updating yaml itself
-	yq w -d'*' ${src_dir}/deploy/operator.yaml 'metadata.namespace' ${namespace} \
+	yq w -d'*' "${operator_manifest}" 'metadata.namespace' ${namespace} \
 		| yq w -d'3' - 'subjects[0].namespace' ${namespace} \
 		| yq w -d'4' - 'spec.template.spec.containers[0].image' ${IMAGE_DEPLOYER} \
 		| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
@@ -616,9 +618,16 @@ create_user_secrets() {
 
 wait_cluster_consistency() {
 	cluster_name=${1}
+
+	wait_cluster_status ${cluster_name} "pgcluster Initialized"
+}
+
+wait_cluster_status() {
+	cluster_name=${1}
+	target_status=${2}
 	retry=0
 
-	until [[ "$(kubectl_bin get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "pgcluster Initialized" ]]; do
+	until [[ "$(kubectl_bin get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "${target_status}" ]]; do
 		let retry+=1
 		if [ $retry -ge 16 ]; then
 			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster

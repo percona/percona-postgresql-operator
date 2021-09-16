@@ -1,0 +1,86 @@
+#!/bin/bash
+
+set -o errexit
+set -o xtrace
+
+test_dir=$(realpath $(dirname $0))
+. "${test_dir}"/../functions
+
+IMAGE_OPERATOR="percona/percona-postgresql-operator:0.2.0-postgres-operator"
+IMAGE_DEPLOYER="percona/percona-postgresql-operator:0.2.0-pgo-deployer"
+
+IMAGE_PGBOUNCER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbouncer"
+IMAGE_PG_HA="percona/percona-postgresql-operator:0.2.0-ppg13-postgres-ha"
+IMAGE_BACKREST="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest"
+IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest-repo"
+IMAGE_PGBADGER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbadger"
+
+main() {
+    create_namespace $namespace
+
+	deploy_operator '' "${test_dir}/conf/0.2.0_operator.yaml"
+
+	desc 'start cluster'
+	cluster="upgrade"
+	kubectl_bin apply -f $conf_dir/client.yml
+
+    spinup_pgcluster "${cluster}" "${test_dir}/conf/0.2.0_cr.yaml"
+    wait_deployment "${cluster}-repl1"
+    wait_deployment "${cluster}-repl2"
+    wait_job_completion "backrest-backup-${cluster}"
+
+    kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"replace","path":"/spec/pause","value":true}]'
+    wait_cluster_status "${cluster}" "pgcluster Shutdown"
+
+    kubectl_bin delete \
+        serviceaccounts/pgo-deployer-sa \
+        clusterroles/pgo-deployer-cr \
+        configmaps/pgo-deployer-cm \
+        clusterrolebindings/pgo-deployer-crb \
+        jobs.batch/pgo-deploy \
+        deployment/postgres-operator
+
+    IMAGE_OPERATOR="perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"
+    IMAGE_DEPLOYER="perconalab/percona-postgresql-operator:${GIT_BRANCH}-pgo-deployer"
+
+    IMAGE_PGBOUNCER="perconalab/percona-postgresql-operator:main-ppg13-pgbouncer"
+    IMAGE_PG_HA="perconalab/percona-postgresql-operator:main-ppg13-postgres-ha"
+    IMAGE_BACKREST="perconalab/percona-postgresql-operator:main-ppg13-pgbackrest"
+    IMAGE_BACKREST_REPO="perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo"
+    IMAGE_PGBADGER="perconalab/percona-postgresql-operator:main-ppg13-pgbadger"
+
+    deploy_operator
+
+    kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+        '[
+            {"op":"replace","path":"/spec/backup/backrestRepoImage","value":'${IMAGE_BACKREST_REPO}'},
+            {"op":"replace","path":"/spec/backup/image","value":'${IMAGE_BACKREST}'},
+            {"op":"replace","path":"/spec/pgBadger/image","value":'${IMAGE_PGBADGER}'},
+            {"op":"replace","path":"/spec/pgBouncer/image","value":'${IMAGE_PGBOUNCER}'},
+            {"op":"replace","path":"/spec/pgPrimary/image","value":'${IMAGE_PG_HA}'},
+            {"op":"replace","path":"/spec/userLabels/pgo-version","value":'${GIT_BRANCH}'},
+            {"op":"replace","path":"/metadata/labels/pgo-version","value":'${GIT_BRANCH}'},
+            {"op":"replace","path":"/spec/pause","value":false}
+        ]'
+
+    wait_cluster_consistency "${cluster}"
+    wait_deployment "${cluster}"
+    wait_deployment "${cluster}-repl1"
+    wait_deployment "${cluster}-repl2"
+
+    kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+        '[
+            {"op":"add","path":"/spec/backup/schedule","value":[{"name":"5min-backup","schedule":"*/5 * * * *","keep":3,"type":"full","storage":"local"}]},
+            {"op":"add","path":"/spec/backup/storages","value":{"local":{"type":"local"}}}
+        ]'
+    sleep 10
+    configmap_creation_time=$(kubectl_bin get configmap/${cluster}-5min-backup -o jsonpath='{.metadata.creationTimestamp}')
+    backup_target_minute=$(($(($(gdate -d${configmap_creation_time} +%M)+5))-$(($(($(gdate -d${configmap_creation_time} +%M)+5))%5))))
+    sleep_time=$(($((${backup_target_minute}-$(gdate +%M)))*60))
+    sleep ${sleep_time}
+
+    backup_job=$(kubectl_bin get jobs --selector=backrest-command=backup,pg-cluster=${cluster} | grep sch | awk '{print $1}')
+    wait_job_completion ${backup_job}
+}
+
+main
