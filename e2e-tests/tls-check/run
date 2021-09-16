@@ -42,8 +42,8 @@ main() {
 
 	desc 'create first cluster'
 	cluster="some-name"
-	kubectl create secret generic cluster1-ssl-ca --from-file=ca.crt=${test_dir}/conf/ca.crt
-	kubectl create secret tls cluster1-ssl-keypair --cert=${test_dir}/conf/server.crt --key=${test_dir}/conf/server.key
+	kubectl create secret generic cluster1-ssl-ca --from-file=ca.crt=${conf_dir}/ca.crt
+	kubectl create secret tls cluster1-ssl-keypair --cert=${conf_dir}/server.crt --key=${conf_dir}/server.key
 	kubectl_bin apply \
 		-f $conf_dir/${cluster}-secrets.yml \
 		-f ${test_dir}/conf/client.yml
