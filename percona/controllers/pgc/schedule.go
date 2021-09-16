@@ -21,10 +21,11 @@ type s struct {
 }
 
 const (
-	keep   actionType = "keep"
-	delete actionType = "delete"
-	update actionType = "update"
-	create actionType = "create"
+	keep         actionType = "keep"
+	delete       actionType = "delete"
+	update       actionType = "update"
+	create       actionType = "create"
+	storageLocal            = "local"
 )
 
 func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPGCluster) error {
@@ -88,8 +89,12 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 }
 func getScheduleConfigMap(name string, schedule s, newCluster *crv1.PerconaPGCluster) (*v1.ConfigMap, error) {
 	storage, ok := newCluster.Spec.Backup.Storages[schedule.job.Storage]
-	if !ok {
+	if !ok && schedule.job.Storage != storageLocal {
 		return nil, errors.Errorf("invalid storage name '%s' in schedule '%s'", schedule.job.Storage, schedule.job.Name)
+	}
+	storageType := storageLocal
+	if ok {
+		storageType = string(storage.Type)
 	}
 	scheduleTemp := scheduler.ScheduleTemplate{
 		Name:      schedule.job.Name,
@@ -99,7 +104,7 @@ func getScheduleConfigMap(name string, schedule s, newCluster *crv1.PerconaPGClu
 		Namespace: newCluster.Namespace,
 		PGBackRest: scheduler.PGBackRest{
 			Type:        schedule.job.Type,
-			StorageType: string(storage.Type),
+			StorageType: storageType,
 			Deployment:  newCluster.Name,
 			Container:   "database",
 		},
