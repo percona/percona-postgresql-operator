@@ -301,7 +301,7 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica, newP
 	updateResources(cl, deployment)
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(cl, deployment)
 	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
-		dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster)
+		dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster.Spec.PGPrimary.Image)
 	}
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)

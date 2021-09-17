@@ -40,11 +40,11 @@ func UpdateSpecTemplateLabels(labels map[string]string, deployment *appsv1.Deplo
 	return
 }
 
-func UpdateDeploymentImage(deployment *appsv1.Deployment, cluster *crv1.PerconaPGCluster) {
+func UpdateDeploymentImage(deployment *appsv1.Deployment, image string) {
 	containers := []v1.Container{}
 	for _, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == "database" {
-			c.Image = cluster.Spec.PGPrimary.Image
+			c.Image = image
 		}
 		containers = append(containers, c)
 	}
