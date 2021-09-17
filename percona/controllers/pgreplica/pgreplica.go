@@ -115,7 +115,7 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 		replica.ResourceVersion = oldReplica.ResourceVersion
 		replica.Status = oldReplica.Status
 
-		err = updateDeployment(clientset, replica)
+		err = updateDeployment(clientset, replica, newCluster, oldCluster)
 		if err != nil {
 			return errors.Wrapf(err, "update replica deployment%s", replica.Name)
 		}
@@ -280,7 +280,7 @@ func updateLabels(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	return
 }
 
-func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) error {
+func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
 	deployment, err := clientset.AppsV1().Deployments(replica.Namespace).Get(ctx,
 		replica.Name, metav1.GetOptions{})
@@ -300,6 +300,9 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica) erro
 	}
 	updateResources(cl, deployment)
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(cl, deployment)
+	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
+		dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster)
+	}
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)
 	}

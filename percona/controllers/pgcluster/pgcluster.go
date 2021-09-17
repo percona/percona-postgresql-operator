@@ -45,22 +45,30 @@ func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluste
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
 	pgCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
+
 	deployment, err := clientset.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
 		pgCluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "could not find instance")
 	}
+
 	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PMM, newPerconaPGCluster.Spec.PMM) {
 		err = pmm.UpdatePMMSidecar(clientset, pgCluster, deployment)
 		if err != nil {
 			return errors.Wrap(err, "update pmm sidecar")
 		}
 	}
+
+	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
+		dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster)
+	}
+
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "could not update deployment")
 	}
+
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update pgcluster resource")
