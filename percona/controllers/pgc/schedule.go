@@ -8,9 +8,10 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler/scheduler"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
-	"github.com/pkg/errors"
 
+	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -70,7 +71,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 			}
 		case delete:
 			err := c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Delete(ctx, name, metav1.DeleteOptions{})
-			if err != nil {
+			if err != nil && !kerrors.IsNotFound(err) {
 				return errors.Wrapf(err, "delete config map %s", name)
 			}
 		case update:
