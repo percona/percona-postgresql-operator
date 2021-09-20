@@ -8,9 +8,10 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler/scheduler"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
-	"github.com/pkg/errors"
 
+	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -21,10 +22,11 @@ type s struct {
 }
 
 const (
-	keep   actionType = "keep"
-	delete actionType = "delete"
-	update actionType = "update"
-	create actionType = "create"
+	keep         actionType = "keep"
+	delete       actionType = "delete"
+	update       actionType = "update"
+	create       actionType = "create"
+	storageLocal            = "local"
 )
 
 func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPGCluster) error {
@@ -69,7 +71,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 			}
 		case delete:
 			err := c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Delete(ctx, name, metav1.DeleteOptions{})
-			if err != nil {
+			if err != nil && !kerrors.IsNotFound(err) {
 				return errors.Wrapf(err, "delete config map %s", name)
 			}
 		case update:
@@ -88,8 +90,12 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 }
 func getScheduleConfigMap(name string, schedule s, newCluster *crv1.PerconaPGCluster) (*v1.ConfigMap, error) {
 	storage, ok := newCluster.Spec.Backup.Storages[schedule.job.Storage]
-	if !ok {
+	if !ok && schedule.job.Storage != storageLocal {
 		return nil, errors.Errorf("invalid storage name '%s' in schedule '%s'", schedule.job.Storage, schedule.job.Name)
+	}
+	storageType := storageLocal
+	if ok {
+		storageType = string(storage.Type)
 	}
 	scheduleTemp := scheduler.ScheduleTemplate{
 		Name:      schedule.job.Name,
@@ -99,7 +105,7 @@ func getScheduleConfigMap(name string, schedule s, newCluster *crv1.PerconaPGClu
 		Namespace: newCluster.Namespace,
 		PGBackRest: scheduler.PGBackRest{
 			Type:        schedule.job.Type,
-			StorageType: string(storage.Type),
+			StorageType: storageType,
 			Deployment:  newCluster.Name,
 			Container:   "database",
 		},
