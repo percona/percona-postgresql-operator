@@ -629,7 +629,7 @@ wait_cluster_status() {
 
 	until [[ "$(kubectl_bin get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "${target_status}" ]]; do
 		let retry+=1
-		if [ $retry -ge 16 ]; then
+		if [ $retry -ge 24 ]; then
 			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
 			exit 1
 		fi

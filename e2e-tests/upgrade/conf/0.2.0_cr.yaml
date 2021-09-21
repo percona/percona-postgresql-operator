@@ -116,7 +116,7 @@ spec:
 #        pg-cluster-label: cluster1
   pgReplicas:
     hotStandby:
-      size: 2
+      size: 0
       resources:
         requests:
 #          cpu: "1"
