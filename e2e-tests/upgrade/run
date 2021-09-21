@@ -15,36 +15,6 @@ IMAGE_BACKREST="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest"
 IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest-repo"
 IMAGE_PGBADGER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbadger"
 
-compare_psql() {
-	local command_id="$1"
-	local command="$2"
-	local uri="$3"
-	local sslmode="$4"
-
-	local expected_result=${test_dir}/compare/${command_id}.sql
-
-	run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
-		>$tmp_dir/${command_id}.sql
-	if [ ! -s "$tmp_dir/${command_id}.sql" ]; then
-		sleep 20
-		run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
-			>$tmp_dir/${command_id}.sql
-	fi
-	diff -u $expected_result $tmp_dir/${command_id}.sql
-}
-
-run_psql_ssl() {
-	local command="$1"
-	local uri="$2"
-	local driver=${3:-postgres}
-	local suffix=${4:-.svc.cluster.local}
-	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
-	local sslmode="$5"
-
-	kubectl_bin exec ${client_container} -- \
-		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix" || true
-}
-
 main() {
 	create_namespace $namespace
 
@@ -117,8 +87,8 @@ main() {
 		]'
 	sleep 10
 	configmap_creation_time=$(kubectl_bin get configmap/${cluster}-${backup_time_interval_min}min-backup -o jsonpath='{.metadata.creationTimestamp}')
-	backup_target_minute=$(($(($(gdate -d${configmap_creation_time} +%M)+${backup_time_interval_min}))-$(($(($(gdate -d${configmap_creation_time} +%M)+${backup_time_interval_min}))%${backup_time_interval_min}))))
-	sleep_time=$(($((${backup_target_minute}-$(gdate +%M)))*60))
+	backup_target_minute=$(($(($($date -d${configmap_creation_time} +%M) + ${backup_time_interval_min})) - $(($(($($date -d${configmap_creation_time} +%M) + ${backup_time_interval_min})) % ${backup_time_interval_min}))))
+	sleep_time=$(($((${backup_target_minute} - $($date +%M))) * 60))
 	sleep ${sleep_time}
 
 	backup_job=$(kubectl_bin get jobs --selector=backrest-command=backup,pg-cluster=${cluster} | grep sch | awk '{print $1}')
