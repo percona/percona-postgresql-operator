@@ -45,25 +45,68 @@ func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluste
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
 	pgCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
+
+	err = updatePGPrimaryDeployment(clientset, pgCluster, newPerconaPGCluster, oldPerconaPGCluster)
+	if err != nil {
+		return errors.Wrapf(err, "update pgPrimary deployment")
+	}
+
+	err = updateBackrestSharedRepoDeployment(clientset, pgCluster, newPerconaPGCluster, oldPerconaPGCluster)
+	if err != nil {
+		return errors.Wrapf(err, "update backrest shared repo deployment")
+	}
+
+	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update pgcluster resource")
+	}
+
+	return nil
+}
+
+func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcluster, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
 	deployment, err := clientset.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
 		pgCluster.Name, metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrap(err, "could not find instance")
+		return errors.Wrap(err, "get deployment")
 	}
+
 	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PMM, newPerconaPGCluster.Spec.PMM) {
 		err = pmm.UpdatePMMSidecar(clientset, pgCluster, deployment)
 		if err != nil {
 			return errors.Wrap(err, "update pmm sidecar")
 		}
 	}
+
+	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
+		dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster.Spec.PGPrimary.Image)
+	}
+
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
-		return errors.Wrap(err, "could not update deployment")
+		return errors.Wrap(err, "update deployment")
 	}
-	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
+
+	return nil
+}
+
+func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcluster, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
+	if oldPerconaPGCluster.Spec.Backup.BackrestRepoImage == newPerconaPGCluster.Spec.Backup.BackrestRepoImage {
+		return nil
+	}
+	ctx := context.TODO()
+	deployment, err := clientset.AppsV1().Deployments(pgCluster.Namespace).Get(ctx,
+		pgCluster.Name+"-backrest-shared-repo", metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrap(err, "update pgcluster resource")
+		return errors.Wrap(err, "getdeployment")
+	}
+
+	dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster.Spec.Backup.BackrestRepoImage)
+
+	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
+		return errors.Wrap(err, "update deployment")
 	}
 
 	return nil
@@ -82,12 +125,21 @@ func UpdatePgBouncer(clientset *kubeapi.Client, newPerconaPGCluster, oldPerconaP
 	ctx := context.TODO()
 	for i := 0; i <= 30; i++ {
 		time.Sleep(5 * time.Second)
+		bouncerTerminated := false
 		_, err := clientset.AppsV1().Deployments(newPerconaPGCluster.Namespace).Get(ctx,
 			newPerconaPGCluster.Name+"-pgbouncer", metav1.GetOptions{})
 		if err != nil && kerrors.IsNotFound(err) {
+			bouncerTerminated = true
+
+		}
+		primaryDepl, err := clientset.AppsV1().Deployments(newPerconaPGCluster.Namespace).Get(ctx,
+			newPerconaPGCluster.Name, metav1.GetOptions{})
+		if err != nil && !kerrors.IsNotFound(err) {
+			return errors.Wrap(err, "get pgprimary deployment")
+		}
+		if primaryDepl.Status.Replicas == primaryDepl.Status.AvailableReplicas && bouncerTerminated {
 			break
 		}
-
 	}
 
 	err = changeBouncerSize(clientset, newPerconaPGCluster, oldPerconaPGCluster, oldPerconaPGCluster.Spec.PGBouncer.Size)

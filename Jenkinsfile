@@ -399,6 +399,7 @@ pipeline {
                         runTest('operator-self-healing', 'sandbox')
                         runTest('clone-cluster', 'sandbox')
                         runTest('tls-check', 'sandbox')
+                        runTest('upgrade', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }
