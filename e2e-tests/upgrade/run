@@ -3,19 +3,27 @@
 set -o errexit
 set -o xtrace
 
+TARGET_IMAGE_OPERATOR=${IMAGE_OPERATOR}
+TARGET_IMAGE_DEPLOYER=${IMAGE_DEPLOYER}
+TARGET_IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER}
+TARGET_IMAGE_PG_HA=${IMAGE_PG_HA}
+TARGET_IMAGE_BACKREST=${IMAGE_BACKREST}
+TARGET_IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO}
+TARGET_IMAGE_PGBADGER=${IMAGE_PGBADGER}
+
 test_dir=$(realpath $(dirname $0))
 . "${test_dir}"/../functions
 
-IMAGE_OPERATOR="percona/percona-postgresql-operator:0.2.0-postgres-operator"
-IMAGE_DEPLOYER="percona/percona-postgresql-operator:0.2.0-pgo-deployer"
-
-IMAGE_PGBOUNCER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbouncer"
-IMAGE_PG_HA="percona/percona-postgresql-operator:0.2.0-ppg13-postgres-ha"
-IMAGE_BACKREST="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest"
-IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest-repo"
-IMAGE_PGBADGER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbadger"
-
 main() {
+	IMAGE_OPERATOR="percona/percona-postgresql-operator:0.2.0-postgres-operator"
+	IMAGE_DEPLOYER="percona/percona-postgresql-operator:0.2.0-pgo-deployer"
+
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:0.2.0-ppg13-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbadger"
+
 	create_namespace $namespace
 
 	deploy_operator '' "${test_dir}/conf/0.2.0_operator.yaml"
@@ -43,14 +51,14 @@ main() {
 		jobs.batch/pgo-deploy \
 		deployment/postgres-operator
 
-	IMAGE_OPERATOR="perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"
-	IMAGE_DEPLOYER="perconalab/percona-postgresql-operator:${GIT_BRANCH}-pgo-deployer"
+	IMAGE_OPERATOR="${TARGET_IMAGE_OPERATOR:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"}"
+	IMAGE_DEPLOYER="${TARGET_IMAGE_DEPLOYER:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-pgo-deployer"}"
 
-	IMAGE_PGBOUNCER="perconalab/percona-postgresql-operator:main-ppg13-pgbouncer"
-	IMAGE_PG_HA="perconalab/percona-postgresql-operator:main-ppg13-postgres-ha"
-	IMAGE_BACKREST="perconalab/percona-postgresql-operator:main-ppg13-pgbackrest"
-	IMAGE_BACKREST_REPO="perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo"
-	IMAGE_PGBADGER="perconalab/percona-postgresql-operator:main-ppg13-pgbadger"
+	IMAGE_PGBOUNCER="${TARGET_IMAGE_PGBOUNCER:-"perconalab/percona-postgresql-operator:main-ppg13-pgbouncer"}"
+	IMAGE_PG_HA="${TARGET_IMAGE_PG_HA:-"perconalab/percona-postgresql-operator:main-ppg13-postgres-ha"}"
+	IMAGE_BACKREST="${TARGET_IMAGE_BACKREST:-"perconalab/percona-postgresql-operator:main-ppg13-pgbackrest"}"
+	IMAGE_BACKREST_REPO="${TARGET_IMAGE_BACKREST_REPO:-"perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo"}"
+	IMAGE_PGBADGER="${TARGET_IMAGE_PGBADGER:-"perconalab/percona-postgresql-operator:main-ppg13-pgbadger"}"
 
 	deploy_operator
 
