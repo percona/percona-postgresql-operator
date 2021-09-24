@@ -70,7 +70,7 @@ kubectl_bin apply \
 desc 'install PMM Server'
 platform=kubernetes
 helm del --purge monitoring || :
-if [ ! -z "$OPENSHIFT" ]; then
+if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
 	platform=openshift
 	oc create sa pmm-server
 	oc adm policy add-scc-to-user privileged -z pmm-server

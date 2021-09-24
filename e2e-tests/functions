@@ -22,6 +22,7 @@ SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 BUCKET=${BUCKET:-"pg-operator-testing"}
 PGO_K8S_NAME=${PGO_K8S_NAME}
 ECR=${ECR:-"119175775298.dkr.ecr.us-east-1.amazonaws.com"}
+PLATFORM="GKE"
 
 tmp_dir=$(mktemp -d)
 sed=$(which gsed || which sed)
@@ -37,7 +38,11 @@ if [ -f "$conf_dir/cloud-secret.yml" ]; then
 fi
 
 if oc get projects; then
-	OPENSHIFT=4
+	PLATFORM="OPENSHIFT"
+fi
+
+if [ $(kubectl version -o json | jq -r '.serverVersion.gitVersion' | grep "\-eks\-") ]; then
+	PLATFORM="EKS"
 fi
 
 KUBE_VERSION=$(kubectl version -o json | jq -r '.serverVersion.major + "." + .serverVersion.minor' | $sed -r 's/[^0-9.]+//g')
@@ -81,7 +86,7 @@ create_namespace() {
 			ValidatingWebhookConfiguration/validate-auth || true
 	fi
 
-	if [ -n "${OPENSHIFT}" ]; then
+	if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
 		oc delete project "$namespace" && sleep 40 || :
 		oc new-project "$namespace"
 		oc project "$namespace"
@@ -130,7 +135,7 @@ deploy_operator() {
 		$sed -i ${tmp_dir}/operator.ini -e "s#pgo_image_pull_secret: .*#pgo_image_pull_secret: \"${pull_secret_name}\"#g"
 	fi
 
-	if [ -n "$OPENSHIFT" ]; then
+	if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
 		$sed -i -e 's#disable_fsgroup: .*#disable_fsgroup: "true"#g' ${tmp_dir}/operator.ini
 	fi
 
@@ -506,7 +511,7 @@ compare_kubectl() {
 	local expected_result=${test_dir}/compare/${resource//\//_}${postfix}.yml
 	local new_result="${tmp_dir}/${resource//\//_}.yml"
 
-	if [ -n "$OPENSHIFT" -a -f ${expected_result//.yml/-oc.yml} ]; then
+	if [[ ${PLATFORM} == "OPENSHIFT" && -f ${expected_result//.yml/-oc.yml} ]]; then
 		expected_result=${expected_result//.yml/-oc.yml}
 	fi
 
@@ -744,7 +749,7 @@ destroy() {
 
 	kubectl_bin delete -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml 2>/dev/null || :
 
-	if [ -n "$OPENSHIFT" ]; then
+	if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
 		oc delete --grace-period=0 --force=true project "$namespace"
 	else
 		kubectl_bin delete --grace-period=0 --force=true namespace "$namespace"
@@ -896,16 +901,49 @@ deploy_chaos_mesh() {
 		helm del chaos-mesh --namespace ${old_cm_namespace} || :
 	fi
 	helm repo add chaos-mesh https://charts.chaos-mesh.org
-	if version_gt "1.19"; then
-		if [[ -n ${OPENSHIFT} ]]; then
+	case ${PLATFORM} in
+		"OPENSHIFT")
 			oc adm policy add-scc-to-user privileged -n ${chaos_mesh_ns} -z chaos-daemon
-			helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${chaos_mesh_ns} --set chaosDaemon.runtime=crio --set chaosDaemon.socketPath=/var/run/crio/crio.sock --set dashboard.create=false --version v2.0.0 --set clusterScoped=false --set controllerManager.targetNamespace=${chaos_mesh_ns}
-		else
-			helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${chaos_mesh_ns} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version v2.0.0 --set clusterScoped=false --set controllerManager.targetNamespace=${chaos_mesh_ns}
-		fi
-	else
-		helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${chaos_mesh_ns} --set dashboard.create=false --version v2.0.0 --set clusterScoped=false --set controllerManager.targetNamespace=${chaos_mesh_ns}
-	fi
+			helm install chaos-mesh chaos-mesh/chaos-mesh \
+				--namespace=${chaos_mesh_ns} \
+				--set chaosDaemon.runtime=crio \
+				--set chaosDaemon.socketPath=/var/run/crio/crio.sock \
+				--set dashboard.create=false \
+				--version v2.0.0 \
+				--set clusterScoped=false \
+				--set controllerManager.targetNamespace=${chaos_mesh_ns}
+			;;
+		"EKS")
+			helm install chaos-mesh chaos-mesh/chaos-mesh \
+				--namespace=${chaos_mesh_ns} \
+				--set chaosDaemon.runtime=containerd \
+				--set chaosDaemon.socketPath=/var/run/dockershim.sock \
+				--set dashboard.create=false \
+				--version v2.0.0 \
+				--set clusterScoped=false \
+				--set controllerManager.targetNamespace=${chaos_mesh_ns}
+			;;
+		*)
+			if version_gt "1.20"; then
+				helm install chaos-mesh chaos-mesh/chaos-mesh \
+					--namespace=${chaos_mesh_ns} \
+					--set chaosDaemon.runtime=containerd \
+					--set chaosDaemon.socketPath=/run/containerd/containerd.sock \
+					--set dashboard.create=false \
+					--version v2.0.0 \
+					--set clusterScoped=false \
+					--set controllerManager.targetNamespace=${chaos_mesh_ns}
+			else
+				helm install chaos-mesh chaos-mesh/chaos-mesh \
+					--namespace=${chaos_mesh_ns} \
+					--set dashboard.create=false \
+					--version v2.0.0 \
+					--set clusterScoped=false \
+					--set controllerManager.targetNamespace=${chaos_mesh_ns}
+			fi
+			;;
+	esac
+
 	sleep 10
 }
 
