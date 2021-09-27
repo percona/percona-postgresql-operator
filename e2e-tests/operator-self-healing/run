@@ -13,7 +13,8 @@ get_operator_pod() {
 wait_deployments_removal() {
 	local name=${1}
 	local target_size=${2}
-
+	kubectl get deployments --selector=name=${name} -o jsonpath='{.items}'
+	kubectl get deployments --selector=name=${name} -o jsonpath='{.items}' | jq length
 	set +o xtrace
 	retry=0
 	until [[ $(kubectl_bin get deployments --selector=name=${name} -o jsonpath='{.items}' | jq length) == ${target_size} ]]; do
