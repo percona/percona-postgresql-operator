@@ -924,7 +924,7 @@ deploy_chaos_mesh() {
 				--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			;;
 		*)
-			if version_gt "1.20"; then
+			if version_gt "1.19"; then
 				helm install chaos-mesh chaos-mesh/chaos-mesh \
 					--namespace=${chaos_mesh_ns} \
 					--set chaosDaemon.runtime=containerd \
