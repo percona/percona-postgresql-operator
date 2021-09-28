@@ -1,6 +1,14 @@
 Providing Backups
 =================
 
+The Operator allows doing backups in two ways.
+*Scheduled backups* are configured in the
+`deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`_
+file to be executed automatically in proper time. *On-demand backups*
+can be done manually at any moment.
+
+.. contents:: :local:
+
 .. _backups.pgbackrest:
 
 The Operator uses the open source `pgBackRest <https://pgbackrest.org/>`_ backup
@@ -15,7 +23,9 @@ Kubernetes cluster. Storing backups on `Persistent Volume <https://kubernetes.io
 attached to the pgBackRest Pod is also possible. At PostgreSQL cluster creation
 time, you can specify a specific Storage Class for the pgBackRest repository.
 Additionally, you can also specify the type of the pgBackRest repository that
-can be used in the ``backup.storageTypes`` option:
+can be used for backups:
+
+.. _backups.pgbackrest.repo.type:
 
 * ``local``: Uses the storage that is provided by the Kubernetes cluster’s
   Storage Class that you select,
@@ -40,6 +50,8 @@ The pgBackRest repository consists of the following Kubernetes objects:
 The PostgreSQL primary is automatically configured to use the
 ``pgbackrest archive-push`` and push the write-ahead log (WAL) archives to the
 correct repository.
+
+.. _backups.pgbackrest.backup.type:
 
 The PostgreSQL Operator supports three types of pgBackRest backups:
 
@@ -174,6 +186,38 @@ The Operator will also need your service account key to access storage.
    .. code:: bash
 
       $ kubectl apply -f deploy/cr.yaml
+
+.. _backups.scheduled:
+
+Making scheduled backups
+------------------------
+
+Backups schedule is defined in the ``backup`` section of the
+`deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
+file. This section contains following subsections:
+
+* ``storages`` subsection contains data needed to access the S3-compatible cloud
+  to store backups.
+* ``schedule`` subsection allows to actually schedule backups (the schedule is
+  specified in crontab format).
+
+Here is an example of `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__ which uses Amazon S3 storage for backups:
+
+.. code:: yaml
+
+   ...
+   backup:
+     ...
+     schedule:
+      - name: "sat-night-backup"
+        schedule: "0 0 * * 6"
+        keep: 3
+        type: full
+        storage: local
+     ...
+
+The schedule is specified in crontab format as explained in
+:ref:`backup-schedule-schedule<Custom Resource options>`.
 
 .. _backups-manual:
 
