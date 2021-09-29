@@ -45,6 +45,7 @@ Configuration and Management
 
    backups
    pause
+   TLS
    monitoring
 
 .. toctree::
