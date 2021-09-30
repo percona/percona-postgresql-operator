@@ -22,8 +22,8 @@ Operator yourself, as well as how to temporarily disable it if needed.
 
 .. contents:: :local:
 
-Generate certificates
-=====================
+Generate certificates for the Operator
+======================================
 
 To generate certificates, follow these steps:
 
@@ -112,6 +112,52 @@ Don't forget to apply changes as usual:
 .. code:: bash
 
    $ kubectl apply -f deploy/cr.yaml
+
+Check the external connection
+-----------------------------
+
+.. code:: bash
+
+   $ cat <<EOF | kubectl apply -f -
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: pg-client
+   spec:
+     replicas: 1
+     selector:
+       matchLabels:
+         name: pg-client
+     template:
+       metadata:
+         labels:
+           name: pg-client
+       spec:
+         containers:
+           - name: pg-client
+             image: perconalab/percona-distribution-postgresql:13.2
+             imagePullPolicy: Always
+             command:
+             - sleep
+             args:
+             - "100500"
+             volumeMounts:
+               - name: ca
+                 mountPath: "/tmp/tls"
+         volumes:
+         - name: ca
+           secret:
+             secretName: <cluster_name>-ssl-ca
+             items:
+             - key: ca.crt
+               path: ca.crt
+               mode: 0777
+   EOF
+
+.. code:: bash
+
+   $ kubectl exec -it deployment/pg-client -- bash -il
+   $ PGSSLMODE=verify-ca PGSSLROOTCERT=/tmp/tls/ca.crt psql postgres://<postgres-user>:<postgres-pass>@<cluster-name>-pgbouncer.<namespace>.svc.cluster.local
 
 Run Percona Distribution for PostgreSQL without TLS
 ===================================================
