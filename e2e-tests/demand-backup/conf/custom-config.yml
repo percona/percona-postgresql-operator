@@ -10,3 +10,6 @@ data:
         postgresql:
           parameters:
             track_commit_timestamp: on
+            max_connections: 30
+            shared_buffers: 2GB
+            password_encryption: scram-sha-256
