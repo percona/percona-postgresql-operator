@@ -116,7 +116,7 @@ Don't forget to apply changes as usual:
 Check connectivity to the cluster
 ---------------------------------
 
-You can check TLS communication with use of the ``psql``, the standart interactive terminal-based front-end to PostgreSQL. The following command will spawn a new ``pg-client`` container, which includes needed command and can be used for the check:
+You can check TLS communication with use of the ``psql``, the standart interactive terminal-based front-end to PostgreSQL. The following command will spawn a new ``pg-client`` container, which includes needed command and can be used for the check (use your real cluster name instead of the ``<cluster-name>`` placeholder):
 
 .. code:: bash
 
