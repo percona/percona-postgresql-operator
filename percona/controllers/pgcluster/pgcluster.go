@@ -333,6 +333,7 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.TLSOnly = pgc.Spec.TlSOnly
 	cluster.Spec.Standby = pgc.Spec.Standby
 	cluster.Spec.Shutdown = pgc.Spec.Pause
+	cluster.Spec.CustomConfig = pgc.Spec.PGPrimary.Customconfig
 	if cluster.Spec.TablespaceMounts == nil {
 		cluster.Spec.TablespaceMounts = make(map[string]crv1.PgStorageSpec)
 	}

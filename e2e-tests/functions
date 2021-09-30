@@ -397,7 +397,7 @@ apply_cluster() {
 	fi
 
 	if [[ ${custom_config} != "false" ]]; then
-		yq w -i "${tmp_dir}/cr.yaml" 'spec.customconfig' ${custom_config}
+		yq w -i "${tmp_dir}/cr.yaml" 'spec.pgPrimary.customconfig' ${custom_config}
 	fi
 
 	if [[ ${tls_enabled} == "true" ]]; then
