@@ -113,8 +113,10 @@ Don't forget to apply changes as usual:
 
    $ kubectl apply -f deploy/cr.yaml
 
-Check the external connection
------------------------------
+Check connectivity to the cluster
+---------------------------------
+
+You can check TLS communication with use of the ``psql``, the standart interactive terminal-based front-end to PostgreSQL. The following command will spawn a new ``pg-client`` container, which includes needed command and can be used for the check:
 
 .. code:: bash
 
@@ -154,10 +156,20 @@ Check the external connection
                mode: 0777
    EOF
 
+Now get shell access to the newly created container, and launch the PostgreSQL interactive terminal to check connectivity over the encrypted channel (please use real cluster-name, PostgreSQL user login and password):
+
 .. code:: bash
 
    $ kubectl exec -it deployment/pg-client -- bash -il
-   $ PGSSLMODE=verify-ca PGSSLROOTCERT=/tmp/tls/ca.crt psql postgres://<postgres-user>:<postgres-pass>@<cluster-name>-pgbouncer.<namespace>.svc.cluster.local
+   [postgres@pg-client /]$ PGSSLMODE=verify-ca PGSSLROOTCERT=/tmp/tls/ca.crt psql postgres://<postgresql-user>:<postgresql-password>@<cluster-name>-pgbouncer.<namespace>.svc.cluster.local
+
+Now you should see the prompt of PostgreSQL interactive terminal:
+
+.. code:: bash
+
+   psql (13.2)
+   Type "help" for help.
+   pgdb=>
 
 Run Percona Distribution for PostgreSQL without TLS
 ===================================================
