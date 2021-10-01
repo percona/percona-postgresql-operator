@@ -51,7 +51,7 @@ This will carry on the image update, cluster version update and the pause status
            {"op":"replace","path":"/spec/pgBouncer/size","value":1}
        ]'
 
-Wait untill the cluster is ready.
+Wait until the cluster is ready.
  
 
 
