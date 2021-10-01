@@ -18,11 +18,11 @@ main() {
 	IMAGE_OPERATOR="percona/percona-postgresql-operator:0.2.0-postgres-operator"
 	IMAGE_DEPLOYER="percona/percona-postgresql-operator:0.2.0-pgo-deployer"
 
-	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbouncer"
-	IMAGE_PG_HA="percona/percona-postgresql-operator:0.2.0-ppg13-postgres-ha"
-	IMAGE_BACKREST="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest"
-	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest-repo"
-	IMAGE_PGBADGER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbadger"
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:0.2.0-ppg12-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:0.2.0-ppg12-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:0.2.0-ppg12-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:0.2.0-ppg12-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:0.2.0-ppg12-pgbadger"
 
 	create_namespace $namespace
 

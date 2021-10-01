@@ -4,7 +4,12 @@ metadata:
   annotations:
     current-primary: cluster1
   labels:
-    pgo-version: 0.2.0
+    crunchy-pgha-scope: cluster1
+    deployment-name: cluster1
+    name: cluster1
+    pg-cluster: cluster1
+    pgo-version: 1.0.0
+    pgouser: admin
   name: cluster1
 spec:
   database: pgdb
@@ -38,7 +43,7 @@ spec:
 #      storageclass: ""
 #      matchLabels: ""
   userLabels:
-    pgo-version: "0.2.0"
+    pgo-version: "1.0.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
     resources:
@@ -61,7 +66,7 @@ spec:
 #    customconfig: ""
   pmm:
     enabled: false
-    image: percona/pmm-client:2.15.1
+    image: percona/pmm-client:2.21.0
     serverHost: monitoring-service
     serverUser: admin
     pmmSecret: cluster1-pmm-secret

@@ -8,7 +8,7 @@ metadata:
     deployment-name: some-name
     name: some-name
     pg-cluster: some-name
-    pgo-version: 0.2.0
+    pgo-version: 1.0.0
     pgouser: admin
   name: some-name
 spec:
@@ -17,7 +17,7 @@ spec:
   port: "5432"
   user: pguser
   userLabels:
-    pgo-version: "0.2.0"
+    pgo-version: "1.0.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
     resources:
@@ -26,7 +26,7 @@ spec:
     tolerations: []
   pmm:
     enabled: true
-    image: percona/pmm-client:2.15.1
+    image: percona/pmm-client:2.21.0
     serverHost: monitoring-service
     serverUser: admin
     pmmSecret: some-name-pmm-secret
@@ -57,7 +57,7 @@ spec:
 #        limits:
 #          cpu: "1"
 #          memory: "128Mi"
-      volumeSpec: 
+      volumeSpec:
         accessmode: ReadWriteOnce
         size: 1G
         storagetype: dynamic
@@ -73,5 +73,5 @@ spec:
 #        loadBalancerSourceRanges:
 #        annotations:
 #          pg-cluster-annot: cluster1
-#        labels: 
+#        labels:
 #          pg-cluster-label: cluster1
