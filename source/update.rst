@@ -8,7 +8,7 @@ This includes upgrades of the Operator itself, and upgrades of the Percona
 Distribution for PostgreSQL.
 
    .. note:: Only the incremental update to a nearest minor version of the
-      Operator is supported (for example, update from 0.1.0 to 0.2.0). To update
+      Operator is supported. To update
       to a newer version, which differs from the current version by more
       than one, make several incremental updates sequentially.
 
