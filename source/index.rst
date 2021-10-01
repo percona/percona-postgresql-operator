@@ -34,6 +34,7 @@ Installation guide
    :maxdepth: 1
 
    kubernetes
+   openshift
    gke
    helm
 
