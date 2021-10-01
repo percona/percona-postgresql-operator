@@ -8,7 +8,7 @@ metadata:
     deployment-name: cluster1
     name: cluster1
     pg-cluster: cluster1
-    pgo-version: 0.2.0
+    pgo-version: 1.0.0
     pgouser: admin
     role: master
   name: cluster1
@@ -18,7 +18,7 @@ spec:
   port: "5432"
   user: pguser
   userLabels:
-    pgo-version: "0.2.0"
+    pgo-version: "1.0.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
     resources:
@@ -58,7 +58,7 @@ spec:
 #        limits:
 #          cpu: "1"
 #          memory: "128Mi"
-      volumeSpec: 
+      volumeSpec:
         accessmode: ReadWriteOnce
         matchLabels: ""
         size: 1G
@@ -77,5 +77,5 @@ spec:
 #        loadBalancerSourceRanges:
 #        annotations:
 #          pg-cluster-annot: cluster1
-#        labels: 
+#        labels:
 #          pg-cluster-label: cluster1
