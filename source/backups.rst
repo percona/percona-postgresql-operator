@@ -98,8 +98,8 @@ options in the ``backup.storages`` subsection:
 
 You also need to supply pgBackRest with base64-encoded AWS S3 key and AWS S3 key
 secret stored along with other sensitive information in `Kubernetes Secrets <https://kubernetes.io/docs/concepts/configuration/secret/>`_
-(e.g. encoding needed data with the ``echo "string-to-encode" | base64`` command).
-Edit the ``deploy/backup/cluster1-backrest-repo-config-secret.yaml``
+(e.g. encoding needed data with the ``echo "string-to-encode" | base64``
+command). Edit the ``deploy/backup/cluster1-backrest-repo-config-secret.yaml``
 configuration file: set there proper cluster name, AWS S3 key, and key secret:
 
    .. code:: yaml
@@ -246,7 +246,8 @@ When the backup options are configured, execute the actual backup command:
 List existing backups
 --------------------------------------------------
 
-To get list of all existing backups in the pgBackrest repo, use the following command:
+To get list of all existing backups in the pgBackrest repo, use the following
+command:
 
 .. code:: bash
 
@@ -261,7 +262,9 @@ The Operator supports the ability to perform a full restore on a PostgreSQL
 cluster as well as a point-in-time-recovery. There are two types of ways to
 restore a cluster:
 
-* restore to a new cluster using the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` option (and possibly, :ref:`pgDataSource.restoreOpts<pgdatasource-restoreopts>` for custom pgBackRest options),
+* restore to a new cluster using the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>`
+  option (and possibly, :ref:`pgDataSource.restoreOpts<pgdatasource-restoreopts>`
+  for custom pgBackRest options),
 * restore in-place, to an existing cluster (note that this is destructive).
 
 Restoring to a new PostgreSQL cluster allows you to take a backup and create a
@@ -280,8 +283,8 @@ configuration file. The example of the backup configuration file is
 The following keys are the most important in the parameters section of this file:
 
 * ``parameters.backrest-restore-from-cluster`` specifies the name of a
-  PostgreSQL cluster which will be restored. This includes stopping the database and
-  recreating a new primary with the restored data (for example,
+  PostgreSQL cluster which will be restored. This includes stopping the database
+  and recreating a new primary with the restored data (for example, 
   ``cluster1``),
 * ``parameters.backrest-restore-opts`` specifies additional options for
   pgBackRest (for example, ``--type=time --target="2021-04-16 15:13:32"`` to
@@ -299,9 +302,11 @@ To create a new PostgreSQL cluster from either the active  one, or a former clus
 whose pgBackRest repository still exists,  use the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` 
 option. 
 
-The following example will create a new cluster named ``cluster2`` from an existing one named``cluster1``.
+The following example will create a new cluster named ``cluster2`` from an
+existing one named``cluster1``.
 
-#. First, create the ``cluster2-config-secrets.yaml`` configuration file with the following content:
+#. First, create the ``cluster2-config-secrets.yaml`` configuration file with
+   the following content:
 
    .. code:: yaml
 
@@ -350,7 +355,8 @@ The following example will create a new cluster named ``cluster2`` from an exist
 #. Edit the ``deploy/cr.yaml`` configuration file:
 
    * set a new cluster name (``cluster2``),
-   * set the option :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` to ``cluster1``.
+   * set the option :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` to
+     ``cluster1``.
 
 Create the cluster as follows:
 
@@ -363,13 +369,22 @@ Create the cluster as follows:
 Delete a previously saved backup
 --------------------------------------------------
 
-If you want to delete some backup, you need to delete both the ``pgtask`` object and the corresponding job itself. Deletion of the backup object can be done using the same YAML file which was used for the on-demand backup:  
+The maximum amount of stored backups is controlled by the
+:ref:`backup.schedule.keep<backup-schedule-keep>` option (only successful
+backups are counted). Older backups are automatically deleted, so that amount of
+stored backups do not exceed this number.
+
+If you want to delete some backup manually, you need to delete both the
+``pgtask`` object and the corresponding job itself. Deletion of the backup
+object can be done using the same YAML file which was used for the on-demand
+backup:  
 
 .. code:: bash
 
    $ kubectl delete -f deploy/backup/backup.yaml
 
-Deletion of the job which corresponds to the backup can be done using ``kubectl delete jobs`` command with the backup name:
+Deletion of the job which corresponds to the backup can be done using
+``kubectl delete jobs`` command with the backup name:
 
 .. code:: bash
 
