@@ -20,7 +20,7 @@ export PGO_CONF_DIR=$PGOROOT/installers/ansible/roles/pgo-operator/files
 # the version of the Operator you run is set by these vars
 export PGO_IMAGE_PREFIX=registry.developers.crunchydata.com/crunchydata
 export PGO_BASEOS=centos8
-export PGO_VERSION=0.2.0
+export PGO_VERSION=1.0.0
 export PGO_IMAGE_TAG=$PGO_BASEOS-$PGO_VERSION
 
 # for setting the pgo apiserver port, disabling TLS or not verifying TLS
@@ -47,7 +47,7 @@ export PGO_CLIENT_KEY=$PGOROOT/conf/postgres-operator/server.key
 # Operator using a ClusterRole.  Options: `dynamic`, `readonly`, and `disabled`
 export PGO_NAMESPACE_MODE=dynamic
 
-# During a Bash install determines whether or not the PostgreSQL Operator will granted the 
+# During a Bash install determines whether or not the PostgreSQL Operator will granted the
 # permissions needed to reconcile RBAC within targeted namespaces.
 export PGO_RECONCILE_RBAC=true
 
