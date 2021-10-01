@@ -213,7 +213,7 @@ Here is an example of `deploy/cr.yaml <https://github.com/percona/percona-postgr
         schedule: "0 0 * * 6"
         keep: 3
         type: full
-        storage: local
+        storage: s3
      ...
 
 The schedule is specified in crontab format as explained in
