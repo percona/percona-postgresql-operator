@@ -9,7 +9,8 @@ The Percona Distribution for PostgreSQL Operator uses Transport Layer Security
 * Internal - communication between PostgreSQL instances in the cluster
 * External - communication between the client application and the cluster
 
-The internal certificate is also used as an authorization method.
+The internal certificate is also used as an authorization method for PostgreSQL
+Replica instances.
 
 Currently, TLS security needs manual certificates generation.
 
@@ -28,9 +29,10 @@ Generate certificates for the Operator
 To generate certificates, follow these steps:
 
 1. Provision a :abbr:`CA (Certificate authority)` to generate TLS certificates,
-2. Generate a :abbr:`CA (Certificate authority)` key and certificate file with the server details,
-3. Create the server TLS certificates using the :abbr:`CA (Certificate authority)` keys, certs, and server
-   details.
+2. Generate a :abbr:`CA (Certificate authority)` key and certificate file with
+   the server details,
+3. Create the server TLS certificates using the
+   :abbr:`CA (Certificate authority)` keys, certs, and server details.
 
 The set of commands generates certificates with the following attributes:
 
@@ -38,9 +40,11 @@ The set of commands generates certificates with the following attributes:
 *  ``Server-key.pem`` - the private key
 *  ``ca.pem`` - Certificate Authority
 
-You should generate one set of certificates for external communications, and another set for internal ones.
+You should generate one set of certificates for external communications, and
+another set for internal ones.
 
-Supposing that your cluster name is ``cluster1``, you can use the following commands to generate certificates:
+Supposing that your cluster name is ``cluster1``, you can use the following
+commands to generate certificates:
 
 .. code:: bash
 
@@ -95,7 +99,8 @@ Supposing that your cluster name is ``cluster1``, you can use the following comm
    $ kubectl create secret generic ${CLUSTER_NAME}-ssl-ca --from-file=ca.crt=ca.pem
    $ kubectl create secret tls  ${CLUSTER_NAME}-ssl-keypair --cert=server.pem --key=server-key.pem
 
-When certificates are generated, set the following keys in the ``deploy/cr.yaml`` configuration file:
+When certificates are generated, set the following keys in the
+``deploy/cr.yaml`` configuration file:
 
 * ``spec.sslCA`` key should contain the name of the secret with TLS
   :abbr:`CA (Certificate authority)` used for both connection encryption
@@ -116,7 +121,11 @@ Don't forget to apply changes as usual:
 Check connectivity to the cluster
 ---------------------------------
 
-You can check TLS communication with use of the ``psql``, the standart interactive terminal-based front-end to PostgreSQL. The following command will spawn a new ``pg-client`` container, which includes needed command and can be used for the check (use your real cluster name instead of the ``<cluster-name>`` placeholder):
+You can check TLS communication with use of the ``psql``, the standart
+interactive terminal-based front-end to PostgreSQL. The following command will
+spawn a new ``pg-client`` container, which includes needed command and can be
+used for the check (use your real cluster name instead of the ``<cluster-name>``
+placeholder):
 
 .. code:: bash
 
@@ -156,7 +165,9 @@ You can check TLS communication with use of the ``psql``, the standart interacti
                mode: 0777
    EOF
 
-Now get shell access to the newly created container, and launch the PostgreSQL interactive terminal to check connectivity over the encrypted channel (please use real cluster-name, PostgreSQL user login and password):
+Now get shell access to the newly created container, and launch the PostgreSQL
+interactive terminal to check connectivity over the encrypted channel (please
+use real cluster-name, PostgreSQL user login and password):
 
 .. code:: bash
 
@@ -174,7 +185,8 @@ Now you should see the prompt of PostgreSQL interactive terminal:
 Run Percona Distribution for PostgreSQL without TLS
 ===================================================
 
-Omitting TLS is also possible, but we recommend that you run your cluster with the TLS protocol enabled.
+Omitting TLS is also possible, but we recommend that you run your cluster with
+the TLS protocol enabled.
 
 To disable TLS protocol (e.g. for demonstration purposes) set the
 ``spec.tlsOnly`` key to ``false`, and and make sure that there are no
