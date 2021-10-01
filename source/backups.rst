@@ -189,7 +189,7 @@ The Operator will also need your service account key to access storage.
 
 .. _backups.scheduled:
 
-Making scheduled backups
+Scheduling backups
 ------------------------
 
 Backups schedule is defined in the ``backup`` section of the
