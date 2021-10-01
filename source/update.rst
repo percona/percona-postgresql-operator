@@ -3,13 +3,12 @@
 Update Percona Distribution for PostgreSQL Operator
 ===================================================
 
-Percona Distribution for PostgreSQL Operator
-allows upgrades to newer versions. This includes upgrades of the
-Operator itself, and upgrades of the Percona Distribution for
-PostgreSQL.
+Percona Distribution for PostgreSQL Operator allows upgrades to newer versions.
+This includes upgrades of the Operator itself, and upgrades of the Percona
+Distribution for PostgreSQL.
 
-The following steps will allow you to update both of them to
-current version (use the name of your cluster instead of the ``<cluster-name>`` placeholder).
+The following steps will allow you to update both of them to current version
+(use the name of your cluster instead of the ``<cluster-name>`` placeholder).
 
 #. Pause the cluster in order to stop all possible activities:
 
@@ -38,9 +37,14 @@ current version (use the name of your cluster instead of the ``<cluster-name>`` 
 
 .. code:: bash
 
-   $ kubectl patch perconapgcluster/<cluster-name> --type json -p '[{"op": "replace", "path": "/spec/backup/backrestRepoImage", "value": "perconalab/percona-postgresql-operator:v{{{release}}}-ppg13-pgbackrest-repo"},{"op":"replace","path":"/spec/backup/image","value":"perconalab/percona-postgresql-operator:v{{{release}}}-ppg13-pgbackrest"},{"op":"replace","path":"/spec/pgBadger/image","value":"perconalab/percona-postgresql-operator:v{{{release}}}-ppg13-pgbadger"},{"op":"replace","path":"/spec/pgBouncer/image","value":"perconalab/percona-postgresql-operator:v{{{release}}}-ppg13-pgbouncer"},{"op":"replace","path":"/spec/pgPrimary/image","value":"perconalab/percona-postgresql-operator:v{{{release}}}-ppg13-postgres-ha"},{"op":"replace","path":"/spec/userLabels/pgo-version","value":"v{{{release}}}"},{"op":"replace","path":"/metadata/labels/pgo-version","value":"v{{{release}}}"},{"op": "replace", "path": "/spec/pause", "value": false}]'
+   $ kubectl patch perconapgcluster/<cluster-name> --type json -p '[{"op": "replace", "path": "/spec/backup/backrestRepoImage", "value": "percona/percona-postgresql-operator:v{{{release}}}-ppg13-pgbackrest-repo"},{"op":"replace","path":"/spec/backup/image","value":"percona/percona-postgresql-operator:v{{{release}}}-ppg13-pgbackrest"},{"op":"replace","path":"/spec/pgBadger/image","value":"percona/percona-postgresql-operator:v{{{release}}}-ppg13-pgbadger"},{"op":"replace","path":"/spec/pgBouncer/image","value":"percona/percona-postgresql-operator:v{{{release}}}-ppg13-pgbouncer"},{"op":"replace","path":"/spec/pgPrimary/image","value":"percona/percona-postgresql-operator:v{{{release}}}-ppg13-postgres-ha"},{"op":"replace","path":"/spec/userLabels/pgo-version","value":"v{{{release}}}"},{"op":"replace","path":"/metadata/labels/pgo-version","value":"v{{{release}}}"},{"op": "replace", "path": "/spec/pause", "value": false}]'
 
-This will carry on the image update, cluster version update and the pause status switch.
+.. note:: The above example is composed in asumption of using PostgreSQL 13 as
+   a database management system. For PostgreSQL 12 you should change all
+   occurrences of the ``ppg13`` substring to ``ppg12``.
+
+This will carry on the image update, cluster version update and the pause status
+switch.
 
 #. Now you can enable the ``pgbouncer`` again:
 
@@ -52,6 +56,3 @@ This will carry on the image update, cluster version update and the pause status
        ]'
 
 Wait until the cluster is ready.
- 
-
-
