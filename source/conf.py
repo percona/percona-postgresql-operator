@@ -37,12 +37,12 @@ project = u'Percona Distribution for PostgreSQL Operator'
 copyright = u'Percona LLC and/or its affiliates 2009 - 2021'
 
 # the short X.Y version
-version = '0.2.0'
+version = '1.0.0'
 # the full version including alpha/beta/rc tags.
-release = '0.2.0'
+release = '1.0.0'
 # the PGO recommended versions to be used in docs
 
-pmm2recommended = '2.16.0'
+pmm2recommended = '2.21.0'
 
 
 # List of patterns, relative to source directory, that match files and
