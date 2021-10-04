@@ -35,7 +35,7 @@ The following steps will allow you to update both of them to current version
        jobs.batch/pgo-deploy \
        deployment/postgres-operator
  
-   $ kubectl create -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v{{{release}}}/deploy/operator.yaml
+   $ kubectl create -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/release-1.0.0/deploy/operator.yaml
    $ kubectl wait --for=condition=Complete job/pgo-deploy --timeout=90s
 
 #. Now you can switch the cluster to a new version:

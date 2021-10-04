@@ -70,7 +70,7 @@ Installing the Operator
 
    .. code:: bash
 
-      git clone -b v{{{release}}} https://github.com/percona/percona-postgresql-operator
+      git clone -b release-1.0.0 https://github.com/percona/percona-postgresql-operator
       cd percona-postgresql-operator
 
 
