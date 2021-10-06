@@ -9,7 +9,7 @@
 
 **Percona announces the general availability of Percona Distribution for PostgreSQL Operator 1.0.0.**
 
-The Percona Distribution for PostgreSQL Operator automates the lifecycle, simplifies deploying and managing open source PostgreSQL clusters on Kubernetes. Percona Distribution for PostgreSQL Operator is based on `Postgres Operator <https://crunchydata.github.io/postgres-operator/latest/>`_ developed by Crunchy Data.
+The Percona Distribution for PostgreSQL Operator automates the lifecycle, simplifies deploying and managing open source PostgreSQL clusters on Kubernetes.
 
 The Operator follows best practices for configuration and setup of the `Percona Distribution for PostgreSQL <https://www.percona.com/doc/postgresql/LATEST/index.html>`_. The Operator provides a consistent way to package, deploy, manage, and perform a backup and a restore for a Kubernetes application. Operators deliver automation advantages in cloud-native applications.
 
@@ -32,6 +32,8 @@ The advantages are the following:
 * Support advanced Kubernetes features such as pod disruption budgets, node
   selector, constraints, tolerations, priority classes, and
   affinity/anti-affinity
+
+ Percona Distribution for PostgreSQL Operator is based on `Postgres Operator <https://crunchydata.github.io/postgres-operator/latest/>`_ developed by Crunchy Data.
 
 Release Highlights
 ================================================================================
