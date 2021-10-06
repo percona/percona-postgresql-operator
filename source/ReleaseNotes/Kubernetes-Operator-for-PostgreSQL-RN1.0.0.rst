@@ -33,7 +33,7 @@ The advantages are the following:
   selector, constraints, tolerations, priority classes, and
   affinity/anti-affinity
 
- Percona Distribution for PostgreSQL Operator is based on `Postgres Operator <https://crunchydata.github.io/postgres-operator/latest/>`_ developed by Crunchy Data.
+Percona Distribution for PostgreSQL Operator is based on `Postgres Operator <https://crunchydata.github.io/postgres-operator/latest/>`_ developed by Crunchy Data.
 
 Release Highlights
 ================================================================================
