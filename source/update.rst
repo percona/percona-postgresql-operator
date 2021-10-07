@@ -19,8 +19,7 @@ The following steps will allow you to update both of them to current version
 
 .. code:: bash
 
-   $ kubectl patch perconapgcluster/<cluster-name> --type json -p '[{"op": "replace", "path": "/spec/pause", "value": true},{"op":"replace","path":"/spec/pgBouncer/size","value":0}
-]'
+   $ kubectl patch perconapgcluster/<cluster-name> --type json -p '[{"op": "replace", "path": "/spec/pause", "value": true},{"op":"replace","path":"/spec/pgBouncer/size","value":0}]'
 
 #. Remove the old Operator and start the new Operator version:
 

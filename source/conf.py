@@ -226,7 +226,7 @@ htmlhelp_basename = 'postgresqloperator'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'percona-kubernetes-operator-for-postgresql.tex', u'Percona Distribution for PostgreSQL Operator',
+  ('index', 'PerconaDistributionPostgreSQLOperator.tex', u'Percona Distribution for PostgreSQL Operator',
      u'Percona LLC and/or its affiliates 2009-2021', 'manual'),
 ]
 

@@ -217,7 +217,7 @@ Here is an example of `deploy/cr.yaml <https://github.com/percona/percona-postgr
      ...
 
 The schedule is specified in crontab format as explained in
-:ref:`backup-schedule-schedule<Custom Resource options>`.
+:ref:`Custom Resource options<backup-schedule-schedule>`.
 
 .. _backups-manual:
 
