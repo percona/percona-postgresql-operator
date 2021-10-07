@@ -4,7 +4,7 @@
 *Percona Distribution for PostgreSQL Operator* 1.0.0
 ================================================================================
 
-:Date: October 6, 2021
+:Date: October 7, 2021
 :Installation: `Installing Percona Distribution for PostgreSQL Operator <https://www.percona.com/doc/kubernetes-operator-for-postgresql/index.html#installation-guide>`_
 
 **Percona announces the general availability of Percona Distribution for PostgreSQL Operator 1.0.0.**
