@@ -90,9 +90,9 @@ The Operator includes various components that get deployed to your Kubernetes cl
 
 The following platforms were tested and are officially supported by the Operator 1.0.0:
 
-    Google Kubernetes Engine (GKE) 1.17 - 1.21
-    Amazon Elastic Container Service for Kubernetes (EKS) 1.21
-    OpenShift 4.6 - 4.8
+* Google Kubernetes Engine (GKE) 1.17 - 1.21
+* Amazon Elastic Container Service for Kubernetes (EKS) 1.21
+* OpenShift 4.6 - 4.8
 
 Other Kubernetes platforms may also work but have not been tested.
 
