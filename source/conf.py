@@ -22,7 +22,7 @@ import sys, os
 sys.path.append(os.path.abspath('ext'))
 
 extensions=['sphinx.ext.intersphinx', 'sphinx.ext.todo',
-            'sphinx.ext.coverage', 'sphinx.ext.ifconfig','sphinx.ext.extlinks', 'sphinx-prompt', ]
+            'sphinx.ext.coverage', 'sphinx.ext.ifconfig','sphinx.ext.extlinks', 'sphinx-prompt', 'psdom' ]
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -226,7 +226,7 @@ htmlhelp_basename = 'postgresqloperator'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'percona-kubernetes-operator-for-postgresql.tex', u'Percona Distribution for PostgreSQL Operator',
+  ('index', 'PerconaDistributionPostgreSQLOperator.tex', u'Percona Distribution for PostgreSQL Operator',
      u'Percona LLC and/or its affiliates 2009-2021', 'manual'),
 ]
 

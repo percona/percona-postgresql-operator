@@ -14,7 +14,7 @@ Percona Distribution for PostgreSQL on OpenShift.
 
    .. code:: bash
 
-      git clone -b release-1.0.0 https://github.com/percona/percona-postgresql-operator
+      git clone -b v{{{release}}} https://github.com/percona/percona-postgresql-operator
       cd percona-postgresql-operator
 
    .. note:: It is crucial to specify the right branch with ``-b``
