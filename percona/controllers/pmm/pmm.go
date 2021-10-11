@@ -241,6 +241,14 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName string) v1.Containe
 				Value: "postgresql",
 			},
 			{
+				Name:  "PMM_AGENT_SIDECAR",
+				Value: "true",
+			},
+			{
+				Name:  "PMM_AGENT_SIDECAR_SLEEP",
+				Value: "5",
+			},
+			{
 				Name: "DB_PASS",
 				ValueFrom: &v1.EnvVarSource{
 					SecretKeyRef: &v1.SecretKeySelector{
