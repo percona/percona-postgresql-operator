@@ -112,28 +112,23 @@ func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *
 	return nil
 }
 
-func UpdatePgBouncer(clientset *kubeapi.Client, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
-	if oldPerconaPGCluster.Spec.TlSOnly == newPerconaPGCluster.Spec.TlSOnly {
-		return nil
-	}
-
-	err := changeBouncerSize(clientset, newPerconaPGCluster, oldPerconaPGCluster, 0)
+func RestartPgBouncer(clientset *kubeapi.Client, perconaPGCluster *crv1.PerconaPGCluster) error {
+	err := ChangeBouncerSize(clientset, perconaPGCluster, 0)
 	if err != nil {
 		return errors.Wrap(err, "change bouncer size to 0")
 	}
-
 	ctx := context.TODO()
 	for i := 0; i <= 30; i++ {
 		time.Sleep(5 * time.Second)
 		bouncerTerminated := false
-		_, err := clientset.AppsV1().Deployments(newPerconaPGCluster.Namespace).Get(ctx,
-			newPerconaPGCluster.Name+"-pgbouncer", metav1.GetOptions{})
+		_, err := clientset.AppsV1().Deployments(perconaPGCluster.Namespace).Get(ctx,
+			perconaPGCluster.Name+"-pgbouncer", metav1.GetOptions{})
 		if err != nil && kerrors.IsNotFound(err) {
 			bouncerTerminated = true
 
 		}
-		primaryDepl, err := clientset.AppsV1().Deployments(newPerconaPGCluster.Namespace).Get(ctx,
-			newPerconaPGCluster.Name, metav1.GetOptions{})
+		primaryDepl, err := clientset.AppsV1().Deployments(perconaPGCluster.Namespace).Get(ctx,
+			perconaPGCluster.Name, metav1.GetOptions{})
 		if err != nil && !kerrors.IsNotFound(err) {
 			return errors.Wrap(err, "get pgprimary deployment")
 		}
@@ -141,8 +136,7 @@ func UpdatePgBouncer(clientset *kubeapi.Client, newPerconaPGCluster, oldPerconaP
 			break
 		}
 	}
-
-	err = changeBouncerSize(clientset, newPerconaPGCluster, oldPerconaPGCluster, oldPerconaPGCluster.Spec.PGBouncer.Size)
+	err = ChangeBouncerSize(clientset, perconaPGCluster, perconaPGCluster.Spec.PGBouncer.Size)
 	if err != nil {
 		return errors.Wrap(err, "change bouncer size")
 	}
@@ -150,9 +144,9 @@ func UpdatePgBouncer(clientset *kubeapi.Client, newPerconaPGCluster, oldPerconaP
 	return nil
 }
 
-func changeBouncerSize(clientset *kubeapi.Client, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster, size int32) error {
+func ChangeBouncerSize(clientset *kubeapi.Client, newPerconaPGCluster *crv1.PerconaPGCluster, size int32) error {
 	ctx := context.TODO()
-	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Get(ctx, oldPerconaPGCluster.Name, metav1.GetOptions{})
+	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(newPerconaPGCluster.Namespace).Get(ctx, newPerconaPGCluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
