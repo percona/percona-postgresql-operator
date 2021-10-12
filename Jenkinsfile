@@ -290,7 +290,7 @@ pipeline {
                             -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                             -w /go/src/github.com/percona/percona-postgresql-operator \
                             -e GO111MODULE=on \
-                            golang:1.16 sh -c '
+                            golang:1.17 sh -c '
                                 go get github.com/google/go-licenses;
                                 /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/apiserver \
                                     | cut -d , -f 3 \
@@ -333,7 +333,7 @@ pipeline {
                             -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                             -w /go/src/github.com/percona/percona-postgresql-operator \
                             -e GO111MODULE=on \
-                            golang:1.16 sh -c 'go build -v -o apiserver github.com/percona/percona-postgresql-operator/cmd/apiserver;
+                            golang:1.17 sh -c 'go build -v -o apiserver github.com/percona/percona-postgresql-operator/cmd/apiserver;
                                                go build -v -o pgo-rmdata github.com/percona/percona-postgresql-operator/cmd/pgo-rmdata;
                                                go build -v -o pgo-scheduler github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler;
                                                go build -v -o postgres-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator '
