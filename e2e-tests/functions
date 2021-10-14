@@ -1017,3 +1017,11 @@ run_psql_ssl() {
 	kubectl_bin exec ${client_container} -- \
 		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix" || true
 }
+
+patch_secret() {
+	local secret=$1
+	local key=$2
+	local value=$3
+
+	kubectl_bin patch secret $secret -p="{\"data\":{\"$key\": \"$value\"}}"
+}

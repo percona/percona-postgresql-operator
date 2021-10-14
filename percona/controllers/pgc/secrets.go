@@ -117,16 +117,11 @@ func (c *Controller) GenerateUsersInternalSecretsData(clusterName string) ([]Sec
 	if err != nil {
 		return nil, errors.Wrap(err, "generate primaryuser")
 	}
-	pgUserData, err := generateUserSecretData("pguser", clusterName, "")
-	if err != nil {
-		return nil, errors.Wrap(err, "generate pgUser")
-	}
 
 	secrets := []SecretData{
 		bouncerUserData,
 		postgresUserData,
 		primaryUserData,
-		pgUserData,
 	}
 
 	return secrets, nil
@@ -149,9 +144,6 @@ func generateUserSecretData(user, clusterName, password string) (SecretData, err
 	case "primaryuser":
 		name = "primaryuser"
 		secretName = clusterName + "-primaryuser-secret"
-	case "pguser":
-		name = "pguser"
-		secretName = clusterName + "-pguser-secret"
 	case "pgbouncer":
 		name = "pgbouncer"
 		secretName = clusterName + "-pgbouncer-secret"
