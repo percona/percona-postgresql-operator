@@ -257,6 +257,10 @@ spec:
               value: container
             - name: DB_TYPE
               value: postgresql
+            - name: PMM_AGENT_SIDECAR
+              value: "true"
+            - name: PMM_AGENT_SIDECAR_SLEEP
+              value: "5"
             - name: DB_PASS
               valueFrom:
                 secretKeyRef:
