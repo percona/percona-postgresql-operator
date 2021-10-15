@@ -52,6 +52,8 @@ RUN mkdir -p /opt/cpm/bin
 
 RUN mkdir -p /opt/cpm/bin
 
+RUN mkdir -p /opt/cpm/bin
+
 COPY installers/ansible /ansible/postgres-operator
 COPY installers/metrics/ansible /ansible/metrics
 COPY installers/image/bin/pgo-deploy.sh /pgo-deploy.sh

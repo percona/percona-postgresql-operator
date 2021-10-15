@@ -1,46 +1,34 @@
-FROM golang:1.17 AS go_builder
-WORKDIR /go/src/github.com/percona/percona-postgresql-operator
+ARG BASEOS
+ARG BASEVER
+ARG PREFIX
+ARG PGVERSION
+ARG BACKREST_VERSION
+FROM ${PREFIX}/pgo-base:${BASEOS}-${BASEVER}
 
-COPY . .
+ARG BASEOS
+ARG PACKAGER
+ARG PGVERSION
 
-ARG GIT_COMMIT
-ARG GIT_BRANCH
-ARG GO_LDFLAGS
-ARG GOOS=linux
-ARG GOARCH=amd64
-ARG CGO_ENABLED=0
+LABEL name="pgo-apiserver" \
+	summary="Crunchy PostgreSQL Operator - Apiserver" \
+	description="Crunchy PostgreSQL Operator - Apiserver"
 
-RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
-       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
-           -o build/_output/bin/apiserver \
-               ./cmd/apiserver \
-    && cp -r build/_output/bin/apiserver /usr/local/bin/apiserver
+RUN if [ "$BASEOS" = "ubi8" ] ; then \
+	${PACKAGER} -y install \
+	    postgresql${PGVERSION} \
+	    hostname \
+	&& ${PACKAGER} -y clean all ; \
+else \
+	${PACKAGER} -y install \
+	    --setopt=skip_missing_names_on_install=False \
+	    postgresql${PGVERSION} \
+	    hostname \
+	&& ${PACKAGER} -y clean all ; \
+fi
 
-RUN ./bin/license_aggregator.sh; \
-    cp -r ./licenses /licenses
-
-FROM registry.access.redhat.com/ubi8/ubi-minimal AS ubi8
-
-LABEL name="Percona Postgres Operator API server" \
-      vendor="Percona" \
-      summary="API server for Percona Postgres database management" \
-      description="Percona Postgres Operator API server allows user clients to interact with Percona Postgres Operator software bundle and run databases in kubectl manner" \
-      maintainer="Percona Development <info@percona.com>"
-
-COPY redhat/licenses /licenses
-COPY redhat/atomic/help.1 /help.1
-COPY redhat/atomic/help.md /help.md
-
-RUN set -ex; \
-    microdnf -y install \
-	    hostname; \
-	microdnf -y clean all
-
-COPY --from=go_builder /usr/local/bin/apiserver /usr/local/bin
-COPY --from=go_builder /licenses /licenses
-COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
-COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
+ADD bin/apiserver /usr/local/bin
+ADD installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
+ADD conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
 
 USER 2
 

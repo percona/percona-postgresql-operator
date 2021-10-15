@@ -22,10 +22,17 @@ import (
 	"fmt"
 	"reflect"
 
+<<<<<<< HEAD
 	"github.com/iancoleman/orderedmap"
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/util"
+=======
+	"github.com/crunchydata/postgres-operator/internal/config"
+	"github.com/crunchydata/postgres-operator/internal/kubeapi"
+	"github.com/crunchydata/postgres-operator/internal/util"
+	"github.com/iancoleman/orderedmap"
+>>>>>>> v4.7.3
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

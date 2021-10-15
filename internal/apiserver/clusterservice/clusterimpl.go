@@ -1006,10 +1006,6 @@ func CreateCluster(request *msgs.CreateClusterRequest, ns, pgouser string) msgs.
 			secret.ObjectMeta.Labels[k] = v
 		}
 
-		for k, v := range util.GetCustomLabels(newInstance) {
-			secret.ObjectMeta.Labels[k] = v
-		}
-
 		if _, err := apiserver.Clientset.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{}); err != nil && !kubeapi.IsAlreadyExists(err) {
 			resp.Status.Code = msgs.Error
 			resp.Status.Msg = fmt.Sprintf("could not create backrest repo secret: %s", err)

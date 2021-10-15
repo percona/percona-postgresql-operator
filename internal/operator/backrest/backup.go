@@ -119,8 +119,8 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 	jobFields := backrestJobTemplateFields{
 		JobName:         task.Spec.Parameters[config.LABEL_JOB_NAME],
 		ClusterName:     task.Spec.Parameters[config.LABEL_PG_CLUSTER],
-		PodName:         pods.Items[0].Name,
-		SecurityContext: "{}",
+		PodName:         task.Spec.Parameters[config.LABEL_POD_NAME],
+		SecurityContext: `{"runAsNonRoot": true}`,
 		Command:         cmd,
 		CommandOpts:     task.Spec.Parameters[config.LABEL_BACKREST_OPTS],
 		PITRTarget:      "",
