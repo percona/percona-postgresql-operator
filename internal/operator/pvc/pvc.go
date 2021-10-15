@@ -23,17 +23,10 @@ import (
 	"os"
 	"strings"
 
-<<<<<<< HEAD
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/operator"
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
-=======
-	"github.com/crunchydata/postgres-operator/internal/config"
-	"github.com/crunchydata/postgres-operator/internal/operator"
-	"github.com/crunchydata/postgres-operator/internal/util"
-	crv1 "github.com/crunchydata/postgres-operator/pkg/apis/crunchydata.com/v1"
->>>>>>> v4.7.3
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
