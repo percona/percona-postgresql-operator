@@ -99,6 +99,22 @@ commands to generate certificates:
    $ kubectl create secret generic ${CLUSTER_NAME}-ssl-ca --from-file=ca.crt=ca.pem
    $ kubectl create secret tls  ${CLUSTER_NAME}-ssl-keypair --cert=server.pem --key=server-key.pem
 
+You can also generate certificates for PostgreSQL replica in a similar way:
+
+.. code:: bash
+
+   $ cat <<EOF | cfssl gencert -ca=ca.pem  -ca-key=ca-key.pem -config=./ca-config.json - | cfssljson -bare replicas
+   {
+      "CN": "primaryuser",
+      "key": {
+         "algo": "ecdsa",
+         "size": 384
+      }
+   }
+   EOF
+
+   $ kubectl create secret tls  ${CLUSTER_NAME}-ssl-replicas --cert=replicas.pem --key=replicas-key.pem
+
 When certificates are generated, set the following keys in the
 ``deploy/cr.yaml`` configuration file:
 
