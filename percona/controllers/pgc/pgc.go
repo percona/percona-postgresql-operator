@@ -77,6 +77,7 @@ func (c *Controller) onAdd(obj interface{}) {
 	err = c.CreateNewInternalSecrets(newCluster.Name, newCluster.Spec.UsersSecretName, newCluster.Namespace)
 	if err != nil {
 		log.Errorf("create new internal users secrets: %s", err)
+		return
 	}
 	err = pgcluster.Create(c.Client, newCluster)
 	if err != nil {
@@ -296,19 +297,6 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	primary, err := pgcluster.IsPrimary(c.Client, oldCluster)
 	if err != nil {
 		log.Errorf("update perconapgcluster: check is pgcluster primary: %s", err)
-	}
-	if _, ok := newCluster.Annotations["updateuser"]; ok {
-		updateUserPassword(c.Client, "postgres", "test1", &crv1.Pgcluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      newCluster.Name,
-				Namespace: newCluster.Namespace,
-			},
-			Spec: crv1.PgclusterSpec{
-				Name:         newCluster.Name,
-				PasswordType: "md5",
-				Port:         newCluster.Spec.Port,
-			},
-		})
 	}
 	if primary {
 		err = pgreplica.Update(c.Client, newCluster, oldCluster)

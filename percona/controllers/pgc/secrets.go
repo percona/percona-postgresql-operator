@@ -10,6 +10,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgcluster"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -96,7 +97,7 @@ func (c *Controller) generateUsersInternalSecretsDataFromSecret(usersSecret *v1.
 	for userName, password := range usersSecret.Data {
 		secretData, err := generateUserSecretData(userName, clusterName, string(password))
 		if err != nil {
-			return nil, errors.Wrapf(err, "get secret data for%s", userName)
+			return nil, errors.Wrapf(err, "get secret data for %s", userName)
 		}
 		secrets = append(secrets, secretData)
 	}
@@ -127,8 +128,8 @@ func (c *Controller) GenerateUsersInternalSecretsData(clusterName string) ([]Sec
 	return secrets, nil
 }
 
-func generateUserSecretData(user, clusterName, password string) (SecretData, error) {
-	var name, secretName, roles, usersTXT string
+func generateUserSecretData(userName, clusterName, password string) (SecretData, error) {
+	var secretName, roles, usersTXT string
 	if len(password) == 0 {
 		generatedPassword, err := util.GeneratePassword(util.DefaultGeneratedPasswordLength)
 		if err != nil {
@@ -136,25 +137,22 @@ func generateUserSecretData(user, clusterName, password string) (SecretData, err
 		}
 		password = generatedPassword
 	}
-	name = user
-	switch user {
+
+	switch userName {
 	case "postgres":
-		name = "postgres"
 		secretName = clusterName + "-postgres-secret"
 	case "primaryuser":
-		name = "primaryuser"
 		secretName = clusterName + "-primaryuser-secret"
 	case "pgbouncer":
-		name = "pgbouncer"
 		secretName = clusterName + "-pgbouncer-secret"
 		roles = ""
-		usersTXT = `"pgbouncer" "md5` + fmt.Sprintf("%x", md5.Sum([]byte(password+name))) + `"`
+		usersTXT = `"pgbouncer" "md5` + fmt.Sprintf("%x", md5.Sum([]byte(password+userName))) + `"`
 	}
 
 	return SecretData{
 		Name: secretName,
 		Data: UserSecretData{
-			Name:     name,
+			Name:     userName,
 			Password: password,
 			Roles:    roles,
 			UsersTXT: usersTXT,
@@ -206,6 +204,10 @@ func (c *Controller) createUsersInternalSecrets(secrets []SecretData, namespace,
 
 func (c *Controller) updateUsersInternalSecrets(secrets []SecretData, namespace, clusterName string) error {
 	ctx := context.TODO()
+	pgCluster, err := c.Client.CrunchydataV1().Pgclusters(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get pgcluster resource")
+	}
 	for _, secret := range secrets {
 		s, err := c.Client.CoreV1().Secrets(namespace).Get(ctx, secret.Name, metav1.GetOptions{})
 		if err != nil && !kerrors.IsNotFound(err) {
@@ -217,10 +219,6 @@ func (c *Controller) updateUsersInternalSecrets(secrets []SecretData, namespace,
 			if string(pass) == secret.Data.Password {
 				continue
 			}
-		}
-		pgCluster, err := c.Client.CrunchydataV1().Pgclusters(namespace).Get(ctx, clusterName, metav1.GetOptions{})
-		if err != nil {
-			return errors.Wrapf(err, "get pgcluster resource")
 		}
 		err = updateUserPassword(c.Client, secret.Data.Name, secret.Data.Password, pgCluster)
 		if err != nil {
@@ -246,25 +244,11 @@ func (c *Controller) updateUsersInternalSecrets(secrets []SecretData, namespace,
 			if err != nil {
 				return errors.Wrap(err, "change bouncer size to 0")
 			}
-			ctx := context.TODO()
-			for i := 0; i <= 30; i++ {
-				time.Sleep(5 * time.Second)
-				bouncerTerminated := false
-				_, err := c.Client.AppsV1().Deployments(perconaPGCluster.Namespace).Get(ctx,
-					perconaPGCluster.Name+"-pgbouncer", metav1.GetOptions{})
-				if err != nil && kerrors.IsNotFound(err) {
-					bouncerTerminated = true
-
-				}
-				primaryDepl, err := c.Client.AppsV1().Deployments(perconaPGCluster.Namespace).Get(ctx,
-					perconaPGCluster.Name, metav1.GetOptions{})
-				if err != nil && !kerrors.IsNotFound(err) {
-					return errors.Wrap(err, "get pgprimary deployment")
-				}
-				if primaryDepl.Status.Replicas == primaryDepl.Status.AvailableReplicas && bouncerTerminated {
-					break
-				}
+			err = c.waitBouncerTermination(perconaPGCluster)
+			if err != nil {
+				return errors.Wrap(err, "wait pgBouncer termination")
 			}
+
 			s.ResourceVersion = ""
 			_, err = c.Client.CoreV1().Secrets(namespace).Create(ctx, s, metav1.CreateOptions{})
 			if err != nil {
@@ -283,6 +267,29 @@ func (c *Controller) updateUsersInternalSecrets(secrets []SecretData, namespace,
 	}
 
 	return nil
+}
+
+func (c *Controller) waitBouncerTermination(perconaPGCluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	for i := 0; i <= 30; i++ {
+		time.Sleep(5 * time.Second)
+		bouncerTerminated := false
+		_, err := c.Client.AppsV1().Deployments(perconaPGCluster.Namespace).Get(ctx,
+			perconaPGCluster.Name+"-pgbouncer", metav1.GetOptions{})
+		if err != nil && kerrors.IsNotFound(err) {
+			bouncerTerminated = true
+
+		}
+		primaryDepl, err := c.Client.AppsV1().Deployments(perconaPGCluster.Namespace).Get(ctx,
+			perconaPGCluster.Name, metav1.GetOptions{})
+		if err != nil && !kerrors.IsNotFound(err) {
+			return errors.Wrap(err, "get pgprimary deployment")
+		}
+		if primaryDepl.Status.Replicas == primaryDepl.Status.AvailableReplicas && bouncerTerminated {
+			return nil
+		}
+	}
+	return errors.New(perconaPGCluster.Name + "-pgbouncer didn't stop properly")
 }
 
 func sha256Hash(data []byte) string {
