@@ -194,7 +194,7 @@ func (c *Controller) createUsersInternalSecrets(secrets []SecretData, namespace,
 			StringData: data,
 		}
 		_, err := c.Client.CoreV1().Secrets(namespace).Create(ctx, s, metav1.CreateOptions{})
-		if err != nil {
+		if err != nil && !kerrors.IsAlreadyExists(err) {
 			return errors.Wrapf(err, "create secret %s", secret.Name)
 		}
 	}
