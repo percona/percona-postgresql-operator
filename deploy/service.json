@@ -4,8 +4,7 @@
     "metadata": {
 	"name": "postgres-operator",
         "labels": {
-            "name": "postgres-operator",
-            "vendor": "crunchydata"
+            "name": "postgres-operator"
         }
     },
     "spec": {
