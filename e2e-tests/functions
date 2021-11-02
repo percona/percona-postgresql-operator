@@ -13,11 +13,13 @@ IMAGE_RMDATA=${IMAGE_RMDATA:-"${IMAGE_URI_BASE}-pgo-rmdata"}
 IMAGE_SCHEDULER=${IMAGE_SCHEDULER:-"${IMAGE_URI_BASE}-pgo-scheduler"}
 IMAGE_OPERATOR=${IMAGE_OPERATOR:-"${IMAGE_URI_BASE}-postgres-operator"}
 IMAGE_DEPLOYER=${IMAGE_DEPLOYER:-"${IMAGE_URI_BASE}-pgo-deployer"}
-IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-ppg13-pgbouncer"}
-IMAGE_PG_HA=${IMAGE_PG_HA:-"${IMAGE_BASE}:main-ppg13-postgres-ha"}
-IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg13-pgbackrest"}
-IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg13-pgbackrest-repo"}
-IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg13-pgbadger"}
+
+PG_VER="${PG_VER:-14}"
+IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbouncer"}
+IMAGE_PG_HA=${IMAGE_PG_HA:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres-ha"}
+IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest"}
+IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest-repo"}
+IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbadger"}
 IMAGE_PMM=${IMAGE_PMM:-"perconalab/pmm-client:dev-latest"}
 SKIP_BACKUPS_TO_AWS_GCP=${SKIP_BACKUPS_TO_AWS_GCP:-1}
 BUCKET=${BUCKET:-"pg-operator-testing"}
@@ -454,10 +456,12 @@ wait_for_delete() {
 		sleep 1
 		echo -n .
 		let retry+=1
-		if [ $retry -ge 60 ]; then
+		if [ $retry -ge 120 ]; then
 			kubectl_bin logs $(get_operator_pod) \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
+				| grep -v 'Getting tasks for pod' \
+				| grep -v 'Getting pods from source' \
 				| tail -100
 			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
 			exit 1
@@ -473,7 +477,7 @@ wait_deployment() {
 	set +o xtrace
 	retry=0
 	echo -n $name
-	until [ "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.readyReplicas}')" ]; do
+	until [ -n "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" -a "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.readyReplicas}')" ]; do
 		sleep 1
 		echo -n .
 		let retry+=1
@@ -698,30 +702,6 @@ run_psql_ssl() {
 
 	kubectl_bin exec ${client_container} -- \
 		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix" || true
-}
-
-wait_for_delete() {
-	local res="$1"
-
-	set +o xtrace
-	echo -n "$res - "
-	retry=0
-	until (kubectl_bin get $res || :) 2>&1 | grep NotFound; do
-		sleep 1
-		echo -n .
-		let retry+=1
-		if [ $retry -ge 60 ]; then
-			kubectl_bin logs $(get_operator_pod) \
-				| grep -v 'level=info' \
-				| grep -v 'level=debug' \
-				| grep -v 'Getting tasks for pod' \
-				| grep -v 'Getting pods from source' \
-				| tail -100
-			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
-			exit 1
-		fi
-	done
-	set -o xtrace
 }
 
 run_psql() {

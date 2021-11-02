@@ -15,25 +15,91 @@ test_dir=$(realpath $(dirname $0))
 . "${test_dir}"/../functions
 
 main() {
-	IMAGE_OPERATOR="percona/percona-postgresql-operator:0.2.0-postgres-operator"
-	IMAGE_DEPLOYER="percona/percona-postgresql-operator:0.2.0-pgo-deployer"
-
-	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbouncer"
-	IMAGE_PG_HA="percona/percona-postgresql-operator:0.2.0-ppg13-postgres-ha"
-	IMAGE_BACKREST="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest"
-	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:0.2.0-ppg13-pgbackrest-repo"
-	IMAGE_PGBADGER="percona/percona-postgresql-operator:0.2.0-ppg13-pgbadger"
 
 	create_namespace $namespace
-
-	deploy_operator '' "${test_dir}/conf/0.2.0_operator.yaml"
-
-	desc 'start cluster'
 	cluster="some-name"
-	kubectl_bin apply -f $conf_dir/client.yml
 
-	spinup_pgcluster "${cluster}" "${test_dir}/conf/0.2.0_cr.yaml"
-	wait_job_completion "backrest-backup-${cluster}"
+	if [[ "${PG_VER}" -le '13' ]]; then
+		PGO_TAG='0.2.0'
+
+		IMAGE_OPERATOR="percona/percona-postgresql-operator:$PGO_TAG-postgres-operator"
+		IMAGE_DEPLOYER="percona/percona-postgresql-operator:$PGO_TAG-pgo-deployer"
+
+		IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+		IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+		IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+		IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+		IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+
+		deploy_operator '' "${test_dir}/conf/0.2.0_operator.yaml"
+
+		desc 'start cluster'
+		cluster="some-name"
+		kubectl_bin apply -f $conf_dir/client.yml
+
+		spinup_pgcluster "${cluster}" "${test_dir}/conf/0.2.0_cr.yaml"
+		wait_job_completion "backrest-backup-${cluster}"
+
+		kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+			'[
+				{"op":"replace","path":"/spec/pause","value":true},
+				{"op":"replace","path":"/spec/pgBouncer/size","value":0},
+			]'
+		wait_cluster_status "${cluster}" "pgcluster Shutdown"
+
+		kubectl_bin delete \
+			serviceaccounts/pgo-deployer-sa \
+			clusterroles/pgo-deployer-cr \
+			configmaps/pgo-deployer-cm \
+			configmaps/pgo-config \
+			clusterrolebindings/pgo-deployer-crb \
+			jobs.batch/pgo-deploy \
+			deployment/postgres-operator \
+			deployment/some-name-pgbouncer \
+			service/some-name-pgbouncer || :
+	fi
+
+	PGO_TAG='1.0.0'
+	IMAGE_OPERATOR="perconalab/percona-postgresql-operator:${PGO_TAG}-postgres-operator"
+	IMAGE_DEPLOYER="perconalab/percona-postgresql-operator:${PGO_TAG}-pgo-deployer"
+
+	IMAGE_PGBOUNCER="perconalab/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+	IMAGE_PG_HA="perconalab/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+	IMAGE_BACKREST="perconalab/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+	IMAGE_BACKREST_REPO="perconalab/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+	IMAGE_PGBADGER="perconalab/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+
+	deploy_operator
+	if [[ "${PG_VER}" -ge '14' ]]; then
+		desc 'start cluster'
+		kubectl_bin apply -f $conf_dir/client.yml
+		spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+	else
+		kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+			'[
+				{"op":"replace","path":"/spec/backup/backrestRepoImage","value":'${IMAGE_BACKREST_REPO}'},
+				{"op":"replace","path":"/spec/backup/image","value":'${IMAGE_BACKREST}'},
+				{"op":"replace","path":"/spec/pgBadger/image","value":'${IMAGE_PGBADGER}'},
+				{"op":"replace","path":"/spec/pgBouncer/image","value":'${IMAGE_PGBOUNCER}'},
+				{"op":"replace","path":"/spec/pgPrimary/image","value":'${IMAGE_PG_HA}'},
+				{"op":"replace","path":"/spec/userLabels/pgo-version","value":'${PGO_TAG}'},
+				{"op":"replace","path":"/metadata/labels/pgo-version","value":'${PGO_TAG}'},
+				{"op":"replace","path":"/spec/pause","value":false}
+			]'
+	fi
+
+	wait_cluster_consistency "${cluster}"
+	wait_deployment "${cluster}"
+	# wait for some significant time period. Pgbouncer pod may not be started otherwise
+	sleep 10
+	if [[ "${PG_VER}" -le '13' ]]; then
+		kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+			'[
+				{"op":"replace","path":"/spec/pgBouncer/size","value":1}
+			]'
+	fi
+	wait_cluster_consistency "${cluster}"
+	wait_deployment "${cluster}-pgbouncer"
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
@@ -49,16 +115,18 @@ main() {
 		configmaps/pgo-config \
 		clusterrolebindings/pgo-deployer-crb \
 		jobs.batch/pgo-deploy \
-		deployment/postgres-operator
+		deployment/postgres-operator \
+		deployment/some-name-pgbouncer \
+		service/some-name-pgbouncer || :
 
 	IMAGE_OPERATOR="${TARGET_IMAGE_OPERATOR:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"}"
 	IMAGE_DEPLOYER="${TARGET_IMAGE_DEPLOYER:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-pgo-deployer"}"
 
-	IMAGE_PGBOUNCER="${TARGET_IMAGE_PGBOUNCER:-"perconalab/percona-postgresql-operator:1.0.0-ppg13-pgbouncer"}"
-	IMAGE_PG_HA="${TARGET_IMAGE_PG_HA:-"perconalab/percona-postgresql-operator:1.0.0-ppg13-postgres-ha"}"
-	IMAGE_BACKREST="${TARGET_IMAGE_BACKREST:-"perconalab/percona-postgresql-operator:1.0.0-ppg13-pgbackrest"}"
-	IMAGE_BACKREST_REPO="${TARGET_IMAGE_BACKREST_REPO:-"perconalab/percona-postgresql-operator:1.0.0-ppg13-pgbackrest-repo"}"
-	IMAGE_PGBADGER="${TARGET_IMAGE_PGBADGER:-"perconalab/percona-postgresql-operator:1.0.0-ppg13-pgbadger"}"
+	IMAGE_PGBOUNCER="${TARGET_IMAGE_PGBOUNCER:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbouncer"}"
+	IMAGE_PG_HA="${TARGET_IMAGE_PG_HA:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-postgres-ha"}"
+	IMAGE_BACKREST="${TARGET_IMAGE_BACKREST:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbackrest"}"
+	IMAGE_BACKREST_REPO="${TARGET_IMAGE_BACKREST_REPO:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbackrest-repo"}"
+	IMAGE_PGBADGER="${TARGET_IMAGE_PGBADGER:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbadger"}"
 
 	deploy_operator
 
@@ -77,7 +145,7 @@ main() {
 	wait_cluster_consistency "${cluster}"
 	wait_deployment "${cluster}"
 	# wait for some significant time period. Pgbouncer pod may not be started otherwise
-	sleep 120
+	sleep 10
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
 			{"op":"replace","path":"/spec/pgBouncer/size","value":1}
@@ -85,56 +153,7 @@ main() {
 	wait_cluster_consistency "${cluster}"
 	wait_deployment "${cluster}-pgbouncer"
 
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-		'[
-			{"op":"replace","path":"/spec/pause","value":true},
-			{"op":"replace","path":"/spec/pgBouncer/size","value":0},
-		]'
-	wait_cluster_status "${cluster}" "pgcluster Shutdown"
-
-	kubectl_bin delete \
-		serviceaccounts/pgo-deployer-sa \
-		clusterroles/pgo-deployer-cr \
-		configmaps/pgo-deployer-cm \
-		configmaps/pgo-config \
-		clusterrolebindings/pgo-deployer-crb \
-		jobs.batch/pgo-deploy \
-		deployment/postgres-operator
-
-	IMAGE_OPERATOR="${TARGET_IMAGE_OPERATOR:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"}"
-	IMAGE_DEPLOYER="${TARGET_IMAGE_DEPLOYER:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-pgo-deployer"}"
-
-	IMAGE_PGBOUNCER="${TARGET_IMAGE_PGBOUNCER:-"perconalab/percona-postgresql-operator:main-ppg13-pgbouncer"}"
-	IMAGE_PG_HA="${TARGET_IMAGE_PG_HA:-"perconalab/percona-postgresql-operator:main-ppg13-postgres-ha"}"
-	IMAGE_BACKREST="${TARGET_IMAGE_BACKREST:-"perconalab/percona-postgresql-operator:main-ppg13-pgbackrest"}"
-	IMAGE_BACKREST_REPO="${TARGET_IMAGE_BACKREST_REPO:-"perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo"}"
-	IMAGE_PGBADGER="${TARGET_IMAGE_PGBADGER:-"perconalab/percona-postgresql-operator:main-ppg13-pgbadger"}"
-
-	deploy_operator
-
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-		'[
-			{"op":"replace","path":"/spec/backup/backrestRepoImage","value":'${IMAGE_BACKREST_REPO}'},
-			{"op":"replace","path":"/spec/backup/image","value":'${IMAGE_BACKREST}'},
-			{"op":"replace","path":"/spec/pgBadger/image","value":'${IMAGE_PGBADGER}'},
-			{"op":"replace","path":"/spec/pgBouncer/image","value":'${IMAGE_PGBOUNCER}'},
-			{"op":"replace","path":"/spec/pgPrimary/image","value":'${IMAGE_PG_HA}'},
-			{"op":"replace","path":"/spec/userLabels/pgo-version","value":'${GIT_BRANCH}'},
-			{"op":"replace","path":"/metadata/labels/pgo-version","value":'${GIT_BRANCH}'},
-			{"op":"replace","path":"/spec/pause","value":false}
-		]'
-
-	wait_cluster_consistency "${cluster}"
-	wait_deployment "${cluster}"
-	# wait for some significant time period. Pgbouncer pod may not be started otherwise
-	sleep 180
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-		'[
-			{"op":"replace","path":"/spec/pgBouncer/size","value":1}
-		]'
-	wait_cluster_consistency "${cluster}"
-	wait_deployment "${cluster}-pgbouncer"
-
+	sleep 10
 	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "${cluster}:${cluster}_pass@${cluster}-pgbouncer.${namespace}"
 
 	backup_time_interval_min=5
@@ -172,7 +191,7 @@ main() {
 		'[
 			{"op":"replace","path":"/spec/pgBouncer/size","value":0}
 		]'
-	sleep 130
+	sleep 10
 	wait_for_delete "deployment/${cluster}-pgbouncer"
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
@@ -180,7 +199,7 @@ main() {
 			{"op":"replace","path":"/spec/pgBouncer/size","value":1}
 		]'
 	wait_deployment "${cluster}-pgbouncer"
-
+	sleep 10
 	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "${cluster}:${cluster}_pass@${cluster}-pgbouncer.${namespace}" "verify-ca"
 
 	destroy "${namespace}"
