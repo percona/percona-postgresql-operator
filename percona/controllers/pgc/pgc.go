@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controllers/service"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
+	"github.com/robfig/cron/v3"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -38,6 +40,7 @@ type Controller struct {
 	Informer                    informers.PerconaPGClusterInformer
 	PerconaPGClusterWorkerCount int
 	deploymentTemplateData      []byte
+	crons                       CronRegistry
 }
 
 const (
@@ -45,6 +48,29 @@ const (
 	templatePath           = "/"
 	defaultSecurityContext = `{"fsGroup": 26,"supplementalGroups": [1001]}`
 )
+
+type CronRegistry struct {
+	crons             *cron.Cron
+	ensureVersionJobs map[string]Schedule
+	backupJobs        *sync.Map
+}
+
+type Schedule struct {
+	ID           int
+	CronSchedule string
+}
+
+func NewCronRegistry() CronRegistry {
+	c := CronRegistry{
+		crons:             cron.New(),
+		ensureVersionJobs: make(map[string]Schedule),
+		backupJobs:        new(sync.Map),
+	}
+
+	c.crons.Start()
+
+	return c
+}
 
 // onAdd is called when a pgcluster is added
 func (c *Controller) onAdd(obj interface{}) {
@@ -129,7 +155,7 @@ func (c *Controller) RunWorker(stopCh <-chan struct{}, doneCh chan<- struct{}) {
 		return
 	}
 	c.deploymentTemplateData = deploymentTemplateData
-
+	c.crons = NewCronRegistry()
 	log.Debug("perconapgcluster Contoller: worker queue has been shutdown, writing to the done channel")
 	doneCh <- struct{}{}
 }
