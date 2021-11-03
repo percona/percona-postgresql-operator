@@ -19,6 +19,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgreplica"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/service"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/version"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
 	"github.com/robfig/cron/v3"
@@ -83,6 +84,12 @@ func (c *Controller) onAdd(obj interface{}) {
 	c.Queue.Add(key)
 	defer c.Queue.Done(key)
 	newCluster := obj.(*crv1.PerconaPGCluster)
+	err = version.EnsureVersion(newCluster, version.VersionServiceClient{
+		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
+	})
+	if err != nil {
+		fmt.Println("ensure version error", err)
+	}
 	err = c.updateTemplate(newCluster)
 	if err != nil {
 		log.Errorf("update deployment template: %s", err)
