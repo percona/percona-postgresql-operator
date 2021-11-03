@@ -84,12 +84,11 @@ func (c *Controller) onAdd(obj interface{}) {
 	c.Queue.Add(key)
 	defer c.Queue.Done(key)
 	newCluster := obj.(*crv1.PerconaPGCluster)
-	err = version.EnsureVersion(newCluster, version.VersionServiceClient{
-		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
-	})
+	err = updateVersion(newCluster)
 	if err != nil {
-		fmt.Println("ensure version error", err)
+		log.Errorf("update version: %s", err)
 	}
+
 	err = c.updateTemplate(newCluster)
 	if err != nil {
 		log.Errorf("update deployment template: %s", err)
@@ -125,8 +124,27 @@ func (c *Controller) onAdd(obj interface{}) {
 	if err != nil {
 		log.Errorf("handle schedule: %s", err)
 	}
+	ctx := context.TODO()
+	_, err = c.Client.CrunchydataV1().PerconaPGClusters(newCluster.Namespace).Update(ctx, newCluster, metav1.UpdateOptions{})
+	if err != nil {
+		log.Errorf("handle schedule: %s", err)
+	}
 
 	c.Queue.Forget(key)
+}
+
+func updateVersion(newCluster *crv1.PerconaPGCluster) error {
+	if newCluster.Spec.UpgradeOptions == nil {
+		return nil
+	}
+	err := version.EnsureVersion(newCluster, version.VersionServiceClient{
+		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
+	})
+	if err != nil {
+		return errors.Wrap(err, "ensure version")
+	}
+
+	return nil
 }
 
 func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster) error {

@@ -157,6 +157,6 @@ spec:
 #  securityContext:
 #    fsGroup: 1001
 #    supplementalGroups: [1001, 1002, 1003]
-  upgradeOptions:
-    versionServiceEndpoint: https://check.percona.com
-    apply: recommended
+#  upgradeOptions:
+#    versionServiceEndpoint: https://check.percona.com
+#    apply: recommended

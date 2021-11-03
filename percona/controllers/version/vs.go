@@ -1,7 +1,6 @@
 package version
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/versionserviceclient"
 	"github.com/percona/percona-postgresql-operator/versionserviceclient/models"
 	"github.com/percona/percona-postgresql-operator/versionserviceclient/version_service"
+	"github.com/pkg/errors"
 )
 
 const productName = "postgresql-operator"
@@ -20,7 +20,7 @@ func (vs VersionServiceClient) GetExactVersion(cr *api.PerconaPGCluster, endpoin
 	}
 	requestURL, err := url.Parse(endpoint)
 	if err != nil {
-		return DepVersion{}, err
+		return DepVersion{}, errors.Wrap(err, "parse endpoint")
 	}
 
 	srvCl := versionserviceclient.NewHTTPClientWithConfig(nil, &versionserviceclient.TransportConfig{
@@ -46,45 +46,37 @@ func (vs VersionServiceClient) GetExactVersion(cr *api.PerconaPGCluster, endpoin
 	applyParams = applyParams.WithTimeout(10 * time.Second)
 
 	resp, err := srvCl.VersionService.VersionServiceApply(applyParams)
-
 	if err != nil {
-		return DepVersion{}, err
+		return DepVersion{}, errors.Wrap(err, "version service apply")
 	}
 
 	if len(resp.Payload.Versions) == 0 {
-		return DepVersion{}, fmt.Errorf("empty versions response")
+		return DepVersion{}, errors.New("empty versions response")
 	}
-	b, err := resp.Payload.Versions[0].Matrix.MarshalBinary()
-	fmt.Println(string(b))
-	fmt.Println("get backrest version")
+
 	pgBackrestVersion, err := getVersion(resp.Payload.Versions[0].Matrix.Pgbackrest)
 	if err != nil {
-		return DepVersion{}, err
+		return DepVersion{}, errors.Wrap(err, "get pgBackrest version")
 	}
-	fmt.Println("get bouncer version")
 	bouncerVersion, err := getVersion(resp.Payload.Versions[0].Matrix.Pgbouncer)
 	if err != nil {
-		return DepVersion{}, err
+		return DepVersion{}, errors.Wrap(err, "get pgBouncer version")
 	}
-	fmt.Println("get pmm version")
 	pmmVersion, err := getVersion(resp.Payload.Versions[0].Matrix.Pmm)
 	if err != nil {
-		return DepVersion{}, err
+		return DepVersion{}, errors.Wrap(err, "get pmm version")
 	}
-	fmt.Println("get backrestrepo version")
 	pgBackrestRepoVersion, err := getVersion(resp.Payload.Versions[0].Matrix.PgbackrestRepo)
 	if err != nil {
-		return DepVersion{}, err
+		return DepVersion{}, errors.Wrap(err, "get pgBackrestRepo version")
 	}
-	fmt.Println("get badger version")
 	pgBadgerVersion, err := getVersion(resp.Payload.Versions[0].Matrix.Pgbadger)
 	if err != nil {
-		return DepVersion{}, err
+		return DepVersion{}, errors.Wrap(err, "get pgBadger version")
 	}
-	fmt.Println("get psql version")
 	postgreSQLVersion, err := getVersion(resp.Payload.Versions[0].Matrix.Postgresql)
 	if err != nil {
-		return DepVersion{}, err
+		return DepVersion{}, errors.Wrap(err, "get postgresql version")
 	}
 	dv := DepVersion{
 		PostgresImage:       resp.Payload.Versions[0].Matrix.Postgresql[postgreSQLVersion].ImagePath,
@@ -93,16 +85,14 @@ func (vs VersionServiceClient) GetExactVersion(cr *api.PerconaPGCluster, endpoin
 		PGBackrestRepoImage: resp.Payload.Versions[0].Matrix.PgbackrestRepo[pgBackrestRepoVersion].ImagePath,
 		PGBadgerImage:       resp.Payload.Versions[0].Matrix.Pgbadger[pgBadgerVersion].ImagePath,
 		PMMImage:            resp.Payload.Versions[0].Matrix.Pmm[pmmVersion].ImagePath,
-		PMMVersion:          pmmVersion,
 	}
 
 	return dv, nil
 }
 
 func getVersion(versions map[string]models.VersionVersion) (string, error) {
-	//if len(versions) != 1 {
-	if len(versions) == 0 {
-		return "", fmt.Errorf("response has multiple or zero versions")
+	if len(versions) != 1 {
+		return "", errors.New("response has multiple or zero versions")
 	}
 
 	for k := range versions {
