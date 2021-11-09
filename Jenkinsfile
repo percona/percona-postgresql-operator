@@ -400,6 +400,7 @@ pipeline {
                         runTest('clone-cluster', 'sandbox')
                         runTest('tls-check', 'sandbox')
                         runTest('upgrade', 'sandbox')
+                        runTest('smart-update', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }
