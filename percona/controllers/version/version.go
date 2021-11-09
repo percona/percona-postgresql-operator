@@ -6,6 +6,9 @@ import (
 )
 
 func EnsureVersion(cr *api.PerconaPGCluster, vs VersionService) error {
+	if cr.Spec.UpgradeOptions == nil {
+		return nil
+	}
 	newVersion, err := vs.GetExactVersion(cr, cr.Spec.UpgradeOptions.VersionServiceEndpoint, versionMeta{
 		Apply: cr.Spec.UpgradeOptions.Apply,
 		CRUID: string(cr.GetUID()),

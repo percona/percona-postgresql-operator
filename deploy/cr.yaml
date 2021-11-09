@@ -160,3 +160,4 @@ spec:
 #  upgradeOptions:
 #    versionServiceEndpoint: https://check.percona.com
 #    apply: recommended
+#    schedule: "* * * * *"
