@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	sqlAlterRole      = `ALTER ROLE %s`
+	sqlAlterRole      = `ALTER USER %s`
 	sqlPasswordClause = `WITH PASSWORD %s`
 )
 
@@ -36,6 +36,7 @@ func (c *Controller) UpdateUsers(usersSecret *v1.Secret, clusterName, namespace 
 }
 
 func updateUserPassword(clientset kubeapi.Interface, username, password string, cluster *crv1.Pgcluster) error {
+	fmt.Println("Update user password for", username, password)
 	pod, err := util.GetPrimaryPod(clientset, cluster)
 	if err != nil {
 		return errors.Wrap(err, "get primary pod")

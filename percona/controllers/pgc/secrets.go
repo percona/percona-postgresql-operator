@@ -28,7 +28,7 @@ type SecretData struct {
 	Data UserSecretData
 }
 
-func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, namespace string) error {
+func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, clusterUser, namespace string) error {
 	ctx := context.TODO()
 	if len(secretName) == 0 {
 		secretName = clusterName + "-users"
@@ -38,7 +38,7 @@ func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, namespace
 	if err != nil && !kerrors.IsNotFound(err) {
 		return errors.Wrapf(err, "get secret %s", secretName)
 	} else if kerrors.IsNotFound(err) {
-		generatedSecretsData, err := c.GenerateUsersInternalSecretsData(clusterName)
+		generatedSecretsData, err := c.GenerateUsersInternalSecretsData(clusterName, clusterUser)
 		if err != nil {
 			return errors.Wrap(err, "generate users internal data")
 		}
@@ -105,7 +105,7 @@ func (c *Controller) generateUsersInternalSecretsDataFromSecret(usersSecret *v1.
 	return secrets, nil
 }
 
-func (c *Controller) GenerateUsersInternalSecretsData(clusterName string) ([]SecretData, error) {
+func (c *Controller) GenerateUsersInternalSecretsData(clusterName, clusterUser string) ([]SecretData, error) {
 	bouncerUserData, err := generateUserSecretData("pgbouncer", clusterName, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "generate pgbouncer")
@@ -118,11 +118,15 @@ func (c *Controller) GenerateUsersInternalSecretsData(clusterName string) ([]Sec
 	if err != nil {
 		return nil, errors.Wrap(err, "generate primaryuser")
 	}
-
+	clusterCustomUser, err := generateUserSecretData(clusterUser, clusterName, "")
+	if err != nil {
+		return nil, errors.Wrap(err, "generate cluster users")
+	}
 	secrets := []SecretData{
 		bouncerUserData,
 		postgresUserData,
 		primaryUserData,
+		clusterCustomUser,
 	}
 
 	return secrets, nil
@@ -147,6 +151,8 @@ func generateUserSecretData(userName, clusterName, password string) (SecretData,
 		secretName = clusterName + "-pgbouncer-secret"
 		roles = ""
 		usersTXT = `"pgbouncer" "md5` + fmt.Sprintf("%x", md5.Sum([]byte(password+userName))) + `"`
+	default:
+		secretName = clusterName + "-" + userName + "-secret"
 	}
 
 	return SecretData{
