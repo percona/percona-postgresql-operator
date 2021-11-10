@@ -22,8 +22,8 @@ spec:
 #  sslCA: cluster1-ssl-ca
 #  sslSecretName: cluster1-ssl-keypair
 #  sslReplicationSecretName: cluster1-ssl-keypair
-#  keepData: true
-#  keepBackups: true
+  keepData: true
+  keepBackups: true
 #  pgDataSource:
 #    restoreFrom: ""
 #    restoreOpts: ""

@@ -293,6 +293,8 @@ apply_cluster() {
 		| yq w - 'spec.database' ${name} \
 		| yq w - 'spec.name' ${name} \
 		| yq w - 'spec.user' ${name} \
+		| yq w - 'spec.keepData' false \
+		| yq w - 'spec.keepBackups' false \
 		| yq w - 'spec.pgPrimary.image' ${IMAGE_PG_HA} \
 		| yq w - 'spec.backup.image' ${IMAGE_BACKREST} \
 		| yq w - 'spec.backup.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
