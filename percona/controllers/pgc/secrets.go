@@ -28,10 +28,12 @@ type SecretData struct {
 	Data UserSecretData
 }
 
+const usersSecretTag = "-users"
+
 func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, clusterUser, namespace string) error {
 	ctx := context.TODO()
 	if len(secretName) == 0 {
-		secretName = clusterName + "-users"
+		secretName = clusterName + usersSecretTag
 	}
 	secretsData := []SecretData{}
 	usersSecret, err := c.Client.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
@@ -60,6 +62,18 @@ func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, clusterUs
 		return errors.Wrap(err, "create users internal secrets")
 	}
 
+	return nil
+}
+
+func (c *Controller) DeleteSecrets(cr *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	if cr.Spec.KeepBackups || cr.Spec.KeepData {
+		return nil
+	}
+	err := c.Client.CoreV1().Secrets(cr.Namespace).Delete(ctx, cr.Name+usersSecretTag, metav1.DeleteOptions{})
+	if err != nil {
+		return errors.Wrap(err, "delete users secret")
+	}
 	return nil
 }
 

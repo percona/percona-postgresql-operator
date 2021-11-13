@@ -340,6 +340,10 @@ func (c *Controller) onDelete(obj interface{}) {
 	if err != nil {
 		log.Errorf("delete cluster: %s", err)
 	}
+	err = c.DeleteSecrets(cluster)
+	if err != nil {
+		log.Errorf("delete secrets: %s", err)
+	}
 }
 
 // AddPerconaPGClusterEventHandler adds the pgcluster event handler to the pgcluster informer
