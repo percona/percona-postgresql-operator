@@ -291,6 +291,7 @@ apply_cluster() {
 		| yq w - 'spec.database' ${name} \
 		| yq w - 'spec.name' ${name} \
 		| yq w - 'spec.user' ${name} \
+		| yq w - 'spec.secretsName' ${name}-users-secrets \
 		| yq w - 'spec.pgPrimary.image' ${IMAGE_PG_HA} \
 		| yq w - 'spec.backup.image' ${IMAGE_BACKREST} \
 		| yq w - 'spec.backup.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
@@ -573,8 +574,6 @@ spinup_pgcluster() {
 	local schedule_type=${7:-"false"}
 	local tls_enabled=${8:-"false"}
 	desc 'create first PG cluster'
-
-	create_user_secrets "${cluster}"
 
 	desc 'create fresh PG cluster'
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type} ${tls_enabled}
