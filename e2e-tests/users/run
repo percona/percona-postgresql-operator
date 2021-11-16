@@ -9,7 +9,6 @@ test_dir=$(realpath $(dirname $0))
 create_namespace $namespace
 deploy_operator
 cluster="some-name"
-kubectl_bin apply -f $conf_dir/client.yml
 
 spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"

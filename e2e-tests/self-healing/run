@@ -30,8 +30,6 @@ main() {
 
 	desc 'start cluster'
 	cluster="some-name"
-	kubectl_bin apply -f $conf_dir/client.yml
-
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
 	kill_pod "$(get_pod_by_role ${cluster} master name)"
