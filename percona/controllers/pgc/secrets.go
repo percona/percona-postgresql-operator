@@ -70,7 +70,11 @@ func (c *Controller) DeleteSecrets(cr *crv1.PerconaPGCluster) error {
 	if cr.Spec.KeepBackups || cr.Spec.KeepData {
 		return nil
 	}
-	err := c.Client.CoreV1().Secrets(cr.Namespace).Delete(ctx, cr.Name+usersSecretTag, metav1.DeleteOptions{})
+	usersSecretName := cr.Name + usersSecretTag
+	if len(cr.Spec.UsersSecretName) > 0 {
+		usersSecretName = cr.Spec.UsersSecretName
+	}
+	err := c.Client.CoreV1().Secrets(cr.Namespace).Delete(ctx, usersSecretName, metav1.DeleteOptions{})
 	if err != nil {
 		return errors.Wrap(err, "delete users secret")
 	}
