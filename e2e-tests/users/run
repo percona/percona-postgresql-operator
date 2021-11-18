@@ -9,7 +9,6 @@ test_dir=$(realpath $(dirname $0))
 create_namespace $namespace
 deploy_operator
 cluster="some-name"
-kubectl_bin apply -f $conf_dir/client.yml
 
 spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"
@@ -17,16 +16,16 @@ compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:postgr
 
 newpass="test-password"
 newpassencrypted=$(echo -n "$newpass" | base64)
-
-patch_secret "some-name-users" "postgres" "$newpassencrypted"
+secret_name='some-name-users-secrets'
+patch_secret "$secret_name" "postgres" "$newpassencrypted"
 sleep 15
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:${newpass}@${cluster}.${namespace}"
 
-patch_secret "some-name-users" "some-name" "$newpassencrypted"
+patch_secret "$secret_name" "some-name" "$newpassencrypted"
 sleep 15
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:${newpass}@${cluster}.${namespace}"
 
-patch_secret "some-name-users" "pgbouncer" "$newpassencrypted"
+patch_secret "$secret_name" "pgbouncer" "$newpassencrypted"
 sleep 60
 compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:${newpass}@${cluster}-pgbouncer.${namespace}"
 

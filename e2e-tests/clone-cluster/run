@@ -9,7 +9,6 @@ test_dir=$(realpath $(dirname $0))
 create_pgcluster_clone_from() {
 	local cluster=$1
 
-	create_user_secrets "${cluster}-clone"
 	apply_cluster "${src_dir}/deploy/cr.yaml" "${cluster}-clone" "local" "${cluster}"
 	wait_bootstap_completeness "${cluster}-clone"
 }
@@ -21,10 +20,6 @@ main() {
 	desc 'create first PG cluster'
 
 	cluster="some-name"
-	kubectl_bin apply \
-		-f $conf_dir/${cluster}-secrets.yml \
-		-f $conf_dir/client.yml
-
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 	create_backup "${cluster}" "fulldata" "full"
 

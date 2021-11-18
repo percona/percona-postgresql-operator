@@ -11,10 +11,6 @@ deploy_operator
 
 desc 'create first PG cluster'
 cluster="some-name"
-kubectl_bin apply \
-	-f $conf_dir/${cluster}-secrets.yml \
-	-f $conf_dir/client.yml
-
 spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
 compare_kubectl "deployment/postgres-operator"
