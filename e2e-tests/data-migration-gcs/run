@@ -147,4 +147,9 @@ function main {
 	destroy ${namespace}
 }
 
+if [[ "${PG_VER}" -ge '14' ]]; then
+	echo 'Migration to >= PG14 is not supported. Skipping ...'
+	exit 0
+fi
+
 main
