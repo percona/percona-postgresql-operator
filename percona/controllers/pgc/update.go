@@ -59,7 +59,7 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 		}
 		oldCluster, err := c.Client.CrunchydataV1().PerconaPGClusters(newCluster.Namespace).Get(context.TODO(), newCluster.Name, metav1.GetOptions{})
 		if err != nil {
-			log.Errorf("update perconapgcluster: %s", err)
+			log.Errorf("get perconapgcluster: %s", err)
 		}
 		err = smartUpdateCluster(c.Client, newCluster, oldCluster)
 		if err != nil {
