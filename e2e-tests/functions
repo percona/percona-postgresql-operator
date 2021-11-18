@@ -1012,12 +1012,12 @@ run_psql_ssl() {
 	local command="$1"
 	local uri="$2"
 	local driver=${3:-postgres}
-	local suffix=${4:-.svc.cluster.local}
+
 	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 	local sslmode="$5"
 
 	kubectl_bin exec ${client_container} -- \
-		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix" || true
+		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri" || true
 }
 
 patch_secret() {
