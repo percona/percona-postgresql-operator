@@ -32,6 +32,7 @@ main() {
 	cluster="some-name"
 	kubectl_bin apply -f $conf_dir/client.yml
 
+	create_user_secrets "${cluster}"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/0.2.0_cr.yaml"
 	wait_job_completion "backrest-backup-${cluster}"
 
