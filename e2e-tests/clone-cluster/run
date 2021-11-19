@@ -9,6 +9,7 @@ test_dir=$(realpath $(dirname $0))
 create_pgcluster_clone_from() {
 	local cluster=$1
 
+	kubectl_bin apply -f $conf_dir/secrets.yml
 	apply_cluster "${src_dir}/deploy/cr.yaml" "${cluster}-clone" "local" "${cluster}"
 	wait_bootstap_completeness "${cluster}-clone"
 }
