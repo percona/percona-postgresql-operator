@@ -10,8 +10,6 @@ create_namespace $namespace
 deploy_operator
 
 cluster="some-name"
-kubectl_bin apply -f ${conf_dir}/client.yml \
-	-f ${conf_dir}/${cluster}-secrets.yml
 spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
 compare_kubectl "deployment/${cluster}"

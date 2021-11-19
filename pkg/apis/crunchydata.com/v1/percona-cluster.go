@@ -44,6 +44,7 @@ type PerconaPGClusterSpec struct {
 	SSLCA                    string                 `json:"sslCA"`
 	SSLSecretName            string                 `json:"sslSecretName"`
 	SSLReplicationSecretName string                 `json:"sslReplicationSecretName"`
+	UsersSecretName          string                 `json:"secretsName"`
 }
 
 type PerconaPGClusterStatus struct {

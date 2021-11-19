@@ -37,6 +37,7 @@ main() {
 		cluster="some-name"
 		kubectl_bin apply -f $conf_dir/client.yml
 
+		create_user_secrets "${cluster}"
 		spinup_pgcluster "${cluster}" "${test_dir}/conf/0.2.0_cr.yaml"
 		wait_job_completion "backrest-backup-${cluster}"
 
@@ -72,7 +73,7 @@ main() {
 	deploy_operator
 	if [[ "${PG_VER}" -ge '14' ]]; then
 		desc 'start cluster'
-		kubectl_bin apply -f $conf_dir/client.yml
+		create_user_secrets "${cluster}"
 		spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 	else
 		kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \

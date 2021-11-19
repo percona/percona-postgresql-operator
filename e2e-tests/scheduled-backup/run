@@ -54,9 +54,6 @@ function apply_configs {
 	yq r $test_dir/conf/custom-config.yml \
 		| yq w - 'metadata.name' "${cluster}-custom-config" \
 		| kubectl_bin apply -f -
-
-	kubectl_bin apply \
-		-f $conf_dir/client.yml
 }
 
 function main {

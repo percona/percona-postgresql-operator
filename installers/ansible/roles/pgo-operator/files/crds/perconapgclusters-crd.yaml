@@ -25,3 +25,8 @@ spec:
           type: object
           x-kubernetes-preserve-unknown-fields: true
       type: object
+  subresources:
+    status: {}
+    scale:
+      specReplicasPath: .spec.pgReplicas.hotStandby.size
+      statusReplicasPath: .status.ready
