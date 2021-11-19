@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"reflect"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -53,7 +52,7 @@ const (
 type CronRegistry struct {
 	crons             *cron.Cron
 	ensureVersionJobs map[string]Schedule
-	backupJobs        *sync.Map
+	inProgress        bool
 }
 
 type Schedule struct {
@@ -65,7 +64,6 @@ func NewCronRegistry() CronRegistry {
 	c := CronRegistry{
 		crons:             cron.New(),
 		ensureVersionJobs: make(map[string]Schedule),
-		backupJobs:        new(sync.Map),
 	}
 
 	c.crons.Start()
@@ -263,13 +261,19 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if reflect.DeepEqual(oldCluster.Spec, newCluster.Spec) {
 		return
 	}
-	err := c.updateVersion(oldCluster, newCluster)
+	err := version.EnsureVersion(newCluster, version.VersionServiceClient{
+		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
+	})
 	if err != nil {
-		log.Errorf("update version: %s", err)
+		log.Errorf("update perconapgcluster: ensure version %s", err)
+	}
+	err = c.updateVersion(oldCluster, newCluster)
+	if err != nil {
+		log.Errorf("update perconapgcluster:update version: %s", err)
 	}
 	err = c.scheduleUpdate(newCluster)
 	if err != nil {
-		log.Errorf("scheduled update: %s", err)
+		log.Errorf("update perconapgcluster: scheduled update: %s", err)
 	}
 	err = c.updateTemplate(newCluster)
 	if err != nil {

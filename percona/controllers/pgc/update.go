@@ -2,6 +2,7 @@ package pgc
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -16,6 +17,9 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controllers/version"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 )
+
+const never = "never"
+const disabled = "disabled"
 
 func (c *Controller) updateVersion(oldCluster, newCluster *crv1.PerconaPGCluster) error {
 	if oldCluster.Spec.Backup.Image == newCluster.Spec.Backup.Image &&
@@ -43,6 +47,12 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 		}
 		return nil
 	}
+	if strings.ToLower(newCluster.Spec.UpgradeOptions.Apply) == never ||
+		strings.ToLower(newCluster.Spec.UpgradeOptions.Apply) == disabled {
+		if ok {
+			c.deleteEnsureVersion(jn)
+		}
+	}
 	if ok && schedule.CronSchedule == newCluster.Spec.UpgradeOptions.Schedule {
 		return nil
 	}
@@ -50,7 +60,15 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 		c.deleteEnsureVersion(jn)
 	}
 	id, err := c.crons.crons.AddFunc(newCluster.Spec.UpgradeOptions.Schedule, func() {
-		log.Println("Smart update started")
+		for i := 1; i < 30; i++ {
+			time.Sleep(5 * time.Second)
+			if !c.crons.inProgress {
+				break
+			}
+		}
+		c.crons.inProgress = true
+		defer func() { c.crons.inProgress = false }()
+
 		err := version.EnsureVersion(newCluster, version.VersionServiceClient{
 			OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 		})
@@ -85,6 +103,20 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 }
 
 func smartUpdateCluster(client *kubeapi.Client, newCluster, oldCluster *crv1.PerconaPGCluster) error {
+	log.Printf("Smart update of cluster %s started", oldCluster.Name)
+	log.Printf(`Update with images:
+	%s
+	%s
+	%s
+	%s
+	%s
+	`,
+		newCluster.Spec.Backup.Image,
+		newCluster.Spec.Backup.BackrestRepoImage,
+		newCluster.Spec.PGPrimary.Image,
+		newCluster.Spec.PGBadger.Image,
+		newCluster.Spec.PGBouncer.Image)
+
 	if newCluster.Spec.Backup.Image != oldCluster.Spec.Backup.Image || newCluster.Spec.Backup.BackrestRepoImage != oldCluster.Spec.Backup.BackrestRepoImage {
 		err := restartBackrest(client, oldCluster, newCluster.Spec.Backup.Image, newCluster.Spec.Backup.BackrestRepoImage)
 		if err != nil {
@@ -117,6 +149,7 @@ func smartUpdateCluster(client *kubeapi.Client, newCluster, oldCluster *crv1.Per
 		}
 	}
 	oldCluster.Spec.PGBouncer.Image = newCluster.Spec.PGBouncer.Image
+	log.Println("Smart update finished")
 
 	return nil
 }
