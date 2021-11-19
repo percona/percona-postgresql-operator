@@ -292,7 +292,8 @@ apply_cluster() {
 		| yq w - 'spec.clustername' ${name} \
 		| yq w - 'spec.database' ${name} \
 		| yq w - 'spec.name' ${name} \
-		| yq w - 'spec.user' ${name} \
+		| yq w - 'spec.user' some-name \
+		| yq w - 'spec.secretsName' some-name-users-secrets \
 		| yq w - 'spec.pgPrimary.image' ${IMAGE_PG_HA} \
 		| yq w - 'spec.backup.image' ${IMAGE_BACKREST} \
 		| yq w - 'spec.backup.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
@@ -576,11 +577,12 @@ spinup_pgcluster() {
 	local schedule=${6:-"false"}
 	local schedule_type=${7:-"false"}
 	local tls_enabled=${8:-"false"}
+	local secretsFile="${9:-$conf_dir/secrets.yml}"
+	local pgoClientFile="${10:-$conf_dir/client.yml}"
 	desc 'create first PG cluster'
 
-	create_user_secrets "${cluster}"
-
 	desc 'create fresh PG cluster'
+	kubectl_bin apply -f ${secretsFile} -f ${pgoClientFile}
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type} ${tls_enabled}
 	wait_deployment "${cluster}-backrest-shared-repo"
 	wait_deployment "${cluster}"
@@ -990,10 +992,18 @@ run_psql_ssl() {
 	local command="$1"
 	local uri="$2"
 	local driver=${3:-postgres}
-	local suffix=${4:-.svc.cluster.local}
+
 	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 	local sslmode="$5"
 
 	kubectl_bin exec ${client_container} -- \
-		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix" || true
+		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri" || true
+}
+
+patch_secret() {
+	local secret=$1
+	local key=$2
+	local value=$3
+
+	kubectl_bin patch secret $secret -p="{\"data\":{\"$key\": \"$value\"}}"
 }

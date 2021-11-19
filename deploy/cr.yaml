@@ -12,6 +12,7 @@ metadata:
     pgouser: admin
   name: cluster1
 spec:
+  secretsName: cluster1-users-secrets
   database: pgdb
   port: "5432"
   user: pguser
