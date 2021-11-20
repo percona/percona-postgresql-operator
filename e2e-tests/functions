@@ -292,6 +292,8 @@ apply_cluster() {
 		| yq w - 'spec.clustername' ${name} \
 		| yq w - 'spec.database' ${name} \
 		| yq w - 'spec.name' ${name} \
+		| yq w - 'spec.keepData' false \
+		| yq w - 'spec.keepBackups' false \
 		| yq w - 'spec.user' some-name \
 		| yq w - 'spec.secretsName' some-name-users-secrets \
 		| yq w - 'spec.pgPrimary.image' ${IMAGE_PG_HA} \
