@@ -127,19 +127,12 @@ func smartUpdateCluster(client *kubeapi.Client, newCluster, oldCluster *crv1.Per
 	oldCluster.Spec.Backup.BackrestRepoImage = newCluster.Spec.Backup.BackrestRepoImage
 
 	if newCluster.Spec.PGPrimary.Image != oldCluster.Spec.PGPrimary.Image {
-		err := restartCluster(client, oldCluster, newCluster.Spec.PGPrimary.Image)
+		err := restartCluster(client, oldCluster, newCluster.Spec.PGPrimary.Image, newCluster.Spec.PGBadger.Image)
 		if err != nil {
 			return errors.Wrap(err, "restart cluster")
 		}
 	}
 	oldCluster.Spec.PGPrimary.Image = newCluster.Spec.PGPrimary.Image
-
-	if newCluster.Spec.PGBadger.Image != oldCluster.Spec.PGBadger.Image {
-		err := restartBadger(client, oldCluster, newCluster.Spec.PGBadger.Image)
-		if err != nil {
-			return errors.Wrap(err, "restart badger")
-		}
-	}
 	oldCluster.Spec.PGBadger.Image = newCluster.Spec.PGBadger.Image
 
 	if newCluster.Spec.PGBouncer.Image != oldCluster.Spec.PGBouncer.Image {
@@ -154,9 +147,10 @@ func smartUpdateCluster(client *kubeapi.Client, newCluster, oldCluster *crv1.Per
 	return nil
 }
 
-func restartCluster(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, newPostgreSQLImage string) error {
+func restartCluster(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, newPostgreSQLImage, newBadgerImage string) error {
 	newCluster := *oldCluster
 	newCluster.Spec.PGPrimary.Image = newPostgreSQLImage
+	newCluster.Spec.PGBadger.Image = newBadgerImage
 	primary, err := pgcluster.IsPrimary(client, oldCluster)
 	if err != nil {
 		return errors.Wrap(err, "check is pgcluster primary")
@@ -205,18 +199,6 @@ func restartBackrest(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, 
 	if err != nil {
 		return errors.Wrap(err, "update pgcluster")
 	}
-	return nil
-}
-
-func restartBadger(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, newBadgerImage string) error {
-	newCluster := *oldCluster
-	newCluster.Spec.PGBadger.Image = newBadgerImage
-
-	err := pgcluster.Update(client, &newCluster, oldCluster)
-	if err != nil {
-		return errors.Wrap(err, "update pgcluster")
-	}
-
 	return nil
 }
 
