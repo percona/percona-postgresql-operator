@@ -25,7 +25,6 @@ main() {
 	wait_job_completion "backrest-backup-${cluster}"
 	sleep 30
 
-
 	kubectl_bin apply -f ${test_dir}/conf/main_cr.yaml
     sleep 60
 	wait_cluster_consistency "${cluster}"
