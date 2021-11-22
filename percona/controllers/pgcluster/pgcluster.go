@@ -82,7 +82,9 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
 		dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster.Spec.PGPrimary.Image)
 	}
-
+	if oldPerconaPGCluster.Spec.PGBadger.Image != newPerconaPGCluster.Spec.PGBadger.Image {
+		dplmnt.UpdateDeploymentPGBadgerImage(deployment, newPerconaPGCluster.Spec.PGBadger.Image)
+	}
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {

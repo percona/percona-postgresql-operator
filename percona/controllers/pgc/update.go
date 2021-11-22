@@ -127,7 +127,7 @@ func smartUpdateCluster(client *kubeapi.Client, newCluster, oldCluster *crv1.Per
 	oldCluster.Spec.Backup.BackrestRepoImage = newCluster.Spec.Backup.BackrestRepoImage
 
 	if newCluster.Spec.PGPrimary.Image != oldCluster.Spec.PGPrimary.Image {
-		err := restartCluster(client, oldCluster, newCluster.Spec.PGPrimary.Image, newCluster.Spec.PGBadger.Image)
+		err := restartCluster(client, oldCluster, newCluster.Spec.PGPrimary.Image, newCluster.Spec.PGBadger.Image, newCluster.Spec.PMM.Image)
 		if err != nil {
 			return errors.Wrap(err, "restart cluster")
 		}
@@ -147,10 +147,11 @@ func smartUpdateCluster(client *kubeapi.Client, newCluster, oldCluster *crv1.Per
 	return nil
 }
 
-func restartCluster(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, newPostgreSQLImage, newBadgerImage string) error {
+func restartCluster(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, newPostgreSQLImage, newBadgerImage, newPMMImage string) error {
 	newCluster := *oldCluster
 	newCluster.Spec.PGPrimary.Image = newPostgreSQLImage
 	newCluster.Spec.PGBadger.Image = newBadgerImage
+	newCluster.Spec.PMM.Image = newPMMImage
 	primary, err := pgcluster.IsPrimary(client, oldCluster)
 	if err != nil {
 		return errors.Wrap(err, "check is pgcluster primary")

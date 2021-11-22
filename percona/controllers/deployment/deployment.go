@@ -51,3 +51,15 @@ func UpdateDeploymentImage(deployment *appsv1.Deployment, image string) {
 
 	deployment.Spec.Template.Spec.Containers = containers
 }
+
+func UpdateDeploymentPGBadgerImage(deployment *appsv1.Deployment, image string) {
+	containers := []v1.Container{}
+	for _, c := range deployment.Spec.Template.Spec.Containers {
+		if c.Name == "pgbadger" {
+			c.Image = image
+		}
+		containers = append(containers, c)
+	}
+
+	deployment.Spec.Template.Spec.Containers = containers
+}
