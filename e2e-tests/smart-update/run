@@ -26,7 +26,7 @@ main() {
 	sleep 30
 
 	kubectl_bin apply -f ${test_dir}/conf/main_cr.yaml
-    sleep 60
+	sleep 60
 	wait_cluster_consistency "${cluster}"
 
 	sleep 10
