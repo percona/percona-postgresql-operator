@@ -14,7 +14,7 @@ main() {
 	desc 'start cluster'
 	cluster="cluster1"
 	PGO_TAG='1.0.0'
-    PG_VER='13'
+	PG_VER='13'
 	kubectl_bin apply -f $conf_dir/client.yml
 	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
 	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
