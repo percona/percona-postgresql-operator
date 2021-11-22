@@ -111,9 +111,9 @@ type DepVersion struct {
 	PostgresImage         string `json:"postgresImage,omitempty"`
 	PostgresVersion       string `json:"postgresVersion,omitempty"`
 	PGBouncerImage        string `json:"pgBouncerImage,omitempty"`
-	PGBouncerVersion      string `json:"pgBouncerImage,omitempty"`
+	PGBouncerVersion      string `json:"pgBouncerVersion,omitempty"`
 	PGBadgerImage         string `json:"pgBadgerImage,omitempty"`
-	PGBadgerVersion       string `json:"pgBadgerImage,omitempty"`
+	PGBadgerVersion       string `json:"pgBadgerVersion,omitempty"`
 }
 
 type VersionService interface {
