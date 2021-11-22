@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
-	"strings"
 	"text/template"
 	"time"
 
@@ -107,7 +106,11 @@ func (c *Controller) onAdd(obj interface{}) {
 			return
 		}
 	}
-
+	err = c.CreateNewInternalSecrets(newCluster.Name, newCluster.Spec.UsersSecretName, newCluster.Spec.User, newCluster.Namespace)
+	if err != nil {
+		log.Errorf("create new internal users secrets: %s", err)
+		return
+	}
 	err = pgcluster.Create(c.Client, newCluster)
 	if err != nil {
 		log.Errorf("create pgcluster resource: %s", err)
@@ -201,26 +204,31 @@ func (c *Controller) handleStatuses() error {
 	}
 	for _, n := range ns.Items {
 		perconaPGClusters, err := c.Client.CrunchydataV1().PerconaPGClusters(n.Name).List(ctx, metav1.ListOptions{})
-		if err != nil && !strings.Contains(err.Error(), "not found") {
+		if err != nil && !kerrors.IsNotFound(err) {
 			return errors.Wrap(err, "list perconapgclusters")
 		} else if err != nil {
 			// there is no perconapgclusters, so no need to continue
 			return nil
 		}
 		for _, p := range perconaPGClusters.Items {
-			pgClusterStatus := crv1.PgclusterStatus{}
-			replStatuses := make(map[string]crv1.PgreplicaStatus)
+			err = c.reconcileUsers(&p)
+			if err != nil && !kerrors.IsNotFound(err) {
+				return errors.Wrap(err, "reconcile users")
+			}
 			pgCluster, err := c.Client.CrunchydataV1().Pgclusters(n.Name).Get(ctx, p.Name, metav1.GetOptions{})
-			if err != nil && !strings.Contains(err.Error(), "not found") {
+			if err != nil && !kerrors.IsNotFound(err) {
 				return errors.Wrap(err, "get pgCluster")
 			}
+
+			pgClusterStatus := crv1.PgclusterStatus{}
+			replStatuses := make(map[string]crv1.PgreplicaStatus)
 			if pgCluster != nil {
 				pgClusterStatus = pgCluster.Status
 			}
 
 			selector := config.LABEL_PG_CLUSTER + "=" + p.Name
 			pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(n.Name).List(ctx, metav1.ListOptions{LabelSelector: selector})
-			if err != nil && !strings.Contains(err.Error(), "not found") {
+			if err != nil && !kerrors.IsNotFound(err) {
 				return errors.Wrap(err, "get pgReplicas list")
 			}
 			if pgReplicas != nil {
@@ -250,6 +258,42 @@ func (c *Controller) handleStatuses() error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Controller) reconcileUsers(cluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	usersSecretName := cluster.Name + "-users"
+	if len(cluster.Spec.UsersSecretName) > 0 {
+		usersSecretName = cluster.Spec.UsersSecretName
+	}
+	usersSecret, err := c.Client.CoreV1().Secrets(cluster.Namespace).Get(ctx, usersSecretName, metav1.GetOptions{})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrapf(err, "get secret %s", usersSecretName)
+	} else if kerrors.IsNotFound(err) {
+		return nil
+	}
+	oldHash := ""
+	if hash, ok := usersSecret.Annotations["last-applied-secret"]; ok {
+		oldHash = hash
+	}
+	secretData, err := json.Marshal(usersSecret.Data)
+	if err != nil {
+		return errors.Wrap(err, "marshal users secret data")
+	}
+	newSecretDataHash := sha256Hash(secretData)
+	if oldHash == newSecretDataHash {
+		return nil
+	}
+	err = c.UpdateUsers(usersSecret, cluster.Name, cluster.Namespace)
+	if err != nil {
+		return errors.Wrap(err, "update users")
+	}
+	usersSecret.Annotations["last-applied-secret"] = newSecretDataHash
+	_, err = c.Client.CoreV1().Secrets(cluster.Namespace).Update(ctx, usersSecret, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "update secret %s", usersSecret.Name)
+	}
 	return nil
 }
 
@@ -304,7 +348,6 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if err != nil {
 		log.Errorf("update perconapgcluster: check is pgcluster primary: %s", err)
 	}
-
 	if primary {
 		err = pgreplica.Update(c.Client, newCluster, oldCluster)
 		if err != nil {
@@ -328,9 +371,11 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			return
 		}
 	}
-	err = pgcluster.UpdatePgBouncer(c.Client, newCluster, oldCluster)
-	if err != nil {
-		log.Errorf("update perconapgcluster: update pgbouncer: %s", err)
+	if oldCluster.Spec.TlSOnly != newCluster.Spec.TlSOnly {
+		err = pgcluster.RestartPgBouncer(c.Client, newCluster)
+		if err != nil {
+			log.Errorf("update perconapgcluster: restart pgbouncer: %s", err)
+		}
 	}
 }
 
@@ -344,6 +389,10 @@ func (c *Controller) onDelete(obj interface{}) {
 	err := pgcluster.Delete(c.Client, cluster)
 	if err != nil {
 		log.Errorf("delete cluster: %s", err)
+	}
+	err = c.DeleteSecrets(cluster)
+	if err != nil {
+		log.Errorf("delete secrets: %s", err)
 	}
 }
 

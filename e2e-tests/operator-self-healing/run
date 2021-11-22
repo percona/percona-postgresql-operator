@@ -43,7 +43,6 @@ main() {
 
 	desc 'start cluster'
 	cluster="some-name-${RANDOM}"
-	kubectl_bin apply -f $conf_dir/client.yml
 
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
