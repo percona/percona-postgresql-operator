@@ -151,7 +151,7 @@ spec:
 #        labels:
 #          pg-cluster-label: cluster1
   pgBadger:
-    enabled: false
+    enabled: true
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
     port: 10000
 #  securityContext:
