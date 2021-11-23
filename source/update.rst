@@ -7,12 +7,19 @@ Percona Distribution for PostgreSQL Operator allows upgrades to newer versions.
 This includes upgrades of the Operator itself, and upgrades of the Percona
 Distribution for PostgreSQL.
 
+.. contents:: :local:
+
+.. _operator-update:
+
+Upgrading the Operator
+----------------------
+
 .. note:: Only the incremental update to a nearest minor version of the
    Operator is supported. To update
    to a newer version, which differs from the current version by more
    than one, make several incremental updates sequentially.
 
-The following steps will allow you to update both of them to current version
+The following steps will allow you to update the Operator to current version
 (use the name of your cluster instead of the ``<cluster-name>`` placeholder).
 
 #. Pause the cluster in order to stop all possible activities:
@@ -36,6 +43,104 @@ The following steps will allow you to update both of them to current version
  
    $ kubectl create -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v{{{release}}}/deploy/operator.yaml
    $ kubectl wait --for=condition=Complete job/pgo-deploy --timeout=90s
+
+.. _operator-update-smartupdates:
+
+Upgrading Percona Distribution for PostgreSQL
+---------------------------------------------
+
+Automatic upgrade
+*****************
+
+Starting from version 1.1.0, the Operator can do fully automatic upgrades to
+the newer versions of Percona PostgreSQL Cluster within the method named *Smart
+Updates*.
+
+.. hidden:: To have this upgrade method enabled, make sure that the ``updateStrategy`` key in the ``deploy/cr.yaml`` configuration file is set to ``SmartUpdate``.
+
+The Operator will carry on upgrades according to the following algorithm.
+It will query a special *Version Service* server at scheduled times to obtain
+fresh information about version numbers and valid image paths needed for the
+upgrade. If the current version should be upgraded, the Operator updates the CR
+to reflect the new image paths and carries on sequential Pods deletion in a safe
+order, allowing the cluster Pods to be re-deployed with the new image.
+
+The upgrade details are set in the ``upgradeOptions`` section of the 
+``deploy/cr.yaml`` configuration file. Make the following edits to configure
+updates:
+
+#. Set the ``apply`` option to one of the following values:
+
+   * ``Recommended`` - automatic upgrades will choose the most recent version
+     of software flagged as Recommended (for clusters created from scratch,
+     the Percona Distribution for PostgreSQL 13 version will be selected instead of the
+     Percona Distribution for PostgreSQL 14 one regardless of the image path; for already
+     existing clusters, the 13 vs. 14 branch choice will be preserved),
+   * ``13-recommended``, ``14-recommended`` - same as above, but preserves
+     specific major Percona Distribution for PostgreSQL version for newly provisioned
+     clusters,
+   * ``Latest`` - automatic upgrades will choose the most recent version of
+     the software available,
+   * ``13-latest``, ``14-latest`` - same as above, but preserves specific
+     major Percona Distribution for PostgreSQL version for newly provisioned
+     clusters,
+   * *version number* - specify the desired version explicitly,
+   * ``Never`` or ``Disabled`` - disable automatic upgrades
+
+     .. note:: When automatic upgrades are disabled by the ``apply`` option, 
+        Smart Update functionality will continue working for changes triggered
+        by other events, such as updating a ConfigMap, rotating a password, or
+        changing resource values.
+
+#. Make sure the ``versionServiceEndpoint`` key is set to a valid Version
+   Server URL (otherwise Smart Updates will not occur).
+
+   A. You can use the URL of the official Percona's Version Service (default).
+      Set ``versionServiceEndpoint`` to ``https://check.percona.com``.
+
+   B. Alternatively, you can run Version Service inside your cluster. This
+      can be done with the ``kubectl`` command as follows:
+      
+      .. code:: bash
+      
+         $ kubectl run version-service --image=perconalab/version-service --env="SERVE_HTTP=true" --port 11000 --expose
+
+   .. note:: Version Service is never checked if automatic updates are disabled.
+      If automatic updates are enabled, but Version Service URL can not be
+      reached, upgrades will not occur.
+
+#. Use the ``schedule`` option to specify the update checks time in CRON format.
+
+The following example sets the midnight update checks with the official
+Percona's Version Service:
+
+.. code:: yaml
+
+   spec:
+     upgradeOptions:
+       apply: Recommended
+       versionServiceEndpoint: https://check-dev.percona.com       
+       schedule: "0 0 * * *"
+   ...
+
+
+.. _operator-update-semi-auto-updates:
+
+Semi-automatic upgrade
+**********************
+
+Semi-automatic update of Percona Distribution for PostgreSQL should be used with the Operator
+version 1.0.0 or earlier. For all newer versions, use :ref:`automatic update<operator-update-smartupdates>`
+instead.
+
+The following steps will allow you to update the Operator to current version
+(use the name of your cluster instead of the ``<cluster-name>`` placeholder).
+
+#. Pause the cluster in order to stop all possible activities:
+
+.. code:: bash
+
+   $ kubectl patch perconapgcluster/<cluster-name> --type json -p '[{"op": "replace", "path": "/spec/pause", "value": true},{"op":"replace","path":"/spec/pgBouncer/size","value":0}]'
 
 #. Now you can switch the cluster to a new version:
 
