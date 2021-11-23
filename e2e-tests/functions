@@ -565,6 +565,7 @@ compare_kubectl() {
 		| yq d - '**.preemptionPolicy' \
 		| yq d - '**.ipFamilies' \
 		| yq d - '**.ipFamilyPolicy' \
+		| yq d - '**.internalTrafficPolicy' \
 			>${new_result}
 
 	case ${KUBE_VERSION} in
