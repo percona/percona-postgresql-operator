@@ -567,6 +567,21 @@ compare_kubectl() {
 		| yq d - '**.ipFamilyPolicy' \
 			>${new_result}
 
+	case ${KUBE_VERSION} in
+		"1.21"|"1.22")
+			: nothing should happen
+			;;
+		*)
+			# add empty annotation struct
+			if [[ "x$(yq r ${new_result} 'metadata.annotations')" == "x" ]]; then
+				yq w -i ${new_result} "metadata.annotations.false_tag" {}
+				yq d -i ${new_result} "metadata.annotations.false_tag"
+				# fix key sorting
+				yq r --tojson ${new_result} | jq -S '.' | yq r - --prettyPrint > "${new_result}-mod"
+				mv "${new_result}-mod" ${new_result}
+			fi
+		;;
+	esac
 	diff -u ${expected_result} ${new_result}
 }
 
@@ -895,7 +910,7 @@ deploy_chaos_mesh() {
 				--set chaosDaemon.runtime=crio \
 				--set chaosDaemon.socketPath=/var/run/crio/crio.sock \
 				--set dashboard.create=false \
-				--version v2.0.0 \
+				--version v2.0.4 \
 				--set clusterScoped=false \
 				--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			;;
@@ -905,7 +920,7 @@ deploy_chaos_mesh() {
 				--set chaosDaemon.runtime=containerd \
 				--set chaosDaemon.socketPath=/var/run/dockershim.sock \
 				--set dashboard.create=false \
-				--version v2.0.0 \
+				--version v2.0.4 \
 				--set clusterScoped=false \
 				--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			;;
@@ -916,14 +931,14 @@ deploy_chaos_mesh() {
 					--set chaosDaemon.runtime=containerd \
 					--set chaosDaemon.socketPath=/run/containerd/containerd.sock \
 					--set dashboard.create=false \
-					--version v2.0.0 \
+					--version v2.0.4 \
 					--set clusterScoped=false \
 					--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			else
 				helm install chaos-mesh chaos-mesh/chaos-mesh \
 					--namespace=${chaos_mesh_ns} \
 					--set dashboard.create=false \
-					--version v2.0.0 \
+					--version v2.0.4 \
 					--set clusterScoped=false \
 					--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			fi
