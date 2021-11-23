@@ -566,6 +566,7 @@ compare_kubectl() {
 		| yq d - '**.ipFamilies' \
 		| yq d - '**.ipFamilyPolicy' \
 		| yq d - '**.internalTrafficPolicy' \
+		| yq d - '**.allocateLoadBalancerNodePorts' \
 			>${new_result}
 
 	case ${KUBE_VERSION} in
@@ -749,8 +750,6 @@ destroy() {
 		| sort -u \
 		| tee $tmp_dir/operator.log
 
-	kubectl_bin delete -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml 2>/dev/null || :
-
 	if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
 		oc delete --grace-period=0 --force=true project "$namespace"
 	else
@@ -759,13 +758,6 @@ destroy() {
 	kubectl_bin delete clusterrolebindings pgo-cluster-role pgo-deployer-cr || true
 	kubectl_bin delete clusterroles pgo-cluster-role pgo-deployer-cr || true
 	rm -rf ${tmp_dir}
-}
-
-deploy_cert_manager() {
-	kubectl_bin create namespace cert-manager || :
-	kubectl_bin label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-	kubectl_bin apply -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml --validate=false || : 2>/dev/null
-	sleep 45
 }
 
 create_replica() {
