@@ -8,6 +8,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+const (
+	ContainerDatabase = "database"
+	ContainerPGBadger = "pgbadger"
+)
+
 func UpdateSpecTemplateSpecSecurityContext(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
 	if cl.Spec.SecurityContext == nil {
 		return
@@ -40,22 +45,10 @@ func UpdateSpecTemplateLabels(labels map[string]string, deployment *appsv1.Deplo
 	return
 }
 
-func UpdateDeploymentImage(deployment *appsv1.Deployment, image string) {
+func UpdateDeploymentImage(deployment *appsv1.Deployment, containerName, image string) {
 	containers := []v1.Container{}
 	for _, c := range deployment.Spec.Template.Spec.Containers {
-		if c.Name == "database" {
-			c.Image = image
-		}
-		containers = append(containers, c)
-	}
-
-	deployment.Spec.Template.Spec.Containers = containers
-}
-
-func UpdateDeploymentPGBadgerImage(deployment *appsv1.Deployment, image string) {
-	containers := []v1.Container{}
-	for _, c := range deployment.Spec.Template.Spec.Containers {
-		if c.Name == "pgbadger" {
+		if c.Name == containerName {
 			c.Image = image
 		}
 		containers = append(containers, c)

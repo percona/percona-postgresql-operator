@@ -32,15 +32,20 @@ func UpdatePMMSidecar(clientset kubeapi.Interface, cluster *crv1.Pgcluster, depl
 
 func AddOrRemovePMMContainer(cl *crv1.PerconaPGCluster, clusterName, nodeName string, deployment *appsv1.Deployment) {
 	containers := []v1.Container{}
+	added := false
 	for _, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == pmmContainerName {
 			if !cl.Spec.PMM.Enabled {
 				continue
 			}
 			containers = append(containers, GetPMMContainer(cl, clusterName, nodeName))
+			added = true
 			continue
 		}
 		containers = append(containers, c)
+	}
+	if !added && cl.Spec.PMM.Enabled {
+		containers = append(containers, GetPMMContainer(cl, clusterName, nodeName))
 	}
 	deployment.Spec.Template.Spec.Containers = containers
 }

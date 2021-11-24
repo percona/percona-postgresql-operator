@@ -80,10 +80,10 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 	}
 
 	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
-		dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster.Spec.PGPrimary.Image)
+		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerDatabase, newPerconaPGCluster.Spec.PGPrimary.Image)
 	}
 	if oldPerconaPGCluster.Spec.PGBadger.Image != newPerconaPGCluster.Spec.PGBadger.Image {
-		dplmnt.UpdateDeploymentPGBadgerImage(deployment, newPerconaPGCluster.Spec.PGBadger.Image)
+		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerPGBadger, newPerconaPGCluster.Spec.PGBadger.Image)
 	}
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
@@ -105,7 +105,7 @@ func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *
 		return errors.Wrap(err, "getdeployment")
 	}
 
-	dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster.Spec.Backup.BackrestRepoImage)
+	dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerDatabase, newPerconaPGCluster.Spec.Backup.BackrestRepoImage)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "update deployment")
