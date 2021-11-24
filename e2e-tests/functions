@@ -570,7 +570,7 @@ compare_kubectl() {
 			>${new_result}
 
 	case ${KUBE_VERSION} in
-		"1.21"|"1.22")
+		"1.21" | "1.22")
 			: nothing should happen
 			;;
 		*)
@@ -579,10 +579,10 @@ compare_kubectl() {
 				yq w -i ${new_result} "metadata.annotations.false_tag" {}
 				yq d -i ${new_result} "metadata.annotations.false_tag"
 				# fix key sorting
-				yq r --tojson ${new_result} | jq -S '.' | yq r - --prettyPrint > "${new_result}-mod"
+				yq r --tojson ${new_result} | jq -S '.' | yq r - --prettyPrint >"${new_result}-mod"
 				mv "${new_result}-mod" ${new_result}
 			fi
-		;;
+			;;
 	esac
 	diff -u ${expected_result} ${new_result}
 }
