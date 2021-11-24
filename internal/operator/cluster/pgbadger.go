@@ -163,17 +163,22 @@ func addPGBadgerSidecar(cluster *crv1.Pgcluster, deployment *appsv1.Deployment) 
 	// this definition will supersede any exporter container already in the
 	// containers list
 	containers := []v1.Container{}
+	added := false
 	for _, c := range deployment.Spec.Template.Spec.Containers {
-		// skip if this is the pgBadger container. pgBadger is added after the loop
+		// update if pgbadger container exist
 		if c.Name == pgBadgerContainerName {
+			containers = append(containers, container)
+			added = true
 			continue
 		}
 
 		containers = append(containers, c)
 	}
 
-	// add the pgBadger container and override the containers list definition
-	containers = append(containers, container)
+	// add the pgBadger container if its not present
+	if !added {
+		containers = append(containers, container)
+	}
 	deployment.Spec.Template.Spec.Containers = containers
 
 	return nil

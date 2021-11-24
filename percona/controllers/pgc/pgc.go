@@ -88,7 +88,7 @@ func (c *Controller) onAdd(obj interface{}) {
 		log.Errorf("update deployment template: %s", err)
 		return
 	}
-	err = c.updateTemplate(newCluster)
+	err = c.updateTemplate(newCluster, newCluster.Name)
 	if err != nil {
 		log.Errorf("update deployment template: %s", err)
 		return
@@ -117,7 +117,7 @@ func (c *Controller) onAdd(obj interface{}) {
 	}
 
 	if newCluster.Spec.PGReplicas != nil {
-		err = pgreplica.Create(c.Client, newCluster)
+		err = c.createReplicas(newCluster)
 		if err != nil {
 			log.Errorf("create pgreplicas: %s", err)
 		}
@@ -136,8 +136,29 @@ func (c *Controller) onAdd(obj interface{}) {
 	c.Queue.Forget(key)
 }
 
-func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster) error {
-	templateData, err := pmm.HandlePMMTemplate(c.deploymentTemplateData, newCluster)
+func (c *Controller) createReplicas(cluster *crv1.PerconaPGCluster) error {
+	if cluster.Spec.PGReplicas.HotStandby.Size == 0 {
+		return nil
+	}
+	err := service.CreateOrUpdate(c.Client, cluster, service.PGReplicaServiceType)
+	if err != nil {
+		return errors.Wrap(err, "handle replica service")
+	}
+	if cluster.Spec.PGReplicas == nil {
+		return nil
+	}
+	for i := 1; i <= cluster.Spec.PGReplicas.HotStandby.Size; i++ {
+		err = pgreplica.CreateReplicaResource(c.Client, cluster, i)
+		if err != nil {
+			return errors.Wrap(err, "create replica")
+		}
+	}
+
+	return nil
+}
+
+func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster, nodeName string) error {
+	templateData, err := pmm.HandlePMMTemplate(c.deploymentTemplateData, newCluster, nodeName)
 	if err != nil {
 		return errors.Wrap(err, "handle pmm template data")
 	}
@@ -319,7 +340,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if err != nil {
 		log.Errorf("update perconapgcluster: scheduled update: %s", err)
 	}
-	err = c.updateTemplate(newCluster)
+	err = c.updateTemplate(newCluster, newCluster.Name)
 	if err != nil {
 		log.Errorf("update perconapgcluster: update deployment template: %s", err)
 	}

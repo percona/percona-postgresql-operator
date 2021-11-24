@@ -19,47 +19,37 @@ const (
 	pmmContainerName = "pmm-client"
 )
 
-func UpdatePMMSidecar(clientset kubeapi.Interface, cluster *crv1.Pgcluster, deployment *appsv1.Deployment) error {
+func UpdatePMMSidecar(clientset kubeapi.Interface, cluster *crv1.Pgcluster, deployment *appsv1.Deployment, nodeName string) error {
 	ctx := context.TODO()
 	cl, err := clientset.CrunchydataV1().PerconaPGClusters(cluster.Namespace).Get(ctx, cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "get perconapgcluster resource: %s")
 	}
 
-	return AddOrRemovePMMSidecar(cl, cluster.Name, deployment)
-}
-
-func AddOrRemovePMMSidecar(cl *crv1.PerconaPGCluster, clusterName string, deployment *appsv1.Deployment) error {
-	removePMMSidecar(deployment)
-	if !cl.Spec.PMM.Enabled {
-		return nil
-	}
-	cl.Name = deployment.Name
-	container := GetPMMContainer(cl, clusterName)
-	deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, container)
-
+	AddOrRemovePMMContainer(cl, cluster.Name, nodeName, deployment)
 	return nil
 }
 
-func removePMMSidecar(deployment *appsv1.Deployment) {
-	// first, find the container entry in the list of containers and remove it
+func AddOrRemovePMMContainer(cl *crv1.PerconaPGCluster, clusterName, nodeName string, deployment *appsv1.Deployment) {
 	containers := []v1.Container{}
 	for _, c := range deployment.Spec.Template.Spec.Containers {
-		// skip if this is the PMM container
 		if c.Name == pmmContainerName {
+			if !cl.Spec.PMM.Enabled {
+				continue
+			}
+			containers = append(containers, GetPMMContainer(cl, clusterName, nodeName))
 			continue
 		}
 		containers = append(containers, c)
 	}
-
 	deployment.Spec.Template.Spec.Containers = containers
 }
 
-func HandlePMMTemplate(template []byte, cluster *crv1.PerconaPGCluster) ([]byte, error) {
+func HandlePMMTemplate(template []byte, cluster *crv1.PerconaPGCluster, nodeName string) ([]byte, error) {
 	if !cluster.Spec.PMM.Enabled {
 		return bytes.Replace(template, []byte("<pmmContainer>"), []byte(""), -1), nil
 	}
-	pmmContainerBytes, err := GetPMMContainerJSON(cluster)
+	pmmContainerBytes, err := GetPMMContainerJSON(cluster, nodeName)
 	if err != nil {
 		return nil, errors.Wrap(err, "get pmm container json: %s")
 	}
@@ -67,8 +57,8 @@ func HandlePMMTemplate(template []byte, cluster *crv1.PerconaPGCluster) ([]byte,
 	return bytes.Replace(template, []byte("<pmmContainer>"), append([]byte(", "), pmmContainerBytes...), -1), nil
 }
 
-func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster) ([]byte, error) {
-	c := GetPMMContainer(pgc, pgc.Name)
+func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster, nodeName string) ([]byte, error) {
+	c := GetPMMContainer(pgc, pgc.Name, "{{.Name}}")
 	b, err := json.Marshal(c)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal container")
@@ -77,9 +67,9 @@ func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster) ([]byte, error) {
 	return b, nil
 }
 
-func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName string) v1.Container {
+func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName, nodeName string) v1.Container {
 	return v1.Container{
-		Name:  "pmm-client",
+		Name:  pmmContainerName,
 		Image: pgc.Spec.PMM.Image,
 		LivenessProbe: &v1.Probe{
 			Handler: v1.Handler{
@@ -218,7 +208,7 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName string) v1.Containe
 			},
 			{
 				Name:  "PMM_AGENT_SETUP_NODE_NAME",
-				Value: pgc.Name,
+				Value: nodeName,
 			},
 			{
 				Name:  "PMM_AGENT_SETUP_METRICS_MODE",

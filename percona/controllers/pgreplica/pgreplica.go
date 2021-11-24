@@ -21,38 +21,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Create(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster) error {
+func CreateReplicaResource(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster, index int) error {
 	ctx := context.TODO()
-	if cluster.Spec.PGReplicas.HotStandby.Size == 0 {
-		return nil
-	}
-	err := service.CreateOrUpdate(clientset, cluster, service.PGReplicaServiceType)
+	replica := getNewReplicaObject(cluster, &crv1.Pgreplica{}, index)
+	_, err := clientset.CrunchydataV1().Pgreplicas(cluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
 	if err != nil {
-		return errors.Wrap(err, "handle replica service")
+		return errors.Wrapf(err, "create replica %s", replica.Name)
 	}
-	if cluster.Spec.PGReplicas == nil {
-		return nil
-	}
-	for i := 1; i <= cluster.Spec.PGReplicas.HotStandby.Size; i++ {
-		replica := getNewReplicaObject(cluster, &crv1.Pgreplica{}, i)
-		_, err := clientset.CrunchydataV1().Pgreplicas(cluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
+	for i := 0; i <= 30; i++ {
+		time.Sleep(5 * time.Second)
+		dep, err := clientset.AppsV1().Deployments(cluster.Namespace).Get(ctx,
+			replica.Name, metav1.GetOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "create replica %s", replica.Name)
+			// no need to return error here
+			log.Info(errors.Wrapf(err, "get deployment %s", replica.Name))
 		}
-		for i := 0; i <= 30; i++ {
-			time.Sleep(5 * time.Second)
-			dep, err := clientset.AppsV1().Deployments(cluster.Namespace).Get(ctx,
-				replica.Name, metav1.GetOptions{})
-
-			if err != nil {
-				log.Info(errors.Wrapf(err, "get deployment %s", replica.Name))
-			}
-			if dep.Status.UnavailableReplicas == 0 {
-				break
-			}
+		if dep.Status.UnavailableReplicas == 0 {
+			break
 		}
 	}
-
 	return nil
 }
 
@@ -117,7 +104,7 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 
 		err = updateDeployment(clientset, replica, newCluster, oldCluster)
 		if err != nil {
-			return errors.Wrapf(err, "update replica deployment%s", replica.Name)
+			return errors.Wrapf(err, "update replica deployment %s", replica.Name)
 		}
 		if !reflect.DeepEqual(newCluster.Spec.PGReplicas.HotStandby, oldCluster.Spec.PGReplicas.HotStandby) {
 			_, err = clientset.CrunchydataV1().Pgreplicas(newCluster.Namespace).Update(ctx, replica, metav1.UpdateOptions{})
@@ -294,10 +281,7 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica, newP
 	}
 	updateAnnotations(cl, deployment)
 	updateLabels(cl, deployment)
-	err = pmm.AddOrRemovePMMSidecar(cl, replica.Spec.ClusterName, deployment)
-	if err != nil {
-		return errors.Wrap(err, "add or remove pmm sidecar: %s")
-	}
+	pmm.AddOrRemovePMMContainer(cl, replica.Spec.ClusterName, replica.Spec.Name, deployment)
 	updateResources(cl, deployment)
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(cl, deployment)
 	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {

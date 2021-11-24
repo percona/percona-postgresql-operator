@@ -73,7 +73,7 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 	}
 
 	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PMM, newPerconaPGCluster.Spec.PMM) {
-		err = pmm.UpdatePMMSidecar(clientset, pgCluster, deployment)
+		err = pmm.UpdatePMMSidecar(clientset, pgCluster, deployment, newPerconaPGCluster.Name)
 		if err != nil {
 			return errors.Wrap(err, "update pmm sidecar")
 		}
