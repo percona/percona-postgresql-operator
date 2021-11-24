@@ -204,6 +204,26 @@ wait_pod_completion() {
 	set -o xtrace
 }
 
+next_backup_after_sec() {
+	# configmap is to contain schedule like '*/N * * * *'
+	local conf_map_name=$1
+
+	local configmap_creation_time=$($date '+%s' --date=$(kubectl_bin get configmap/${conf_map_name} -o jsonpath='{.metadata.creationTimestamp}'))
+	local backup_time_interval_sec=$(($(kubectl_bin get configmap/${conf_map_name} -o jsonpath='{.data.schedule}' | jq '.schedule' | grep -Eo '[0-9]+') * 60))
+
+	local next_interval_hop=$((${configmap_creation_time} + ${backup_time_interval_sec}))
+	local next_interval_min_edge=$((${next_interval_hop} % ${backup_time_interval_sec}))
+	local next_backup_at_sec=$((${next_interval_hop} - ${next_interval_min_edge}))
+
+	local sec_to_wait=$((${next_backup_at_sec} - $($date +%s)))
+	if [[ ${sec_to_wait} -lt 0 ]]; then
+		echo 0
+		return
+	fi
+
+	echo ${sec_to_wait}
+}
+
 wait_pod() {
 	local pod=$1
 

@@ -160,17 +160,12 @@ main() {
 	backup_time_interval_min=5
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
-			{"op":"add","path":"/spec/backup/schedule","value":[{"name":"5min-backup","schedule":"*/'${backup_time_interval_min}' * * * *","keep":3,"type":"full","storage":"local"}]},
+			{"op":"add","path":"/spec/backup/schedule","value":[{"name":"'${backup_time_interval_min}'min-backup","schedule":"*/'${backup_time_interval_min}' * * * *","keep":3,"type":"full","storage":"local"}]},
 			{"op":"add","path":"/spec/backup/storages","value":{"local":{"type":"local"}}}
 		]'
 	sleep 10
-	configmap_creation_time=$(kubectl_bin get configmap/${cluster}-${backup_time_interval_min}min-backup -o jsonpath='{.metadata.creationTimestamp}')
-	backup_target_minute=$(($(($($date -d${configmap_creation_time} +%M) + ${backup_time_interval_min})) - $(($(($($date -d${configmap_creation_time} +%M) + ${backup_time_interval_min})) % ${backup_time_interval_min}))))
-	sleep_time=$(($((${backup_target_minute} - $($date +%M))) * 60))
-	sleep ${sleep_time}
-
-	backup_job=$(kubectl_bin get jobs --selector=backrest-command=backup,pg-cluster=${cluster} | grep sch | awk '{print $1}')
-	wait_job_completion ${backup_job}
+	sleep $(next_backup_after_sec ${cluster}-${backup_time_interval_min}min-backup)
+	kubectl_bin wait "job/${cluster}-full-sch-backup" --for=condition=Complete --timeout=300s
 
 	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "${cluster}:${cluster}_pass@${cluster}-pgbouncer.${namespace}"
 
@@ -193,7 +188,7 @@ main() {
 			{"op":"replace","path":"/spec/pgBouncer/size","value":0}
 		]'
 	sleep 10
-	wait_for_delete "deployment/${cluster}-pgbouncer"
+	kubectl_bin wait --for=delete "deployment/${cluster}-pgbouncer" --timeout=60s
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[

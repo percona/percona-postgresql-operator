@@ -97,7 +97,6 @@ function main {
 	unset TARGET_CONFIG
 
 	create_namespace $namespace
-	deploy_cert_manager
 	deploy_operator
 
 	desc 'create first PG cluster'
