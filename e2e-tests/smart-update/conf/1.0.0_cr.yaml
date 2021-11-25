@@ -12,7 +12,6 @@ metadata:
     pgouser: admin
   name: cluster1
 spec:
-  secretsName: cluster1-users-secrets
   database: pgdb
   port: "5432"
   user: pguser
@@ -23,8 +22,8 @@ spec:
 #  sslCA: cluster1-ssl-ca
 #  sslSecretName: cluster1-ssl-keypair
 #  sslReplicationSecretName: cluster1-ssl-keypair
-  keepData: true
-  keepBackups: true
+#  keepData: true
+#  keepBackups: true
 #  pgDataSource:
 #    restoreFrom: ""
 #    restoreOpts: ""
@@ -46,7 +45,7 @@ spec:
   userLabels:
     pgo-version: "1.0.0"
   pgPrimary:
-    image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
+    image: perconalab/percona-postgresql-operator:1.0.0-ppg13-postgres-ha
     resources:
       requests:
         memory: "128Mi"
@@ -79,8 +78,8 @@ spec:
 #        cpu: "1"
 #        memory: "400M"
   backup:
-    image: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
-    backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
+    image: perconalab/percona-postgresql-operator:1.0.0-ppg13-pgbackrest
+    backrestRepoImage: perconalab/percona-postgresql-operator:1.0.0-ppg13-pgbackrest-repo
     resources:
       requests:
         memory: "48Mi"
@@ -105,7 +104,7 @@ spec:
         type: full
         storage: local
   pgBouncer:
-    image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
+    image: perconalab/percona-postgresql-operator:1.0.0-ppg13-pgbouncer
     size: 1
     resources:
       requests:
@@ -152,8 +151,8 @@ spec:
 #        labels:
 #          pg-cluster-label: cluster1
   pgBadger:
-    enabled: false
-    image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
+    enabled: true
+    image: perconalab/percona-postgresql-operator:1.0.0-ppg13-pgbadger
     port: 10000
 #  securityContext:
 #    fsGroup: 1001
@@ -161,4 +160,3 @@ spec:
 #  upgradeOptions:
 #    versionServiceEndpoint: https://check.percona.com
 #    apply: recommended
-#    schedule: "* * * * *"

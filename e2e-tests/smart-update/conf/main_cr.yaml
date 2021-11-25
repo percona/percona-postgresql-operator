@@ -12,7 +12,6 @@ metadata:
     pgouser: admin
   name: cluster1
 spec:
-  secretsName: cluster1-users-secrets
   database: pgdb
   port: "5432"
   user: pguser
@@ -23,8 +22,8 @@ spec:
 #  sslCA: cluster1-ssl-ca
 #  sslSecretName: cluster1-ssl-keypair
 #  sslReplicationSecretName: cluster1-ssl-keypair
-  keepData: true
-  keepBackups: true
+#  keepData: true
+#  keepBackups: true
 #  pgDataSource:
 #    restoreFrom: ""
 #    restoreOpts: ""
@@ -44,7 +43,7 @@ spec:
 #      storageclass: ""
 #      matchLabels: ""
   userLabels:
-    pgo-version: "1.0.0"
+    pgo-version: "main"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
     resources:
@@ -152,7 +151,7 @@ spec:
 #        labels:
 #          pg-cluster-label: cluster1
   pgBadger:
-    enabled: false
+    enabled: true
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
     port: 10000
 #  securityContext:
@@ -161,4 +160,4 @@ spec:
 #  upgradeOptions:
 #    versionServiceEndpoint: https://check.percona.com
 #    apply: recommended
-#    schedule: "* * * * *"
+#    schedule: "*/5 * * * *"

@@ -15,6 +15,7 @@ import (
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -73,20 +74,33 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 	}
 
 	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PMM, newPerconaPGCluster.Spec.PMM) {
-		err = pmm.UpdatePMMSidecar(clientset, pgCluster, deployment)
+		err = pmm.UpdatePMMSidecar(clientset, pgCluster, deployment, newPerconaPGCluster.Name)
 		if err != nil {
 			return errors.Wrap(err, "update pmm sidecar")
 		}
 	}
 
 	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
-		dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster.Spec.PGPrimary.Image)
+		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerDatabase, newPerconaPGCluster.Spec.PGPrimary.Image)
 	}
-
+	if oldPerconaPGCluster.Spec.PGBadger.Image != newPerconaPGCluster.Spec.PGBadger.Image {
+		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerPGBadger, newPerconaPGCluster.Spec.PGBadger.Image)
+	}
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "update deployment")
+	}
+	for i := 0; i <= 30; i++ {
+		time.Sleep(5 * time.Second)
+		dep, err := clientset.AppsV1().Deployments(deployment.Namespace).Get(ctx,
+			deployment.Name, metav1.GetOptions{})
+		if err != nil {
+			log.Info(errors.Wrapf(err, "get deployment %s", deployment.Name))
+		}
+		if dep.Status.UnavailableReplicas == 0 {
+			break
+		}
 	}
 
 	return nil
@@ -103,7 +117,7 @@ func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *
 		return errors.Wrap(err, "getdeployment")
 	}
 
-	dplmnt.UpdateDeploymentImage(deployment, newPerconaPGCluster.Spec.Backup.BackrestRepoImage)
+	dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerDatabase, newPerconaPGCluster.Spec.Backup.BackrestRepoImage)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "update deployment")

@@ -23,7 +23,7 @@ type s struct {
 
 const (
 	keep         actionType = "keep"
-	delete       actionType = "delete"
+	del          actionType = "delete"
 	update       actionType = "update"
 	create       actionType = "create"
 	storageLocal            = "local"
@@ -44,7 +44,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 	sm := make(map[string]s)
 	for _, schedule := range oldCluster.Spec.Backup.Schedule {
 		cmName := newCluster.Name + "-" + schedule.Name
-		sm[cmName] = s{schedule, delete}
+		sm[cmName] = s{schedule, del}
 	}
 
 	for _, scheduleJob := range newCluster.Spec.Backup.Schedule {
@@ -69,7 +69,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 			if err != nil {
 				return errors.Wrap(err, "create config map")
 			}
-		case delete:
+		case del:
 			err := c.Client.CoreV1().ConfigMaps(newCluster.Namespace).Delete(ctx, name, metav1.DeleteOptions{})
 			if err != nil && !kerrors.IsNotFound(err) {
 				return errors.Wrapf(err, "delete config map %s", name)

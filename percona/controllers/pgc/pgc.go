@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -17,8 +19,10 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgreplica"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/service"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/version"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
+	"github.com/robfig/cron/v3"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -37,12 +41,64 @@ type Controller struct {
 	Informer                    informers.PerconaPGClusterInformer
 	PerconaPGClusterWorkerCount int
 	deploymentTemplateData      []byte
+	crons                       CronRegistry
+	lockers                     lockStore
 }
 
 const (
 	deploymentTemplateName = "cluster-deployment.json"
 	templatePath           = "/"
 	defaultSecurityContext = `{"fsGroup": 26,"supplementalGroups": [1001]}`
+)
+
+type CronRegistry struct {
+	crons             *cron.Cron
+	ensureVersionJobs map[string]Schedule
+}
+
+type Schedule struct {
+	ID           int
+	CronSchedule string
+}
+
+func NewCronRegistry() CronRegistry {
+	c := CronRegistry{
+		crons:             cron.New(),
+		ensureVersionJobs: make(map[string]Schedule),
+	}
+
+	c.crons.Start()
+
+	return c
+}
+
+type lockStore struct {
+	store *sync.Map
+}
+
+func newLockStore() lockStore {
+	return lockStore{
+		store: new(sync.Map),
+	}
+}
+
+func (l lockStore) LoadOrCreate(key string) lock {
+	val, _ := l.store.LoadOrStore(key, lock{
+		statusMutex: new(sync.Mutex),
+		updateSync:  new(int32),
+	})
+
+	return val.(lock)
+}
+
+type lock struct {
+	statusMutex *sync.Mutex
+	updateSync  *int32
+}
+
+const (
+	updateDone = 0
+	updateWait = 1
 )
 
 // onAdd is called when a pgcluster is added
@@ -56,7 +112,14 @@ func (c *Controller) onAdd(obj interface{}) {
 	c.Queue.Add(key)
 	defer c.Queue.Done(key)
 	newCluster := obj.(*crv1.PerconaPGCluster)
-	err = c.updateTemplate(newCluster)
+	err = version.EnsureVersion(newCluster, version.VersionServiceClient{
+		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
+	})
+	if err != nil {
+		log.Errorf("update deployment template: %s", err)
+		return
+	}
+	err = c.updateTemplate(newCluster, newCluster.Name)
 	if err != nil {
 		log.Errorf("update deployment template: %s", err)
 		return
@@ -85,7 +148,7 @@ func (c *Controller) onAdd(obj interface{}) {
 	}
 
 	if newCluster.Spec.PGReplicas != nil {
-		err = pgreplica.Create(c.Client, newCluster)
+		err = c.createReplicas(newCluster)
 		if err != nil {
 			log.Errorf("create pgreplicas: %s", err)
 		}
@@ -95,12 +158,38 @@ func (c *Controller) onAdd(obj interface{}) {
 	if err != nil {
 		log.Errorf("handle schedule: %s", err)
 	}
+	ctx := context.TODO()
+	_, err = c.Client.CrunchydataV1().PerconaPGClusters(newCluster.Namespace).Update(ctx, newCluster, metav1.UpdateOptions{})
+	if err != nil {
+		log.Errorf("handle schedule: %s", err)
+	}
 
 	c.Queue.Forget(key)
 }
 
-func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster) error {
-	templateData, err := pmm.HandlePMMTemplate(c.deploymentTemplateData, newCluster)
+func (c *Controller) createReplicas(cluster *crv1.PerconaPGCluster) error {
+	if cluster.Spec.PGReplicas.HotStandby.Size == 0 {
+		return nil
+	}
+	err := service.CreateOrUpdate(c.Client, cluster, service.PGReplicaServiceType)
+	if err != nil {
+		return errors.Wrap(err, "handle replica service")
+	}
+	if cluster.Spec.PGReplicas == nil {
+		return nil
+	}
+	for i := 1; i <= cluster.Spec.PGReplicas.HotStandby.Size; i++ {
+		err = pgreplica.CreateReplicaResource(c.Client, cluster, i)
+		if err != nil {
+			return errors.Wrap(err, "create replica")
+		}
+	}
+
+	return nil
+}
+
+func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster, nodeName string) error {
+	templateData, err := pmm.HandlePMMTemplate(c.deploymentTemplateData, newCluster, nodeName)
 	if err != nil {
 		return errors.Wrap(err, "handle pmm template data")
 	}
@@ -132,7 +221,8 @@ func (c *Controller) RunWorker(stopCh <-chan struct{}, doneCh chan<- struct{}) {
 		return
 	}
 	c.deploymentTemplateData = deploymentTemplateData
-
+	c.crons = NewCronRegistry()
+	c.lockers = newLockStore()
 	log.Debug("perconapgcluster Contoller: worker queue has been shutdown, writing to the done channel")
 	doneCh <- struct{}{}
 }
@@ -269,7 +359,29 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	err := c.updateTemplate(newCluster)
+	nn := types.NamespacedName{
+		Name:      newCluster.Name,
+		Namespace: newCluster.Namespace,
+	}
+	l := c.lockers.LoadOrCreate(nn.String())
+	l.statusMutex.Lock()
+	defer l.statusMutex.Unlock()
+	defer atomic.StoreInt32(l.updateSync, updateDone)
+	err := version.EnsureVersion(newCluster, version.VersionServiceClient{
+		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
+	})
+	if err != nil {
+		log.Errorf("update perconapgcluster: ensure version %s", err)
+	}
+	err = c.updateVersion(oldCluster, newCluster)
+	if err != nil {
+		log.Errorf("update perconapgcluster:update version: %s", err)
+	}
+	err = c.scheduleUpdate(newCluster)
+	if err != nil {
+		log.Errorf("update perconapgcluster: scheduled update: %s", err)
+	}
+	err = c.updateTemplate(newCluster, newCluster.Name)
 	if err != nil {
 		log.Errorf("update perconapgcluster: update deployment template: %s", err)
 	}
