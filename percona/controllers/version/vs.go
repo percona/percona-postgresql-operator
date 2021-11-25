@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const productName = "postgresql-operator"
+const productName = "pg-operator"
 
 func (vs VersionServiceClient) GetExactVersion(cr *api.PerconaPGCluster, endpoint string, vm versionMeta) (DepVersion, error) {
 	if len(endpoint) == 0 {
