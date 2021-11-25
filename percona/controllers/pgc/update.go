@@ -3,6 +3,7 @@ package pgc
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -70,6 +71,10 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 	id, err := c.crons.crons.AddFunc(newCluster.Spec.UpgradeOptions.Schedule, func() {
 		l.statusMutex.Lock()
 		defer l.statusMutex.Unlock()
+
+		if !atomic.CompareAndSwapInt32(l.updateSync, updateDone, updateWait) {
+			return
+		}
 
 		err := version.EnsureVersion(newCluster, version.VersionServiceClient{
 			OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],

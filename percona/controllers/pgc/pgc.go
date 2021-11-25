@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -94,6 +95,11 @@ type lock struct {
 	statusMutex *sync.Mutex
 	updateSync  *int32
 }
+
+const (
+	updateDone = 0
+	updateWait = 1
+)
 
 // onAdd is called when a pgcluster is added
 func (c *Controller) onAdd(obj interface{}) {
@@ -360,7 +366,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	l := c.lockers.LoadOrCreate(nn.String())
 	l.statusMutex.Lock()
 	defer l.statusMutex.Unlock()
-
+	defer atomic.StoreInt32(l.updateSync, updateDone)
 	err := version.EnsureVersion(newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
