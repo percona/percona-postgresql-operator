@@ -215,7 +215,7 @@ next_backup_after_sec() {
 	local next_interval_min_edge=$((${next_interval_hop} % ${backup_time_interval_sec}))
 	local next_backup_at_sec=$((${next_interval_hop} - ${next_interval_min_edge}))
 
-	local sec_to_wait=$((${next_backup_at_sec} - $($date +%s --utc)))
+	local sec_to_wait=$((${next_backup_at_sec} - $(curl -sI https://percona.com/ | grep date | sed 's/date: //g' | { read gmt ; $date -d "$gmt" --utc +%s; })))
 	if [[ ${sec_to_wait} -lt 0 ]]; then
 		echo 0
 		return
