@@ -207,9 +207,9 @@ wait_pod_completion() {
 calculate_next_backup_start() {
 	local start_time_sec=$1
 	local backup_time_interval_sec=$2
-	local next_interval_hop=$((${start_time_sec} + ${backup_time_interval_sec}))
-	local next_interval_min_edge=$((${next_interval_hop} % ${backup_time_interval_sec}))
-	local next_backup_at_sec=$((${next_interval_hop} - ${next_interval_min_edge}))
+	local next_interval_hop=$((start_time_sec + backup_time_interval_sec))
+	local next_interval_min_edge=$((next_interval_hop % backup_time_interval_sec))
+	local next_backup_at_sec=$((next_interval_hop - next_interval_min_edge))
 	echo ${next_backup_at_sec}
 }
 
@@ -226,14 +226,12 @@ next_backup_after_sec() {
 	local backup_time_interval_sec=$(($(kubectl_bin get configmap/${conf_map_name} -o jsonpath='{.data.schedule}' | jq '.schedule' | grep -Eo '[0-9]+') * 60))
 
 	local result=$((\
-				$(calculate_next_backup_start ${configmap_creation_time} ${backup_time_interval_sec}) \
-				- \
-				$(get_current_epoch_time) ))
+		$(calculate_next_backup_start ${configmap_creation_time} ${backup_time_interval_sec}) - \
+		$(get_current_epoch_time) ))
 	until [[ ${result} -gt 0 ]]; do
 		result=$((\
-				$(calculate_next_backup_start $(get_current_epoch_time) ${backup_time_interval_sec}) \
-				- \
-				$(get_current_epoch_time) ))
+			$(calculate_next_backup_start $(get_current_epoch_time) ${backup_time_interval_sec}) - \
+			$(get_current_epoch_time) ))
 	done
 	echo ${result}
 }
