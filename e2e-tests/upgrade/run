@@ -188,7 +188,7 @@ main() {
 			{"op":"replace","path":"/spec/pgBouncer/size","value":0}
 		]'
 	sleep 10
-	kubectl_bin wait --for=delete "deployment/${cluster}-pgbouncer" --timeout=60s
+	kubectl_bin wait --for=delete "deployment/${cluster}-pgbouncer" --timeout=180s
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
