@@ -34,7 +34,7 @@ func CreateReplicaResource(clientset kubeapi.Interface, cluster *crv1.PerconaPGC
 			replica.Name, metav1.GetOptions{})
 		if err != nil {
 			// no need to return error here
-			log.Info(errors.Wrapf(err, "get deployment %s", replica.Name))
+			log.Error(errors.Wrapf(err, "get deployment %s", replica.Name))
 		}
 		if dep.Status.UnavailableReplicas == 0 {
 			break

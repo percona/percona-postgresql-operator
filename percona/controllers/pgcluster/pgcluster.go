@@ -15,6 +15,7 @@ import (
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -89,6 +90,17 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "update deployment")
+	}
+	for i := 0; i <= 30; i++ {
+		time.Sleep(5 * time.Second)
+		dep, err := clientset.AppsV1().Deployments(deployment.Namespace).Get(ctx,
+			deployment.Name, metav1.GetOptions{})
+		if err != nil {
+			log.Info(errors.Wrapf(err, "get deployment %s", deployment.Name))
+		}
+		if dep.Status.UnavailableReplicas == 0 {
+			break
+		}
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"sync"
 	"text/template"
 	"time"
 
@@ -40,6 +41,7 @@ type Controller struct {
 	PerconaPGClusterWorkerCount int
 	deploymentTemplateData      []byte
 	crons                       CronRegistry
+	lockers                     lockStore
 }
 
 const (
@@ -51,7 +53,6 @@ const (
 type CronRegistry struct {
 	crons             *cron.Cron
 	ensureVersionJobs map[string]Schedule
-	inProgress        bool
 }
 
 type Schedule struct {
@@ -68,6 +69,30 @@ func NewCronRegistry() CronRegistry {
 	c.crons.Start()
 
 	return c
+}
+
+type lockStore struct {
+	store *sync.Map
+}
+
+func newLockStore() lockStore {
+	return lockStore{
+		store: new(sync.Map),
+	}
+}
+
+func (l lockStore) LoadOrCreate(key string) lock {
+	val, _ := l.store.LoadOrStore(key, lock{
+		statusMutex: new(sync.Mutex),
+		updateSync:  new(int32),
+	})
+
+	return val.(lock)
+}
+
+type lock struct {
+	statusMutex *sync.Mutex
+	updateSync  *int32
 }
 
 // onAdd is called when a pgcluster is added
@@ -191,6 +216,7 @@ func (c *Controller) RunWorker(stopCh <-chan struct{}, doneCh chan<- struct{}) {
 	}
 	c.deploymentTemplateData = deploymentTemplateData
 	c.crons = NewCronRegistry()
+	c.lockers = newLockStore()
 	log.Debug("perconapgcluster Contoller: worker queue has been shutdown, writing to the done channel")
 	doneCh <- struct{}{}
 }
@@ -326,6 +352,15 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if reflect.DeepEqual(oldCluster.Spec, newCluster.Spec) {
 		return
 	}
+
+	nn := types.NamespacedName{
+		Name:      newCluster.Name,
+		Namespace: newCluster.Namespace,
+	}
+	l := c.lockers.LoadOrCreate(nn.String())
+	l.statusMutex.Lock()
+	defer l.statusMutex.Unlock()
+
 	err := version.EnsureVersion(newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})

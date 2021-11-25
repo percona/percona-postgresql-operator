@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgcluster"
@@ -59,15 +60,16 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 	if ok {
 		c.deleteEnsureVersion(jn)
 	}
+
+	nn := types.NamespacedName{
+		Name:      newCluster.Name,
+		Namespace: newCluster.Namespace,
+	}
+	l := c.lockers.LoadOrCreate(nn.String())
+
 	id, err := c.crons.crons.AddFunc(newCluster.Spec.UpgradeOptions.Schedule, func() {
-		for i := 1; i < 30; i++ {
-			time.Sleep(5 * time.Second)
-			if !c.crons.inProgress {
-				break
-			}
-		}
-		c.crons.inProgress = true
-		defer func() { c.crons.inProgress = false }()
+		l.statusMutex.Lock()
+		defer l.statusMutex.Unlock()
 
 		err := version.EnsureVersion(newCluster, version.VersionServiceClient{
 			OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
