@@ -227,11 +227,11 @@ next_backup_after_sec() {
 
 	local result=$((\
 		$(calculate_next_backup_start ${configmap_creation_time} ${backup_time_interval_sec}) - \
-		$(get_current_epoch_time) ))
+		$(get_current_epoch_time)))
 	until [[ ${result} -gt 0 ]]; do
 		result=$((\
 			$(calculate_next_backup_start $(get_current_epoch_time) ${backup_time_interval_sec}) - \
-			$(get_current_epoch_time) ))
+			$(get_current_epoch_time)))
 	done
 	echo ${result}
 }
