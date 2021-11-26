@@ -76,7 +76,7 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 			return
 		}
 
-		err := version.EnsureVersion(newCluster, version.VersionServiceClient{
+		err := version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
 			OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 		})
 		if err != nil {

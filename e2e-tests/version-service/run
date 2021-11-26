@@ -23,6 +23,7 @@ function apply_version {
 	local cluster=$1
 	local version_to_upgrade=$2
 	local release_channel=$3
+	local db_version=$4
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json \
 		-p='[
@@ -44,7 +45,7 @@ function apply_version {
 		| jq -r '.versions[] | .matrix | .pgbackrest, .pgbackrestRepo, .pgbadger, .pgbouncer, .postgresql | .[].imagePath' \
 			>"${tmp_dir}/${version_to_upgrade}-origin-${release_channel}-images.txt"
 
-	diff -u "${tmp_dir}/${version_to_upgrade}-deployed-${release_channel}-images.txt" "${tmp_dir}/${version_to_upgrade}-origin-${release_channel}-images.txt"
+	diff -u "${tmp_dir}/${version_to_upgrade}-deployed-${release_channel}-images.txt" "${test_dir}/compare/${db_version}.txt"
 }
 
 main() {
@@ -66,7 +67,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "${PG_VER}.4-recommended"
+	apply_version ${cluster} '9.9.9' "recommended" ${PG_VER}
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
@@ -80,7 +81,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "${PG_VER}.8-recommended"
+	apply_version ${cluster} '9.9.9' "recommended" ${PG_VER}
 	destroy "${namespace}"
 }
 
