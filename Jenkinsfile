@@ -401,6 +401,7 @@ pipeline {
                         runTest('tls-check', 'sandbox')
                         runTest('upgrade', 'sandbox')
                         runTest('smart-update', 'sandbox')
+                        runTest('version-service', 'sandbox')
                         runTest('users', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
