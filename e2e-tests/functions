@@ -554,7 +554,7 @@ wait_generation_uniformity() {
 		fi
 	done
 	if [[ $(kubectl_bin get deployments --selector=pg-cluster=${cluster} -o jsonpath='{range .items[*]}{.metadata.annotations.deployment\.kubernetes\.io\/revision}{"\n"}{end}' \
-		| uniq ) != ${target_revision} ]]; then
+		| uniq) != ${target_revision} ]]; then
 		echo "Unexpected deployment generation revision. Exiting..."
 		exit 1
 	fi

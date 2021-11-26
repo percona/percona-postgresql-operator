@@ -13,8 +13,8 @@ VS_ENDPOINT="${VS_URL}:${VS_PORT}"
 function deploy_version_service {
 	desc 'install version service'
 	kubectl_bin create configmap versions \
-	  --from-file "${test_dir}/conf/operator.9.9.9.pg-operator.dep.json" \
-	  --from-file "${test_dir}/conf/operator.9.9.9.pg-operator.json"
+		--from-file "${test_dir}/conf/operator.9.9.9.pg-operator.dep.json" \
+		--from-file "${test_dir}/conf/operator.9.9.9.pg-operator.json"
 	kubectl_bin apply -f "${test_dir}/conf/vs.yml"
 	sleep 10
 }
@@ -41,8 +41,8 @@ function apply_version {
 
 	kubectl_bin exec $(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}') -- \
 		curl -s "${VS_ENDPOINT}/versions/v1/pg-operator/${version_to_upgrade}/${release_channel}" \
-		| jq -r '.versions[] | .matrix | .pgbackrest, .pgbackrestRepo, .pgbadger, .pgbouncer, .postgresql | .[].imagePath'\
-		>"${tmp_dir}/${version_to_upgrade}-origin-${release_channel}-images.txt"
+		| jq -r '.versions[] | .matrix | .pgbackrest, .pgbackrestRepo, .pgbadger, .pgbouncer, .postgresql | .[].imagePath' \
+			>"${tmp_dir}/${version_to_upgrade}-origin-${release_channel}-images.txt"
 
 	diff -u "${tmp_dir}/${version_to_upgrade}-deployed-${release_channel}-images.txt" "${tmp_dir}/${version_to_upgrade}-origin-${release_channel}-images.txt"
 }
