@@ -204,6 +204,38 @@ wait_pod_completion() {
 	set -o xtrace
 }
 
+calculate_next_backup_start() {
+	local start_time_sec=$1
+	local backup_time_interval_sec=$2
+	local next_interval_hop=$((start_time_sec + backup_time_interval_sec))
+	local next_interval_min_edge=$((next_interval_hop % backup_time_interval_sec))
+	local next_backup_at_sec=$((next_interval_hop - next_interval_min_edge))
+	echo ${next_backup_at_sec}
+}
+
+get_current_epoch_time() {
+	local curent_date=$(curl -sI https://percona.com/ | grep date | $sed 's/date: //g')
+	echo $($date --date "${curent_date}" --utc +%s)
+}
+
+next_backup_after_sec() {
+	# configmap is to contain schedule like '*/N * * * *'
+	local conf_map_name=$1
+
+	local configmap_creation_time=$($date '+%s' --date=$(kubectl_bin get configmap/${conf_map_name} -o jsonpath='{.metadata.creationTimestamp}') --utc)
+	local backup_time_interval_sec=$(($(kubectl_bin get configmap/${conf_map_name} -o jsonpath='{.data.schedule}' | jq '.schedule' | grep -Eo '[0-9]+') * 60))
+
+	local result=$((\
+		$(calculate_next_backup_start ${configmap_creation_time} ${backup_time_interval_sec}) - \
+		$(get_current_epoch_time)))
+	until [[ ${result} -gt 0 ]]; do
+		result=$((\
+			$(calculate_next_backup_start $(get_current_epoch_time) ${backup_time_interval_sec}) - \
+			$(get_current_epoch_time)))
+	done
+	echo ${result}
+}
+
 wait_pod() {
 	local pod=$1
 
@@ -565,8 +597,25 @@ compare_kubectl() {
 		| yq d - '**.preemptionPolicy' \
 		| yq d - '**.ipFamilies' \
 		| yq d - '**.ipFamilyPolicy' \
+		| yq d - '**.internalTrafficPolicy' \
+		| yq d - '**.allocateLoadBalancerNodePorts' \
 			>${new_result}
 
+	case ${KUBE_VERSION} in
+		"1.21" | "1.22")
+			: nothing should happen
+			;;
+		*)
+			# add empty annotation struct
+			if [[ "x$(yq r ${new_result} 'metadata.annotations')" == "x" ]]; then
+				yq w -i ${new_result} "metadata.annotations.false_tag" {}
+				yq d -i ${new_result} "metadata.annotations.false_tag"
+				# fix key sorting
+				yq r --tojson ${new_result} | jq -S '.' | yq r - --prettyPrint >"${new_result}-mod"
+				mv "${new_result}-mod" ${new_result}
+			fi
+			;;
+	esac
 	diff -u ${expected_result} ${new_result}
 }
 
@@ -595,7 +644,7 @@ spinup_pgcluster() {
 	wait_job_completion "backrest-backup-${cluster}"
 
 	wait_cluster_consistency ${cluster}
-    sleep 10
+	sleep 10
 	desc 'write data'
 
 	run_psql \
@@ -733,8 +782,6 @@ destroy() {
 		| sort -u \
 		| tee $tmp_dir/operator.log
 
-	kubectl_bin delete -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml 2>/dev/null || :
-
 	if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
 		oc delete --grace-period=0 --force=true project "$namespace"
 	else
@@ -743,13 +790,6 @@ destroy() {
 	kubectl_bin delete clusterrolebindings pgo-cluster-role pgo-deployer-cr || true
 	kubectl_bin delete clusterroles pgo-cluster-role pgo-deployer-cr || true
 	rm -rf ${tmp_dir}
-}
-
-deploy_cert_manager() {
-	kubectl_bin create namespace cert-manager || :
-	kubectl_bin label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-	kubectl_bin apply -f https://github.com/jetstack/cert-manager/releases/download/v0.15.1/cert-manager.yaml --validate=false || : 2>/dev/null
-	sleep 45
 }
 
 create_replica() {
@@ -894,7 +934,7 @@ deploy_chaos_mesh() {
 				--set chaosDaemon.runtime=crio \
 				--set chaosDaemon.socketPath=/var/run/crio/crio.sock \
 				--set dashboard.create=false \
-				--version v2.0.0 \
+				--version v2.0.4 \
 				--set clusterScoped=false \
 				--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			;;
@@ -904,7 +944,7 @@ deploy_chaos_mesh() {
 				--set chaosDaemon.runtime=containerd \
 				--set chaosDaemon.socketPath=/var/run/dockershim.sock \
 				--set dashboard.create=false \
-				--version v2.0.0 \
+				--version v2.0.4 \
 				--set clusterScoped=false \
 				--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			;;
@@ -915,14 +955,14 @@ deploy_chaos_mesh() {
 					--set chaosDaemon.runtime=containerd \
 					--set chaosDaemon.socketPath=/run/containerd/containerd.sock \
 					--set dashboard.create=false \
-					--version v2.0.0 \
+					--version v2.0.4 \
 					--set clusterScoped=false \
 					--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			else
 				helm install chaos-mesh chaos-mesh/chaos-mesh \
 					--namespace=${chaos_mesh_ns} \
 					--set dashboard.create=false \
-					--version v2.0.0 \
+					--version v2.0.4 \
 					--set clusterScoped=false \
 					--set controllerManager.targetNamespace=${chaos_mesh_ns}
 			fi

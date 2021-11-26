@@ -58,7 +58,6 @@ function apply_configs {
 
 function main {
 	create_namespace $namespace
-	deploy_cert_manager
 	deploy_operator
 
 	cluster="some-name-${RANDOM}"
@@ -66,9 +65,8 @@ function main {
 	desc 'Testing full backup/restore from s3'
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config" "false" "true" "full"
-	sleep 60
-	backup_job=$(kubectl_bin get jobs --selector=backrest-command=backup,pg-cluster=${cluster} | grep sch | awk '{print $1}')
-	wait_job_completion ${backup_job}
+	sleep $(next_backup_after_sec "${cluster}-$(kubectl_bin get perconapgcluster/${cluster} -o jsonpath={.spec.backup.schedule[0].name})")
+	kubectl_bin wait "job/${cluster}-full-sch-backup" --for=condition=Complete --timeout=300s
 	restore ${cluster} "s3" "full"
 
 	kubectl_bin delete perconapgcluster/${cluster}
@@ -78,9 +76,8 @@ function main {
     cluster="some-name-${RANDOM}"
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config" "false" "true" "diff"
-	sleep 60
-	backup_job=$(kubectl_bin get jobs --selector=backrest-command=backup,pg-cluster=${cluster} | grep sch | awk '{print $1}')
-	wait_job_completion ${backup_job}
+	sleep $(next_backup_after_sec "${cluster}-$(kubectl_bin get perconapgcluster/${cluster} -o jsonpath={.spec.backup.schedule[0].name})")
+	kubectl_bin wait "job/${cluster}-diff-sch-backup" --for=condition=Complete --timeout=300s
 	restore ${cluster} "s3" "diff"
 
 	kubectl_bin delete perconapgcluster/${cluster}
@@ -91,9 +88,8 @@ function main {
     cluster="some-name-${RANDOM}"
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config" "false" "true" "incr"
-	sleep 60
-	backup_job=$(kubectl_bin get jobs --selector=backrest-command=backup,pg-cluster=${cluster} | grep sch | awk '{print $1}')
-	wait_job_completion ${backup_job}
+	sleep $(next_backup_after_sec "${cluster}-$(kubectl_bin get perconapgcluster/${cluster} -o jsonpath={.spec.backup.schedule[0].name})")
+	kubectl_bin wait "job/${cluster}-incr-sch-backup" --for=condition=Complete --timeout=300s
 	restore ${cluster} "s3" "incr"
 
 	kubectl_bin delete perconapgcluster/${cluster}
@@ -103,9 +99,8 @@ function main {
 	cluster="some-name-${RANDOM}"
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config" "false" "true" "full"
-	sleep 60
-	backup_job=$(kubectl_bin get jobs --selector=backrest-command=backup,pg-cluster=${cluster} | grep sch | awk '{print $1}')
-	wait_job_completion ${backup_job}
+	sleep $(next_backup_after_sec "${cluster}-$(kubectl_bin get perconapgcluster/${cluster} -o jsonpath={.spec.backup.schedule[0].name})")
+	kubectl_bin wait "job/${cluster}-full-sch-backup" --for=condition=Complete --timeout=300s
 	restore ${cluster} "s3" "full"
 
 	destroy ${namespace}
