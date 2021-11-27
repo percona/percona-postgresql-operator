@@ -112,7 +112,7 @@ func (c *Controller) onAdd(obj interface{}) {
 	c.Queue.Add(key)
 	defer c.Queue.Done(key)
 	newCluster := obj.(*crv1.PerconaPGCluster)
-	err = version.EnsureVersion(newCluster, version.VersionServiceClient{
+	err = version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
 	if err != nil {
@@ -367,7 +367,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	l.statusMutex.Lock()
 	defer l.statusMutex.Unlock()
 	defer atomic.StoreInt32(l.updateSync, updateDone)
-	err := version.EnsureVersion(newCluster, version.VersionServiceClient{
+	err := version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
 	if err != nil {

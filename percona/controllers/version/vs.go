@@ -5,11 +5,16 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/pkg/errors"
+
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/util"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/db"
 	api "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	"github.com/percona/percona-postgresql-operator/versionserviceclient"
 	"github.com/percona/percona-postgresql-operator/versionserviceclient/models"
 	"github.com/percona/percona-postgresql-operator/versionserviceclient/version_service"
-	"github.com/pkg/errors"
 )
 
 const productName = "pg-operator"
@@ -99,6 +104,22 @@ func getVersion(versions map[string]models.VersionVersion) (string, error) {
 		return k, nil
 	}
 	return "", nil
+}
+
+func GetPostgresqlVersin(clientset kubeapi.Interface, cluster *crv1.Pgcluster) (string, error) {
+	pod, err := util.GetPrimaryPod(clientset, cluster)
+	if err != nil {
+		return "", errors.Wrap(err, "get primary pod")
+	}
+
+	sql := "SHOW server_version"
+
+	result, err := db.ExecuteSQL(clientset, pod, cluster.Spec.Port, sql, []string{})
+	if err != nil {
+		return "", errors.Wrap(err, "execute sql")
+	}
+
+	return result, nil
 }
 
 type DepVersion struct {

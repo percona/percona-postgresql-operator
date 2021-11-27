@@ -529,6 +529,39 @@ wait_deployment() {
 	set -o xtrace
 }
 
+wait_generation_uniformity() {
+	local cluster=$1
+	local target_revision=$2
+
+	set +o xtrace
+	retry=0
+	uniq_generation_values=0
+	echo -n $name
+	until [[ ${uniq_generation_values} == 1 ]]; do
+		sleep 1
+		uniq_generation_values=$(kubectl_bin get deployments \
+			--selector=pg-cluster=${cluster} -o jsonpath='{range .items[*]}{.metadata.annotations.deployment\.kubernetes\.io\/revision}{"\n"}{end}' \
+			| sort -s -u | wc -l | grep -Eo '[0-9]+')
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			kubectl_bin logs $(get_operator_pod) \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	if [[ $(kubectl_bin get deployments --selector=pg-cluster=${cluster} -o jsonpath='{range .items[*]}{.metadata.annotations.deployment\.kubernetes\.io\/revision}{"\n"}{end}' \
+		| uniq) != ${target_revision} ]]; then
+		echo "Unexpected deployment generation revision. Exiting..."
+		exit 1
+	fi
+	echo
+	set -o xtrace
+}
+
 enable_pgBouncer() {
 	local cluster_name=${1}
 	local replicas_num=${2:-'1'}

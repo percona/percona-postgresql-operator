@@ -3,19 +3,19 @@ package pgc
 import (
 	"context"
 	"fmt"
-	"strings"
+
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 
 	"github.com/percona/percona-postgresql-operator/internal/apiserver"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/pgadmin"
 	pgpassword "github.com/percona/percona-postgresql-operator/internal/postgres/password"
 	"github.com/percona/percona-postgresql-operator/internal/util"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/db"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -63,42 +63,11 @@ func updateUserPassword(clientset kubeapi.Interface, username, password string, 
 	if err := updatePgAdmin(clientset, client.Config, cluster, username, password); err != nil {
 		return errors.Wrap(err, "update pgAdmin")
 	}
-	if _, err := executeSQL(clientset, pod, cluster.Spec.Port, sql, []string{}); err != nil {
+	if _, err := db.ExecuteSQL(clientset, pod, cluster.Spec.Port, sql, []string{}); err != nil {
 		return errors.Wrap(err, "execute sql")
 	}
 
 	return nil
-}
-
-func executeSQL(clientset kubeapi.Interface, pod *v1.Pod, port, sql string, extraCommandArgs []string) (string, error) {
-	command := []string{"psql", "-A", "-t"}
-
-	// add the port
-	command = append(command, "-p", port)
-
-	// add any extra arguments
-	command = append(command, extraCommandArgs...)
-
-	// execute into the primary pod to run the query
-	client, err := kubeapi.NewClient()
-	if err != nil {
-		log.Errorf("new client: %s", err.Error())
-	}
-
-	RESTConfig := client.Config
-	stdout, stderr, err := kubeapi.ExecToPodThroughAPI(RESTConfig,
-		clientset, command,
-		"database", pod.Name, pod.ObjectMeta.Namespace, strings.NewReader(sql))
-
-	// if there is an error executing the command, which includes the stderr,
-	// return the error
-	if err != nil {
-		return "", err
-	} else if stderr != "" {
-		return "", errors.New(stderr)
-	}
-
-	return stdout, nil
 }
 
 func getHashedPassword(username, password string, passwordType pgpassword.PasswordType) (string, error) {
