@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
@@ -24,6 +25,12 @@ func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs Ver
 		return errors.Wrap(err, "get postgrsql version")
 	}
 
+	applySp := strings.Split(string(cr.Spec.UpgradeOptions.Apply), "-")
+	pVerSp := strings.Split(string(pVer), ".")
+	if len(applySp) > 1 && len(pVerSp) > 1 && applySp[0] != pVerSp[0] {
+		log.Errorf("%s value for spec.upgradeOptions.apply option is not supported", cr.Spec.UpgradeOptions.Apply)
+		return nil
+	}
 	newVersion, err := vs.GetExactVersion(cr, cr.Spec.UpgradeOptions.VersionServiceEndpoint, versionMeta{
 		PGVersion: strings.TrimSuffix(pVer, "\n"),
 		Apply:     cr.Spec.UpgradeOptions.Apply,

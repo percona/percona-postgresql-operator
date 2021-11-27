@@ -115,20 +115,20 @@ main() {
 	wait_for_delete "deployment/${cluster}"
 	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
 
-	# desc 'Updating PG cluster with 14 from 13'
-	# PG_VER='13'
-	# IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
-	# IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
-	# IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
-	# IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
-	# IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
-	# spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
-	# # No update between major versions should happen. Thus expected revision is 1
-	# apply_version ${cluster} '9.9.9' "14-recommended" "${PGO_TAG}-${PG_VER}" "${VS_ENDPOINT}" 1
+	desc 'Updating PG cluster with 14 from 13'
+	PG_VER='13'
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
+	# No update between major versions should happen. Thus expected revision is 1
+	apply_version ${cluster} '9.9.9' "14-recommended" "${PGO_TAG}-${PG_VER}" "${VS_ENDPOINT}" 1
 
-	# kubectl delete perconapgcluster/${cluster}
-	# wait_for_delete "deployment/${cluster}"
-	# wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+	kubectl delete perconapgcluster/${cluster}
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
 
 	destroy "${namespace}"
 }
