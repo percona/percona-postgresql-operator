@@ -112,13 +112,7 @@ func (c *Controller) onAdd(obj interface{}) {
 	c.Queue.Add(key)
 	defer c.Queue.Done(key)
 	newCluster := obj.(*crv1.PerconaPGCluster)
-	err = version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
-		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
-	})
-	if err != nil {
-		log.Errorf("update deployment template: %s", err)
-		return
-	}
+
 	err = c.updateTemplate(newCluster, newCluster.Name)
 	if err != nil {
 		log.Errorf("update deployment template: %s", err)
