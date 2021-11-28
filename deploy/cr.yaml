@@ -13,6 +13,13 @@ metadata:
   name: cluster1
 spec:
   secretsName: cluster1-users-secrets
+#  sslCA: cluster1-ssl-ca
+#  sslSecretName: cluster1-ssl-keypair
+#  sslReplicationSecretName: cluster1-ssl-keypair
+  upgradeOptions:
+    versionServiceEndpoint: https://check.percona.com
+    apply: recommended
+    schedule: "0 4 * * *"
   database: pgdb
   port: "5432"
   user: pguser
@@ -20,9 +27,6 @@ spec:
   tlsOnly: false
   standby: false
   pause: false
-#  sslCA: cluster1-ssl-ca
-#  sslSecretName: cluster1-ssl-keypair
-#  sslReplicationSecretName: cluster1-ssl-keypair
   keepData: true
   keepBackups: true
 #  pgDataSource:
@@ -158,7 +162,3 @@ spec:
 #  securityContext:
 #    fsGroup: 1001
 #    supplementalGroups: [1001, 1002, 1003]
-#  upgradeOptions:
-#    versionServiceEndpoint: https://check.percona.com
-#    apply: recommended
-#    schedule: "* * * * *"
