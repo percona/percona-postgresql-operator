@@ -127,6 +127,7 @@ deploy_operator() {
 	# modifing ini structure from configMap
 	yq r -d'2' "${operator_manifest}" 'data[values.yaml]' \
 		| $sed -e "s#namespace: .*#namespace: \"${namespace}\"#g" \
+		| $sed -e "s#crunchy_debug: .*#crunchy_debug: \"true\"#g" \
 		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: \"${namespace}\"#g" \
 		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: $(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)#g" \
 		| $sed -e "s#ccp_image_prefix: .*#ccp_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"#g" \
