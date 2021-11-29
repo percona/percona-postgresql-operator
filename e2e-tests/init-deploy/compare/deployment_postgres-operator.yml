@@ -89,7 +89,7 @@ spec:
               name: tmp
         - env:
             - name: CRUNCHY_DEBUG
-              value: "false"
+              value: "true"
             - name: PGO_INSTALLATION_NAME
               value: devtest
             - name: PGO_OPERATOR_NAMESPACE
@@ -127,7 +127,7 @@ spec:
           terminationMessagePolicy: File
         - env:
             - name: CRUNCHY_DEBUG
-              value: "false"
+              value: "true"
             - name: PGO_OPERATOR_NAMESPACE
               valueFrom:
                 fieldRef:
