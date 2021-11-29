@@ -29,7 +29,7 @@ spec:
       containers:
         - env:
             - name: CRUNCHY_DEBUG
-              value: "false"
+              value: "true"
             - name: PORT
               value: "8443"
             - name: PGO_INSTALLATION_NAME
