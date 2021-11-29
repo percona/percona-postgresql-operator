@@ -74,14 +74,8 @@ updates:
      the Percona Distribution for PostgreSQL 14 version will be selected instead of the
      Percona Distribution for PostgreSQL 13 one regardless of the image path; for already
      existing clusters, the 13 vs. 14 branch choice will be preserved),
-   * ``13-recommended``, ``14-recommended`` - same as above, but preserves
-     specific major Percona Distribution for PostgreSQL version for newly provisioned
-     clusters,
    * ``Latest`` - automatic upgrades will choose the most recent version of
      the software available,
-   * ``13-latest``, ``14-latest`` - same as above, but preserves specific
-     major Percona Distribution for PostgreSQL version for newly provisioned
-     clusters,
    * *version number* - specify the desired version explicitly,
    * ``Never`` or ``Disabled`` - disable automatic upgrades
 
