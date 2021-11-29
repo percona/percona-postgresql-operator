@@ -57,6 +57,11 @@ func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluste
 		return errors.Wrapf(err, "update backrest shared repo deployment")
 	}
 
+	if pgCluster.Annotations == nil {
+		pgCluster.Annotations = make(map[string]string)
+	}
+	pgCluster.Annotations[config.ANNOTATION_IS_UPGRADED] = "true"
+
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update pgcluster resource")
@@ -87,6 +92,13 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerPGBadger, newPerconaPGCluster.Spec.PGBadger.Image)
 	}
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
+
+	if deployment.Labels == nil {
+		deployment.Labels = make(map[string]string)
+	}
+	if newPerconaPGCluster.Labels != nil {
+		deployment.Labels[config.LABEL_PGO_VERSION] = newPerconaPGCluster.Labels[config.LABEL_PGO_VERSION]
+	}
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "update deployment")
