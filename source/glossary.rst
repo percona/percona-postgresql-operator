@@ -93,6 +93,22 @@ The Operator options glossary
 
       :ref:`pmm.image<pmm-image>`
 
+   imagePullPolicy
+
+     ..
+
+      :ref:`backup.imagePullPolicy<backup-imagepullpolicy>`
+
+      :ref:`pgBadger.imagePullPolicy<pgbadger-imagepullpolicy>`
+
+      :ref:`pgBouncer.imagePullPolicy<pgbouncer-imagepullpolicy>`
+
+      :ref:`pgPrimary.imagePullPolicy<pgprimary-imagepullpolicy>`
+
+      :ref:`pgReplicas.REPLICA_NAME.imagePullPolicy<pgreplicas-imagepullpolicy>`
+
+      :ref:`pmm.imagePullPolicy<pmm-imagepullpolicy>`
+
    labels
 
      ..
