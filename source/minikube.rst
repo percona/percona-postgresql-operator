@@ -11,7 +11,7 @@ a popular way to test the Kubernetes application locally prior to deploying it
 on a cloud.
 
 The following steps are needed to run Percona Distribution for PostgreSQL Operator on
-Minikube:
+minikube:
 
 #. `Install minikube <https://kubernetes.io/docs/tasks/tools/install-minikube/>`_,
    using a way recommended for your system. This includes the installation of
@@ -23,7 +23,7 @@ Minikube:
 
    After the installation, run ``minikube start`` command. Being executed,
    this command will download needed virtualized images, then initialize and run
-   the cluster. After Minikube is successfully started, you can optionally run
+   the cluster. After minikube is successfully started, you can optionally run
    the Kubernetes dashboard, which visually represents the state of your cluster.
    Executing ``minikube dashboard`` will start the dashboard and open it in your
    default web browser.
