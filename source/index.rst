@@ -35,6 +35,7 @@ Installation guide
 
    kubernetes
    openshift
+   minikube
    gke
    helm
 
