@@ -70,10 +70,7 @@ updates:
 #. Set the ``apply`` option to one of the following values:
 
    * ``Recommended`` - automatic upgrades will choose the most recent version
-     of software flagged as Recommended (for clusters created from scratch,
-     the Percona Distribution for PostgreSQL 14 version will be selected instead of the
-     Percona Distribution for PostgreSQL 13 one regardless of the image path; for already
-     existing clusters, the 13 vs. 14 branch choice will be preserved),
+     of software flagged as Recommended,
    * ``Latest`` - automatic upgrades will choose the most recent version of
      the software available,
    * *version number* - specify the desired version explicitly,
