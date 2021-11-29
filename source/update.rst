@@ -52,11 +52,9 @@ Upgrading Percona Distribution for PostgreSQL
 Automatic upgrade
 *****************
 
-Starting from version 1.1.0, the Operator can do fully automatic upgrades to
+Starting from version 1.1.0, the Operator does fully automatic upgrades to
 the newer versions of Percona PostgreSQL Cluster within the method named *Smart
 Updates*.
-
-.. hidden:: To have this upgrade method enabled, make sure that the ``updateStrategy`` key in the ``deploy/cr.yaml`` configuration file is set to ``SmartUpdate``.
 
 The Operator will carry on upgrades according to the following algorithm.
 It will query a special *Version Service* server at scheduled times to obtain
@@ -73,8 +71,8 @@ updates:
 
    * ``Recommended`` - automatic upgrades will choose the most recent version
      of software flagged as Recommended (for clusters created from scratch,
-     the Percona Distribution for PostgreSQL 13 version will be selected instead of the
-     Percona Distribution for PostgreSQL 14 one regardless of the image path; for already
+     the Percona Distribution for PostgreSQL 14 version will be selected instead of the
+     Percona Distribution for PostgreSQL 13 one regardless of the image path; for already
      existing clusters, the 13 vs. 14 branch choice will be preserved),
    * ``13-recommended``, ``14-recommended`` - same as above, but preserves
      specific major Percona Distribution for PostgreSQL version for newly provisioned
