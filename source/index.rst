@@ -45,6 +45,7 @@ Configuration and Management
    :maxdepth: 1
 
    backups
+   options
    update
    pause
    TLS
