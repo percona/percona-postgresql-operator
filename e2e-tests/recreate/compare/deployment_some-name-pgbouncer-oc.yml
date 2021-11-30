@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   annotations:
     deployment.kubernetes.io/revision: "1"
-  generation: 1
+  generation: 2
   labels:
     crunchy-pgbouncer: "true"
     name: some-name-pgbouncer
@@ -13,7 +13,7 @@ metadata:
   name: some-name-pgbouncer
 spec:
   progressDeadlineSeconds: 600
-  replicas: 3
+  replicas: 1
   revisionHistoryLimit: 10
   selector:
     matchLabels:
