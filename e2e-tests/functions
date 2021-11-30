@@ -636,21 +636,10 @@ compare_kubectl() {
 		| yq d - '**.allocateLoadBalancerNodePorts' \
 			>${new_result}
 
-	case ${KUBE_VERSION} in
-		"1.21" | "1.22")
-			: nothing should happen
-			;;
-		*)
-			# add empty annotation struct
-			if [[ "x$(yq r ${new_result} 'metadata.annotations')" == "x" ]]; then
-				yq w -i ${new_result} "metadata.annotations.false_tag" {}
-				yq d -i ${new_result} "metadata.annotations.false_tag"
-				# fix key sorting
-				yq r --tojson ${new_result} | jq -S '.' | yq r - --prettyPrint >"${new_result}-mod"
-				mv "${new_result}-mod" ${new_result}
-			fi
-			;;
-	esac
+	if [[ $(yq r ${new_result} 'kind') == 'Service' && "x$(yq r ${new_result} 'metadata.annotations')" == 'x' ]]; then
+		yq d -i ${new_result} 'metadata.annotations'
+	fi
+
 	diff -u ${expected_result} ${new_result}
 }
 

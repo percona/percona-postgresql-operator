@@ -110,7 +110,7 @@ spec:
         storage: local
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
-    size: 1
+    size: 3
     resources:
       requests:
         cpu: "1"
