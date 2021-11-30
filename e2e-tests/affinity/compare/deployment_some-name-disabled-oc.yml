@@ -202,7 +202,7 @@ spec:
         - name: user-volume
           secret:
             defaultMode: 420
-            secretName: some-name-disabled-some-name-disabled-secret
+            secretName: some-name-disabled-some-name-secret
         - name: primary-volume
           secret:
             defaultMode: 420
