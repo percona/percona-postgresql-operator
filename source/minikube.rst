@@ -28,7 +28,7 @@ minikube:
    Executing ``minikube dashboard`` will start the dashboard and open it in your
    default web browser.
 
-#. Clone the percona-xtradb-cluster-operator repository:
+#. Clone the percona-postgresql-operator repository:
 
    .. code:: bash
 
