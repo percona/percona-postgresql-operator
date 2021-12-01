@@ -39,7 +39,7 @@ PostgreSQL Operator comes with the following users:
     * - ``pguser``
       - Non-privileged user
     * - ``pgbouncer``
-      - Еhe administrative user for the `pgBouncer connection pooler <http://pgbouncer.github.io/>`_
+      - Administrative user for the `pgBouncer connection pooler <http://pgbouncer.github.io/>`_
 
 The ``postgres`` user will be the admin user for the database instance. The
 ``primaryuser`` is used for replication between primary and replicas. The
