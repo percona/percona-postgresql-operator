@@ -16,7 +16,7 @@ User accounts within the Cluster can be divided into two different groups:
 
 Credentials for system users are stored as a `Kubernetes Secrets <https://kubernetes.io/docs/concepts/configuration/secret/>`_ object.
 The Operator requires to be deployed before PostgreSQL Cluster is
-started. The name of the required secrets (``cluster1-users-secrets`` by default)
+started. The name of the required secrets (``cluster1-users`` by default)
 should be set in the ``spec.secretsName`` option of the ``deploy/cr.yaml``
 configuration file.
 
@@ -50,7 +50,7 @@ YAML Object Format
 ******************
 
 The default name of the Secrets object for these users is
-``cluster1-users-secrets`` and can be set in the CR for your cluster in
+``cluster1-users`` and can be set in the CR for your cluster in
 ``spec.secretName`` to something different. When you create the object yourself,
 it should match the following simple format:
 
@@ -59,7 +59,7 @@ it should match the following simple format:
    apiVersion: v1
    kind: Secret
    metadata:
-     name: cluster1-user-secrets
+     name: cluster1-users
    type: Opaque
    stringData:
      pgbouncer: pgbouncer_password
@@ -77,9 +77,9 @@ object contains passwords stored as ``data`` - i.e., base64-encoded strings.
 If you want to update any field, you'll need to encode the value into base64
 format. To do this, you can run ``echo -n "password" | base64`` in your local
 shell to get valid values. For example, setting the PMM Server user's password
-to ``new_password`` in the ``cluster1-users-secrets`` object can be done
+to ``new_password`` in the ``cluster1-users`` object can be done
 with the following command:
 
 .. code:: bash
 
-   kubectl patch secret/cluster1-users-secrets -p '{"data":{"pguser": '$(echo -n new_password | base64)'}}'
+   kubectl patch secret/cluster1-users -p '{"data":{"pguser": '$(echo -n new_password | base64)'}}'
