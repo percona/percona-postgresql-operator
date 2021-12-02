@@ -130,7 +130,7 @@ Percona's Version Service:
 
    spec:
      upgradeOptions:
-       apply: Recommended
+       apply: recommended
        versionServiceEndpoint: https://check-dev.percona.com       
        schedule: "0 4 * * *"
    ...
