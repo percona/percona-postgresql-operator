@@ -132,7 +132,7 @@ Percona's Version Service:
      upgradeOptions:
        apply: Recommended
        versionServiceEndpoint: https://check-dev.percona.com       
-       schedule: "0 0 * * *"
+       schedule: "0 4 * * *"
    ...
 
 
