@@ -286,7 +286,8 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 |                 |       parameters:                                                                         |
 |                 |         max_wal_senders: 10                                                               |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The ``posgresql.conf`` file options to be passed to PostgreSQL cluster nodes              |
+| **Description** | :ref:`Custom configuration options<operator-configmaps-cr>` to be passed to PostgreSQL    |
+|                 | cluster instances                                                                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-walstorage-section:
