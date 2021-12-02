@@ -79,6 +79,9 @@ Starting from version 1.1.0, the Operator does fully automatic upgrades to
 the newer versions of Percona PostgreSQL Cluster within the method named *Smart
 Updates*.
 
+.. note:: Smart Updates have technical preview status and are disabled by
+          default for the Operator version 1.1.0.
+
 The Operator will carry on upgrades according to the following algorithm.
 It will query a special *Version Service* server at scheduled times to obtain
 fresh information about version numbers and valid image paths needed for the
@@ -92,12 +95,12 @@ updates:
 
 #. Set the ``apply`` option to one of the following values:
 
-   * ``Recommended`` - automatic upgrades will choose the most recent version
-     of software flagged as Recommended,
-   * ``Latest`` - automatic upgrades will choose the most recent version of
+   * ``recommended`` - automatic upgrades will choose the most recent version
+     of software flagged as recommended,
+   * ``latest`` - automatic upgrades will choose the most recent version of
      the software available,
    * *version number* - specify the desired version explicitly,
-   * ``Never`` or ``Disabled`` - disable automatic upgrades
+   * ``never`` or ``disabled`` - disable automatic upgrades
 
      .. note:: When automatic upgrades are disabled by the ``apply`` option, 
         Smart Update functionality will continue working for changes triggered
