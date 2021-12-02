@@ -43,7 +43,8 @@ PostgreSQL Operator comes with the following users:
 
 The ``postgres`` user will be the admin user for the database instance. The
 ``primaryuser`` is used for replication between primary and replicas. The
-``pguser`` is the default non-privileged user.
+``pguser`` is the default non-privileged user (you can configure different name
+of this user in the ``spec.user``  Custom Resource option).
 
 YAML Object Format
 ******************
@@ -58,7 +59,7 @@ it should match the following simple format:
    apiVersion: v1
    kind: Secret
    metadata:
-     name: my-cluster-secrets
+     name: cluster1-user-secrets
    type: Opaque
    stringData:
      pgbouncer: pgbouncer_password
