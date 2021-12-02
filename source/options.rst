@@ -37,8 +37,8 @@ See :ref:`operator.custom-resource-options` for more details.
 Use a ConfigMap
 ---------------
 
-You can use a configmap and the cluster restart to reset configuration
-options. A configmap allows Kubernetes to pass or update configuration
+You can use a ConfigMap and the cluster restart to reset configuration
+options. A ConfigMap allows Kubernetes to pass or update configuration
 data inside a containerized application.
 
 Use the ``kubectl`` command to create the configmap from external
