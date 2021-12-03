@@ -45,6 +45,7 @@ Configuration and Management
 .. toctree::
    :maxdepth: 1
 
+   users
    backups
    pause
    update
