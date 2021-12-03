@@ -4,13 +4,9 @@ Changing PostgreSQL Options
 ===========================
 
 You may require a configuration change for your application. PostgreSQL
-allows the option to configure the database with a configuration files.
-You can pass the PostgreSQL configuration options in one of the following ways:
-
-* edit the ``deploy/cr.yaml`` file,
-* use a ConfigMap.
-
-Both ways allow you to provide options specific to the following PostgreSQL
+allows to configure the database with a configuration files.
+You can use a `ConfigMap <https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#create-a-configmap>`__
+to provide the PostgreSQL configuration options specific to the following
 configuration files:
 
 * PostgreSQL main configuration, `postgresql.conf <https://www.postgresql.org/docs/current/config-setting.html>`_,
@@ -61,6 +57,10 @@ options. A `ConfigMap <https://kubernetes.io/docs/tasks/configure-pod-container/
 allows Kubernetes to pass or update configuration data inside a containerized
 application.
 
+Use the ``kubectl`` command to create the configmap from external
+resources, for more information see `Configure a Pod to use a
+ConfigMap <https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#create-a-configmap>`__.
+
 Use the ``kubectl edit configmap -n pgo <cluster-name>-pgha-config`` command
 with the name of your cluster instead of the ``<cluster-name>`` placeholder.
 This will run your default text editor where you can put needed options to
@@ -88,4 +88,36 @@ code present in the text editor:
 
 Save changes and exit your text editor to make options updated. Also, some
 options may require you to restart the cluster to ensure the configuration
+
+You can create a configmap from the ``postgresql.conf`` file with the
+``kubectl create configmap`` command.
+
+You should use the combination of the cluster name with the ``-pgha-config``
+addon as the naming convention for the configmap. To find the cluster
+name, you can use the following command:
+
+.. code:: bash
+   kubectl get pgo
+The syntax for ``kubectl create configmap`` command is:
+
+::
+
+   kubectl create configmap <clusterName>-pgha-config <resource-type=resource-name>
+
+The following example defines ``cluster1-pgo`` as the configmap name and the
+``postgresql.conf`` file as the data source:
+
+.. code:: bash
+   kubectl create configmap cluster1-pgo --from-file=postgresql.conf
+To view the created configmap, use the following command:
+
+.. code:: bash
+   kubectl describe configmaps cluster1-pgo
+.. _operator-configmaps-restart:
+
+Make changed options visible to PostgreSQL
+------------------------------------------
+
+Do not forget to restart the cluster to ensure it has updated the configuration
+(see details on how to connect in the `Install Percona Distribution for PostgreSQL on Kubernetes <kubernetes.html>`_ page).
 update took effect.
