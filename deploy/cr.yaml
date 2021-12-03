@@ -12,7 +12,7 @@ metadata:
     pgouser: admin
   name: cluster1
 spec:
-  secretsName: cluster1-users-secrets
+#  secretsName: cluster1-users
 #  sslCA: cluster1-ssl-ca
 #  sslSecretName: cluster1-ssl-keypair
 #  sslReplicationSecretName: cluster1-ssl-keypair
