@@ -27,6 +27,8 @@ Requirements
    System-Requirements
    architecture
 
+.. _operator-install:
+
 Installation guide
 ===================
 

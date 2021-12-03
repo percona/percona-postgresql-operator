@@ -279,10 +279,10 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | string                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``cluster1-pgha-config``                                                                  |
+| **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | :ref:`Custom configuration options ConfigMap <operator-configmaps-cr>` for the            |
-|                 | to PostgreSQL cluster                                                                     |
+| **Description** | Name of the :ref:`Custom configuration options ConfigMap <operator-configmaps>` for       |
+|                 | PostgreSQL cluster                                                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-walstorage-section:
