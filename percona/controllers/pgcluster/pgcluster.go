@@ -271,6 +271,11 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	for k, v := range pgc.Spec.UserLabels {
 		userLabels[k] = v
 	}
+	_, ok = userLabels[config.LABEL_PGO_VERSION]
+	if !ok {
+		userLabels[config.LABEL_PGO_VERSION] = pgoVersion
+	}
+
 	var syncReplication *bool
 	if pgc.Spec.PGReplicas != nil {
 		syncReplication = &pgc.Spec.PGReplicas.HotStandby.EnableSyncStandby
