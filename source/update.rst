@@ -79,15 +79,17 @@ Starting from version 1.1.0, the Operator does fully automatic upgrades to
 the newer versions of Percona PostgreSQL Cluster within the method named *Smart
 Updates*.
 
-.. note:: Smart Updates have technical preview status and are disabled by
-          default for the Operator version 1.1.0.
-
 The Operator will carry on upgrades according to the following algorithm.
 It will query a special *Version Service* server at scheduled times to obtain
 fresh information about version numbers and valid image paths needed for the
 upgrade. If the current version should be upgraded, the Operator updates the CR
 to reflect the new image paths and carries on sequential Pods deletion in a safe
 order, allowing the cluster Pods to be re-deployed with the new image.
+
+.. note:: Version Service is in technical preview status and is disabled by
+          default for the Operator version 1.1.0. Disabling Version Service
+          makes Smart Updates rely on the ``image`` keys in the :ref:`Operator's Custom Resource<operator.custom-resource-options>`.
+
 
 The upgrade details are set in the ``upgradeOptions`` section of the 
 ``deploy/cr.yaml`` configuration file. Make the following edits to configure
