@@ -45,8 +45,9 @@ Configuration and Management
    :maxdepth: 1
 
    backups
-   update
    pause
+   update
+   scaling
    TLS
    monitoring
 
