@@ -99,7 +99,7 @@ Now you can create the cluster following the :ref:`regular installation instruct
 Modifying options for the existing cluster
 ------------------------------------------
 
-For example, you can change ``max_connections`` option in a ``proxysql.conf``
+For example, you can change ``max_connections`` option in a ``postgresql.conf``
 configuration file with the following ``postgres-ha.yaml`` contents:
 
 .. code:: yaml
