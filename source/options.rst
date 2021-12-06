@@ -39,6 +39,10 @@ key in the ``deploy/cr.yaml`` configuration file.
 To change options for an existing cluster, you can do the same but put options
 in a ``postgres-ha.yaml`` file directly, without the ``bootstrap`` section.
 
+In both cases, the ``postgres-ha.yaml`` file doesn't fully overwrite PostgreSQL
+configuration files: options present in ``postgres-ha.yaml`` will be
+overwritten, while non-present options will be left intact.
+
 .. _operator-configmaps-create:
 
 Creating a cluster with custom options
