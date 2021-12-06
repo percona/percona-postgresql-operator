@@ -45,7 +45,7 @@ Creating a cluster with custom options
 --------------------------------------
 
 For example, you can create a cluster with a custom ``max_connections`` option
-in a ``proxysql.conf`` configuration file using the following ``postgres-ha.yaml``
+in a ``postgresql.conf`` configuration file using the following ``postgres-ha.yaml``
 contents:
 
 .. code:: yaml
