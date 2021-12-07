@@ -74,7 +74,7 @@ main() {
 	if [[ "${PG_VER}" -ge '14' ]]; then
 		desc 'start cluster'
 		create_user_secrets "${cluster}"
-		spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+		spinup_pgcluster "${cluster}" ""${test_dir}/conf/${PGO_TAG}_cr.yaml""
 	else
 		kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 			'[
