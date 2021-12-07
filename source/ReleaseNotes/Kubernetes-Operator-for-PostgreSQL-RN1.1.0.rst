@@ -31,3 +31,15 @@ Bugs Fixed
 ================================================================================
 
 * :jirabug:`K8SPG-120`: The Operator default behavior is now to keep backups and PVCs when the cluster is deleted
+
+Supported platforms
+-------------------
+
+The following platforms were tested and are officially supported by the Operator
+1.1.0:
+
+* `Google Kubernetes Engine (GKE) <https://cloud.google.com/kubernetes-engine>`_ 1.19 - 1.22
+* `Amazon Elastic Container Service for Kubernetes (EKS) <https://aws.amazon.com>`_ 1.18 - 1.21
+* `OpenShift <https://www.redhat.com/en/technologies/cloud-computing/openshift>`_ 4.7 - 4.9
+
+This list only includes the platforms that the Percona Operators are specifically tested on as part of the release process. Other Kubernetes flavors and versions depend on the backward compatibility offered by Kubernetes itself.
