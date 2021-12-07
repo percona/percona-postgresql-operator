@@ -37,6 +37,7 @@ Installation guide
 
    kubernetes
    openshift
+   minikube
    gke
    helm
 
@@ -46,10 +47,12 @@ Configuration and Management
 .. toctree::
    :maxdepth: 1
 
+   users
    backups
    options
-   update
    pause
+   update
+   scaling
    TLS
    monitoring
 
