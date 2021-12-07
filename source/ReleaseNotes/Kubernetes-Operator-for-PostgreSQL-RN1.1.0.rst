@@ -11,7 +11,7 @@ Release Highlights
 ================================================================================
 
 * :ref:`A Kubernetes-native horizontal scaling<operator-scale>` capability was added to the Custom Resource to unblock Horizontal Pod Autoscaler and Kubernetes Event-driven Autoscaling (KEDA) usage
-* The :ref:`Smart Upgarde functionality<operator-update-smartupdates>` along with the technical preview of the Version Service allows users to automatically get the latest version of the software compatible with the Operator and apply it safely
+* The :ref:`Smart Upgrade functionality<operator-update-smartupdates>` along with the technical preview of the Version Service allows users to automatically get the latest version of the software compatible with the Operator and apply it safely
 * Percona Distribution for PostgreSQL Operator now supports PostgreSQL 14
 
 New Features
