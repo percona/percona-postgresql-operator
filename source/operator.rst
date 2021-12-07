@@ -271,7 +271,19 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 | **Description** | A PostgreSQL Primary storage `label selector                                              |
 |                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__             |
 +-----------------+-------------------------------------------------------------------------------------------+
-
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-customconfig:                                                               |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.customconfig <operator.html#pgprimary-customconfig>`_                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Name of the :ref:`Custom configuration options ConfigMap <operator-configmaps>` for       |
+|                 | PostgreSQL cluster                                                                        |
++-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-walstorage-section:
 

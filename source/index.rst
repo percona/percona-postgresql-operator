@@ -27,6 +27,8 @@ Requirements
    System-Requirements
    architecture
 
+.. _operator-install:
+
 Installation guide
 ===================
 
@@ -47,6 +49,7 @@ Configuration and Management
 
    users
    backups
+   options
    pause
    update
    scaling
