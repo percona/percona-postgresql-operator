@@ -1,7 +1,7 @@
 .. _K8SPG-1.1.0:
 
 ================================================================================
-*Percona Kubernetes Operator for PostgreSQL* 1.1.0
+*Percona Distribution for PostgreSQL Operator* 1.1.0
 ================================================================================
 
 :Date: December 7, 2021
@@ -10,22 +10,22 @@
 Release Highlights
 ================================================================================
 
-* A Kubernetes-native horizontal scaling capability was added to the Custom Resource to unblock Horizontal Pod Autoscaler and KEDA usage
-* Smart Upgarde functionality along with the Version Service allows users to automatically get the latest version of the software compatible with the Operator and apply it safely.
+* :ref:`A Kubernetes-native horizontal scaling<operator-scale>` capability was added to the Custom Resource to unblock Horizontal Pod Autoscaler and Kubernetes Event-driven Autoscaling (KEDA) usage
+* The :ref:`Smart Upgarde functionality<operator-update-smartupdates>` along with the technical preview of the Version Service allows users to automatically get the latest version of the software compatible with the Operator and apply it safely
+* Percona Distribution for PostgreSQL Operator now supports PostgreSQL 14
 
 New Features
 ================================================================================
 
-* :jirabug:`K8SPG-101`: Add support for Kubernetes horizontal scaling
+* :jirabug:`K8SPG-101`: Add support for Kubernetes horizontal scaling to set the number of Replicas dynamically via the ``kubectl scale`` command or Horizontal Pod Autoscaler
 * :jirabug:`K8SPG-77`: Add support for PostgreSQL 14 in the Operator
-* :jirabug:`K8SPG-75`: Add possibility to change passwords via secrets
-* :jirabug:`K8SPG-71`: Add Smart Upgrade functionality 
+* :jirabug:`K8SPG-75`: :ref:`Manage Operator’s system users<users>` hrough a single Secret resource even after cluster creation
+* :jirabug:`K8SPG-71`: Add Smart Upgrade functionality to automate Percona Distribution for PostgreSQL upgrades
 
 Improvements
 ================================================================================
 
-* :jirabug:`K8SPG-96`: PMM container should not cause the crash of the whole database Pod if pmm-agent is not working properly
-* :jirabug:`K8SPG-86`: The Operator is now certified to run on Openshift. Openshift certification provides guarantee to Enterprise users that our Operator is production ready and can safely run on Openshift. This improvement does not require code changes, but pass through a rigorous certification process.
+* :jirabug:`K8SPG-96`: PMM container does not cause the crash of the whole database Pod if pmm-agent is not working properly
 
 Bugs Fixed
 ================================================================================
