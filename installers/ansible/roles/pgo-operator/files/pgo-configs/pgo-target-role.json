@@ -88,6 +88,8 @@
                  "pg.percona.com"
             ],
             "resources": [
+                "perconapgclusters",
+                "perconapgclusters/status",
                 "pgclusters",
                 "pgpolicies",
                 "pgtasks",

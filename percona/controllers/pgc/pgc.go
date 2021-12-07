@@ -207,7 +207,7 @@ func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster, nodeName 
 func (c *Controller) RunWorker(stopCh <-chan struct{}, doneCh chan<- struct{}) {
 	go c.waitForShutdown(stopCh)
 
-	go c.reconcileStatuses(stopCh)
+	go c.reconcilePerconaPG(stopCh)
 
 	deploymentTemplateData, err := ioutil.ReadFile(templatePath + deploymentTemplateName)
 	if err != nil {
@@ -228,22 +228,22 @@ func (c *Controller) waitForShutdown(stopCh <-chan struct{}) {
 	log.Debug("perconapgcluster Contoller: received stop signal, worker queue told to shutdown")
 }
 
-func (c *Controller) reconcileStatuses(stopCh <-chan struct{}) {
+func (c *Controller) reconcilePerconaPG(stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-stopCh:
 			return
 		default:
-			err := c.handleStatuses()
+			err := c.reconcilePerconaPGClusters()
 			if err != nil {
-				log.Error(errors.Wrap(err, "handle statuses"))
+				log.Error(errors.Wrap(err, "reconcile perocnapgclusters"))
 			}
 			time.Sleep(5 * time.Second)
 		}
 	}
 }
 
-func (c *Controller) handleStatuses() error {
+func (c *Controller) reconcilePerconaPGClusters() error {
 	ctx := context.TODO()
 	ns, err := c.Client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -259,50 +259,56 @@ func (c *Controller) handleStatuses() error {
 		}
 		for _, p := range perconaPGClusters.Items {
 			err = c.reconcileUsers(&p)
-			if err != nil && !kerrors.IsNotFound(err) {
+			if err != nil {
 				return errors.Wrap(err, "reconcile users")
 			}
-			pgCluster, err := c.Client.CrunchydataV1().Pgclusters(n.Name).Get(ctx, p.Name, metav1.GetOptions{})
-			if err != nil && !kerrors.IsNotFound(err) {
-				return errors.Wrap(err, "get pgCluster")
-			}
-
-			pgClusterStatus := crv1.PgclusterStatus{}
-			replStatuses := make(map[string]crv1.PgreplicaStatus)
-			if pgCluster != nil {
-				pgClusterStatus = pgCluster.Status
-			}
-
-			selector := config.LABEL_PG_CLUSTER + "=" + p.Name
-			pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(n.Name).List(ctx, metav1.ListOptions{LabelSelector: selector})
-			if err != nil && !kerrors.IsNotFound(err) {
-				return errors.Wrap(err, "get pgReplicas list")
-			}
-			if pgReplicas != nil {
-				for _, repl := range pgReplicas.Items {
-					replStatuses[repl.Name] = repl.Status
-				}
-			}
-
-			if reflect.DeepEqual(p.Status.PGCluster, pgCluster.Status) && reflect.DeepEqual(p.Status.PGReplicas, replStatuses) {
-				return nil
-			}
-
-			value := crv1.PerconaPGClusterStatus{
-				PGCluster:  pgClusterStatus,
-				PGReplicas: replStatuses,
-			}
-
-			patch, err := kubeapi.NewJSONPatch().Replace("status")(value).Bytes()
+			err = c.reconcileStatus(&p)
 			if err != nil {
-				return errors.Wrap(err, "create patch bytes")
-			}
-			_, err = c.Client.CrunchydataV1().PerconaPGClusters(p.Namespace).
-				Patch(ctx, p.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
-			if err != nil {
-				return errors.Wrap(err, "patch percona status")
+				return errors.Wrap(err, "reconcile status")
 			}
 		}
+	}
+
+	return nil
+}
+
+func (c *Controller) reconcileStatus(cluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	pgCluster, err := c.Client.CrunchydataV1().Pgclusters(cluster.Name).Get(ctx, cluster.Name, metav1.GetOptions{})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrap(err, "get pgCluster")
+	}
+
+	pgClusterStatus := crv1.PgclusterStatus{}
+	replStatuses := make(map[string]crv1.PgreplicaStatus)
+	if pgCluster != nil {
+		pgClusterStatus = pgCluster.Status
+	}
+
+	selector := config.LABEL_PG_CLUSTER + "=" + cluster.Name
+	pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(cluster.Name).List(ctx, metav1.ListOptions{LabelSelector: selector})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrap(err, "get pgReplicas list")
+	}
+	if pgReplicas != nil {
+		for _, repl := range pgReplicas.Items {
+			replStatuses[repl.Name] = repl.Status
+		}
+	}
+
+	if reflect.DeepEqual(cluster.Status.PGCluster, pgCluster.Status) && reflect.DeepEqual(cluster.Status.PGReplicas, replStatuses) {
+		return nil
+	}
+
+	value := crv1.PerconaPGClusterStatus{
+		PGCluster:  pgClusterStatus,
+		PGReplicas: replStatuses,
+	}
+	cluster.Status = value
+
+	_, err = c.Client.CrunchydataV1().PerconaPGClusters(cluster.Namespace).UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update perconapgcluster status")
 	}
 
 	return nil
