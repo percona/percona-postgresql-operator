@@ -51,7 +51,7 @@ function create_or_upgrade_to_version() {
 	wait_deployment "${cluster}"
 	# wait for some significant time period. Pgbouncer pod may not be started otherwise
 	sleep 10
-	if [[ "${PG_VER}" -le '13' ]]; then
+	if [[ ${PG_VER} -le '13' ]]; then
 		kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 			'[
 				{"op":"replace","path":"/spec/pgBouncer/size","value":1}
