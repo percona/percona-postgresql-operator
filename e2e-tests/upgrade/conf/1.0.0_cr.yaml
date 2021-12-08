@@ -2,17 +2,13 @@ apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   labels:
-    pgo-version: 1.1.0
+    pgo-version: 1.0.0
   name: cluster1
 spec:
 #  secretsName: cluster1-users
 #  sslCA: cluster1-ssl-ca
 #  sslSecretName: cluster1-ssl-keypair
 #  sslReplicationSecretName: cluster1-ssl-keypair
-  upgradeOptions:
-    versionServiceEndpoint: https://check.percona.com
-    apply: disabled
-    schedule: "0 4 * * *"
   database: pgdb
   port: "5432"
   user: pguser
@@ -20,8 +16,8 @@ spec:
   tlsOnly: false
   standby: false
   pause: false
-  keepData: true
-  keepBackups: true
+  keepData: false
+  keepBackups: false
 #  pgDataSource:
 #    restoreFrom: ""
 #    restoreOpts: ""
@@ -40,8 +36,8 @@ spec:
 #      storagetype: dynamic
 #      storageclass: ""
 #      matchLabels: ""
-#  userLabels:
-#    pgo-version: "1.1.0"
+  userLabels:
+    pgo-version: "1.0.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
     resources:
@@ -64,7 +60,7 @@ spec:
 #    customconfig: ""
   pmm:
     enabled: false
-    image: percona/pmm-client:2.24.0
+    image: percona/pmm-client:2.21.0
     serverHost: monitoring-service
     serverUser: admin
     pmmSecret: cluster1-pmm-secret
