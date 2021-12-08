@@ -14,7 +14,7 @@ specifically saved config, or on the fly, using the following command:
 
 .. code:: bash
 
-   $ kubectl scale --replicas=5 pgo/cluster1
+   $ kubectl scale --replicas=5 perconapgcluster/cluster1
 
 
 In this example we have changed the number of PostgreSQL Replicas to ``5``
