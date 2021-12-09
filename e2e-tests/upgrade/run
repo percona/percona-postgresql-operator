@@ -84,7 +84,7 @@ main() {
 	create_namespace $namespace
 	cluster="some-name"
 
-	if [[ "${PG_VER}" -le '13' ]]; then
+	if [[ ${PG_VER} -le '13' ]]; then
 		create_or_upgrade_to_version ${cluster} '0.2.0' "${test_dir}/conf/0.2.0_operator.yaml"
 		create_or_upgrade_to_version ${cluster} '1.0.0'
 	fi
