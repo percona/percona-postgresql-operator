@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
@@ -16,29 +17,43 @@ func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs Ver
 	if cr.Spec.UpgradeOptions == nil {
 		return nil
 	}
+	var pVer string
 	pgCluster, err := clientset.CrunchydataV1().Pgclusters(cr.Namespace).Get(context.TODO(), cr.Name, metav1.GetOptions{})
-	if err != nil {
+	if err != nil && !kerrors.IsNotFound(err) {
 		return errors.Wrap(err, "get pgcluster resource")
 	}
-	pVer, err := GetPostgresqlVersin(clientset, pgCluster)
-	if err != nil {
-		return errors.Wrap(err, "get postgrsql version")
+	if pgCluster != nil && err == nil {
+		pVer, err = GetPostgresqlVersin(clientset, pgCluster)
+		if err != nil {
+			return errors.Wrap(err, "get postgrsql version")
+		}
 	}
-
 	applySp := strings.Split(string(cr.Spec.UpgradeOptions.Apply), "-")
 	pVerSp := strings.Split(string(pVer), ".")
 	if len(applySp) > 1 && len(pVerSp) > 1 && applySp[0] != pVerSp[0] {
 		log.Errorf("%s value for spec.upgradeOptions.apply option is not supported", cr.Spec.UpgradeOptions.Apply)
 		return nil
 	}
-	newVersion, err := vs.GetExactVersion(cr, cr.Spec.UpgradeOptions.VersionServiceEndpoint, versionMeta{
-		PGVersion: strings.TrimSuffix(pVer, "\n"),
-		Apply:     cr.Spec.UpgradeOptions.Apply,
-		CRUID:     string(cr.GetUID()),
-	})
+	verMeta := versionMeta{
+		Apply: cr.Spec.UpgradeOptions.Apply,
+		CRUID: string(cr.GetUID()),
+	}
+	if len(pVer) > 0 {
+		verMeta.PGVersion = strings.TrimSuffix(pVer, "\n")
+	}
+	newVersion, err := vs.GetExactVersion(cr, cr.Spec.UpgradeOptions.VersionServiceEndpoint, verMeta)
 	if err != nil {
 		return errors.Wrap(err, "failed to check version")
 	}
+	log.Printf(`ensured version images:
+	%s
+	%s
+	%s
+	%s
+	%s
+	%s
+	`, newVersion.PostgresImage, newVersion.PGBadgerImage, newVersion.PGBouncerImage, newVersion.PGBackrestImage, newVersion.PGBackrestRepoImage, newVersion.PMMImage)
+
 	cr.Spec.PGPrimary.Image = newVersion.PostgresImage
 	cr.Spec.PGBadger.Image = newVersion.PGBadgerImage
 	cr.Spec.PGBouncer.Image = newVersion.PGBouncerImage

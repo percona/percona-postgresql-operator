@@ -111,8 +111,22 @@ func (c *Controller) onAdd(obj interface{}) {
 
 	c.Queue.Add(key)
 	defer c.Queue.Done(key)
-	newCluster := obj.(*crv1.PerconaPGCluster)
 
+	newCluster := obj.(*crv1.PerconaPGCluster)
+	nn := types.NamespacedName{
+		Name:      newCluster.Name,
+		Namespace: newCluster.Namespace,
+	}
+	l := c.lockers.LoadOrCreate(nn.String())
+	l.statusMutex.Lock()
+	defer l.statusMutex.Unlock()
+
+	err = version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
+		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
+	})
+	if err != nil {
+		log.Errorf("ensure version %s", err)
+	}
 	err = c.updateTemplate(newCluster, newCluster.Name)
 	if err != nil {
 		log.Errorf("update deployment template: %s", err)
@@ -150,12 +164,12 @@ func (c *Controller) onAdd(obj interface{}) {
 
 	err = c.handleScheduleBackup(newCluster, nil)
 	if err != nil {
-		log.Errorf("handle schedule: %s", err)
+		log.Errorf("handle schedule backups: %s", err)
 	}
 	ctx := context.TODO()
 	_, err = c.Client.CrunchydataV1().PerconaPGClusters(newCluster.Namespace).Update(ctx, newCluster, metav1.UpdateOptions{})
 	if err != nil {
-		log.Errorf("handle schedule: %s", err)
+		log.Errorf("update perconapgcluster: %s", err)
 	}
 
 	c.Queue.Forget(key)
@@ -255,16 +269,28 @@ func (c *Controller) reconcilePerconaPGClusters() error {
 			return errors.Wrap(err, "list perconapgclusters")
 		} else if err != nil {
 			// there is no perconapgclusters, so no need to continue
-			return nil
+			continue
 		}
-		for _, p := range perconaPGClusters.Items {
-			err = c.reconcileUsers(&p)
-			if err != nil {
-				return errors.Wrap(err, "reconcile users")
+		for _, pi := range perconaPGClusters.Items {
+			nn := types.NamespacedName{
+				Name:      pi.Name,
+				Namespace: pi.Namespace,
 			}
-			err = c.reconcileStatus(&p)
+			l := c.lockers.LoadOrCreate(nn.String())
+			l.statusMutex.Lock()
+
+			p, err := c.Client.CrunchydataV1().PerconaPGClusters(pi.Namespace).Get(ctx, pi.Name, metav1.GetOptions{})
+			if err != nil && !kerrors.IsNotFound(err) {
+				return errors.Wrap(err, "get perconapgluster")
+			}
+
+			err = c.reconcileUsers(p)
 			if err != nil {
-				return errors.Wrap(err, "reconcile status")
+				log.Error(errors.Wrap(err, "reconcile users"))
+			}
+			err = c.reconcileStatus(p, l.statusMutex)
+			if err != nil {
+				log.Error(errors.Wrap(err, "reconcile status"))
 			}
 		}
 	}
@@ -272,9 +298,11 @@ func (c *Controller) reconcilePerconaPGClusters() error {
 	return nil
 }
 
-func (c *Controller) reconcileStatus(cluster *crv1.PerconaPGCluster) error {
+func (c *Controller) reconcileStatus(cluster *crv1.PerconaPGCluster, statusMutex *sync.Mutex) error {
+	defer statusMutex.Unlock()
+
 	ctx := context.TODO()
-	pgCluster, err := c.Client.CrunchydataV1().Pgclusters(cluster.Name).Get(ctx, cluster.Name, metav1.GetOptions{})
+	pgCluster, err := c.Client.CrunchydataV1().Pgclusters(cluster.Namespace).Get(ctx, cluster.Name, metav1.GetOptions{})
 	if err != nil && !kerrors.IsNotFound(err) {
 		return errors.Wrap(err, "get pgCluster")
 	}
@@ -286,7 +314,7 @@ func (c *Controller) reconcileStatus(cluster *crv1.PerconaPGCluster) error {
 	}
 
 	selector := config.LABEL_PG_CLUSTER + "=" + cluster.Name
-	pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(cluster.Name).List(ctx, metav1.ListOptions{LabelSelector: selector})
+	pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(cluster.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
 	if err != nil && !kerrors.IsNotFound(err) {
 		return errors.Wrap(err, "get pgReplicas list")
 	}
@@ -305,7 +333,6 @@ func (c *Controller) reconcileStatus(cluster *crv1.PerconaPGCluster) error {
 		PGReplicas: replStatuses,
 	}
 	cluster.Status = value
-
 	_, err = c.Client.CrunchydataV1().PerconaPGClusters(cluster.Namespace).UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update perconapgcluster status")
