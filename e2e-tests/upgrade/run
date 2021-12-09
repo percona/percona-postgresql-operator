@@ -91,6 +91,7 @@ main() {
 
 	create_or_upgrade_to_version ${cluster} '1.1.0'
 
+	LATEST_TAG='1.2.0'
 	IMAGE_OPERATOR="${TARGET_IMAGE_OPERATOR:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"}"
 	IMAGE_DEPLOYER="${TARGET_IMAGE_DEPLOYER:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-pgo-deployer"}"
 
@@ -109,13 +110,18 @@ main() {
 			{"op":"replace","path":"/spec/pgBadger/image","value":'${IMAGE_PGBADGER}'},
 			{"op":"replace","path":"/spec/pgBouncer/image","value":'${IMAGE_PGBOUNCER}'},
 			{"op":"replace","path":"/spec/pgPrimary/image","value":'${IMAGE_PG_HA}'},
-			{"op":"replace","path":"/spec/userLabels/pgo-version","value":'${GIT_BRANCH}'},
-			{"op":"replace","path":"/metadata/labels/pgo-version","value":'${GIT_BRANCH}'},
+			{"op":"replace","path":"/spec/userLabels/pgo-version","value":'${LATEST_TAG}'},
+			{"op":"replace","path":"/metadata/labels/pgo-version","value":'${LATEST_TAG}'},
 			{"op":"replace","path":"/spec/pause","value":false}
 		]'
 
 	wait_cluster_consistency "${cluster}"
 	wait_deployment "${cluster}"
+	if [[ $(kubectl_bin get deployment/${cluster} -o jsonpath='{.metadata.labels.pgo-version}') != ${LATEST_TAG} ]] \
+		|| [[ $(kubectl_bin get deployment/${cluster} -o jsonpath='{.spec.template.metadata.labels.pgo-version}') != ${LATEST_TAG} ]]; then
+		echo "PGO version has not been updated. Exiting..."
+		exit 1
+	fi
 	# wait for some significant time period. Pgbouncer pod may not be started otherwise
 	sleep 10
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
