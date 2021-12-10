@@ -117,6 +117,10 @@ func (c *Controller) onAdd(obj interface{}) {
 		Name:      newCluster.Name,
 		Namespace: newCluster.Namespace,
 	}
+	if c.lockers.store == nil {
+		c.lockers = newLockStore()
+	}
+
 	l := c.lockers.LoadOrCreate(nn.String())
 	l.statusMutex.Lock()
 	defer l.statusMutex.Unlock()
@@ -222,15 +226,15 @@ func (c *Controller) RunWorker(stopCh <-chan struct{}, doneCh chan<- struct{}) {
 	go c.waitForShutdown(stopCh)
 
 	go c.reconcilePerconaPG(stopCh)
-
+	c.crons = NewCronRegistry()
+	c.lockers = newLockStore()
 	deploymentTemplateData, err := ioutil.ReadFile(templatePath + deploymentTemplateName)
 	if err != nil {
 		log.Printf("new template data: %s", err)
 		return
 	}
 	c.deploymentTemplateData = deploymentTemplateData
-	c.crons = NewCronRegistry()
-	c.lockers = newLockStore()
+
 	log.Debug("perconapgcluster Contoller: worker queue has been shutdown, writing to the done channel")
 	doneCh <- struct{}{}
 }
