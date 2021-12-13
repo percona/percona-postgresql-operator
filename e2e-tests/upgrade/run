@@ -119,14 +119,14 @@ main() {
 
 	wait_cluster_consistency "${cluster}"
 	wait_deployment "${cluster}"
-	
-	 if [[ $(kubectl_bin get deployment/${cluster} -o jsonpath='{.metadata.labels.pgo-version}') != ${LATEST_TAG} ]] \
-	 	|| [[ $(kubectl_bin get deployment/${cluster} -o jsonpath='{.spec.template.metadata.labels.pgo-version}') != ${LATEST_TAG} ]]; then
-	 	echo "PGO version has not been updated. Exiting..."
-	 	exit 1
-	 fi
-	 wait for some significant time period. Pgbouncer pod may not be started otherwise
-	
+
+	if [[ $(kubectl_bin get deployment/${cluster} -o jsonpath='{.metadata.labels.pgo-version}') != ${LATEST_TAG} ]] \
+		|| [[ $(kubectl_bin get deployment/${cluster} -o jsonpath='{.spec.template.metadata.labels.pgo-version}') != ${LATEST_TAG} ]]; then
+		echo "PGO version has not been updated. Exiting..."
+		exit 1
+	fi
+	wait for some significant time period. Pgbouncer pod may not be started otherwise
+
 	sleep 10
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
