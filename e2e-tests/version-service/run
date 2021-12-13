@@ -52,64 +52,33 @@ main() {
 
 	deploy_version_service
 
-	desc 'PG cluster update with explicitly specified image inside version service'
+	desc 'Use simple recommended channel'
 	cluster="cluster1"
-	PGO_TAG='1.0.0'
-	PG_VER='13'
-	kubectl_bin apply -f $conf_dir/client.yml
-	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
-	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
-	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
-	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
-	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
-	spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
-
-	apply_version ${cluster} '9.9.9' "${PG_VER}.4" ${PG_VER}
-
-	kubectl delete perconapgcluster/${cluster}
-	wait_for_delete "deployment/${cluster}"
-	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
-
-	desc 'PG cluster update with the latest image by version service'
-	PG_VER='12'
-	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
-	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
-	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
-	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
-	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
-	spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
-
-	apply_version ${cluster} '9.9.9' "latest" ${PG_VER}
-
-	kubectl delete perconapgcluster/${cluster}
-	wait_for_delete "deployment/${cluster}"
-	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
-
-	desc 'PG cluster with version service offline'
+	PGO_TAG='1.1.0'
 	PG_VER='13'
 	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
 	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
 	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
 	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
-	spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "latest" "${PGO_TAG}-${PG_VER}" 'http://not-a-version-service/' 1
+	apply_version ${cluster} '9.9.9' "recommended" "${PG_VER}" "${VS_ENDPOINT}"
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
 	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
 
-	desc 'Updating PG cluster with version service available but disabled'
+	desc 'Use major version recommended channel'
 	PG_VER='12'
 	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
 	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
 	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
 	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
-	spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "disabled" "${PGO_TAG}-${PG_VER}" "${VS_ENDPOINT}" 1
+	apply_version ${cluster} '9.9.9' "12-recommended" "${PG_VER}" "${VS_ENDPOINT}"
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
@@ -122,13 +91,91 @@ main() {
 	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
 	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
-	spinup_pgcluster "${cluster}" "${test_dir}/conf/1.0.0_cr.yaml"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 	# No update between major versions should happen. Thus expected revision is 1
 	apply_version ${cluster} '9.9.9' "14-recommended" "${PGO_TAG}-${PG_VER}" "${VS_ENDPOINT}" 1
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
 	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+	desc 'PG cluster update with the latest image by version service'
+	PG_VER='12'
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
+
+	apply_version ${cluster} '9.9.9' "latest" ${PG_VER}
+
+	kubectl delete perconapgcluster/${cluster}
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+	desc 'PG cluster with major version latest release channel'
+	PG_VER='12'
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
+
+	apply_version ${cluster} '9.9.9' "12-latest" "${PG_VER}"
+
+	kubectl delete perconapgcluster/${cluster}
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+	desc 'PG cluster update with explicitly specified image inside version service'
+	PG_VER='13'
+	kubectl_bin apply -f $conf_dir/client.yml
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
+
+	apply_version ${cluster} '9.9.9' "${PG_VER}.5" ${PG_VER}
+
+	kubectl delete perconapgcluster/${cluster}
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+	desc 'PG cluster with version service offline'
+	PG_VER='13'
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
+
+	apply_version ${cluster} '9.9.9' "latest" "${PGO_TAG}-${PG_VER}" 'http://not-a-version-service/' 1
+
+	kubectl delete perconapgcluster/${cluster}
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+
+	desc 'Updating PG cluster with version service available but disabled'
+	PG_VER='12'
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
+
+	apply_version ${cluster} '9.9.9' "disabled" "${PGO_TAG}-${PG_VER}" "${VS_ENDPOINT}" 1
+
+	kubectl delete perconapgcluster/${cluster}
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
 
 	destroy "${namespace}"
 }
