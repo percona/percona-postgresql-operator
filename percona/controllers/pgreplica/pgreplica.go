@@ -295,12 +295,7 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica, newP
 			newPerconaPGCluster.Spec.PGBadger.ImagePullPolicy)
 	}
 
-	if deployment.Labels == nil {
-		deployment.Labels = make(map[string]string)
-	}
-	if newPerconaPGCluster.Labels != nil {
-		deployment.Labels[config.LABEL_PGO_VERSION] = newPerconaPGCluster.Labels[config.LABEL_PGO_VERSION]
-	}
+	dplmnt.UpdateDeploymentVersionLabels(deployment, newPerconaPGCluster)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)

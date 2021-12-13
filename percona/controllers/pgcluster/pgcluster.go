@@ -98,12 +98,7 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
-	if deployment.Labels == nil {
-		deployment.Labels = make(map[string]string)
-	}
-	if newPerconaPGCluster.Labels != nil {
-		deployment.Labels[config.LABEL_PGO_VERSION] = newPerconaPGCluster.Labels[config.LABEL_PGO_VERSION]
-	}
+	dplmnt.UpdateDeploymentVersionLabels(deployment, newPerconaPGCluster)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "update deployment")

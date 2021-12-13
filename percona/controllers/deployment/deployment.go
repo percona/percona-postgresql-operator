@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/operator"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
@@ -57,4 +58,17 @@ func UpdateDeploymentContainer(deployment *appsv1.Deployment, containerName, ima
 	}
 
 	deployment.Spec.Template.Spec.Containers = containers
+}
+
+func UpdateDeploymentVersionLabels(deployment *appsv1.Deployment, cluster *crv1.PerconaPGCluster) {
+	if deployment.Labels == nil {
+		deployment.Labels = make(map[string]string)
+	}
+	if deployment.Spec.Template.Labels == nil {
+		deployment.Spec.Template.Labels = make(map[string]string)
+	}
+	if cluster.Labels != nil {
+		deployment.Labels[config.LABEL_PGO_VERSION] = cluster.Labels[config.LABEL_PGO_VERSION]
+		deployment.Spec.Template.Labels[config.LABEL_PGO_VERSION] = cluster.Labels[config.LABEL_PGO_VERSION]
+	}
 }
