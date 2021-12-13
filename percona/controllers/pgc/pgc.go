@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	ns "github.com/percona/percona-postgresql-operator/internal/ns"
 	"github.com/percona/percona-postgresql-operator/internal/operator"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgreplica"
@@ -22,9 +24,9 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controllers/version"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
-	"github.com/robfig/cron/v3"
 
 	"github.com/pkg/errors"
+	"github.com/robfig/cron/v3"
 	log "github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -261,14 +263,35 @@ func (c *Controller) reconcilePerconaPG(stopCh <-chan struct{}) {
 	}
 }
 
+func (c *Controller) getOperatorNamespaceList() ([]string, error) {
+	nsOpMode, err := ns.GetNamespaceOperatingMode(c.Client)
+	if err != nil {
+		return nil, errors.Wrap(err, "get namespaceOperatingMode")
+	}
+	installationName := os.Getenv("PGO_INSTALLATION_NAME")
+	if installationName == "" {
+		return nil, errors.New("PGO_INSTALLATION_NAME env var is not set")
+	}
+	pgoNamespace := os.Getenv("PGO_OPERATOR_NAMESPACE")
+	if pgoNamespace == "" {
+		return nil, errors.New("PGO_OPERATOR_NAMESPACE env var is not set")
+	}
+	namespaces, err := ns.GetInitialNamespaceList(c.Client, nsOpMode, installationName, pgoNamespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "get namespaces list")
+	}
+
+	return namespaces, nil
+}
+
 func (c *Controller) reconcilePerconaPGClusters() error {
 	ctx := context.TODO()
-	ns, err := c.Client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	namespaces, err := c.getOperatorNamespaceList()
 	if err != nil {
-		return errors.Wrap(err, "get ns list")
+		return errors.Wrap(err, "get operator ns list")
 	}
-	for _, n := range ns.Items {
-		perconaPGClusters, err := c.Client.CrunchydataV1().PerconaPGClusters(n.Name).List(ctx, metav1.ListOptions{})
+	for _, namespace := range namespaces {
+		perconaPGClusters, err := c.Client.CrunchydataV1().PerconaPGClusters(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil && !kerrors.IsNotFound(err) {
 			return errors.Wrap(err, "list perconapgclusters")
 		} else if err != nil {

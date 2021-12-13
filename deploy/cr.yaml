@@ -1,24 +1,17 @@
 apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
-  annotations:
-    current-primary: cluster1
   labels:
-    crunchy-pgha-scope: cluster1
-    deployment-name: cluster1
-    name: cluster1
-    pg-cluster: cluster1
-    pgo-version: 1.1.0
-    pgouser: admin
+    pgo-version: 1.2.0
   name: cluster1
 spec:
-  secretsName: cluster1-users-secrets
+#  secretsName: cluster1-users
 #  sslCA: cluster1-ssl-ca
 #  sslSecretName: cluster1-ssl-keypair
 #  sslReplicationSecretName: cluster1-ssl-keypair
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
-    apply: recommended
+    apply: disabled
     schedule: "0 4 * * *"
   database: pgdb
   port: "5432"
@@ -47,8 +40,8 @@ spec:
 #      storagetype: dynamic
 #      storageclass: ""
 #      matchLabels: ""
-  userLabels:
-    pgo-version: "1.1.0"
+#  userLabels:
+#    pgo-version: "1.2.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
     resources:
@@ -71,7 +64,7 @@ spec:
 #    customconfig: ""
   pmm:
     enabled: false
-    image: percona/pmm-client:2.21.0
+    image: percona/pmm-client:2.24.0
     serverHost: monitoring-service
     serverUser: admin
     pmmSecret: cluster1-pmm-secret
@@ -110,7 +103,7 @@ spec:
         storage: local
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
-    size: 1
+    size: 3
     resources:
       requests:
         cpu: "1"

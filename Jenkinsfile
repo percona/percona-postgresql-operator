@@ -414,15 +414,6 @@ pipeline {
                         ShutdownCluster('backups')
                     }
                 }
-                stage('E2E Data migration') {
-                    steps {
-                        CreateCluster('upstream')
-                        CreateCluster('migration')
-                        runTest('data-migration-gcs', 'migration')
-                        ShutdownCluster('migration')
-                        ShutdownCluster('upstream')
-                    }
-                }
             }
         }
     }
