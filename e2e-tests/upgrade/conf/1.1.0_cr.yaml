@@ -8,22 +8,49 @@ metadata:
     deployment-name: cluster1
     name: cluster1
     pg-cluster: cluster1
-    pgo-version: 1.2.0
+    pgo-version: 1.1.0
     pgouser: admin
   name: cluster1
 spec:
+#  secretsName: cluster1-users
+#  sslCA: cluster1-ssl-ca
+#  sslSecretName: cluster1-ssl-keypair
+#  sslReplicationSecretName: cluster1-ssl-keypair
+  upgradeOptions:
+    versionServiceEndpoint: https://check.percona.com
+    apply: disabled
+    schedule: "0 4 * * *"
   database: pgdb
-  namespace: pgo
   port: "5432"
   user: pguser
   disableAutofail: false
   tlsOnly: false
   standby: false
   pause: false
+  keepData: true
+  keepBackups: true
+#  pgDataSource:
+#    restoreFrom: ""
+#    restoreOpts: ""
+#  tablespaceStorages:
+#    lake:
+#      volumeSpec:
+#        size: 1G
+#        accessmode: ReadWriteOnce
+#        storagetype: dynamic
+#        storageclass: ""
+#        matchLabels: ""
+#  walStorage:
+#    volumeSpec:
+#      size: 1G
+#      accessmode: ReadWriteOnce
+#      storagetype: dynamic
+#      storageclass: ""
+#      matchLabels: ""
   userLabels:
-    pgo-version: "1.2.0"
+    pgo-version: "1.1.0"
   pgPrimary:
-    image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
+    image: percona/percona-postgresql-operator:1.1.0-ppg14-postgres-ha
     resources:
       requests:
         memory: "128Mi"
@@ -41,9 +68,10 @@ spec:
 #        pg-cluster-annot: cluster1
 #      labels:
 #        pg-cluster-label: cluster1
+#    customconfig: ""
   pmm:
     enabled: false
-    image: percona/pmm-client:2.15.1
+    image: percona/pmm-client:2.24.0
     serverHost: monitoring-service
     serverUser: admin
     pmmSecret: cluster1-pmm-secret
@@ -55,8 +83,8 @@ spec:
 #        cpu: "1"
 #        memory: "400M"
   backup:
-    image: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
-    backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
+    image: percona/percona-postgresql-operator:1.1.0-ppg14-pgbackrest
+    backrestRepoImage: percona/percona-postgresql-operator:1.1.0-ppg14-pgbackrest-repo
     resources:
       requests:
         memory: "48Mi"
@@ -73,18 +101,16 @@ spec:
 #      my-gcs:
 #        type: gcs
 #        bucket: some-gcs-bucket
-#    storageTypes: [
-#      "gcs"
-#    ]
 #    repoPath: ""
     schedule:
-      - name: "sch-backup"
-        schedule: "*/5 * * * *"
+      - name: "sat-night-backup"
+        schedule: "0 0 * * 6"
+        keep: 3
         type: full
-        storage: my-s3
+        storage: local
   pgBouncer:
-    image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
-    size: 1
+    image: percona/percona-postgresql-operator:1.1.0-ppg14-pgbouncer
+    size: 3
     resources:
       requests:
         cpu: "1"
@@ -101,7 +127,7 @@ spec:
 #        pg-cluster-label: cluster1
   pgReplicas:
     hotStandby:
-      size: 0
+      size: 2
       resources:
         requests:
 #          cpu: "1"
@@ -131,7 +157,7 @@ spec:
 #          pg-cluster-label: cluster1
   pgBadger:
     enabled: false
-    image: perconalab/percona-postgresql-operator:main-ppg13-pgbadger
+    image: percona/percona-postgresql-operator:1.1.0-ppg14-pgbadger
     port: 10000
 #  securityContext:
 #    fsGroup: 1001

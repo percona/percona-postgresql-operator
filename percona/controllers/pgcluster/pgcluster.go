@@ -22,7 +22,7 @@ import (
 
 const (
 	templatePath      = "/"
-	defaultPGOVersion = "1.1.0"
+	defaultPGOVersion = "1.2.0"
 	S3StorageType     = crv1.StorageType("s3")
 	GCSStorageType    = crv1.StorageType("gcs")
 )

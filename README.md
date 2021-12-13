@@ -75,7 +75,7 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
     * Selecting different storage classes for your primary, replica, and backup storage
     * Select your own container resources class for each PostgreSQL cluster deployment; differentiate between resources applied for primary and replica clusters
     * Use your own container image repository, including `imagePullSecrets` and private repositories  support
-    * Customize your PostgreSQL configuration 
+    * Customize your PostgreSQL configuration
     * Bring your own trusted certificate authority (CA) for use with the Operator API server
     * Override your PostgreSQL configuration for each cluster
     * Use your own custom images, re-define the image for each container separately
@@ -88,7 +88,7 @@ The Operator includes various components that get deployed to your Kubernetes cl
 
 ### Supported Platforms
 
-The following platforms were tested and are officially supported by the Operator 1.1.0:
+The following platforms were tested and are officially supported by the Operator 1.2.0:
 
 * Google Kubernetes Engine (GKE) 1.17 - 1.21
 * Amazon Elastic Container Service for Kubernetes (EKS) 1.21
