@@ -8,13 +8,13 @@
           "12.8": {
             "image_path": "perconalab/percona-postgresql-operator:main-ppg12-postgres-ha",
             "image_hash": "a1876115f67bd9fe50817dc043b1d5b67107129935c568367210c17f5d49998c",
-            "status": "available",
+            "status": "recommended",
             "critical": false
           },
           "13.5": {
             "image_path": "perconalab/percona-postgresql-operator:main-ppg13-postgres-ha",
             "image_hash": "fabe43635f5b74ee62fe6d8a6aa28a8eb266981de9a6369acead532710fb31e7",
-            "status": "available",
+            "status": "recommended",
             "critical": false
           },
           "14.1": {
@@ -36,13 +36,13 @@
           "12.8": {
             "image_path": "perconalab/percona-postgresql-operator:main-ppg12-pgbackrest",
             "image_hash": "e0d913a7543b54c491a57511eafc29a4f79d52fa65b6a386384cc1b2caff7794",
-            "status": "available",
+            "status": "recommended",
             "critical": false
           },
           "13.5": {
             "image_path": "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest",
             "image_hash": "81161945a0a0f3998a42dec37507be4ba1fa2ba6a70549db7f043b2e40ddf7dd",
-            "status": "available",
+            "status": "recommended",
             "critical": false
           },
           "14.1": {
