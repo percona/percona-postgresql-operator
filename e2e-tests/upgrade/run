@@ -77,7 +77,9 @@ function create_or_upgrade_to_version() {
 		deployment/postgres-operator \
 		deployment/some-name-pgbouncer \
 		service/some-name-pgbouncer || :
-
+	kubectl_bin delete \
+		rolebindings,roles,clusterrolebindings,clusterroles,sa \
+		--selector=vendor=crunchydata
 }
 
 main() {
@@ -86,10 +88,10 @@ main() {
 
 	if [[ ${PG_VER} -le '13' ]]; then
 		create_or_upgrade_to_version ${cluster} '0.2.0' "${test_dir}/conf/0.2.0_operator.yaml"
-		create_or_upgrade_to_version ${cluster} '1.0.0'
+		create_or_upgrade_to_version ${cluster} '1.0.0' "${test_dir}/conf/1.0.0_operator.yaml"
 	fi
 
-	create_or_upgrade_to_version ${cluster} '1.1.0'
+	create_or_upgrade_to_version ${cluster} '1.1.0' "${test_dir}/conf/1.1.0_operator.yaml"
 
 	LATEST_TAG='1.2.0'
 	IMAGE_OPERATOR="${TARGET_IMAGE_OPERATOR:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"}"
