@@ -176,7 +176,6 @@ main() {
 	wait_for_delete "deployment/${cluster}"
 	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
 
-
 	destroy "${namespace}"
 }
 
