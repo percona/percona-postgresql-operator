@@ -7,48 +7,48 @@ test_dir=$(realpath $(dirname $0))
 . ${test_dir}/../functions
 
 function main {
-    create_namespace $namespace
-    # run operator in the same namespace as cr (default configuration)
-    deploy_operator
+	create_namespace $namespace
+	# run operator in the same namespace as cr (default configuration)
+	deploy_operator
 
-    desc 'create first PG cluster'
-    cluster="some-name"
-    spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+	desc 'create first PG cluster'
+	cluster="some-name"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
-    kubectl_bin delete perconapgcluster/${cluster}
-    sleep 10
-    kubectl_bin wait jobs --for=condition=Complete --selector=pg-cluster=${cluster},pgrmdata='true'
+	kubectl_bin delete perconapgcluster/${cluster}
+	sleep 10
+	kubectl_bin wait jobs --for=condition=Complete --selector=pg-cluster=${cluster},pgrmdata='true'
 
-    destroy_operator
+	destroy_operator
 
-    # dynymic operator mode. Should create namespace for cluster by itself
-    ns="${test_name}-${RANDOM}"
-    deploy_operator '' "${src_dir}/deploy/operator.yaml" ${ns} 'dynamic'
-    spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+	# dynymic operator mode. Should create namespace for cluster by itself
+	ns="${test_name}-${RANDOM}"
+	deploy_operator '' "${src_dir}/deploy/operator.yaml" ${ns} 'dynamic'
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
-    kubectl_bin -n ${ns} delete perconapgcluster/${cluster}
-    sleep 10
-    kubectl_bin -n ${ns} wait jobs --for=condition=Complete --selector=pg-cluster=${cluster},pgrmdata='true'
+	kubectl_bin -n ${ns} delete perconapgcluster/${cluster}
+	sleep 10
+	kubectl_bin -n ${ns} wait jobs --for=condition=Complete --selector=pg-cluster=${cluster},pgrmdata='true'
 
-    destroy_operator
+	destroy_operator
 
-    # readonly operator mode. Should only watch namespace for cluster. No namespace creation or removal
-    ns="${test_name}-${RANDOM}"
-    kubectl_bin delete namespace ${ns} --force --grace-period=0 || :
-    deploy_operator '' "${src_dir}/deploy/operator.yaml" ${ns} 'readonly'
-    sleep 5
-    if [[ "${ns}" == "$(kubectl_bin get namespace ${ns} -o jsonpath='{.metadata.name}')" ]]; then
-        echo "Namespace shouldn't be created in readonly mode. Exiting..."
-        exit 1
-    fi
-    kubectl_bin create namespace ${ns}
-    spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+	# readonly operator mode. Should only watch namespace for cluster. No namespace creation or removal
+	ns="${test_name}-${RANDOM}"
+	kubectl_bin delete namespace ${ns} --force --grace-period=0 || :
+	deploy_operator '' "${src_dir}/deploy/operator.yaml" ${ns} 'readonly'
+	sleep 5
+	if [[ "${ns}" == "$(kubectl_bin get namespace ${ns} -o jsonpath='{.metadata.name}')" ]]; then
+		echo "Namespace shouldn't be created in readonly mode. Exiting..."
+		exit 1
+	fi
+	kubectl_bin create namespace ${ns}
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
-    kubectl_bin -n ${ns} delete perconapgcluster/${cluster}
-    sleep 10
-    kubectl_bin -n ${ns} wait jobs --for=condition=Complete --selector=pg-cluster=${cluster},pgrmdata='true'
+	kubectl_bin -n ${ns} delete perconapgcluster/${cluster}
+	sleep 10
+	kubectl_bin -n ${ns} wait jobs --for=condition=Complete --selector=pg-cluster=${cluster},pgrmdata='true'
 
-    destroy "${namespace}"
+	destroy "${namespace}"
 }
 
 main
