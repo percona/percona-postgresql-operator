@@ -118,17 +118,36 @@ desc() {
 	set -o xtrace
 }
 
+destroy_operator() {
+	kubectl_bin delete \
+		serviceaccounts/pgo-deployer-sa \
+		clusterroles/pgo-deployer-cr \
+		configmaps/pgo-deployer-cm \
+		configmaps/pgo-config \
+		clusterrolebindings/pgo-deployer-crb \
+		jobs.batch/pgo-deploy \
+		deployment/postgres-operator \
+		deployment/some-name-pgbouncer \
+		service/some-name-pgbouncer || :
+	kubectl_bin delete \
+		rolebindings,roles,clusterrolebindings,clusterroles,sa \
+		--selector=vendor=crunchydata
+}
+
 deploy_operator() {
 	local pull_secret_name=${1}
 	local operator_manifest=${2:-"${src_dir}/deploy/operator.yaml"}
+	local watch_namespace=${3:-"${namespace}"}
+	local namespace_mode=${4:-"disabled"}
 
 	desc 'start operator'
 
 	# modifing ini structure from configMap
 	yq r -d'2' "${operator_manifest}" 'data[values.yaml]' \
-		| $sed -e "s#namespace: .*#namespace: \"${namespace}\"#g" \
+		| $sed -e "s#namespace: .*#namespace: \"${watch_namespace}\"#g" \
 		| $sed -e "s#crunchy_debug: .*#crunchy_debug: \"true\"#g" \
 		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: \"${namespace}\"#g" \
+		| $sed -e "s#namespace_mode: .*#namespace_mode: \"${namespace_mode}\"#g" \
 		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: $(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)#g" \
 		| $sed -e "s#ccp_image_prefix: .*#ccp_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"#g" \
 		| $sed -e "s#pgo_image_prefix: .*#pgo_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"#g" \
@@ -156,7 +175,7 @@ deploy_operator() {
 	fi
 	kubectl_bin apply -f ${tmp_dir}/operator.yaml
 
-	wait_job_completion "pgo-deploy"
+	wait_job_completion "pgo-deploy" 'true' ${namespace}
 
 	wait_pod $(get_operator_pod)
 }
@@ -264,10 +283,11 @@ wait_pod() {
 wait_job_completion() {
 	local job=$1
 	local mandatory=${2:-"true"}
+	local target_namespace=${3:-"$(get_target_namespace)"}
 
 	retry=0
 	set +o xtrace
-	until KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
+	until KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl -n ${target_namespace} get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
 		sleep 1
 		echo -n .
 		let retry+=1
@@ -282,8 +302,8 @@ wait_job_completion() {
 	done
 
 	retry=0
-	until [[ $(kubectl_bin get job/$job -o jsonpath='{.metadata.name}' 2>&1 | grep -io 'not found') == "not found" ]] \
-		|| [[ $(kubectl_bin get job/$job -o jsonpath='{.status.succeeded}' 2>/dev/null) == '1' ]]; do
+	until [[ $(kubectl_bin -n ${target_namespace} get job/$job -o jsonpath='{.metadata.name}' 2>&1 | grep -io 'not found') == "not found" ]] \
+		|| [[ $(kubectl_bin -n ${target_namespace} get job/$job -o jsonpath='{.status.succeeded}' 2>/dev/null) == '1' ]]; do
 		sleep 1
 		echo -n .
 		let retry+=1
@@ -302,6 +322,13 @@ wait_job_completion() {
 	set -o xtrace
 }
 
+get_target_namespace() {
+	set +x
+	local ns=$(kubectl_bin get configmap/pgo-deployer-cm -o yaml | yq r - 'data[values.yaml]' | grep -Eo "^namespace: .*$" | $sed 's/namespace\:\s//' | $sed 's/\"//g')
+	set -x
+	echo ${ns}
+}
+
 apply_cluster() {
 	local path=${1}
 	local name=${2}
@@ -314,8 +341,7 @@ apply_cluster() {
 	local schedule_type=${9}
 	local tls_enabled=${10}
 
-	yq w "${path}" 'metadata.namespace' ${namespace} \
-		| yq w - 'spec.namespace' ${namespace} \
+	yq w "${path}" 'metadata.namespace' $(get_target_namespace) \
 		| yq w - 'metadata.annotations.current-primary' ${name} \
 		| yq w - 'metadata.labels.crunchy-pgha-scope' ${name} \
 		| yq w - 'metadata.labels.deployment-name' ${name} \
@@ -509,12 +535,15 @@ wait_for_delete() {
 
 wait_deployment() {
 	local name=$1
+	local target_namespace=${2:-"$(get_target_namespace)"}
 
 	sleep 10
 	set +o xtrace
 	retry=0
 	echo -n $name
-	until [ -n "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" -a "$(kubectl_bin get deployment $name -o jsonpath='{.status.replicas}')" == "$(kubectl_bin get deployment $name -o jsonpath='{.status.readyReplicas}')" ]; do
+	until [ -n "$(kubectl_bin -n ${target_namespace} get deployment $name -o jsonpath='{.status.replicas}')" \
+		-a "$(kubectl_bin -n ${target_namespace} get deployment $name -o jsonpath='{.status.replicas}')" \
+		== "$(kubectl_bin -n ${target_namespace} get deployment $name -o jsonpath='{.status.readyReplicas}')" ]; do
 		sleep 1
 		echo -n .
 		let retry+=1
@@ -655,10 +684,9 @@ spinup_pgcluster() {
 	local tls_enabled=${8:-"false"}
 	local secretsFile="${9:-$conf_dir/secrets.yml}"
 	local pgoClientFile="${10:-$conf_dir/client.yml}"
-	desc 'create first PG cluster'
 
 	desc 'create fresh PG cluster'
-	kubectl_bin apply -f ${secretsFile} -f ${pgoClientFile}
+	kubectl_bin -n $(get_target_namespace) apply -f ${secretsFile} -f ${pgoClientFile}
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type} ${tls_enabled}
 	wait_deployment "${cluster}-backrest-shared-repo"
 	wait_deployment "${cluster}"
@@ -674,13 +702,13 @@ spinup_pgcluster() {
 
 	run_psql \
 		'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
-		"postgres:postgres_pass@${cluster}.${namespace}"
+		"postgres:postgres_pass@${cluster}.$(get_target_namespace)"
 	run_psql \
 		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
-		"postgres:postgres_pass@${cluster}.${namespace}"
+		"postgres:postgres_pass@${cluster}.$(get_target_namespace)"
 	run_psql \
 		'\c myapp \\\ GRANT SELECT,INSERT ON myApp to "some-name";GRANT USAGE ON SCHEMA public TO "some-name";' \
-		"postgres:postgres_pass@${cluster}.${namespace}"
+		"postgres:postgres_pass@${cluster}.$(get_target_namespace)"
 	sleep 10
 }
 
@@ -712,11 +740,12 @@ wait_cluster_consistency() {
 }
 
 wait_cluster_status() {
-	cluster_name=${1}
-	target_status=${2}
+	local cluster_name=${1}
+	local target_status=${2}
+	local target_namespace=${3:-"$(get_target_namespace)"}
 	retry=0
 
-	until [[ "$(kubectl_bin get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "${target_status}" ]]; do
+	until [[ "$(kubectl_bin -n ${target_namespace} get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "${target_status}" ]]; do
 		let retry+=1
 		if [ $retry -ge 24 ]; then
 			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster

@@ -67,19 +67,7 @@ function create_or_upgrade_to_version() {
 		]'
 	wait_cluster_status "${cluster}" "pgcluster Shutdown"
 
-	kubectl_bin delete \
-		serviceaccounts/pgo-deployer-sa \
-		clusterroles/pgo-deployer-cr \
-		configmaps/pgo-deployer-cm \
-		configmaps/pgo-config \
-		clusterrolebindings/pgo-deployer-crb \
-		jobs.batch/pgo-deploy \
-		deployment/postgres-operator \
-		deployment/some-name-pgbouncer \
-		service/some-name-pgbouncer || :
-	kubectl_bin delete \
-		rolebindings,roles,clusterrolebindings,clusterroles,sa \
-		--selector=vendor=crunchydata
+	destroy_operator
 }
 
 main() {

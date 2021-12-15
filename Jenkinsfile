@@ -403,6 +403,7 @@ pipeline {
                         runTest('smart-update', 'sandbox')
                         runTest('version-service', 'sandbox')
                         runTest('users', 'sandbox')
+                        runTest('ns-mode', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }
