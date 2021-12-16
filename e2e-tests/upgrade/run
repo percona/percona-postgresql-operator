@@ -18,6 +18,8 @@ function create_or_upgrade_to_version() {
 	local cluster=$1
 	local pgo_tag=$2
 	local operator_yaml=${3}
+	local namespace_mode=${4:-"disabled"}
+	local operator_action=${5:-"install"}
 
 	IMAGE_OPERATOR="percona/percona-postgresql-operator:${pgo_tag}-postgres-operator"
 	IMAGE_DEPLOYER="percona/percona-postgresql-operator:${pgo_tag}-pgo-deployer"
@@ -28,7 +30,12 @@ function create_or_upgrade_to_version() {
 	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:${pgo_tag}-ppg$PG_VER-pgbackrest-repo"
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:${pgo_tag}-ppg$PG_VER-pgbadger"
 
-	deploy_operator '' ${operator_yaml}
+	if [[ "x$operator_action" == 'xinstall' ]]; then
+		deploy_operator '' ${operator_yaml} ${namespace_mode}
+	else
+		deploy_operator '' ${operator_yaml} ${namespace_mode} 'update'
+	fi
+
 	if [[ "x$(kubectl_bin get perconapgcluster/${cluster})" == "x" ]]; then
 		desc 'start cluster'
 		create_user_secrets "${cluster}"
@@ -62,24 +69,29 @@ function create_or_upgrade_to_version() {
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
-			{"op":"replace","path":"/spec/pause","value":true},
 			{"op":"replace","path":"/spec/pgBouncer/size","value":0},
 		]'
+	sleep 10
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+		'[
+			{"op":"replace","path":"/spec/pause","value":true},
+		]'
 	wait_cluster_status "${cluster}" "pgcluster Shutdown"
-
-	destroy_operator
 }
 
 main() {
 	create_namespace $namespace
 	cluster="some-name"
 
+	operator_action='install'
 	if [[ ${PG_VER} -le '13' ]]; then
-		create_or_upgrade_to_version ${cluster} '0.2.0' "${test_dir}/conf/0.2.0_operator.yaml"
-		create_or_upgrade_to_version ${cluster} '1.0.0' "${test_dir}/conf/1.0.0_operator.yaml"
+		create_or_upgrade_to_version ${cluster} '0.2.0' "${test_dir}/conf/0.2.0_operator.yaml" 'dynamic' "$operator_action"
+		operator_action='update'
+
+		create_or_upgrade_to_version ${cluster} '1.0.0' "${test_dir}/conf/1.0.0_operator.yaml" 'dynamic' "$operator_action"
 	fi
 
-	create_or_upgrade_to_version ${cluster} '1.1.0' "${test_dir}/conf/1.1.0_operator.yaml"
+	create_or_upgrade_to_version ${cluster} '1.1.0' "${test_dir}/conf/1.1.0_operator.yaml" 'dynamic' "$operator_action"
 
 	LATEST_TAG='1.2.0'
 	IMAGE_OPERATOR="${TARGET_IMAGE_OPERATOR:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"}"
@@ -91,7 +103,7 @@ main() {
 	IMAGE_BACKREST_REPO="${TARGET_IMAGE_BACKREST_REPO:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbackrest-repo"}"
 	IMAGE_PGBADGER="${TARGET_IMAGE_PGBADGER:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbadger"}"
 
-	deploy_operator
+	deploy_operator '' '' 'update'
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
@@ -148,22 +160,10 @@ main() {
 			{"op":"add","path":"/spec/sslSecretName","value":'"'${cluster}-ssl-keypair'"'},
 			{"op":"add","path":"/spec/sslReplicationSecretName","value":'"'${cluster}-ssl-keypair'"'},
 		]'
-	wait_cluster_consistency "${cluster}"
-	wait_deployment "${cluster}"
-
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-		'[
-			{"op":"replace","path":"/spec/pgBouncer/size","value":0}
-		]'
-	sleep 10
-	kubectl_bin wait --for=delete "deployment/${cluster}-pgbouncer" --timeout=180s
-
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-		'[
-			{"op":"replace","path":"/spec/pgBouncer/size","value":1}
-		]'
-	wait_deployment "${cluster}-pgbouncer"
-	sleep 10
+#	wait_cluster_consistency "${cluster}"
+#	wait_deployment "${cluster}"
+#	wait_deployment "${cluster}-pgbouncer"
+	sleep 200
 	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "${cluster}:${cluster}_pass@${cluster}-pgbouncer.${namespace}" "verify-ca"
 
 	destroy "${namespace}"
