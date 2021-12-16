@@ -135,10 +135,6 @@ destroy_operator() {
 	kubectl_bin ${OPERATOR_NS:+-n $OPERATOR_NS} apply -f ${tmp_dir}/operator-destroy.yaml
 	wait_job_completion "pgo-deploy" 'true' ${OPERATOR_NS}
 	kubectl_bin ${OPERATOR_NS:+-n $OPERATOR_NS} delete  -f ${tmp_dir}/operator-destroy.yaml
-
-	if [[ -n "${OPERATOR_NS}" ]]; then
-		destroy_namespace ${OPERATOR_NS}
-	fi
 }
 
 prepare_operator_yaml() {

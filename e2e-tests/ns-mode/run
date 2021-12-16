@@ -25,6 +25,7 @@ function main {
 	deploy_operator '' "${src_dir}/deploy/operator.yaml" 'dynamic'
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 	destroy_operator
+	destroy_namespace $OPERATOR_NS
 	unset OPERATOR_NS
 
 	desc 'readonly operator mode. Should only watch namespace for cluster. No namespace creation or removal'
