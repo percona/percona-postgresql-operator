@@ -6,6 +6,12 @@ set -o xtrace
 test_dir=$(realpath $(dirname $0))
 . ${test_dir}/../functions
 
+function uninstall_operator {
+	kubectl_bin delete -f "${src_dir}/deploy/operator.yaml"
+	deploy_operator '' "${src_dir}/deploy/operator.yaml" ${namespace} "disabled" "uninstall"
+	kubectl_bin -n ${namespace} delete jobs --selector=job-name=pgo-deploy
+}
+
 function main {
 	create_namespace $namespace
 	# run operator in the same namespace as cr (default configuration)
@@ -19,7 +25,7 @@ function main {
 	sleep 10
 	kubectl_bin wait jobs --for=condition=Complete --selector=pg-cluster=${cluster},pgrmdata='true'
 
-	destroy_operator
+	uninstall_operator
 
 	# dynymic operator mode. Should create namespace for cluster by itself
 	ns="${test_name}-${RANDOM}"
@@ -29,8 +35,9 @@ function main {
 	kubectl_bin -n ${ns} delete perconapgcluster/${cluster}
 	sleep 10
 	kubectl_bin -n ${ns} wait jobs --for=condition=Complete --selector=pg-cluster=${cluster},pgrmdata='true'
+	kubectl_bin delete namespace ${ns}
 
-	destroy_operator
+	uninstall_operator
 
 	# readonly operator mode. Should only watch namespace for cluster. No namespace creation or removal
 	ns="${test_name}-${RANDOM}"

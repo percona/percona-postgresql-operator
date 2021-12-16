@@ -139,6 +139,7 @@ deploy_operator() {
 	local operator_manifest=${2:-"${src_dir}/deploy/operator.yaml"}
 	local watch_namespace=${3:-"${namespace}"}
 	local namespace_mode=${4:-"disabled"}
+	local deploy_action=${5:-"install"}
 
 	desc 'start operator'
 
@@ -166,6 +167,7 @@ deploy_operator() {
 	yq w -d'*' "${operator_manifest}" 'metadata.namespace' ${namespace} \
 		| yq w -d'3' - 'subjects[0].namespace' ${namespace} \
 		| yq w -d'4' - 'spec.template.spec.containers[0].image' ${IMAGE_DEPLOYER} \
+		| yq w -d'4' - 'spec.template.spec.containers[0].env[0].value' ${deploy_action} \
 		| yq w -d'2' - -d2 'data[values.yaml]' "$(cat ${tmp_dir}/operator.ini)" \
 			>${tmp_dir}/operator.yaml
 
@@ -177,7 +179,13 @@ deploy_operator() {
 
 	wait_job_completion "pgo-deploy" 'true' ${namespace}
 
-	wait_pod $(get_operator_pod)
+	case ${deploy_action} in
+		"install")
+			wait_pod $(get_operator_pod)
+			;;
+		*)
+			;;
+	esac
 }
 
 deploy_miniogw() {
