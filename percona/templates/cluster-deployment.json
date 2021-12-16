@@ -232,7 +232,7 @@
                         "protocol": "TCP",
                         "name": "patroni"
                     }],
-                    "imagePullPolicy": "IfNotPresent"
+                    "imagePullPolicy": "<imagePullPolicy>"
                 }
                 {{ if .ExporterAddon }}
                 ,{{.ExporterAddon }}

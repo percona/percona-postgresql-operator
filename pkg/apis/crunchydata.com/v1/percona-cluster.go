@@ -58,9 +58,10 @@ type PVCStorage struct {
 }
 
 type Badger struct {
-	Enabled bool   `json:"enabled"`
-	Image   string `json:"image"`
-	Port    int    `json:"port"`
+	Enabled         bool   `json:"enabled"`
+	Image           string `json:"image"`
+	Port            int    `json:"port"`
+	ImagePullPolicy string `json:"imagePullPolicy"`
 }
 
 type PgBouncer struct {
@@ -70,6 +71,7 @@ type PgBouncer struct {
 	TLSSecret        string              `json:"tlsSecret"`
 	Expose           Expose              `json:"expose"`
 	AntiAffinityType PodAntiAffinityType `json:"antiAffinityType"`
+	ImagePullPolicy  string              `json:"imagePullPolicy"`
 }
 
 type PGDataSource struct {
@@ -108,6 +110,7 @@ type HotStandby struct {
 	Affinity          *v1.Affinity      `json:"affinity"`
 	EnableSyncStandby bool              `json:"enableSyncStandby"`
 	Expose            Expose            `json:"expose"`
+	ImagePullPolicy   string            `json:"imagePullPolicy"`
 }
 type Expose struct {
 	ServiceType              v1.ServiceType    `json:"serviceType"`
@@ -123,6 +126,7 @@ type Resources struct {
 
 type Backup struct {
 	Image             string                `json:"image"`
+	ImagePullPolicy   string                `json:"imagePullPolicy"`
 	BackrestRepoImage string                `json:"backrestRepoImage"`
 	ServiceAccount    string                `json:"serviceAccount"`
 	Resources         Resources             `json:"resources"`
@@ -156,12 +160,13 @@ type CronJob struct {
 
 // PMMSpec contains settings for PMM
 type PMMSpec struct {
-	Enabled    bool      `json:"enabled"`
-	Image      string    `json:"image"`
-	ServerHost string    `json:"serverHost,omitempty"`
-	ServerUser string    `json:"serverUser,omitempty"`
-	PMMSecret  string    `json:"pmmSecret,omitempty"`
-	Resources  Resources `json:"resources"`
+	Enabled         bool      `json:"enabled"`
+	Image           string    `json:"image"`
+	ImagePullPolicy string    `json:"imagePullPolicy"`
+	ServerHost      string    `json:"serverHost,omitempty"`
+	ServerUser      string    `json:"serverUser,omitempty"`
+	PMMSecret       string    `json:"pmmSecret,omitempty"`
+	Resources       Resources `json:"resources"`
 }
 
 // PerconaPGClusterList is the CRD that defines a Percona PG Cluster List
@@ -178,4 +183,33 @@ type UpgradeOptions struct {
 	VersionServiceEndpoint string `json:"versionServiceEndpoint,omitempty"`
 	Apply                  string `json:"apply,omitempty"`
 	Schedule               string `json:"schedule,omitempty"`
+}
+
+var PullPolicyAlways = "Always"
+
+func (p *PerconaPGCluster) CheckAndSetDefaults() {
+	if p.Spec.PGPrimary.ImagePullPolicy == "" {
+		p.Spec.PGPrimary.ImagePullPolicy = PullPolicyAlways
+	}
+	if p.Spec.PGReplicas.HotStandby.ImagePullPolicy == "" {
+		p.Spec.PGReplicas.HotStandby.ImagePullPolicy = PullPolicyAlways
+	}
+	if p.Spec.PGBouncer.ImagePullPolicy == "" {
+		p.Spec.PGBouncer.ImagePullPolicy = PullPolicyAlways
+	}
+	if p.Spec.PGBadger.ImagePullPolicy == "" {
+		p.Spec.PGBadger.ImagePullPolicy = PullPolicyAlways
+	}
+	if p.Spec.Backup.ImagePullPolicy == "" {
+		p.Spec.Backup.ImagePullPolicy = PullPolicyAlways
+	}
+	if p.Spec.PMM.ImagePullPolicy == "" {
+		p.Spec.PMM.ImagePullPolicy = PullPolicyAlways
+	}
+
+	if p.Spec.UpgradeOptions != nil {
+		if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
+			p.Spec.UpgradeOptions.VersionServiceEndpoint = "https://check.percona.com"
+		}
+	}
 }

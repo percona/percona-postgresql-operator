@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	ContainerDatabase = "database"
-	ContainerPGBadger = "pgbadger"
+	ContainerDatabase  = "database"
+	ContainerPGBadger  = "pgbadger"
+	ContainerPGBouncer = "pgbouncer"
 )
 
 func UpdateSpecTemplateSpecSecurityContext(cl *crv1.PerconaPGCluster, deployment *appsv1.Deployment) {
@@ -45,11 +46,12 @@ func UpdateSpecTemplateLabels(labels map[string]string, deployment *appsv1.Deplo
 	return
 }
 
-func UpdateDeploymentImage(deployment *appsv1.Deployment, containerName, image string) {
+func UpdateDeploymentContainer(deployment *appsv1.Deployment, containerName, image, pullPolicy string) {
 	containers := []v1.Container{}
 	for _, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == containerName {
 			c.Image = image
+			c.ImagePullPolicy = v1.PullPolicy(pullPolicy)
 		}
 		containers = append(containers, c)
 	}

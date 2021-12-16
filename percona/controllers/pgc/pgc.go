@@ -1,7 +1,6 @@
 package pgc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,17 +9,16 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
-	"text/template"
 	"time"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	ns "github.com/percona/percona-postgresql-operator/internal/ns"
-	"github.com/percona/percona-postgresql-operator/internal/operator"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgreplica"
-	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/service"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/template"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/version"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	informers "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/crunchydata.com/v1"
@@ -38,20 +36,16 @@ import (
 
 // Controller holds the connections for the controller
 type Controller struct {
-	Client                      *kubeapi.Client
-	Queue                       workqueue.RateLimitingInterface
-	Informer                    informers.PerconaPGClusterInformer
-	PerconaPGClusterWorkerCount int
-	deploymentTemplateData      []byte
-	crons                       CronRegistry
-	lockers                     lockStore
+	Client                             *kubeapi.Client
+	Queue                              workqueue.RateLimitingInterface
+	Informer                           informers.PerconaPGClusterInformer
+	PerconaPGClusterWorkerCount        int
+	deploymentTemplateData             []byte
+	backrestRepoDeploymentTemplateData []byte
+	bouncerTemplateData                []byte
+	crons                              CronRegistry
+	lockers                            lockStore
 }
-
-const (
-	deploymentTemplateName = "cluster-deployment.json"
-	templatePath           = "/"
-	defaultSecurityContext = `{"fsGroup": 26,"supplementalGroups": [1001]}`
-)
 
 type CronRegistry struct {
 	crons             *cron.Cron
@@ -133,9 +127,12 @@ func (c *Controller) onAdd(obj interface{}) {
 	if err != nil {
 		log.Errorf("ensure version: %s", err)
 	}
-	err = c.updateTemplate(newCluster, newCluster.Name)
+
+	newCluster.CheckAndSetDefaults()
+
+	err = c.updateTemplates(newCluster)
 	if err != nil {
-		log.Errorf("update deployment template: %s", err)
+		log.Errorf("update templates: %s", err)
 		return
 	}
 
@@ -205,21 +202,19 @@ func (c *Controller) createReplicas(cluster *crv1.PerconaPGCluster) error {
 	return nil
 }
 
-func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster, nodeName string) error {
-	templateData, err := pmm.HandlePMMTemplate(c.deploymentTemplateData, newCluster, nodeName)
+func (c *Controller) updateTemplates(newCluster *crv1.PerconaPGCluster) error {
+	err := template.UpdateDeploymentTemplate(c.deploymentTemplateData, newCluster, newCluster.Name)
 	if err != nil {
-		return errors.Wrap(err, "handle pmm template data")
+		return errors.Wrap(err, "update deployment template")
 	}
-	templateData, err = handleSecurityContextTemplate(templateData, newCluster)
+	err = template.UpdateBackrestRepoTemplate(c.backrestRepoDeploymentTemplateData, newCluster, newCluster.Name)
 	if err != nil {
-		return errors.Wrap(err, "handle security context template data")
+		return errors.Wrap(err, "update backrest repo deployment template")
 	}
-	t, err := template.New(deploymentTemplateName).Parse(string(templateData))
+	err = template.UpdateBouncerTemplate(c.bouncerTemplateData, newCluster, newCluster.Name)
 	if err != nil {
-		return errors.Wrap(err, "parse template")
+		return errors.Wrap(err, "update bouncer deployment template")
 	}
-
-	config.DeploymentTemplate = t
 
 	return nil
 }
@@ -229,19 +224,38 @@ func (c *Controller) updateTemplate(newCluster *crv1.PerconaPGCluster, nodeName 
 // workqueue.
 func (c *Controller) RunWorker(stopCh <-chan struct{}, doneCh chan<- struct{}) {
 	go c.waitForShutdown(stopCh)
-
 	go c.reconcilePerconaPG(stopCh)
 	c.crons = NewCronRegistry()
 	c.lockers = newLockStore()
-	deploymentTemplateData, err := ioutil.ReadFile(templatePath + deploymentTemplateName)
+
+	err := c.setControllerTemplatesData()
 	if err != nil {
-		log.Printf("new template data: %s", err)
+		log.Printf("set controller template data: %s", err)
 		return
 	}
-	c.deploymentTemplateData = deploymentTemplateData
 
 	log.Debug("perconapgcluster Contoller: worker queue has been shutdown, writing to the done channel")
 	doneCh <- struct{}{}
+}
+
+func (c *Controller) setControllerTemplatesData() error {
+	deploymentTemplateData, err := ioutil.ReadFile(template.Path + template.ClusterDeploymentTemplateName)
+	if err != nil {
+		return errors.Wrap(err, "new cluster template data")
+	}
+	backrestRepodeploymentTemplateData, err := ioutil.ReadFile(template.Path + template.BackrestRepoDeploymentTemplateName)
+	if err != nil {
+		return errors.Wrap(err, "new backrest repo template data")
+	}
+	bouncerTemplateData, err := ioutil.ReadFile(template.Path + template.BouncerDeploymentTemplateName)
+	if err != nil {
+		return errors.Wrap(err, "new bouncer template data")
+	}
+	c.deploymentTemplateData = deploymentTemplateData
+	c.backrestRepoDeploymentTemplateData = backrestRepodeploymentTemplateData
+	c.bouncerTemplateData = bouncerTemplateData
+
+	return nil
 }
 
 // waitForShutdown waits for a message on the stop channel and then shuts down the work queue
@@ -413,6 +427,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if reflect.DeepEqual(oldCluster.Spec, newCluster.Spec) {
 		return
 	}
+	newCluster.CheckAndSetDefaults()
 
 	nn := types.NamespacedName{
 		Name:      newCluster.Name,
@@ -436,11 +451,11 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if err != nil {
 		log.Errorf("update perconapgcluster: scheduled update: %s", err)
 	}
-	err = c.updateTemplate(newCluster, newCluster.Name)
+	err = c.updateTemplates(newCluster)
 	if err != nil {
-		log.Errorf("update perconapgcluster: update deployment template: %s", err)
+		log.Errorf("update perconapgcluster: update templates: %s", err)
+		return
 	}
-
 	if !reflect.DeepEqual(oldCluster.Spec.PGPrimary.Expose, newCluster.Spec.PGPrimary.Expose) {
 		err = service.CreateOrUpdate(c.Client, newCluster, service.PGPrimaryServiceType)
 		if err != nil {
@@ -448,15 +463,13 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			return
 		}
 	}
-	if !reflect.DeepEqual(oldCluster.Spec.PGBouncer.Expose, newCluster.Spec.PGBouncer.Expose) {
-		if newCluster.Spec.PGBouncer.Size > 0 {
-			err = service.CreateOrUpdate(c.Client, newCluster, service.PGBouncerServiceType)
-			if err != nil {
-				log.Errorf("update perconapgcluster: handle bouncer service on update: %s", err)
-				return
-			}
-		}
+
+	err = pgbouncer.Update(c.Client, newCluster, oldCluster)
+	if err != nil {
+		log.Errorf("update perconapgcluster: update bouncer: %s", err)
+		return
 	}
+
 	err = c.handleScheduleBackup(newCluster, oldCluster)
 	if err != nil {
 		log.Errorf("update perconapgcluster: handle schedule: %s", err)
@@ -576,26 +589,4 @@ func deleteDatabasePods(clientset *kubeapi.Client, clusterName, namespace string
 	}
 
 	return nil
-}
-
-func handleSecurityContextTemplate(template []byte, cluster *crv1.PerconaPGCluster) ([]byte, error) {
-	if cluster.Spec.SecurityContext == nil {
-		if operator.Pgo.DisableFSGroup() {
-			return bytes.Replace(template, []byte("<securityContext>"), []byte(`{"supplementalGroups": [1001]}`), -1), nil
-		}
-		return bytes.Replace(template, []byte("<securityContext>"), []byte(defaultSecurityContext), -1), nil
-	}
-	securityContextBytes, err := getSecurityContextJSON(cluster)
-	if err != nil {
-		return nil, errors.Wrap(err, "get security context json: %s")
-	}
-
-	return bytes.Replace(template, []byte("<securityContext>"), securityContextBytes, -1), nil
-}
-
-func getSecurityContextJSON(cluster *crv1.PerconaPGCluster) ([]byte, error) {
-	if operator.Pgo.DisableFSGroup() && cluster.Spec.SecurityContext != nil {
-		cluster.Spec.SecurityContext.FSGroup = nil
-	}
-	return json.Marshal(cluster.Spec.SecurityContext)
 }

@@ -284,11 +284,15 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica, newP
 	pmm.AddOrRemovePMMContainer(cl, replica.Spec.ClusterName, replica.Spec.Name, deployment)
 	updateResources(cl, deployment)
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(cl, deployment)
-	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
-		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerDatabase, newPerconaPGCluster.Spec.PGPrimary.Image)
+	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PGPrimary, newPerconaPGCluster.Spec.PGPrimary) {
+		dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
+			newPerconaPGCluster.Spec.PGPrimary.Image,
+			newPerconaPGCluster.Spec.PGPrimary.ImagePullPolicy)
 	}
-	if oldPerconaPGCluster.Spec.PGBadger.Image != newPerconaPGCluster.Spec.PGBadger.Image {
-		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerPGBadger, newPerconaPGCluster.Spec.PGBadger.Image)
+	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PGBadger, newPerconaPGCluster.Spec.PGBadger) {
+		dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerPGBadger,
+			newPerconaPGCluster.Spec.PGBadger.Image,
+			newPerconaPGCluster.Spec.PGBadger.ImagePullPolicy)
 	}
 
 	if deployment.Labels == nil {

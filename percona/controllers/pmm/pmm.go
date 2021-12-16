@@ -1,9 +1,7 @@
 package pmm
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
@@ -50,32 +48,11 @@ func AddOrRemovePMMContainer(cl *crv1.PerconaPGCluster, clusterName, nodeName st
 	deployment.Spec.Template.Spec.Containers = containers
 }
 
-func HandlePMMTemplate(template []byte, cluster *crv1.PerconaPGCluster, nodeName string) ([]byte, error) {
-	if !cluster.Spec.PMM.Enabled {
-		return bytes.Replace(template, []byte("<pmmContainer>"), []byte(""), -1), nil
-	}
-	pmmContainerBytes, err := GetPMMContainerJSON(cluster, nodeName)
-	if err != nil {
-		return nil, errors.Wrap(err, "get pmm container json: %s")
-	}
-
-	return bytes.Replace(template, []byte("<pmmContainer>"), append([]byte(", "), pmmContainerBytes...), -1), nil
-}
-
-func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster, nodeName string) ([]byte, error) {
-	c := GetPMMContainer(pgc, pgc.Name, "{{.Name}}")
-	b, err := json.Marshal(c)
-	if err != nil {
-		return nil, errors.Wrap(err, "marshal container")
-	}
-
-	return b, nil
-}
-
 func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName, nodeName string) v1.Container {
 	return v1.Container{
-		Name:  pmmContainerName,
-		Image: pgc.Spec.PMM.Image,
+		Name:            pmmContainerName,
+		Image:           pgc.Spec.PMM.Image,
+		ImagePullPolicy: v1.PullPolicy(pgc.Spec.PMM.ImagePullPolicy),
 		LivenessProbe: &v1.Probe{
 			Handler: v1.Handler{
 				HTTPGet: &v1.HTTPGetAction{

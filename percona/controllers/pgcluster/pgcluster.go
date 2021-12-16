@@ -85,12 +85,17 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 		}
 	}
 
-	if oldPerconaPGCluster.Spec.PGPrimary.Image != newPerconaPGCluster.Spec.PGPrimary.Image {
-		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerDatabase, newPerconaPGCluster.Spec.PGPrimary.Image)
+	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PGPrimary, newPerconaPGCluster.Spec.PGPrimary) {
+		dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
+			newPerconaPGCluster.Spec.PGPrimary.Image,
+			newPerconaPGCluster.Spec.PGPrimary.ImagePullPolicy)
 	}
-	if oldPerconaPGCluster.Spec.PGBadger.Image != newPerconaPGCluster.Spec.PGBadger.Image {
-		dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerPGBadger, newPerconaPGCluster.Spec.PGBadger.Image)
+	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PGBadger, newPerconaPGCluster.Spec.PGBadger) {
+		dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerPGBadger,
+			newPerconaPGCluster.Spec.PGBadger.Image,
+			newPerconaPGCluster.Spec.PGBadger.ImagePullPolicy)
 	}
+
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
 	if deployment.Labels == nil {
@@ -129,7 +134,9 @@ func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *
 		return errors.Wrap(err, "getdeployment")
 	}
 
-	dplmnt.UpdateDeploymentImage(deployment, dplmnt.ContainerDatabase, newPerconaPGCluster.Spec.Backup.BackrestRepoImage)
+	dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
+		newPerconaPGCluster.Spec.Backup.BackrestRepoImage,
+		newPerconaPGCluster.Spec.Backup.ImagePullPolicy)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "update deployment")
