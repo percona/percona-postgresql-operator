@@ -186,25 +186,26 @@ type UpgradeOptions struct {
 }
 
 var PullPolicyAlways = "Always"
+var PullPolicyIfNotPresent = "IfNotPresent"
 
 func (p *PerconaPGCluster) CheckAndSetDefaults() {
 	if p.Spec.PGPrimary.ImagePullPolicy == "" {
-		p.Spec.PGPrimary.ImagePullPolicy = PullPolicyAlways
+		p.Spec.PGPrimary.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 	if p.Spec.PGReplicas.HotStandby.ImagePullPolicy == "" {
-		p.Spec.PGReplicas.HotStandby.ImagePullPolicy = PullPolicyAlways
+		p.Spec.PGReplicas.HotStandby.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 	if p.Spec.PGBouncer.ImagePullPolicy == "" {
-		p.Spec.PGBouncer.ImagePullPolicy = PullPolicyAlways
+		p.Spec.PGBouncer.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 	if p.Spec.PGBadger.ImagePullPolicy == "" {
-		p.Spec.PGBadger.ImagePullPolicy = PullPolicyAlways
+		p.Spec.PGBadger.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 	if p.Spec.Backup.ImagePullPolicy == "" {
-		p.Spec.Backup.ImagePullPolicy = PullPolicyAlways
+		p.Spec.Backup.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 	if p.Spec.PMM.ImagePullPolicy == "" {
-		p.Spec.PMM.ImagePullPolicy = PullPolicyAlways
+		p.Spec.PMM.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 
 	if p.Spec.UpgradeOptions != nil {
