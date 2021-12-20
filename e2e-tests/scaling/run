@@ -18,7 +18,6 @@ desc 'scaling up'
 kubectl_bin patch "perconapgcluster/some-name" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": '${replica_quantity}'}]'
 kubectl_bin wait --for=condition=Ready --selector=pg-cluster=${cluster},role=replica pods --timeout=120s
 for i in $(seq 1 ${replica_quantity}); do
-	#	create_replica ${cluster} ${i}
 	compare_kubectl "deployment/${cluster}-repl${i}"
 done
 sleep 10
