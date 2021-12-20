@@ -197,7 +197,6 @@ main() {
 	yq w -i "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'spec.userLabels.pgo-version' "9.9.9"
 	yq w -i "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'spec.upgradeOptions.versionServiceEndpoint' "${VS_ENDPOINT}"
 	yq w -i --style=single "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'spec.upgradeOptions.apply' "recommended"
-	yq w -i "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'spec.upgradeOptions.schedule' "*/2 * * * *"
 
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
