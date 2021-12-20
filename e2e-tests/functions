@@ -284,7 +284,7 @@ wait_pod() {
 		echo -n .
 		let retry+=1
 		if [ $retry -ge 360 ]; then
-			kubectl_bin ${ns:+-n $ns} describe  pod/$pod
+			kubectl_bin ${ns:+-n $ns} describe pod/$pod
 			kubectl_bin ${ns:+-n $ns} logs $pod
 			kubectl_bin ${ns:+-n $ns} logs $(get_operator_pod) \
 				| grep -v 'level=info' \
