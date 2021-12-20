@@ -327,7 +327,7 @@ wait_job_completion() {
 		if [ $retry -ge 600 ]; then
 			kubectl_bin describe -n $ns job/$job
 			kubectl_bin logs $(kubectl_bin -n $ns get pods --selector=job-name=${job} -o jsonpath='{.items[0].metadata.name}') -n $ns
-			kubectl_bin -n $ns logs  $(get_operator_pod) \
+			kubectl_bin -n $ns logs $(get_operator_pod) \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| tail -100
