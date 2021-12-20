@@ -132,6 +132,7 @@ func (c *Controller) onAdd(obj interface{}) {
 	})
 	if err != nil {
 		log.Errorf("ensure version %s", err)
+		return
 	}
 	err = c.updateTemplate(newCluster, newCluster.Name)
 	if err != nil {
@@ -159,18 +160,21 @@ func (c *Controller) onAdd(obj interface{}) {
 	err = pgcluster.Create(c.Client, newCluster)
 	if err != nil {
 		log.Errorf("create pgcluster resource: %s", err)
+		return
 	}
 
 	if newCluster.Spec.PGReplicas != nil {
 		err = c.createReplicas(newCluster)
 		if err != nil {
 			log.Errorf("create pgreplicas: %s", err)
+			return
 		}
 	}
 
 	err = c.handleScheduleBackup(newCluster, nil)
 	if err != nil {
 		log.Errorf("handle schedule backups: %s", err)
+		return
 	}
 	ctx := context.TODO()
 	_, err = c.Client.CrunchydataV1().PerconaPGClusters(newCluster.Namespace).Update(ctx, newCluster, metav1.UpdateOptions{})
@@ -333,12 +337,11 @@ func (c *Controller) reconcileStatus(cluster *crv1.PerconaPGCluster, statusMutex
 	if err != nil && !kerrors.IsNotFound(err) {
 		return errors.Wrap(err, "get pgCluster")
 	}
-
-	pgClusterStatus := crv1.PgclusterStatus{}
-	replStatuses := make(map[string]crv1.PgreplicaStatus)
-	if pgCluster != nil {
-		pgClusterStatus = pgCluster.Status
+	if pgCluster == nil {
+		return nil
 	}
+	pgClusterStatus := pgCluster.Status
+	replStatuses := make(map[string]crv1.PgreplicaStatus)
 
 	selector := config.LABEL_PG_CLUSTER + "=" + cluster.Name
 	pgReplicas, err := c.Client.CrunchydataV1().Pgreplicas(cluster.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
@@ -355,11 +358,10 @@ func (c *Controller) reconcileStatus(cluster *crv1.PerconaPGCluster, statusMutex
 		return nil
 	}
 
-	value := crv1.PerconaPGClusterStatus{
+	cluster.Status = crv1.PerconaPGClusterStatus{
 		PGCluster:  pgClusterStatus,
 		PGReplicas: replStatuses,
 	}
-	cluster.Status = value
 	_, err = c.Client.CrunchydataV1().PerconaPGClusters(cluster.Namespace).UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update perconapgcluster status")
