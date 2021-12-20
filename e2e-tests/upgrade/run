@@ -160,9 +160,9 @@ main() {
 			{"op":"add","path":"/spec/sslSecretName","value":'"'${cluster}-ssl-keypair'"'},
 			{"op":"add","path":"/spec/sslReplicationSecretName","value":'"'${cluster}-ssl-keypair'"'},
 		]'
-#	wait_cluster_consistency "${cluster}"
-#	wait_deployment "${cluster}"
-#	wait_deployment "${cluster}-pgbouncer"
+	#	wait_cluster_consistency "${cluster}"
+	#	wait_deployment "${cluster}"
+	#	wait_deployment "${cluster}-pgbouncer"
 	sleep 200
 	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "${cluster}:${cluster}_pass@${cluster}-pgbouncer.${namespace}" "verify-ca"
 
