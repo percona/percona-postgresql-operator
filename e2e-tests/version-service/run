@@ -37,6 +37,15 @@ function apply_version {
 
 	wait_generation_uniformity ${cluster} ${target_revision}
 
+	verify_applied_version ${cluster} ${version_to_upgrade} ${release_channel} ${db_version}
+}
+
+function verify_applied_version {
+	local cluster=$1
+	local version_to_upgrade=$2
+	local release_channel=$3
+	local db_version=$4
+
 	kubectl_bin get deployments,jobs \
 		--selector=pg-cluster=${cluster} \
 		-o jsonpath='{range .items[*]}{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}{end}' | sort -s -u \
@@ -171,6 +180,28 @@ main() {
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
 	apply_version ${cluster} '9.9.9' "disabled" "${PGO_TAG}-${PG_VER}" "${VS_ENDPOINT}" 1
+
+	kubectl delete perconapgcluster/${cluster}
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+	desc 'Start the cluster up with version service images'
+	PG_VER='12'
+	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
+	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
+	IMAGE_BACKREST="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest"
+	IMAGE_BACKREST_REPO="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbackrest-repo"
+	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
+
+	yq w -i "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'metadata.labels.pgo-version' "9.9.9"
+	yq w -i "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'spec.userLabels.pgo-version' "9.9.9"
+	yq w -i "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'spec.upgradeOptions.versionServiceEndpoint' "${VS_ENDPOINT}"
+	yq w -i --style=single "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'spec.upgradeOptions.apply' "recommended"
+	yq w -i "${test_dir}/conf/${PGO_TAG}_cr.yaml" 'spec.upgradeOptions.schedule' "*/2 * * * *"
+
+	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
+
+	verify_applied_version "${cluster}" '9.9.9' "recommended" "14"
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"

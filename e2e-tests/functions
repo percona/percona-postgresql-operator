@@ -370,7 +370,6 @@ apply_cluster() {
 		| yq w - 'spec.pgBadger.image' ${IMAGE_PGBADGER} \
 		| yq w - 'spec.pmm.image' ${IMAGE_PMM} \
 		| yq w - 'spec.pgBouncer.image' ${IMAGE_PGBOUNCER} \
-		| yq d - 'spec.upgradeOptions' \
 			>"${tmp_dir}/cr.yaml"
 
 
