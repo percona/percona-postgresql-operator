@@ -106,7 +106,7 @@ func getVersion(versions map[string]models.VersionVersion) (string, error) {
 	return "", nil
 }
 
-func GetPostgresqlVersin(clientset kubeapi.Interface, cluster *crv1.Pgcluster) (string, error) {
+func GetPostgresqlVersion(clientset kubeapi.Interface, cluster *crv1.Pgcluster) (string, error) {
 	pod, err := util.GetPrimaryPod(clientset, cluster)
 	if err != nil {
 		return "", errors.Wrap(err, "get primary pod")

@@ -23,7 +23,7 @@ func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs Ver
 		return errors.Wrap(err, "get pgcluster resource")
 	}
 	if pgCluster != nil && err == nil {
-		pVer, err = GetPostgresqlVersin(clientset, pgCluster)
+		pVer, err = GetPostgresqlVersion(clientset, pgCluster)
 		if err != nil {
 			return errors.Wrap(err, "get postgrsql version")
 		}
