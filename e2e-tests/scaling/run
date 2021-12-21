@@ -47,7 +47,7 @@ done
 desc 'Scaling down'
 
 kubectl_bin patch "perconapgcluster/some-name" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": 0}]'
-kubectl_bin wait --for=delete --selector=pg-cluster=${cluster},role=replica pods
+kubectl_bin wait --for=delete --selector=pg-cluster=${cluster},role=replica pods --timeout=180s
 
 run_psql \
 	'SELECT usename,application_name,client_addr,state from pg_stat_replication' \
