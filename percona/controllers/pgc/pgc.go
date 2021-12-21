@@ -131,8 +131,7 @@ func (c *Controller) onAdd(obj interface{}) {
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
 	if err != nil {
-		log.Errorf("ensure version %s", err)
-		return
+		log.Errorf("ensure version: %s", err)
 	}
 	err = c.updateTemplate(newCluster, newCluster.Name)
 	if err != nil {
