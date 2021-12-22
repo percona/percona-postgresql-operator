@@ -89,6 +89,7 @@
             ],
             "resources": [
                 "perconapgclusters",
+                "perconapgclusters/status",
                 "pgclusters",
                 "pgpolicies",
                 "pgtasks",

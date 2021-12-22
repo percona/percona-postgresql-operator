@@ -112,6 +112,7 @@ rules:
       - pg.percona.com
     resources:
       - perconapgclusters
+      - perconapgclusters/status
       - pgclusters
       - pgreplicas
       - pgpolicies
