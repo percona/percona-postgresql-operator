@@ -399,9 +399,6 @@ pipeline {
                         runTest('operator-self-healing', 'sandbox')
                         runTest('clone-cluster', 'sandbox')
                         runTest('tls-check', 'sandbox')
-                        runTest('upgrade', 'sandbox')
-                        runTest('smart-update', 'sandbox')
-                        runTest('version-service', 'sandbox')
                         runTest('users', 'sandbox')
                         runTest('ns-mode', 'sandbox')
                         ShutdownCluster('sandbox')
@@ -413,6 +410,15 @@ pipeline {
                         runTest('demand-backup', 'backups')
                         runTest('scheduled-backup', 'backups')
                         ShutdownCluster('backups')
+                    }
+                }
+                stage('E2E Upgrade') {
+                    steps {
+                        CreateCluster('upgrade')
+                        runTest('upgrade', 'upgrade')
+                        runTest('smart-update', 'upgrade')
+                        runTest('version-service', 'upgrade')
+                        ShutdownCluster('upgrade')
                     }
                 }
             }
