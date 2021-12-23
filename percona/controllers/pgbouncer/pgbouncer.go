@@ -40,15 +40,16 @@ func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluste
 	if reflect.DeepEqual(oldPerconaPGCluster.Spec.PGBouncer, newPerconaPGCluster.Spec.PGBouncer) {
 		return nil
 	}
-	if newPerconaPGCluster.Spec.PGBouncer.Size > 0 {
-		err := service.CreateOrUpdate(clientset, newPerconaPGCluster, service.PGBouncerServiceType)
-		if err != nil {
-			return errors.Wrap(err, "handle bouncer service on update")
-		}
-		err = UpdateDeployment(clientset, newPerconaPGCluster, oldPerconaPGCluster)
-		if err != nil {
-			return errors.Wrap(err, "update deployment")
-		}
+	if newPerconaPGCluster.Spec.PGBouncer.Size == 0 {
+		return nil
+	}
+	err := service.CreateOrUpdate(clientset, newPerconaPGCluster, service.PGBouncerServiceType)
+	if err != nil {
+		return errors.Wrap(err, "handle bouncer service on update")
+	}
+	err = UpdateDeployment(clientset, newPerconaPGCluster, oldPerconaPGCluster)
+	if err != nil {
+		return errors.Wrap(err, "update deployment")
 	}
 
 	return nil
