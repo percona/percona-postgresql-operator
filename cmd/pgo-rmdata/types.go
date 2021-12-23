@@ -18,11 +18,14 @@ limitations under the License.
 import (
 	"fmt"
 
+	"k8s.io/client-go/dynamic"
+
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 )
 
 type Request struct {
 	Clientset        kubeapi.Interface
+	DynamicClient    dynamic.Interface
 	RemoveData       bool
 	RemoveBackup     bool
 	IsBackup         bool
