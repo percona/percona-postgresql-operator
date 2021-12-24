@@ -20,9 +20,6 @@ import (
 const productName = "pg-operator"
 
 func (vs VersionServiceClient) GetExactVersion(cr *api.PerconaPGCluster, endpoint string, vm versionMeta) (DepVersion, error) {
-	if len(endpoint) == 0 {
-		endpoint = "https://check.percona.com"
-	}
 	requestURL, err := url.Parse(endpoint)
 	if err != nil {
 		return DepVersion{}, errors.Wrap(err, "parse endpoint")
