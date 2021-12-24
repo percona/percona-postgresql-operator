@@ -102,8 +102,11 @@ main() {
 	IMAGE_BACKREST="${TARGET_IMAGE_BACKREST:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbackrest"}"
 	IMAGE_BACKREST_REPO="${TARGET_IMAGE_BACKREST_REPO:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbackrest-repo"}"
 	IMAGE_PGBADGER="${TARGET_IMAGE_PGBADGER:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbadger"}"
+    desc 'remove operator'
+	kubectl_bin delete deployment/postgres-operator
 
-	deploy_operator '' '' 'update'
+	sleep 10
+	deploy_operator
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
@@ -125,7 +128,7 @@ main() {
 		echo "PGO version has not been updated. Exiting..."
 		exit 1
 	fi
-	wait for some significant time period. Pgbouncer pod may not be started otherwise
+	#wait for some significant time period. Pgbouncer pod may not be started otherwise
 
 	sleep 10
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
