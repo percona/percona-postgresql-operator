@@ -112,17 +112,9 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 				return errors.Wrapf(err, "update replica %s", replica.Name)
 			}
 		}
-
-		for i := 0; i <= 30; i++ {
-			time.Sleep(5 * time.Second)
-			dep, err := clientset.AppsV1().Deployments(newCluster.Namespace).Get(ctx,
-				replicaName, metav1.GetOptions{})
-			if err != nil {
-				log.Info(errors.Wrapf(err, "get deployment %s", replica.Name))
-			}
-			if dep.Status.UnavailableReplicas == 0 {
-				break
-			}
+		err = dplmnt.Wait(clientset, replicaName, newCluster.Namespace)
+		if err != nil {
+			return errors.Wrap(err, "wait deployment")
 		}
 	}
 
