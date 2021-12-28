@@ -601,6 +601,28 @@ wait_generation_uniformity() {
 	set -o xtrace
 }
 
+wait_smart_update() {
+	local cluster=$1
+	local target=$2
+
+	set +o xtrace
+	retry=0
+
+	while [[ $(kubectl_bin logs $(get_operator_pod) operator | grep -c "Smart update finished") == ${target} ]]; do
+		sleep 1
+
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	sleep 90
+	echo
+	set -o xtrace
+}
+
 enable_pgBouncer() {
 	local cluster_name=${1}
 	local replicas_num=${2:-'1'}
