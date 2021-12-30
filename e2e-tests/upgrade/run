@@ -102,11 +102,9 @@ main() {
 	IMAGE_BACKREST="${TARGET_IMAGE_BACKREST:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbackrest"}"
 	IMAGE_BACKREST_REPO="${TARGET_IMAGE_BACKREST_REPO:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbackrest-repo"}"
 	IMAGE_PGBADGER="${TARGET_IMAGE_PGBADGER:-"perconalab/percona-postgresql-operator:main-ppg$PG_VER-pgbadger"}"
-    desc 'remove operator'
-	kubectl_bin delete deployment/postgres-operator
-
-	sleep 10
-	deploy_operator
+	desc 'remove operator'
+	
+	deploy_operator '' "${src_dir}/deploy/operator.yaml" 'disabled' 'update'
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[

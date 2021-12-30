@@ -25,7 +25,7 @@ function apply_version {
 	local release_channel=$3
 	local db_version=$4
 	local vs_endpoint=${5:-"${VS_ENDPOINT}"}
-	local target_revision=${6:-"0"}
+	local target=${6:-"0"}
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json \
 		-p='[
@@ -34,8 +34,8 @@ function apply_version {
 				{"op":"replace","path":"/spec/userLabels/pgo-version","value":"'${version_to_upgrade}'"}
 			]'
 	sleep 10
-	echo $target_revision
-	wait_smart_update ${cluster} ${target_revision}
+
+	wait_smart_update ${cluster} ${target}
 
 	verify_applied_version ${cluster} ${version_to_upgrade} ${release_channel} ${db_version}
 }

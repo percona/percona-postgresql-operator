@@ -182,7 +182,7 @@ deploy_operator() {
 	local pull_secret_name=${1:-""}
 	local operator_manifest=${2:-"${src_dir}/deploy/operator.yaml"}
 	local namespace_mode=${3:-"disabled"}
-	local actiom=${4:-"install"}
+	local action=${4:-"install"}
 	local namespace=${5:-"${namespace}"}
 
 	desc 'start operator'
