@@ -25,7 +25,7 @@ function apply_version {
 	local release_channel=$3
 	local db_version=$4
 	local vs_endpoint=${5:-"${VS_ENDPOINT}"}
-	local target_revision=${6:-"2"}
+	local update_finished_log_entries=${6:-"0"}
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json \
 		-p='[
@@ -35,7 +35,7 @@ function apply_version {
 			]'
 	sleep 10
 
-	wait_generation_uniformity ${cluster} ${target_revision}
+	wait_smart_update ${cluster} ${update_finished_log_entries}
 
 	verify_applied_version ${cluster} ${version_to_upgrade} ${release_channel} ${db_version}
 }
@@ -72,7 +72,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "recommended" "${PG_VER}" "${VS_ENDPOINT}"
+	apply_version ${cluster} '9.9.9' "recommended" "${PG_VER}" "${VS_ENDPOINT}" 0
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
@@ -87,7 +87,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "12-recommended" "${PG_VER}" "${VS_ENDPOINT}"
+	apply_version ${cluster} '9.9.9' "12-recommended" "${PG_VER}" "${VS_ENDPOINT}" 1
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
@@ -117,7 +117,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "latest" ${PG_VER}
+	apply_version ${cluster} '9.9.9' "latest" ${PG_VER} "${VS_ENDPOINT}" 2
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
@@ -132,7 +132,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "12-latest" "${PG_VER}"
+	apply_version ${cluster} '9.9.9' "12-latest" "${PG_VER}" "${VS_ENDPOINT}" 3
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
@@ -148,7 +148,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "${PG_VER}.5" ${PG_VER}
+	apply_version ${cluster} '9.9.9' "${PG_VER}.5" ${PG_VER} "${VS_ENDPOINT}" 4
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
@@ -163,7 +163,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "latest" "${PGO_TAG}-${PG_VER}" 'http://not-a-version-service/' 1
+	apply_version ${cluster} '9.9.9' "latest" "${PGO_TAG}-${PG_VER}" 'http://not-a-version-service/' 4
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
@@ -179,7 +179,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "disabled" "${PGO_TAG}-${PG_VER}" "${VS_ENDPOINT}" 1
+	apply_version ${cluster} '9.9.9' "disabled" "${PGO_TAG}-${PG_VER}" "${VS_ENDPOINT}" 4
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"

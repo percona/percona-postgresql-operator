@@ -4,16 +4,16 @@ import (
 	"context"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	log "github.com/sirupsen/logrus"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/percona/controllers/deployment"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgreplica"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/version"
@@ -134,7 +134,12 @@ func smartUpdateCluster(client *kubeapi.Client, newCluster, oldCluster *crv1.Per
 	oldCluster.Spec.Backup.BackrestRepoImage = newCluster.Spec.Backup.BackrestRepoImage
 
 	if newCluster.Spec.PGPrimary.Image != oldCluster.Spec.PGPrimary.Image {
-		err := restartCluster(client, oldCluster, newCluster.Spec.PGPrimary.Image, newCluster.Spec.PGBadger.Image, newCluster.Spec.PMM.Image)
+		err := restartCluster(client,
+			oldCluster,
+			newCluster.Spec.PGPrimary.Image,
+			newCluster.Spec.PGBadger.Image,
+			newCluster.Spec.PMM.Image,
+			newCluster.Labels[config.LABEL_PGO_VERSION])
 		if err != nil {
 			return errors.Wrap(err, "restart cluster")
 		}
@@ -154,11 +159,15 @@ func smartUpdateCluster(client *kubeapi.Client, newCluster, oldCluster *crv1.Per
 	return nil
 }
 
-func restartCluster(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, newPostgreSQLImage, newBadgerImage, newPMMImage string) error {
+func restartCluster(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, newPostgreSQLImage, newBadgerImage, newPMMImage, version string) error {
 	newCluster := *oldCluster
 	newCluster.Spec.PGPrimary.Image = newPostgreSQLImage
 	newCluster.Spec.PGBadger.Image = newBadgerImage
 	newCluster.Spec.PMM.Image = newPMMImage
+	if newCluster.Labels == nil {
+		newCluster.Labels = make(map[string]string)
+	}
+	newCluster.Labels[config.LABEL_PGO_VERSION] = version
 	primary, err := pgcluster.IsPrimary(client, oldCluster)
 	if err != nil {
 		return errors.Wrap(err, "check is pgcluster primary")
@@ -182,17 +191,9 @@ func restartCluster(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, n
 			return errors.Wrap(err, "update pgreplica")
 		}
 	}
-	ctx := context.TODO()
-	for i := 0; i <= 30; i++ {
-		time.Sleep(5 * time.Second)
-		primaryDepl, err := client.AppsV1().Deployments(newCluster.Namespace).Get(ctx,
-			newCluster.Name, metav1.GetOptions{})
-		if err != nil && !kerrors.IsNotFound(err) {
-			return errors.Wrap(err, "get pgprimary deployment")
-		}
-		if primaryDepl.Status.Replicas == primaryDepl.Status.AvailableReplicas {
-			break
-		}
+	err = deployment.Wait(client, newCluster.Name, newCluster.Namespace)
+	if err != nil {
+		return errors.Wrap(err, "wait deployment")
 	}
 
 	return nil
@@ -203,10 +204,15 @@ func restartBackrest(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, 
 	newCluster.Spec.Backup.Image = newBackrestImage
 	newCluster.Spec.Backup.BackrestRepoImage = newBackrestRepoImage
 
-	err := pgcluster.Update(client, &newCluster, oldCluster)
+	err := pgcluster.UpdateCR(client, &newCluster, oldCluster)
 	if err != nil {
-		return errors.Wrap(err, "update pgcluster")
+		return errors.Wrap(err, "update pgcluster cr")
 	}
+	err = deployment.Wait(client, newCluster.Name+"-backrest-shared-repo", newCluster.Namespace)
+	if err != nil {
+		return errors.Wrap(err, "wait deployment")
+	}
+
 	return nil
 }
 
@@ -214,9 +220,13 @@ func restartBouncer(client *kubeapi.Client, oldCluster *crv1.PerconaPGCluster, n
 	newCluster := *oldCluster
 	newCluster.Spec.PGBouncer.Image = newBouncerImage
 
-	err := pgcluster.Update(client, &newCluster, oldCluster)
+	err := pgcluster.UpdateCR(client, &newCluster, oldCluster)
 	if err != nil {
-		return errors.Wrap(err, "update pgcluster")
+		return errors.Wrap(err, "update pgcluster cr")
+	}
+	err = deployment.Wait(client, newCluster.Name+"-pgbouncer", newCluster.Namespace)
+	if err != nil {
+		return errors.Wrap(err, "wait deployment")
 	}
 
 	return nil

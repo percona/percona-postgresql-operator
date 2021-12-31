@@ -182,7 +182,7 @@ deploy_operator() {
 	local pull_secret_name=${1:-""}
 	local operator_manifest=${2:-"${src_dir}/deploy/operator.yaml"}
 	local namespace_mode=${3:-"disabled"}
-	local actiom=${4:-"install"}
+	local action=${4:-"install"}
 	local namespace=${5:-"${namespace}"}
 
 	desc 'start operator'
@@ -597,6 +597,28 @@ wait_generation_uniformity() {
 		echo "Unexpected deployment generation revision. Exiting..."
 		exit 1
 	fi
+	echo
+	set -o xtrace
+}
+
+wait_smart_update() {
+	local cluster=$1
+	local target=$2
+
+	set +o xtrace
+	retry=0
+
+	while [[ $(kubectl_bin logs $(get_operator_pod) operator | grep -c "Smart update finished") == ${target} ]]; do
+		sleep 1
+
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	sleep 90
 	echo
 	set -o xtrace
 }

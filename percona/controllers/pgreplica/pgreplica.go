@@ -112,17 +112,9 @@ func Update(clientset kubeapi.Interface, newCluster, oldCluster *crv1.PerconaPGC
 				return errors.Wrapf(err, "update replica %s", replica.Name)
 			}
 		}
-
-		for i := 0; i <= 30; i++ {
-			time.Sleep(5 * time.Second)
-			dep, err := clientset.AppsV1().Deployments(newCluster.Namespace).Get(ctx,
-				replicaName, metav1.GetOptions{})
-			if err != nil {
-				log.Info(errors.Wrapf(err, "get deployment %s", replica.Name))
-			}
-			if dep.Status.UnavailableReplicas == 0 {
-				break
-			}
+		err = dplmnt.Wait(clientset, replicaName, newCluster.Namespace)
+		if err != nil {
+			return errors.Wrap(err, "wait deployment")
 		}
 	}
 
@@ -295,12 +287,7 @@ func updateDeployment(clientset kubeapi.Interface, replica *crv1.Pgreplica, newP
 			newPerconaPGCluster.Spec.PGBadger.ImagePullPolicy)
 	}
 
-	if deployment.Labels == nil {
-		deployment.Labels = make(map[string]string)
-	}
-	if newPerconaPGCluster.Labels != nil {
-		deployment.Labels[config.LABEL_PGO_VERSION] = newPerconaPGCluster.Labels[config.LABEL_PGO_VERSION]
-	}
+	dplmnt.UpdateDeploymentVersionLabels(deployment, newPerconaPGCluster)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "could not update deployment for pgreplica: %s", replica.Name)

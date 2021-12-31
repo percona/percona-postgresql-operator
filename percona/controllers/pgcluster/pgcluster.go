@@ -15,7 +15,6 @@ import (
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -41,13 +40,12 @@ func Create(clientset kubeapi.Interface, newPerconaPGCluster *crv1.PerconaPGClus
 
 func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Get(ctx, oldPerconaPGCluster.Name, metav1.GetOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "get old pgcluster resource")
+	pgCluster := getPGCLuster(newPerconaPGCluster, &crv1.Pgcluster{})
+	if pgCluster.Annotations == nil {
+		pgCluster.Annotations = make(map[string]string)
 	}
-	pgCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
 
-	err = updatePGPrimaryDeployment(clientset, pgCluster, newPerconaPGCluster, oldPerconaPGCluster)
+	err := updatePGPrimaryDeployment(clientset, pgCluster, newPerconaPGCluster, oldPerconaPGCluster)
 	if err != nil {
 		return errors.Wrapf(err, "update pgPrimary deployment")
 	}
@@ -57,10 +55,31 @@ func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluste
 		return errors.Wrapf(err, "update backrest shared repo deployment")
 	}
 
+	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Get(ctx, oldPerconaPGCluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get old pgcluster resource")
+	}
+	pgCluster = getPGCLuster(newPerconaPGCluster, oldPGCluster)
 	if pgCluster.Annotations == nil {
 		pgCluster.Annotations = make(map[string]string)
 	}
 	pgCluster.Annotations[config.ANNOTATION_IS_UPGRADED] = "true"
+
+	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update pgcluster resource")
+	}
+
+	return nil
+}
+
+func UpdateCR(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Get(ctx, oldPerconaPGCluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get old pgcluster resource")
+	}
+	pgCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
 
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -98,26 +117,15 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 
 	dplmnt.UpdateSpecTemplateSpecSecurityContext(newPerconaPGCluster, deployment)
 
-	if deployment.Labels == nil {
-		deployment.Labels = make(map[string]string)
-	}
-	if newPerconaPGCluster.Labels != nil {
-		deployment.Labels[config.LABEL_PGO_VERSION] = newPerconaPGCluster.Labels[config.LABEL_PGO_VERSION]
-	}
+	dplmnt.UpdateDeploymentVersionLabels(deployment, newPerconaPGCluster)
 
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "update deployment")
 	}
-	for i := 0; i <= 30; i++ {
-		time.Sleep(5 * time.Second)
-		dep, err := clientset.AppsV1().Deployments(deployment.Namespace).Get(ctx,
-			deployment.Name, metav1.GetOptions{})
-		if err != nil {
-			log.Info(errors.Wrapf(err, "get deployment %s", deployment.Name))
-		}
-		if dep.Status.UnavailableReplicas == 0 {
-			break
-		}
+
+	err = dplmnt.Wait(clientset, deployment.Name, deployment.Namespace)
+	if err != nil {
+		return errors.Wrap(err, "wait deployment")
 	}
 
 	return nil
