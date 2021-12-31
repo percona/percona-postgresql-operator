@@ -25,7 +25,7 @@ function apply_version {
 	local release_channel=$3
 	local db_version=$4
 	local vs_endpoint=${5:-"${VS_ENDPOINT}"}
-	local target=${6:-"0"}
+	local update_finished_log_entries=${6:-"0"}
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json \
 		-p='[
@@ -35,7 +35,7 @@ function apply_version {
 			]'
 	sleep 10
 
-	wait_smart_update ${cluster} ${target}
+	wait_smart_update ${cluster} ${update_finished_log_entries}
 
 	verify_applied_version ${cluster} ${version_to_upgrade} ${release_channel} ${db_version}
 }
