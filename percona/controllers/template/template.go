@@ -17,6 +17,7 @@ const (
 	ClusterDeploymentTemplateName      = "cluster-deployment.json"
 	BackrestRepoDeploymentTemplateName = "pgo-backrest-repo-template.json"
 	BouncerDeploymentTemplateName      = "pgbouncer-template.json"
+	PGBadgerTemplateName               = "pgbadger.json"
 	Path                               = "/"
 	defaultSecurityContext             = `{"fsGroup": 26,"supplementalGroups": [1001]}`
 )
@@ -64,6 +65,19 @@ func UpdateBouncerTemplate(bouncerDeploymentTemplateData []byte, newCluster *crv
 	}
 
 	config.PgbouncerTemplate = t
+
+	return nil
+}
+
+func UpdatePGBadgerTemplate(pgBadgerTemplateData []byte, newCluster *crv1.PerconaPGCluster, nodeName string) error {
+	templateData := handleDeploymentImagePullPolicy(pgBadgerTemplateData, []byte(newCluster.Spec.PGBadger.ImagePullPolicy))
+
+	t, err := template.New(PGBadgerTemplateName).Parse(string(templateData))
+	if err != nil {
+		return errors.Wrap(err, "parse template")
+	}
+
+	config.BadgerTemplate = t
 
 	return nil
 }
