@@ -411,6 +411,9 @@ func (c *Controller) reconcileUsers(cluster *crv1.PerconaPGCluster) error {
 	if err != nil {
 		return errors.Wrap(err, "update users")
 	}
+	if usersSecret.Annotations == nil {
+		usersSecret.Annotations = make(map[string]string)
+	}
 	usersSecret.Annotations["last-applied-secret"] = newSecretDataHash
 	_, err = c.Client.CoreV1().Secrets(cluster.Namespace).Update(ctx, usersSecret, metav1.UpdateOptions{})
 	if err != nil {
