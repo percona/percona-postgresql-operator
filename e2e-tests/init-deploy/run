@@ -8,9 +8,45 @@ test_dir=$(realpath $(dirname $0))
 
 create_namespace $namespace
 deploy_operator
+deploy_helm $namespace
 
-desc 'create first PG cluster'
+
 cluster="some-name"
+desc 'install PMM Server'
+platform=kubernetes
+helm del --purge monitoring || :
+if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
+	platform=openshift
+	oc create sa pmm-server
+	oc adm policy add-scc-to-user privileged -z pmm-server
+
+	helm install monitoring --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-2.24.0.tgz
+else
+	helm install monitoring --set platform=$platform https://percona-charts.storage.googleapis.com/pmm-server-2.24.0.tgz
+fi
+desc 'create first PG cluster'
+spinup_pgcluster "${cluster}" "${test_dir}/conf/cr.yaml"
+compare_kubectl "deployment/${cluster}" "always"
+kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+	'[
+		{"op":"replace","path":"/spec/backup/imagePullPolicy","value":"IfNotPresent"},
+		{"op":"replace","path":"/spec/pgBadger/imagePullPolicy","value":"IfNotPresent"},
+		{"op":"replace","path":"/spec/pgBouncer/imagePullPolicy","value":"IfNotPresent"},
+		{"op":"replace","path":"/spec/pgPrimary/imagePullPolicy","value":"IfNotPresent"},
+		{"op":"replace","path":"/spec/pmm/imagePullPolicy","value":"IfNotPresent"}
+	]'
+
+sleep 240
+wait_cluster_consistency "${cluster}"
+
+compare_kubectl "deployment/${cluster}" "notpresent"
+
+kubectl delete PerconaPGCluster --ignore-not-found --all
+	wait_for_delete "deployment/${cluster}"
+	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+
+desc 'create second PG cluster'
+
 spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
 compare_kubectl "deployment/postgres-operator"
