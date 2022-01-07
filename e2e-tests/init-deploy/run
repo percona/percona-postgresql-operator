@@ -10,7 +10,6 @@ create_namespace $namespace
 deploy_operator
 deploy_helm $namespace
 
-
 cluster="some-name"
 desc 'install PMM Server'
 platform=kubernetes
