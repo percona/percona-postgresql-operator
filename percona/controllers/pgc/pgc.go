@@ -396,7 +396,7 @@ func (c *Controller) reconcileUsers(cluster *crv1.PerconaPGCluster) error {
 		return nil
 	}
 	oldHash := ""
-	if hash, ok := usersSecret.Annotations["last-applied-secret"]; ok {
+	if hash, ok := usersSecret.Annotations[annotationLastAppliedSecret]; ok {
 		oldHash = hash
 	}
 	secretData, err := json.Marshal(usersSecret.Data)
@@ -411,7 +411,10 @@ func (c *Controller) reconcileUsers(cluster *crv1.PerconaPGCluster) error {
 	if err != nil {
 		return errors.Wrap(err, "update users")
 	}
-	usersSecret.Annotations["last-applied-secret"] = newSecretDataHash
+	if usersSecret.Annotations == nil {
+		usersSecret.Annotations = make(map[string]string)
+	}
+	usersSecret.Annotations[annotationLastAppliedSecret] = newSecretDataHash
 	_, err = c.Client.CoreV1().Secrets(cluster.Namespace).Update(ctx, usersSecret, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "update secret %s", usersSecret.Name)

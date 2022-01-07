@@ -29,6 +29,7 @@ type SecretData struct {
 }
 
 const usersSecretTag = "-users"
+const annotationLastAppliedSecret = "last-applied-secret"
 
 func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, clusterUser, namespace string) error {
 	ctx := context.TODO()
@@ -60,6 +61,33 @@ func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, clusterUs
 	err = c.createUsersInternalSecrets(secretsData, namespace, clusterName)
 	if err != nil {
 		return errors.Wrap(err, "create users internal secrets")
+	}
+	usersSecret, err = c.Client.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get secret %s", secretName)
+	}
+	err = c.UpdateUsersSecret(usersSecret, namespace)
+	if err != nil {
+		return errors.Wrap(err, "update users secret")
+	}
+
+	return nil
+}
+
+func (c *Controller) UpdateUsersSecret(usersSecret *v1.Secret, namespace string) error {
+	ctx := context.TODO()
+	secretDataJSON, err := json.Marshal(usersSecret.Data)
+	if err != nil {
+		return errors.Wrap(err, "marshal users secret data")
+	}
+	secretDataHash := sha256Hash(secretDataJSON)
+	if usersSecret.Annotations == nil {
+		usersSecret.Annotations = make(map[string]string)
+	}
+	usersSecret.Annotations[annotationLastAppliedSecret] = secretDataHash
+	_, err = c.Client.CoreV1().Secrets(namespace).Update(ctx, usersSecret, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update secret object")
 	}
 
 	return nil
@@ -97,7 +125,7 @@ func (c *Controller) createUsersSecret(secretsData []SecretData, secretName, nam
 			Name:      secretName,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				"last-applied-secret": secretDataHash,
+				annotationLastAppliedSecret: secretDataHash,
 			},
 		},
 		Data: data,
