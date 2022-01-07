@@ -132,7 +132,7 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 }
 
 func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcluster, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
-	if oldPerconaPGCluster.Spec.Backup.BackrestRepoImage == newPerconaPGCluster.Spec.Backup.BackrestRepoImage {
+	if oldPerconaPGCluster.Spec.Backup.BackrestRepoImage == newPerconaPGCluster.Spec.Backup.BackrestRepoImage && oldPerconaPGCluster.Spec.Backup.ImagePullPolicy == newPerconaPGCluster.Spec.Backup.ImagePullPolicy {
 		return nil
 	}
 	ctx := context.TODO()

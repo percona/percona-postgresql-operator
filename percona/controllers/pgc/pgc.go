@@ -36,15 +36,20 @@ import (
 
 // Controller holds the connections for the controller
 type Controller struct {
-	Client                             *kubeapi.Client
-	Queue                              workqueue.RateLimitingInterface
-	Informer                           informers.PerconaPGClusterInformer
-	PerconaPGClusterWorkerCount        int
+	Client                      *kubeapi.Client
+	Queue                       workqueue.RateLimitingInterface
+	Informer                    informers.PerconaPGClusterInformer
+	PerconaPGClusterWorkerCount int
+	templates                   Templates
+	crons                       CronRegistry
+	lockers                     lockStore
+}
+
+type Templates struct {
 	deploymentTemplateData             []byte
 	backrestRepoDeploymentTemplateData []byte
 	bouncerTemplateData                []byte
-	crons                              CronRegistry
-	lockers                            lockStore
+	pgBadgerTemplateData               []byte
 }
 
 type CronRegistry struct {
@@ -203,15 +208,19 @@ func (c *Controller) createReplicas(cluster *crv1.PerconaPGCluster) error {
 }
 
 func (c *Controller) updateTemplates(newCluster *crv1.PerconaPGCluster) error {
-	err := template.UpdateDeploymentTemplate(c.deploymentTemplateData, newCluster, newCluster.Name)
+	err := template.UpdatePGBadgerTemplate(c.templates.pgBadgerTemplateData, newCluster, newCluster.Name)
+	if err != nil {
+		return errors.Wrap(err, "update pgbadger template")
+	}
+	err = template.UpdateDeploymentTemplate(c.templates.deploymentTemplateData, newCluster, newCluster.Name)
 	if err != nil {
 		return errors.Wrap(err, "update deployment template")
 	}
-	err = template.UpdateBackrestRepoTemplate(c.backrestRepoDeploymentTemplateData, newCluster, newCluster.Name)
+	err = template.UpdateBackrestRepoTemplate(c.templates.backrestRepoDeploymentTemplateData, newCluster, newCluster.Name)
 	if err != nil {
 		return errors.Wrap(err, "update backrest repo deployment template")
 	}
-	err = template.UpdateBouncerTemplate(c.bouncerTemplateData, newCluster, newCluster.Name)
+	err = template.UpdateBouncerTemplate(c.templates.bouncerTemplateData, newCluster, newCluster.Name)
 	if err != nil {
 		return errors.Wrap(err, "update bouncer deployment template")
 	}
@@ -251,9 +260,14 @@ func (c *Controller) setControllerTemplatesData() error {
 	if err != nil {
 		return errors.Wrap(err, "new bouncer template data")
 	}
-	c.deploymentTemplateData = deploymentTemplateData
-	c.backrestRepoDeploymentTemplateData = backrestRepodeploymentTemplateData
-	c.bouncerTemplateData = bouncerTemplateData
+	pgBadgerTemplateData, err := ioutil.ReadFile(template.Path + template.PGBadgerTemplateName)
+	if err != nil {
+		return errors.Wrap(err, "new bouncer template data")
+	}
+	c.templates.deploymentTemplateData = deploymentTemplateData
+	c.templates.backrestRepoDeploymentTemplateData = backrestRepodeploymentTemplateData
+	c.templates.bouncerTemplateData = bouncerTemplateData
+	c.templates.pgBadgerTemplateData = pgBadgerTemplateData
 
 	return nil
 }
