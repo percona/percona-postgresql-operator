@@ -42,8 +42,8 @@ wait_cluster_consistency "${cluster}"
 compare_kubectl "deployment/${cluster}" "notpresent"
 
 kubectl delete PerconaPGCluster --ignore-not-found --all
-	wait_for_delete "deployment/${cluster}"
-	wait_for_delete "deployment/${cluster}-backrest-shared-repo"
+wait_for_delete "deployment/${cluster}"
+wait_for_delete "deployment/${cluster}-backrest-shared-repo"
 
 desc 'create second PG cluster'
 
