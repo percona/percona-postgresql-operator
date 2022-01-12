@@ -5,7 +5,7 @@ spec:
     metadata:
       name: pgo-deploy
       labels:
-{{ include "postgres-operator.labels" . | indent 8 }} 
+{{ include "postgres-operator.labels" . | indent 8 }}
     spec:
       serviceAccountName: {{ include "postgres-operator.serviceAccountName" . }}
       restartPolicy: Never
@@ -19,6 +19,10 @@ spec:
         volumeMounts:
           - name: deployer-conf
             mountPath: "/conf"
+{{- if .Values.jobs.resources }}
+        resources:
+{{ toYaml .Values.jobs.resources | indent 10 }}
+{{- end }}
       volumes:
         - name: deployer-conf
           configMap:

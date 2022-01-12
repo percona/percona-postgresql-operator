@@ -52,6 +52,7 @@ be found in the [documentation](https://access.crunchydata.com/documentation/pos
 | rbac.useClusterAdmin | false | If enabled the ServiceAccount will be given cluster-admin privileges. |
 | serviceAccount.create | true | If false a ServiceAccount will not be created. A ServiceAccount must be created manually. |
 | serviceAccount.name | "" | Use to override the default ServiceAccount name. If serviceAccount.create is false this ServiceAccount will be used. |
+| `jobs.resources` | The [resources] to allocate for the job containers | undefined |
 
 {{% notice tip %}}
 If installing into an OpenShift 3.11 or Kubernetes 1.11 cluster `rbac.useClusterAdmin` must be enabled.
