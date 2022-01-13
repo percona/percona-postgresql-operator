@@ -18,6 +18,15 @@ serviceAccount:
     # serviceAccount.name: The name of the Service Account to create or use
     name: ""
 
+jobs:
+  resources: {}
+    # requests:
+    #   cpu: 250m
+    #   memory: 256Mi
+    # limits:
+    #   cpu: 250m
+    #   memory: 256Mi
+
 # =====================
 # Configuration Options
 # More info for these options can be found in the docs
@@ -76,7 +85,7 @@ pgo_client_version: "4.7.3"
 pgo_cluster_admin: "false"
 pgo_disable_eventing: "false"
 pgo_disable_tls: "false"
-pgo_image_prefix: "registry.developers.crunchydata.com/crunchydata"
+pgo_image_prefix: "percona/percona-postgresql-operator"
 pgo_image_pull_secret: ""
 pgo_image_pull_secret_manifest: ""
 pgo_image_tag: "centos8-4.7.3"
@@ -141,3 +150,27 @@ storage9_access_mode: "ReadWriteOnce"
 storage9_size: "1Gi"
 storage9_type: "dynamic"
 storage9_class: "rook-ceph-block"
+
+apiserver_resources: "false"
+apiserver_resources_requests_cpu: "250m"
+apiserver_resources_requests_memory: "128Mi"
+apiserver_resources_limits_cpu: "250m"
+apiserver_resources_limits_memory: "128Mi"
+
+operator_resources: "false"
+operator_resources_requests_cpu: "250m"
+operator_resources_requests_memory: "256Mi"
+operator_resources_limits_cpu: "250m"
+operator_resources_limits_memory: "256Mi"
+
+scheduler_resources: "false"
+scheduler_resources_requests_cpu: "250m"
+scheduler_resources_requests_memory: "128Mi"
+scheduler_resources_limits_cpu: "250m"
+scheduler_resources_limits_memory: "128Mi"
+
+event_resources: "false"
+event_resources_requests_cpu: "250m"
+event_resources_requests_memory: "128Mi"
+event_resources_limits_cpu: "250m"
+event_resources_limits_memory: "128Mi"
