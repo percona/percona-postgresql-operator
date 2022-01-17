@@ -21,7 +21,7 @@ trap "rm -rf '$DIR'" EXIT
 
 # Build code generators that match the version of "k8s.io/client-go".
 version="$(go list -f '{{ .Version }}' -m k8s.io/client-go)"
-( cd "$DIR" && go mod init tmp && go get -d "k8s.io/code-generator/cmd/...@${version}" )
+(cd "$DIR" && go mod init tmp && go get -d "k8s.io/code-generator/cmd/...@${version}")
 
 # Check that the script exists and expects Bash.
 tool="$(go list -f '{{ .Dir }}' -m "k8s.io/code-generator@${version}")/generate-groups.sh"
