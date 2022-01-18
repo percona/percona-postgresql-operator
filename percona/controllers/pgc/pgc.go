@@ -153,9 +153,9 @@ func (c *Controller) onAdd(obj interface{}) {
 			return
 		}
 	}
-	err = c.CreateNewInternalSecrets(newCluster.Name, newCluster.Spec.UsersSecretName, newCluster.Spec.User, newCluster.Namespace)
+	err = c.handleSecrets(newCluster)
 	if err != nil {
-		log.Errorf("create new internal users secrets: %s", err)
+		log.Errorf("handle secrets: %s", err)
 		return
 	}
 	err = pgcluster.Create(c.Client, newCluster)
