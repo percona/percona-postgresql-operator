@@ -33,12 +33,7 @@ const annotationLastAppliedSecret = "last-applied-secret"
 
 func (c *Controller) handleSecrets(cluster *crv1.PerconaPGCluster) error {
 	if len(cluster.Spec.PGDataSource.RestoreFrom) > 0 {
-		ctx := context.TODO()
-		oldCluster, err := c.Client.CrunchydataV1().PerconaPGClusters(cluster.Namespace).Get(ctx, cluster.Spec.PGDataSource.RestoreFrom, metav1.GetOptions{})
-		if err != nil {
-			return errors.Wrap(err, "get perconapgluster")
-		}
-		err = c.copyClusterUsersSecrets(cluster, oldCluster)
+		err := c.copyClusterUsersSecrets(cluster)
 		if err != nil {
 			return errors.Wrap(err, "copy cluster users secrets")
 		}
@@ -50,14 +45,20 @@ func (c *Controller) handleSecrets(cluster *crv1.PerconaPGCluster) error {
 	return nil
 }
 
-func (c *Controller) copyClusterUsersSecrets(cluster, oldCluster *crv1.PerconaPGCluster) error {
+func (c *Controller) copyClusterUsersSecrets(cluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
+	oldCluster, err := c.Client.CrunchydataV1().PerconaPGClusters(cluster.Namespace).Get(ctx, cluster.Spec.PGDataSource.RestoreFrom, metav1.GetOptions{})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrap(err, "get perconapgluster")
+	} else if kerrors.IsNotFound(err) {
+		return nil
+	}
 	var usersSecret *v1.Secret
 	secretName := cluster.Spec.PGDataSource.RestoreFrom + usersSecretTag
 	if len(oldCluster.Spec.UsersSecretName) > 0 {
 		secretName = oldCluster.Spec.UsersSecretName
 	}
-	usersSecret, err := c.Client.CoreV1().Secrets(cluster.Namespace).Get(ctx, secretName, metav1.GetOptions{})
+	usersSecret, err = c.Client.CoreV1().Secrets(cluster.Namespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "get secret %s", secretName)
 	}
@@ -67,7 +68,7 @@ func (c *Controller) copyClusterUsersSecrets(cluster, oldCluster *crv1.PerconaPG
 	}
 	usersSecret.ResourceVersion = ""
 	_, err = c.Client.CoreV1().Secrets(cluster.Namespace).Create(ctx, usersSecret, metav1.CreateOptions{})
-	if err != nil {
+	if err != nil && !kerrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "create secret %s", usersSecret.Name)
 	}
 
