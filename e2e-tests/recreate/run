@@ -25,7 +25,6 @@ compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:$(get
 compare_kubectl "deployment/${cluster}-pgbouncer"
 compare_kubectl "service/${cluster}-pgbouncer"
 
-
 for repl in $(seq 1 3); do
 	desc "check replica ${repl}"
 	kubectl_bin patch "perconapgcluster/some-name" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": '${repl}'}]'
