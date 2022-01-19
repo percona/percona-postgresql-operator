@@ -30,7 +30,7 @@ main() {
 	wait_cluster_consistency "${cluster}"
 
 	sleep 10
-	compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"
+	compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:$(get_psql_user_pass pgbouncer ${cluster})@${cluster}-pgbouncer.${namespace}"
 
 	destroy "${namespace}"
 }

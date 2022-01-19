@@ -9,7 +9,7 @@ test_dir=$(realpath $(dirname $0))
 create_pgcluster_clone_from() {
 	local cluster=$1
 
-	kubectl_bin apply -f $conf_dir/secrets.yml
+	create_user_secrets "${cluster}-clone"
 	apply_cluster "${src_dir}/deploy/cr.yaml" "${cluster}-clone" "local" "${cluster}"
 	wait_bootstap_completeness "${cluster}-clone"
 }
@@ -27,7 +27,7 @@ main() {
 	desc 'create clone from live cluster'
 
 	create_pgcluster_clone_from "${cluster}"
-	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-clone-pgbouncer.${namespace}"
+	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:$(get_psql_user_pass some-name "${cluster}-clone")@${cluster}-clone-pgbouncer.${namespace}"
 
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"add","path":"/spec/keepBackups","value":true}]'
 	sleep 30
@@ -45,7 +45,7 @@ main() {
 	desc 'start clone from backup only'
 
 	create_pgcluster_clone_from "${cluster}"
-	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-clone-pgbouncer.${namespace}"
+	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:$(get_psql_user_pass some-name "${cluster}-clone")@${cluster}-clone-pgbouncer.${namespace}"
 
 	destroy $namespace
 }

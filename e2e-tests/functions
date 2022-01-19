@@ -716,7 +716,7 @@ spinup_pgcluster() {
 	local namespace="${10:-"$namespace"}"
 
 	desc 'create fresh PG cluster'
-	create_user_secrets ${cluster}
+	create_user_secrets ${cluster} ${namespace}
 	kubectl_bin -n $namespace apply -f ${pgoClientFile}
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type} ${tls_enabled}
 	wait_deployment "${cluster}-backrest-shared-repo"
@@ -745,21 +745,30 @@ spinup_pgcluster() {
 
 create_user_secrets() {
 	local cluster=$1
-
+	local namespace="${2:-"$namespace"}"
 	yq r -d0 $src_dir/deploy/users-secret.yaml \
 		| yq w - 'metadata.name' "${cluster}-users-secret" \
 		| yq w - 'stringData.some-name' "some-name_pass" \
-		| kubectl_bin apply -f -
+		| kubectl_bin -n ${namespace} apply -f -
 	yq r -d1 $src_dir/deploy/users-secret.yaml \
 		| yq w - 'metadata.name' "${cluster}-pmm-secret" \
-		| kubectl_bin apply -f -
+		| kubectl_bin -n ${namespace} apply -f -
 }
 
 get_psql_user_pass() {
 	local user=${1}
 	local cluster=${2:-"some-name"}
+	local namespace="${3:-"$namespace"}"
 
-	echo $(kubectl_bin get "secret/$(kubectl_bin get perconapgcluster/${cluster} -o jsonpath='{.spec.secretsName}')" -o jsonpath='{.data.'${user}'}' | base64 -d)
+	if [[ "x$(kubectl_bin -n ${namespace} get perconapgcluster/${cluster} -o jsonpath='{.metadata.name}')" == "x" ]]; then
+		: no cluster ${cluster} is running.
+		return 0
+	elif [[ "x$(kubectl_bin -n ${namespace} get perconapgcluster/${cluster} -o jsonpath='{.spec.secretsName}')" == "x" ]]; then
+		: assuming user secret was created by default
+		echo $(kubectl_bin -n ${namespace} get "secret/${cluster}-users-secret" -o jsonpath='{.data.'${user}'}' | base64 -d)
+	else
+		echo $(kubectl_bin -n ${namespace} get "secret/$(kubectl_bin -n ${namespace} get perconapgcluster/${cluster} -o jsonpath='{.spec.secretsName}')" -o jsonpath='{.data.'${user}'}' | base64 -d)
+	fi
 }
 
 wait_cluster_consistency() {
