@@ -363,7 +363,7 @@ apply_cluster() {
 		| yq w - 'spec.keepData' false \
 		| yq w - 'spec.keepBackups' false \
 		| yq w - 'spec.user' some-name \
-		| yq w - 'spec.secretsName' some-name-users-secrets \
+		| yq w - 'spec.secretsName' "${name}-users-secret" \
 		| yq w - 'spec.pgPrimary.image' ${IMAGE_PG_HA} \
 		| yq w - 'spec.backup.image' ${IMAGE_BACKREST} \
 		| yq w - 'spec.backup.backrestRepoImage' ${IMAGE_BACKREST_REPO} \
@@ -712,12 +712,12 @@ spinup_pgcluster() {
 	local schedule=${6:-"false"}
 	local schedule_type=${7:-"false"}
 	local tls_enabled=${8:-"false"}
-	local secretsFile="${9:-$conf_dir/secrets.yml}"
-	local pgoClientFile="${10:-$conf_dir/client.yml}"
-	local namespace="${11:-"$namespace"}"
+	local pgoClientFile="${9:-$conf_dir/client.yml}"
+	local namespace="${10:-"$namespace"}"
 
 	desc 'create fresh PG cluster'
-	kubectl_bin -n $namespace apply -f ${secretsFile} -f ${pgoClientFile}
+	create_user_secrets ${cluster}
+	kubectl_bin -n $namespace apply -f ${pgoClientFile}
 	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type} ${tls_enabled}
 	wait_deployment "${cluster}-backrest-shared-repo"
 	wait_deployment "${cluster}"
@@ -733,35 +733,33 @@ spinup_pgcluster() {
 
 	run_psql \
 		'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
-		"postgres:postgres_pass@${cluster}.$namespace"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.$namespace"
 	run_psql \
 		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
-		"postgres:postgres_pass@${cluster}.$namespace"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.$namespace"
 	run_psql \
 		'\c myapp \\\ GRANT SELECT,INSERT ON myApp to "some-name";GRANT USAGE ON SCHEMA public TO "some-name";' \
-		"postgres:postgres_pass@${cluster}.$namespace"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.$namespace"
 	sleep 10
 }
 
 create_user_secrets() {
 	local cluster=$1
 
-	yq r -d0 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-pgbouncer-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+	yq r -d0 $src_dir/deploy/users-secret.yaml \
+		| yq w - 'metadata.name' "${cluster}-users-secret" \
+		| yq w - 'stringData.some-name' "some-name_pass" \
 		| kubectl_bin apply -f -
-	yq r -d1 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-postgres-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
+	yq r -d1 $src_dir/deploy/users-secret.yaml \
+		| yq w - 'metadata.name' "${cluster}-pmm-secret" \
 		| kubectl_bin apply -f -
-	yq r -d2 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-primaryuser-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
-	yq r -d3 $conf_dir/some-name-secrets.yml \
-		| yq w - 'metadata.name' "${cluster}-${cluster}-secret" \
-		| yq w - 'metadata.labels.pg-cluster' "${cluster}" \
-		| kubectl_bin apply -f -
+}
+
+get_psql_user_pass() {
+	local user=${1}
+	local cluster=${2:-"some-name"}
+
+	echo $(kubectl_bin get "secret/$(kubectl_bin get perconapgcluster/${cluster} -o jsonpath='{.spec.secretsName}')" -o jsonpath='{.data.'${user}'}' | base64 -d)
 }
 
 wait_cluster_consistency() {
@@ -884,7 +882,7 @@ check_replica() {
 
 	run_psql \
 		'SELECT usename,application_name,client_addr,state from pg_stat_replication' \
-		"postgres:postgres_pass@${cluster}.${namespace}" \
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}" \
 		>${tmp_dir}/replicas.list
 
 	replica_pod_name=$(kubectl_bin -n $namespace get pods --selector=deployment-name=${name},name=${cluster}-replica -o 'jsonpath={.items[0].metadata.name}')

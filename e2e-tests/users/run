@@ -12,7 +12,7 @@ cluster="some-name"
 
 spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"
-compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:postgres_pass@${cluster}.${namespace}"
+compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}"
 
 newpass="test-password"
 newpassencrypted=$(echo -n "$newpass" | base64)

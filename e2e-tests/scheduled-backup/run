@@ -14,31 +14,31 @@ function restore {
 
 	run_psql \
 		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
-		"postgres:postgres_pass@${cluster}.${namespace}"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}"
 
 	compare_psql_cmd \
 		"select-1" \
 		'\c myapp \\\ SELECT * from myApp;' \
-		"postgres:postgres_pass@${cluster}.${namespace}"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}"
 
 	run_psql \
 		'\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' \
-		"postgres:postgres_pass@${cluster}.${namespace}"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}"
 
 	restore_target="$(run_psql \
 		'\c myapp \\\ SELECT xmin FROM myApp WHERE id='100501';' \
-		"postgres:postgres_pass@${cluster}.${namespace}" | awk '{$1=$1;print}')"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}" | awk '{$1=$1;print}')"
 
 	run_psql \
 		'DROP DATABASE myapp' \
-		"postgres:postgres_pass@${cluster}.${namespace}"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}"
 
 	run_restore ${cluster} ${backup_type} ${storage} "${restore_target}" 'xid'
 
 	compare_psql_cmd \
 		"select-1" \
 		'\c myapp \\\ SELECT * from myApp;' \
-		"postgres:postgres_pass@${cluster}.${namespace}"
+		"postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}"
 }
 
 function apply_configs {

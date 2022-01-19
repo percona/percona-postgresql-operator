@@ -37,7 +37,7 @@ function main {
 	create_namespace "${namespace}-disabled" 'true'
 	export OPERATOR_NS="${namespace}-disabled"
 	deploy_operator '' "${src_dir}/deploy/operator.yaml" 'disabled' '' "${namespace}-disabled"
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' '' '' '' '' '' '' "${namespace}-disabled"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' '' '' '' '' '' "${namespace}-disabled"
 
 	destroy_operator
 	destroy
