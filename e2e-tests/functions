@@ -628,16 +628,19 @@ enable_pgBouncer() {
 	local replicas_num=${2:-'1'}
 
 	kubectl_bin patch \
-		"pgcluster/${cluster_name}" \
+		"perconapgcluster/${cluster_name}" \
 		--type json \
-		-p='[{"op":"add","path":"/spec/pgBouncer","value":{"image":"'"${IMAGE_PGBOUNCER}"'","limits":{"cpu":"2","memory":"512Mi"},"replicas":'${replicas_num}',"resources":{"cpu":"1","memory":"128Mi"},"tlsSecret":"","serviceType":"LoadBalancer"}}]'
+		-p='[{"op":"replace","path":"/spec/pgBouncer/size","value":'${replicas_num}'}]'
+	sleep 15
+	kubectl_bin wait --for=condition=Available "deployment/${cluster}-pgbouncer"
 }
 
-disable_pgbouncer() {
+disable_pgBouncer() {
 	kubectl_bin patch \
-		"pgcluster/${1}" \
+		"perconapgcluster/${1}" \
 		--type json \
-		-p='[{"op":"remove","path":"/spec/pgBouncer"}]'
+		-p='[{"op":"replace","path":"/spec/pgBouncer/size","value":0}]'
+	kubectl_bin wait --for=delete "deployment/${1}-pgbouncer"
 }
 
 compare_kubectl() {
@@ -783,7 +786,7 @@ wait_cluster_status() {
 	local target_namespace=${3:-"$namespace"}
 	retry=0
 
-	until [[ "$(kubectl_bin -n ${target_namespace} get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "${target_status}" ]]; do
+	until [[ "$(kubectl_bin -n ${target_namespace} get "perconapgcluster/${cluster_name}" -o jsonpath='{.status.PGCluster.state}')" == "${target_status}" ]]; do
 		let retry+=1
 		if [ $retry -ge 24 ]; then
 			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
