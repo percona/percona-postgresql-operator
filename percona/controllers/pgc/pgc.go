@@ -140,7 +140,17 @@ func (c *Controller) onAdd(obj interface{}) {
 		log.Errorf("update templates: %s", err)
 		return
 	}
+	err = c.handleTLS(newCluster)
+	if err != nil {
+		log.Errorf("handle tls: %s", err)
+		return
+	}
 
+	err = c.CreateNewInternalSecrets(newCluster.Name, newCluster.Spec.UsersSecretName, newCluster.Spec.User, newCluster.Namespace)
+	if err != nil {
+		log.Errorf("create new internal users secrets: %s", err)
+		return
+	}
 	err = service.CreateOrUpdate(c.Client, newCluster, service.PGPrimaryServiceType)
 	if err != nil {
 		log.Errorf("handle primary service on create: %s", err)
@@ -153,11 +163,7 @@ func (c *Controller) onAdd(obj interface{}) {
 			return
 		}
 	}
-	err = c.CreateNewInternalSecrets(newCluster.Name, newCluster.Spec.UsersSecretName, newCluster.Spec.User, newCluster.Namespace)
-	if err != nil {
-		log.Errorf("create new internal users secrets: %s", err)
-		return
-	}
+
 	err = pgcluster.Create(c.Client, newCluster)
 	if err != nil {
 		log.Errorf("create pgcluster resource: %s", err)
@@ -458,6 +464,11 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	l.statusMutex.Lock()
 	defer l.statusMutex.Unlock()
 	defer atomic.StoreInt32(l.updateSync, updateDone)
+	err = c.handleTLS(newCluster)
+	if err != nil {
+		log.Errorf("handle tls: %s", err)
+		return
+	}
 	err = version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
