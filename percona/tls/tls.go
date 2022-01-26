@@ -19,17 +19,14 @@ func Issue(hosts []string) (caCert []byte, tlsCert []byte, tlsKey []byte, err er
 	rsaBits := 2048
 	priv, err := rsa.GenerateKey(rand.Reader, rsaBits)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("generate rsa key: %v", err)
+		return nil, nil, nil, fmt.Errorf("generate rsa key: %w", err)
 	}
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("generate serial number for root: %v", err)
+		return nil, nil, nil, fmt.Errorf("generate serial number for root: %w", err)
 	}
 	subject := pkix.Name{
-		Organization: []string{"Root CA"},
-	}
-	issuer := pkix.Name{
 		Organization: []string{"Root CA"},
 	}
 	caTemplate := x509.Certificate{
@@ -45,21 +42,24 @@ func Issue(hosts []string) (caCert []byte, tlsCert []byte, tlsKey []byte, err er
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &caTemplate, &caTemplate, &priv.PublicKey, priv)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("generate CA certificate: %v", err)
+		return nil, nil, nil, fmt.Errorf("generate CA certificate: %w", err)
 	}
 	certOut := &bytes.Buffer{}
 	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("encode CA certificate: %v", err)
+		return nil, nil, nil, fmt.Errorf("encode CA certificate: %w", err)
 	}
 	cert := certOut.Bytes()
 
 	serialNumber, err = rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("generate serial number for client: %v", err)
+		return nil, nil, nil, fmt.Errorf("generate serial number for client: %w", err)
 	}
 	subject = pkix.Name{
 		Organization: []string{"PGO"},
+	}
+	issuer := pkix.Name{
+		Organization: []string{"Root CA"},
 	}
 	tlsTemplate := x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -75,7 +75,7 @@ func Issue(hosts []string) (caCert []byte, tlsCert []byte, tlsKey []byte, err er
 	}
 	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("generate client key: %v", err)
+		return nil, nil, nil, fmt.Errorf("generate client key: %w", err)
 	}
 	tlsDerBytes, err := x509.CreateCertificate(rand.Reader, &tlsTemplate, &caTemplate, &clientKey.PublicKey, priv)
 	if err != nil {
@@ -84,7 +84,7 @@ func Issue(hosts []string) (caCert []byte, tlsCert []byte, tlsKey []byte, err er
 	tlsCertOut := &bytes.Buffer{}
 	err = pem.Encode(tlsCertOut, &pem.Block{Type: "CERTIFICATE", Bytes: tlsDerBytes})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("encode TLS  certificate: %v", err)
+		return nil, nil, nil, fmt.Errorf("encode TLS  certificate: %w", err)
 	}
 	tlsCert = tlsCertOut.Bytes()
 
@@ -92,7 +92,7 @@ func Issue(hosts []string) (caCert []byte, tlsCert []byte, tlsKey []byte, err er
 	block := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(clientKey)}
 	err = pem.Encode(keyOut, block)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("encode RSA private key: %v", err)
+		return nil, nil, nil, fmt.Errorf("encode RSA private key: %w", err)
 	}
 	privKey := keyOut.Bytes()
 
