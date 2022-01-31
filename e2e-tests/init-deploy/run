@@ -59,11 +59,11 @@ compare_kubectl "service/${cluster}-pgbouncer"
 
 desc 'checking essential users access'
 
-compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:postgres_pass@${cluster}.${namespace}"
-compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}.${namespace}"
+compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}.${namespace}"
+compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:$(get_psql_user_pass some-name ${cluster})@${cluster}.${namespace}"
 
-compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:pgbouncer_pass@${cluster}-pgbouncer.${namespace}"
-compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer.${namespace}"
+compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:$(get_psql_user_pass pgbouncer ${cluster})@${cluster}-pgbouncer.${namespace}"
+compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:$(get_psql_user_pass some-name ${cluster})@${cluster}-pgbouncer.${namespace}"
 
 if [[ -n $(which aws) ]]; then
 	desc "Starting to test private registry"
