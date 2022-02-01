@@ -67,4 +67,6 @@ Reference
 
    operator
    images
+   faq
+   HOWTOs <howtos/index>
    Release Notes <ReleaseNotes/index>
