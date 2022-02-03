@@ -59,6 +59,12 @@ Configuration and Management
 .. toctree::
    :maxdepth: 1
 
+HOWTOs
+=============
+
+   standby
+
+
 Reference
 =============
 
@@ -68,5 +74,4 @@ Reference
    operator
    images
    faq
-   HOWTOs <howtos/index>
    Release Notes <ReleaseNotes/index>
