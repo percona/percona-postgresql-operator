@@ -96,6 +96,6 @@ moment when you get out your ``cluster2`` from standby:
 .. image:: ./assets/images/dr2.svg
    :align: center
 
-.. warning:: If ``cluster1`` still exists for some reason,
+.. note:: If ``cluster1`` still exists for some reason,
    **make sure it can not connect** to pgBackRest repository. Otherwise, both
    clusters sending WAL archives to it would cause data corruption!
