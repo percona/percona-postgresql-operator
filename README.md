@@ -101,13 +101,42 @@ Other Kubernetes platforms may also work but have not been tested.
 The Operator is tested with a variety of different types of Kubernetes storage and Storage Classes, as well as hostPath and NFS.
 The variety of different Storage Classes available for Kubernetes is too wide to verify the Operator functionality in each one. With that said, the Operator is designed to be storage class agnostic and has been demonstrated to work with additional Storage Classes.
 
-## Installation
+## Quickstart installation
 
-Quickly make the Operator up and running with cloud native PostgreSQL includes
-two main steps:
+### Helm
 
-* Deploy the operator from `deploy/operator.yaml`
-* Deploy the database cluster itself from `deploy/cr.yaml`
+Install the Operator:
+
+```sh
+helm install my-operator percona/pg-operator
+```
+
+Install Percona Distribution for PostgreSQL:
+
+```sh
+helm install my-db percona/pg-db 
+```
+
+See more details in:
+- [Helm installation documentation](https://www.percona.com/doc/kubernetes-operator-for-postgresql/helm.html)
+- [Operator helm chart parameter reference](https://github.com/percona/percona-helm-charts/blob/main/charts/pg-operator)
+- [Percona Distribution for PostgreSQL helm chart parameters reference](https://github.com/percona/percona-helm-charts/blob/main/charts/pg-db)
+
+### kubectl
+
+Quickly make the Operator up and running with cloud native PostgreSQL includes two main steps:
+
+Deploy the operator from `deploy/operator.yaml`
+
+```sh
+kubectl create namespace pgo
+kubectl -n pgo apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/main/deploy/operator.yaml
+```
+Deploy the database cluster itself from `deploy/cr.yaml`
+
+```sh
+kubectl -n pgo apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/main/deploy/cr.yaml
+```
 
 See full installation instructions with examples and various advanced cases on [percona.com](https://www.percona.com/doc/kubernetes-operator-for-postgresql/index.html#installation-guide).
 
