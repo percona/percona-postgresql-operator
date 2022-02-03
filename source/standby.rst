@@ -97,5 +97,5 @@ moment when you get out your ``cluster2`` from standby:
    :align: center
 
 .. note:: If ``cluster1`` still exists for some reason,
-   **make sure it can not connect** to pgBackRest repository. Otherwise, both
+   **make sure it can not connect** to backup storage. Otherwise, both
    clusters sending WAL archives to it would cause data corruption!
