@@ -96,7 +96,7 @@ configuration file:
        ...
          customconfig: "cluster1-custom-config"
 
-Now you can create the cluster following the :ref:`regular installation instructions<_operator-install>`.
+Now you can create the cluster following the :ref:`regular installation instructions<operator-install>`.
 
 .. _operator-configmaps-change:
 

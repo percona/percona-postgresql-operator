@@ -6,52 +6,51 @@ Percona certified images
 Following table presents Percona’s certified docker images to be used with the
 Percona Distribution for PostgreSQL Operator:
 
-      .. tabularcolumns:: |p{3.7cm}|p{11.8cm}|
-      .. list-table::
-         :widths: 15 50
-         :header-rows: 1
+.. tabularcolumns:: |p{4.8cm}|p{12cm}|
 
-         * - Image
-           - Digest
-         * - percona/percona-postgresql-operator:1.1.0-pgo-deployer
-           - sha256:caabb96e98c883e4809b5e21d5733403e67720c812fca81b79ad339341bf3708
-         * - percona/percona-postgresql-operator:1.1.0-postgres-operator
-           - sha256:d7729cc714ec4db04fc9a6c4e29405875b5115b129b49d4f5dee6c85cf0731c6
-         * - percona/percona-postgresql-operator:1.1.0-pgo-scheduler
-           - sha256:90432634f7414cc2f6c7e270e78af3adf92ce31e97d8dee16a2f7babe3e674c7
-         * - percona/percona-postgresql-operator:1.1.0-pgo-rmdata
-           - sha256:ad3c14f6a8b1907b7d7f5fa3cdc8c2a494913c2255ec97a49927e13e5ea9579a
-         * - percona/percona-postgresql-operator:1.1.0-pgo-event
-           - sha256:919d35795e206e6b83f7f624749615a3b07aabd42322d83494f9bf30fe618411
-         * - percona/percona-postgresql-operator:1.1.0-pgo-apiserver
-           - sha256:b13ddb198eb248af14fc02f1170c0026274c1e88ad9dba54030e5089c910d01a
-         * - percona/percona-postgresql-operator:1.1.0-ppg12-pgbadger
-           - sha256:5508ce5316014b498e07801472f23cb64947c0393b07dc7f664f2e246021f066
-         * - percona/percona-postgresql-operator:1.1.0-ppg13-pgbadger
-           - sha256:2044d5e94f7862bc7ec4eceb94bee22d79d0f2f8c84a622790b9f530aba7cd9e
-         * - percona/percona-postgresql-operator:1.1.0-ppg14-pgbadger   
-           - sha256:fc6505b5c12b1ab1f948b37a7406f7694759a1b5ff2b695ba0b8f31c11da30af
-         * - percona/percona-postgresql-operator:1.1.0-ppg12-postgres-ha
-           - sha256:f7ca98c2d3c325a87700fd5a3833e6a5e22c93b12b35fa0aef72373e40a2474a
-         * - percona/percona-postgresql-operator:1.1.0-ppg13-postgres-ha
-           - sha256:83985cdd73d4531eebcd2a2bab11848036744caf4e4e31559a0c994ac49d88f0
-         * - percona/percona-postgresql-operator:1.1.0-ppg14-postgres-ha   
-           - sha256:9134f670e4fa785c41a12559598fa893107d62e6193af1eb7749ae87beec64e5
-         * - percona/percona-postgresql-operator:1.1.0-ppg12-pgbouncer
-           - sha256:61ebf3623c9a8fad773d54bf3449b2bbf6663bb5e56a3cd02cf6747fa38da7f1
-         * - percona/percona-postgresql-operator:1.1.0-ppg13-pgbouncer
-           - sha256:834af973b183674ae80656f746bd63b6f856038b0a8c28ef1977a0b65c1a5fca
-         * - percona/percona-postgresql-operator:1.1.0-ppg14-pgbouncer   
-           - sha256:0ad239b7a94bdad12d7b7cee78d91feda3735cc0c68939aab4901ca2970a4e7f
-         * - percona/percona-postgresql-operator:1.1.0-ppg12-pgbackrest
-           - sha256:d2305c7f4f5c5b3dc32758c80ece9ec9b43871f5a582268613acf947dd0ac37a
-         * - percona/percona-postgresql-operator:1.1.0-ppg13-pgbackrest
-           - sha256:43e34b4a4a58046fd7670771e05777ffd15779d7fd00c18224c6081ab185e9a8
-         * - percona/percona-postgresql-operator:1.1.0-ppg14-pgbackrest  
-           - sha256:def581e58384508316b355067fd5837e4b46565c9b917af959e0199b4150cf81
-         * - percona/percona-postgresql-operator:1.1.0-ppg12-pgbackrest-repo
-           - sha256:8b954f29136ec7ea68143c126e311b6104e94b6524cc4234f87769a86edff8bb
-         * - percona/percona-postgresql-operator:1.1.0-ppg13-pgbackrest-repo
-           - sha256:5bff3605833ef241281f28a76a877ef20583feed0fc1c95049f0dbc0af403129
-         * - percona/percona-postgresql-operator:1.1.0-ppg14-pgbackrest-repo  
-           - sha256:202d9751977119103b9720b8b78dbd8a5cf03f49fa1c71ac2876a298937f86b1
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| Image                                                           | Digest                                                                  |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-pgo-deployer          | sha256:caabb96e98c883e4809b5e21d5733403e67720c812fca81b79ad339341bf3708 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-postgres-operator     | sha256:d7729cc714ec4db04fc9a6c4e29405875b5115b129b49d4f5dee6c85cf0731c6 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-pgo-scheduler         | sha256:90432634f7414cc2f6c7e270e78af3adf92ce31e97d8dee16a2f7babe3e674c7 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-pgo-rmdata            | sha256:ad3c14f6a8b1907b7d7f5fa3cdc8c2a494913c2255ec97a49927e13e5ea9579a |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-pgo-event             | sha256:919d35795e206e6b83f7f624749615a3b07aabd42322d83494f9bf30fe618411 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-pgo-apiserver         | sha256:b13ddb198eb248af14fc02f1170c0026274c1e88ad9dba54030e5089c910d01a |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg12-pgbadger        | sha256:5508ce5316014b498e07801472f23cb64947c0393b07dc7f664f2e246021f066 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg13-pgbadger        | sha256:2044d5e94f7862bc7ec4eceb94bee22d79d0f2f8c84a622790b9f530aba7cd9e |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg14-pgbadger        | sha256:fc6505b5c12b1ab1f948b37a7406f7694759a1b5ff2b695ba0b8f31c11da30af |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg12-postgres-ha     | sha256:f7ca98c2d3c325a87700fd5a3833e6a5e22c93b12b35fa0aef72373e40a2474a |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg13-postgres-ha     | sha256:83985cdd73d4531eebcd2a2bab11848036744caf4e4e31559a0c994ac49d88f0 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg14-postgres-ha     | sha256:9134f670e4fa785c41a12559598fa893107d62e6193af1eb7749ae87beec64e5 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg12-pgbouncer       | sha256:61ebf3623c9a8fad773d54bf3449b2bbf6663bb5e56a3cd02cf6747fa38da7f1 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg13-pgbouncer       | sha256:834af973b183674ae80656f746bd63b6f856038b0a8c28ef1977a0b65c1a5fca |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg14-pgbouncer       | sha256:0ad239b7a94bdad12d7b7cee78d91feda3735cc0c68939aab4901ca2970a4e7f |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg12-pgbackrest      | sha256:d2305c7f4f5c5b3dc32758c80ece9ec9b43871f5a582268613acf947dd0ac37a |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg13-pgbackrest      | sha256:43e34b4a4a58046fd7670771e05777ffd15779d7fd00c18224c6081ab185e9a8 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg14-pgbackrest      | sha256:def581e58384508316b355067fd5837e4b46565c9b917af959e0199b4150cf81 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg12-pgbackrest-repo | sha256:8b954f29136ec7ea68143c126e311b6104e94b6524cc4234f87769a86edff8bb |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg13-pgbackrest-repo | sha256:5bff3605833ef241281f28a76a877ef20583feed0fc1c95049f0dbc0af403129 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+| percona/percona-postgresql-operator:1.1.0-ppg14-pgbackrest-repo | sha256:202d9751977119103b9720b8b78dbd8a5cf03f49fa1c71ac2876a298937f86b1 |
++-----------------------------------------------------------------+-------------------------------------------------------------------------+
+
