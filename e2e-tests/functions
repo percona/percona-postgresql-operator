@@ -792,7 +792,7 @@ wait_cluster_status() {
 			;;
 		*)
 			status_query="kubectl_bin -n ${target_namespace} get perconapgcluster/${cluster_name} -o jsonpath='{.status.PGCluster.state}'"
-		;;
+			;;
 	esac
 	local retry=0
 	until [[ "$(eval ${status_query})" == "${target_status}" ]]; do
