@@ -12,9 +12,11 @@ deploy_operator
 cluster="some-name"
 spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
-desc 'enabling pgbouncer'
+desc 'Quick pgbouncer switch off and switch on'
 
-enable_pgBouncer ${cluster}
+disable_pgBouncer ${cluster}
+
+enable_pgBouncer ${cluster} 3
 
 wait_deployment "${cluster}-pgbouncer"
 compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:$(get_psql_user_pass pgbouncer ${cluster})@${cluster}-pgbouncer.${namespace}"
@@ -23,11 +25,10 @@ compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:$(get
 compare_kubectl "deployment/${cluster}-pgbouncer"
 compare_kubectl "service/${cluster}-pgbouncer"
 
-
 for repl in $(seq 1 3); do
-    desc "check replica ${repl}"
-    kubectl_bin patch "perconapgcluster/some-name" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": '${repl}'}]'
-    sleep 30
+	desc "check replica ${repl}"
+	kubectl_bin patch "perconapgcluster/some-name" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": '${repl}'}]'
+	sleep 30
 	wait_deployment "${cluster}-repl${repl}"
 	sleep 30
 	check_replica "${cluster}-repl${repl}" "${cluster}" "select-1"
@@ -37,7 +38,7 @@ desc 'Restart the cluster'
 kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"add","path":"/spec/keepData","value":true}]'
 sleep 30
 for i in $(seq 1 3); do
-    sleep 15
+	sleep 15
 	wait_deployment "${cluster}-repl${i}"
 done
 wait_deployment "${cluster}"
@@ -82,7 +83,7 @@ for r in $(seq 1 3); do
 	kubectl_bin patch "perconapgcluster/some-name" --type json -p '[{"op": "replace", "path": "/spec/pgReplicas/hotStandby/size", "value": '${r}'}]'
 	sleep 25
 	wait_deployment "${cluster}-repl${r}"
-    sleep 35
+	sleep 35
 	check_replica "${cluster}-repl${r}" "${cluster}" "select-2"
 done
 
