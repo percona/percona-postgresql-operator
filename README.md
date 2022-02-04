@@ -124,7 +124,7 @@ See more details in:
 
 ### kubectl
 
-Quickly make the Operator up and running with cloud native PostgreSQL includes two main steps:
+Quickly making the Operator up and running with cloud native PostgreSQL includes two main steps:
 
 Deploy the operator from `deploy/operator.yaml`
 
