@@ -789,7 +789,7 @@ wait_cluster_status() {
 	case $(kubectl_bin get perconapgcluster/${cluster_name} -o jsonpath='{.metadata.labels.pgo-version}') in
 		'1.1.0' | '1.0.0' | '0.2.0')
 			status_query="kubectl_bin -n ${target_namespace} get pgcluster/${cluster_name} -o jsonpath='{.status.state}'"
-		;;
+			;;
 		*)
 			status_query="kubectl_bin -n ${target_namespace} get perconapgcluster/${cluster_name} -o jsonpath='{.status.PGCluster.state}'"
 		;;
