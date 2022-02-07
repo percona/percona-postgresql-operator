@@ -31,7 +31,51 @@ type SecretData struct {
 const usersSecretTag = "-users"
 const annotationLastAppliedSecret = "last-applied-secret"
 
-func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, clusterUser, namespace string) error {
+func (c *Controller) handleSecrets(cluster *crv1.PerconaPGCluster) error {
+	if len(cluster.Spec.PGDataSource.RestoreFrom) > 0 {
+		err := c.copyClusterUsersSecrets(cluster)
+		if err != nil {
+			return errors.Wrap(err, "copy cluster users secrets")
+		}
+	}
+	err := c.createNewInternalSecrets(cluster.Name, cluster.Spec.UsersSecretName, cluster.Spec.User, cluster.Namespace)
+	if err != nil {
+		return errors.Wrap(err, "create new internal users secrets")
+	}
+	return nil
+}
+
+func (c *Controller) copyClusterUsersSecrets(cluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	oldCluster, err := c.Client.CrunchydataV1().PerconaPGClusters(cluster.Namespace).Get(ctx, cluster.Spec.PGDataSource.RestoreFrom, metav1.GetOptions{})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrap(err, "get perconapgluster")
+	} else if kerrors.IsNotFound(err) {
+		return nil
+	}
+	var usersSecret *v1.Secret
+	secretName := cluster.Spec.PGDataSource.RestoreFrom + usersSecretTag
+	if len(oldCluster.Spec.UsersSecretName) > 0 {
+		secretName = oldCluster.Spec.UsersSecretName
+	}
+	usersSecret, err = c.Client.CoreV1().Secrets(cluster.Namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get secret %s", secretName)
+	}
+	usersSecret.Name = cluster.Name + usersSecretTag
+	if len(cluster.Spec.UsersSecretName) > 0 {
+		usersSecret.Name = cluster.Spec.UsersSecretName
+	}
+	usersSecret.ResourceVersion = ""
+	_, err = c.Client.CoreV1().Secrets(cluster.Namespace).Create(ctx, usersSecret, metav1.CreateOptions{})
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create secret %s", usersSecret.Name)
+	}
+
+	return nil
+}
+
+func (c *Controller) createNewInternalSecrets(clusterName, secretName, clusterUser, namespace string) error {
 	ctx := context.TODO()
 	if len(secretName) == 0 {
 		secretName = clusterName + usersSecretTag
@@ -213,42 +257,75 @@ func generateUserSecretData(userName, clusterName, password string) (SecretData,
 }
 
 func (c *Controller) createUsersInternalSecrets(secrets []SecretData, namespace, clusterName string) error {
-	ctx := context.TODO()
 	for _, secret := range secrets {
-		data := make(map[string]string)
-		labels := map[string]string{
-			"pg-cluster": clusterName,
+		err := c.createUserInternalSecret(clusterName, namespace, secret)
+		if err != nil {
+			return errors.Wrap(err, "create user internal secret")
 		}
-		if len(secret.Data.Password) > 0 {
-			data["password"] = secret.Data.Password
-		}
-		if len(secret.Data.Name) > 0 {
-			name := secret.Data.Name
-			if secret.Data.Name == "pgbouncer" {
-				name = ""
-				labels["crunchy-pgbouncer"] = "true"
-			}
-			data["username"] = name
-		}
-		if len(secret.Data.Roles) > 0 {
-			data["roles"] = secret.Data.Roles
-		}
-		if len(secret.Data.UsersTXT) > 0 {
-			data["users.txt"] = secret.Data.UsersTXT
-		}
+	}
 
-		s := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secret.Name,
-				Namespace: namespace,
-				Labels:    labels,
-			},
-			StringData: data,
+	return nil
+}
+
+func (c *Controller) handleInternalSecrets(cluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	usersSecret, err := c.Client.CoreV1().Secrets(cluster.Namespace).Get(ctx, cluster.Spec.UsersSecretName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get secret %s", cluster.Spec.UsersSecretName)
+	}
+	secretsData, err := c.generateUsersInternalSecretsDataFromSecret(usersSecret, cluster.Name)
+	if err != nil {
+		return errors.Wrap(err, "generate users internal data from secret")
+	}
+
+	for _, secret := range secretsData {
+		if secret.Data.Name != "pgbouncer" {
+			continue
 		}
-		_, err := c.Client.CoreV1().Secrets(namespace).Create(ctx, s, metav1.CreateOptions{})
-		if err != nil && !kerrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "create secret %s", secret.Name)
+		err = c.createUserInternalSecret(cluster.Name, cluster.Namespace, secret)
+		if err != nil {
+			return errors.Wrap(err, "create internal user secret")
 		}
+	}
+
+	return nil
+}
+
+func (c *Controller) createUserInternalSecret(clusterName, namespace string, secret SecretData) error {
+	ctx := context.TODO()
+	data := make(map[string]string)
+	labels := map[string]string{
+		"pg-cluster": clusterName,
+	}
+	if len(secret.Data.Password) > 0 {
+		data["password"] = secret.Data.Password
+	}
+	if len(secret.Data.Name) > 0 {
+		name := secret.Data.Name
+		if secret.Data.Name == "pgbouncer" {
+			name = ""
+			labels["crunchy-pgbouncer"] = "true"
+		}
+		data["username"] = name
+	}
+	if len(secret.Data.Roles) > 0 {
+		data["roles"] = secret.Data.Roles
+	}
+	if len(secret.Data.UsersTXT) > 0 {
+		data["users.txt"] = secret.Data.UsersTXT
+	}
+
+	s := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secret.Name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		StringData: data,
+	}
+	_, err := c.Client.CoreV1().Secrets(namespace).Create(ctx, s, metav1.CreateOptions{})
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create secret %s", secret.Name)
 	}
 
 	return nil

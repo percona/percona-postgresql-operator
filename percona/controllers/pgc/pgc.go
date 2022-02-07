@@ -153,9 +153,9 @@ func (c *Controller) onAdd(obj interface{}) {
 			return
 		}
 	}
-	err = c.CreateNewInternalSecrets(newCluster.Name, newCluster.Spec.UsersSecretName, newCluster.Spec.User, newCluster.Namespace)
+	err = c.handleSecrets(newCluster)
 	if err != nil {
-		log.Errorf("create new internal users secrets: %s", err)
+		log.Errorf("handle secrets: %s", err)
 		return
 	}
 	err = pgcluster.Create(c.Client, newCluster)
@@ -445,7 +445,11 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 		return
 	}
 	newCluster.CheckAndSetDefaults()
-
+	err := c.handleInternalSecrets(newCluster)
+	if err != nil {
+		log.Errorf("update perconapgcluster: handle internal secrets: %s", err)
+		return
+	}
 	nn := types.NamespacedName{
 		Name:      newCluster.Name,
 		Namespace: newCluster.Namespace,
@@ -454,7 +458,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	l.statusMutex.Lock()
 	defer l.statusMutex.Unlock()
 	defer atomic.StoreInt32(l.updateSync, updateDone)
-	err := version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
+	err = version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
 	if err != nil {
