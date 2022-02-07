@@ -16,13 +16,14 @@ limitations under the License.
 */
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 )
@@ -37,23 +38,16 @@ func initOpenTelemetry() (func(), error) {
 
 	switch os.Getenv("OTEL_EXPORTER") {
 	case "jaeger":
-		var endpoint jaeger.EndpointOption
-		agent := os.Getenv("JAEGER_AGENT_ENDPOINT")
-		collector := jaeger.CollectorEndpointFromEnv()
-
-		if agent != "" {
-			endpoint = jaeger.WithAgentEndpoint(agent)
-		}
-		if collector != "" {
-			endpoint = jaeger.WithCollectorEndpoint(collector)
-		}
-
-		provider, flush, err := jaeger.NewExportPipeline(endpoint)
+		exp, err := jaeger.NewExportPipeline(jaeger.WithCollectorEndpoint())
 		if err != nil {
-			return nil, fmt.Errorf("unable to initialize Jaeger exporter: %w", err)
+			return nil, err
 		}
-
-		global.SetTracerProvider(provider)
+		flush := func() {
+			err := exp.ForceFlush(context.TODO())
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
 		return flush, nil
 
 	case "json":
@@ -75,13 +69,13 @@ func initOpenTelemetry() (func(), error) {
 			return nil, fmt.Errorf("unable to initialize stdout exporter: %w", err)
 		}
 		flush := func() {
-			pusher.Stop()
+			pusher.Stop(context.TODO())
 			if closer != nil {
 				_ = closer.Close()
 			}
 		}
 
-		global.SetTracerProvider(provider)
+		otel.SetTracerProvider(provider)
 		return flush, nil
 	}
 

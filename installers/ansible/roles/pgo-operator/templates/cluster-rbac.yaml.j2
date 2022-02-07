@@ -109,6 +109,21 @@ rules:
       - update
       - delete
       - deletecollection
+  - apiGroups:
+      - certmanager.k8s.io
+      - cert-manager.io
+    resources:
+      - issuers
+      - certificates
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+      - deletecollection
 {% endif %}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

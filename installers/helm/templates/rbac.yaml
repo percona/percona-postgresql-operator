@@ -129,6 +129,21 @@ rules:
     verbs:
       - delete
       - list
+  - apiGroups:
+      - certmanager.k8s.io
+      - cert-manager.io
+    resources:
+      - issuers
+      - certificates
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+      - deletecollection
 {{ end }}
 {{ if .Values.rbac.create }}
 ---
