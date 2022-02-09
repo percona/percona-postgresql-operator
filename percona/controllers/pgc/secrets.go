@@ -31,7 +31,51 @@ type SecretData struct {
 const usersSecretTag = "-users"
 const annotationLastAppliedSecret = "last-applied-secret"
 
-func (c *Controller) CreateNewInternalSecrets(clusterName, secretName, clusterUser, namespace string) error {
+func (c *Controller) handleSecrets(cluster *crv1.PerconaPGCluster) error {
+	if len(cluster.Spec.PGDataSource.RestoreFrom) > 0 {
+		err := c.copyClusterUsersSecrets(cluster)
+		if err != nil {
+			return errors.Wrap(err, "copy cluster users secrets")
+		}
+	}
+	err := c.createNewInternalSecrets(cluster.Name, cluster.Spec.UsersSecretName, cluster.Spec.User, cluster.Namespace)
+	if err != nil {
+		return errors.Wrap(err, "create new internal users secrets")
+	}
+	return nil
+}
+
+func (c *Controller) copyClusterUsersSecrets(cluster *crv1.PerconaPGCluster) error {
+	ctx := context.TODO()
+	oldCluster, err := c.Client.CrunchydataV1().PerconaPGClusters(cluster.Namespace).Get(ctx, cluster.Spec.PGDataSource.RestoreFrom, metav1.GetOptions{})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrap(err, "get perconapgluster")
+	} else if kerrors.IsNotFound(err) {
+		return nil
+	}
+	var usersSecret *v1.Secret
+	secretName := cluster.Spec.PGDataSource.RestoreFrom + usersSecretTag
+	if len(oldCluster.Spec.UsersSecretName) > 0 {
+		secretName = oldCluster.Spec.UsersSecretName
+	}
+	usersSecret, err = c.Client.CoreV1().Secrets(cluster.Namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get secret %s", secretName)
+	}
+	usersSecret.Name = cluster.Name + usersSecretTag
+	if len(cluster.Spec.UsersSecretName) > 0 {
+		usersSecret.Name = cluster.Spec.UsersSecretName
+	}
+	usersSecret.ResourceVersion = ""
+	_, err = c.Client.CoreV1().Secrets(cluster.Namespace).Create(ctx, usersSecret, metav1.CreateOptions{})
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "create secret %s", usersSecret.Name)
+	}
+
+	return nil
+}
+
+func (c *Controller) createNewInternalSecrets(clusterName, secretName, clusterUser, namespace string) error {
 	ctx := context.TODO()
 	if len(secretName) == 0 {
 		secretName = clusterName + usersSecretTag

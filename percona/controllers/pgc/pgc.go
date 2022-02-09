@@ -166,6 +166,12 @@ func (c *Controller) onAdd(obj interface{}) {
 		}
 	}
 
+	err = c.handleSecrets(newCluster)
+	if err != nil {
+		log.Errorf("handle secrets: %s", err)
+		return
+	}
+
 	err = pgcluster.Create(c.Client, newCluster)
 	if err != nil {
 		log.Errorf("create pgcluster resource: %s", err)

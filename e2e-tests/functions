@@ -1,8 +1,5 @@
 #!/bin/bash
 
-exec 5>&2
-BASH_XTRACEFD="5"
-
 GIT_COMMIT=$(git rev-parse HEAD)
 GIT_BRANCH=${VERSION:-$(git rev-parse --abbrev-ref HEAD | sed -e 's^/^-^g; s^[.]^-^g;' | sed -e 's/_/-/g' | tr '[:upper:]' '[:lower:]')}
 IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
@@ -35,6 +32,15 @@ test_name=$(basename $test_dir)
 namespace="${test_name}-${RANDOM}"
 conf_dir=$(realpath $test_dir/../conf || :)
 src_dir=$(realpath $test_dir/../..)
+logs_dir=$(realpath $test_dir/../logs)
+
+if [[ ${ENABLE_LOGGING} == "true" ]]; then
+	if [ ! -d "${logs_dir}" ]; then
+		mkdir "${logs_dir}"
+	fi
+	exec &> >(tee ${logs_dir}/${test_name}.log)
+	echo "Log: ${logs_dir}/${test_name}.log"
+fi
 
 if [ -f "$conf_dir/cloud-secret.yml" ]; then
 	SKIP_BACKUPS_TO_AWS_GCP=''
@@ -500,15 +506,10 @@ kubectl_bin() {
 	for i in $(seq 0 2); do
 		KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl "$@" 1>"$LAST_OUT" 2>"$LAST_ERR"
 		exit_status=$?
-		[[ ${-/x/} != $- ]] && echo "--- $i stdout" | cat - "$LAST_OUT" >&$BASH_XTRACEFD
-		[[ ${-/x/} != $- ]] && echo "--- $i stderr" | cat - "$LAST_ERR" >&$BASH_XTRACEFD
 		if [[ ${exit_status} != 0 ]]; then
 			sleep "$((timeout * i))"
 		else
-			cat "$LAST_OUT"
-			cat "$LAST_ERR" >&2
-			rm "$LAST_OUT" "$LAST_ERR"
-			return ${exit_status}
+			break
 		fi
 	done
 	cat "$LAST_OUT"
@@ -628,16 +629,19 @@ enable_pgBouncer() {
 	local replicas_num=${2:-'1'}
 
 	kubectl_bin patch \
-		"pgcluster/${cluster_name}" \
+		"perconapgcluster/${cluster_name}" \
 		--type json \
-		-p='[{"op":"add","path":"/spec/pgBouncer","value":{"image":"'"${IMAGE_PGBOUNCER}"'","limits":{"cpu":"2","memory":"512Mi"},"replicas":'${replicas_num}',"resources":{"cpu":"1","memory":"128Mi"},"tlsSecret":"","serviceType":"LoadBalancer"}}]'
+		-p='[{"op":"replace","path":"/spec/pgBouncer/size","value":'${replicas_num}'}]'
+	sleep 15
+	kubectl_bin wait --for=condition=Available "deployment/${cluster}-pgbouncer"
 }
 
-disable_pgbouncer() {
+disable_pgBouncer() {
 	kubectl_bin patch \
-		"pgcluster/${1}" \
+		"perconapgcluster/${1}" \
 		--type json \
-		-p='[{"op":"remove","path":"/spec/pgBouncer"}]'
+		-p='[{"op":"replace","path":"/spec/pgBouncer/size","value":0}]'
+	kubectl_bin wait --for=delete "deployment/${1}-pgbouncer"
 }
 
 compare_kubectl() {
@@ -781,9 +785,18 @@ wait_cluster_status() {
 	local cluster_name=${1}
 	local target_status=${2}
 	local target_namespace=${3:-"$namespace"}
-	retry=0
+	local status_query=''
 
-	until [[ "$(kubectl_bin -n ${target_namespace} get Pgcluster "${cluster_name}" -o jsonpath='{.status.state}')" == "${target_status}" ]]; do
+	case $(kubectl_bin get perconapgcluster/${cluster_name} -o jsonpath='{.metadata.labels.pgo-version}') in
+		'1.1.0' | '1.0.0' | '0.2.0')
+			status_query="kubectl_bin -n ${target_namespace} get pgcluster/${cluster_name} -o jsonpath='{.status.state}'"
+			;;
+		*)
+			status_query="kubectl_bin -n ${target_namespace} get perconapgcluster/${cluster_name} -o jsonpath='{.status.PGCluster.state}'"
+			;;
+	esac
+	local retry=0
+	until [[ "$(eval ${status_query})" == "${target_status}" ]]; do
 		let retry+=1
 		if [ $retry -ge 24 ]; then
 			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
