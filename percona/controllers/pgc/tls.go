@@ -159,7 +159,7 @@ func (c *Controller) createSSLByCertManager(cr *crv1.PerconaPGCluster) error {
 			SecretName: keyPairSecretName,
 			CommonName: cr.Name + "-ssl",
 			DNSNames:   dnsNames,
-			IsCA:       true,
+			IsCA:       false,
 			IssuerRef: cmmeta.ObjectReference{
 				Name:  issuerName,
 				Kind:  issuerKind,
