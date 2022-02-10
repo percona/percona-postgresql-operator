@@ -54,7 +54,7 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName, nodeName string) v
 		Image:           pgc.Spec.PMM.Image,
 		ImagePullPolicy: v1.PullPolicy(pgc.Spec.PMM.ImagePullPolicy),
 		LivenessProbe: &v1.Probe{
-			Handler: v1.Handler{
+			ProbeHandler: v1.ProbeHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Path:   "/local/Status",
 					Port:   intstr.FromInt(7777),
@@ -68,7 +68,7 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName, nodeName string) v
 			TimeoutSeconds:      5,
 		},
 		Lifecycle: &v1.Lifecycle{
-			PreStop: &v1.Handler{
+			PreStop: &v1.LifecycleHandler{
 				Exec: &v1.ExecAction{
 					Command: []string{
 						"bash",

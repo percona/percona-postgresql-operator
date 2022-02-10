@@ -28,6 +28,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -43,6 +44,7 @@ type Controller struct {
 	templates                   Templates
 	crons                       CronRegistry
 	lockers                     lockStore
+	scheme                      *runtime.Scheme
 }
 
 type Templates struct {
@@ -140,6 +142,11 @@ func (c *Controller) onAdd(obj interface{}) {
 		log.Errorf("update templates: %s", err)
 		return
 	}
+	err = c.handleTLS(newCluster)
+	if err != nil {
+		log.Errorf("handle tls: %s", err)
+		return
+	}
 
 	err = service.CreateOrUpdate(c.Client, newCluster, service.PGPrimaryServiceType)
 	if err != nil {
@@ -153,11 +160,13 @@ func (c *Controller) onAdd(obj interface{}) {
 			return
 		}
 	}
+
 	err = c.handleSecrets(newCluster)
 	if err != nil {
 		log.Errorf("handle secrets: %s", err)
 		return
 	}
+
 	err = pgcluster.Create(c.Client, newCluster)
 	if err != nil {
 		log.Errorf("create pgcluster resource: %s", err)
@@ -458,6 +467,11 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	l.statusMutex.Lock()
 	defer l.statusMutex.Unlock()
 	defer atomic.StoreInt32(l.updateSync, updateDone)
+	err = c.handleTLS(newCluster)
+	if err != nil {
+		log.Errorf("handle tls: %s", err)
+		return
+	}
 	err = version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
