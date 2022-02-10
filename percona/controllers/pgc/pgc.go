@@ -148,11 +148,6 @@ func (c *Controller) onAdd(obj interface{}) {
 		return
 	}
 
-	err = c.CreateNewInternalSecrets(newCluster.Name, newCluster.Spec.UsersSecretName, newCluster.Spec.User, newCluster.Namespace)
-	if err != nil {
-		log.Errorf("create new internal users secrets: %s", err)
-		return
-	}
 	err = service.CreateOrUpdate(c.Client, newCluster, service.PGPrimaryServiceType)
 	if err != nil {
 		log.Errorf("handle primary service on create: %s", err)
