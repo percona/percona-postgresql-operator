@@ -445,7 +445,7 @@ func (c *Controller) reconcileUsers(cluster *crv1.PerconaPGCluster) error {
 	return nil
 }
 
-// onUpdate is called when a pgcluster is updated
+// onUpdate is called when a perconapgcluster is updated
 func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	oldCluster := oldObj.(*crv1.PerconaPGCluster)
 	newCluster := newObj.(*crv1.PerconaPGCluster)
@@ -453,6 +453,10 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if reflect.DeepEqual(oldCluster.Spec, newCluster.Spec) {
 		return
 	}
+	if oldCluster.Spec.Pause && newCluster.Spec.Pause {
+		return
+	}
+
 	newCluster.CheckAndSetDefaults()
 	err := c.handleInternalSecrets(newCluster)
 	if err != nil {
