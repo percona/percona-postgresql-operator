@@ -1,4 +1,5 @@
-.. _operator-pause
+.. _operator-pause:
+
 `Pause/resume PostgreSQL Cluster <pause.html#pause>`_
 ===============================================================================
 
