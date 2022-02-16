@@ -16,12 +16,16 @@ package kubeapi
 */
 
 import (
+	"fmt"
+
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	certmgrscheme "github.com/jetstack/cert-manager/pkg/client/clientset/versioned/scheme"
+	certmanagerv1 "github.com/jetstack/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1"
 	crunchydata "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned"
 	crunchydatascheme "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/scheme"
 	crunchydatav1 "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/typed/crunchydata.com/v1"
@@ -30,6 +34,11 @@ import (
 func init() {
 	// Register all types of our clientset into the standard scheme.
 	_ = crunchydatascheme.AddToScheme(scheme.Scheme)
+	err := certmgrscheme.AddToScheme(scheme.Scheme)
+	if err != nil {
+		fmt.Println("add scheme", err)
+	}
+
 }
 
 type Interface interface {
@@ -48,6 +57,8 @@ var (
 type Client struct {
 	*rest.Config
 	*kubernetes.Clientset
+
+	CMClient *certmanagerv1.CertmanagerV1Client
 
 	crunchydataV1 *crunchydatav1.CrunchydataV1Client
 }
@@ -98,6 +109,10 @@ func NewClientForConfig(config *rest.Config) (*Client, error) {
 
 	if err == nil {
 		client.crunchydataV1, err = crunchydatav1.NewForConfig(client.Config)
+	}
+	cmclient, err := certmanagerv1.NewForConfig(config)
+	if err == nil {
+		client.CMClient = cmclient
 	}
 
 	return client, err

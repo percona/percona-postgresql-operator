@@ -1,6 +1,7 @@
 package v1
 
 import (
+	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -46,6 +47,12 @@ type PerconaPGClusterSpec struct {
 	SSLReplicationSecretName string                 `json:"sslReplicationSecretName"`
 	UpgradeOptions           *UpgradeOptions        `json:"upgradeOptions,omitempty"`
 	UsersSecretName          string                 `json:"secretsName"`
+	TLS                      *PerconaTLSSpec        `json:"tls,omitempty"`
+}
+
+type PerconaTLSSpec struct {
+	SANs       []string                `json:"SANs,omitempty"`
+	IssuerConf *cmmeta.ObjectReference `json:"issuerConf,omitempty"`
 }
 
 type PerconaPGClusterStatus struct {

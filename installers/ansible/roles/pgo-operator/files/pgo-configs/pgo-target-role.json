@@ -105,6 +105,27 @@
                 "delete",
                 "deletecollection"
             ]
+        },
+        {
+            "apiGroups": [
+                 "certmanager.k8s.io",
+                 "cert-manager.io",
+                 ""
+            ],
+            "resources": [
+                "issuers",
+                "certificates"
+            ],
+            "verbs":[
+                "get",
+                "list",
+                "watch",
+                "create",
+                "patch",
+                "update",
+                "delete",
+                "deletecollection"
+            ]
         }
     ]
 }
