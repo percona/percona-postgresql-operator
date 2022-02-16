@@ -28,7 +28,6 @@ type SecretData struct {
 	Data UserSecretData
 }
 
-const usersSecretTag = "-users"
 const annotationLastAppliedSecret = "last-applied-secret"
 
 func (c *Controller) handleSecrets(cluster *crv1.PerconaPGCluster) error {
@@ -54,7 +53,7 @@ func (c *Controller) copyClusterUsersSecrets(cluster *crv1.PerconaPGCluster) err
 		return nil
 	}
 	var usersSecret *v1.Secret
-	secretName := cluster.Spec.PGDataSource.RestoreFrom + usersSecretTag
+	secretName := cluster.Spec.PGDataSource.RestoreFrom + crv1.UsersSecretTag
 	if len(oldCluster.Spec.UsersSecretName) > 0 {
 		secretName = oldCluster.Spec.UsersSecretName
 	}
@@ -62,7 +61,7 @@ func (c *Controller) copyClusterUsersSecrets(cluster *crv1.PerconaPGCluster) err
 	if err != nil {
 		return errors.Wrapf(err, "get secret %s", secretName)
 	}
-	usersSecret.Name = cluster.Name + usersSecretTag
+	usersSecret.Name = cluster.Name + crv1.UsersSecretTag
 	if len(cluster.Spec.UsersSecretName) > 0 {
 		usersSecret.Name = cluster.Spec.UsersSecretName
 	}
@@ -78,7 +77,7 @@ func (c *Controller) copyClusterUsersSecrets(cluster *crv1.PerconaPGCluster) err
 func (c *Controller) createNewInternalSecrets(clusterName, secretName, clusterUser, namespace string) error {
 	ctx := context.TODO()
 	if len(secretName) == 0 {
-		secretName = clusterName + usersSecretTag
+		secretName = clusterName + crv1.UsersSecretTag
 	}
 	secretsData := []SecretData{}
 	usersSecret, err := c.Client.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
@@ -142,7 +141,7 @@ func (c *Controller) DeleteSecrets(cr *crv1.PerconaPGCluster) error {
 	if cr.Spec.KeepBackups || cr.Spec.KeepData {
 		return nil
 	}
-	usersSecretName := cr.Name + usersSecretTag
+	usersSecretName := cr.Name + crv1.UsersSecretTag
 	if len(cr.Spec.UsersSecretName) > 0 {
 		usersSecretName = cr.Spec.UsersSecretName
 	}
