@@ -56,8 +56,10 @@ type PerconaTLSSpec struct {
 }
 
 type PerconaPGClusterStatus struct {
-	PGCluster  PgclusterStatus
-	PGReplicas map[string]PgreplicaStatus
+	Size              int32 `json:"size"`
+	PGCluster         PgclusterStatus
+	PGReplicas        map[string]PgreplicaStatus
+	LabelSelectorPath string `json:"labelSelectorPath,omitempty"`
 }
 
 type PVCStorage struct {

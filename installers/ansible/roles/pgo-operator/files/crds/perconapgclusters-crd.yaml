@@ -33,3 +33,4 @@ spec:
       scale:
         specReplicasPath: .spec.pgReplicas.hotStandby.size
         statusReplicasPath: .status.ready
+        labelSelectorPath: .status.labelSelectorPath
