@@ -197,6 +197,8 @@ type UpgradeOptions struct {
 var PullPolicyAlways = "Always"
 var PullPolicyIfNotPresent = "IfNotPresent"
 
+const UsersSecretTag string = "-users"
+
 func (p *PerconaPGCluster) CheckAndSetDefaults() {
 	if p.Spec.PGPrimary.ImagePullPolicy == "" {
 		p.Spec.PGPrimary.ImagePullPolicy = PullPolicyIfNotPresent
@@ -221,5 +223,9 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 		if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
 			p.Spec.UpgradeOptions.VersionServiceEndpoint = "https://check.percona.com"
 		}
+	}
+
+	if p.Spec.UsersSecretName == "" {
+		p.Spec.UsersSecretName = p.Name + UsersSecretTag
 	}
 }
