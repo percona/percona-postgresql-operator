@@ -145,6 +145,7 @@ type Backup struct {
 	StorageTypes      []BackrestStorageType `json:"storageTypes"`
 	AntiAffinityType  PodAntiAffinityType   `json:"antiAffinityType"`
 	RepoPath          string                `json:"repoPath"`
+	CustomConfig      []v1.VolumeProjection `json:"customConfig"`
 }
 
 type StorageType string
