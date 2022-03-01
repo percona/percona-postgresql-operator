@@ -10,7 +10,7 @@ spec:
   namespace: pgo
   parameters:
     backrest-pitr-target: ''
-    backrest-restore-from-cluster: some-name
+    backrest-restore-cluster: some-name
     backrest-restore-opts: ''
     backrest-storage-type: s3
   status: ''

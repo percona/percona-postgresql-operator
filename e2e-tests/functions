@@ -953,7 +953,7 @@ run_restore() {
 		| yq w - 'metadata.name' "${rstr_prefix}-${cluster}" \
 		| yq w - 'spec.name' "${rstr_prefix}-${cluster}" \
 		| yq w - 'spec.namespace' "${namespace}" \
-		| yq w - 'spec.parameters.backrest-restore-from-cluster' "${cluster}" \
+		| yq w - 'spec.parameters.backrest-restore-cluster' "${cluster}" \
 		| yq w - 'spec.parameters.backrest-storage-type' "${storage}" \
 			>${tmp_dir}/restore.yml
 
