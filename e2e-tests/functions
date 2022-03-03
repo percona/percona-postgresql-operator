@@ -317,10 +317,10 @@ wait_job_completion() {
 		sleep 1
 		echo -n .
 		let retry+=1
-		if [[ $retry -ge 30 && ${mandatory} == "true" ]]; then
+		if [[ $retry -ge 90 && ${mandatory} == "true" ]]; then
 			echo max retry count $retry reached. No target object found.
 			exit 1
-		elif [[ $retry -ge 30 && ${mandatory} != "true" ]]; then
+		elif [[ $retry -ge 90 && ${mandatory} != "true" ]]; then
 			echo Can not detect job. Passing by.
 			set -o xtrace
 			return 0
