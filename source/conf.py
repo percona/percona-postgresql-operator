@@ -34,12 +34,12 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Percona Distribution for PostgreSQL Operator'
-copyright = u'Percona LLC and/or its affiliates 2009 - 2021'
+copyright = u'Percona LLC and/or its affiliates 2009 - 2022'
 
 # the short X.Y version
-version = '1.1.0'
+version = '1.2.0'
 # the full version including alpha/beta/rc tags.
-release = '1.1.0'
+release = '1.2.0'
 # the PGO recommended versions to be used in docs
 
 pmm2recommended = '2.24.0'
@@ -227,7 +227,7 @@ htmlhelp_basename = 'postgresqloperator'
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'PerconaDistributionPostgreSQLOperator.tex', u'Percona Distribution for PostgreSQL Operator',
-     u'Percona LLC and/or its affiliates 2009-2021', 'manual'),
+     u'Percona LLC and/or its affiliates 2009-2022', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -264,7 +264,7 @@ latex_elements = {
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'percona-kubernetes-operator-for-postgresql', u'Percona Distribution for PostgreSQL Operator',
-     [u'Percona LLC and/or its affiliates 2009-2021'], 1)
+     [u'Percona LLC and/or its affiliates 2009-2022'], 1)
 ]
 
 def ultimateReplace(app, docname, source):
