@@ -12,7 +12,10 @@ The Percona Distribution for PostgreSQL Operator uses Transport Layer Security
 The internal certificate is also used as an authorization method for PostgreSQL
 Replica instances.
 
-Currently, TLS security needs manual certificates generation.
+TLS security can be configured in several ways:
+
+* the Operator can generate certificates automatically at cluster creation time,
+* you can also generate certificates manually.
 
 You can also use pre-generated certificates available in the
 ``deploy/ssl-secrets.yaml`` file for test purposes, but we strongly recommend
@@ -23,10 +26,22 @@ Operator yourself, as well as how to temporarily disable it if needed.
 
 .. contents:: :local:
 
-Generate certificates for the Operator
-======================================
+.. _tls.certs.auto:
 
-To generate certificates, follow these steps:
+Allow the Operator to generate certificates automatically
+=========================================================
+
+By default, the Operator generates long-term certificates automatically and
+turns on encryption at cluster creation time, if there are no certificate
+secrets available. You do not need to perform any specific actions to make this
+work.
+
+.. _tls.certs.manual:
+
+Generate certificates manually
+==============================
+
+To generate certificates manually, follow these steps:
 
 1. Provision a :abbr:`CA (Certificate authority)` to generate TLS certificates,
 2. Generate a :abbr:`CA (Certificate authority)` key and certificate file with
@@ -135,10 +150,10 @@ Don't forget to apply changes as usual:
    $ kubectl apply -f deploy/cr.yaml
 
 Check connectivity to the cluster
----------------------------------
+=================================
 
-You can check TLS communication with use of the ``psql``, the standart
-interactive terminal-based front-end to PostgreSQL. The following command will
+You can check TLS communication with use of the ``psql``, the standard
+interactive terminal-based frontend to PostgreSQL. The following command will
 spawn a new ``pg-client`` container, which includes needed command and can be
 used for the check (use your real cluster name instead of the ``<cluster-name>``
 placeholder):
