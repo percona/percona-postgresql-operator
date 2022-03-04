@@ -149,6 +149,8 @@ Don't forget to apply changes as usual:
 
    $ kubectl apply -f deploy/cr.yaml
 
+.. _tls.connectivity.check:
+
 Check connectivity to the cluster
 =================================
 
@@ -212,6 +214,8 @@ Now you should see the prompt of PostgreSQL interactive terminal:
    psql (13.2)
    Type "help" for help.
    pgdb=>
+
+.. _tls.no.tls:
 
 Run Percona Distribution for PostgreSQL without TLS
 ===================================================
