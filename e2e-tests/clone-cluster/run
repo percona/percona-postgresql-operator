@@ -14,7 +14,7 @@ create_pgcluster_clone_from() {
 		create_user_secrets "${cluster}-clone"
 	fi
 	apply_cluster "${src_dir}/deploy/cr.yaml" "${cluster}-clone" "local" "${cluster}"
-	wait_bootstap_completeness "${cluster}-clone"
+	wait_bootstrap_completeness "${cluster}-clone"
 }
 
 main() {
