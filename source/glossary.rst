@@ -105,8 +105,6 @@ The Operator options glossary
 
       :ref:`pgPrimary.imagePullPolicy<pgprimary-imagepullpolicy>`
 
-      :ref:`pgReplicas.REPLICA_NAME.imagePullPolicy<pgreplicas-imagepullpolicy>`
-
       :ref:`pmm.imagePullPolicy<pmm-imagepullpolicy>`
 
    labels

@@ -281,8 +281,8 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``Always``                                                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `policy used to update images <https://kubernetes.io/docs/concepts/containers/images/ |
-|                 | #updating-images>`_                                                                       |
+| **Description** | The `policy used to update pgPrimary and pgReplicas images                                |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_                |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-walstorage-section:
@@ -693,8 +693,8 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``Always``                                                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `policy used to update images <https://kubernetes.io/docs/concepts/containers/images/ |
-|                 | #updating-images>`_                                                                       |
+| **Description** | The `policy used to update pgBackRest images                                              |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_                |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-pmm-section:
@@ -841,8 +841,8 @@ file contains configuration options for Percona Monitoring and Management.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``Always``                                                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `policy used to update images <https://kubernetes.io/docs/concepts/containers/images/ |
-|                 | #updating-images>`_                                                                       |
+| **Description** | The `policy used to update PMM Client images                                              |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_                |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-pgbouncer-section:
@@ -1001,8 +1001,8 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``Always``                                                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `policy used to update images <https://kubernetes.io/docs/concepts/containers/images/ |
-|                 | #updating-images>`_                                                                       |
+| **Description** | The `policy used to update pgBouncer images                                               |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_                |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-pgreplicas-section:
@@ -1246,19 +1246,6 @@ file stores information required to manage the replicas within a PostgreSQL clus
 | **Description** | Set `labels <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_ |
 |                 | for the PostgreSQL Replica Service                                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
-|                                                                                                             |
-+-----------------+-------------------------------------------------------------------------------------------+
-|                 | .. _pgreplicas-imagepullpolicy:                                                           |
-|                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.imagePullPolicy <operator.html#pgreplicas-imagepullpolicy>`_   |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Value**       | string                                                                                    |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``Always``                                                                                |
-+-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `policy used to update images <https://kubernetes.io/docs/concepts/containers/images/ |
-|                 | #updating-images>`_                                                                       |
-+-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-pgbadger-section:
 
@@ -1316,6 +1303,5 @@ file contains configuration options for the `pgBadger PostgreSQL log analyzer <h
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``Always``                                                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | The `policy used to update images <https://kubernetes.io/docs/concepts/containers/images/ |
-|                 | #updating-images>`_                                                                       |
+| **Description** | The `policy used to update pgBadger images                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
