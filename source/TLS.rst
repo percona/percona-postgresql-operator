@@ -140,8 +140,7 @@ When certificates are generated, set the following keys in the
   encrypt **external** communications,
 * ``spec.secrets.sslReplicationSecretName`` key should contain the name of the
   secret created to encrypt **internal** communications,
-* ``spec.tlsOnly`` key should be set to ``true`` if you want to disable
-  unencrypted communications.
+* ``spec.tlsOnly`` is set to ``true`` by default and enforces encryption
 
 Don't forget to apply changes as usual:
 
