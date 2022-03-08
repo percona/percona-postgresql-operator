@@ -31,4 +31,9 @@ Bugs Fixed
 * :jirabug:`K8SPG-115`: Fix the bug that caused creation a "cloned" cluster with ``pgDataSource`` to fail due to missing Secrets
 * :jirabug:`K8SPG-163`: Fix the security vulnerability `CVE-2021-40346 <https://nvd.nist.gov/vuln/detail/CVE-2021-20329>`_ by removing the unused dependency in the Operator images
 * :jirabug:`K8SPG-152`: Fix the bug that prevented deploying several operators in different namespaces in the same Kubernetes cluster
-* :jirabug:`K8SPG-116`: restore parameter backrest-restore-from-cluster is misleading
+* :jirabug:`K8SPG-116`: The ``backrest-restore-from-cluster`` parameter was renamed to ``backrest-restore-from-cluster`` in the `deploy/backup/restore.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_ file used to :ref:`restore the cluster from a previously saved backup<backups-restore>` to make the name more understandable.
+
+Deprecation and Rename/Removal
+================================================================================
+
+Restore resource has a parameter called backrest-restore-from-cluster
