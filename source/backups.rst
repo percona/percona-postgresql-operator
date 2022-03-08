@@ -284,8 +284,8 @@ configuration file. The example of the backup configuration file is
 
 The following keys are the most important in the parameters section of this file:
 
-* ``parameters.backrest-restore-from-cluster`` specifies the name of a
-  PostgreSQL cluster which will be restored. This includes stopping the database
+* ``parameters.backrest-restore-cluster`` specifies the name of a
+  PostgreSQL cluster which will be restored (this option had name ``parameters.backrest-restore-from-cluster`` before the Operator 1.2.0). This includes stopping the database
   and recreating a new primary with the restored data (for example, 
   ``cluster1``),
 * ``parameters.backrest-restore-opts`` specifies additional options for
