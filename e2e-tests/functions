@@ -317,10 +317,10 @@ wait_job_completion() {
 		sleep 1
 		echo -n .
 		let retry+=1
-		if [[ $retry -ge 30 && ${mandatory} == "true" ]]; then
+		if [[ $retry -ge 90 && ${mandatory} == "true" ]]; then
 			echo max retry count $retry reached. No target object found.
 			exit 1
-		elif [[ $retry -ge 30 && ${mandatory} != "true" ]]; then
+		elif [[ $retry -ge 90 && ${mandatory} != "true" ]]; then
 			echo Can not detect job. Passing by.
 			set -o xtrace
 			return 0
@@ -953,11 +953,11 @@ run_restore() {
 		| yq w - 'metadata.name' "${rstr_prefix}-${cluster}" \
 		| yq w - 'spec.name' "${rstr_prefix}-${cluster}" \
 		| yq w - 'spec.namespace' "${namespace}" \
-		| yq w - 'spec.parameters.backrest-restore-from-cluster' "${cluster}" \
+		| yq w - 'spec.parameters.backrest-restore-cluster' "${cluster}" \
 		| yq w - 'spec.parameters.backrest-storage-type' "${storage}" \
 			>${tmp_dir}/restore.yml
 
-	if [[ ${target_time} != "null" ]]; then
+	if [[ ${target} != "null" ]]; then
 		yq w ${tmp_dir}/restore.yml --style=single 'spec.parameters.backrest-pitr-target' "${target}" \
 			| yq w --style=single -- - 'spec.parameters.backrest-restore-opts' "--type=${type}" \
 				>${tmp_dir}/restore.pitr.yml
@@ -966,10 +966,10 @@ run_restore() {
 
 	kubectl apply -f ${tmp_dir}/restore.yml
 
-	wait_bootstap_completeness ${cluster}
+	wait_bootstrap_completeness ${cluster}
 }
 
-wait_bootstap_completeness() {
+wait_bootstrap_completeness() {
 	local cluster=$1
 
 	wait_job_completion "${cluster}-bootstrap"

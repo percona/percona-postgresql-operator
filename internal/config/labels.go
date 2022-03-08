@@ -77,6 +77,7 @@ const (
 	LABEL_BACKREST_REPO_SECRET          = "backrest-repo-config"
 	LABEL_BACKREST_COMMAND              = "backrest-command"
 	LABEL_BACKREST_RESTORE_FROM_CLUSTER = "backrest-restore-from-cluster"
+	LABEL_BACKREST_RESTORE_CLUSTER      = "backrest-restore-cluster"
 	LABEL_BACKREST_RESTORE_OPTS         = "backrest-restore-opts"
 	LABEL_BACKREST_BACKUP_OPTS          = "backrest-backup-opts"
 	LABEL_BACKREST_OPTS                 = "backrest-opts"

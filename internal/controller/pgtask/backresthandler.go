@@ -33,7 +33,9 @@ func (c *Controller) handleBackrestRestore(task *crv1.Pgtask) {
 	ctx := context.TODO()
 	namespace := task.GetNamespace()
 	clusterName := task.Spec.Parameters[config.LABEL_BACKREST_RESTORE_FROM_CLUSTER]
-
+	if len(clusterName) == 0 {
+		clusterName = task.Spec.Parameters[config.LABEL_BACKREST_RESTORE_CLUSTER]
+	}
 	cluster, err := c.Client.CrunchydataV1().Pgclusters(namespace).
 		Get(ctx, clusterName, metav1.GetOptions{})
 	if err != nil {

@@ -79,7 +79,7 @@ spec:
 #    repoPath: ""
     schedule:
       - name: "sch-backup"
-        schedule: "*/5 * * * *"
+        schedule: "*/10 * * * *"
         type: full
         storage: my-s3
   pgBouncer:
