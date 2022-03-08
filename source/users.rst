@@ -9,6 +9,41 @@ User accounts within the Cluster can be divided into two different groups:
 * *system-level users*: the accounts needed to automate the cluster deployment
   and management tasks.
 
+.. contents:: :local:
+
+.. _users.unprivileged-users:
+
+`Unprivileged users <users.html#unprivileged-users>`_
+------------------------------------------------------
+
+By default you can connect to PostgreSQL as non-privileged ``pguser`` user.
+You can login as ``postgres`` (the superuser) **to PostgreSQL Pods**, but
+PgBouncer doesn't allow ``postgres`` user access by default for security
+reasons.
+
+If you need to provide ``postgres`` (or some other user) access to PostgreSQL
+instances from the outside, you can edit the ``cluster1-pgbouncer-secret``
+`Kubernetes Secret <https://kubernetes.io/docs/concepts/configuration/secret/>`_.
+and add an additional line with the user credential to the 'users.txt' option.
+This line should follow the `PgBouncer authentication file format <https://www.pgbouncer.org/config.html#authentication-file-format>`_: 
+
+.. code:: text
+
+   "username"  "password hash"
+
+The "password hash" string consists of the following parts:
+
+* "md5" string,
+* MD5 hash of concatenated password and username.
+
+.. note:: You can generate MD5 hashsum for password with the following command,
+   substituting ``<password>`` and ``<login>`` fields with the real password and
+   login:
+
+   .. code:: bash
+   
+      $ echo "MD5"`echo -n <password><login> | md5sum`
+
 .. _users.system-users:
 
 `System Users <users.html#system-users>`_
