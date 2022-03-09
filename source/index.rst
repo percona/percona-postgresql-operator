@@ -50,6 +50,7 @@ Configuration and Management
    users
    backups
    options
+   constraints
    pause
    update
    scaling
