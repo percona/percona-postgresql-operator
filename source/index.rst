@@ -27,6 +27,8 @@ Requirements
    System-Requirements
    architecture
 
+.. _operator-install:
+
 Installation guide
 ===================
 
@@ -35,6 +37,7 @@ Installation guide
 
    kubernetes
    openshift
+   minikube
    gke
    helm
 
@@ -44,14 +47,23 @@ Configuration and Management
 .. toctree::
    :maxdepth: 1
 
+   users
    backups
-   update
+   options
    pause
+   update
+   scaling
    TLS
    monitoring
 
 .. toctree::
    :maxdepth: 1
+
+HOWTOs
+=============
+
+   standby
+
 
 Reference
 =============
@@ -61,4 +73,5 @@ Reference
 
    operator
    images
+   faq
    Release Notes <ReleaseNotes/index>

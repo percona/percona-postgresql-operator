@@ -61,7 +61,4 @@ Following CRDs are created while the Operator installation:
 * ``pgtasks`` is a general purpose CRD that accepts a type of task that is
   needed to run against a cluster (e.g. take a backup) and tracks the state of
   said task through its workflow.
-* ``pgpolicies`` stores a reference to a SQL file that can be executed against
-  a PostgreSQL cluster. In the past, this was used to manage RLS policies on
-  PostgreSQL clusters.
 

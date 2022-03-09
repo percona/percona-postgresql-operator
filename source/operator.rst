@@ -283,7 +283,20 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | This option is used to set the `policy                                                    |
 |                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_ for updating   |
-| **Description** | pgPrimary and pgReplicas images                                                           |
+|                 | pgPrimary and pgReplicas images                                                           |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-customconfig:                                                               |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.customconfig <operator.html#pgprimary-customconfig>`_                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Name of the :ref:`Custom configuration options ConfigMap <operator-configmaps>` for       |
+|                 | PostgreSQL cluster                                                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-walstorage-section:
