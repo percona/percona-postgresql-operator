@@ -9,6 +9,8 @@ User accounts within the Cluster can be divided into two different groups:
 * *system-level users*: the accounts needed to automate the cluster deployment
   and management tasks.
 
+.. contents:: :local:
+
 .. _users.system-users:
 
 `System Users <users.html#system-users>`_
@@ -65,7 +67,7 @@ it should match the following simple format:
      pgbouncer: pgbouncer_password
      postgres: postgres_password
      primaryuser: primaryuser_password
-     pguser: pguser_password
+    pguser: pguser_password
 
 The example above matches what is shipped in the `deploy/secrets.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/users-secret.yaml>`_
 file.
@@ -83,3 +85,42 @@ with the following command:
 .. code:: bash
 
    kubectl patch secret/cluster1-users -p '{"data":{"pguser": '$(echo -n new_password | base64)'}}'
+
+.. _users.unprivileged-users:
+
+`Application users <users.html#unprivileged-users>`_
+------------------------------------------------------
+
+By default you can connect to PostgreSQL as non-privileged ``pguser`` user.
+You can login as ``postgres`` (the superuser) **to PostgreSQL Pods**, but
+`pgBouncer <http://pgbouncer.github.io/>`__ (the connection pooler for
+PostgreSQL) doesn't allow ``postgres`` user access by default. That's done for
+security reasons.
+
+If you still need to provide ``postgres`` user access to PostgreSQL instances
+from the outside, you can edit the ``cluster1-pgbouncer-secret``
+`Kubernetes Secret <https://kubernetes.io/docs/concepts/configuration/secret/>`_,
+and add an additional line with the user credential to the 'users.txt' option.
+This line should follow the `PgBouncer authentication file format <https://www.pgbouncer.org/config.html#authentication-file-format>`_: 
+
+.. code:: text
+
+   "username"  "password hash"
+
+The "password hash" string consists of the following parts:
+
+* "md5" string,
+* MD5 hash of concatenated password and username.
+
+You can generate MD5 hashsum for the password with the following command,
+substituting ``<password>`` and ``<login>`` fields with the real password and
+login:
+
+.. code:: bash
+
+   $ echo "MD5"`echo -n <password><login> | md5sum`
+
+.. note:: Allowing ``postgres`` user access to the cluster is not recommended.
+   Also, the Operator will not track password changes in this case, so you
+   should maintain synchronization between PostgreSQL ``postgres`` password and
+   its MD5 hash for PgBouncer manually.
