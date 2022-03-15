@@ -26,55 +26,43 @@ for the high availability and balancing purposes.
 
 Percona Distribution for PostgreSQL Operator provides two approaches for doing this:
 
--  simple way to set anti-affinity for Pods, built-in into the Operator,
--  more advanced approach based on using standard Kubernetes
-   constraints.
+-  Pod anti-affinity,
+-  node affinity.
 
-Simple approach - use topologyKey of the Percona Distribution for PostgreSQL Operator
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Percona Distribution for PostgreSQL Operator provides a ``topologyKey`` option, which
-may have one of the following values:
-
--  ``kubernetes.io/hostname`` - Pods will avoid residing within the same
-   host,
--  ``failure-domain.beta.kubernetes.io/zone`` - Pods will avoid residing
-   within the same zone,
--  ``failure-domain.beta.kubernetes.io/region`` - Pods will avoid
-   residing within the same region,
--  ``none`` - no constraints are applied.
-
-The following example forces Percona XtraDB Cluster Pods to avoid
-occupying the same node:
-
-::
-
-   affinity:
-     topologyKey: "kubernetes.io/hostname"
-
-Advanced approach - use standard Kubernetes constraints
+Using Pod anti-affinity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Pod anti-affinity makes it possible to assign PostgreSQL instances to specific
+Kubernetes Nodes based on labels on pods that are already running on the node.
+There are two types of constraints:
 
-Previous way can be used with no special knowledge of the Kubernetes way
-of assigning Pods to specific nodes. Still in some cases more complex
-tuning may be needed. In this case ``advanced`` option placed in the
-`deploy/cr.yaml <https://github.com/percona/percona-percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
-file turns off the effect of the ``topologyKey`` and allows to use
-standard Kubernetes affinity constraints of any complexity:
+- ``preferredDuringSchedulingIgnoredDuringExecution`` Pod anti-affinity is a
+  sort of a *soft rule*. It makes Kubernetes *trying* to schedule Pods matching
+  the anti-affinity rules to different Nodes. If it is not possible, then one or
+  more Pods to the same Node.
+- ``requiredDuringSchedulingIgnoredDuringExecution`` Pod anti-affinity iis a
+  sort of a *hard rule*. It forces Kubernetes to schedule each Pod matching the
+  anti-affinity rules to different Nodes. If it is not possible, then a Pod will
+  not be scheduled at all.
 
-::
+You can set Node affinity using the ``pgReplicas.affinity.podAntiAffinity`` option
+in the ``deploy/cr.yaml`` configuration file and the standard `Kubernetes node
+affinity rules <https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity>`__.
+
+The following example implies two anti-affinity rules to Distribution for
+PostgreSQL Pods:
+
+.. code:: yaml
 
    affinity:
-      advanced:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: security
-                operator: In
-                values:
-                - S1
-            topologyKey: failure-domain.beta.kubernetes.io/zone
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: security
+              operator: In
+              values:
+              - S1
+          topologyKey: failure-domain.beta.kubernetes.io/zone
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
@@ -86,26 +74,46 @@ standard Kubernetes affinity constraints of any complexity:
                   values:
                   - S2
               topologyKey: kubernetes.io/hostname
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: kubernetes.io/e2e-az-name
-                operator: In
-                values:
-                - e2e-az1
-                - e2e-az2
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 1
-            preference:
-              matchExpressions:
-              - key: another-node-label-key
-                operator: In
-                values:
-                - another-node-label-value
+
 
 See explanation of the advanced affinity options `in Kubernetes
-documentation <https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#inter-pod-affinity-and-anti-affinity-beta-feature>`__.
+documentation <https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity>`__.
+
+Using node affinity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Node affinity makes it possible to assign PostgreSQL instances to specific
+Kubernetes Nodes (ones with specific hardware, zone, etc.).
+You can set Node affinity using the ``pgReplicas.affinity.nodeAffinity`` option
+in the ``deploy/cr.yaml`` configuration file and the standard `Kubernetes node
+affinity rules <https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/>`_.
+
+The following example forces Distribution for PostgreSQL Pods to avoid
+occupying the same node:
+
+.. code:: yaml
+
+   affinity:
+     nodeAffinity:
+       requiredDuringSchedulingIgnoredDuringExecution:
+         nodeSelectorTerms:
+         - matchExpressions:
+           - key: kubernetes.io/e2e-az-name
+             operator: In
+             values:
+             - e2e-az1
+             - e2e-az2
+       preferredDuringSchedulingIgnoredDuringExecution:
+       - weight: 1
+         preference:
+           matchExpressions:
+           - key: another-node-label-key
+             operator: In
+             values:
+             - another-node-label-value
+
+See explanation of the advanced affinity options `in Kubernetes
+documentation <https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity>`__.
 
 Tolerations
 -----------
@@ -121,7 +129,10 @@ self-explanatory ``NoSchedule``, less strict ``PreferNoSchedule``, or
 *taint* will be removed from the node, immediately or after the
 ``tolerationSeconds`` interval, like in the following example:
 
-::
+You can use ``pgPrimary.tolerations`` key in the ``deploy/cr.yaml``
+configuration file as follows:
+
+.. code:: yaml
 
    tolerations:
    - key: "node.alpha.kubernetes.io/unreachable"
@@ -133,37 +144,3 @@ The `Kubernetes Taints and
 Toleratins <https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/>`__
 contains more examples on this topic.
 
-Priority Classes
-----------------
-
-Pods may belong to some *priority classes*. This allows scheduler to
-distinguish more and less important Pods to resolve the situation when
-some higher priority Pod cannot be scheduled without evicting a lower
-priority one. This can be done adding one or more PriorityClasses in
-your Kubernetes cluster, and specifying the ``PriorityClassName`` in the
-`deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
-file:
-
-::
-
-   priorityClassName: high-priority
-
-See the `Kubernetes Pods Priority and Preemption
-documentation <https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption>`__
-to find out how to define and use priority classes in your cluster.
-
-Pod Disruption Budgets
-----------------------
-
-Creating the *Pod Disruption Budget* is the Kubernetes style to limits
-the number of Pods of an application that can go down simultaneously due
-to such *voluntary disruptions* as cluster administrator’s actions
-during the update of deployments or nodes, etc. By such a way
-Distribution Budgets allow large applications to retain their high
-availability while maintenance and other administrative activities.
-
-We recommend to apply Pod Disruption Budgets manually to avoid situation
-when Kubernetes stopped all your database Pods. See `the official
-Kubernetes
-documentation <https://kubernetes.io/docs/concepts/workloads/pods/disruptions/>`__
-for details.
