@@ -770,12 +770,21 @@ get_psql_user_pass() {
 	if [[ "x$(kubectl_bin -n ${namespace} get perconapgcluster/${cluster} -o jsonpath='{.metadata.name}')" == "x" ]]; then
 		: no cluster ${cluster} is running.
 		return 0
-	elif [[ "x$(kubectl_bin -n ${namespace} get perconapgcluster/${cluster} -o jsonpath='{.spec.secretsName}')" == "x" ]]; then
-		: assuming user secret was created by default
-		echo $(kubectl_bin -n ${namespace} get "secret/${cluster}-users-secret" -o jsonpath='{.data.'${user}'}' | base64 -d)
-	else
-		echo $(kubectl_bin -n ${namespace} get "secret/$(kubectl_bin -n ${namespace} get perconapgcluster/${cluster} -o jsonpath='{.spec.secretsName}')" -o jsonpath='{.data.'${user}'}' | base64 -d)
 	fi
+
+	case $(kubectl_bin get perconapgcluster/${cluster_name} -o jsonpath='{.metadata.labels.pgo-version}') in
+		'1.0.0' | '0.2.0')
+			echo "$(kubectl_bin -n ${namespace} get secret/${cluster_name}-${user}-secret -o jsonpath='{.data.password}' | base64 -d)"
+			;;
+		*)
+			if [[ "x$(kubectl_bin -n ${namespace} get perconapgcluster/${cluster} -o jsonpath='{.spec.secretsName}')" == "x" ]]; then
+				: assuming user secret was created by default
+				echo $(kubectl_bin -n ${namespace} get "secret/${cluster}-users-secret" -o jsonpath='{.data.'${user}'}' | base64 -d)
+			else
+				echo $(kubectl_bin -n ${namespace} get "secret/$(kubectl_bin -n ${namespace} get perconapgcluster/${cluster} -o jsonpath='{.spec.secretsName}')" -o jsonpath='{.data.'${user}'}' | base64 -d)
+			fi
+			;;
+	esac
 }
 
 wait_cluster_consistency() {
