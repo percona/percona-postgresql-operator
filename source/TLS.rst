@@ -221,7 +221,5 @@ Run Percona Distribution for PostgreSQL without TLS
 
 Omitting TLS is also possible, but we recommend that you run your cluster with
 the TLS protocol enabled.
-
-To disable TLS protocol (e.g. for demonstration purposes) set the
-``spec.tlsOnly`` key to ``false``, and and make sure that there are no
-certificate secrets configured in the ``deploy/cr.yaml`` file.
+̌
+To disable TLS protocol (e.g. for demonstration purposes) set the ``spec.tlsOnly`` key to ``false``, and make sure that there are no certificate secrets configured in the ``deploy/cr.yaml`` file.
