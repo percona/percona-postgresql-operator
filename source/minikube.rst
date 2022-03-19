@@ -28,17 +28,7 @@ minikube:
    Executing ``minikube dashboard`` will start the dashboard and open it in your
    default web browser.
 
-#. Clone the percona-postgresql-operator repository:
-
-   .. code:: bash
-
-      $ git clone -b v{{{release}}} https://github.com/percona/percona-postgresql-operator
-      $ cd percona-postgresql-operator
-
-   .. note:: It is crucial to specify the right branch with ``-b``
-      option while cloning the code on this step. Please be careful.
-
-#. The next thing to do is to add the ``pgo`` namespace to Kubernetes,
+#. The first thing to do is to add the ``pgo`` namespace to Kubernetes,
    not forgetting to set the correspondent context for further steps:
 
    .. code:: bash
@@ -60,19 +50,17 @@ minikube:
 
    .. code:: bash
 
-      $ kubectl apply -f deploy/operator.yaml
+      $ kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v{{{release}}}/deploy/operator.yaml
 
-#. Because minikube runs locally, the default ``deploy/cr.yaml`` file should
-   be edited to adapt the Operator for the the local installation with limited
-   resources. Comment **all occurrences** of the ``resources.requests.memory``
-   and ``resources.requests.cpu`` keys to fit the Operator in minikube default
-   limitations.
-
-#. Now apply the ``deploy/cr.yaml`` file with the following command:
+#. Deploy Percona Distribution for PostgreSQL:
 
    .. code:: bash
 
-      $ kubectl apply -f deploy/cr.yaml
+      $ kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v{{{release}}}/deploy/cr-minimal.yaml
+    
+   This deploys PostgreSQL on one node, because ``deploy/cr-minimal.yaml`` is
+   for minimal non-production deployment. For more configuration options please
+   see ``deploy/cr.yaml`` and :ref:`Custom Resource Options<operator.custom-resource-options>`.
 
    Creation process will take some time. The process is over when both
    operator and replica set pod have reached their Running status:
