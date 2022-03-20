@@ -68,15 +68,13 @@ minikube:
    .. code:: text
 
       $ kubectl get pods
-      NAME                                             READY   STATUS      RESTARTS      AGE
-      backrest-backup-cluster1--1-f29n8                0/1     Completed   0             46s
-      cluster1-79bcc648c5-l4mp6                        1/1     Running     0             2m13s
-      cluster1-backrest-shared-repo-76b888ff97-85bd9   1/1     Running     0             2m39s
-      cluster1-pgbouncer-74867b55f5-cxx74              1/1     Running     0             73s
-      cluster1-repl1-d4599d9fd-64cwb                   1/1     Running     0             32s
-      cluster1-repl2-67d75d4664-nnpzs                  1/1     Running     0             32s
-      pgo-deploy--1-2rxxt                              0/1     Completed   0             12m
-      postgres-operator-7df6999fbd-hfp9g               4/4     Running     1 (11m ago)   11m
+      NAME                                                    READY   STATUS      RESTARTS   AGE
+      backrest-backup-minimal-cluster-dcvkw                   0/1     Completed   0          68s
+      minimal-cluster-6dfd645d94-42xsr                        1/1     Running     0          2m5s
+      minimal-cluster-backrest-shared-repo-77bd498dfd-9msvp   1/1     Running     0          2m23s
+      minimal-cluster-pgbouncer-594bf56d-kjwrp                1/1     Running     0          84s
+      pgo-deploy-lnbv7                                        0/1     Completed   0          4m14s
+      postgres-operator-6c4c558c5-dkk8v                       4/4     Running     0          3m37s
 
    You can also track the progress via the Kubernetes dashboard:
 
