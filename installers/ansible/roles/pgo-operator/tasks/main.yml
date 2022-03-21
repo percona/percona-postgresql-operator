@@ -60,6 +60,7 @@
     - include_tasks: crds.yml
       tags:
         - install
+        - update
 
     - name: PGO Admin Credentials
       tags:
