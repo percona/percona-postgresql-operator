@@ -105,7 +105,7 @@ main() {
 
 	desc 'update operator'
 	deploy_operator '' "${src_dir}/deploy/operator.yaml" 'disabled' 'update'
-
+	kubectl_bin diff -f installers/ansible/roles/pgo-operator/files/crds/perconapgclusters-crd.yaml
 	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
 		'[
 			{"op":"replace","path":"/spec/backup/backrestRepoImage","value":'${IMAGE_BACKREST_REPO}'},

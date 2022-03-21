@@ -48,6 +48,8 @@ RUN set -ex; \
         openssl; \
     microdnf  -y clean all
 
+RUN pip3 install kubernetes
+
 RUN curl -o /usr/bin/kubectl \
         https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl; \
     chmod +x /usr/bin/kubectl; \

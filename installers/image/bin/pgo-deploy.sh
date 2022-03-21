@@ -13,6 +13,8 @@
 
 export DEPLOY_ACTION=${DEPLOY_ACTION:-install}
 
+ansible-galaxy collection install community.kubernetes
+
 /usr/bin/env ansible-playbook \
     -i "/ansible/${PLAYBOOK:-postgres-operator}/inventory.yaml" \
     --extra-vars "kubernetes_in_cluster=true" \
