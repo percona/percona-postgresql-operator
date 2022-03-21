@@ -25,6 +25,12 @@ The Operator options glossary
 
       :ref:`pgReplicas.REPLICA_NAME.annotations<pgreplicas-annotations>`
 
+   apply
+
+     ..
+
+      :ref:`upgradeOptions.apply<upgradeoptions-apply>`
+
    backrestRepoImage
 
      ..
@@ -41,9 +47,17 @@ The Operator options glossary
 
      ..
 
+      :ref:`backup.resources.limits.cpu<backup-resources-limits-cpu>`
+
+      :ref:`backup.resources.requests.cpu<backup-resources-requests-cpu>`
+
       :ref:`pgBouncer.resources.limits.cpu<pgbouncer-resources-limits-cpu>`
 
       :ref:`pgBouncer.resources.requests.cpu<pgbouncer-resources-requests-cpu>`
+
+      :ref:`pgPrimary.resources.limits.cpu<pgprimary-resources-limits-cpu>`
+
+      :ref:`pgPrimary.resources.requests.cpu<pgprimary-resources-requests-cpu>`
 
       :ref:`pgReplicas.REPLICA_NAME.resources.limits.cpu<pgreplicas-resources-limits-cpu>`
 
@@ -135,6 +149,10 @@ The Operator options glossary
 
       :ref:`pgBouncer.resources.requests.memory<pgbouncer-resources-requests-memory>`
 
+      :ref:`pgPrimary.resources.limits.memory<pgprimary-resources-limits-memory>`
+
+      :ref:`pgPrimary.resources.requests.memory<pgprimary-resources-requests-memory>`
+
       :ref:`pgReplicas.REPLICA_NAME.resources.limits.memory<pgreplicas-resources-limits-memory>`
 
       :ref:`pgReplicas.REPLICA_NAME.resources.requests.memory<pgreplicas-resources-requests-memory>`
@@ -178,6 +196,12 @@ The Operator options glossary
      ..
 
       :ref:`pgDataSource.restoreOpts<pgdatasource-restoreopts>`
+
+   schedule
+
+     ..
+
+      :ref:`upgradeOptions.schedule<upgradeoptions-schedule>`
 
    serverHost
 
@@ -243,6 +267,12 @@ The Operator options glossary
 
       :ref:`backup.storageTypes<backup-storagetypes>`
 
+   tolerations
+
+     ..
+
+      :ref:`pgPrimary.tolerations<pgprimary-tolerations>`
+
    type
 
      ..
@@ -260,3 +290,9 @@ The Operator options glossary
      ..
 
       :ref:`backup.storages.STORAGE_NAME.verifyTLS<backup-storages-verifytls>`
+
+   versionServiceEndpoint
+
+     ..
+
+      :ref:`upgradeOptions.versionServiceEndpoint<upgradeoptions-versionserviceendpoint>`
