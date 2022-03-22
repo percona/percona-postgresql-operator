@@ -1,4 +1,4 @@
-# Contributing to Percona Distribution for PostgreSQL Operator
+# Contributing to Percona Operator for PostgreSQL
 
 ## Prerequisites
 

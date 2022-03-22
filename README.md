@@ -1,10 +1,10 @@
-# Percona Distribution for PostgreSQL Operator
+# Percona Operator for PostgreSQL
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## Introduction
 
-Percona Distribution for PostgreSQL Operator automates and simplifies deploying and managing open source PostgreSQL clusters on Kubernetes. Percona Distribution for PostgreSQL Operator is based on [Postgres Operator](https://crunchydata.github.io/postgres-operator/latest/) developed by Crunchy Data.
+Percona Operator for PostgreSQL automates and simplifies deploying and managing open source PostgreSQL clusters on Kubernetes. Percona Operator for PostgreSQL is based on [Postgres Operator](https://crunchydata.github.io/postgres-operator/latest/) developed by Crunchy Data.
 
 Whether you need to get a simple PostgreSQL cluster up and running, need to deploy a high availability, fault tolerant cluster in production, or are running your own database-as-a-service, the Operator provides the essential features you need to keep your clusters healthy:
 
@@ -142,9 +142,9 @@ See full installation instructions with examples and various advanced cases on [
 
 ## Design overview
 
-![Percona Distribution for PostgreSQL Operator](operator.svg)
+![Percona Operator for PostgreSQL](operator.svg)
 
-PostgreSQL containers deployed with Percona Distribution for PostgreSQL Operator include the following components:
+PostgreSQL containers deployed with Percona Operator for PostgreSQL include the following components:
 
 * [PostgreSQL](https://www.postgresql.org/)
   * [PostgreSQL Contrib Modules](https://www.postgresql.org/docs/current/contrib.html)
@@ -157,7 +157,7 @@ PostgreSQL containers deployed with Percona Distribution for PostgreSQL Operator
 * [pg_stat_monitor](https://github.com/percona/pg_stat_monitor/)
 * LLVM (for JIT compilation)
 
-Percona Distribution for PostgreSQL Operator Monitoring involves the following components:
+Percona Operator for PostgreSQL Monitoring involves the following components:
 
 * [pmm-server](https://www.percona.com/doc/percona-monitoring-and-management/2.x/details/architecture.html#pmm-server)
 * [pmm-client](https://www.percona.com/doc/percona-monitoring-and-management/2.x/details/architecture.html#pmm-client)
