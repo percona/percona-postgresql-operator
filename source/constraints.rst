@@ -5,7 +5,7 @@ The operator does good job automatically assigning new Pods to nodes
 with sufficient resources to achieve balanced distribution across the cluster.
 Still there are situations when it is worth to ensure that pods will land
 on specific nodes: for example, to get speed advantages of the SSD
-equipped machine, or to reduce costs choosing nodes in a same
+equipped machine, or to reduce network costs choosing nodes in a same
 availability zone.
 
 Appropriate sections of the
