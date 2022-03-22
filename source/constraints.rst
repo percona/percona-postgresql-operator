@@ -36,7 +36,7 @@ values:
   Kubernetes to schedule each Pod matching the anti-affinity rules to different
   Nodes. If it is not possible, then a Pod will not be scheduled at all.
 
-The following anti-affinity rules are applied to all Distribution for PostgreSQL
+The following anti-affinity rules are applied to all Percona Distribution for PostgreSQL
 Pods:
 
 .. code:: yaml
