@@ -2,7 +2,7 @@ Binding Percona Distribution for PostgreSQL components to Specific Kubernetes/Op
 =============================================================================================
 
 The operator does good job automatically assigning new Pods to nodes
-with sufficient to achieve balanced distribution across the cluster.
+with sufficient resources to achieve balanced distribution across the cluster.
 Still there are situations when it worth to ensure that pods will land
 on specific nodes: for example, to get speed advantages of the SSD
 equipped machine, or to reduce costs choosing nodes in a same
