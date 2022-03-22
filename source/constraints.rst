@@ -66,7 +66,7 @@ documentation <https://kubernetes.io/docs/concepts/scheduling-eviction/assign-po
 .. note:: Setting ``required`` anti-affinity type will result in placing all
    Pods on separate nodes, so default configuration **will require 7 Kubernetes nodes**
    to deploy the cluster with separate nodes assigned to one PostgreSQL primary,
-   three PostgreSQL replica instances, and three pgBouncer Pods.
+   two PostgreSQL replica instances, three pgBouncer and one pgBackrest Pod.
 
 Tolerations
 -----------
