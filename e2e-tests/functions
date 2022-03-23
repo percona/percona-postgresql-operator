@@ -636,7 +636,7 @@ enable_pgBouncer() {
 		--type json \
 		-p='[{"op":"replace","path":"/spec/pgBouncer/size","value":'${replicas_num}'}]'
 	sleep 15
-	kubectl_bin wait --for=condition=Available "deployment/${cluster}-pgbouncer"
+	kubectl_bin wait --timeout=300s --for=condition=Available "deployment/${cluster}-pgbouncer"
 }
 
 disable_pgBouncer() {
@@ -644,7 +644,7 @@ disable_pgBouncer() {
 		"perconapgcluster/${1}" \
 		--type json \
 		-p='[{"op":"replace","path":"/spec/pgBouncer/size","value":0}]'
-	kubectl_bin wait --for=delete "deployment/${1}-pgbouncer"
+	kubectl_bin wait --timeout=300s --for=delete "deployment/${1}-pgbouncer"
 }
 
 compare_kubectl() {
