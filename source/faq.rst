@@ -31,3 +31,22 @@ The best place to discuss Percona Distribution for PostgreSQL Operator
 with developers and other community members is the `community forum <https://forums.percona.com/c/postgresql/percona-kubernetes-operator-for-postgresql/68>`_.
 
 If you would like to report a bug, use the `Percona Distribution for MySQL Operator project in JIRA <https://jira.percona.com/projects/K8SPG>`_.
+
+.. _faq-pgBadger:
+
+How can I analyze PostgreSQL logs with pgBadger?
+================================================================================
+
+`pgBadger <https://pgbadger.darold.net/>`_ is a report generator for PostgreSQL,
+which can analyze PostgreSQL logs and provide you web-based representation with
+charts and various statistics. You can configure it via the 
+:ref:`pgBadger Section<operator-pgbadger-section>` in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
+file. The most important option there is :ref:`pgBadger.enabled<operator.html#pgbadger-enabled>`,
+which is off by default. When enabled, a separate pgBadger sidecar container
+with a specialized HTTP server is added to each PostgreSQL Pod. 
+
+You can generate the log report and access it through an exposed port (10000 by
+default) and an ``/api/badgergenerate`` endpoint: 
+``http://<Pod-address>:10000/api/badgergenerate``. Also, this report
+is available in the appropriate pgBadger container as a ``/report/index.html``
+file.
