@@ -161,7 +161,12 @@ main() {
 			{"op":"add","path":"/spec/sslCA","value":'"'${cluster}-ssl-ca'"'},
 			{"op":"add","path":"/spec/sslSecretName","value":'"'${cluster}-ssl-keypair'"'},
 			{"op":"add","path":"/spec/sslReplicationSecretName","value":'"'${cluster}-ssl-keypair'"'},
+			{"op":"add","path":"/spec/pgBouncer/tlsSecret","value":'"'${cluster}-ssl-keypair'"'},
 		]'
+
+	disable_pgBouncer ${cluster}
+	enable_pgBouncer ${cluster}
+
 	#	wait_cluster_consistency "${cluster}"
 	#	wait_deployment "${cluster}"
 	#	wait_deployment "${cluster}-pgbouncer"
