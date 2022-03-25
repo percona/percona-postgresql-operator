@@ -285,6 +285,91 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 |                 | PostgreSQL cluster                                                                        |
 +-----------------+-------------------------------------------------------------------------------------------+
 
+.. _operator-tablespacestorages-section:
+
+`Tablespaces Storage Section <operator.html#operator-walstorage-section>`_
+--------------------------------------------------------------------------------
+
+The ``tablespaceStorages`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
+file contains configuration options for PostgreSQL `Tablespace <https://www.postgresql.org/docs/current/manage-ag-tablespaces.html>`_.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-size:                                                   |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.size                                        |
+|                 | <operator.html#tablespacestorages-volumespec-size>`_                                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``1G``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
+|                 | persistentvolumeclaims>`_ size for the PostgreSQL Tablespaces storage                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-accessmode:                                             |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.accessmode                                  |
+|                 | <operator.html#tablespacestorages-volumespec-accessmode>`_                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``ReadWriteOnce``                                                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
+|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL Tablespaces storage            |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-storagetype:                                            |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.storagetype                                 |
+|                 | <operator.html#tablespacestorages-volumespec-storagetype>`_                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``dynamic``                                                                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Type of the PostgreSQL Tablespaces storage provisioning: ``create`` (the default          |
+|                 | variant; used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a       |
+|                 | dynamic storage provisioner, e.g. via a StorageClass)                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-storageclass:                                           |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.storageclass                                |
+|                 | <operator.html#tablespacestorages-storageclass>`_                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Optionally sets the `Kubernetes storage class                                             |
+|                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
+|                 | PostgreSQL Tablespaces storage `PersistentVolumeClaim                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-matchlabels:                                            |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.matchLabels                                 |
+|                 | <operator.html#tablespacestorages-volumespec-matchlabels>`_                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | A PostgreSQL Tablespaces storage `label selector                                          |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__             |
++-----------------+-------------------------------------------------------------------------------------------+
+
 .. _operator-walstorage-section:
 
 `Write-ahead Log Storage Section <operator.html#operator-walstorage-section>`_
