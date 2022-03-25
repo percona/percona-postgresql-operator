@@ -635,7 +635,7 @@ enable_pgBouncer() {
 		"perconapgcluster/${cluster_name}" \
 		--type json \
 		-p='[{"op":"replace","path":"/spec/pgBouncer/size","value":'${replicas_num}'}]'
-	sleep 15
+	sleep 60
 	kubectl_bin wait --timeout=300s --for=condition=Available "deployment/${cluster}-pgbouncer"
 }
 
