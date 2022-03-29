@@ -3,7 +3,7 @@
 Transport Layer Security (TLS)
 ******************************
 
-The Percona Distribution for PostgreSQL Operator uses Transport Layer Security
+The |operator| uses Transport Layer Security
 (TLS) cryptographic protocol for the following types of communication:
 
 * Internal - communication between PostgreSQL instances in the cluster

@@ -59,6 +59,8 @@ primary_domain = 'psdom'
 pygments_style = 'sphinx'
 
 rst_prolog = '''
+.. |operator|  replace:: Percona Operator for PostgreSQL
+
 .. |check|  replace:: ``|[[---CHECK---]]|``
 
 .. |xtrabackup|  replace:: :program:`xtrabackup`

@@ -20,17 +20,17 @@ benefits brought by Kubernetes to databases in `this blog post <https://www.perc
 
 The architecture of state-centric applications (like databases) should be
 composed in a right way to avoid crashes, data loss, or data inconsistencies
-during hardware failure. Percona Distribution for PostgreSQL Operator
+during hardware failure. |operator|
 provides out-of-the-box functionality to automate provisioning and management of
 highly available PostgreSQL database clusters on Kubernetes.
 
 How can I contact the developers?
 ================================================================================
 
-The best place to discuss Percona Distribution for PostgreSQL Operator
+The best place to discuss |operator|
 with developers and other community members is the `community forum <https://forums.percona.com/c/postgresql/percona-kubernetes-operator-for-postgresql/68>`_.
 
-If you would like to report a bug, use the `Percona Distribution for MySQL Operator project in JIRA <https://jira.percona.com/projects/K8SPG>`_.
+If you would like to report a bug, use the |operator| `project in JIRA <https://jira.percona.com/projects/K8SPG>`_.
 
 .. _faq-pgBadger:
 

@@ -1,9 +1,9 @@
 .. _operator-updates:
 
-Update Percona Distribution for PostgreSQL Operator
-===================================================
+Update |operator|
+================================================================================
 
-Percona Distribution for PostgreSQL Operator allows upgrades to newer versions.
+|operator| allows upgrades to newer versions.
 This includes upgrades of the Operator itself, and upgrades of the Percona
 Distribution for PostgreSQL.
 
