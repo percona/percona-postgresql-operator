@@ -28,17 +28,7 @@ minikube:
    Executing ``minikube dashboard`` will start the dashboard and open it in your
    default web browser.
 
-#. Clone the percona-postgresql-operator repository:
-
-   .. code:: bash
-
-      $ git clone -b v{{{release}}} https://github.com/percona/percona-postgresql-operator
-      $ cd percona-postgresql-operator
-
-   .. note:: It is crucial to specify the right branch with ``-b``
-      option while cloning the code on this step. Please be careful.
-
-#. The next thing to do is to add the ``pgo`` namespace to Kubernetes,
+#. The first thing to do is to add the ``pgo`` namespace to Kubernetes,
    not forgetting to set the correspondent context for further steps:
 
    .. code:: bash
@@ -60,19 +50,17 @@ minikube:
 
    .. code:: bash
 
-      $ kubectl apply -f deploy/operator.yaml
+      $ kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v{{{release}}}/deploy/operator.yaml
 
-#. Because minikube runs locally, the default ``deploy/cr.yaml`` file should
-   be edited to adapt the Operator for the the local installation with limited
-   resources. Comment **all occurrences** of the ``resources.requests.memory``
-   and ``resources.requests.cpu`` keys to fit the Operator in minikube default
-   limitations.
-
-#. Now apply the ``deploy/cr.yaml`` file with the following command:
+#. Deploy Percona Distribution for PostgreSQL:
 
    .. code:: bash
 
-      $ kubectl apply -f deploy/cr.yaml
+      $ kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v{{{release}}}/deploy/cr-minimal.yaml
+    
+   This deploys PostgreSQL on one node, because ``deploy/cr-minimal.yaml`` is
+   for minimal non-production deployment. For more configuration options please
+   see ``deploy/cr.yaml`` and :ref:`Custom Resource Options<operator.custom-resource-options>`.
 
    Creation process will take some time. The process is over when both
    operator and replica set pod have reached their Running status:
@@ -80,15 +68,13 @@ minikube:
    .. code:: text
 
       $ kubectl get pods
-      NAME                                             READY   STATUS      RESTARTS      AGE
-      backrest-backup-cluster1--1-f29n8                0/1     Completed   0             46s
-      cluster1-79bcc648c5-l4mp6                        1/1     Running     0             2m13s
-      cluster1-backrest-shared-repo-76b888ff97-85bd9   1/1     Running     0             2m39s
-      cluster1-pgbouncer-74867b55f5-cxx74              1/1     Running     0             73s
-      cluster1-repl1-d4599d9fd-64cwb                   1/1     Running     0             32s
-      cluster1-repl2-67d75d4664-nnpzs                  1/1     Running     0             32s
-      pgo-deploy--1-2rxxt                              0/1     Completed   0             12m
-      postgres-operator-7df6999fbd-hfp9g               4/4     Running     1 (11m ago)   11m
+      NAME                                                    READY   STATUS      RESTARTS   AGE
+      backrest-backup-minimal-cluster-dcvkw                   0/1     Completed   0          68s
+      minimal-cluster-6dfd645d94-42xsr                        1/1     Running     0          2m5s
+      minimal-cluster-backrest-shared-repo-77bd498dfd-9msvp   1/1     Running     0          2m23s
+      minimal-cluster-pgbouncer-594bf56d-kjwrp                1/1     Running     0          84s
+      pgo-deploy-lnbv7                                        0/1     Completed   0          4m14s
+      postgres-operator-6c4c558c5-dkk8v                       4/4     Running     0          3m37s
 
    You can also track the progress via the Kubernetes dashboard:
 
