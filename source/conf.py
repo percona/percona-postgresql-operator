@@ -33,7 +33,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Percona Distribution for PostgreSQL Operator'
+project = u'Percona Operator for PostgreSQL'
 copyright = u'Percona LLC and/or its affiliates 2009 - 2022'
 
 # the short X.Y version
@@ -152,10 +152,10 @@ html_theme_path = ['.', './percona-theme']
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = 'Percona Distribution for PostgreSQL Operator Documentation'
+html_title = 'Percona Operator for PostgreSQL Documentation'
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-html_short_title = 'Percona Distribution for PostgreSQL Operator Documentation'
+html_short_title = 'Percona Operator for PostgreSQL Documentation'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -228,7 +228,7 @@ htmlhelp_basename = 'postgresqloperator'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'PerconaDistributionPostgreSQLOperator.tex', u'Percona Distribution for PostgreSQL Operator',
+  ('index', 'PerconaOperatorPostgreSQL'+release+'.tex', u'Percona Operator for PostgreSQL',
      u'Percona LLC and/or its affiliates 2009-2022', 'manual'),
 ]
 
@@ -265,7 +265,7 @@ latex_elements = {
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'percona-kubernetes-operator-for-postgresql', u'Percona Distribution for PostgreSQL Operator',
+    ('index', 'percona-kubernetes-operator-for-postgresql', u'Percona Operator for PostgreSQL',
      [u'Percona LLC and/or its affiliates 2009-2022'], 1)
 ]
 
