@@ -11,7 +11,7 @@ spec:
 #  sslReplicationSecretName: cluster1-ssl-keypair
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
-    apply: disabled
+    apply: 14-recommended
     schedule: "0 4 * * *"
   database: pgdb
   port: "5432"
@@ -47,7 +47,11 @@ spec:
 #    imagePullPolicy: Always
     resources:
       requests:
-        memory: "128Mi"
+        cpu: 500m
+        memory: "256Mi"
+#      limits:
+#        cpu: 500m
+#        memory: "256Mi"
     tolerations: []
     volumeSpec:
       size: 1G
@@ -83,6 +87,7 @@ spec:
     backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest-repo
     resources:
       requests:
+        cpu: "200m"
         memory: "48Mi"
 #      limits:
 #        cpu: "1"
@@ -112,9 +117,9 @@ spec:
       requests:
         cpu: "1"
         memory: "128Mi"
-      limits:
-        cpu: "2"
-        memory: "512Mi"
+#      limits:
+#        cpu: "2"
+#        memory: "512Mi"
     expose:
       serviceType: ClusterIP
 #      loadBalancerSourceRanges:
@@ -127,11 +132,11 @@ spec:
       size: 2
       resources:
         requests:
-#          cpu: "1"
-          memory: "128Mi"
+          cpu: "500m"
+          memory: "256Mi"
 #        limits:
-#          cpu: "1"
-#          memory: "128Mi"
+#          cpu: "500m"
+#          memory: "256Mi"
       volumeSpec:
         accessmode: ReadWriteOnce
         size: 1G
