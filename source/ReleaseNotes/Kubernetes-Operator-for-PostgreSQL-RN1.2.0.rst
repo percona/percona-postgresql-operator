@@ -1,7 +1,7 @@
 .. _K8SPG-1.2.0:
 
 ================================================================================
-*Percona Kubernetes Operator for PostgreSQL* 1.2.0
+*Percona Operator for PostgreSQL* 1.2.0
 ================================================================================
 
 :Date: March 21, 2022
@@ -10,6 +10,7 @@
 Release Highlights
 ================================================================================
 
+* With this release, the Operator turns to a simplified naming convention and changes its official name to **Percona Operator for PostgreSQL**
 * Starting from this release, the Operator :ref:`automatically generates<tls.certs.auto>` TLS certificates and turns on encryption by default at cluster creation time. This includes both external certificates which allow user to connect to pgBouncer and PostgreSQL via encrypted channel, and internal ones used for communication between PostgreSQL cluster nodes
 * Various cleanups in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__ configuration file simplify the deployment of the cluster making no need in going into YAML manifests and tuning them
 
