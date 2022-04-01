@@ -67,19 +67,45 @@ You can set additional namespace to be watched by the Operator as follows:
 
       $ kubectl delete -f ./deploy/operator.yaml
 
-#. Make two changes in the ``deploy/operator.yaml`` file. Find the ``namespace``
-   key (it is set to ``"pgo"`` by default) and append your new namespace to it
-   in a comma-separated list. Also find the element named ``DEPLOY_ACTION`` in
-   the ``env`` subsection and change the value from ``install`` to ``update``:
+#. Make changes in the ``deploy/operator.yaml`` file:
 
-   .. code:: bash
+   * Find the ``pgo-deployer-cm`` ConfigMap. It contains the ``values.yaml``
+     configuration file. Find the ``namespace`` key in this file (it is set to
+     ``"pgo"`` by default) and append your additional namespace to it in a
+     comma-separated list.
+     
+     .. code:: bash
 
-      ...
-      namespace: "pgo,myadditionalnamespace"
-      ...
-      env:
-       - name: DEPLOY_ACTION
-         value: update
+        ...
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: pgo-deployer-cm
+        data:
+          values.yaml: |-
+            ...
+            namespace: "pgo,myadditionalnamespace"
+            ...
+
+   * Find the ``pgo-deploy`` container template in the ``pgo-deploy`` job spec.
+     It has ``env`` element named ``DEPLOY_ACTION``, which you should change
+     from ``install`` to ``update``:
+
+     .. code:: bash
+
+        ...
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+        name: pgo-deploy
+        ...
+            containers:
+              - name: pgo-deploy
+              ...
+              env:
+                - name: DEPLOY_ACTION
+                  value: update
+                  ...
 
 #. Now apply your changes as usual:
 
