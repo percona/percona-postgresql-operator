@@ -50,3 +50,43 @@ default) and an ``/api/badgergenerate`` endpoint:
 ``http://<Pod-address>:10000/api/badgergenerate``. Also, this report
 is available in the appropriate pgBadger container as a ``/report/index.html``
 file.
+
+.. _faq-namespaces:
+
+How can I set the Operator to control PostgreSQL in several namespaces?
+================================================================================
+
+Sometimes it is convenient to have one Operator watching for PostgreSQL Cluster
+custom resources in several namespaces.
+
+You can set additional namespace to be watched by the Operator as follows:
+
+#. First of all clean up the installer artefacts:
+
+   .. code:: bash
+
+      $ kubectl delete -f ./deploy/operator.yaml
+
+#. Make two changes in the ``deploy/operator.yaml`` file. Find the ``namespace``
+   key (it is set to ``"pgo"`` by default) and append your new namespace to it
+   in a comma-separated list. Also find the element named ``DEPLOY_ACTION`` in
+   the ``env`` subsection and change the value from ``install`` to ``update``:
+
+   .. code:: bash
+
+      ...
+      namespace: "pgo,myadditionalnamespace"
+      ...
+      env:
+       - name: DEPLOY_ACTION
+         value: update
+
+#. Now apply your changes as usual:
+
+   .. code:: bash
+
+      $ kubectl apply -f ./deploy/operator.yaml
+
+   .. note:: You need to perform cleanup between each ``DEPLOY_ACTION``
+      activity, which can be either ``install``, ``update``, or ``uninstall``.
+
