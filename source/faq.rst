@@ -65,7 +65,7 @@ You can set additional namespace to be watched by the Operator as follows:
 
    .. code:: bash
 
-      $ kubectl delete -f ./deploy/operator.yaml
+      $ kubectl delete -f deploy/operator.yaml
 
 #. Make changes in the ``deploy/operator.yaml`` file:
 
@@ -111,7 +111,7 @@ You can set additional namespace to be watched by the Operator as follows:
 
    .. code:: bash
 
-      $ kubectl apply -f ./deploy/operator.yaml
+      $ kubectl apply -f deploy/operator.yaml
 
    .. note:: You need to perform cleanup between each ``DEPLOY_ACTION``
       activity, which can be either ``install``, ``update``, or ``uninstall``.
