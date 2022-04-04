@@ -61,7 +61,7 @@ custom resources in several namespaces.
 
 You can set additional namespace to be watched by the Operator as follows:
 
-#. First of all clean up the installer artefacts:
+#. First of all clean up the installer artifacts:
 
    .. code:: bash
 
