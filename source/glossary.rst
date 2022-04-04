@@ -13,6 +13,8 @@ The Operator options glossary
 
       :ref:`pgReplicas.REPLICA_NAME.volumeSpec.accessmode<pgreplicas-volumespec-accessmode>`
 
+      :ref:`tablespaceStorages.STORAGE_NAME.volumeSpec.accessmode<tablespacestorages-volumespec-accessmode>`
+
       :ref:`walStorage.volumeSpec.accessmode<walstorage-volumespec-accessmode>`
 
    annotations
@@ -135,6 +137,8 @@ The Operator options glossary
 
       :ref:`pgReplicas.REPLICA_NAME.volumeSpec.matchLabels<pgreplicas-volumespec-matchlabels>`
 
+      :ref:`tablespaceStorages.STORAGE_NAME.volumeSpec.matchLabels<tablespacestorages-volumespec-matchlabels>`
+
       :ref:`walStorage.volumeSpec.matchLabels<walstorage-volumespec-matchlabels>`
 
    memory
@@ -235,6 +239,8 @@ The Operator options glossary
 
       :ref:`pgReplicas.REPLICA_NAME.volumeSpec.size<pgreplicas-volumespec-size>`
 
+      :ref:`tablespaceStorages.STORAGE_NAME.volumeSpec.size<tablespacestorages-volumespec-size>`
+
       :ref:`walStorage.volumeSpec.size<walstorage-volumespec-size>`
 
    storageclass
@@ -247,6 +253,8 @@ The Operator options glossary
 
       :ref:`pgReplicas.REPLICA_NAME.volumeSpec.storageclass<pgreplicas-volumespec-storageclass>`
 
+      :ref:`tablespaceStorages.STORAGE_NAME.volumeSpec.storageclass<tablespacestorages-volumespec-storageclass>`
+
       :ref:`walStorage.volumeSpec.storageclass<walstorage-volumespec-storageclass>`
 
    storagetype
@@ -258,6 +266,8 @@ The Operator options glossary
       :ref:`pgPrimary.volumeSpec.storagetype<pgprimary-volumespec-storagetype>`
 
       :ref:`pgReplicas.REPLICA_NAME.volumeSpec.storagetype<pgreplicas-volumespec-storagetype>`
+
+      :ref:`tablespaceStorages.STORAGE_NAME.volumeSpec.storagetype<tablespacestorages-volumespec-storagetype>`
 
       :ref:`walStorage.volumeSpec.storagetype<walstorage-volumespec-storagetype>`
 
