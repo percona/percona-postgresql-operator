@@ -50,3 +50,69 @@ default) and an ``/api/badgergenerate`` endpoint:
 ``http://<Pod-address>:10000/api/badgergenerate``. Also, this report
 is available in the appropriate pgBadger container as a ``/report/index.html``
 file.
+
+.. _faq-namespaces:
+
+How can I set the Operator to control PostgreSQL in several namespaces?
+================================================================================
+
+Sometimes it is convenient to have one Operator watching for PostgreSQL Cluster
+custom resources in several namespaces.
+
+You can set additional namespace to be watched by the Operator as follows:
+
+#. First of all clean up the installer artifacts:
+
+   .. code:: bash
+
+      $ kubectl delete -f deploy/operator.yaml
+
+#. Make changes in the ``deploy/operator.yaml`` file:
+
+   * Find the ``pgo-deployer-cm`` ConfigMap. It contains the ``values.yaml``
+     configuration file. Find the ``namespace`` key in this file (it is set to
+     ``"pgo"`` by default) and append your additional namespace to it in a
+     comma-separated list.
+     
+     .. code:: bash
+
+        ...
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: pgo-deployer-cm
+        data:
+          values.yaml: |-
+            ...
+            namespace: "pgo,myadditionalnamespace"
+            ...
+
+   * Find the ``pgo-deploy`` container template in the ``pgo-deploy`` job spec.
+     It has ``env`` element named ``DEPLOY_ACTION``, which you should change
+     from ``install`` to ``update``:
+
+     .. code:: bash
+
+        ...
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+        name: pgo-deploy
+        ...
+            containers:
+              - name: pgo-deploy
+              ...
+              env:
+                - name: DEPLOY_ACTION
+                  value: update
+                  ...
+
+#. Now apply your changes as usual:
+
+   .. code:: bash
+
+      $ kubectl apply -f deploy/operator.yaml
+
+   .. note:: You need to perform cleanup between each ``DEPLOY_ACTION``
+      activity, which can be either ``install``, ``update``, or ``uninstall``.
+
