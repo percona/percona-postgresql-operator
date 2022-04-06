@@ -3,24 +3,25 @@ kind: Deployment
 metadata:
   annotations:
     deployment.kubernetes.io/revision: "1"
-  generation: 1
+  generation: 2
   labels:
     crunchy-pgha-scope: some-name
-    deployment-name: some-name-repl2
-    name: some-name-replica
+    deployment-name: some-name
+    name: some-name
     pg-cluster: some-name
     pgo-pg-database: "true"
     pgo-version: 1.2.0
-    service-name: some-name-replica
+    pgouser: admin
+    service-name: some-name
     vendor: crunchydata
-  name: some-name-repl2
+  name: some-name
 spec:
   progressDeadlineSeconds: 600
   replicas: 1
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      deployment-name: some-name-repl2
+      deployment-name: some-name
       pg-cluster: some-name
       pgo-pg-database: "true"
       vendor: crunchydata
@@ -36,12 +37,13 @@ spec:
         keep-data: "false"
       labels:
         crunchy-pgha-scope: some-name
-        deployment-name: some-name-repl2
-        name: some-name-replica
+        deployment-name: some-name
+        name: some-name
         pg-cluster: some-name
         pg-pod-anti-affinity: preferred
         pgo-pg-database: "true"
         pgo-version: 1.2.0
+        pgouser: admin
         vendor: crunchydata
     spec:
       affinity:
@@ -70,8 +72,13 @@ spec:
               value: "5432"
             - name: PGHA_USER
               value: postgres
+            - name: PGHA_INIT
+              valueFrom:
+                configMapKeyRef:
+                  key: init
+                  name: some-name-pgha-config
             - name: PATRONI_POSTGRESQL_DATA_DIR
-              value: /pgdata/some-name-repl2
+              value: /pgdata/some-name
             - name: PGBACKREST_STANZA
               value: db
             - name: PGBACKREST_REPO1_HOST
@@ -83,7 +90,7 @@ spec:
             - name: PGBACKREST_REPO1_PATH
               value: /backrestrepo/some-name-backrest-shared-repo
             - name: PGBACKREST_DB_PATH
-              value: /pgdata/some-name-repl2
+              value: /pgdata/some-name
             - name: ENABLE_SSHD
               value: "true"
             - name: PGBACKREST_LOG_PATH
@@ -135,7 +142,7 @@ spec:
               value: /tmp/nss_wrapper/postgres/passwd
             - name: NSS_WRAPPER_GROUP
               value: /tmp/nss_wrapper/postgres/group
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           livenessProbe:
             exec:
               command:
@@ -164,8 +171,7 @@ spec:
             timeoutSeconds: 1
           resources:
             requests:
-              cpu: 500m
-              memory: 256Mi
+              memory: 128Mi
           securityContext:
             allowPrivilegeEscalation: false
             privileged: false
@@ -197,6 +203,148 @@ spec:
               name: podinfo
             - mountPath: /tmp
               name: tmp
+        - env:
+            - name: BADGER_TARGET
+              value: some-name
+            - name: PGBADGER_SERVICE_PORT
+              value: "10000"
+          imagePullPolicy: Always
+          name: pgbadger
+          ports:
+            - containerPort: 10000
+              name: pgbadger
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 10000
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+            - mountPath: /pgdata
+              name: pgdata
+              readOnly: true
+            - mountPath: /report
+              name: report
+        - env:
+            - name: PMM_USER
+              value: admin
+            - name: PMM_SERVER
+              value: monitoring-service
+            - name: CLIENT_PORT_LISTEN
+              value: "7777"
+            - name: CLIENT_PORT_MIN
+              value: "30100"
+            - name: CLIENT_PORT_MAX
+              value: "30105"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: POD_NAMESPASE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: PMM_AGENT_SERVER_ADDRESS
+              value: monitoring-service
+            - name: PMM_AGENT_SERVER_USERNAME
+              value: admin
+            - name: PMM_AGENT_SERVER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: some-name-pmm-secret
+            - name: PMM_AGENT_LISTEN_PORT
+              value: "7777"
+            - name: PMM_AGENT_PORTS_MIN
+              value: "30100"
+            - name: PMM_AGENT_PORTS_MAX
+              value: "30105"
+            - name: PMM_AGENT_CONFIG_FILE
+              value: /usr/local/percona/pmm2/config/pmm-agent.yaml
+            - name: PMM_AGENT_SERVER_INSECURE_TLS
+              value: "1"
+            - name: PMM_AGENT_LISTEN_ADDRESS
+              value: 0.0.0.0
+            - name: PMM_AGENT_SETUP_NODE_NAME
+              value: some-name
+            - name: PMM_AGENT_SETUP_METRICS_MODE
+              value: push
+            - name: PMM_AGENT_SETUP
+              value: "1"
+            - name: PMM_AGENT_SETUP_FORCE
+              value: "1"
+            - name: PMM_AGENT_SETUP_NODE_TYPE
+              value: container
+            - name: DB_TYPE
+              value: postgresql
+            - name: PMM_AGENT_SIDECAR
+              value: "true"
+            - name: PMM_AGENT_SIDECAR_SLEEP
+              value: "5"
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: some-name-postgres-secret
+            - name: PMM_AGENT_PRERUN_SCRIPT
+              value: pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify --skip-connection-check --metrics-mode=push --username=postgres --password=$(DB_PASS) --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --host=$(POD_NAME) --port=5432 --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - bash
+                  - -c
+                  - pmm-admin inventory remove node --force $(pmm-admin status --json | python -c "import sys, json; print(json.load(sys.stdin)['pmm_agent_status']['node_id'])")
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /local/Status
+              port: 7777
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: pmm-client
+          ports:
+            - containerPort: 7777
+              protocol: TCP
+            - containerPort: 30100
+              protocol: TCP
+            - containerPort: 30101
+              protocol: TCP
+            - containerPort: 30102
+              protocol: TCP
+            - containerPort: 30103
+              protocol: TCP
+            - containerPort: 30104
+              protocol: TCP
+            - containerPort: 30105
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 500m
+              memory: 200M
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -209,7 +357,7 @@ spec:
       volumes:
         - name: pgdata
           persistentVolumeClaim:
-            claimName: some-name-repl2
+            claimName: some-name
         - name: user-volume
           secret:
             defaultMode: 420
