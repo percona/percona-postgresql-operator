@@ -56,16 +56,13 @@ Configuration and Management
    scaling
    TLS
    monitoring
-   standby
-
-.. toctree::
-   :maxdepth: 1
 
 HOWTOs
 =============
 
+.. toctree::
+   :maxdepth: 1
    standby
-
 
 Reference
 =============
