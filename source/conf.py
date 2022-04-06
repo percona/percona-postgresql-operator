@@ -43,7 +43,7 @@ release = '1.2.0'
 # the PGO recommended versions to be used in docs
 
 pmm2recommended = '2.24.0'
-postgresrecommended = '14.1'
+postgresrecommended = '14.2'
 
 
 # List of patterns, relative to source directory, that match files and
@@ -279,7 +279,8 @@ def ultimateReplace(app, docname, source):
 ultimate_replacements = {
     "{{{release}}}" : release,
     "{{{apiversion}}}" : release.replace(".", "-", 2),
-    "{{{pmm2recommended}}}" : pmm2recommended
+    "{{{pmm2recommended}}}" : pmm2recommended,
+    "{{{postgresrecommended}}}" : postgresrecommended
 }
 
 def setup(app):

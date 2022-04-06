@@ -178,7 +178,7 @@ placeholder):
        spec:
          containers:
            - name: pg-client
-             image: perconalab/percona-distribution-postgresql:13.2
+             image: perconalab/percona-distribution-postgresql:{{{postgresrecommended}}}
              imagePullPolicy: Always
              command:
              - sleep
@@ -210,7 +210,7 @@ Now you should see the prompt of PostgreSQL interactive terminal:
 
 .. code:: bash
 
-   psql (13.2)
+   psql ({{{postgresrecommended}}})
    Type "help" for help.
    pgdb=>
 
