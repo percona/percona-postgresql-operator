@@ -185,7 +185,7 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The name of a data source PostgreSQL cluster, which is used                               |
-|                 | to :ref:`restore backup to a a new cluster<backups-restore>`                              |
+|                 | to :ref:`restore backup to a new cluster<backups-restore>`                                |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -197,7 +197,7 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Custom pgBackRest options to :ref:`restore backup to a a new cluster<backups-restore>`    |
+| **Description** | Custom pgBackRest options to :ref:`restore backup to a new cluster<backups-restore>`      |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator.upgradeoptions-section:
@@ -255,7 +255,7 @@ The ``upgradeOptions`` section in the `deploy/cr.yaml <https://github.com/percon
 .. _operator.pgprimary-section:
 
 `pgPrimary Section <operator.html#operator-pgprimary-section>`_
---------------------------------------------------------------
+---------------------------------------------------------------
 
 The pgPrimary section controls the PostgreSQL Primary instance.
 
@@ -936,7 +936,20 @@ Percona Distribution for PostgreSQL backups.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``local``                                                                                 |
 +-----------------+-------------------------------------------------------------------------------------------+
-|| **Description** | The :ref:`type<backups.pgbackrest.repo.type>` of the pgBackRest repository               |
+| **Description** | The :ref:`type<backups.pgbackrest.repo.type>` of the pgBackRest repository                |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-customconfig:                                                                  |
+|                 |                                                                                           |
+| **Key**         | `backup.customconfig <operator.html#backup-customconfig>`_                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Name of the `ConfigMap <https://kubernetes.io/docs/concepts/configuration/configmap/>`_   |
+|                 | to pass custom pgBackRest configuration options                                           |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-pmm-section:
@@ -1282,7 +1295,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``500m``                                                                                     |
+| **Example**     | ``500m``                                                                                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | `Kubernetes CPU limits                                                                    |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |

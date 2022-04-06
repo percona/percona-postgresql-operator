@@ -43,6 +43,7 @@ release = '1.2.0'
 # the PGO recommended versions to be used in docs
 
 pmm2recommended = '2.24.0'
+postgresrecommended = '14.1'
 
 
 # List of patterns, relative to source directory, that match files and

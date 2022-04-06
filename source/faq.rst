@@ -41,7 +41,7 @@ How can I analyze PostgreSQL logs with pgBadger?
 which can analyze PostgreSQL logs and provide you web-based representation with
 charts and various statistics. You can configure it via the 
 :ref:`pgBadger Section<operator-pgbadger-section>` in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
-file. The most important option there is :ref:`pgBadger.enabled<operator.html#pgbadger-enabled>`,
+file. The most important option there is :ref:`pgBadger.enabled<pgbadger-enabled>`,
 which is off by default. When enabled, a separate pgBadger sidecar container
 with a specialized HTTP server is added to each PostgreSQL Pod. 
 

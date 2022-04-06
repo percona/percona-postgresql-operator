@@ -56,6 +56,7 @@ Configuration and Management
    scaling
    TLS
    monitoring
+   standby
 
 .. toctree::
    :maxdepth: 1
