@@ -43,7 +43,7 @@ spec:
 #  userLabels:
 #    pgo-version: "1.2.0"
   pgPrimary:
-    image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
+    image: percona/percona-postgresql-operator:1.2.0-ppg14-postgres-ha
 #    imagePullPolicy: Always
     resources:
       requests:
@@ -84,9 +84,9 @@ spec:
 #        cpu: "1"
 #        memory: "400M"
   backup:
-    image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
+    image: percona/percona-postgresql-operator:1.2.0-ppg14-pgbackrest
 #    imagePullPolicy: Always
-    backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest-repo
+    backrestRepoImage: percona/percona-postgresql-operator:1.2.0-ppg14-pgbackrest-repo
     resources:
       requests:
         cpu: "200m"
@@ -114,7 +114,7 @@ spec:
         type: full
         storage: local
   pgBouncer:
-    image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
+    image: percona/percona-postgresql-operator:1.2.0-ppg14-pgbouncer
 #    imagePullPolicy: Always
     size: 3
     resources:
@@ -163,7 +163,7 @@ spec:
 #          pg-cluster-label: cluster1
   pgBadger:
     enabled: false
-    image: perconalab/percona-postgresql-operator:main-ppg14-pgbadger
+    image: percona/percona-postgresql-operator:1.2.0-ppg14-pgbadger
 #    imagePullPolicy: Always
     port: 10000
 #  securityContext:
