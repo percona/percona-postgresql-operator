@@ -65,9 +65,12 @@ testsReportMap  = [:]
 testsResultsMap = [:]
 
 void makeReport() {
+    def wholeTestAmount=sh(script: 'ls -l e2e-tests/| grep ^d | wc -l', , returnStdout: true).trim()
+    def startedTestAmount = testsReportMap.size()
     for ( test in testsReportMap ) {
         TestsReport = TestsReport + "\r\n| ${test.key} | ${test.value} |"
     }
+    TestsReport = TestsReport + "\r\n| We run $startedTestAmount out of $wholeTestAmount|"
 }
 
 void setTestsresults() {
@@ -108,16 +111,17 @@ void runTest(String TEST_NAME, String CLUSTER_PREFIX) {
             retryCount++
             return false
         }
+        finally {
+            pushLogFile(TEST_NAME)
+            echo "The $TEST_NAME test was finished!"
+        }
     }
-
-    pushLogFile(TEST_NAME)
-    echo "The $TEST_NAME test was finished!"
 }
 
 
-def skipBranchBulds = true
+def skipBranchBuilds = true
 if ( env.CHANGE_URL ) {
-    skipBranchBulds = false
+    skipBranchBuilds = false
 }
 def FILES_CHANGED = null
 def IMAGE_EXISTS = null
@@ -143,7 +147,7 @@ pipeline {
         stage('Prepare') {
             when {
                 expression {
-                    !skipBranchBulds
+                    !skipBranchBuilds
                 }
             }
             steps {
@@ -197,7 +201,7 @@ pipeline {
         stage('Retag previous commit images if possible'){
             when {
                 allOf {
-                    expression { !skipBranchBulds }
+                    expression { !skipBranchBuilds }
                     allOf {
                         expression { FILES_CHANGED == null }
                         expression { IMAGE_EXISTS == null }
@@ -236,7 +240,7 @@ pipeline {
         stage('Build docker image') {
             when {
                 allOf {
-                    expression { !skipBranchBulds }
+                    expression { !skipBranchBuilds }
                     anyOf {
                         allOf {
                             expression { FILES_CHANGED != null }
@@ -274,7 +278,7 @@ pipeline {
         stage('Save dummy URI_BASE') {
             when {
                 allOf {
-                    expression { !skipBranchBulds }
+                    expression { !skipBranchBuilds }
                     expression { IMAGE_EXISTS != null }
                 }
             }
@@ -293,7 +297,7 @@ pipeline {
         stage('GoLicenseDetector test') {
             when {
                 expression {
-                    !skipBranchBulds
+                    !skipBranchBuilds
                 }
             }
             steps {
@@ -336,7 +340,7 @@ pipeline {
         stage('GoLicense test') {
             when {
                 expression {
-                    !skipBranchBulds
+                    !skipBranchBuilds
                 }
             }
             steps {
@@ -394,7 +398,7 @@ pipeline {
         stage('Run tests for operator') {
             when {
                 expression {
-                    !skipBranchBulds
+                    !skipBranchBuilds
                 }
             }
             options {
