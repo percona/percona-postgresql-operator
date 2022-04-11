@@ -58,12 +58,10 @@ function create_or_upgrade_to_version() {
 	wait_deployment "${cluster}"
 	# wait for some significant time period. Pgbouncer pod may not be started otherwise
 	sleep 10
-	if [[ ${PG_VER} -le '13' ]]; then
-		kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-			'[
-				{"op":"replace","path":"/spec/pgBouncer/size","value":1}
-			]'
-	fi
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+		'[
+			{"op":"replace","path":"/spec/pgBouncer/size","value":1}
+		]'
 	wait_cluster_consistency "${cluster}"
 	wait_deployment "${cluster}-pgbouncer"
 
@@ -84,16 +82,11 @@ main() {
 	cluster="some-name"
 
 	operator_action='install'
-	if [[ ${PG_VER} -le '13' ]]; then
-		create_or_upgrade_to_version ${cluster} '0.2.0' "${test_dir}/conf/0.2.0_operator.yaml" 'dynamic' "$operator_action"
-		operator_action='update'
-
-		create_or_upgrade_to_version ${cluster} '1.0.0' "${test_dir}/conf/1.0.0_operator.yaml" 'dynamic' "$operator_action"
-	fi
-
 	create_or_upgrade_to_version ${cluster} '1.1.0' "${test_dir}/conf/1.1.0_operator.yaml" 'dynamic' "$operator_action"
+	operator_action='update'
+	create_or_upgrade_to_version ${cluster} '1.2.0' "${test_dir}/conf/1.2.0_operator.yaml" 'dynamic' "$operator_action"
 
-	LATEST_TAG='1.2.0'
+	LATEST_TAG='1.3.0'
 	IMAGE_OPERATOR="${TARGET_IMAGE_OPERATOR:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"}"
 	IMAGE_DEPLOYER="${TARGET_IMAGE_DEPLOYER:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-pgo-deployer"}"
 
