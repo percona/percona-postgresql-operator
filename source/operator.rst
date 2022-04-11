@@ -429,6 +429,20 @@ The pgPrimary section controls the PostgreSQL Primary instance.
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-imagepullpolicy:                                                            |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.imagePullPolicy <operator.html#pgprimary-imagepullpolicy>`_                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``Always``                                                                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | This option is used to set the `policy                                                    |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_ for updating   |
+|                 | pgPrimary and pgReplicas images                                                           |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _pgprimary-customconfig:                                                               |
 |                 |                                                                                           |
 | **Key**         | `pgPrimary.customconfig <operator.html#pgprimary-customconfig>`_                          |
@@ -951,6 +965,20 @@ Percona Distribution for PostgreSQL backups.
 | **Description** | Name of the `ConfigMap <https://kubernetes.io/docs/concepts/configuration/configmap/>`_   |
 |                 | to pass custom pgBackRest configuration options                                           |
 +-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-imagepullpolicy:                                                               |
+|                 |                                                                                           |
+| **Key**         | `backup.imagePullPolicy <operator.html#backup-imagepullpolicy>`_                          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``Always``                                                                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | This option is used to set the `policy                                                    |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_ for updating   |
+|                 | pgBackRest images                                                                         |
++-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-pmm-section:
 
@@ -1085,6 +1113,20 @@ file contains configuration options for Percona Monitoring and Management.
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
 |                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
 |                 | for a PMM container                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pmm-imagepullpolicy:                                                                  |
+|                 |                                                                                           |
+| **Key**         | `pmm.imagePullPolicy <operator.html#pmm-imagepullpolicy>`_                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``Always``                                                                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | This option is used to set the `policy                                                    |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_ for updating   |
+| **Description** | PMM Client images                                                                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-pgbouncer-section:
@@ -1232,6 +1274,20 @@ file contains configuration options for the `pgBouncer <http://pgbouncer.github.
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | Set `labels <https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/>`_ |
 |                 | for the pgBouncer Service                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbouncer-imagepullpolicy:                                                            |
+|                 |                                                                                           |
+| **Key**         | `pgBouncer.imagePullPolicy <operator.html#pgbouncer-imagepullpolicy>`_                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``Always``                                                                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | This option is used to set the `policy                                                    |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_ for updating   |
+| **Description** | pgBouncer images                                                                          |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-pgreplicas-section:
@@ -1466,7 +1522,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _pgreplicas-expose-labels:                                                             |
 |                 |                                                                                           |
-| **Key**         | `pgReplicas.<replica-name>.expose.labels <operator.html#pgbouncer-expose-labels>`_        |
+| **Key**         | `pgReplicas.<replica-name>.expose.labels <operator.html#pgreplicas-expose-labels>`_       |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | label                                                                                     |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -1521,4 +1577,18 @@ file contains configuration options for the `pgBadger PostgreSQL log analyzer <h
 | **Example**     |  ``10000``                                                                                |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The port number for pgBadger                                                              |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgbadger-imagepullpolicy:                                                             |
+|                 |                                                                                           |
+| **Key**         | `pgBadger.imagePullPolicy <operator.html#pgbadger-imagepullpolicy>`_                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``Always``                                                                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | This option is used to set the `policy                                                    |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_ for updating   |
+| **Description** | pgBadger images                                                                           |
 +-----------------+-------------------------------------------------------------------------------------------+
