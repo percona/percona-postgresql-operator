@@ -7,7 +7,7 @@ void CreateCluster(String CLUSTER_PREFIX) {
             source $HOME/google-cloud-sdk/path.bash.inc
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
-            gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_PREFIX} --cluster-version=1.20 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${CLUSTER_PREFIX} --no-enable-autoupgrade
+            gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_PREFIX} --cluster-version=1.21 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${CLUSTER_PREFIX} --no-enable-autoupgrade
             kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com
         """
    }

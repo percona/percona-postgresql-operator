@@ -17,7 +17,7 @@ const never = "never"
 const disabled = "disabled"
 
 func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs VersionService) error {
-	if cr.Spec.UpgradeOptions.Schedule == "" ||
+	if cr.Spec.UpgradeOptions == nil ||
 		strings.ToLower(cr.Spec.UpgradeOptions.Apply) == never ||
 		strings.ToLower(cr.Spec.UpgradeOptions.Apply) == disabled {
 		return nil
