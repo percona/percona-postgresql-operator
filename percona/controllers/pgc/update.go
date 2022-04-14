@@ -54,6 +54,7 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 		if ok {
 			c.deleteEnsureVersion(jn)
 		}
+		return nil
 	}
 	if ok && schedule.CronSchedule == newCluster.Spec.UpgradeOptions.Schedule {
 		return nil

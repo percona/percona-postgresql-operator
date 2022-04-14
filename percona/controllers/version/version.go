@@ -13,10 +13,16 @@ import (
 	api "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 )
 
+const never = "never"
+const disabled = "disabled"
+
 func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs VersionService) error {
-	if cr.Spec.UpgradeOptions == nil {
+	if cr.Spec.UpgradeOptions.Schedule == "" ||
+		strings.ToLower(cr.Spec.UpgradeOptions.Apply) == never ||
+		strings.ToLower(cr.Spec.UpgradeOptions.Apply) == disabled {
 		return nil
 	}
+
 	var pVer string
 	pgCluster, err := clientset.CrunchydataV1().Pgclusters(cr.Namespace).Get(context.TODO(), cr.Name, metav1.GetOptions{})
 	if err != nil && !kerrors.IsNotFound(err) {
