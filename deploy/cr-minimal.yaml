@@ -11,7 +11,7 @@ spec:
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
     volumeSpec:
-      size: 1G
+      size: 1Gi
       accessmode: ReadWriteOnce
       storagetype: dynamic
   pgReplicas:
@@ -26,7 +26,7 @@ spec:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
     backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest-repo
     volumeSpec:
-      size: 1G
+      size: 1Gi
       accessmode: ReadWriteOnce
       storagetype: dynamic
       storageclass: ""
