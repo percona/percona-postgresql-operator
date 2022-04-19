@@ -36,6 +36,7 @@ Percona Distribution for PostgreSQL on OpenShift.
 
    .. code:: bash
 
+      $ sed -i -e 's#disable_fsgroup: .*#disable_fsgroup: "false"#g' deploy/operator.yaml
       $ oc apply -f deploy/operator.yaml
 
 #. After the operator is started Percona Distribution for PostgreSQL
