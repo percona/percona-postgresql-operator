@@ -14,9 +14,12 @@ import (
 )
 
 func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs VersionService) error {
-	if cr.Spec.UpgradeOptions == nil {
+	if cr.Spec.UpgradeOptions == nil ||
+		cr.Spec.UpgradeOptions.Apply.Lower() == api.UpgradeStrategyNever ||
+		cr.Spec.UpgradeOptions.Apply.Lower() == api.UpgradeStrategyDisabled {
 		return nil
 	}
+
 	var pVer string
 	pgCluster, err := clientset.CrunchydataV1().Pgclusters(cr.Namespace).Get(context.TODO(), cr.Name, metav1.GetOptions{})
 	if err != nil && !kerrors.IsNotFound(err) {
@@ -35,7 +38,7 @@ func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs Ver
 		return nil
 	}
 	verMeta := versionMeta{
-		Apply: cr.Spec.UpgradeOptions.Apply,
+		Apply: string(cr.Spec.UpgradeOptions.Apply),
 		CRUID: string(cr.GetUID()),
 	}
 	if len(pVer) > 0 {

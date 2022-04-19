@@ -2,7 +2,6 @@ package pgc
 
 import (
 	"context"
-	"strings"
 	"sync/atomic"
 
 	"github.com/pkg/errors"
@@ -19,9 +18,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controllers/version"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 )
-
-const never = "never"
-const disabled = "disabled"
 
 func (c *Controller) updateVersion(oldCluster, newCluster *crv1.PerconaPGCluster) error {
 	if oldCluster.Spec.Backup.Image == newCluster.Spec.Backup.Image &&
@@ -49,11 +45,12 @@ func (c *Controller) scheduleUpdate(newCluster *crv1.PerconaPGCluster) error {
 		}
 		return nil
 	}
-	if strings.ToLower(newCluster.Spec.UpgradeOptions.Apply) == never ||
-		strings.ToLower(newCluster.Spec.UpgradeOptions.Apply) == disabled {
+	if newCluster.Spec.UpgradeOptions.Apply.Lower() == crv1.UpgradeStrategyNever ||
+		newCluster.Spec.UpgradeOptions.Apply.Lower() == crv1.UpgradeStrategyDisabled {
 		if ok {
 			c.deleteEnsureVersion(jn)
 		}
+		return nil
 	}
 	if ok && schedule.CronSchedule == newCluster.Spec.UpgradeOptions.Schedule {
 		return nil
