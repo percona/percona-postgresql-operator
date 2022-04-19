@@ -34,9 +34,17 @@ Percona Distribution for PostgreSQL on OpenShift.
 
 #. Deploy the operator with the following command:
 
+   If you are going to deploy the operator in 'restrictive' environment (default
+   fsGroup is not welcomed) please execute the following command:
+
    .. code:: bash
 
       $ sed -i -e 's#disable_fsgroup: .*#disable_fsgroup: "false"#g' deploy/operator.yaml
+
+   Apply operators essential objects:
+
+   .. code:: bash
+
       $ oc apply -f deploy/operator.yaml
 
 #. After the operator is started Percona Distribution for PostgreSQL
