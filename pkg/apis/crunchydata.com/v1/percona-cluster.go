@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"strings"
+
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -189,10 +191,23 @@ type PerconaPGClusterList struct {
 	Items []PerconaPGCluster `json:"items"`
 }
 
+type UpgradeStrategy string
+
+const (
+	UpgradeStrategyDisabled    UpgradeStrategy = "disabled"
+	UpgradeStrategyNever       UpgradeStrategy = "never"
+	UpgradeStrategyRecommended UpgradeStrategy = "recommended"
+	UpgradeStrategyLatest      UpgradeStrategy = "latest"
+)
+
+func (us UpgradeStrategy) Lower() UpgradeStrategy {
+	return UpgradeStrategy(strings.ToLower(string(us)))
+}
+
 type UpgradeOptions struct {
-	VersionServiceEndpoint string `json:"versionServiceEndpoint,omitempty"`
-	Apply                  string `json:"apply,omitempty"`
-	Schedule               string `json:"schedule,omitempty"`
+	VersionServiceEndpoint string          `json:"versionServiceEndpoint,omitempty"`
+	Apply                  UpgradeStrategy `json:"apply,omitempty"`
+	Schedule               string          `json:"schedule,omitempty"`
 }
 
 var PullPolicyAlways = "Always"

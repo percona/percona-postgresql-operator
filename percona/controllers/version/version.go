@@ -13,13 +13,10 @@ import (
 	api "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 )
 
-const never = "never"
-const disabled = "disabled"
-
 func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs VersionService) error {
 	if cr.Spec.UpgradeOptions == nil ||
-		strings.ToLower(cr.Spec.UpgradeOptions.Apply) == never ||
-		strings.ToLower(cr.Spec.UpgradeOptions.Apply) == disabled {
+		cr.Spec.UpgradeOptions.Apply.Lower() == api.UpgradeStrategyNever ||
+		cr.Spec.UpgradeOptions.Apply.Lower() == api.UpgradeStrategyDisabled {
 		return nil
 	}
 
@@ -41,7 +38,7 @@ func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs Ver
 		return nil
 	}
 	verMeta := versionMeta{
-		Apply: cr.Spec.UpgradeOptions.Apply,
+		Apply: string(cr.Spec.UpgradeOptions.Apply),
 		CRUID: string(cr.GetUID()),
 	}
 	if len(pVer) > 0 {
