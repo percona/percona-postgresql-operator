@@ -7,7 +7,7 @@ void CreateCluster(String CLUSTER_PREFIX) {
             source $HOME/google-cloud-sdk/path.bash.inc
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
-            gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_PREFIX} --cluster-version=1.20 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${CLUSTER_PREFIX} --no-enable-autoupgrade
+            gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_PREFIX} --cluster-version=1.21 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${CLUSTER_PREFIX} --no-enable-autoupgrade
             kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com
         """
    }
@@ -306,8 +306,8 @@ pipeline {
                             -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                             -w /go/src/github.com/percona/percona-postgresql-operator \
                             -e GO111MODULE=on \
-                            golang:1.17 sh -c '
-                                go get github.com/google/go-licenses;
+                            golang:1.18 sh -c '
+                                go install github.com/google/go-licenses@latest;
                                 /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/apiserver \
                                     | cut -d , -f 3 \
                                     | sort -u \
@@ -349,7 +349,7 @@ pipeline {
                             -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                             -w /go/src/github.com/percona/percona-postgresql-operator \
                             -e GO111MODULE=on \
-                            golang:1.17 sh -c 'go build -v -o apiserver github.com/percona/percona-postgresql-operator/cmd/apiserver;
+                            golang:1.18 sh -c 'go build -v -o apiserver github.com/percona/percona-postgresql-operator/cmd/apiserver;
                                                go build -v -o pgo-rmdata github.com/percona/percona-postgresql-operator/cmd/pgo-rmdata;
                                                go build -v -o pgo-scheduler github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler;
                                                go build -v -o postgres-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator '
