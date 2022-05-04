@@ -300,6 +300,8 @@ The actual restoration process can be started as follows:
 
       $ kubectl apply -f deploy/backup/restore.yaml
 
+.. seealso:: :ref:`faq-skip-tls`
+
 To create a new PostgreSQL cluster from either the active  one, or a former cluster
 whose pgBackRest repository still exists,  use the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` 
 option. 
