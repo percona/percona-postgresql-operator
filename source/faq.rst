@@ -128,7 +128,7 @@ The  :ref:`backup.storages.<storage-name>.verifyTLS<backup-storages-verifytls>` 
 *Restoring a backup* without TLS requires you to make two changes in the ``parameters`` subsection of the ``deploy/restore.yaml`` file:
 
 * set ``backrest-s3-verify-tls`` option to ``false``,
-* add ``--no-repo1-storage-verify-tls`` value to ``backrest-restore-opts`` field:
+* add ``--no-repo1-storage-verify-tls`` value to ``backrest-restore-opts`` field.
 
 The following example shows how the resulting ``parameters`` section may look like:
 
