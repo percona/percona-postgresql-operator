@@ -3,7 +3,7 @@
 Transport Layer Security (TLS)
 ******************************
 
-The Percona Distribution for PostgreSQL Operator uses Transport Layer Security
+The |operator| uses Transport Layer Security
 (TLS) cryptographic protocol for the following types of communication:
 
 * Internal - communication between PostgreSQL instances in the cluster
@@ -12,7 +12,10 @@ The Percona Distribution for PostgreSQL Operator uses Transport Layer Security
 The internal certificate is also used as an authorization method for PostgreSQL
 Replica instances.
 
-Currently, TLS security needs manual certificates generation.
+TLS security can be configured in several ways:
+
+* the Operator can generate certificates automatically at cluster creation time,
+* you can also generate certificates manually.
 
 You can also use pre-generated certificates available in the
 ``deploy/ssl-secrets.yaml`` file for test purposes, but we strongly recommend
@@ -23,10 +26,22 @@ Operator yourself, as well as how to temporarily disable it if needed.
 
 .. contents:: :local:
 
-Generate certificates for the Operator
-======================================
+.. _tls.certs.auto:
 
-To generate certificates, follow these steps:
+Allow the Operator to generate certificates automatically
+=========================================================
+
+By default, the Operator generates long-term certificates automatically and
+turns on encryption at cluster creation time, if there are no certificate
+secrets available. You do not need to perform any specific actions to make this
+work.
+
+.. _tls.certs.manual:
+
+Generate certificates manually
+==============================
+
+To generate certificates manually, follow these steps:
 
 1. Provision a :abbr:`CA (Certificate authority)` to generate TLS certificates,
 2. Generate a :abbr:`CA (Certificate authority)` key and certificate file with
@@ -125,8 +140,7 @@ When certificates are generated, set the following keys in the
   encrypt **external** communications,
 * ``spec.secrets.sslReplicationSecretName`` key should contain the name of the
   secret created to encrypt **internal** communications,
-* ``spec.tlsOnly`` key should be set to ``true`` if you want to disable
-  unencrypted communications.
+* ``spec.tlsOnly`` is set to ``true`` by default and enforces encryption
 
 Don't forget to apply changes as usual:
 
@@ -134,11 +148,13 @@ Don't forget to apply changes as usual:
 
    $ kubectl apply -f deploy/cr.yaml
 
-Check connectivity to the cluster
----------------------------------
+.. _tls.connectivity.check:
 
-You can check TLS communication with use of the ``psql``, the standart
-interactive terminal-based front-end to PostgreSQL. The following command will
+Check connectivity to the cluster
+=================================
+
+You can check TLS communication with use of the ``psql``, the standard
+interactive terminal-based frontend to PostgreSQL. The following command will
 spawn a new ``pg-client`` container, which includes needed command and can be
 used for the check (use your real cluster name instead of the ``<cluster-name>``
 placeholder):
@@ -162,7 +178,7 @@ placeholder):
        spec:
          containers:
            - name: pg-client
-             image: perconalab/percona-distribution-postgresql:13.2
+             image: perconalab/percona-distribution-postgresql:{{{postgresrecommended}}}
              imagePullPolicy: Always
              command:
              - sleep
@@ -194,9 +210,11 @@ Now you should see the prompt of PostgreSQL interactive terminal:
 
 .. code:: bash
 
-   psql (13.2)
+   psql ({{{postgresrecommended}}})
    Type "help" for help.
    pgdb=>
+
+.. _tls.no.tls:
 
 Run Percona Distribution for PostgreSQL without TLS
 ===================================================
@@ -205,5 +223,5 @@ Omitting TLS is also possible, but we recommend that you run your cluster with
 the TLS protocol enabled.
 
 To disable TLS protocol (e.g. for demonstration purposes) set the
-``spec.tlsOnly`` key to ``false`, and and make sure that there are no
+``spec.tlsOnly`` key to ``false``, and make sure that there are no
 certificate secrets configured in the ``deploy/cr.yaml`` file.
