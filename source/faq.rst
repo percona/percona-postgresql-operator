@@ -116,3 +116,28 @@ You can set additional namespace to be watched by the Operator as follows:
    .. note:: You need to perform cleanup between each ``DEPLOY_ACTION``
       activity, which can be either ``install``, ``update``, or ``uninstall``.
 
+.. _faq-skip-tls:
+
+How can I store backups on S3-compatible storage with self-issued certificates?
+================================================================================
+
+The Operator allows you to store backups on any S3-compatible storage including your private one (for example, a local `MinIO <https://en.wikipedia.org/wiki/MinIO>`_ installation). Backup and restore with a private S3-compatible storage can be done following the :ref:`official instruction<backups>` except the case when you use self-signed certificates and would like to skip TLS verification (which can be reasonable when both your database and storage are located in the same Kubernetes cluster or in the same protected intranet segment).
+
+The  :ref:`backup.storages.<storage-name>.verifyTLS<backup-storages-verifytls>` option in the ``deploy/cr.yaml`` configuration file allows you to skip TLS verification for specific S3-compatible storage. Setting it to ``true`` is enough to *make a backup*.
+
+*Restoring a backup* without TLS requires you to make two changes in the ``parameters`` subsection of the ``deploy/restore.yaml`` file:
+
+* set ``backrest-s3-verify-tls`` option to ``false``,
+* add ``--no-repo1-storage-verify-tls`` value to ``backrest-restore-opts`` field.
+
+The following example shows how the resulting ``parameters`` section may look like:
+
+.. code:: yaml
+
+   ...
+   parameters:
+    backrest-restore-from-cluster: cluster1
+    backrest-restore-opts: --type=time --target="2022-05-03 15:22:42" --no-repo1-storage-verify-tls
+    backrest-storage-type: "s3"
+    backrest-s3-verify-tls: "false"
+   tasktype: restore
