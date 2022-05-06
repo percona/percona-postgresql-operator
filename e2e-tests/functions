@@ -99,7 +99,7 @@ create_namespace() {
 
 	if [[ ${CLEAN_NAMESPACE} == 1 ]] && [[ -z ${skip_clean_namespace} ]]; then
 		kubectl_bin get ns \
-			| egrep -v "^kube-|^default|Terminating|openshift|^NAME" \
+			| egrep -v "^kube-|^default|Terminating|openshift|^NAME|^tanzu-|^tkg-|" \
 			| awk '{print$1}' \
 			| xargs kubectl delete ns &
 		cleanup_rbac
@@ -900,7 +900,7 @@ destroy() {
 	destroy_operator
 
 	kubectl_bin get ns \
-		| egrep -v "^kube-|^default|Terminating|openshift|^NAME" \
+		| egrep -v "^kube-|^default|Terminating|openshift|^NAME|^tkg-|^tanzu-" \
 		| awk '{print$1}' \
 		| xargs kubectl delete ns --grace-period=0 --force=true
 
