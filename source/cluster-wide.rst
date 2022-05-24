@@ -1,8 +1,8 @@
 .. _howto-clusterwide:
 
-============================================
-Install |operator| cluster-wide
-============================================
+===========================================================
+|operator| single-namespace and multi-namespace deployment 
+===========================================================
 
 
 There are two design patterns that you can choose from when deploying Percona Operator for PostgreSQL and PostgreSQL clusters in Kubernetes:
