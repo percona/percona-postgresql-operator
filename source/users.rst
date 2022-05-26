@@ -26,8 +26,8 @@ The following table shows system users' names and purposes.
 
 .. warning:: These users should not be used to run an application.
 
-The default PostgreSQL instance installation via the Percona Distribution for
-PostgreSQL Operator comes with the following users:
+The default PostgreSQL instance installation via the |operator| comes with the
+following users:
 
 .. list-table::
     :header-rows: 1
