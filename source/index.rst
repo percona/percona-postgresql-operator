@@ -64,6 +64,8 @@ HOWTOs
    :maxdepth: 1
 
    standby
+   cluster-wide
+   tablespace
 
 Reference
 =============
