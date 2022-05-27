@@ -14,6 +14,8 @@ PostgreSQL supports this feature, allowing you to
 *store data outside of the primary data directory*, and |operator| is a good
 option to bring this to your Kubernetes environment when needed.
 
+.. _howto-tablespace-usecases:
+
 Possible use cases
 -------------------
 
@@ -40,6 +42,8 @@ directory.
 
 .. image:: ./assets/images/tablespaces.svg
    :align: center
+
+.. _howto-tablespace-create:
 
 Creating a new tablespace
 --------------------------
@@ -101,6 +105,8 @@ As you can see, |operator| simplifies tablespace creation by carrying on all
 necessary modifications with Persistent Volumes and Pods. The same would not be
 true for the deletion of an already existing tablespace, which is not automated,
 neither by the Operator nor by PostgreSQL.
+
+.. _howto-tablespace-delete:
 
 Deleting an existing tablespace
 -------------------------------
