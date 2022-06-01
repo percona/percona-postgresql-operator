@@ -31,19 +31,20 @@ RUN set -ex; \
 
 RUN set -ex; \
     microdnf -y install \
-        python3 \
-        python3-jinja2 \
-        python3-pyyaml \
-        python3-six \
+        python3.8 \
+        python38-jinja2 \
+        python38-pyyaml \
+        python38-six \
+        python38-cryptography \
+        git-core \
         sshpass
 
 RUN set -ex; \
     curl -Lf -o /tmp/epel-release.rpm https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm; \
-    curl -Lf -o /tmp/python3-jmespath.rpm http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/python3-jmespath-0.9.0-11.el8.noarch.rpm; \
-    curl -Lf -o /tmp/ansible.rpm https://cbs.centos.org/kojifiles/packages/ansible/2.9.27/3.el8/noarch/ansible-2.9.27-3.el8.noarch.rpm; \
-    rpmkeys --checksig /tmp/python3-jmespath.rpm /tmp/epel-release.rpm /tmp/ansible.rpm; \
-    rpm -i /tmp/epel-release.rpm /tmp/python3-jmespath.rpm /tmp/ansible.rpm; \
-    rm -rf /tmp/epel-release.rpm /tmp/python3-jmespath.rpm /tmp/ansible.rpm
+    curl -Lf -o /tmp/python38-resolvelib.rpm http://rpmfind.net/linux/centos/8-stream/AppStream/x86_64/os/Packages/python38-resolvelib-0.5.4-5.el8.noarch.rpm; \
+    curl -Lf -o /tmp/ansible-core-2.12.7.rpm http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/ansible-core-2.12.7-1.el8.x86_64.rpm;\
+    rpm -i /tmp/epel-release.rpm /tmp/python38-resolvelib.rpm /tmp/ansible-core-2.12.7.rpm; \
+    rm -rf /tmp/epel-release.rpm /tmp/python38-resolvelib.rpm /tmp/ansible-core-2.12.7.rpm
 
 RUN set -ex; \
     microdnf -y install \
@@ -52,7 +53,7 @@ RUN set -ex; \
         openssl; \
     microdnf  -y clean all
 
-RUN pip3 install kubernetes
+RUN pip3 install kubernetes jmespath
 
 RUN curl -o /usr/bin/kubectl \
         https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl; \
