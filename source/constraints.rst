@@ -1,3 +1,5 @@
+.. _operator-constraints:
+
 Binding Percona Distribution for PostgreSQL components to Specific Kubernetes/OpenShift Nodes
 =============================================================================================
 
