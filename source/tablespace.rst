@@ -1,7 +1,7 @@
 .. _howto-tablespace:
 
 ===========================================================
-|operator| single-namespace and multi-namespace deployment 
+Using PostgreSQL Tablespaces with |operator| 
 ===========================================================
 
 Tablespaces allow DBAs to store a database on multiple file systems within the
