@@ -1,7 +1,7 @@
 .. _howto-tablespace:
 
 ===========================================================
-Using PostgreSQL Tablespaces with |operator| 
+Using PostgreSQL tablespaces with |operator| 
 ===========================================================
 
 Tablespaces allow DBAs to store a database on multiple file systems within the
