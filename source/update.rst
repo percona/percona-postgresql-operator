@@ -1,9 +1,9 @@
 .. _operator-updates:
 
-Update Percona Distribution for PostgreSQL Operator
-===================================================
+Update |operator|
+================================================================================
 
-Percona Distribution for PostgreSQL Operator allows upgrades to newer versions.
+|operator| allows upgrades to newer versions.
 This includes upgrades of the Operator itself, and upgrades of the Percona
 Distribution for PostgreSQL.
 
@@ -96,9 +96,21 @@ updates:
 #. Set the ``apply`` option to one of the following values:
 
    * ``recommended`` - automatic upgrades will choose the most recent version
-     of software flagged as recommended,
+     of software flagged as recommended (for clusters created from scratch,
+     the Percona Distribution for PostgreSQL 14 version will be selected
+     instead of the Percona Distribution for PostgreSQL 13 or 12 version
+     regardless of the image path; for already existing clusters, 14 vs. 13 or
+     12 branch choice will be preserved),
+   * ``14-recommended``, ``13-recommended``, ``12-recommended`` - same as above,
+     but preserves specific major Percona Distribution for PostgreSQL version
+     for newly provisioned clusters (for example, 14 will not be automatically
+     used instead of 13),
    * ``latest`` - automatic upgrades will choose the most recent version of
      the software available,
+   * ``14-latest``, ``13-latest``, ``12-latest`` - same as above, but preserves
+     specific major Percona Distribution for PostgreSQL version for newly
+     provisioned clusters (for example, 14 will not be automatically
+     used instead of 13),
    * *version number* - specify the desired version explicitly,
    * ``never`` or ``disabled`` - disable automatic upgrades
 

@@ -1,14 +1,14 @@
 Design overview
 ===============
 
-The Percona Distribution for PostgreSQL Operator automates and simplifies
+The |operator| automates and simplifies
 deploying and managing open source PostgreSQL clusters on Kubernetes.
 The Operator is based on `CrunchyData's PostgreSQL Operator <https://crunchydata.github.io/postgres-operator/latest/>`_.
 
 .. image:: ./assets/images/pgo.svg
    :align: center
 
-PostgreSQL containers deployed with the PostgreSQL Operator include the following components:
+PostgreSQL containers deployed with the Operator include the following components:
 
 * The `PostgreSQL <https://www.postgresql.org/>`_ database management system, including:
 

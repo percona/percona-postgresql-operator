@@ -284,8 +284,8 @@ configuration file. The example of the backup configuration file is
 
 The following keys are the most important in the parameters section of this file:
 
-* ``parameters.backrest-restore-from-cluster`` specifies the name of a
-  PostgreSQL cluster which will be restored. This includes stopping the database
+* ``parameters.backrest-restore-cluster`` specifies the name of a
+  PostgreSQL cluster which will be restored (this option had name ``parameters.backrest-restore-from-cluster`` before the Operator 1.2.0). This includes stopping the database
   and recreating a new primary with the restored data (for example, 
   ``cluster1``),
 * ``parameters.backrest-restore-opts`` specifies additional options for
@@ -299,6 +299,8 @@ The actual restoration process can be started as follows:
    .. code:: bash
 
       $ kubectl apply -f deploy/backup/restore.yaml
+
+.. seealso:: :ref:`faq-skip-tls`
 
 To create a new PostgreSQL cluster from either the active  one, or a former cluster
 whose pgBackRest repository still exists,  use the :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` 

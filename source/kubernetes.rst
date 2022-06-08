@@ -72,7 +72,7 @@ Percona Distribution for PostgreSQL in a Kubernetes-based environment.
 
    .. code:: bash
 
-      $ kubectl run -i --rm --tty pg-client --image=perconalab/percona-distribution-postgresql:13.2 --restart=Never -- bash -il
+      $ kubectl run -i --rm --tty pg-client --image=perconalab/percona-distribution-postgresql:{{{postgresrecommended}}} --restart=Never -- bash -il
       [postgres@pg-client /]$ PGPASSWORD='pguser_password' psql -h cluster1-pgbouncer -p 5432 -U pguser pgdb
 
 
@@ -80,7 +80,7 @@ Percona Distribution for PostgreSQL in a Kubernetes-based environment.
 
    .. code:: text
 
-      psql (13.2)
+      psql ({{{postgresrecommended}}})
       Type "help" for help.
       pgdb=>
 

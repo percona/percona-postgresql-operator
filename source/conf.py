@@ -33,16 +33,17 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Percona Distribution for PostgreSQL Operator'
-copyright = u'Percona LLC and/or its affiliates 2009 - 2021'
+project = u'Percona Operator for PostgreSQL'
+copyright = u'Percona LLC and/or its affiliates 2009 - 2022'
 
 # the short X.Y version
-version = '1.1.0'
+version = '1.2.0'
 # the full version including alpha/beta/rc tags.
-release = '1.1.0'
+release = '1.2.0'
 # the PGO recommended versions to be used in docs
 
 pmm2recommended = '2.24.0'
+postgresrecommended = '14.2'
 
 
 # List of patterns, relative to source directory, that match files and
@@ -59,6 +60,8 @@ primary_domain = 'psdom'
 pygments_style = 'sphinx'
 
 rst_prolog = '''
+.. |operator|  replace:: Percona Operator for PostgreSQL
+
 .. |check|  replace:: ``|[[---CHECK---]]|``
 
 .. |xtrabackup|  replace:: :program:`xtrabackup`
@@ -150,10 +153,10 @@ html_theme_path = ['.', './percona-theme']
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = 'Percona Distribution for PostgreSQL Operator Documentation'
+html_title = 'Percona Operator for PostgreSQL Documentation'
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-html_short_title = 'Percona Distribution for PostgreSQL Operator Documentation'
+html_short_title = 'Percona Operator for PostgreSQL Documentation'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -226,8 +229,8 @@ htmlhelp_basename = 'postgresqloperator'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'PerconaDistributionPostgreSQLOperator.tex', u'Percona Distribution for PostgreSQL Operator',
-     u'Percona LLC and/or its affiliates 2009-2021', 'manual'),
+  ('index', 'PerconaOperatorPostgreSQL'+release+'.tex', u'Percona Operator for PostgreSQL',
+     u'Percona LLC and/or its affiliates 2009-2022', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -263,8 +266,8 @@ latex_elements = {
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'percona-kubernetes-operator-for-postgresql', u'Percona Distribution for PostgreSQL Operator',
-     [u'Percona LLC and/or its affiliates 2009-2021'], 1)
+    ('index', 'percona-kubernetes-operator-for-postgresql', u'Percona Operator for PostgreSQL',
+     [u'Percona LLC and/or its affiliates 2009-2022'], 1)
 ]
 
 def ultimateReplace(app, docname, source):
@@ -276,7 +279,8 @@ def ultimateReplace(app, docname, source):
 ultimate_replacements = {
     "{{{release}}}" : release,
     "{{{apiversion}}}" : release.replace(".", "-", 2),
-    "{{{pmm2recommended}}}" : pmm2recommended
+    "{{{pmm2recommended}}}" : pmm2recommended,
+    "{{{postgresrecommended}}}" : postgresrecommended
 }
 
 def setup(app):

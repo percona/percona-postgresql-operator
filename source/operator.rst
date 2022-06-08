@@ -28,6 +28,16 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
      - Pause/resume: setting it to ``true`` gracefully stops the cluster, and
        setting it to ``false`` after shut down starts the cluster back.
 
+   * - upgradeOptions
+     - :ref:`subdoc<operator.upgradeoptions-section>`
+     -
+     - Percona Distribution for PostgreSQL upgrade options section
+
+   * - pgPrimary
+     - :ref:`subdoc<operator.pgprimary-section>`
+     -
+     - PostgreSQL Primary instance options section
+
    * - walStorage
      - :ref:`subdoc<operator-walstorage-section>`
      -
@@ -175,7 +185,7 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The name of a data source PostgreSQL cluster, which is used                               |
-|                 | to :ref:`restore backup to a a new cluster<backups-restore>`                              |
+|                 | to :ref:`restore backup to a new cluster<backups-restore>`                                |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -187,9 +197,70 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Example**     | ``""``                                                                                    |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Description** | Custom pgBackRest options to :ref:`restore backup to a a new cluster<backups-restore>`    |
+| **Description** | Custom pgBackRest options to :ref:`restore backup to a new cluster<backups-restore>`      |
++-----------------+-------------------------------------------------------------------------------------------+
+
+.. _operator.upgradeoptions-section:
+
+`Upgrade Options Section <operator.html#operator-upgradeoptions-section>`_
+--------------------------------------------------------------------------------
+
+The ``upgradeOptions`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__ file contains various configuration options to control Percona Distribution for PostgreSQL upgrades.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _upgradeoptions-versionserviceendpoint:                                                |
+|                 |                                                                                           |
+| **Key**         | `upgradeOptions.versionServiceEndpoint                                                    |
+|                 | <operator.html#upgradeoptions-versionserviceendpoint>`_                                   |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``https://check.percona.com``                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The Version Service URL used to check versions compatibility for upgrade                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _upgradeoptions-apply:                                                                 |
+|                 |                                                                                           |
+| **Key**         | `upgradeOptions.apply <operator.html#upgradeoptions-apply>`_                              |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``14-recommended``                                                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Specifies how :ref:`updates are processed<operator-update-smartupdates>` by the Operator. |
+|                 | ``Never`` or ``Disabled`` will completely disable automatic upgrades, otherwise it can be |
+|                 | set to ``Latest`` or ``Recommended`` or to a specific version number of Percona           |
+|                 | Distribution for PostgreSQL to have it version-locked (so that the user can               |
+|                 | control the version running, but use automatic upgrades to move between them).            |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _upgradeoptions-schedule:                                                              |
+|                 |                                                                                           |
+| **Key**         | `upgradeOptions.schedule <operator.html#upgradeoptions-schedule>`_                        |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``0 2 * * *``                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Scheduled time to check for updates, specified in the                                     |
+|                 | `crontab format <https://en.wikipedia.org/wiki/Cron>`_                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+
+
+.. _operator.pgprimary-section:
+
+`pgPrimary Section <operator.html#operator-pgprimary-section>`_
+---------------------------------------------------------------
+
+The pgPrimary section controls the PostgreSQL Primary instance.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
 +-----------------+-------------------------------------------------------------------------------------------+
 |                 | .. _pgprimary-image:                                                                      |
 |                 |                                                                                           |
@@ -200,6 +271,91 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 | **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-postgres-ha``                         |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The Docker image of the PostgreSQL Primary instance                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-imagepullpolicy:                                                            |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.imagePullPolicy <operator.html#pgprimary-imagepullpolicy>`_                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``Always``                                                                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | This option is used to set the `policy                                                    |
+|                 | <https://kubernetes.io/docs/concepts/containers/images/#updating-images>`_ for updating   |
+|                 | pgPrimary and pgReplicas images                                                           |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-resources-requests-memory:                                                  |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.resources.requests.memory <operator.html#pgprimary-resources-requests-memory>`_|
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``256Mi``                                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes memory requests                                                           |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
+|                 | for a PostgreSQL Primary container                                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-resources-requests-cpu:                                                     |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.resources.requests.cpu <operator.html#pgprimary-resources-requests-cpu>`_      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``500m``                                                                                  |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes CPU requests                                                                  |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a PostgreSQL Primary container  |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-resources-limits-cpu:                                                       |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.resources.limits.cpu <operator.html#pgprimary-resources-limits-cpu>`_          |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``500m``                                                                                  |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes CPU limits                                                                    |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a PostgreSQL Primary container  |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-resources-limits-memory:                                                    |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.resources.limits.memory <operator.html#pgprimary-resources-limits-memory>`_    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``256Mi``                                                                                 |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes memory limits                                                             |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_                                     |
+|                 | for a PostgreSQL Primary container                                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _pgprimary-tolerations:                                                                |
+|                 |                                                                                           |
+| **Key**         | `pgPrimary.tolerations <operator.html#pgprimary-tolerations>`_                            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | subdoc                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``node.alpha.kubernetes.io/unreachable``                                                  |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes Pod tolerations                                                               |
+|                 | <https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/>`_               |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -297,6 +453,91 @@ The spec part of the `deploy/cr.yaml <https://github.com/percona/percona-postgre
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | Name of the :ref:`Custom configuration options ConfigMap <operator-configmaps>` for       |
 |                 | PostgreSQL cluster                                                                        |
++-----------------+-------------------------------------------------------------------------------------------+
+
+.. _operator-tablespacestorages-section:
+
+`Tablespaces Storage Section <operator.html#operator-walstorage-section>`_
+--------------------------------------------------------------------------------
+
+The ``tablespaceStorages`` section in the `deploy/cr.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/cr.yaml>`__
+file contains configuration options for PostgreSQL `Tablespace <https://www.postgresql.org/docs/current/manage-ag-tablespaces.html>`_.
+
+.. tabularcolumns:: |p{2cm}|p{13.6cm}|
+
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-size:                                                   |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.size                                        |
+|                 | <operator.html#tablespacestorages-volumespec-size>`_                                      |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | int                                                                                       |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``1G``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#                         |
+|                 | persistentvolumeclaims>`_ size for the PostgreSQL Tablespaces storage                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-accessmode:                                             |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.accessmode                                  |
+|                 | <operator.html#tablespacestorages-volumespec-accessmode>`_                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``ReadWriteOnce``                                                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | The `Kubernetes PersistentVolumeClaim                                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/                          |
+|                 | #persistentvolumeclaims>`_ access modes for the PostgreSQL Tablespaces storage            |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-storagetype:                                            |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.storagetype                                 |
+|                 | <operator.html#tablespacestorages-volumespec-storagetype>`_                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``dynamic``                                                                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Type of the PostgreSQL Tablespaces storage provisioning: ``create`` (the default          |
+|                 | variant; used if storage is provisioned, e.g. using hostpath) or ``dynamic`` (for a       |
+|                 | dynamic storage provisioner, e.g. via a StorageClass)                                     |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-storageclass:                                           |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.storageclass                                |
+|                 | <operator.html#tablespacestorages-storageclass>`_                                         |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Optionally sets the `Kubernetes storage class                                             |
+|                 | <https://kubernetes.io/docs/concepts/storage/storage-classes/>`_ to use with the          |
+|                 | PostgreSQL Tablespaces storage `PersistentVolumeClaim                                     |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims>`_|
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _tablespacestorages-volumespec-matchlabels:                                            |
+|                 |                                                                                           |
+| **Key**         | `tablespaceStorages.<storage-name>.volumeSpec.matchLabels                                 |
+|                 | <operator.html#tablespacestorages-volumespec-matchlabels>`_                               |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | A PostgreSQL Tablespaces storage `label selector                                          |
+|                 | <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector>`__             |
 +-----------------+-------------------------------------------------------------------------------------------+
 
 .. _operator-walstorage-section:
@@ -415,6 +656,20 @@ Percona Distribution for PostgreSQL backups.
 | **Example**     | ``perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo``                     |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The Docker image for the :ref:`BackRest repository<backups.pgbackrest.repository>`        |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-resources-requests-cpu:                                                        |
+|                 |                                                                                           |
+| **Key**         | `backup.resources.requests.cpu <operator.html#backup-resources-requests-cpu>`_            |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``500m``                                                                                  |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | `Kubernetes CPU requests                                                                  |
+|                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
+|                 | #resource-requests-and-limits-of-pod-and-container>`_ for a pgBackRest container          |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -696,6 +951,19 @@ Percona Distribution for PostgreSQL backups.
 | **Example**     | ``local``                                                                                 |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The :ref:`type<backups.pgbackrest.repo.type>` of the pgBackRest repository                |
++-----------------+-------------------------------------------------------------------------------------------+
+|                                                                                                             |
++-----------------+-------------------------------------------------------------------------------------------+
+|                 | .. _backup-customconfig:                                                                  |
+|                 |                                                                                           |
+| **Key**         | `backup.customconfig <operator.html#backup-customconfig>`_                                |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Value**       | string                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Example**     | ``""``                                                                                    |
++-----------------+-------------------------------------------------------------------------------------------+
+| **Description** | Name of the `ConfigMap <https://kubernetes.io/docs/concepts/configuration/configmap/>`_   |
+|                 | to pass custom pgBackRest configuration options                                           |
 +-----------------+-------------------------------------------------------------------------------------------+
 |                                                                                                             |
 +-----------------+-------------------------------------------------------------------------------------------+
@@ -1052,7 +1320,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``1``                                                                                     |
+| **Example**     | ``500m``                                                                                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | `Kubernetes CPU requests                                                                  |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
@@ -1067,7 +1335,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``128Mi``                                                                                 |
+| **Example**     | ``256Mi``                                                                                 |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Kubernetes memory requests                                                           |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
@@ -1083,7 +1351,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``2``                                                                                     |
+| **Example**     | ``500m``                                                                                  |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | `Kubernetes CPU limits                                                                    |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
@@ -1098,7 +1366,7 @@ file stores information required to manage the replicas within a PostgreSQL clus
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Value**       | int                                                                                       |
 +-----------------+-------------------------------------------------------------------------------------------+
-| **Example**     | ``512Mi``                                                                                 |
+| **Example**     | ``256Mi``                                                                                 |
 +-----------------+-------------------------------------------------------------------------------------------+
 | **Description** | The `Kubernetes memory limits                                                             |
 |                 | <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/    |
