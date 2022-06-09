@@ -65,8 +65,6 @@ testsReportMap  = [:]
 testsResultsMap = [:]
 
 void makeReport() {
-    def wholeTestAmountTest=sh(script: "ls -l e2e-tests/| grep ^d| egrep -v 'conf|data-migration-gcs|license'", , returnStdout: true).trim()
-    echo "$wholeTestAmountTest"
     def wholeTestAmount=sh(script: "ls -l e2e-tests/| grep ^d| egrep -v 'conf|data-migration-gcs|license' | wc -l", , returnStdout: true).trim()
     def startedTestAmount = testsReportMap.size()
     for ( test in testsReportMap ) {
