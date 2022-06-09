@@ -33,32 +33,12 @@ Allow the Operator to generate certificates automatically
 
 The Operator is able to generate long-term certificates automatically and
 turn on encryption at cluster creation time, if there are no certificate
-secrets available. 
+secrets available. It generates certificates with the help of `cert-manager <https://cert-manager.io/docs/>`_
+-  a Kubernetes certificate management controller widely used to
+automate the management and issuance of TLS certificates.
+Cert-manager is community-driven and open source.
 
-You need two things to make this work:
-
-#. Install `cert-manager <https://cert-manager.io/docs/>`_ -  a Kubernetes
-   certificate management controller widely used to automate the management and
-   issuance of TLS certificates. It is community-driven, and open source. 
-
-   When you have already installed *cert-manager* and deploy the operator, the
-   operator requests a certificate from the *cert-manager*.
-
-#. Uncomment ``sslCA``, ``sslSecretName``, and ``sslReplicationSecretName``
-   options in ``deploy/cr.yaml`` configuration file to make certificates appear:
-
-   .. code:: yaml
-
-      ...
-      spec:
-      #  secretsName: cluster1-users
-        sslCA: cluster1-ssl-ca
-        sslSecretName: cluster1-ssl-keypair
-        sslReplicationSecretName: cluster1-ssl-keypair
-      ...
-
-When done, you can deploy your cluster as usual, with the
-``kubectl apply -f deploy/cr.yaml`` command.
+.. _tls.certs.auto.manager:
 
 Installation of the *cert-manager*
 ----------------------------------
@@ -84,6 +64,30 @@ After the installation, you can verify the *cert-manager* by running the followi
    $ kubectl get pods -n cert-manager
 
 The result should display the *cert-manager* and webhook active and running.
+
+.. _tls.certs.auto.on:
+
+Turning automatic generation of certificates on
+-----------------------------------------------
+
+When you have already installed *cert-manager*, the operator is able to request a
+certificate from it. To make this happend, uncomment ``sslCA``, ``sslSecretName``,
+and ``sslReplicationSecretName`` options in the ``deploy/cr.yaml`` configuration
+file:
+
+   .. code:: yaml
+
+      ...
+      spec:
+      #  secretsName: cluster1-users
+        sslCA: cluster1-ssl-ca
+        sslSecretName: cluster1-ssl-keypair
+        sslReplicationSecretName: cluster1-ssl-keypair
+      ...
+
+When done, deploy your cluster as usual, with the ``kubectl apply -f deploy/cr.yaml``
+command. Certificates will be generated if there are no certificate secrets
+available.
 
 .. _tls.certs.manual:
 
