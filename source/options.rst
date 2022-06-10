@@ -36,9 +36,6 @@ use ``kubectl create configmap`` command with this file to create a ConfigMap,
 and finally put the ConfigMap name to :ref:`pgPrimary.customconfig<pgprimary-customconfig>`
 key in the ``deploy/cr.yaml`` configuration file.
 
-To change options for an existing cluster, you can do the same but put options
-in a ``postgres-ha.yaml`` file directly, without the ``bootstrap`` section.
-
 In both cases, the ``postgres-ha.yaml`` file doesn't fully overwrite PostgreSQL
 configuration files: options present in ``postgres-ha.yaml`` will be
 overwritten, while non-present options will be left intact.
@@ -103,58 +100,64 @@ Now you can create the cluster following the :ref:`regular installation instruct
 Modifying options for the existing cluster
 ------------------------------------------
 
-For example, you can change ``max_connections`` option in a ``postgresql.conf``
-configuration file with the following ``postgres-ha.yaml`` contents:
+If you need to update cluster’s configuration settings, you should modify
+settings in the ``<clusterName>-pgha-config`` ConfigMap.
+
+.. note:: This ConfigMap contains ``<clusterName>-dcs-config`` configuration
+   applied globally to ``postgresql.conf`` of all database servers, and
+   local configurations for the PostgreSQL cluster database servers:
+   ``<clusterName>-local-config`` for the current primary,
+   ``<clusterName>-repl1-local-config``for the first replica, and so on.
+
+This can be done using the various commands available using the kubectl client (or the oc client if using OpenShift) for modifying Kubernetes resources. For instance, the following command can be utilized to open 
+
+For example, let's change the ``max_connections`` option in a globally applied
+``postgresql.conf`` configuration file for the cluster named ``cluster1``. 
+Edit the ``cluster1-pgha-config`` ConfigMap with the following command:
+
+.. code:: bash
+
+   $ kubectl edit -n pgo configmap cluster1-pgha-config
+
+This will open the ConfigMap in a local text editor of your choice. Make sure
+to modify it as follows:
 
 .. code:: yaml
 
-   ---
-   dcs:
+   ...
+   cluster1-dcs-config: |
      postgresql:
        parameters:
-         max_connections: 50
+        ...
+        max_connections: 50
+        ...
 
-..note:: ``dsc.postgresql`` subsection means that option will be applied globally to
-         ``postgresql.conf`` of all database servers.
+Now :ref:`restart the cluster<operator-pause>` to ensure the update took effect.
 
-You can create a ConfigMap from this file. The syntax for ``kubectl create configmap`` command is:
+You can check if the changes are applied by quering the appropriate Pods of your
+cluster using the ``kubectl exec`` command with specific Pod name. 
 
-.. code:: bash
+First find out names of your Pods in a common way, using the ``kubectl get pods``
+command:
 
-   kubectl -n <namespace> create configmap <configmap-name> --from-file=postgres-ha.yaml
+   .. code:: bash
 
-ConfigMap name should include your cluster name and a dash as a prefix
-(``cluster1-`` by default). 
+      $ kubectl get pods
+      NAME                                              READY   STATUS    RESTARTS   AGE
+      backrest-backup-cluster1-j275w                    0/1     Completed 0          10m
+      cluster1-85486d645f-gpxzb                         1/1     Running   0          10m
+      cluster1-backrest-shared-repo-6495464548-c8wvl    1/1     Running   0          10m
+      cluster1-pgbouncer-fc45869f7-s86rf                1/1     Running   0          10m
+      pgo-deploy-rhv6k                                  0/1     Completed 0          5m
+      postgres-operator-8646c68b57-z8m62                4/4     Running   1          5m
 
-The following example defines ``cluster1-custom-config`` as the ConfigMap name:
-
-.. code:: bash
-
-   $ kubectl create -n pgo configmap cluster1-custom-config --from-file=postgres-ha.yaml
-
-To view the created ConfigMap, use the following command:
-
-.. code:: bash
-
-   $ kubectl describe configmaps cluster1-custom-config
-
-You can also use a similar ``kubectl edit configmap`` command to change the
-already existing ConfigMap with your default text editor:
+Now let's check the ``cluster1-85486d645f-gpxzb`` Pod for the current
+``max_connections`` value:
 
 .. code:: bash
 
-   $ kubectl edit -n pgo configmap cluster1-custom-config
-
-Don't forget to put the name of your ConfigMap to the ``deploy/cr.yaml``
-configuration file if it isn't already there:
-
-.. code:: yaml
-
-   spec:
-     ...
-     pgPrimary:
-       ...
-         customconfig: "cluster1-custom-config"
-
-Now you should :ref:`restart the cluster<operator-pause>` to ensure the update
-took effect.
+   $ kubectl -n pgo exec -it cluster1-85486d645f-gpxzb -- psql -c 'show max_connections;'
+     max_connections 
+     -----------------
+     50
+     (1 row)
