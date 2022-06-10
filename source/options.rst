@@ -58,8 +58,8 @@ contents:
          parameters:
            max_connections: 30
 
-..note:: ``dsc.postgresql`` subsection means that option will be applied globally to
-         ``postgresql.conf`` of all database servers.
+.. note:: ``dsc.postgresql`` subsection means that option will be applied
+          globally to ``postgresql.conf`` of all database servers.
 
 You can create a ConfigMap from this file. The syntax for ``kubectl create configmap`` command is:
 
