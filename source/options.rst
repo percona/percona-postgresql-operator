@@ -132,22 +132,22 @@ to modify it as follows:
 
 Now :ref:`restart the cluster<operator-pause>` to ensure the update took effect.
 
-You can check if the changes are applied by quering the appropriate Pods of your
-cluster using the ``kubectl exec`` command with specific Pod name. 
+You can check if the changes are applied by querying the appropriate Pods of
+your cluster using the ``kubectl exec`` command with a specific Pod name. 
 
 First find out names of your Pods in a common way, using the ``kubectl get pods``
 command:
 
-   .. code:: bash
+.. code:: bash
 
-      $ kubectl get pods
-      NAME                                              READY   STATUS    RESTARTS   AGE
-      backrest-backup-cluster1-j275w                    0/1     Completed 0          10m
-      cluster1-85486d645f-gpxzb                         1/1     Running   0          10m
-      cluster1-backrest-shared-repo-6495464548-c8wvl    1/1     Running   0          10m
-      cluster1-pgbouncer-fc45869f7-s86rf                1/1     Running   0          10m
-      pgo-deploy-rhv6k                                  0/1     Completed 0          5m
-      postgres-operator-8646c68b57-z8m62                4/4     Running   1          5m
+   $ kubectl get pods
+   NAME                                              READY   STATUS    RESTARTS   AGE
+   backrest-backup-cluster1-j275w                    0/1     Completed 0          10m
+   cluster1-85486d645f-gpxzb                         1/1     Running   0          10m
+   cluster1-backrest-shared-repo-6495464548-c8wvl    1/1     Running   0          10m
+   cluster1-pgbouncer-fc45869f7-s86rf                1/1     Running   0          10m
+   pgo-deploy-rhv6k                                  0/1     Completed 0          5m
+   postgres-operator-8646c68b57-z8m62                4/4     Running   1          5m
 
 Now let's check the ``cluster1-85486d645f-gpxzb`` Pod for the current
 ``max_connections`` value:
