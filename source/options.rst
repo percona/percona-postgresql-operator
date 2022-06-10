@@ -109,8 +109,6 @@ settings in the ``<clusterName>-pgha-config`` ConfigMap.
    ``<clusterName>-local-config`` for the current primary,
    ``<clusterName>-repl1-local-config``for the first replica, and so on.
 
-This can be done using the various commands available using the kubectl client (or the oc client if using OpenShift) for modifying Kubernetes resources. For instance, the following command can be utilized to open 
-
 For example, let's change the ``max_connections`` option in a globally applied
 ``postgresql.conf`` configuration file for the cluster named ``cluster1``. 
 Edit the ``cluster1-pgha-config`` ConfigMap with the following command:
