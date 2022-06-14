@@ -436,9 +436,9 @@ pgBackRest with few additional options specified in the
   the typical string formatted as ``<YYYY-MM-DD HH:MM:DD>``, optionally followed
   by a timezone offset: ``"2021-04-16 15:13:32-04"`` (``-04`` here means Eastern
   Daylight Time Zone, or EDT),
-* optionally set ``--set`` option to choose which backup to start the
-  point-in-time recovery from (:ref:`look through the available backups<backups-list>`
-  to find out the proper name). This option must be specified if the target is
+* optional ``--set`` option allows you to choose the backup which will be the
+  starting point for point-in-time recovery (:ref:`look through the available backups<backups-list>`
+  to find out the proper backup name). This option must be specified if the target is
   one or more backups away from the current moment.
 
 After setting these options in the *backup restore* configuration file,
