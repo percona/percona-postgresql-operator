@@ -330,7 +330,7 @@ The following keys are the most important in the parameters section of this file
   ``parameters.backrest-restore-from-cluster`` before the Operator 1.2.0).
   It includes stopping the database and recreating a new primary with the
   restored data (for example, ``cluster1``),
-* ``parameters.backrest-restore-opts`` specifies additional options for
+* ``parameters.backrest-restore-opts`` passes through additional options for
   pgBackRest,
 * ``parameters.backrest-storage-type`` the type of the pgBackRest repository,
   (for example, ``local``).
