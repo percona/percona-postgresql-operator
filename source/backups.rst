@@ -255,6 +255,27 @@ command:
 
    $ kubectl exec <name-of-backrest-shared-repo-pod>  -it -- pgbackrest info
 
+You can find out the appropriate Pod name using the `` kubectl get pods``
+command, as usual. Here is an example of the backups list:
+
+.. code:: bash
+
+   $ kubectl exec cluster1-backrest-shared-repo-5ffc465b85-gvhlh -it -- pgbackrest info
+   stanza: db
+       status: ok
+       cipher: none
+
+       db (current)
+           wal archive min/max (14): 000000010000000000000001/000000010000000000000003
+
+           full backup: 20220614-104859F
+               timestamp start/stop: 2022-06-14 10:48:59 / 2022-06-14 10:49:13
+               wal start/stop: 000000010000000000000002 / 000000010000000000000002
+               database size: 33.5MB, database backup size: 33.5MB
+               repo1: backup set size: 4.3MB, backup size: 4.3MB
+
+In this example there is only one backup named ``20220614-104859F``.
+
 .. _backups-restore:
 
 Restore the cluster from a previously saved backup
@@ -414,7 +435,8 @@ pgBackRest with few additional options specified in the
   timezone offset: ``"2021-04-16 15:13:32-03"`` with a timezone specified as
   ``-03`` for EDT.
 * optionally set ``--set`` option to choose which backup to start the
-  point-in-time recovery from.
+  point-in-time recovery from (:ref:`look through the available backups<backups-list>`
+  to find out the proper name).
 
 After setting these options in the *backup restore* configuration file,
 follow the :ref:`standard restore instructions<backups-restore>`.
