@@ -438,7 +438,8 @@ pgBackRest with few additional options specified in the
   Daylight Time Zone, or EDT),
 * optionally set ``--set`` option to choose which backup to start the
   point-in-time recovery from (:ref:`look through the available backups<backups-list>`
-  to find out the proper name).
+  to find out the proper name). This option must be specified if the target is
+  one or more backups away from the current moment.
 
 After setting these options in the *backup restore* configuration file,
 follow the :ref:`standard restore instructions<backups-restore>`.
