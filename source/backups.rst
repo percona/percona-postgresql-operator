@@ -429,7 +429,7 @@ pgBackRest with few additional options specified in the
      namespace: pgo
      parameters:
        backrest-restore-from-cluster: cluster1
-       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32"
+       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32-04"
 
 * set ``--type`` option to ``time``,
 * set ``--target`` to a specific time you would like to restore to. You can use
