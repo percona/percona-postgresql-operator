@@ -396,7 +396,7 @@ a state before an unwanted change had occurred.
 
 You can set up a point-in-time recovery using the normal restore command of
 pgBackRest with few additional options specified in the
-``parameters.backrest-restore-opts`` key:
+``parameters.backrest-restore-opts`` key in the `backup restore configuration file <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_:
 
 .. code:: yaml
 
