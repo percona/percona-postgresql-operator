@@ -30,7 +30,8 @@ can be used for backups:
 .. _backups.pgbackrest.repo.type:
 
 * ``local``: Uses the storage that is provided by the Kubernetes cluster’s
-  Storage Class that you select,
+  Storage Class that you select (for historical reasons this repository type can
+  be alternatively named ``posix``),
 * ``s3``: Use Amazon S3 or an object storage system that uses the S3 protocol,
 * ``local,s3``: Use both the storage that is provided by the Kubernetes
   cluster’s Storage Class that you select AND Amazon S3 (or equivalent object
@@ -319,15 +320,16 @@ configuration file. The example of the backup configuration file is
      parameters:
        backrest-restore-from-cluster: cluster1
        backrest-restore-opts: --type=time --target="2021-04-16 15:13:32"
-       backrest-storage-type: posix
+       backrest-storage-type: local
      tasktype: restore
 
 The following keys are the most important in the parameters section of this file:
 
 * ``parameters.backrest-restore-cluster`` specifies the name of a
-  PostgreSQL cluster which will be restored (this option had name ``parameters.backrest-restore-from-cluster`` before the Operator 1.2.0). This includes stopping the database
-  and recreating a new primary with the restored data (for example, 
-  ``cluster1``),
+  PostgreSQL cluster which will be restored (this option had name
+  ``parameters.backrest-restore-from-cluster`` before the Operator 1.2.0).
+  It includes stopping the database and recreating a new primary with the
+  restored data (for example, ``cluster1``),
 * ``parameters.backrest-restore-opts`` specifies additional options for
   pgBackRest,
 * ``parameters.backrest-storage-type`` the type of the pgBackRest repository,
@@ -431,9 +433,9 @@ pgBackRest with few additional options specified in the
 
 * set ``--type`` option to ``time``,
 * set ``--target`` to a specific time you would like to restore to. You can use
-  the typical string formatted as ``<YYYY-MM-DD HH:MM:DD>``, followed by a
-  timezone offset: ``"2021-04-16 15:13:32-03"`` with a timezone specified as
-  ``-03`` for EDT.
+  the typical string formatted as ``<YYYY-MM-DD HH:MM:DD>``, optionally followed
+  by a timezone offset: ``"2021-04-16 15:13:32-04"`` (``-04`` here means Eastern
+  Daylight Time Zone, or EDT),
 * optionally set ``--set`` option to choose which backup to start the
   point-in-time recovery from (:ref:`look through the available backups<backups-list>`
   to find out the proper name).
