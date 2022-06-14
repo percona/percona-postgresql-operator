@@ -319,7 +319,7 @@ configuration file. The example of the backup configuration file is
      namespace: pgo
      parameters:
        backrest-restore-from-cluster: cluster1
-       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32"
+       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32-04"
        backrest-storage-type: local
      tasktype: restore
 
