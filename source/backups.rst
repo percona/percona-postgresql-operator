@@ -319,7 +319,7 @@ configuration file. The example of the backup configuration file is
      namespace: pgo
      parameters:
        backrest-restore-from-cluster: cluster1
-       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32-04"
+       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32+00"
        backrest-storage-type: local
      tasktype: restore
 
@@ -429,13 +429,13 @@ pgBackRest with few additional options specified in the
      namespace: pgo
      parameters:
        backrest-restore-from-cluster: cluster1
-       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32-04"
+       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32+00"
 
 * set ``--type`` option to ``time``,
 * set ``--target`` to a specific time you would like to restore to. You can use
   the typical string formatted as ``<YYYY-MM-DD HH:MM:DD>``, optionally followed
-  by a timezone offset: ``"2021-04-16 15:13:32-04"`` (``-04`` here means Eastern
-  Daylight Time Zone, or EDT),
+  by a timezone offset: ``"2021-04-16 15:13:32-04"`` (``+00`` in the above
+  example means just UTC),
 * optional ``--set`` argument allows you to choose the backup which will be the
   starting point for point-in-time recovery (:ref:`look through the available backups<backups-list>`
   to find out the proper backup name). This option must be specified if the target is
