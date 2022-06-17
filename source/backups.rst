@@ -30,7 +30,8 @@ can be used for backups:
 .. _backups.pgbackrest.repo.type:
 
 * ``local``: Uses the storage that is provided by the Kubernetes cluster’s
-  Storage Class that you select,
+  Storage Class that you select (for historical reasons this repository type can
+  be alternatively named ``posix``),
 * ``s3``: Use Amazon S3 or an object storage system that uses the S3 protocol,
 * ``local,s3``: Use both the storage that is provided by the Kubernetes
   cluster’s Storage Class that you select AND Amazon S3 (or equivalent object
@@ -255,6 +256,27 @@ command:
 
    $ kubectl exec <name-of-backrest-shared-repo-pod>  -it -- pgbackrest info
 
+You can find out the appropriate Pod name using the `` kubectl get pods``
+command, as usual. Here is an example of the backups list:
+
+.. code:: bash
+
+   $ kubectl exec cluster1-backrest-shared-repo-5ffc465b85-gvhlh -it -- pgbackrest info
+   stanza: db
+       status: ok
+       cipher: none
+
+       db (current)
+           wal archive min/max (14): 000000010000000000000001/000000010000000000000003
+
+           full backup: 20220614-104859F
+               timestamp start/stop: 2022-06-14 10:48:59 / 2022-06-14 10:49:13
+               wal start/stop: 000000010000000000000002 / 000000010000000000000002
+               database size: 33.5MB, database backup size: 33.5MB
+               repo1: backup set size: 4.3MB, backup size: 4.3MB
+
+In this example there is only one backup named ``20220614-104859F``.
+
 .. _backups-restore:
 
 Restore the cluster from a previously saved backup
@@ -280,25 +302,44 @@ scenarios where using this technique is helpful:
 
 To restore the previously saved backup the user should use a *backup restore*
 configuration file. The example of the backup configuration file is
-`deploy/backup/restore.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_.
+`deploy/backup/restore.yaml <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_:
+
+.. code:: bash
+
+   apiVersion: pg.percona.com/v1
+   kind: Pgtask
+   metadata:
+     labels:
+       pg-cluster: cluster1
+       pgouser: admin
+     name: cluster1-backrest-restore
+     namespace: pgo
+   spec:
+     name: cluster1-backrest-restore
+     namespace: pgo
+     parameters:
+       backrest-restore-from-cluster: cluster1
+       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32+00"
+       backrest-storage-type: local
+     tasktype: restore
 
 The following keys are the most important in the parameters section of this file:
 
 * ``parameters.backrest-restore-cluster`` specifies the name of a
-  PostgreSQL cluster which will be restored (this option had name ``parameters.backrest-restore-from-cluster`` before the Operator 1.2.0). This includes stopping the database
-  and recreating a new primary with the restored data (for example, 
-  ``cluster1``),
-* ``parameters.backrest-restore-opts`` specifies additional options for
-  pgBackRest (for example, ``--type=time --target="2021-04-16 15:13:32"`` to
-  perform a point-in-time-recovery),
+  PostgreSQL cluster which will be restored (this option had name
+  ``parameters.backrest-restore-from-cluster`` before the Operator 1.2.0).
+  It includes stopping the database and recreating a new primary with the
+  restored data (for example, ``cluster1``),
+* ``parameters.backrest-restore-opts`` passes through additional options for
+  pgBackRest,
 * ``parameters.backrest-storage-type`` the type of the pgBackRest repository,
   (for example, ``local``).
 
 The actual restoration process can be started as follows:
 
-   .. code:: bash
+.. code:: bash
 
-      $ kubectl apply -f deploy/backup/restore.yaml
+   $ kubectl apply -f deploy/backup/restore.yaml
 
 .. seealso:: :ref:`faq-skip-tls`
 
@@ -362,11 +403,51 @@ existing one named``cluster1``.
    * set the option :ref:`pgDataSource.restoreFrom<pgdatasource-restorefrom>` to
      ``cluster1``.
 
-Create the cluster as follows:
+#. Create the cluster as follows:
 
    .. code:: bash
 
       $ kubectl apply -f deploy/cr.yaml
+
+.. _backups-restore-pitr:
+
+Restore the cluster with point-in-time recovery
+-------------------------------------------------
+
+Point-in-time recovery functionality allows users to revert the database back to
+a state before an unwanted change had occurred.
+
+You can set up a point-in-time recovery using the normal restore command of
+pgBackRest with few additional options specified in the
+``parameters.backrest-restore-opts`` key in the `backup restore configuration file <https://github.com/percona/percona-postgresql-operator/blob/main/deploy/backup/restore.yaml>`_:
+
+.. code:: yaml
+
+   ...
+   spec:
+     name: cluster1-backrest-restore
+     namespace: pgo
+     parameters:
+       backrest-restore-from-cluster: cluster1
+       backrest-restore-opts: --type=time --target="2021-04-16 15:13:32+00"
+
+* set ``--type`` option to ``time``,
+* set ``--target`` to a specific time you would like to restore to. You can use
+  the typical string formatted as ``<YYYY-MM-DD HH:MM:DD>``, optionally followed
+  by a timezone offset: ``"2021-04-16 15:13:32+00"`` (``+00`` in the above
+  example means just UTC),
+* optional ``--set`` argument allows you to choose the backup which will be the
+  starting point for point-in-time recovery (:ref:`look through the available backups<backups-list>`
+  to find out the proper backup name). This option must be specified if the target is
+  one or more backups away from the current moment.
+
+After setting these options in the *backup restore* configuration file,
+follow the :ref:`standard restore instructions<backups-restore>`.
+
+.. note:: Make sure you have a backup that is older than your desired point in
+   time. You obviously can’t restore from a time where you do not have a backup.
+   All relevant write-ahead log files must be successfully pushed before you
+   make the restore.
 
 .. _backups-delete:
 
