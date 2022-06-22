@@ -31,18 +31,22 @@ RUN set -ex; \
 
 RUN set -ex; \
     microdnf -y install \
-        python3
+        python3 \
+        python3-jinja2 \
+        python3-pyyaml \
+        python3-six \
+        sshpass
 
 RUN set -ex; \
     curl -Lf -o /tmp/epel-release.rpm https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm; \
     curl -Lf -o /tmp/python3-jmespath.rpm http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/python3-jmespath-0.9.0-11.el8.noarch.rpm; \
-    rpmkeys --checksig /tmp/python3-jmespath.rpm /tmp/epel-release.rpm; \
-    rpm -i /tmp/epel-release.rpm /tmp/python3-jmespath.rpm; \
-    rm -rf /tmp/epel-release.rpm /tmp/python3-jmespath.rpm
+    curl -Lf -o /tmp/ansible.rpm https://cbs.centos.org/kojifiles/packages/ansible/2.9.27/3.el8/noarch/ansible-2.9.27-3.el8.noarch.rpm; \
+    rpmkeys --checksig /tmp/python3-jmespath.rpm /tmp/epel-release.rpm /tmp/ansible.rpm; \
+    rpm -i /tmp/epel-release.rpm /tmp/python3-jmespath.rpm /tmp/ansible.rpm; \
+    rm -rf /tmp/epel-release.rpm /tmp/python3-jmespath.rpm /tmp/ansible.rpm
 
 RUN set -ex; \
     microdnf -y install \
-        ansible-2.9.* \
         which \
         gettext \
         openssl; \
