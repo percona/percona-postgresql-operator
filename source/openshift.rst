@@ -32,12 +32,12 @@ Percona Distribution for PostgreSQL on OpenShift.
       the ``namespace: pgo`` line in both ``deploy/cr.yaml`` and
       ``deploy/operator.yaml`` configuration files.
 
-#. If you are going to deploy the operator in 'restrictive' environment (default
-   `FSGroup <https://kubernetes.io/docs/concepts/security/pod-security-policy/#volumes-and-file-systems>`_ is not welcomed) please execute the following command:
+#. If you are going to use the operator with `anyuid <https://docs.openshift.com/container-platform/4.9/authentication/managing-security-context-constraints.html>` security context constraint
+   please execute the following command:
 
    .. code:: bash
 
-      $ sed -i -e 's#disable_fsgroup: .*#disable_fsgroup: "true"#g' deploy/operator.yaml
+      $ sed -i '/disable_auto_failover: "false"/a \ \ \ \ disable_fsgroup: "false"' deploy/operator.yaml
 
 #. Deploy the operator with the following command:
 
