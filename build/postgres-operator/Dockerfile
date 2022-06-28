@@ -42,6 +42,8 @@ COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
 COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
 COPY percona/templates/ /
 
+RUN ansible-galaxy collection install community.kubernetes
+
 USER 2
 
 ENTRYPOINT ["postgres-operator"]
