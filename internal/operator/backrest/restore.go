@@ -26,6 +26,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/internal/operator"
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	"github.com/percona/percona-postgresql-operator/pkg/events"
@@ -67,6 +68,14 @@ func UpdatePGClusterSpecForRestore(clientset kubeapi.Interface, cluster *crv1.Pg
 	storageType := task.Spec.Parameters[config.LABEL_BACKREST_STORAGE_TYPE]
 	if storageType != "" && !strings.Contains(restoreOpts, "--repo-type") {
 		restoreOpts = fmt.Sprintf("%s --repo-type=%s", restoreOpts, storageType)
+	}
+
+	verifyTLS, ok := task.Spec.Parameters[config.LABEL_BACKREST_S3_VERIFY_TLS]
+	if !ok {
+		verifyTLS = operator.GetS3VerifyTLSSetting(cluster)
+	}
+	if verifyTLS == "false" {
+		restoreOpts = fmt.Sprintf("%s --no-repo1-s3-verify-tls", restoreOpts)
 	}
 
 	cluster.Spec.PGDataSource.RestoreOpts = restoreOpts
