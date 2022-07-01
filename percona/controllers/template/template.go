@@ -16,11 +16,25 @@ import (
 const (
 	ClusterDeploymentTemplateName      = "cluster-deployment.json"
 	BackrestRepoDeploymentTemplateName = "pgo-backrest-repo-template.json"
+	BackrestJobTemplateName            = "backrest-job.json"
 	BouncerDeploymentTemplateName      = "pgbouncer-template.json"
 	PGBadgerTemplateName               = "pgbadger.json"
 	Path                               = "/"
 	defaultSecurityContext             = `{"fsGroup": 26,"supplementalGroups": [1001]}`
 )
+
+func UpdateBackrestJobTemplate(backrestJobTemplateData []byte, newCluster *crv1.PerconaPGCluster) error {
+	templateData := handleImagePullPolicy(backrestJobTemplateData, []byte(newCluster.Spec.Backup.ImagePullPolicy))
+
+	t, err := template.New(BackrestJobTemplateName).Parse(string(templateData))
+	if err != nil {
+		return errors.Wrap(err, "parse template")
+	}
+
+	config.BackrestjobTemplate = t
+
+	return nil
+}
 
 func UpdateDeploymentTemplate(deploymentTemplateData []byte, newCluster *crv1.PerconaPGCluster, nodeName string) error {
 	templateData, err := handlePMMTemplate(deploymentTemplateData, newCluster, nodeName)
@@ -31,7 +45,7 @@ func UpdateDeploymentTemplate(deploymentTemplateData []byte, newCluster *crv1.Pe
 	if err != nil {
 		return errors.Wrap(err, "handle security context template data")
 	}
-	templateData = handleDeploymentImagePullPolicy(templateData, []byte(newCluster.Spec.PGPrimary.ImagePullPolicy))
+	templateData = handleImagePullPolicy(templateData, []byte(newCluster.Spec.PGPrimary.ImagePullPolicy))
 
 	t, err := template.New(ClusterDeploymentTemplateName).Parse(string(templateData))
 	if err != nil {
@@ -44,7 +58,7 @@ func UpdateDeploymentTemplate(deploymentTemplateData []byte, newCluster *crv1.Pe
 }
 
 func UpdateBackrestRepoTemplate(backrestRepoDeploymentTemplateData []byte, newCluster *crv1.PerconaPGCluster, nodeName string) error {
-	templateData := handleDeploymentImagePullPolicy(backrestRepoDeploymentTemplateData, []byte(newCluster.Spec.Backup.ImagePullPolicy))
+	templateData := handleImagePullPolicy(backrestRepoDeploymentTemplateData, []byte(newCluster.Spec.Backup.ImagePullPolicy))
 
 	t, err := template.New(BackrestRepoDeploymentTemplateName).Parse(string(templateData))
 	if err != nil {
@@ -57,7 +71,7 @@ func UpdateBackrestRepoTemplate(backrestRepoDeploymentTemplateData []byte, newCl
 }
 
 func UpdateBouncerTemplate(bouncerDeploymentTemplateData []byte, newCluster *crv1.PerconaPGCluster, nodeName string) error {
-	templateData := handleDeploymentImagePullPolicy(bouncerDeploymentTemplateData, []byte(newCluster.Spec.PGBouncer.ImagePullPolicy))
+	templateData := handleImagePullPolicy(bouncerDeploymentTemplateData, []byte(newCluster.Spec.PGBouncer.ImagePullPolicy))
 
 	t, err := template.New(BouncerDeploymentTemplateName).Parse(string(templateData))
 	if err != nil {
@@ -70,7 +84,7 @@ func UpdateBouncerTemplate(bouncerDeploymentTemplateData []byte, newCluster *crv
 }
 
 func UpdatePGBadgerTemplate(pgBadgerTemplateData []byte, newCluster *crv1.PerconaPGCluster, nodeName string) error {
-	templateData := handleDeploymentImagePullPolicy(pgBadgerTemplateData, []byte(newCluster.Spec.PGBadger.ImagePullPolicy))
+	templateData := handleImagePullPolicy(pgBadgerTemplateData, []byte(newCluster.Spec.PGBadger.ImagePullPolicy))
 
 	t, err := template.New(PGBadgerTemplateName).Parse(string(templateData))
 	if err != nil {
@@ -103,7 +117,7 @@ func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster, nodeName string) ([]byte, e
 	return b, nil
 }
 
-func handleDeploymentImagePullPolicy(template, imagePullPolicy []byte) []byte {
+func handleImagePullPolicy(template, imagePullPolicy []byte) []byte {
 	return bytes.Replace(template, []byte("<imagePullPolicy>"), imagePullPolicy, -1)
 }
 

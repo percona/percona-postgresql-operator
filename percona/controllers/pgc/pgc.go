@@ -53,6 +53,7 @@ type Templates struct {
 	backrestRepoDeploymentTemplateData []byte
 	bouncerTemplateData                []byte
 	pgBadgerTemplateData               []byte
+	backrestJobTemplateData            []byte
 }
 
 type CronRegistry struct {
@@ -230,6 +231,10 @@ func (c *Controller) updateTemplates(newCluster *crv1.PerconaPGCluster) error {
 	if err != nil {
 		return errors.Wrap(err, "update backrest repo deployment template")
 	}
+	err = template.UpdateBackrestJobTemplate(c.templates.backrestJobTemplateData, newCluster)
+	if err != nil {
+		return errors.Wrap(err, "update backrest job template")
+	}
 	err = template.UpdateBouncerTemplate(c.templates.bouncerTemplateData, newCluster, newCluster.Name)
 	if err != nil {
 		return errors.Wrap(err, "update bouncer deployment template")
@@ -272,12 +277,17 @@ func (c *Controller) setControllerTemplatesData() error {
 	}
 	pgBadgerTemplateData, err := ioutil.ReadFile(template.Path + template.PGBadgerTemplateName)
 	if err != nil {
-		return errors.Wrap(err, "new bouncer template data")
+		return errors.Wrap(err, "new pgBadger template data")
+	}
+	backrestJobTemplateData, err := ioutil.ReadFile(template.Path + template.BackrestJobTemplateName)
+	if err != nil {
+		return errors.Wrap(err, "new backrestJob template data")
 	}
 	c.templates.deploymentTemplateData = deploymentTemplateData
 	c.templates.backrestRepoDeploymentTemplateData = backrestRepodeploymentTemplateData
 	c.templates.bouncerTemplateData = bouncerTemplateData
 	c.templates.pgBadgerTemplateData = pgBadgerTemplateData
+	c.templates.backrestJobTemplateData = backrestJobTemplateData
 
 	return nil
 }
