@@ -54,6 +54,10 @@ func UpdateSpecTemplateLabels(labels map[string]string, deployment *appsv1.Deplo
 	return
 }
 
+func UpdateSpecTemplateAffinity(deployment *appsv1.Deployment, affinity crv1.PodAffinity) {
+	deployment.Spec.Template.Spec.Affinity = affinity.Advanced
+}
+
 func UpdateDeploymentContainer(deployment *appsv1.Deployment, containerName, image, pullPolicy string) {
 	containers := []v1.Container{}
 	for _, c := range deployment.Spec.Template.Spec.Containers {

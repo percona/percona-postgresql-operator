@@ -76,13 +76,13 @@ type Badger struct {
 }
 
 type PgBouncer struct {
-	Image            string              `json:"image"`
-	Size             int32               `json:"size"`
-	Resources        Resources           `json:"resources"`
-	TLSSecret        string              `json:"tlsSecret"`
-	Expose           Expose              `json:"expose"`
-	AntiAffinityType PodAntiAffinityType `json:"antiAffinityType"`
-	ImagePullPolicy  string              `json:"imagePullPolicy"`
+	Image           string       `json:"image"`
+	Size            int32        `json:"size"`
+	Resources       Resources    `json:"resources"`
+	TLSSecret       string       `json:"tlsSecret"`
+	Expose          Expose       `json:"expose"`
+	Affinity        *PodAffinity `json:"affinity,omitempty"`
+	ImagePullPolicy string       `json:"imagePullPolicy"`
 }
 
 type PGDataSource struct {
@@ -92,20 +92,19 @@ type PGDataSource struct {
 }
 
 type PGPrimary struct {
-	Image              string              `json:"image"`
-	Customconfig       string              `json:"customconfig"`
-	Resources          Resources           `json:"resources"`
-	VolumeSpec         *PgStorageSpec      `json:"volumeSpec"`
-	Labels             map[string]string   `json:"labels"`
-	Annotations        map[string]string   `json:"annotations"`
-	Affinity           v1.Affinity         `json:"affinity"`
-	AntiAffinityType   PodAntiAffinityType `json:"antiAffinityType"`
-	ImagePullPolicy    string              `json:"imagePullPolicy"`
-	Tolerations        []v1.Toleration     `json:"tolerations"`
-	NodeSelector       string              `json:"nodeSelector"`
-	RuntimeClassName   string              `json:"runtimeClassName"`
-	PodSecurityContext string              `json:"podSecurityContext"`
-	Expose             Expose              `json:"expose"`
+	Image              string            `json:"image"`
+	Customconfig       string            `json:"customconfig"`
+	Resources          Resources         `json:"resources"`
+	VolumeSpec         *PgStorageSpec    `json:"volumeSpec"`
+	Labels             map[string]string `json:"labels"`
+	Annotations        map[string]string `json:"annotations"`
+	Affinity           *PodAffinity      `json:"affinity,omitempty"`
+	ImagePullPolicy    string            `json:"imagePullPolicy"`
+	Tolerations        []v1.Toleration   `json:"tolerations"`
+	NodeSelector       string            `json:"nodeSelector"`
+	RuntimeClassName   string            `json:"runtimeClassName"`
+	PodSecurityContext string            `json:"podSecurityContext"`
+	Expose             Expose            `json:"expose"`
 }
 
 type PGReplicas struct {
@@ -145,6 +144,7 @@ type Backup struct {
 	Storages          map[string]Storage    `json:"storages"`
 	Schedule          []CronJob             `json:"schedule"`
 	StorageTypes      []BackrestStorageType `json:"storageTypes"`
+	Affinity          *PodAffinity          `json:"affinity,omitempty"`
 	AntiAffinityType  PodAntiAffinityType   `json:"antiAffinityType"`
 	RepoPath          string                `json:"repoPath"`
 	CustomConfig      []v1.VolumeProjection `json:"customConfig"`
@@ -181,6 +181,11 @@ type PMMSpec struct {
 	Resources       Resources `json:"resources"`
 }
 
+type PodAffinity struct {
+	TopologyKey *string      `json:"antiAffinityTopologyKey,omitempty"`
+	Advanced    *v1.Affinity `json:"advanced,omitempty"`
+}
+
 // PerconaPGClusterList is the CRD that defines a Percona PG Cluster List
 // swagger:ignore
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -215,6 +220,8 @@ var PullPolicyIfNotPresent = "IfNotPresent"
 
 const UsersSecretTag string = "-users"
 
+var defaultAffinityTopologyKey = "kubernetes.io/hostname"
+
 func (p *PerconaPGCluster) CheckAndSetDefaults() {
 	if p.Spec.PGPrimary.ImagePullPolicy == "" {
 		p.Spec.PGPrimary.ImagePullPolicy = PullPolicyIfNotPresent
@@ -243,5 +250,53 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 
 	if p.Spec.UsersSecretName == "" {
 		p.Spec.UsersSecretName = p.Name + UsersSecretTag
+	}
+
+	p.checkAndSetAffinity(p.Name)
+}
+
+func (p *PerconaPGCluster) checkAndSetAffinity(clusterName string) {
+	if p.Spec.PGPrimary.Affinity == nil {
+		p.Spec.PGPrimary.Affinity = getDefaultAffinity(clusterName)
+	}
+	if p.Spec.PGBouncer.Affinity == nil {
+		p.Spec.PGBouncer.Affinity = getDefaultAffinity(clusterName)
+	}
+	if p.Spec.Backup.Affinity == nil {
+		p.Spec.Backup.Affinity = getDefaultAffinity(clusterName)
+	}
+}
+
+func getDefaultAffinity(clusterName string) *PodAffinity {
+	return &PodAffinity{
+		Advanced: &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+					getDefaultWeightedPodAffinityTerm(clusterName),
+				},
+			},
+		},
+	}
+}
+
+func getDefaultWeightedPodAffinityTerm(clusterName string) v1.WeightedPodAffinityTerm {
+	return v1.WeightedPodAffinityTerm{
+		PodAffinityTerm: v1.PodAffinityTerm{
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "pg-pod-anti-affinity",
+						Operator: metav1.LabelSelectorOpExists,
+					},
+					{
+						Key:      "pg-cluster",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{clusterName},
+					},
+				},
+			},
+			TopologyKey: defaultAffinityTopologyKey,
+		},
+		Weight: int32(1),
 	}
 }

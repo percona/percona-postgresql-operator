@@ -104,6 +104,8 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 		}
 	}
 
+	dplmnt.UpdateSpecTemplateAffinity(deployment, *newPerconaPGCluster.Spec.PGPrimary.Affinity)
+
 	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PGPrimary, newPerconaPGCluster.Spec.PGPrimary) {
 		dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
 			newPerconaPGCluster.Spec.PGPrimary.Image,
@@ -141,7 +143,7 @@ func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *
 	if err != nil {
 		return errors.Wrap(err, "getdeployment")
 	}
-
+	dplmnt.UpdateSpecTemplateAffinity(deployment, *newPerconaPGCluster.Spec.Backup.Affinity)
 	dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
 		newPerconaPGCluster.Spec.Backup.BackrestRepoImage,
 		newPerconaPGCluster.Spec.Backup.ImagePullPolicy)
@@ -319,20 +321,6 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests
 	cluster.Spec.PgBouncer.Limits = pgc.Spec.PGBouncer.Resources.Limits
 	cluster.Spec.PGOImagePrefix = operator.Pgo.Cluster.CCPImagePrefix
-	if len(pgc.Spec.PGPrimary.AntiAffinityType) == 0 {
-		pgc.Spec.PGPrimary.AntiAffinityType = "preferred"
-	}
-	if len(pgc.Spec.Backup.AntiAffinityType) == 0 {
-		pgc.Spec.Backup.AntiAffinityType = "preferred"
-	}
-	if len(pgc.Spec.PGBouncer.AntiAffinityType) == 0 {
-		pgc.Spec.PGBouncer.AntiAffinityType = "preferred"
-	}
-	cluster.Spec.PodAntiAffinity = crv1.PodAntiAffinitySpec{
-		Default:    pgc.Spec.PGPrimary.AntiAffinityType,
-		PgBackRest: pgc.Spec.Backup.AntiAffinityType,
-		PgBouncer:  pgc.Spec.PGBouncer.AntiAffinityType,
-	}
 	cluster.Spec.Port = pgc.Spec.Port
 	cluster.Spec.Resources = pgc.Spec.PGPrimary.Resources.Requests
 	cluster.Spec.Limits = pgc.Spec.PGPrimary.Resources.Limits
