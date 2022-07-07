@@ -40,7 +40,7 @@ spec:
         deployment-name: some-name
         name: some-name
         pg-cluster: some-name
-        pg-pod-anti-affinity: preferred
+        pg-pod-anti-affinity: ""
         pgo-pg-database: "true"
         pgo-version: 1.3.0
         pgouser: admin
@@ -52,10 +52,6 @@ spec:
             - podAffinityTerm:
                 labelSelector:
                   matchExpressions:
-                    - key: vendor
-                      operator: In
-                      values:
-                        - crunchydata
                     - key: pg-pod-anti-affinity
                       operator: Exists
                     - key: pg-cluster
