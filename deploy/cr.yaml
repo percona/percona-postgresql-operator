@@ -116,6 +116,7 @@ spec:
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
 #    imagePullPolicy: Always
+    exposeSuperusers: false
     size: 3
     resources:
       requests:

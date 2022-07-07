@@ -94,6 +94,8 @@ const (
 
 	// the path to the pgbouncer installation script
 	pgBouncerInstallScript = "/opt/crunchy/bin/postgres-ha/sql/pgbouncer/pgbouncer-install.sql"
+	// the path to the pgbouncer installation script that exposes superusers through pgbouncer
+	pgBouncerExposeSuperusersScript = "/opt/crunchy/bin/postgres-ha/sql/pgbouncer/pgbouncer-expose-superusers.sql"
 )
 
 const (
@@ -124,8 +126,8 @@ func AddPgbouncer(clientset kubernetes.Interface, restconfig *rest.Config, clust
 		return err
 	}
 
-	// check to see if pgBoncer is "installed" in the PostgreSQL cluster. This
-	// means checking to see if there is a pgbouncer user, effetively
+	// Check to see if pgBouncer is "installed" in the PostgreSQL cluster.
+	// This effectively means checking to see if there is a pgbouncer user.
 	if installed, err := checkPgBouncerInstall(clientset, restconfig, pod, cluster.Spec.Port); err != nil {
 		return err
 	} else if !installed {
@@ -134,7 +136,7 @@ func AddPgbouncer(clientset kubernetes.Interface, restconfig *rest.Config, clust
 			return ErrStandbyNotAllowed
 		}
 
-		if err := installPgBouncer(clientset, restconfig, pod, cluster.Spec.Port); err != nil {
+		if err := installPgBouncer(clientset, restconfig, pod, cluster.Spec.Port, cluster.Spec.PgBouncer.ExposeSuperusers); err != nil {
 			return err
 		}
 	}
@@ -381,7 +383,7 @@ func UninstallPgBouncer(clientset kubernetes.Interface, restconfig *rest.Config,
 //
 // Any errors that are returned should be logged in the calling function, though
 // some logging occurs in this function as well
-func UpdatePgbouncer(clientset kubernetes.Interface, oldCluster, newCluster *crv1.Pgcluster) error {
+func UpdatePgbouncer(clientset kubernetes.Interface, restconfig *rest.Config, oldCluster, newCluster *crv1.Pgcluster) error {
 	clusterName := newCluster.Name
 	namespace := newCluster.Namespace
 
@@ -391,9 +393,10 @@ func UpdatePgbouncer(clientset kubernetes.Interface, oldCluster, newCluster *crv
 	//
 	// 1. The Service type for the pgBouncer Service
 	// 2. The # of replicas to maintain
-	// 3. The pgBouncer container resources
+	// 3. Are superusers exposed or not
+	// 4. The pgBouncer container resources
 	//
-	// As #3 is a bit more destructive, we'll do that last
+	// As #4 is a bit more destructive, we'll do that last
 
 	// check the pgBouncer Service
 	if oldCluster.Spec.PgBouncer.ServiceType != newCluster.Spec.PgBouncer.ServiceType {
@@ -406,6 +409,13 @@ func UpdatePgbouncer(clientset kubernetes.Interface, oldCluster, newCluster *crv
 	if oldCluster.Spec.PgBouncer.Replicas != newCluster.Spec.PgBouncer.Replicas ||
 		oldCluster.Spec.PgBouncer.Image != newCluster.Spec.PgBouncer.Image {
 		if err := updatePgBouncerReplicas(clientset, newCluster); err != nil {
+			return err
+		}
+	}
+
+	// check if superusers exposed or not
+	if oldCluster.Spec.PgBouncer.ExposeSuperusers != newCluster.Spec.PgBouncer.ExposeSuperusers {
+		if err := updatePgBouncerExposeSuperusers(clientset, restconfig, newCluster); err != nil {
 			return err
 		}
 	}
@@ -830,7 +840,7 @@ func getPgBouncerDeployment(clientset kubernetes.Interface, cluster *crv1.Pgclus
 
 // installPgBouncer installs the "pgbouncer" user and other management objects
 // into the PostgreSQL pod
-func installPgBouncer(clientset kubernetes.Interface, restconfig *rest.Config, pod *v1.Pod, port string) error {
+func installPgBouncer(clientset kubernetes.Interface, restconfig *rest.Config, pod *v1.Pod, port string, exposeSuperusers bool) error {
 	// get the list of databases that we need to scan through
 	databases, err := getPgBouncerDatabases(clientset, restconfig, pod, port)
 	if err != nil {
@@ -843,6 +853,11 @@ func installPgBouncer(clientset kubernetes.Interface, restconfig *rest.Config, p
 		databaseName := strings.TrimSpace(databases.Text())
 
 		execPgBouncerScript(clientset, restconfig, pod, port, databaseName, pgBouncerInstallScript)
+
+		if exposeSuperusers {
+			execPgBouncerScript(clientset, restconfig, pod, port, databaseName, pgBouncerExposeSuperusersScript)
+			log.Warn("Superusers are exposed through PgBouncer")
+		}
 	}
 
 	return nil
@@ -944,6 +959,37 @@ func updatePgBouncerResources(clientset kubernetes.Interface, cluster *crv1.Pgcl
 	if _, err := clientset.AppsV1().Deployments(deployment.Namespace).
 		Update(ctx, deployment, metav1.UpdateOptions{}); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// updatePgBouncerExposeSuperusers updates the pgbouncer.get_auth function to allow superusers connect through pgBouncer
+func updatePgBouncerExposeSuperusers(clientset kubernetes.Interface, restconfig *rest.Config, cluster *crv1.Pgcluster) error {
+	pod, err := util.GetPrimaryPod(clientset, cluster)
+	if err != nil {
+		return err
+	}
+
+	script := pgBouncerInstallScript
+	if cluster.Spec.PgBouncer.ExposeSuperusers {
+		script = pgBouncerExposeSuperusersScript
+	}
+
+	// get the list of databases that we need to scan through
+	databases, err := getPgBouncerDatabases(clientset, restconfig, pod, cluster.Spec.Port)
+	if err != nil {
+		return err
+	}
+
+	// iterate through the list of databases that are returned, and execute the script
+	for databases.Scan() {
+		databaseName := strings.TrimSpace(databases.Text())
+		execPgBouncerScript(clientset, restconfig, pod, cluster.Spec.Port, databaseName, script)
+	}
+
+	if cluster.Spec.PgBouncer.ExposeSuperusers {
+		log.Warn("Superusers are exposed through PgBouncer")
 	}
 
 	return nil

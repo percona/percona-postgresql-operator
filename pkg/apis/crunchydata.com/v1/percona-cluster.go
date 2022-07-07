@@ -81,6 +81,7 @@ type PgBouncer struct {
 	Resources        Resources           `json:"resources"`
 	TLSSecret        string              `json:"tlsSecret"`
 	Expose           Expose              `json:"expose"`
+	ExposeSuperusers bool                `json:"exposeSuperusers,omitempty"`
 	AntiAffinityType PodAntiAffinityType `json:"antiAffinityType"`
 	ImagePullPolicy  string              `json:"imagePullPolicy"`
 }

@@ -318,6 +318,7 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PgBouncer.Replicas = pgc.Spec.PGBouncer.Size
 	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests
 	cluster.Spec.PgBouncer.Limits = pgc.Spec.PGBouncer.Resources.Limits
+	cluster.Spec.PgBouncer.ExposeSuperusers = pgc.Spec.PGBouncer.ExposeSuperusers
 	cluster.Spec.PGOImagePrefix = operator.Pgo.Cluster.CCPImagePrefix
 	if len(pgc.Spec.PGPrimary.AntiAffinityType) == 0 {
 		pgc.Spec.PGPrimary.AntiAffinityType = "preferred"

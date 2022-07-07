@@ -348,6 +348,8 @@ type PgBouncerSpec struct {
 	// two keys: tls.crt and tls.key
 	TLSSecret string `json:"tlsSecret"`
 	Image     string `json:"image"`
+
+	ExposeSuperusers bool `json:"exposeSuperusers,omitempty"`
 }
 
 // Enabled returns true if the pgBouncer is enabled for the cluster, i.e. there
