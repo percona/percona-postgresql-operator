@@ -22,6 +22,9 @@ import (
 )
 
 func CreateReplicaResource(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster, index int) error {
+	if cluster.Spec.PGReplicas == nil {
+		return nil
+	}
 	ctx := context.TODO()
 	replica := getNewReplicaObject(cluster, &crv1.Pgreplica{}, index)
 	_, err := clientset.CrunchydataV1().Pgreplicas(cluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
