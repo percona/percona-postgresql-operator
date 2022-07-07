@@ -210,6 +210,8 @@ type UpgradeOptions struct {
 	Schedule               string          `json:"schedule,omitempty"`
 }
 
+const DefaultVersionServiceEndpoint = "https://check.percona.com"
+
 var PullPolicyAlways = "Always"
 var PullPolicyIfNotPresent = "IfNotPresent"
 
@@ -235,10 +237,15 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 		p.Spec.PMM.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 
-	if p.Spec.UpgradeOptions != nil {
-		if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
-			p.Spec.UpgradeOptions.VersionServiceEndpoint = "https://check.percona.com"
+	if p.Spec.UpgradeOptions == nil {
+		p.Spec.UpgradeOptions = &UpgradeOptions{
+			Apply:                  UpgradeStrategyDisabled,
+			VersionServiceEndpoint: DefaultVersionServiceEndpoint,
 		}
+	}
+
+	if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
+		p.Spec.UpgradeOptions.VersionServiceEndpoint = DefaultVersionServiceEndpoint
 	}
 
 	if p.Spec.UsersSecretName == "" {
