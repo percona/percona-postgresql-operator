@@ -95,7 +95,7 @@ const (
 	// the path to the pgbouncer installation script
 	pgBouncerInstallScript = "/opt/crunchy/bin/postgres-ha/sql/pgbouncer/pgbouncer-install.sql"
 	// the path to the pgbouncer installation script that exposes superusers through pgbouncer
-	pgBouncerExposeSuperusersScript = "/opt/crunchy/bin/postgres-ha/sql/pgbouncer/pgbouncer-expose-superusers.sql"
+	pgBouncerExposePostgresScript = "/opt/crunchy/bin/postgres-ha/sql/pgbouncer/pgbouncer-expose-postgres.sql"
 )
 
 const (
@@ -136,7 +136,7 @@ func AddPgbouncer(clientset kubernetes.Interface, restconfig *rest.Config, clust
 			return ErrStandbyNotAllowed
 		}
 
-		if err := installPgBouncer(clientset, restconfig, pod, cluster.Spec.Port, cluster.Spec.PgBouncer.ExposeSuperusers); err != nil {
+		if err := installPgBouncer(clientset, restconfig, pod, cluster.Spec.Port, cluster.Spec.PgBouncer.ExposePostgresUser); err != nil {
 			return err
 		}
 	}
@@ -413,9 +413,9 @@ func UpdatePgbouncer(clientset kubernetes.Interface, restconfig *rest.Config, ol
 		}
 	}
 
-	// check if superusers exposed or not
-	if oldCluster.Spec.PgBouncer.ExposeSuperusers != newCluster.Spec.PgBouncer.ExposeSuperusers {
-		if err := updatePgBouncerExposeSuperusers(clientset, restconfig, newCluster); err != nil {
+	// check if postgres exposed or not
+	if oldCluster.Spec.PgBouncer.ExposePostgresUser != newCluster.Spec.PgBouncer.ExposePostgresUser {
+		if err := updatePgBouncerExposePostgresUser(clientset, restconfig, newCluster); err != nil {
 			return err
 		}
 	}
@@ -840,7 +840,7 @@ func getPgBouncerDeployment(clientset kubernetes.Interface, cluster *crv1.Pgclus
 
 // installPgBouncer installs the "pgbouncer" user and other management objects
 // into the PostgreSQL pod
-func installPgBouncer(clientset kubernetes.Interface, restconfig *rest.Config, pod *v1.Pod, port string, exposeSuperusers bool) error {
+func installPgBouncer(clientset kubernetes.Interface, restconfig *rest.Config, pod *v1.Pod, port string, exposePostgresUser bool) error {
 	// get the list of databases that we need to scan through
 	databases, err := getPgBouncerDatabases(clientset, restconfig, pod, port)
 	if err != nil {
@@ -852,11 +852,13 @@ func installPgBouncer(clientset kubernetes.Interface, restconfig *rest.Config, p
 	for databases.Scan() {
 		databaseName := strings.TrimSpace(databases.Text())
 
+		log.Debugf("Executing %s on db %s", pgBouncerInstallScript, databaseName)
 		execPgBouncerScript(clientset, restconfig, pod, port, databaseName, pgBouncerInstallScript)
 
-		if exposeSuperusers {
-			execPgBouncerScript(clientset, restconfig, pod, port, databaseName, pgBouncerExposeSuperusersScript)
-			log.Warn("Superusers are exposed through PgBouncer")
+		if exposePostgresUser {
+			log.Debugf("Executing %s on db %s", pgBouncerExposePostgresScript, databaseName)
+			execPgBouncerScript(clientset, restconfig, pod, port, databaseName, pgBouncerExposePostgresScript)
+			log.Warn("postgres user are exposed through PgBouncer")
 		}
 	}
 
@@ -964,16 +966,16 @@ func updatePgBouncerResources(clientset kubernetes.Interface, cluster *crv1.Pgcl
 	return nil
 }
 
-// updatePgBouncerExposeSuperusers updates the pgbouncer.get_auth function to allow superusers connect through pgBouncer
-func updatePgBouncerExposeSuperusers(clientset kubernetes.Interface, restconfig *rest.Config, cluster *crv1.Pgcluster) error {
+// updatePgBouncerExposePostgresUser updates the pgbouncer.get_auth function to allow postgres connect through pgBouncer
+func updatePgBouncerExposePostgresUser(clientset kubernetes.Interface, restconfig *rest.Config, cluster *crv1.Pgcluster) error {
 	pod, err := util.GetPrimaryPod(clientset, cluster)
 	if err != nil {
 		return err
 	}
 
 	script := pgBouncerInstallScript
-	if cluster.Spec.PgBouncer.ExposeSuperusers {
-		script = pgBouncerExposeSuperusersScript
+	if cluster.Spec.PgBouncer.ExposePostgresUser {
+		script = pgBouncerExposePostgresScript
 	}
 
 	// get the list of databases that we need to scan through
@@ -985,11 +987,12 @@ func updatePgBouncerExposeSuperusers(clientset kubernetes.Interface, restconfig 
 	// iterate through the list of databases that are returned, and execute the script
 	for databases.Scan() {
 		databaseName := strings.TrimSpace(databases.Text())
+		log.Debugf("Executing %s on db %s", script, databaseName)
 		execPgBouncerScript(clientset, restconfig, pod, cluster.Spec.Port, databaseName, script)
 	}
 
-	if cluster.Spec.PgBouncer.ExposeSuperusers {
-		log.Warn("Superusers are exposed through PgBouncer")
+	if cluster.Spec.PgBouncer.ExposePostgresUser {
+		log.Warn("postgres user are exposed through PgBouncer")
 	}
 
 	return nil
