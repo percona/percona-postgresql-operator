@@ -52,7 +52,7 @@ function apply_configs {
 		| yq w - 'data[aws-s3-key]' "$(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_ACCESS_KEY_ID')" \
 		| yq w - 'data[aws-s3-key-secret]' "$(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_SECRET_ACCESS_KEY')" \
 		| yq w - 'data[gcs-key]' "$(yq r -d0 ${conf_dir}/cloud-secret-minio-gw.yml 'stringData."credentials.json"' | base64)" \
-		>/tmp/repo.secret.yaml
+			>/tmp/repo.secret.yaml
 	if [[ ${backup_storage_type} == "minio" ]]; then
 		yq w -i /tmp/repo.secret.yaml 'data[aws-s3-key]' "$(echo -n some-access-key | base64)"
 		yq w -i /tmp/repo.secret.yaml 'data[aws-s3-key-secret]' "$(echo -n some-secret-key | base64)"
