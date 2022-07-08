@@ -56,7 +56,6 @@ function apply_configs {
 	if [[ ${backup_storage_type} == "minio" ]]; then
 		yq w -i /tmp/repo.secret.yaml 'data[aws-s3-key]' "$(echo -n some-access-key | base64)"
 		yq w -i /tmp/repo.secret.yaml 'data[aws-s3-key-secret]' "$(echo -n some-secret-key | base64)"
-		# yq w -i /tmp/repo.secret.yaml 'data[aws-s3-ca]' "$(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.ca\.crt}')"
 	fi
 	kubectl_bin apply -f /tmp/repo.secret.yaml
 	rm -rf /tmp/repo.secret.yaml
