@@ -45,13 +45,21 @@ function prepare_n_restore {
 
 function apply_configs {
 	local cluster=${1}
+	local backup_storage_type=${2:-""}
 
 	set +x
 	yq w $test_dir/conf/backrest-repo-secret.yml 'metadata.name' "${cluster}-backrest-repo-config" \
 		| yq w - 'data[aws-s3-key]' "$(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_ACCESS_KEY_ID')" \
 		| yq w - 'data[aws-s3-key-secret]' "$(yq r -d"0" ${conf_dir}/cloud-secret.yml 'data.AWS_SECRET_ACCESS_KEY')" \
 		| yq w - 'data[gcs-key]' "$(yq r -d0 ${conf_dir}/cloud-secret-minio-gw.yml 'stringData."credentials.json"' | base64)" \
-		| kubectl_bin apply -f -
+		>/tmp/repo.secret.yaml
+	if [[ ${backup_storage_type} == "minio" ]]; then
+		yq w -i /tmp/repo.secret.yaml 'data[aws-s3-key]' "$(echo -n some-access-key | base64)"
+		yq w -i /tmp/repo.secret.yaml 'data[aws-s3-key-secret]' "$(echo -n some-secret-key | base64)"
+		# yq w -i /tmp/repo.secret.yaml 'data[aws-s3-ca]' "$(kubectl_bin get secret/minio-gw-tls -o jsonpath='{.data.ca\.crt}')"
+	fi
+	kubectl_bin apply -f /tmp/repo.secret.yaml
+	rm -rf /tmp/repo.secret.yaml
 	set -x
 	yq r $test_dir/conf/custom-config.yml \
 		| yq w - 'metadata.name' "${cluster}-custom-config" \
@@ -60,14 +68,16 @@ function apply_configs {
 
 function main {
 	create_namespace $namespace
+	deploy_cert_manager
 	deploy_operator
+	deploy_minio
 
 	desc 'create first PG cluster'
 	cluster="some-name-${RANDOM}"
 
-	desc 'Testing backup/restore from s3'
-	apply_configs ${cluster}
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config"
+	desc 'Testing backup/restore from minio (self-signed crt)'
+	apply_configs ${cluster} 'minio'
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "minio" "${cluster}-custom-config"
 
 	# custom parameters check
 	compare_psql_cmd \
@@ -83,9 +93,8 @@ function main {
 
 	kubectl_bin delete perconapgcluster/${cluster}
 	sleep 60
-
+	destroy_minio
 	apply_configs ${cluster}
-	kubectl_bin run -i --rm aws-cli --image=perconalab/awscli --overrides='{"spec":{"containers":[{"image":"perconalab/awscli","name":"awscli","command":["/usr/bin/aws"],"args":["s3","rm","--recursive","'"s3://${BUCKET}/backrestrepo/${cluster}-backrest-shared-repo"'"],"env":[{"name":"AWS_ACCESS_KEY_ID","valueFrom":{"secretKeyRef":{"name":"'"${cluster}-backrest-repo-config"'","key":"aws-s3-key"}}},{"name":"AWS_SECRET_ACCESS_KEY","valueFrom":{"secretKeyRef":{"name":"'"${cluster}-backrest-repo-config"'","key":"aws-s3-key-secret"}}}]}]}}'
 
 	sleep 30
 
