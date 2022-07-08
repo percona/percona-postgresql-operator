@@ -384,23 +384,23 @@ apply_cluster() {
 
 	case ${podAntiAffinity} in
 		'preferred')
-			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
-				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
-				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.affinity.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.backup.affinity.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.pgBouncer.affinity.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
 			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
 		'required')
-			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
-				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
-				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.affinity.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.backup.affinity.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.pgBouncer.affinity.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
 			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
 		'disabled')
-			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.antiAffinityType' ${podAntiAffinity} \
-				| yq w - 'spec.backup.antiAffinityType' ${podAntiAffinity} \
-				| yq w - 'spec.pgBouncer.antiAffinityType' ${podAntiAffinity} \
+			yq w ${tmp_dir}/cr.yaml 'spec.pgPrimary.affinity.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.backup.affinity.antiAffinityType' ${podAntiAffinity} \
+				| yq w - 'spec.pgBouncer.affinity.antiAffinityType' ${podAntiAffinity} \
 					>${tmp_dir}/cr.podAffinity.yaml
 			mv ${tmp_dir}/cr.podAffinity.yaml ${tmp_dir}/cr.yaml
 			;;
