@@ -104,7 +104,7 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 		}
 	}
 
-	dplmnt.UpdateSpecTemplateAffinity(deployment, *newPerconaPGCluster.Spec.PGPrimary.Affinity)
+	dplmnt.UpdateSpecTemplateAffinity(deployment, newPerconaPGCluster.Spec.PGPrimary.Affinity)
 
 	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PGPrimary, newPerconaPGCluster.Spec.PGPrimary) {
 		dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
@@ -143,7 +143,7 @@ func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *
 	if err != nil {
 		return errors.Wrap(err, "getdeployment")
 	}
-	dplmnt.UpdateSpecTemplateAffinity(deployment, *newPerconaPGCluster.Spec.Backup.Affinity)
+	dplmnt.UpdateSpecTemplateAffinity(deployment, newPerconaPGCluster.Spec.Backup.Affinity)
 	dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
 		newPerconaPGCluster.Spec.Backup.BackrestRepoImage,
 		newPerconaPGCluster.Spec.Backup.ImagePullPolicy)
@@ -320,6 +320,22 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PgBouncer.Replicas = pgc.Spec.PGBouncer.Size
 	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests
 	cluster.Spec.PgBouncer.Limits = pgc.Spec.PGBouncer.Resources.Limits
+	cluster.Spec.NodeAffinity = pgc.Spec.PGPrimary.NodeAffinity
+	if len(pgc.Spec.PGPrimary.Affinity.AntiAffinityType) == 0 && pgc.Spec.PGPrimary.Affinity.Advanced == nil {
+		pgc.Spec.PGPrimary.Affinity.AntiAffinityType = "preferred"
+	}
+	if len(pgc.Spec.Backup.Affinity.AntiAffinityType) == 0 && pgc.Spec.Backup.Affinity.Advanced == nil {
+		pgc.Spec.Backup.Affinity.AntiAffinityType = "preferred"
+	}
+	if len(pgc.Spec.PGBouncer.Affinity.AntiAffinityType) == 0 && pgc.Spec.PGBouncer.Affinity.Advanced == nil {
+		pgc.Spec.PGBouncer.Affinity.AntiAffinityType = "preferred"
+	}
+	cluster.Spec.PodAntiAffinity = crv1.PodAntiAffinitySpec{
+		Default:    pgc.Spec.PGPrimary.Affinity.AntiAffinityType,
+		PgBackRest: pgc.Spec.Backup.Affinity.AntiAffinityType,
+		PgBouncer:  pgc.Spec.PGBouncer.Affinity.AntiAffinityType,
+	}
+
 	cluster.Spec.PGOImagePrefix = operator.Pgo.Cluster.CCPImagePrefix
 	cluster.Spec.Port = pgc.Spec.Port
 	cluster.Spec.Resources = pgc.Spec.PGPrimary.Resources.Requests

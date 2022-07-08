@@ -23,7 +23,7 @@ func UpdateDeployment(clientset kubeapi.Interface, newPerconaPGCluster, oldPerco
 	} else if err != nil {
 		return nil
 	}
-	dplmnt.UpdateSpecTemplateAffinity(deployment, *newPerconaPGCluster.Spec.PGBouncer.Affinity)
+	dplmnt.UpdateSpecTemplateAffinity(deployment, newPerconaPGCluster.Spec.PGBouncer.Affinity)
 	dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerPGBouncer,
 		newPerconaPGCluster.Spec.PGBouncer.Image,
 		newPerconaPGCluster.Spec.PGBouncer.ImagePullPolicy)

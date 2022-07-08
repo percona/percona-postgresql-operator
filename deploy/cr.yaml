@@ -52,7 +52,8 @@ spec:
 #      limits:
 #        cpu: 500m
 #        memory: "256Mi"
-#    affinity:
+    affinity:
+     antiAffinityType: preferred
 #      antiAffinityTopologyKey: "kubernetes.io/hostname"
 #      advanced:
 #        nodeAffinity:
@@ -104,8 +105,8 @@ spec:
 #      limits:
 #        cpu: "1"
 #        memory: "64Mi"
-#    affinity:
-#      antiAffinityType: preferred
+    affinity:
+     antiAffinityType: preferred
     volumeSpec:
       size: 1G
       accessmode: ReadWriteOnce
@@ -134,8 +135,8 @@ spec:
 #      limits:
 #        cpu: "2"
 #        memory: "512Mi"
-#    affinity:
-#      antiAffinityType: preferred
+    affinity:
+     antiAffinityType: preferred
     expose:
       serviceType: ClusterIP
 #      loadBalancerSourceRanges:
