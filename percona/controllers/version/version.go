@@ -14,10 +14,8 @@ import (
 	api "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 )
 
-const EnvDisableTelemetry = "DISABLE_TELEMETRY"
-
 func TelemetryEnabled() bool {
-	return os.Getenv(EnvDisableTelemetry) == "false"
+	return os.Getenv("DISABLE_TELEMETRY") == "false"
 }
 
 func VersionUpgradeEnabled(cr *api.PerconaPGCluster) bool {
