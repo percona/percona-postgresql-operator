@@ -61,8 +61,27 @@ Creating such a standby cluster involves the following steps:
 
 * Apply the Adjusted Kubernetes Secrets:
 
-   $ export standby_cluster_name=cluster2
-   $ kubectl create -f /tmp/copied-secrets/${standby_cluster_name}-users
+  .. code:: bash 
+
+     $ export standby_cluster_name=cluster2
+     $ kubectl create -f /tmp/copied-secrets/${standby_cluster_name}-users
+
+* Set the :ref:`backup.repoPath<backup-repopath>` option in the
+  ``deploy/cr.yaml`` file of your *standby cluster* to the actual place where
+  the *primary cluster* stores backups. If this option is not set in
+  ``deploy/cr.yaml`` of your *primary cluster*, then the following default
+  naming is used: ``/backrestrepo/<primary-cluster-name>-backrest-shared-repo``.
+  For example, in case of ``myPrimaryCluster`` and ``myStandbyCluster``
+  clusters, it should look as follows:
+
+  .. code:: yaml
+
+     ...
+       name: myStandbyCluster
+     ...
+       backup:
+         ...
+         repoPath: "/backrestrepo/myPrimaryCluster-backrest-shared-repo"
 
 * Supply your *standby cluster* with the Kubernetes Secret used by pgBackRest of
   the *primary cluster* to Access the Storage Bucket. The name of this Secret is
