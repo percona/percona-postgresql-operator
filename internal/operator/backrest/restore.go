@@ -74,7 +74,7 @@ func UpdatePGClusterSpecForRestore(clientset kubeapi.Interface, cluster *crv1.Pg
 	if !ok {
 		verifyTLS = operator.GetS3VerifyTLSSetting(cluster)
 	}
-	if verifyTLS == "false" {
+	if storageType == "s3" && verifyTLS == "false" {
 		restoreOpts = fmt.Sprintf("%s --no-repo1-s3-verify-tls", restoreOpts)
 	}
 
