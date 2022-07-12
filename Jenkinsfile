@@ -189,8 +189,8 @@ pipeline {
                 '''
                 script {
                     FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' | head -1", , returnStdout: true).trim() ?: null
-                    IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $VERSION | head -1', , returnStdout: true).trim() ?: null
-                    PREVIOUS_IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT | head -1', , returnStdout: true).trim() ?: null
+                    IMAGE_EXISTS = sh(script: '[[ $(curl -s https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $VERSION | wc -l | grep -Eo \'[0-9]+\') == 6 ]] && echo true || : ', , returnStdout: true).trim() ?: null
+                    PREVIOUS_IMAGE_EXISTS = sh(script: '[[ $(curl -s https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT | wc -l | grep -Eo \'[0-9]+\') == 6 ]] && echo true || :  ', , returnStdout: true).trim() ?: null
                 }
                 withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
                     sh '''
