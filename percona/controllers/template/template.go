@@ -123,9 +123,7 @@ func handleAffinityTemplate(template []byte, affinity crv1.PodAffinity, withNode
 		{{if and .NodeSelector .PodAntiAffinity}},{{end}}
 		{{.PodAntiAffinity}}
 	  }`)
-	affinityBytes := []byte(`{
-		{{.PodAntiAffinity}}
-				}`)
+	affinityBytes := []byte(`{ {{.PodAntiAffinity}} }`)
 
 	if withNodeSelector {
 		affinityBytes = affinityBytesWithNodeSelector
@@ -134,7 +132,7 @@ func handleAffinityTemplate(template []byte, affinity crv1.PodAffinity, withNode
 	if affinity.Advanced != nil {
 		customAffinity, err := GetAffinityJSON(affinity)
 		if err != nil {
-			return nil, errors.Wrap(err, "get affinity json: %s")
+			return nil, errors.Wrap(err, "get affinity json")
 		}
 		affinityBytes = customAffinity
 
