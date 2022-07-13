@@ -63,7 +63,20 @@ compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:$(get_psql_user_pass some-name ${cluster})@${cluster}.${namespace}"
 
 compare_psql_cmd "show-1" 'SHOW DATABASES' "pgbouncer:$(get_psql_user_pass pgbouncer ${cluster})@${cluster}-pgbouncer.${namespace}"
+kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+	'[
+		{"op":"replace","path":"/spec/pgBouncer/exposePostgresUser","value":true}
+	]'
+sleep 15
+compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}-pgbouncer.${namespace}"
 compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "some-name:$(get_psql_user_pass some-name ${cluster})@${cluster}-pgbouncer.${namespace}"
+
+kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+	'[
+		{"op":"replace","path":"/spec/pgBouncer/exposePostgresUser","value":false}
+	]'
+sleep 15
+compare_psql "select-2" '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}-pgbouncer.${namespace}" "allow"
 
 if [[ -n $(which aws) ]]; then
 	desc "Starting to test private registry"
@@ -100,7 +113,13 @@ if [[ -n $(which aws) ]]; then
 	export IMAGE_PGBADGER="${ECR}/${IMAGE_PGBADGER}"
 
 	deploy_operator "ecr"
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' '' '' '' '' "$conf_dir/client.yml" "$namespace" 'true'
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
+	'[
+		{"op":"replace","path":"/spec/pgBouncer/exposePostgresUser","value":true}
+	]'
+    sleep 15
+	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}-pgbouncer.${namespace}"
 
 fi
 
