@@ -114,11 +114,6 @@ if [[ -n $(which aws) ]]; then
 
 	deploy_operator "ecr"
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' '' '' '' '' "$conf_dir/client.yml" "$namespace" 'true'
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-	'[
-		{"op":"replace","path":"/spec/pgBouncer/exposePostgresUser","value":true}
-	]'
-    sleep 15
 	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}-pgbouncer.${namespace}"
 
 fi
