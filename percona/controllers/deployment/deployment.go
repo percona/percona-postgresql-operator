@@ -54,7 +54,7 @@ func UpdateSpecTemplateLabels(labels map[string]string, deployment *appsv1.Deplo
 	return
 }
 
-func UpdateSpecTemplateAffinity(deployment *appsv1.Deployment, affinity crv1.PodAffinity) {
+func UpdateSpecTemplateAffinity(deployment *appsv1.Deployment, affinity crv1.Affinity) {
 	deployment.Spec.Template.Spec.Affinity = affinity.Advanced
 }
 

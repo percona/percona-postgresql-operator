@@ -54,6 +54,9 @@ spec:
 #        memory: "256Mi"
     affinity:
      antiAffinityType: preferred
+#     nodeAffinityType: required
+#     nodeLabel:
+#       kubernetes.io/region: us-central1
 #      antiAffinityTopologyKey: "kubernetes.io/hostname"
 #      advanced:
 #        nodeAffinity:

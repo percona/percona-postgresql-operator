@@ -115,7 +115,7 @@ func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster, nodeName string) ([]byte, e
 	return b, nil
 }
 
-func handleAffinityTemplate(template []byte, affinity crv1.PodAffinity, withNodeSelector bool) ([]byte, error) {
+func handleAffinityTemplate(template []byte, affinity crv1.Affinity, withNodeSelector bool) ([]byte, error) {
 	affinityBytesWithNodeSelector := []byte(`{
 		{{if .NodeSelector}}
 		"nodeAffinity": {{ .NodeSelector }}
@@ -141,7 +141,7 @@ func handleAffinityTemplate(template []byte, affinity crv1.PodAffinity, withNode
 	return bytes.Replace(template, []byte("<affinity>"), affinityBytes, -1), nil
 }
 
-func GetAffinityJSON(affinity crv1.PodAffinity) ([]byte, error) {
+func GetAffinityJSON(affinity crv1.Affinity) ([]byte, error) {
 	b, err := json.Marshal(affinity.Advanced)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal affinity")

@@ -195,9 +195,6 @@ func getNewReplicaObject(cluster *crv1.PerconaPGCluster, replica *crv1.Pgreplica
 		replica.ObjectMeta.Annotations[k] = v
 	}
 
-	if cluster.Spec.PGReplicas.HotStandby.Affinity != nil {
-		replica.Spec.NodeAffinity = cluster.Spec.PGReplicas.HotStandby.Affinity.NodeAffinity
-	}
 	replica.Spec.Name = labels[config.LABEL_NAME]
 	replica.Spec.ReplicaStorage = storage
 	replica.Spec.UserLabels = cluster.Spec.UserLabels

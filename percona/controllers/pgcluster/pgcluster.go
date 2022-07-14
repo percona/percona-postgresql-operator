@@ -10,6 +10,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/operator"
+	util "github.com/percona/percona-postgresql-operator/internal/util"
 	dplmnt "github.com/percona/percona-postgresql-operator/percona/controllers/deployment"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
@@ -320,7 +321,19 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PgBouncer.Replicas = pgc.Spec.PGBouncer.Size
 	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests
 	cluster.Spec.PgBouncer.Limits = pgc.Spec.PGBouncer.Resources.Limits
-	cluster.Spec.NodeAffinity = pgc.Spec.PGPrimary.NodeAffinity
+	if pgc.Spec.PGPrimary.Affinity.NodeLabel != nil {
+		var nodeAffinityType crv1.NodeAffinityType
+		switch pgc.Spec.PGPrimary.Affinity.NodeAffinityType {
+		case "preferred":
+			nodeAffinityType = crv1.NodeAffinityTypePreferred
+		case "required":
+			nodeAffinityType = crv1.NodeAffinityTypeRequired
+		}
+		for key, val := range pgc.Spec.PGPrimary.Affinity.NodeLabel {
+			cluster.Spec.NodeAffinity.Default = util.GenerateNodeAffinity(nodeAffinityType, key, []string{val})
+		}
+	}
+
 	if len(pgc.Spec.PGPrimary.Affinity.AntiAffinityType) == 0 && pgc.Spec.PGPrimary.Affinity.Advanced == nil {
 		pgc.Spec.PGPrimary.Affinity.AntiAffinityType = "preferred"
 	}

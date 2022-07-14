@@ -76,13 +76,13 @@ type Badger struct {
 }
 
 type PgBouncer struct {
-	Image           string      `json:"image"`
-	Size            int32       `json:"size"`
-	Resources       Resources   `json:"resources"`
-	TLSSecret       string      `json:"tlsSecret"`
-	Expose          Expose      `json:"expose"`
-	Affinity        PodAffinity `json:"affinity,omitempty"`
-	ImagePullPolicy string      `json:"imagePullPolicy"`
+	Image           string    `json:"image"`
+	Size            int32     `json:"size"`
+	Resources       Resources `json:"resources"`
+	TLSSecret       string    `json:"tlsSecret"`
+	Expose          Expose    `json:"expose"`
+	Affinity        Affinity  `json:"affinity,omitempty"`
+	ImagePullPolicy string    `json:"imagePullPolicy"`
 }
 
 type PGDataSource struct {
@@ -99,7 +99,7 @@ type PGPrimary struct {
 	Labels             map[string]string `json:"labels"`
 	Annotations        map[string]string `json:"annotations"`
 	NodeAffinity       NodeAffinitySpec  `json:"nodeAffinitySpec"`
-	Affinity           PodAffinity       `json:"affinity,omitempty"`
+	Affinity           Affinity          `json:"affinity,omitempty"`
 	ImagePullPolicy    string            `json:"imagePullPolicy"`
 	Tolerations        []v1.Toleration   `json:"tolerations"`
 	NodeSelector       string            `json:"nodeSelector"`
@@ -118,7 +118,6 @@ type HotStandby struct {
 	VolumeSpec        *PgStorageSpec    `json:"volumeSpec"`
 	Labels            map[string]string `json:"labels"`
 	Annotations       map[string]string `json:"annotations"`
-	Affinity          *v1.Affinity      `json:"affinity"`
 	EnableSyncStandby bool              `json:"enableSyncStandby"`
 	Expose            Expose            `json:"expose"`
 	ImagePullPolicy   string            `json:"imagePullPolicy"`
@@ -145,7 +144,7 @@ type Backup struct {
 	Storages          map[string]Storage    `json:"storages"`
 	Schedule          []CronJob             `json:"schedule"`
 	StorageTypes      []BackrestStorageType `json:"storageTypes"`
-	Affinity          PodAffinity           `json:"affinity,omitempty"`
+	Affinity          Affinity              `json:"affinity,omitempty"`
 	RepoPath          string                `json:"repoPath"`
 	CustomConfig      []v1.VolumeProjection `json:"customConfig"`
 }
@@ -181,8 +180,10 @@ type PMMSpec struct {
 	Resources       Resources `json:"resources"`
 }
 
-type PodAffinity struct {
-	AntiAffinityType PodAntiAffinityType `json:"antiAffinityType"`
+type Affinity struct {
+	NodeLabel        map[string]string   `json:"nodeLabel,omitempty"`
+	NodeAffinityType string              `json:"nodeAffinityType,omitempty"`
+	AntiAffinityType PodAntiAffinityType `json:"antiAffinityType,omitempty"`
 	TopologyKey      *string             `json:"antiAffinityTopologyKey,omitempty"`
 	Advanced         *v1.Affinity        `json:"advanced,omitempty"`
 }
@@ -268,8 +269,8 @@ func (p *PerconaPGCluster) checkAndSetAffinity(clusterName string) {
 	}
 }
 
-func getDefaultAffinity(clusterName string) PodAffinity {
-	return PodAffinity{
+func getDefaultAffinity(clusterName string) Affinity {
+	return Affinity{
 		Advanced: &v1.Affinity{
 			PodAntiAffinity: &v1.PodAntiAffinity{
 				PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
