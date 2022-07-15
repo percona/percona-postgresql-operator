@@ -28,7 +28,7 @@ const (
 
 func Create(clientset kubeapi.Interface, newPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	cluster := getPGCLuster(newPerconaPGCluster, &crv1.Pgcluster{})
+	cluster := getPGCluster(newPerconaPGCluster, &crv1.Pgcluster{})
 
 	_, err := clientset.CrunchydataV1().Pgclusters(newPerconaPGCluster.Namespace).Create(ctx, cluster, metav1.CreateOptions{})
 	if err != nil {
@@ -40,7 +40,7 @@ func Create(clientset kubeapi.Interface, newPerconaPGCluster *crv1.PerconaPGClus
 
 func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	pgCluster := getPGCLuster(newPerconaPGCluster, &crv1.Pgcluster{})
+	pgCluster := getPGCluster(newPerconaPGCluster, &crv1.Pgcluster{})
 	if pgCluster.Annotations == nil {
 		pgCluster.Annotations = make(map[string]string)
 	}
@@ -59,7 +59,7 @@ func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluste
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	pgCluster = getPGCLuster(newPerconaPGCluster, oldPGCluster)
+	pgCluster = getPGCluster(newPerconaPGCluster, oldPGCluster)
 	if pgCluster.Annotations == nil {
 		pgCluster.Annotations = make(map[string]string)
 	}
@@ -79,7 +79,7 @@ func UpdateCR(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGClus
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	pgCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
+	pgCluster := getPGCluster(newPerconaPGCluster, oldPGCluster)
 
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -191,7 +191,7 @@ func ChangeBouncerSize(clientset *kubeapi.Client, newPerconaPGCluster *crv1.Perc
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	newPGCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
+	newPGCluster := getPGCluster(newPerconaPGCluster, oldPGCluster)
 	newPGCluster.Spec.PgBouncer.Replicas = size
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPGCluster.Namespace).Update(ctx, newPGCluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -235,7 +235,7 @@ func IsPrimary(clientset kubeapi.Interface, perconaPGCluster *crv1.PerconaPGClus
 	return false, nil
 }
 
-func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
+func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
 	metaAnnotations := map[string]string{
 		"current-primary": pgc.Name,
 	}
@@ -318,6 +318,7 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PgBouncer.Replicas = pgc.Spec.PGBouncer.Size
 	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests
 	cluster.Spec.PgBouncer.Limits = pgc.Spec.PGBouncer.Resources.Limits
+	cluster.Spec.PgBouncer.ExposePostgresUser = pgc.Spec.PGBouncer.ExposePostgresUser
 	cluster.Spec.PGOImagePrefix = operator.Pgo.Cluster.CCPImagePrefix
 	if len(pgc.Spec.PGPrimary.AntiAffinityType) == 0 {
 		pgc.Spec.PGPrimary.AntiAffinityType = "preferred"

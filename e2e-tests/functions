@@ -397,6 +397,7 @@ apply_cluster() {
 	local schedule=${8}
 	local schedule_type=${9}
 	local tls_enabled=${10}
+	local root_via_pgbouncer=${11}
 
 	yq w "${path}" 'metadata.annotations.current-primary' ${name} \
 		| yq w - 'metadata.labels.crunchy-pgha-scope' ${name} \
@@ -544,6 +545,12 @@ apply_cluster() {
 			| yq w - 'spec.sslReplicationSecretName' 'cluster1-ssl-keypair' \
 				>"${tmp_dir}/cr.tls.yaml"
 		mv "${tmp_dir}/cr.tls.yaml" "${tmp_dir}/cr.yaml"
+	fi
+
+	if [[ ${root_via_pgbouncer} == "true" ]]; then
+		yq w "${tmp_dir}/cr.yaml" 'spec.pgBouncer.exposePostgresUser' true \
+				>"${tmp_dir}/cr.root_pgb.yaml"
+		mv "${tmp_dir}/cr.root_pgb.yaml" "${tmp_dir}/cr.yaml"
 	fi
 
 	kubectl_bin apply -f "${tmp_dir}/cr.yaml" -n $namespace
@@ -769,11 +776,12 @@ spinup_pgcluster() {
 	local tls_enabled=${8:-"false"}
 	local pgoClientFile="${9:-$conf_dir/client.yml}"
 	local namespace="${10:-"$namespace"}"
+	local root_via_pgbouncer="${11}"
 
 	desc 'create fresh PG cluster'
 	create_user_secrets ${cluster} ${namespace}
 	kubectl_bin -n $namespace apply -f ${pgoClientFile}
-	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type} ${tls_enabled}
+	apply_cluster ${config} ${cluster} ${backup} 'false' 'false' ${custom_config} ${podAntiAffinity} ${schedule} ${schedule_type} ${tls_enabled} ${root_via_pgbouncer}
 	wait_deployment "${cluster}-backrest-shared-repo"
 	wait_deployment "${cluster}"
 	# Exiting since we are running cluster in stanby mode

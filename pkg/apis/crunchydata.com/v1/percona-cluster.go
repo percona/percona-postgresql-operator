@@ -76,13 +76,14 @@ type Badger struct {
 }
 
 type PgBouncer struct {
-	Image            string              `json:"image"`
-	Size             int32               `json:"size"`
-	Resources        Resources           `json:"resources"`
-	TLSSecret        string              `json:"tlsSecret"`
-	Expose           Expose              `json:"expose"`
-	AntiAffinityType PodAntiAffinityType `json:"antiAffinityType"`
-	ImagePullPolicy  string              `json:"imagePullPolicy"`
+	Image              string              `json:"image"`
+	Size               int32               `json:"size"`
+	Resources          Resources           `json:"resources"`
+	TLSSecret          string              `json:"tlsSecret"`
+	Expose             Expose              `json:"expose"`
+	ExposePostgresUser bool                `json:"exposePostgresUser,omitempty"`
+	AntiAffinityType   PodAntiAffinityType `json:"antiAffinityType"`
+	ImagePullPolicy    string              `json:"imagePullPolicy"`
 }
 
 type PGDataSource struct {
