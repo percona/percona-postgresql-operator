@@ -113,7 +113,7 @@ if [[ -n $(which aws) ]]; then
 	export IMAGE_PGBADGER="${ECR}/${IMAGE_PGBADGER}"
 
 	deploy_operator "ecr"
-	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' '' '' '' '' "$conf_dir/client.yml" "$namespace" 'true'
+	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "false" "false" "false" "false" "false" "false" "$conf_dir/client.yml" "$namespace" "true"
 	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres ${cluster})@${cluster}-pgbouncer.${namespace}"
 
 fi
