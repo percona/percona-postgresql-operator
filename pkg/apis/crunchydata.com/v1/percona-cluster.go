@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -258,6 +259,9 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 }
 
 func (p *PerconaPGCluster) checkAndSetAffinity(clusterName string) {
+	if p.Spec.PGPrimary.Affinity.NodeLabel == nil && len(p.Spec.PGPrimary.Affinity.NodeAffinityType) > 0 {
+		log.Warn("Using nodeAffinityType without nodeLabel set makes no sense and so far forbidden")
+	}
 	if p.Spec.PGPrimary.Affinity.Advanced == nil && len(p.Spec.PGPrimary.Affinity.AntiAffinityType) == 0 {
 		p.Spec.PGPrimary.Affinity = getDefaultAffinity(clusterName)
 	}

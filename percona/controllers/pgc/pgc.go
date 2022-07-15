@@ -461,7 +461,12 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	}
 
 	newCluster.CheckAndSetDefaults()
-	err := c.handleInternalSecrets(newCluster)
+	err := c.updateTemplates(newCluster)
+	if err != nil {
+		log.Errorf("update perconapgcluster: update templates: %s", err)
+		return
+	}
+	err = c.handleInternalSecrets(newCluster)
 	if err != nil {
 		log.Errorf("update perconapgcluster: handle internal secrets: %s", err)
 		return
@@ -493,11 +498,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if err != nil {
 		log.Errorf("update perconapgcluster: scheduled update: %s", err)
 	}
-	err = c.updateTemplates(newCluster)
-	if err != nil {
-		log.Errorf("update perconapgcluster: update templates: %s", err)
-		return
-	}
+
 	if !reflect.DeepEqual(oldCluster.Spec.PGPrimary.Expose, newCluster.Spec.PGPrimary.Expose) {
 		err = service.CreateOrUpdate(c.Client, newCluster, service.PGPrimaryServiceType)
 		if err != nil {
