@@ -13,4 +13,5 @@ spec:
     backrest-restore-from-cluster: cluster1
     backrest-restore-opts: --type=time --target="2021-04-16 15:13:32"
     backrest-storage-type: posix
+    backrest-s3-verify-tls: "true"
   tasktype: restore
