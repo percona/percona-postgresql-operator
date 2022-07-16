@@ -263,46 +263,12 @@ func (p *PerconaPGCluster) checkAndSetAffinity(clusterName string) {
 		log.Warn("Using nodeAffinityType without nodeLabel set makes no sense and so far forbidden")
 	}
 	if p.Spec.PGPrimary.Affinity.Advanced == nil && len(p.Spec.PGPrimary.Affinity.AntiAffinityType) == 0 {
-		p.Spec.PGPrimary.Affinity = getDefaultAffinity(clusterName)
+		p.Spec.PGPrimary.Affinity.AntiAffinityType = "preferred"
 	}
 	if p.Spec.PGBouncer.Affinity.Advanced == nil && len(p.Spec.PGBouncer.Affinity.AntiAffinityType) == 0 {
-		p.Spec.PGBouncer.Affinity = getDefaultAffinity(clusterName)
+		p.Spec.PGBouncer.Affinity.AntiAffinityType = "preferred"
 	}
 	if p.Spec.Backup.Affinity.Advanced == nil && len(p.Spec.Backup.Affinity.AntiAffinityType) == 0 {
-		p.Spec.Backup.Affinity = getDefaultAffinity(clusterName)
-	}
-}
-
-func getDefaultAffinity(clusterName string) Affinity {
-	return Affinity{
-		Advanced: &v1.Affinity{
-			PodAntiAffinity: &v1.PodAntiAffinity{
-				PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
-					getDefaultWeightedPodAffinityTerm(clusterName),
-				},
-			},
-		},
-	}
-}
-
-func getDefaultWeightedPodAffinityTerm(clusterName string) v1.WeightedPodAffinityTerm {
-	return v1.WeightedPodAffinityTerm{
-		PodAffinityTerm: v1.PodAffinityTerm{
-			LabelSelector: &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "pg-pod-anti-affinity",
-						Operator: metav1.LabelSelectorOpExists,
-					},
-					{
-						Key:      "pg-cluster",
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{clusterName},
-					},
-				},
-			},
-			TopologyKey: defaultAffinityTopologyKey,
-		},
-		Weight: int32(1),
+		p.Spec.Backup.Affinity.AntiAffinityType = "preferred"
 	}
 }
