@@ -420,13 +420,7 @@
                     }
                     {{.TablespaceVolumes}}
                 ],
-                "affinity": {
-                  {{if .NodeSelector}}
-                  "nodeAffinity": {{ .NodeSelector }}
-                  {{ end }}
-                  {{if and .NodeSelector .PodAntiAffinity}},{{end}}
-                  {{.PodAntiAffinity}}
-                },
+                "affinity": <affinity>,
                 "restartPolicy": "Always",
                 "dnsPolicy": "ClusterFirst"
             }
