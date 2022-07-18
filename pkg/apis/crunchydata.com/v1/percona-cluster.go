@@ -220,8 +220,10 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 	if p.Spec.PGPrimary.ImagePullPolicy == "" {
 		p.Spec.PGPrimary.ImagePullPolicy = PullPolicyIfNotPresent
 	}
-	if p.Spec.PGReplicas.HotStandby.ImagePullPolicy == "" {
-		p.Spec.PGReplicas.HotStandby.ImagePullPolicy = PullPolicyIfNotPresent
+	if p.Spec.PGReplicas != nil {
+		if p.Spec.PGReplicas.HotStandby.ImagePullPolicy == "" {
+			p.Spec.PGReplicas.HotStandby.ImagePullPolicy = PullPolicyIfNotPresent
+		}
 	}
 	if p.Spec.PGBouncer.ImagePullPolicy == "" {
 		p.Spec.PGBouncer.ImagePullPolicy = PullPolicyIfNotPresent
