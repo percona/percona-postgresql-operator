@@ -59,6 +59,8 @@ func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs Ver
 
 	var newVersion DepVersion
 	if VersionUpgradeEnabled(cr) || (!VersionUpgradeEnabled(cr) && TelemetryEnabled()) {
+		log.Infof("Fetching versions from %s", cr.Spec.UpgradeOptions.VersionServiceEndpoint)
+
 		newVersion, err = vs.GetExactVersion(cr, cr.Spec.UpgradeOptions.VersionServiceEndpoint, verMeta)
 		if err != nil {
 			return errors.Wrap(err, "failed to check version")
