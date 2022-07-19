@@ -52,8 +52,22 @@ spec:
 #      limits:
 #        cpu: 500m
 #        memory: "256Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
+#     nodeAffinityType: required
+#     nodeLabel:
+#       kubernetes.io/region: us-central1
+#      antiAffinityTopologyKey: "kubernetes.io/hostname"
+#      advanced:
+#        nodeAffinity:
+#          requiredDuringSchedulingIgnoredDuringExecution:
+#            nodeSelectorTerms:
+#            - matchExpressions:
+#              - key: kubernetes.io/e2e-az-name
+#                operator: In
+#                values:
+#                - e2e-az1
+#                - e2e-az2
     tolerations: []
     volumeSpec:
       size: 1G
@@ -94,8 +108,8 @@ spec:
 #      limits:
 #        cpu: "1"
 #        memory: "64Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
     volumeSpec:
       size: 1G
       accessmode: ReadWriteOnce
@@ -116,6 +130,7 @@ spec:
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
 #    imagePullPolicy: Always
+#    exposePostgresUser: false
     size: 3
     resources:
       requests:
@@ -124,8 +139,8 @@ spec:
 #      limits:
 #        cpu: "2"
 #        memory: "512Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
     expose:
       serviceType: ClusterIP
 #      loadBalancerSourceRanges:

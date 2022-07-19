@@ -143,9 +143,7 @@
                     }
                   }
                 ],
-                "affinity": {
-                  {{.PodAntiAffinity}}
-                },
+                "affinity": <affinity>,
                 "restartPolicy": "Always",
                 "dnsPolicy": "ClusterFirst"
             }
