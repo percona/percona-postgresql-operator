@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"os"
 	"strings"
 
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
@@ -211,6 +212,16 @@ type UpgradeOptions struct {
 }
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"
+
+func GetDefaultVersionServiceEndpoint() string {
+	endpoint := os.Getenv("PERCONA_VS_FALLBACK_URI")
+
+	if len(endpoint) != 0 {
+		return endpoint
+	}
+
+	return DefaultVersionServiceEndpoint
+}
 
 var PullPolicyAlways = "Always"
 var PullPolicyIfNotPresent = "IfNotPresent"

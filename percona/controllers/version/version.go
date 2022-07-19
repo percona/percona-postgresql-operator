@@ -64,11 +64,11 @@ func EnsureVersion(clientset kubeapi.Interface, cr *api.PerconaPGCluster, vs Ver
 			return errors.Wrap(err, "failed to check version")
 		}
 
-		if TelemetryEnabled() && cr.Spec.UpgradeOptions.VersionServiceEndpoint != api.DefaultVersionServiceEndpoint {
-			_, err = vs.GetExactVersion(cr, api.DefaultVersionServiceEndpoint, verMeta)
+		if TelemetryEnabled() && cr.Spec.UpgradeOptions.VersionServiceEndpoint != api.GetDefaultVersionServiceEndpoint() {
+			_, err = vs.GetExactVersion(cr, api.GetDefaultVersionServiceEndpoint(), verMeta)
 			if err != nil {
 				// we don't return here to not block execution just because we can't phone home
-				log.WithError(err).Errorf("failed to send telemetry to %s", api.DefaultVersionServiceEndpoint)
+				log.WithError(err).Errorf("failed to send telemetry to %s", api.GetDefaultVersionServiceEndpoint())
 			}
 		}
 	}
