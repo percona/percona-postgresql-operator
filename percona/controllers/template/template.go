@@ -45,7 +45,12 @@ func UpdateDeploymentTemplate(deploymentTemplateData []byte, newCluster *crv1.Pe
 	if err != nil {
 		return errors.Wrap(err, "handle security context template data")
 	}
+
 	templateData = handleImagePullPolicy(templateData, []byte(newCluster.Spec.PGPrimary.ImagePullPolicy))
+	templateData, err = handleAffinityTemplate(templateData, newCluster.Spec.PGPrimary.Affinity, true)
+	if err != nil {
+		return errors.Wrap(err, "handle affinity template data")
+	}
 
 	t, err := template.New(ClusterDeploymentTemplateName).Parse(string(templateData))
 	if err != nil {
@@ -59,6 +64,10 @@ func UpdateDeploymentTemplate(deploymentTemplateData []byte, newCluster *crv1.Pe
 
 func UpdateBackrestRepoTemplate(backrestRepoDeploymentTemplateData []byte, newCluster *crv1.PerconaPGCluster, nodeName string) error {
 	templateData := handleImagePullPolicy(backrestRepoDeploymentTemplateData, []byte(newCluster.Spec.Backup.ImagePullPolicy))
+	templateData, err := handleAffinityTemplate(templateData, newCluster.Spec.Backup.Affinity, false)
+	if err != nil {
+		return errors.Wrap(err, "handle affinity template data")
+	}
 
 	t, err := template.New(BackrestRepoDeploymentTemplateName).Parse(string(templateData))
 	if err != nil {
@@ -72,6 +81,10 @@ func UpdateBackrestRepoTemplate(backrestRepoDeploymentTemplateData []byte, newCl
 
 func UpdateBouncerTemplate(bouncerDeploymentTemplateData []byte, newCluster *crv1.PerconaPGCluster, nodeName string) error {
 	templateData := handleImagePullPolicy(bouncerDeploymentTemplateData, []byte(newCluster.Spec.PGBouncer.ImagePullPolicy))
+	templateData, err := handleAffinityTemplate(templateData, newCluster.Spec.PGBouncer.Affinity, false)
+	if err != nil {
+		return errors.Wrap(err, "handle affinity template data")
+	}
 
 	t, err := template.New(BouncerDeploymentTemplateName).Parse(string(templateData))
 	if err != nil {
@@ -107,11 +120,47 @@ func handlePMMTemplate(template []byte, cluster *crv1.PerconaPGCluster, nodeName
 
 	return bytes.Replace(template, []byte("<pmmContainer>"), append([]byte(", "), pmmContainerBytes...), -1), nil
 }
+
 func GetPMMContainerJSON(pgc *crv1.PerconaPGCluster, nodeName string) ([]byte, error) {
 	c := pmm.GetPMMContainer(pgc, pgc.Name, "{{.Name}}")
 	b, err := json.Marshal(c)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal container")
+	}
+
+	return b, nil
+}
+
+func handleAffinityTemplate(template []byte, affinity crv1.Affinity, withNodeSelector bool) ([]byte, error) {
+	affinityBytesWithNodeSelector := []byte(`{
+		{{if .NodeSelector}}
+		"nodeAffinity": {{ .NodeSelector }}
+		{{ end }}
+		{{if and .NodeSelector .PodAntiAffinity}},{{end}}
+		{{.PodAntiAffinity}}
+	  }`)
+	affinityBytes := []byte(`{ {{.PodAntiAffinity}} }`)
+
+	if withNodeSelector {
+		affinityBytes = affinityBytesWithNodeSelector
+	}
+
+	if affinity.Advanced != nil {
+		customAffinity, err := GetAffinityJSON(affinity)
+		if err != nil {
+			return nil, errors.Wrap(err, "get affinity json")
+		}
+		affinityBytes = customAffinity
+
+	}
+
+	return bytes.Replace(template, []byte("<affinity>"), affinityBytes, -1), nil
+}
+
+func GetAffinityJSON(affinity crv1.Affinity) ([]byte, error) {
+	b, err := json.Marshal(affinity.Advanced)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal affinity")
 	}
 
 	return b, nil

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -76,14 +77,14 @@ type Badger struct {
 }
 
 type PgBouncer struct {
-	Image              string              `json:"image"`
-	Size               int32               `json:"size"`
-	Resources          Resources           `json:"resources"`
-	TLSSecret          string              `json:"tlsSecret"`
-	Expose             Expose              `json:"expose"`
-	ExposePostgresUser bool                `json:"exposePostgresUser,omitempty"`
-	AntiAffinityType   PodAntiAffinityType `json:"antiAffinityType"`
-	ImagePullPolicy    string              `json:"imagePullPolicy"`
+	Image              string    `json:"image"`
+	Size               int32     `json:"size"`
+	Resources          Resources `json:"resources"`
+	TLSSecret          string    `json:"tlsSecret"`
+	Expose             Expose    `json:"expose"`
+	ExposePostgresUser bool      `json:"exposePostgresUser,omitempty"`
+	Affinity           Affinity  `json:"affinity,omitempty"`
+	ImagePullPolicy    string    `json:"imagePullPolicy"`
 }
 
 type PGDataSource struct {
@@ -93,20 +94,20 @@ type PGDataSource struct {
 }
 
 type PGPrimary struct {
-	Image              string              `json:"image"`
-	Customconfig       string              `json:"customconfig"`
-	Resources          Resources           `json:"resources"`
-	VolumeSpec         *PgStorageSpec      `json:"volumeSpec"`
-	Labels             map[string]string   `json:"labels"`
-	Annotations        map[string]string   `json:"annotations"`
-	Affinity           v1.Affinity         `json:"affinity"`
-	AntiAffinityType   PodAntiAffinityType `json:"antiAffinityType"`
-	ImagePullPolicy    string              `json:"imagePullPolicy"`
-	Tolerations        []v1.Toleration     `json:"tolerations"`
-	NodeSelector       string              `json:"nodeSelector"`
-	RuntimeClassName   string              `json:"runtimeClassName"`
-	PodSecurityContext string              `json:"podSecurityContext"`
-	Expose             Expose              `json:"expose"`
+	Image              string            `json:"image"`
+	Customconfig       string            `json:"customconfig"`
+	Resources          Resources         `json:"resources"`
+	VolumeSpec         *PgStorageSpec    `json:"volumeSpec"`
+	Labels             map[string]string `json:"labels"`
+	Annotations        map[string]string `json:"annotations"`
+	NodeAffinity       NodeAffinitySpec  `json:"nodeAffinitySpec"`
+	Affinity           Affinity          `json:"affinity,omitempty"`
+	ImagePullPolicy    string            `json:"imagePullPolicy"`
+	Tolerations        []v1.Toleration   `json:"tolerations"`
+	NodeSelector       string            `json:"nodeSelector"`
+	RuntimeClassName   string            `json:"runtimeClassName"`
+	PodSecurityContext string            `json:"podSecurityContext"`
+	Expose             Expose            `json:"expose"`
 }
 
 type PGReplicas struct {
@@ -119,7 +120,6 @@ type HotStandby struct {
 	VolumeSpec        *PgStorageSpec    `json:"volumeSpec"`
 	Labels            map[string]string `json:"labels"`
 	Annotations       map[string]string `json:"annotations"`
-	Affinity          *v1.Affinity      `json:"affinity"`
 	EnableSyncStandby bool              `json:"enableSyncStandby"`
 	Expose            Expose            `json:"expose"`
 	ImagePullPolicy   string            `json:"imagePullPolicy"`
@@ -146,7 +146,7 @@ type Backup struct {
 	Storages          map[string]Storage    `json:"storages"`
 	Schedule          []CronJob             `json:"schedule"`
 	StorageTypes      []BackrestStorageType `json:"storageTypes"`
-	AntiAffinityType  PodAntiAffinityType   `json:"antiAffinityType"`
+	Affinity          Affinity              `json:"affinity,omitempty"`
 	RepoPath          string                `json:"repoPath"`
 	CustomConfig      []v1.VolumeProjection `json:"customConfig"`
 }
@@ -180,6 +180,14 @@ type PMMSpec struct {
 	ServerUser      string    `json:"serverUser,omitempty"`
 	PMMSecret       string    `json:"pmmSecret,omitempty"`
 	Resources       Resources `json:"resources"`
+}
+
+type Affinity struct {
+	NodeLabel        map[string]string   `json:"nodeLabel,omitempty"`
+	NodeAffinityType string              `json:"nodeAffinityType,omitempty"`
+	AntiAffinityType PodAntiAffinityType `json:"antiAffinityType,omitempty"`
+	TopologyKey      *string             `json:"antiAffinityTopologyKey,omitempty"`
+	Advanced         *v1.Affinity        `json:"advanced,omitempty"`
 }
 
 // PerconaPGClusterList is the CRD that defines a Percona PG Cluster List
@@ -216,12 +224,16 @@ var PullPolicyIfNotPresent = "IfNotPresent"
 
 const UsersSecretTag string = "-users"
 
+var defaultAffinityTopologyKey = "kubernetes.io/hostname"
+
 func (p *PerconaPGCluster) CheckAndSetDefaults() {
 	if p.Spec.PGPrimary.ImagePullPolicy == "" {
 		p.Spec.PGPrimary.ImagePullPolicy = PullPolicyIfNotPresent
 	}
-	if p.Spec.PGReplicas.HotStandby.ImagePullPolicy == "" {
-		p.Spec.PGReplicas.HotStandby.ImagePullPolicy = PullPolicyIfNotPresent
+	if p.Spec.PGReplicas != nil {
+		if p.Spec.PGReplicas.HotStandby.ImagePullPolicy == "" {
+			p.Spec.PGReplicas.HotStandby.ImagePullPolicy = PullPolicyIfNotPresent
+		}
 	}
 	if p.Spec.PGBouncer.ImagePullPolicy == "" {
 		p.Spec.PGBouncer.ImagePullPolicy = PullPolicyIfNotPresent
@@ -244,5 +256,22 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 
 	if p.Spec.UsersSecretName == "" {
 		p.Spec.UsersSecretName = p.Name + UsersSecretTag
+	}
+
+	p.checkAndSetAffinity(p.Name)
+}
+
+func (p *PerconaPGCluster) checkAndSetAffinity(clusterName string) {
+	if p.Spec.PGPrimary.Affinity.NodeLabel == nil && len(p.Spec.PGPrimary.Affinity.NodeAffinityType) > 0 {
+		log.Warn("Using nodeAffinityType without nodeLabel set makes no sense and so far forbidden")
+	}
+	if p.Spec.PGPrimary.Affinity.Advanced == nil && len(p.Spec.PGPrimary.Affinity.AntiAffinityType) == 0 {
+		p.Spec.PGPrimary.Affinity.AntiAffinityType = "preferred"
+	}
+	if p.Spec.PGBouncer.Affinity.Advanced == nil && len(p.Spec.PGBouncer.Affinity.AntiAffinityType) == 0 {
+		p.Spec.PGBouncer.Affinity.AntiAffinityType = "preferred"
+	}
+	if p.Spec.Backup.Affinity.Advanced == nil && len(p.Spec.Backup.Affinity.AntiAffinityType) == 0 {
+		p.Spec.Backup.Affinity.AntiAffinityType = "preferred"
 	}
 }
