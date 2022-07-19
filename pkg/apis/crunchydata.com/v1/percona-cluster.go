@@ -251,12 +251,12 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 	if p.Spec.UpgradeOptions == nil {
 		p.Spec.UpgradeOptions = &UpgradeOptions{
 			Apply:                  UpgradeStrategyDisabled,
-			VersionServiceEndpoint: DefaultVersionServiceEndpoint,
+			VersionServiceEndpoint: GetDefaultVersionServiceEndpoint(),
 		}
 	}
 
 	if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
-		p.Spec.UpgradeOptions.VersionServiceEndpoint = DefaultVersionServiceEndpoint
+		p.Spec.UpgradeOptions.VersionServiceEndpoint = GetDefaultVersionServiceEndpoint()
 	}
 
 	if p.Spec.UsersSecretName == "" {
