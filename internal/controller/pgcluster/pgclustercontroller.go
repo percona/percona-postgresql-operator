@@ -982,7 +982,7 @@ func updatePgBouncer(c *Controller, oldCluster *crv1.Pgcluster, newCluster *crv1
 	}
 
 	// otherwise, this is an update
-	return clusteroperator.UpdatePgbouncer(c.Client, oldCluster, newCluster)
+	return clusteroperator.UpdatePgbouncer(c.Client, c.Client.Config, oldCluster, newCluster)
 }
 
 // updateServices handles any updates to the Service objects. Given how legacy

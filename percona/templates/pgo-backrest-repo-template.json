@@ -194,9 +194,7 @@
                     "sizeLimit": "128Ki"
                   }
                 }],
-                "affinity": {
-        {{.PodAntiAffinity}}
-                },
+                "affinity": <affinity>,
                 "restartPolicy": "Always",
                 "dnsPolicy": "ClusterFirst"
             }

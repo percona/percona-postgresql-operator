@@ -10,6 +10,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/operator"
+	util "github.com/percona/percona-postgresql-operator/internal/util"
 	dplmnt "github.com/percona/percona-postgresql-operator/percona/controllers/deployment"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
@@ -28,7 +29,7 @@ const (
 
 func Create(clientset kubeapi.Interface, newPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	cluster := getPGCLuster(newPerconaPGCluster, &crv1.Pgcluster{})
+	cluster := getPGCluster(newPerconaPGCluster, &crv1.Pgcluster{})
 
 	_, err := clientset.CrunchydataV1().Pgclusters(newPerconaPGCluster.Namespace).Create(ctx, cluster, metav1.CreateOptions{})
 	if err != nil {
@@ -40,7 +41,7 @@ func Create(clientset kubeapi.Interface, newPerconaPGCluster *crv1.PerconaPGClus
 
 func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	pgCluster := getPGCLuster(newPerconaPGCluster, &crv1.Pgcluster{})
+	pgCluster := getPGCluster(newPerconaPGCluster, &crv1.Pgcluster{})
 	if pgCluster.Annotations == nil {
 		pgCluster.Annotations = make(map[string]string)
 	}
@@ -59,7 +60,7 @@ func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluste
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	pgCluster = getPGCLuster(newPerconaPGCluster, oldPGCluster)
+	pgCluster = getPGCluster(newPerconaPGCluster, oldPGCluster)
 	if pgCluster.Annotations == nil {
 		pgCluster.Annotations = make(map[string]string)
 	}
@@ -79,7 +80,7 @@ func UpdateCR(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGClus
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	pgCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
+	pgCluster := getPGCluster(newPerconaPGCluster, oldPGCluster)
 
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -103,6 +104,8 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 			return errors.Wrap(err, "update pmm sidecar")
 		}
 	}
+
+	dplmnt.UpdateSpecTemplateAffinity(deployment, newPerconaPGCluster.Spec.PGPrimary.Affinity)
 
 	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PGPrimary, newPerconaPGCluster.Spec.PGPrimary) {
 		dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
@@ -141,7 +144,7 @@ func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *
 	if err != nil {
 		return errors.Wrap(err, "getdeployment")
 	}
-
+	dplmnt.UpdateSpecTemplateAffinity(deployment, newPerconaPGCluster.Spec.Backup.Affinity)
 	dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
 		newPerconaPGCluster.Spec.Backup.BackrestRepoImage,
 		newPerconaPGCluster.Spec.Backup.ImagePullPolicy)
@@ -191,7 +194,7 @@ func ChangeBouncerSize(clientset *kubeapi.Client, newPerconaPGCluster *crv1.Perc
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	newPGCluster := getPGCLuster(newPerconaPGCluster, oldPGCluster)
+	newPGCluster := getPGCluster(newPerconaPGCluster, oldPGCluster)
 	newPGCluster.Spec.PgBouncer.Replicas = size
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPGCluster.Namespace).Update(ctx, newPGCluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -235,7 +238,7 @@ func IsPrimary(clientset kubeapi.Interface, perconaPGCluster *crv1.PerconaPGClus
 	return false, nil
 }
 
-func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
+func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
 	metaAnnotations := map[string]string{
 		"current-primary": pgc.Name,
 	}
@@ -318,21 +321,36 @@ func getPGCLuster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PgBouncer.Replicas = pgc.Spec.PGBouncer.Size
 	cluster.Spec.PgBouncer.Resources = pgc.Spec.PGBouncer.Resources.Requests
 	cluster.Spec.PgBouncer.Limits = pgc.Spec.PGBouncer.Resources.Limits
+	if pgc.Spec.PGPrimary.Affinity.NodeLabel != nil {
+		var nodeAffinityType crv1.NodeAffinityType
+		switch pgc.Spec.PGPrimary.Affinity.NodeAffinityType {
+		case "preferred":
+			nodeAffinityType = crv1.NodeAffinityTypePreferred
+		case "required":
+			nodeAffinityType = crv1.NodeAffinityTypeRequired
+		}
+		for key, val := range pgc.Spec.PGPrimary.Affinity.NodeLabel {
+			cluster.Spec.NodeAffinity.Default = util.GenerateNodeAffinity(nodeAffinityType, key, []string{val})
+		}
+	}
+	cluster.Spec.PgBouncer.ExposePostgresUser = pgc.Spec.PGBouncer.ExposePostgresUser
 	cluster.Spec.PGOImagePrefix = operator.Pgo.Cluster.CCPImagePrefix
-	if len(pgc.Spec.PGPrimary.AntiAffinityType) == 0 {
-		pgc.Spec.PGPrimary.AntiAffinityType = "preferred"
+	if len(pgc.Spec.PGPrimary.Affinity.AntiAffinityType) == 0 && pgc.Spec.PGPrimary.Affinity.Advanced == nil {
+		pgc.Spec.PGPrimary.Affinity.AntiAffinityType = "preferred"
 	}
-	if len(pgc.Spec.Backup.AntiAffinityType) == 0 {
-		pgc.Spec.Backup.AntiAffinityType = "preferred"
+	if len(pgc.Spec.Backup.Affinity.AntiAffinityType) == 0 && pgc.Spec.Backup.Affinity.Advanced == nil {
+		pgc.Spec.Backup.Affinity.AntiAffinityType = "preferred"
 	}
-	if len(pgc.Spec.PGBouncer.AntiAffinityType) == 0 {
-		pgc.Spec.PGBouncer.AntiAffinityType = "preferred"
+	if len(pgc.Spec.PGBouncer.Affinity.AntiAffinityType) == 0 && pgc.Spec.PGBouncer.Affinity.Advanced == nil {
+		pgc.Spec.PGBouncer.Affinity.AntiAffinityType = "preferred"
 	}
 	cluster.Spec.PodAntiAffinity = crv1.PodAntiAffinitySpec{
-		Default:    pgc.Spec.PGPrimary.AntiAffinityType,
-		PgBackRest: pgc.Spec.Backup.AntiAffinityType,
-		PgBouncer:  pgc.Spec.PGBouncer.AntiAffinityType,
+		Default:    pgc.Spec.PGPrimary.Affinity.AntiAffinityType,
+		PgBackRest: pgc.Spec.Backup.Affinity.AntiAffinityType,
+		PgBouncer:  pgc.Spec.PGBouncer.Affinity.AntiAffinityType,
 	}
+
+	cluster.Spec.PGOImagePrefix = operator.Pgo.Cluster.CCPImagePrefix
 	cluster.Spec.Port = pgc.Spec.Port
 	cluster.Spec.Resources = pgc.Spec.PGPrimary.Resources.Requests
 	cluster.Spec.Limits = pgc.Spec.PGPrimary.Resources.Limits
