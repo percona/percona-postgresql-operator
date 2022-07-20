@@ -207,7 +207,7 @@ deploy_operator() {
 	kubectl_bin delete ${OPERATOR_NS:+-n $OPERATOR_NS} -f ${tmp_dir}/operator.yaml
 
 	wait_pod $(get_operator_pod) ${OPERATOR_NS}
-	if [[ ! -z ${version_service_uri_override} ]]; then
+	if [[ -n ${version_service_uri_override} ]]; then
 		kubectl_bin -n ${namespace} patch deployment/postgres-operator --type json -p='[{"op":"add","path":"/spec/template/spec/containers/1/env/-","value":{"name":"PERCONA_VS_FALLBACK_URI","value":"'${version_service_uri_override}'"}}]'
 		sleep 15
 	fi
