@@ -152,6 +152,7 @@ prepare_operator_yaml() {
 	local namespace_mode=${3:-"disabled"}
 	local operator_action=${4:-"install"}
 	local namespace=${5:-"$namespace"}
+	local dont_send_telemetry=${6:-"false"}
 
 	yq r -d'2' "${operator_manifest}" 'data[values.yaml]' \
 		| $sed -e "s#^namespace: .*#namespace: \"${namespace}\"#g" \
@@ -161,6 +162,7 @@ prepare_operator_yaml() {
 		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)\"#g" \
 		| $sed -e "s#ccp_image_prefix: .*#ccp_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"#g" \
 		| $sed -e "s#pgo_image_prefix: .*#pgo_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"#g" \
+		| $sed -e "s#^disable_telemetry: .*#disable_telemetry: \"${dont_send_telemetry}\"#g" \
 			>${tmp_dir}/operator.ini
 
 
@@ -193,16 +195,22 @@ deploy_operator() {
 	local namespace_mode=${3:-"disabled"}
 	local action=${4:-"install"}
 	local namespace=${5:-"${namespace}"}
+	local dont_send_telemetry=${6:-"false"}
+	local version_service_uri_override=${7}
 
 	desc 'start operator'
 
-	prepare_operator_yaml "${pull_secret_name}" "${operator_manifest}" "${namespace_mode}" "${action}" "${namespace}"
+	prepare_operator_yaml "${pull_secret_name}" "${operator_manifest}" "${namespace_mode}" "${action}" "${namespace}" "${dont_send_telemetry}"
 	kubectl_bin apply ${OPERATOR_NS:+-n $OPERATOR_NS} -f ${tmp_dir}/operator.yaml
 
 	wait_job_completion "pgo-deploy" 'true' ${OPERATOR_NS}
 	kubectl_bin delete ${OPERATOR_NS:+-n $OPERATOR_NS} -f ${tmp_dir}/operator.yaml
 
 	wait_pod $(get_operator_pod) ${OPERATOR_NS}
+	if [[ ! -z ${version_service_uri_override} ]]; then
+		kubectl_bin -n ${namespace} patch deployment/postgres-operator --type json -p='[{"op":"add","path":"/spec/template/spec/containers/1/env/-","value":{"name":"PERCONA_VS_FALLBACK_URI","value":"'${version_service_uri_override}'"}}]'
+		sleep 15
+	fi
 }
 
 retry() {
