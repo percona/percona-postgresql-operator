@@ -404,7 +404,7 @@ pipeline {
                 }
             }
             options {
-                timeout(time: 3, unit: 'HOURS')
+                timeout(time: 5, unit: 'HOURS')
             }
             parallel {
                 stage('E2E Basic tests') {
@@ -426,12 +426,18 @@ pipeline {
                         ShutdownCluster('sandbox')
                     }
                 }
-                stage('E2E Backups') {
+                stage('E2E demand-backup') {
                     steps {
-                        CreateCluster('backups')
-                        runTest('demand-backup', 'backups')
-                        runTest('scheduled-backup', 'backups')
-                        ShutdownCluster('backups')
+                        CreateCluster('demand-backup')
+                        runTest('demand-backup', 'demand-backup')
+                        ShutdownCluster('demand-backup')
+                    }
+                }
+                stage('E2E scheduled-backup') {
+                    steps {
+                        CreateCluster('scheduled-backup')
+                        runTest('scheduled-backup', 'scheduled-backup')
+                        ShutdownCluster('scheduled-backup')
                     }
                 }
                 stage('E2E Upgrade') {
@@ -439,8 +445,14 @@ pipeline {
                         CreateCluster('upgrade')
                         runTest('upgrade', 'upgrade')
                         runTest('smart-update', 'upgrade')
-                        runTest('version-service', 'upgrade')
                         ShutdownCluster('upgrade')
+                    }
+                }
+                stage('E2E Version-service') {
+                    steps {
+                        CreateCluster('version-service')
+                        runTest('version-service', 'version-service')
+                        ShutdownCluster('version-service')
                     }
                 }
             }
