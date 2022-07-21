@@ -36,14 +36,15 @@ RUN set -ex; \
         python38-pyyaml \
         python38-six \
         python38-cryptography \
-        git-core \
+        git \
         sshpass
 
 RUN set -ex; \
     curl -Lf -o /tmp/epel-release.rpm https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm; \
     curl -Lf -o /tmp/python38-resolvelib.rpm http://rpmfind.net/linux/centos/8-stream/AppStream/x86_64/os/Packages/python38-resolvelib-0.5.4-5.el8.noarch.rpm; \
-    rpm -i /tmp/epel-release.rpm /tmp/python38-resolvelib.rpm; \
-    rm -rf /tmp/epel-release.rpm /tmp/python38-resolvelib.rpm
+    curl -Lf -o /tmp/ansible-core.rpm http://rpmfind.net/linux/centos/8-stream/AppStream/x86_64/os/Packages/ansible-core-2.12.5-1.el8.x86_64.rpm; \
+    rpm -i /tmp/epel-release.rpm /tmp/python38-resolvelib.rpm /tmp/ansible-core.rpm; \
+    rm -rf /tmp/epel-release.rpm /tmp/python38-resolvelib.rpm /tmp/ansible-core.rpm
 
 RUN set -ex; \
     microdnf -y install \
