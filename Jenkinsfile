@@ -90,7 +90,7 @@ void runTest(String TEST_NAME, String CLUSTER_PREFIX) {
             testsReportMap[TEST_NAME] = "[failed]($testUrl)"
             popArtifactFile("${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$TEST_NAME")
 
-            timeout(time: 90, unit: 'MINUTES') {
+            timeout(time: 120, unit: 'MINUTES') {
                 sh """
                     if [ -f "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$TEST_NAME" ]; then
                         echo Skip $TEST_NAME test
