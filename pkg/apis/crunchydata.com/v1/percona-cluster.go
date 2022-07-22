@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"os"
 	"strings"
 
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
@@ -219,6 +220,18 @@ type UpgradeOptions struct {
 	Schedule               string          `json:"schedule,omitempty"`
 }
 
+const DefaultVersionServiceEndpoint = "https://check.percona.com"
+
+func GetDefaultVersionServiceEndpoint() string {
+	endpoint := os.Getenv("PERCONA_VS_FALLBACK_URI")
+
+	if len(endpoint) != 0 {
+		return endpoint
+	}
+
+	return DefaultVersionServiceEndpoint
+}
+
 var PullPolicyAlways = "Always"
 var PullPolicyIfNotPresent = "IfNotPresent"
 
@@ -248,10 +261,15 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 		p.Spec.PMM.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 
-	if p.Spec.UpgradeOptions != nil {
-		if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
-			p.Spec.UpgradeOptions.VersionServiceEndpoint = "https://check.percona.com"
+	if p.Spec.UpgradeOptions == nil {
+		p.Spec.UpgradeOptions = &UpgradeOptions{
+			Apply:                  UpgradeStrategyDisabled,
+			VersionServiceEndpoint: GetDefaultVersionServiceEndpoint(),
 		}
+	}
+
+	if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
+		p.Spec.UpgradeOptions.VersionServiceEndpoint = GetDefaultVersionServiceEndpoint()
 	}
 
 	if p.Spec.UsersSecretName == "" {
