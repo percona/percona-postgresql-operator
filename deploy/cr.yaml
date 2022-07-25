@@ -54,20 +54,20 @@ spec:
 #        memory: "256Mi"
 #     affinity:
 #       antiAffinityType: preferred
-#     nodeAffinityType: required
-#     nodeLabel:
-#       kubernetes.io/region: us-central1
-#      antiAffinityTopologyKey: "kubernetes.io/hostname"
-#      advanced:
-#        nodeAffinity:
-#          requiredDuringSchedulingIgnoredDuringExecution:
-#            nodeSelectorTerms:
-#            - matchExpressions:
-#              - key: kubernetes.io/e2e-az-name
-#                operator: In
-#                values:
-#                - e2e-az1
-#                - e2e-az2
+#       nodeAffinityType: required
+#       nodeLabel:
+#         kubernetes.io/region: us-central1
+#       antiAffinityTopologyKey: "kubernetes.io/hostname"
+#       advanced:
+#         nodeAffinity:
+#           requiredDuringSchedulingIgnoredDuringExecution:
+#             nodeSelectorTerms:
+#             - matchExpressions:
+#               - key: kubernetes.io/e2e-az-name
+#                 operator: In
+#                 values:
+#                 - e2e-az1
+#                 - e2e-az2
     tolerations: []
     volumeSpec:
       size: 1G
@@ -110,6 +110,20 @@ spec:
 #        memory: "64Mi"
 #     affinity:
 #       antiAffinityType: preferred
+#       nodeAffinityType: required
+#       nodeLabel:
+#         kubernetes.io/region: us-central1
+#       antiAffinityTopologyKey: "kubernetes.io/hostname"
+#       advanced:
+#         nodeAffinity:
+#           requiredDuringSchedulingIgnoredDuringExecution:
+#             nodeSelectorTerms:
+#             - matchExpressions:
+#               - key: kubernetes.io/e2e-az-name
+#                 operator: In
+#                 values:
+#                 - e2e-az1
+#                 - e2e-az2
     volumeSpec:
       size: 1G
       accessmode: ReadWriteOnce
@@ -141,6 +155,20 @@ spec:
 #        memory: "512Mi"
 #     affinity:
 #       antiAffinityType: preferred
+#       nodeAffinityType: required
+#       nodeLabel:
+#         kubernetes.io/region: us-central1
+#       antiAffinityTopologyKey: "kubernetes.io/hostname"
+#       advanced:
+#         nodeAffinity:
+#           requiredDuringSchedulingIgnoredDuringExecution:
+#             nodeSelectorTerms:
+#             - matchExpressions:
+#               - key: kubernetes.io/e2e-az-name
+#                 operator: In
+#                 values:
+#                 - e2e-az1
+#                 - e2e-az2
     expose:
       serviceType: ClusterIP
 #      loadBalancerSourceRanges:
