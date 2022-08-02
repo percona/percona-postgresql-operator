@@ -22,7 +22,7 @@ sudo yum -y install epel-release https://repo.percona.com/yum/percona-release-la
 sudo yum -y install coreutils sed jq curl docker
 sudo curl -s -L https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_amd64 -o /usr/bin/yq
 sudo chmod a+x /usr/bin/yq
-curl -s -L https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz \
+curl -s -L https://github.com/openshift/origin/releases/download/v4.10.0/openshift-origin-client-tools-v4.10.0-0cbc58b-linux-64bit.tar.gz \
     | tar -C /usr/bin --strip-components 1 --wildcards -zxvpf - '*/oc' '*/kubectl'
 curl -s https://get.helm.sh/helm-v3.2.4-linux-amd64.tar.gz \
     | tar -C /usr/bin --strip-components 1 -zxvpf - '*/helm'
@@ -70,26 +70,12 @@ Use the following script to build the image:
 ./e2e-tests/build
 ```
 
-You can also build the image and run your cluster in one command:
-
-```
-./e2e-tests/build-and-run
-```
-
-Running all tests at once can be done with the following command:
-
-```
-./e2e-tests/run
-```
-
-(see how to configure the testing infrastructure [here](#using-environment-variables-to-customize-the-testing-process)).
-
-Tests can also be run one-by-one using the appropriate scripts (their names should be self-explanatory):
+You can run tests one-by-one using the appropriate scripts with self-explanatory names
+(see how to configure the testing infrastructure [here](#using-environment-variables-to-customize-the-testing-process)):
 
 ```
 ./e2e-tests/affinity/run
 ./e2e-tests/clone-cluster/run
-./e2e-tests/data-migration-gcs/run
 ./e2e-tests/demand-backup/run
 ./e2e-tests/init-deploy/run
 ./e2e-tests/monitoring/run
@@ -103,6 +89,7 @@ Tests can also be run one-by-one using the appropriate scripts (their names shou
 ./e2e-tests/tls-check/run
 ./e2e-tests/upgrade/run
 ./e2e-tests/users/run
+./e2e-tests/version-service/run
 ....
 ```
 
