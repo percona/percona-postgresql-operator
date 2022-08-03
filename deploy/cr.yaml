@@ -57,7 +57,6 @@ spec:
 #       nodeAffinityType: required
 #       nodeLabel:
 #         kubernetes.io/region: us-central1
-#       antiAffinityTopologyKey: "kubernetes.io/hostname"
 #       advanced:
 #         nodeAffinity:
 #           requiredDuringSchedulingIgnoredDuringExecution:
