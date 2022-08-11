@@ -152,7 +152,7 @@ prepare_operator_yaml() {
 	local namespace_mode=${3:-"disabled"}
 	local operator_action=${4:-"install"}
 	local namespace=${5:-"$namespace"}
-	local dont_send_telemetry=${6:-"false"}
+	local dont_send_telemetry=${6:-"true"}
 
 	yq r -d'2' "${operator_manifest}" 'data[values.yaml]' \
 		| $sed -e "s#^namespace: .*#namespace: \"${namespace}\"#g" \
