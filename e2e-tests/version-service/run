@@ -115,9 +115,15 @@ main() {
 	check_telemetry_transfer "http://version-service-cr:11000" "disabled" "disabled"
 	check_telemetry_transfer "http://version-service-cr:11000" "recommended" "disabled"
 
+	# Enabling telemetry on the operator level
+	kubectl_bin -n $namespace patch deployment/postgres-operator \
+		--type json \
+		-p='[{"op":"replace","path":"/spec/template/spec/containers/1/env/7","value":{"name":"DISABLE_TELEMETRY","value":"false"}}]'
+	wait_deployment 'postgres-operator'
+
 	desc 'Use simple recommended channel'
 	cluster="cluster1"
-	PGO_TAG='1.2.0'
+	PGO_TAG='1.3.0'
 	PG_VER='13'
 	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
 	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
@@ -202,7 +208,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "${PG_VER}.6" ${PG_VER} "${VS_ENDPOINT}" 4
+	apply_version ${cluster} '9.9.9' "${PG_VER}.7" ${PG_VER} "${VS_ENDPOINT}" 4
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"

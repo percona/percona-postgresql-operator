@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: pgo-deployer-sa
-  namespace: pgo
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -77,6 +76,7 @@ rules:
       - get
       - create
       - delete
+      - patch
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -108,6 +108,7 @@ rules:
       - pg.percona.com
     resources:
       - perconapgclusters
+      - perconapgclusters/status
       - pgclusters
       - pgreplicas
       - pgpolicies
@@ -120,7 +121,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: pgo-deployer-cm
-  namespace: pgo
 data:
   values.yaml: |-
     # =====================
@@ -145,7 +145,7 @@ data:
     ccp_image_prefix: "percona/percona-postgresql-operator"
     ccp_image_pull_secret: ""
     ccp_image_pull_secret_manifest: ""
-    ccp_image_tag: "1.0.0-postgres-ha"
+    ccp_image_tag: "1.3.0-ppg14-postgres-ha"
     create_rbac: "true"
     crunchy_debug: "false"
     db_name: ""
@@ -162,11 +162,12 @@ data:
     delete_watched_namespaces: "false"
     disable_auto_failover: "false"
     disable_fsgroup: "false"
+    disable_telemetry: "true"
     reconcile_rbac: "true"
     exporterport: "9187"
     metrics: "false"
     namespace: "pgo"
-    namespace_mode: "dynamic"
+    namespace_mode: "disabled"
     pgbadgerport: "10000"
     pgo_add_os_ca_store: "false"
     pgo_admin_password: "examplepassword"
@@ -182,11 +183,11 @@ data:
     pgo_cluster_admin: "false"
     pgo_disable_eventing: "false"
     pgo_disable_tls: "false"
-    pgo_image_prefix: "percona/percona-postgresql-operator"
+    pgo_image_prefix: "perconalab/percona-postgresql-operator"
     pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "1.0.0"
+    pgo_image_tag: "1.3.0"
     pgo_installation_name: "devtest"
     pgo_noauth_routes: ""
     pgo_operator_namespace: "pgo"
@@ -266,7 +267,6 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: pgo-deploy
-  namespace: pgo
 spec:
   backoffLimit: 0
   template:
@@ -277,7 +277,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: percona/percona-postgresql-operator:1.0.0-pgo-deployer
+          image: percona/percona-postgresql-operator:1.3.0-pgo-deployer
           imagePullPolicy: Always
           env:
             - name: DEPLOY_ACTION

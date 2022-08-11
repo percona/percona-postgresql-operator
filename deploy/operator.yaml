@@ -142,10 +142,10 @@ data:
     backrest_gcs_key_type: ""
     backrest_port: "2022"
     badger: "false"
-    ccp_image_prefix: "percona/percona-postgresql-operator"
+    ccp_image_prefix: "perconalab/percona-postgresql-operator"
     ccp_image_pull_secret: ""
     ccp_image_pull_secret_manifest: ""
-    ccp_image_tag: "1.3.0-ppg14-postgres-ha"
+    ccp_image_tag: "main-ppg14-postgres-ha"
     create_rbac: "true"
     crunchy_debug: "false"
     db_name: ""
@@ -182,11 +182,11 @@ data:
     pgo_cluster_admin: "false"
     pgo_disable_eventing: "false"
     pgo_disable_tls: "false"
-    pgo_image_prefix: "percona/percona-postgresql-operator"
+    pgo_image_prefix: "perconalab/percona-postgresql-operator"
     pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "1.3.0"
+    pgo_image_tag: "main"
     pgo_installation_name: "devtest"
     pgo_noauth_routes: ""
     pgo_operator_namespace: "pgo"
@@ -276,7 +276,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: percona/percona-postgresql-operator:1.3.0-pgo-deployer
+          image: perconalab/percona-postgresql-operator:main-pgo-deployer
           imagePullPolicy: Always
           env:
             - name: DEPLOY_ACTION

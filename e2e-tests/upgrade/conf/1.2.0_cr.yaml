@@ -40,8 +40,8 @@ spec:
 #      storagetype: dynamic
 #      storageclass: ""
 #      matchLabels: ""
-#  userLabels:
-#    pgo-version: "1.2.0"
+  userLabels:
+    pgo-version: "1.2.0"
   pgPrimary:
     image: percona/percona-postgresql-operator:1.2.0-ppg14-postgres-ha
 #    imagePullPolicy: Always
