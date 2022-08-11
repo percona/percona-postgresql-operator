@@ -114,6 +114,7 @@ func PrepareClusterForRestore(clientset kubeapi.Interface, cluster *crv1.Pgclust
 	patch, err := kubeapi.NewMergePatch().
 		Add("metadata", "annotations")(map[string]string{
 		config.ANNOTATION_BACKREST_RESTORE: "",
+		config.ANNOTATION_CURRENT_PRIMARY:  cluster.Name,
 	}).
 		Add("metadata", "labels")(map[string]string{
 		config.LABEL_DEPLOYMENT_NAME: clusterName,
