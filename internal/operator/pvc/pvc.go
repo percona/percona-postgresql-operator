@@ -61,9 +61,13 @@ func CreateMissingPostgreSQLVolumes(clientset kubernetes.Interface,
 	tablespaceVolumes map[string]operator.StorageResult,
 	err error,
 ) {
+	log.WithField("case", "CS0028980").Debugf("CreateMissingPostgreSQLVolumes dataStorageSpec %+v", dataStorageSpec)
+
 	dataVolume, err = CreateIfNotExists(clientset,
 		dataStorageSpec, pvcNamePrefix, cluster.Spec.Name, namespace,
 		util.GetCustomLabels(cluster))
+
+	log.WithField("case", "CS0028980").Debugf("CreateMissingPostgreSQLVolumes dataVolume %+v err=%+v", dataVolume, err)
 
 	if err == nil {
 		walVolume, err = CreateIfNotExists(clientset,
@@ -90,6 +94,7 @@ func CreateIfNotExists(clientset kubernetes.Interface, spec crv1.PgStorageSpec, 
 	result := operator.StorageResult{
 		SupplementalGroups: spec.GetSupplementalGroups(),
 	}
+	log.WithField("case", "CS0028980").Debugf("CreateIfNotExists PgStorageSpec %+v", spec)
 
 	switch spec.StorageType {
 	case "", "emptydir":

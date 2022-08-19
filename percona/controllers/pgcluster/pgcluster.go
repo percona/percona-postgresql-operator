@@ -14,6 +14,7 @@ import (
 	dplmnt "github.com/percona/percona-postgresql-operator/percona/controllers/deployment"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/pkg/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -304,7 +305,11 @@ func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Name = pgc.Name
 	cluster.Namespace = pgc.Namespace
 	cluster.Spec.BackrestStorage = getStorage(pgc.Spec.Backup.VolumeSpec)
+
+	log.WithField("case", "CS0028980").Debugf("PerconaPGCluster Primary VolumeSpec %+v", pgc.Spec.PGPrimary.VolumeSpec)
 	cluster.Spec.PrimaryStorage = getStorage(pgc.Spec.PGPrimary.VolumeSpec)
+	log.WithField("case", "CS0028980").Debugf("PGCluster PrimaryStorage %+v", cluster.Spec.PrimaryStorage)
+
 	cluster.Spec.ClusterName = pgc.Name
 	cluster.Spec.PGImage = pgc.Spec.PGPrimary.Image
 	cluster.Spec.BackrestImage = pgc.Spec.Backup.Image

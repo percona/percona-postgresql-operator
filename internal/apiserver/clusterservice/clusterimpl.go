@@ -1310,8 +1310,10 @@ func getClusterParams(request *msgs.CreateClusterRequest, name string, ns string
 	}
 
 	spec.PrimaryStorage, _ = apiserver.Pgo.GetStorageSpec(apiserver.Pgo.PrimaryStorage)
+	log.WithField("case", "CS0028980").Debugf("PrimaryStorage from apiserver Pgo config %+v", spec.PrimaryStorage)
 	if request.StorageConfig != "" {
 		spec.PrimaryStorage, _ = apiserver.Pgo.GetStorageSpec(request.StorageConfig)
+		log.WithField("case", "CS0028980").Debugf("PrimaryStorage from request StorageConfig %+v", spec.PrimaryStorage)
 	}
 
 	// set the pd anti-affinity values
