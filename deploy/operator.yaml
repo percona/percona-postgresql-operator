@@ -147,7 +147,7 @@ data:
     ccp_image_pull_secret_manifest: ""
     ccp_image_tag: "main-ppg14-postgres-ha"
     create_rbac: "true"
-    crunchy_debug: "false"
+    crunchy_debug: "true"
     db_name: ""
     db_password_age_days: "0"
     db_password_length: "24"
@@ -165,7 +165,7 @@ data:
     reconcile_rbac: "true"
     exporterport: "9187"
     metrics: "false"
-    namespace: "pgo"
+    namespace: "cs0028980"
     namespace_mode: "disabled"
     pgbadgerport: "10000"
     pgo_add_os_ca_store: "false"
@@ -186,10 +186,10 @@ data:
     pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "main"
+    pgo_image_tag: "cs0028980"
     pgo_installation_name: "devtest"
     pgo_noauth_routes: ""
-    pgo_operator_namespace: "pgo"
+    pgo_operator_namespace: "cs0028980"
     pgo_tls_ca_store: ""
     pgo_tls_no_verify: "false"
     pod_anti_affinity: "preferred"
@@ -260,7 +260,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: pgo-deployer-sa
-    namespace: pgo
+    namespace: cs0028980
 ---
 apiVersion: batch/v1
 kind: Job
