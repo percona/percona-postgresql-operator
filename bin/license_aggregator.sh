@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright 2021 Crunchy Data Solutions, Inc.
+# Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -13,27 +13,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -eu
+
 # Inputs / outputs
-SCAN_DIR=${GOPATH:-~/go}/pkg/mod
+IN_PACKAGES=("$@")
 OUT_DIR=licenses
 
-# Fail on error
-set -e
-
 # Clean up before we start our work
-rm -rf $OUT_DIR/*/
+rm -rf ${OUT_DIR:?}/*/
 
-# Get any file in the vendor directory with the word "license" in it.  Note that we'll also keep its path
-myLicenses=$(find $SCAN_DIR -type f | grep -i license)
-for licensefile in $myLicenses
-do
-    # make a new license directory matching the same vendor structure
-    licensedir=$(dirname $licensefile)
-    newlicensedir=$(echo $licensedir | sed "s:$SCAN_DIR:$OUT_DIR:" | sed 's:@[0-9a-zA-Z.\\-]*/:/:' | sed 's:@[0-9a-zA-Z.\\-]*::')
-    mkdir -p $newlicensedir
-    # And, copy over the license
-    cp -f $licensefile $newlicensedir
-done
+# Download dependencies of the requested packages, excluding the main module.
+# - https://golang.org/ref/mod#glos-main-module
+module=$(go list -m)
+modules=$(go list -deps -f '{{with .Module}}{{.Path}}{{"\t"}}{{.Dir}}{{end}}' "${IN_PACKAGES[@]}")
+dependencies=$(grep -v "^${module}" <<< "${modules}")
 
-sudo chmod -R 755 licenses
-sudo chmod 0644 licenses/LICENSE.txt
+while IFS=$'\t' read -r module directory; do
+	licenses=$(find "${directory}" -type f -ipath '*license*' -not -name '*.go')
+	[ -n "${licenses}" ] || continue
+
+	while IFS= read -r license; do
+		# Replace the local module directory with the module path.
+		# - https://golang.org/ref/mod#module-path
+		relative="${module}${license:${#directory}}"
+
+		# Copy the license file with the same layout as the module.
+		destination="${OUT_DIR}/${relative%/*}"
+		install -d "${destination}"
+		install -m 0644 "${license}" "${destination}"
+	done <<< "${licenses}"
+done <<< "${dependencies}"

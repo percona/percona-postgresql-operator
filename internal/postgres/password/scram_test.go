@@ -1,7 +1,7 @@
 package password
 
 /*
- Copyright 2020 - 2021 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -94,7 +94,7 @@ func TestSCRAMBuild(t *testing.T) {
 				return []byte("h1pp0p4rty2020"), nil
 			}
 
-			// a crednetial is valid if it generates the specified md5 hash
+			// a credential is valid if it generates the specified md5 hash
 			for _, credentials := range credentialList {
 				t.Run(credentials[0], func(t *testing.T) {
 					scram := NewSCRAMPassword(credentials[0])

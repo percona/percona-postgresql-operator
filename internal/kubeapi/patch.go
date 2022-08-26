@@ -1,7 +1,7 @@
 package kubeapi
 
 /*
- Copyright 2020 - 2021 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -16,8 +16,11 @@ package kubeapi
 */
 
 import (
-	"encoding/json"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 // escapeJSONPointer encodes '~' and '/' according to RFC 6901.
@@ -58,7 +61,6 @@ func (*JSON6902) pointer(tokens ...string) string {
 // >
 // > o  If the target location specifies an object member that does exist,
 // >    that member's value is replaced.
-//
 func (patch *JSON6902) Add(path ...string) func(value interface{}) *JSON6902 {
 	i := len(*patch)
 	f := func(value interface{}) *JSON6902 {
@@ -80,7 +82,6 @@ func (patch *JSON6902) Add(path ...string) func(value interface{}) *JSON6902 {
 // > The "remove" operation removes the value at the target location.
 // >
 // > The target location MUST exist for the operation to be successful.
-//
 func (patch *JSON6902) Remove(path ...string) *JSON6902 {
 	*patch = append(*patch, map[string]interface{}{
 		"op":   "remove",
@@ -96,7 +97,6 @@ func (patch *JSON6902) Remove(path ...string) *JSON6902 {
 // > with a new value.
 // >
 // > The target location MUST exist for the operation to be successful.
-//
 func (patch *JSON6902) Replace(path ...string) func(value interface{}) *JSON6902 {
 	i := len(*patch)
 	f := func(value interface{}) *JSON6902 {
@@ -114,7 +114,16 @@ func (patch *JSON6902) Replace(path ...string) func(value interface{}) *JSON6902
 }
 
 // Bytes returns the JSON representation of patch.
-func (patch JSON6902) Bytes() ([]byte, error) { return json.Marshal(patch) }
+func (patch JSON6902) Bytes() ([]byte, error) { return patch.Data(nil) }
+
+// Data returns the JSON representation of patch.
+func (patch JSON6902) Data(runtime.Object) ([]byte, error) { return json.Marshal(patch) }
+
+// IsEmpty returns true when patch has no operations.
+func (patch JSON6902) IsEmpty() bool { return len(patch) == 0 }
+
+// Type returns k8s.io/apimachinery/pkg/types.JSONPatchType.
+func (patch JSON6902) Type() types.PatchType { return types.JSONPatchType }
 
 // Merge7386 represents a JSON Merge Patch according to RFC 7386; the same as
 // k8s.io/apimachinery/pkg/types.MergePatchType.
@@ -132,7 +141,6 @@ func NewMergePatch() *Merge7386 { return &Merge7386{} }
 // > contain the member, the value is replaced.  Null values in the merge
 // > patch are given special meaning to indicate the removal of existing
 // > values in the target.
-//
 func (patch *Merge7386) Add(path ...string) func(value interface{}) *Merge7386 {
 	position := *patch
 
@@ -168,4 +176,13 @@ func (patch *Merge7386) Remove(path ...string) *Merge7386 {
 }
 
 // Bytes returns the JSON representation of patch.
-func (patch Merge7386) Bytes() ([]byte, error) { return json.Marshal(patch) }
+func (patch Merge7386) Bytes() ([]byte, error) { return patch.Data(nil) }
+
+// Data returns the JSON representation of patch.
+func (patch Merge7386) Data(runtime.Object) ([]byte, error) { return json.Marshal(patch) }
+
+// IsEmpty returns true when patch has no modifications.
+func (patch Merge7386) IsEmpty() bool { return len(patch) == 0 }
+
+// Type returns k8s.io/apimachinery/pkg/types.MergePatchType.
+func (patch Merge7386) Type() types.PatchType { return types.MergePatchType }

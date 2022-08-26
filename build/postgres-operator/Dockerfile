@@ -1,47 +1,32 @@
-FROM golang:1.18 AS go_builder
-WORKDIR /go/src/github.com/percona/percona-postgresql-operator
+ARG BASE_IMAGE_OS
+ARG DOCKERBASEREGISTRY
+FROM ${DOCKERBASEREGISTRY}${BASE_IMAGE_OS}
 
-COPY . .
+ARG PGVERSION
+ARG PG_FULL
+ARG PACKAGER
+ARG RELVER
 
-RUN GOBIN="$(pwd -P)/hack/tools" ./hack/update-codegen.sh
+MAINTAINER info@crunchydata.com
 
-ARG GIT_COMMIT
-ARG GIT_BRANCH
-ARG GO_LDFLAGS
-ARG GOOS=linux
-ARG GOARCH=amd64
-ARG CGO_ENABLED=0
+LABEL vendor="Crunchy Data" \
+	url="https://crunchydata.com" \
+	release="${RELVER}" \
+	postgresql.version.major="${PGVERSION}" \
+	postgresql.version="${PG_FULL}" \
+	org.opencontainers.image.vendor="Crunchy Data" \
+	io.openshift.tags="postgresql,postgres,sql,nosql,crunchy" \
+	io.k8s.description="Trusted open source PostgreSQL-as-a-Service" \
+	name="postgres-operator" \
+	summary="Crunchy PostgreSQL Operator" \
+	description="Crunchy PostgreSQL Operator"
 
-RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
-       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
-           -o build/_output/bin/postgres-operator \
-               ./cmd/postgres-operator \
-    && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator
-
-RUN ./bin/license_aggregator.sh; \
-	cp -r ./licenses /licenses
-
-FROM registry.access.redhat.com/ubi8/ubi-minimal AS ubi8
-
-LABEL name="Percona Postgres Operator" \
-      vendor="Percona" \
-      summary="Percona Postgres Operator performs Postgres database creation, adjustment and maintenance inside Kubernetes cluster" \
-      description="Percona Postgres Operator simplifies and automates all essential actions for stable and continious database operation during the whole database lifecycle" \
-      maintainer="Percona Development <info@percona.com>"
-
-COPY redhat/licenses /licenses
-COPY redhat/atomic/help.1 /help.1
-COPY redhat/atomic/help.md /help.md
 COPY licenses /licenses
 
-COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
-COPY --from=go_builder /licenses /licenses
-COPY installers/ansible/roles/pgo-operator/files/pgo-backrest-repo /default-pgo-backrest-repo
-COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
-COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
-COPY percona/templates/ /
+RUN ${PACKAGER} -y update && ${PACKAGER} -y clean all
+
+ADD bin/postgres-operator /usr/local/bin
 
 USER 2
 
-ENTRYPOINT ["postgres-operator"]
+CMD ["postgres-operator"]

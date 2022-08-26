@@ -1,7 +1,7 @@
 package password
 
 /*
- Copyright 2020 - 2021 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -26,7 +26,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/xdg/stringprep"
+	"github.com/xdg-go/stringprep"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -162,10 +162,10 @@ func (s *SCRAMPassword) isASCII() bool {
 // using SCRAM. It differs from RFC 4013 in that it returns the original,
 // unmodified password when:
 //
-//  - the input is not valid UTF-8
-//  - the output would be empty
-//  - the output would contain prohibited characters
-//  - the output would contain ambiguous bidirectional characters
+//   - the input is not valid UTF-8
+//   - the output would be empty
+//   - the output would contain prohibited characters
+//   - the output would contain ambiguous bidirectional characters
 //
 // See:
 //
@@ -180,11 +180,12 @@ func (s *SCRAMPassword) saslPrep() string {
 	// perform SASLprep on the password. if the SASLprep fails or returns an
 	// empty string, return the original password
 	// Otherwise return the clean pasword
-	if cleanedPassword, err := stringprep.SASLprep.Prepare(s.password); cleanedPassword == "" || err != nil {
+	cleanedPassword, err := stringprep.SASLprep.Prepare(s.password)
+	if cleanedPassword == "" || err != nil {
 		return s.password
-	} else {
-		return cleanedPassword
 	}
+
+	return cleanedPassword
 }
 
 // NewSCRAMPassword constructs a new SCRAMPassword struct with sane defaults
@@ -197,7 +198,7 @@ func NewSCRAMPassword(password string) *SCRAMPassword {
 	}
 }
 
-// scramGenerateSalt generates aseries of cryptographic bytes of a specified
+// scramGenerateSalt generates a series of cryptographic bytes of a specified
 // length for purposes of SCRAM. must be at least 1
 func scramGenerateSalt(length int) ([]byte, error) {
 	// length must be at least one

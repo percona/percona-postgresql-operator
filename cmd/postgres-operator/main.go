@@ -1,7 +1,7 @@
 package main
 
 /*
-Copyright 2017 - 2021 Crunchy Data
+Copyright 2017 - 2022 Crunchy Data Solutions, Inc.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -16,147 +16,138 @@ limitations under the License.
 */
 
 import (
-	"fmt"
+	"context"
 	"os"
-	"time"
+	"strings"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
-	"github.com/percona/percona-postgresql-operator/internal/controller"
-	"github.com/percona/percona-postgresql-operator/internal/controller/manager"
-	nscontroller "github.com/percona/percona-postgresql-operator/internal/controller/namespace"
-	crunchylog "github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/ns"
-	log "github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
+	cruntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeinformers "k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-
-	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
-	"github.com/percona/percona-postgresql-operator/internal/operator"
+	"github.com/crunchydata/postgres-operator/internal/controller/postgrescluster"
+	"github.com/crunchydata/postgres-operator/internal/controller/runtime"
+	"github.com/crunchydata/postgres-operator/internal/logging"
+	"github.com/crunchydata/postgres-operator/internal/upgradecheck"
+	"github.com/crunchydata/postgres-operator/internal/util"
 )
 
-func main() {
-	if flush, err := initOpenTelemetry(); err != nil {
-		log.Fatal(err)
-	} else {
-		defer flush()
-	}
+var versionString string
 
-	debugFlag := os.Getenv("CRUNCHY_DEBUG")
-	// add logging configuration
-	crunchylog.CrunchyLogger(crunchylog.SetParameters())
-	if debugFlag == "true" {
-		log.SetLevel(log.DebugLevel)
-		log.Debug("debug flag set to true")
-	} else {
-		log.Info("debug flag set to false")
-	}
-
-	// give time for pgo-event to start up
-	time.Sleep(time.Duration(5) * time.Second)
-
-	newKubernetesClient := func() (*kubeapi.Client, error) {
-		config, err := kubeapi.LoadClientConfig()
-		if err != nil {
-			return nil, err
-		}
-
-		config.Wrap(otelTransportWrapper())
-
-		return kubeapi.NewClientForConfig(config)
-	}
-
-	client, err := newKubernetesClient()
+// assertNoError panics when err is not nil.
+func assertNoError(err error) {
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-
-	operator.Initialize(client)
-
-	// Configure namespaces for the Operator.  This includes determining the namespace
-	// operating mode, creating/updating namespaces (if permitted), and obtaining a valid
-	// list of target namespaces for the operator install
-	namespaceList, err := operator.SetupNamespaces(client)
-	if err != nil {
-		log.Fatalf("Error configuring operator namespaces: %v", err)
-	}
-
-	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler()
-
-	// create a new controller manager with controllers for all current namespaces and then run
-	// all of those controllers
-	controllerManager, err := manager.NewControllerManager(namespaceList, operator.Pgo,
-		operator.PgoNamespace, operator.InstallationName, operator.NamespaceOperatingMode())
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Debug("controller manager created")
-
-	controllerManager.NewKubernetesClient = newKubernetesClient
-
-	// If not using the "disabled" namespace operating mode, start a real namespace controller
-	// that is able to resond to namespace events in the Kube cluster.  If using the "disabled"
-	// operating mode, then create a fake client containing all namespaces defined for the install
-	// (i.e. via the NAMESPACE environment variable) and use that to create the namespace
-	// controller.  This allows for namespace and RBAC reconciliation logic to be run in a
-	// consistent manner regardless of the namespace operating mode being utilized.
-	if operator.NamespaceOperatingMode() != ns.NamespaceOperatingModeDisabled {
-		if err := createAndStartNamespaceController(client, controllerManager,
-			stopCh); err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		fakeClient, err := ns.CreateFakeNamespaceClient(operator.InstallationName)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := createAndStartNamespaceController(fakeClient, controllerManager,
-			stopCh); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	defer controllerManager.RemoveAll()
-
-	log.Info("PostgreSQL Operator initialized and running, waiting for signal to exit")
-	<-stopCh
-	log.Infof("Signal received, now exiting")
 }
 
-// createAndStartNamespaceController creates a namespace controller and then starts it
-func createAndStartNamespaceController(kubeClientset kubernetes.Interface,
-	controllerManager controller.Manager, stopCh <-chan struct{}) error {
-	nsKubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClientset,
-		time.Duration(*operator.Pgo.Pgo.NamespaceRefreshInterval)*time.Second,
-		kubeinformers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("%s=%s,%s=%s",
-				config.LABEL_VENDOR, config.LABEL_CRUNCHY,
-				config.LABEL_PGO_INSTALLATION_NAME, operator.InstallationName)
-		}))
-	nsController, err := nscontroller.NewNamespaceController(controllerManager,
-		nsKubeInformerFactory.Core().V1().Namespaces(),
-		*operator.Pgo.Pgo.NamespaceWorkerCount)
+func initLogging() {
+	// Configure a singleton that treats logr.Logger.V(1) as logrus.DebugLevel.
+	var verbosity int
+	if strings.EqualFold(os.Getenv("CRUNCHY_DEBUG"), "true") {
+		verbosity = 1
+	}
+	logging.SetLogFunc(verbosity, logging.Logrus(os.Stdout, versionString, 1))
+}
+
+func main() {
+	// Set any supplied feature gates; panic on any unrecognized feature gate
+	err := util.AddAndSetFeatureGates(os.Getenv("PGO_FEATURE_GATES"))
+	assertNoError(err)
+
+	otelFlush, err := initOpenTelemetry()
+	assertNoError(err)
+	defer otelFlush()
+
+	initLogging()
+
+	// create a context that will be used to stop all controllers on a SIGTERM or SIGINT
+	ctx := cruntime.SetupSignalHandler()
+	log := logging.FromContext(ctx)
+	log.V(1).Info("debug flag set to true")
+
+	cruntime.SetLogger(log)
+
+	cfg, err := runtime.GetConfig()
+	assertNoError(err)
+
+	cfg.Wrap(otelTransportWrapper())
+
+	// Configure client-go to suppress warnings when warning headers are encountered. This prevents
+	// warnings from being logged over and over again during reconciliation (e.g. this will suppress
+	// deprecation warnings when using an older version of a resource for backwards compatibility).
+	rest.SetDefaultWarningHandler(rest.NoWarnings{})
+
+	mgr, err := runtime.CreateRuntimeManager(os.Getenv("PGO_TARGET_NAMESPACE"), cfg, false)
+	assertNoError(err)
+
+	// add all PostgreSQL Operator controllers to the runtime manager
+	err = addControllersToManager(ctx, mgr)
+	assertNoError(err)
+
+	log.Info("starting controller runtime manager and will wait for signal to exit")
+
+	// Enable upgrade checking
+	upgradeCheckingDisabled := strings.EqualFold(os.Getenv("CHECK_FOR_UPGRADES"), "false")
+	if !upgradeCheckingDisabled {
+		log.Info("upgrade checking enabled")
+		// get the URL for the check for upgrades endpoint if set in the env
+		upgradeCheckURL := os.Getenv("CHECK_FOR_UPGRADES_URL")
+		go upgradecheck.CheckForUpgradesScheduler(ctx, versionString, upgradeCheckURL,
+			mgr.GetClient(), mgr.GetConfig(), isOpenshift(ctx, mgr.GetConfig()),
+			mgr.GetCache(),
+		)
+	} else {
+		log.Info("upgrade checking disabled")
+	}
+
+	assertNoError(mgr.Start(ctx))
+	log.Info("signal received, exiting")
+}
+
+// addControllersToManager adds all PostgreSQL Operator controllers to the provided controller
+// runtime manager.
+func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
+	r := &postgrescluster.Reconciler{
+		Client:      mgr.GetClient(),
+		Owner:       postgrescluster.ControllerName,
+		Recorder:    mgr.GetEventRecorderFor(postgrescluster.ControllerName),
+		Tracer:      otel.Tracer(postgrescluster.ControllerName),
+		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
+	}
+	return r.SetupWithManager(mgr)
+}
+
+func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
+	log := logging.FromContext(ctx)
+
+	const sccGroupName, sccKind = "security.openshift.io", "SecurityContextConstraints"
+
+	client, err := discovery.NewDiscoveryClientForConfig(cfg)
+	assertNoError(err)
+
+	groups, err := client.ServerGroups()
 	if err != nil {
-		return err
+		assertNoError(err)
+	}
+	for _, g := range groups.Groups {
+		if g.Name != sccGroupName {
+			continue
+		}
+		for _, v := range g.Versions {
+			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
+			if err != nil {
+				assertNoError(err)
+			}
+			for _, r := range resourceList.APIResources {
+				if r.Kind == sccKind {
+					log.Info("detected OpenShift environment")
+					return true
+				}
+			}
+		}
 	}
 
-	// start the namespace controller
-	nsKubeInformerFactory.Start(stopCh)
-
-	if ok := cache.WaitForNamedCacheSync("namespace", stopCh,
-		nsKubeInformerFactory.Core().V1().Namespaces().Informer().HasSynced); !ok {
-		return fmt.Errorf("failed waiting for namespace cache to sync")
-	}
-
-	for i := 0; i < nsController.WorkerCount(); i++ {
-		go nsController.RunWorker(stopCh)
-	}
-
-	log.Debug("namespace controller is now running")
-
-	return nil
+	return false
 }

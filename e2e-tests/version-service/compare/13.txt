@@ -1,5 +1,0 @@
-perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
-perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
-perconalab/percona-postgresql-operator:main-ppg13-pgbadger
-perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
-perconalab/percona-postgresql-operator:main-ppg13-postgres-ha

@@ -8,6 +8,8 @@ IMAGES=(
     crunchy-postgres-ha
     crunchy-pgbadger
     crunchy-pgbouncer
+    crunchy-pgdump
+    crunchy-pgrestore
 )
 
 function echo_green() {

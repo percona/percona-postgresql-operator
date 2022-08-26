@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-# Copyright 2017 - 2021 Crunchy Data Solutions, Inc.
+# Copyright 2017 - 2022 Crunchy Data Solutions, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,7 +14,7 @@
 # limitations under the License.
 
 echo "Getting pgMonitor..."
-PGMONITOR_COMMIT='v4.5-RC3'
+PGMONITOR_COMMIT='6eb120a38a0eefb059d5b9abc24159733870aa72'
 
 # pgMonitor Setup
 if [[ -d ${PGOROOT?}/tools/pgmonitor ]]

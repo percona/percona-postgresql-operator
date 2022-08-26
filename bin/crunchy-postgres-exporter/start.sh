@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2017 - 2021 Crunchy Data Solutions, Inc.
+# Copyright 2017 - 2022 Crunchy Data Solutions, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -182,7 +182,7 @@ else
         else
           echo_warn "Query file queries_pg_stat_statements_reset_info.yml not loaded."
         fi
-    elif (( ${VERSION?} >= 130000 ))
+    elif (( ${VERSION?} >= 130000 )) && (( ${VERSION?} < 140000 ))
     then
         if [[ -f ${CONFIG_DIR?}/pg13/queries_general.yml ]]
         then
@@ -201,6 +201,28 @@ else
         if [[ -f ${CONFIG_DIR?}/pg13/queries_pg_stat_statements_reset_info.yml ]];
         then
           cat ${CONFIG_DIR?}/pg13/queries_pg_stat_statements_reset_info.yml >> /tmp/queries.yml
+        else
+          echo_warn "Query file queries_pg_stat_statements_reset_info.yml not loaded."
+        fi
+    elif (( ${VERSION?} >= 140000 ))
+    then
+        if [[ -f ${CONFIG_DIR?}/pg14/queries_general.yml ]]
+        then
+            cat ${CONFIG_DIR?}/pg14/queries_general.yml >> /tmp/queries.yml
+        else
+            echo_err "Query file queries_general.yml does not exist (it should).."
+        fi
+        if [[ -f ${CONFIG_DIR?}/pg14/queries_pg_stat_statements.yml ]]
+        then
+          cat ${CONFIG_DIR?}/pg14/queries_pg_stat_statements.yml >> /tmp/queries.yml
+        else
+          echo_warn "Query file queries_pg_stat_statements.yml not loaded."
+        fi
+        # queries_pg_stat_statements_reset is only available in PG12+. This may
+        # need to be updated based on a new path
+        if [[ -f ${CONFIG_DIR?}/pg14/queries_pg_stat_statements_reset_info.yml ]];
+        then
+          cat ${CONFIG_DIR?}/pg14/queries_pg_stat_statements_reset_info.yml >> /tmp/queries.yml
         else
           echo_warn "Query file queries_pg_stat_statements_reset_info.yml not loaded."
         fi
