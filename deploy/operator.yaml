@@ -125,55 +125,16 @@ data:
   values.yaml: |-
     archive_mode: "true"
     archive_timeout: "60"
-    ccp_image_prefix: "perconalab/percona-postgresql-operator"
     ccp_image_pull_secret: ""
     ccp_image_pull_secret_manifest: ""
-    ccp_image_tag: "main-ppg14-postgres-ha"
     create_rbac: "true"
-    crunchy_debug: "false"
-    db_name: ""
-    db_password_age_days: "0"
-    db_password_length: "24"
-    db_port: "5432"
-    db_replicas: "0"
-    db_user: "testuser"
-    disable_auto_failover: "false"
-    disable_telemetry: "false"
+    delete_operator_namespace: "false"
+    delete_watched_namespaces: "false"
     namespace: "pgo"
     namespace_mode: "disabled"
-    pgo_add_os_ca_store: "false"
-    pgo_admin_password: "examplepassword"
-    pgo_admin_perms: "*"
-    pgo_admin_role_name: "pgoadmin"
-    pgo_admin_username: "admin"
-    pgo_cluster_admin: "false"
-    pgo_disable_eventing: "false"
-    pgo_disable_tls: "false"
-    pgo_image_prefix: "perconalab/percona-postgresql-operator"
-    pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "main"
-    pgo_installation_name: "devtest"
-    pgo_noauth_routes: ""
     pgo_operator_namespace: "pgo"
-    pgo_tls_ca_store: ""
-    pgo_tls_no_verify: "false"
-    pod_anti_affinity: "preferred"
-    pod_anti_affinity_pgbackrest: ""
-    pod_anti_affinity_pgbouncer: ""
-    scheduler_timeout: "3600"
-    service_type: "ClusterIP"
-    backrest_storage: "default"
-    backup_storage: "default"
-    primary_storage: "default"
-    reconcile_rbac: "true"
-    replica_storage: "default"
-    wal_storage: ""
-    storage1_name: "default"
-    storage1_access_mode: "ReadWriteOnce"
-    storage1_size: "1G"
-    storage1_type: "dynamic"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -202,7 +163,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: perconalab/percona-postgresql-operator:main-pgo-deployer
+          image: perconalab/percona-postgresql-operator:update-options-pgo-deployer
           imagePullPolicy: Always
           env:
             - name: DEPLOY_ACTION

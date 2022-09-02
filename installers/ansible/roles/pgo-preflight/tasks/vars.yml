@@ -12,4 +12,5 @@
       when:
         - not conf_path_result.stat.exists
 
+    - include_vars: "{{ role_path }}/../../values.yaml"
     - include_vars: "{{ config_path }}"
