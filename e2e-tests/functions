@@ -167,8 +167,8 @@ prepare_operator_yaml() {
 
 
 	if [[ -n ${pull_secret_name} ]]; then
-		echo "ccp_image_pull_secret: \"${pull_secret_name}\"" >> ${tmp_dir}/operator.ini
-		echo "pgo_image_pull_secret: \"${pull_secret_name}\"" >> ${tmp_dir}/operator.ini
+		echo "ccp_image_pull_secret: \"${pull_secret_name}\"" >>${tmp_dir}/operator.ini
+		echo "pgo_image_pull_secret: \"${pull_secret_name}\"" >>${tmp_dir}/operator.ini
 	fi
 
 	if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
