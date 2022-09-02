@@ -165,7 +165,6 @@ prepare_operator_yaml() {
 		| cat <(echo 'crunchy_debug: "true"') - \
 			>${tmp_dir}/operator.ini
 
-
 	if [[ -n ${pull_secret_name} ]]; then
 		echo "ccp_image_pull_secret: \"${pull_secret_name}\"" >>${tmp_dir}/operator.ini
 		echo "pgo_image_pull_secret: \"${pull_secret_name}\"" >>${tmp_dir}/operator.ini
