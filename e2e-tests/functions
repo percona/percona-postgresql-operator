@@ -172,7 +172,7 @@ prepare_operator_yaml() {
 	fi
 
 	if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
-		echo 'disable_fsgroup: "true"' >> ${tmp_dir}/operator.ini
+		echo 'disable_fsgroup: "true"' >>${tmp_dir}/operator.ini
 	fi
 
 	# updating yaml itself
