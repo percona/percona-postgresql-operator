@@ -134,6 +134,7 @@ data:
     namespace: "pgo"
     namespace_mode: "disabled"
     pgo_image_prefix: "perconalab/percona-postgresql-operator"
+    pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
     pgo_image_tag: "main"
