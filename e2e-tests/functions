@@ -162,7 +162,7 @@ prepare_operator_yaml() {
 		| cat <(echo "ccp_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"") - \
 		| cat <(echo "pgo_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"") - \
 		| cat <(echo "disable_telemetry: \"${dont_send_telemetry}\"") - \
-		| cat <(echo "crunchy_debug: \"true\"") - \
+		| cat <(echo 'crunchy_debug: "true"') - \
 			>${tmp_dir}/operator.ini
 
 
