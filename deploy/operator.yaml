@@ -130,10 +130,13 @@ data:
     create_rbac: "true"
     delete_operator_namespace: "false"
     delete_watched_namespaces: "false"
+    disable_telemetry: "false"
     namespace: "pgo"
     namespace_mode: "disabled"
+    pgo_image_prefix: "perconalab/percona-postgresql-operator"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
+    pgo_image_tag: "main"
     pgo_operator_namespace: "pgo"
 ---
 apiVersion: rbac.authorization.k8s.io/v1

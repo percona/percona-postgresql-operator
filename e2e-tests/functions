@@ -158,16 +158,15 @@ prepare_operator_yaml() {
 		| $sed -e "s#^namespace: .*#namespace: \"${namespace}\"#g" \
 		| $sed -e "s#pgo_operator_namespace: .*#pgo_operator_namespace: \"${OPERATOR_NS:-$namespace}\"#g" \
 		| $sed -e "s#namespace_mode: .*#namespace_mode: \"${namespace_mode}\"#g" \
-		| cat <(echo "pgo_image_tag: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)\"") - \
-		| cat <(echo "ccp_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"") - \
-		| cat <(echo "pgo_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"") - \
-		| cat <(echo "disable_telemetry: \"${dont_send_telemetry}\"") - \
+		| $sed -e "s#pgo_image_tag: .*#pgo_image_tag: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f2)\"#g" \
+		| $sed -e "s#pgo_image_prefix: .*#pgo_image_prefix: \"$(echo ${IMAGE_OPERATOR%-postgres-operator} | cut -d: -f1)\"#g" \
+		| $sed -e "s#^disable_telemetry: .*#disable_telemetry: \"${dont_send_telemetry}\"#g" \
 		| cat <(echo 'crunchy_debug: "true"') - \
 			>${tmp_dir}/operator.ini
 
 	if [[ -n ${pull_secret_name} ]]; then
-		echo "ccp_image_pull_secret: \"${pull_secret_name}\"" >>${tmp_dir}/operator.ini
-		echo "pgo_image_pull_secret: \"${pull_secret_name}\"" >>${tmp_dir}/operator.ini
+		$sed -i ${tmp_dir}/operator.ini -e "s#ccp_image_pull_secret: .*#ccp_image_pull_secret: \"${pull_secret_name}\"#g"
+		$sed -i ${tmp_dir}/operator.ini -e "s#pgo_image_pull_secret: .*#pgo_image_pull_secret: \"${pull_secret_name}\"#g"
 	fi
 
 	if [[ ${PLATFORM} == "OPENSHIFT" ]]; then
