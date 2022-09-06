@@ -31,6 +31,18 @@
                         "image": "{% if pgo_apiserver_image | default('') != '' %}{{ pgo_apiserver_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-apiserver
                                 {%- endif %}",
+                        {% if apiserver_resources == "true" %}
+                        "resources": {
+                          "requests": {
+                            "cpu": "{{ apiserver_resources_requests_cpu }}",
+                            "memory": "{{ apiserver_resources_requests_memory }}"
+                          },
+                          "limits": {
+                            "cpu": "{{ apiserver_resources_limits_cpu }}",
+                            "memory": "{{ apiserver_resources_limits_memory }}"
+                          }
+                        },
+                        {% endif %}
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
                                           {%- else %}IfNotPresent
                                           {%- endif %}",
@@ -125,6 +137,18 @@
                         "image": "{% if pgo_image | default('') != '' %}{{ pgo_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-postgres-operator
                                 {%- endif %}",
+                        {% if operator_resources == "true" %}
+                        "resources": {
+                          "requests": {
+                            "cpu": "{{ operator_resources_requests_cpu }}",
+                            "memory": "{{ operator_resources_requests_memory }}"
+                          },
+                          "limits": {
+                            "cpu": "{{ operator_resources_limits_cpu }}",
+                            "memory": "{{ operator_resources_limits_memory }}"
+                          }
+                        },
+                        {% endif %}
                         "imagePullPolicy": "{% if pgo_image_pull_policy | default('') != '' %}{{ pgo_image_pull_policy }}
                                           {%- else %}IfNotPresent
                                           {%- endif %}",
@@ -191,6 +215,17 @@
                         "image": "{% if pgo_scheduler_image | default('') != '' %}{{ pgo_scheduler_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-scheduler
                                 {%- endif %}",
+                        {% if scheduler_resources == "true" %}
+                        "resources": {
+                          "requests": {
+                            "cpu": "{{ scheduler_resources_requests_cpu }}",
+                            "memory": "{{ scheduler_resources_requests_memory }}"
+                          },
+                          "limits": {
+                            "cpu": "{{ scheduler_resources_limits_cpu }}",
+                            "memory": "{{ scheduler_resources_limits_memory }}"
+                          }
+                        },
                         "securityContext": {
                           "allowPrivilegeEscalation": false,
                           "privileged": false,
@@ -252,6 +287,17 @@
                         "image": "{% if pgo_event_image | default('') != '' %}{{ pgo_event_image }}
                                 {%- else %}{{ pgo_image_prefix }}:{{ pgo_image_tag }}-pgo-event
                                 {%- endif %}",
+                        {% if event_resources == "true" %}
+                        "resources": {
+                          "requests": {
+                            "cpu": "{{ event_resources_requests_cpu }}",
+                            "memory": "{{ event_resources_requests_memory }}"
+                          },
+                          "limits": {
+                            "cpu": "{{ event_resources_limits_cpu }}",
+                            "memory": "{{ event_resources_limits_memory }}"
+                          }
+                        },
                         "securityContext": {
                           "allowPrivilegeEscalation": false,
                           "privileged": false,
