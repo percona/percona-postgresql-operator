@@ -119,12 +119,14 @@ func getPrimaryServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, e
 					TargetPort: intstr.FromInt(port),
 				},
 			},
+
 			Selector: map[string]string{
 				"pg-cluster": cluster.Name,
 				"role":       "master",
 			},
 			SessionAffinity:          corev1.ServiceAffinityNone,
 			LoadBalancerSourceRanges: cluster.Spec.PGPrimary.Expose.LoadBalancerSourceRanges,
+			LoadBalancerIP:           cluster.Spec.PGPrimary.Expose.LoadBalancerIP,
 		},
 	}, nil
 }
@@ -170,6 +172,7 @@ func getPGBouncerServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service,
 			},
 			SessionAffinity:          corev1.ServiceAffinityNone,
 			LoadBalancerSourceRanges: cluster.Spec.PGBouncer.Expose.LoadBalancerSourceRanges,
+			LoadBalancerIP:           cluster.Spec.PGBouncer.Expose.LoadBalancerIP,
 		},
 	}, nil
 }
