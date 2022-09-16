@@ -58,7 +58,7 @@
                 "tolerations": {{ .Tolerations }},
                 {{ end }}
                 "containers": [{
-                    "name": "database",
+                    "name": "backrest-repo",
                     "image": "{{.Image}}",
                     "imagePullPolicy": "<imagePullPolicy>",
                     "securityContext": {
