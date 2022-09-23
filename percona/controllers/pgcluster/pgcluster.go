@@ -359,6 +359,7 @@ func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.SyncReplication = syncReplication
 	cluster.Spec.UserLabels = userLabels
 	cluster.Spec.Annotations.Global = specAnnotationsGlobal
+	cluster.Spec.Annotations.Postgres = pgc.Spec.PGPrimary.Annotations
 	cluster.Spec.Tolerations = pgc.Spec.PGPrimary.Tolerations
 	storageMap := map[crv1.BackrestStorageType]crv1.BackrestStorageType{
 		crv1.BackrestStorageTypeLocal: crv1.BackrestStorageTypeLocal,
