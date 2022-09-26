@@ -27,7 +27,7 @@ spec:
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
 
-  image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-14.5-0
+  image: perconalab/percona-postgresql-operator:main-ppg14-postgres
   postgresVersion: 14
 #  port: 5432
 
@@ -104,7 +104,7 @@ spec:
   proxy:
     pgBouncer:
 #      replicas: 3
-      image: registry.developers.crunchydata.com/crunchydata/crunchy-pgbouncer:ubi8-1.17-0
+      image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
 #      resources:
 #        limits:
 #          cpu: 200m
@@ -159,7 +159,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: registry.developers.crunchydata.com/crunchydata/crunchy-pgbackrest:ubi8-2.40-0
+      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
 #      configuration:
 #        - secret:
 #            name: hippo-pgbackrest-secrets
