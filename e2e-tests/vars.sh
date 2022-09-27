@@ -14,7 +14,7 @@ export IMAGE=${IMAGE:-"perconalab/percona-postgresql-operator:${VERSION}"}
 
 date=$(which gdate || which date)
 
-if command -v oc &> /dev/null; then
+if command -v oc &>/dev/null; then
 	if oc get projects; then
 		export OPENSHIFT=4
 	fi
