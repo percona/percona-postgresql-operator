@@ -1,29 +1,8 @@
-apiVersion: pg.percona.com/v2beta1
-kind: PerconaPGCluster
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
 metadata:
   name: hippo
 spec:
-#  secrets:
-#    customTLSSecretName:
-#    customReplicationTLSSecret:
-
-#  standby:
-#    enabled: true
-#    host: "<primary-ip>"
-#    port: "<primary-port>"
-
-#  openshift: true
-
-#  users:
-#    - name: rhino
-#      databases:
-#        - zoo
-#      options: "SUPERUSER"
-
-#  databaseInitSQL:
-#    key: init.sql
-#    name: hippo-init-sql
-
 #  shutdown: true
 #  paused: true
 
@@ -52,17 +31,18 @@ spec:
   postgresVersion: 14
 #  port: 5432
 
+#  service:
+#    metadata:
+#      annotations:
+#        my-annotation: value1
+#      labels:
+#        my-label: value2
+#    type: NodePort
+#    nodePort: 32000
+
   instances:
 #    metadata:
 #      labels:
-#     expose:
-#       annotations:
-#         my-annotation: value1
-#       labels:
-#         my-label: value2
-#      type: NodePort
-#      nodePort: 32000
-#      loadBalancerSourceRanges: []
   - name: instance1
 #    replicas: 1
 #    resources:
@@ -70,7 +50,7 @@ spec:
 #        cpu: 2.0
 #        memory: 4Gi
 #
-#    sidecars:
+#    containers:
 #    - name: testcontainer
 #      image: mycontainer1:latest
 #    - name: testcontainer2
@@ -106,18 +86,20 @@ spec:
         requests:
           storage: 1Gi
 
-#    patroniConfiguration:
-#      switchover:
-#        enabled: true
-#        targetInstance: hippo-instance1-wm5p
-#        type: Failover
-#      dynamicConfiguration:
-#        postgresql:
-#          parameters:
-#            max_parallel_workers: 2
-#            max_worker_processes: 2
-#            shared_buffers: 1GB
-#            work_mem: 2MB
+#  users:
+#    - name: rhino
+#      databases:
+#        - zoo
+#      options: "SUPERUSER"
+
+#  databaseInitSQL:
+#    key: init.sql
+#    name: hippo-init-sql
+
+#  monitoring:
+#    pgmonitor:
+#      exporter:
+#        image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-exporter:ubi8-5.2.0-0
 
   proxy:
     pgBouncer:
@@ -128,14 +110,14 @@ spec:
 #          cpu: 200m
 #          memory: 128Mi
 #
-#      expose:
-#        annotations:
-#          my-annotation: value1
-#        labels:
-#          my-label: value2
+#      service:
+#        metadata:
+#          annotations:
+#            my-annotation: value1
+#          labels:
+#            my-label: value2
 #        type: NodePort
 #        nodePort: 32000
-#        loadBalancerSourceRanges: []
 #
 #      affinity:
 #        podAntiAffinity:
@@ -162,14 +144,14 @@ spec:
 #            matchLabels:
 #              postgres-operator.crunchydata.com/role: pgbouncer
 #
-#      sidecars:
+#      containers:
 #      - name: bouncertestcontainer1
 #        image: mycontainer1:latest
 #
 #      customTLSSecret:
 #        name: keycloakdb-pgbouncer.tls
 #
-#      configuration:
+#      config:
 #        global:
 #          pool_mode: transaction
 
@@ -260,3 +242,36 @@ spec:
 #       - --target="2021-06-09 14:15:11-04"
 #       restore iindividual databases
 #       - --db-include=hippo
+
+#  patroni:
+#    switchover:
+#      enabled: true
+#      targetInstance: hippo-instance1-wm5p
+#      type: Failover
+#    dynamicConfiguration:
+#      postgresql:
+#        parameters:
+#          max_parallel_workers: 2
+#          max_worker_processes: 2
+#          shared_buffers: 1GB
+#          work_mem: 2MB
+
+#  customTLSSecret:
+#    name: hippo.tls
+#    items:
+#      - key: <tls.crt key>
+#        path: tls.crt
+#      - key: <tls.key key>
+#        path: tls.key
+#      - key: <ca.crt key>
+#        path: ca.crt
+
+#  customReplicationTLSSecret:
+#    name: replication-cert
+
+#  standby:
+#    enabled: true
+#    host: "<primary-ip>"
+#    port: "<primary-port>"
+
+# openshift: true

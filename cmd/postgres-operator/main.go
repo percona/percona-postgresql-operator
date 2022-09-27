@@ -31,6 +31,9 @@ import (
 	"github.com/crunchydata/postgres-operator/internal/logging"
 	"github.com/crunchydata/postgres-operator/internal/upgradecheck"
 	"github.com/crunchydata/postgres-operator/internal/util"
+
+	percona "github.com/crunchydata/postgres-operator/percona/controllers"
+	"github.com/crunchydata/postgres-operator/pkg/apis/pg.percona.com/v2beta1"
 )
 
 var versionString string
@@ -82,6 +85,9 @@ func main() {
 	mgr, err := runtime.CreateRuntimeManager(os.Getenv("PGO_TARGET_NAMESPACE"), cfg, false)
 	assertNoError(err)
 
+	// Add Percona custom resource types to scheme
+	assertNoError(v2beta1.AddToScheme(mgr.GetScheme()))
+
 	// add all PostgreSQL Operator controllers to the runtime manager
 	err = addControllersToManager(ctx, mgr)
 	assertNoError(err)
@@ -116,7 +122,17 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Tracer:      otel.Tracer(postgrescluster.ControllerName),
 		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
 	}
-	return r.SetupWithManager(mgr)
+	if err := r.SetupWithManager(mgr); err != nil {
+		return err
+	}
+
+	p := &percona.Reconciler{
+		Client:   mgr.GetClient(),
+		Owner:    percona.ControllerName,
+		Recorder: mgr.GetEventRecorderFor(percona.ControllerName),
+		Tracer:   otel.Tracer(percona.ControllerName),
+	}
+	return p.SetupWithManager(mgr)
 }
 
 func isOpenshift(ctx context.Context, cfg *rest.Config) bool {

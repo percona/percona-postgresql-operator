@@ -270,15 +270,21 @@ pull-%:
 
 generate: generate-crd generate-crd-docs generate-deepcopy generate-rbac
 
-generate-crd:
+generate-crunchy-crd:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
 		crd:crdVersions='v1' \
-		paths='./pkg/apis/...' \
-		output:dir='build/crd/generated' # build/crd/generated/{group}_{plural}.yaml
-	@
-	@# Kustomize returns lots of objects. The following only makes sense when there is one CRD.
-	[ "$$(ls -1 ./build/crd/generated)" = 'postgres-operator.crunchydata.com_postgresclusters.yaml' ]
-	$(PGO_KUBE_CLIENT) kustomize ./build/crd > ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml
+		paths='./pkg/apis/postgres-operator.crunchydata.com/...' \
+		output:dir='build/crd/crunchy/generated' # build/crd/generated/{group}_{plural}.yaml
+	$(PGO_KUBE_CLIENT) kustomize ./build/crd/crunchy/ > ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml
+
+generate-percona-crd:
+	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
+		crd:crdVersions='v1' \
+		paths='./pkg/apis/pg.percona.com/...' \
+		output:dir='build/crd/percona/generated' # build/crd/generated/{group}_{plural}.yaml
+	$(PGO_KUBE_CLIENT) kustomize ./build/crd/percona/ > ./config/crd/bases/pg.percona.com_perconapgclusters.yaml
+
+generate-crd: generate-crunchy-crd generate-percona-crd
 
 generate-crd-docs:
 	GOBIN='$(CURDIR)/hack/tools' go install fybrik.io/crdoc@v0.5.2
@@ -290,7 +296,7 @@ generate-crd-docs:
 generate-deepcopy:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
 		object:headerFile='hack/boilerplate.go.txt' \
-		paths='./pkg/apis/postgres-operator.crunchydata.com/...'
+		paths='./pkg/apis/...'
 
 generate-rbac:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/generate-rbac.sh \
