@@ -27,7 +27,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal AS ubi9
 LABEL name="Percona Postgres Operator" \
       vendor="Percona" \
       summary="Percona Postgres Operator performs Postgres database creation, adjustment and maintenance inside Kubernetes cluster" \
-      description="Percona Postgres Operator simplifies and automates all essential actions for stable and continious database operation during the whole database lifecycle" \
+      description="Percona Postgres Operator simplifies and automates all essential actions for stable and continuous database operation during the whole database lifecycle" \
       maintainer="Percona Development <info@percona.com>"
 
 COPY licenses /licenses
