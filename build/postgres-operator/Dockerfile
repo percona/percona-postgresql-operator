@@ -1,31 +1,39 @@
-ARG BASE_IMAGE_OS
-ARG DOCKERBASEREGISTRY
-FROM ${DOCKERBASEREGISTRY}${BASE_IMAGE_OS}
+FROM golang:1.19 AS go_builder
+WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
-ARG PGVERSION
-ARG PG_FULL
-ARG PACKAGER
-ARG RELVER
+COPY . .
+RUN go mod download
 
-MAINTAINER info@crunchydata.com
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+ARG GO_LDFLAGS
+ARG GOOS=linux
+ARG GOARCH=amd64
+ARG CGO_ENABLED=0
 
-LABEL vendor="Crunchy Data" \
-	url="https://crunchydata.com" \
-	release="${RELVER}" \
-	postgresql.version.major="${PGVERSION}" \
-	postgresql.version="${PG_FULL}" \
-	org.opencontainers.image.vendor="Crunchy Data" \
-	io.openshift.tags="postgresql,postgres,sql,nosql,crunchy" \
-	io.k8s.description="Trusted open source PostgreSQL-as-a-Service" \
-	name="postgres-operator" \
-	summary="Crunchy PostgreSQL Operator" \
-	description="Crunchy PostgreSQL Operator"
+RUN mkdir -p build/_output/bin \
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
+       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
+           -o build/_output/bin/postgres-operator \
+               ./cmd/postgres-operator \
+    && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator
+
+
+RUN ./bin/license_aggregator.sh ./cmd/...; \
+	cp -r ./licenses /licenses
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS ubi9
+
+LABEL name="Percona Postgres Operator" \
+      vendor="Percona" \
+      summary="Percona Postgres Operator performs Postgres database creation, adjustment and maintenance inside Kubernetes cluster" \
+      description="Percona Postgres Operator simplifies and automates all essential actions for stable and continuous database operation during the whole database lifecycle" \
+      maintainer="Percona Development <info@percona.com>"
 
 COPY licenses /licenses
 
-RUN ${PACKAGER} -y update && ${PACKAGER} -y clean all
-
-ADD bin/postgres-operator /usr/local/bin
+COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
+COPY --from=go_builder /licenses /licenses
 
 USER 2
 
