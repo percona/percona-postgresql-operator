@@ -74,6 +74,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		postgresCluster.Spec.OpenShift = perconaPGCluster.Spec.OpenShift
 		postgresCluster.Spec.Paused = perconaPGCluster.Spec.Paused
 		postgresCluster.Spec.Standby = perconaPGCluster.Spec.Standby
+		postgresCluster.Spec.Service = perconaPGCluster.Spec.Expose.ToCrunchy()
 
 		postgresCluster.Spec.CustomReplicationClientTLSSecret = perconaPGCluster.Spec.Secrets.CustomReplicationClientTLSSecret
 		postgresCluster.Spec.CustomTLSSecret = perconaPGCluster.Spec.Secrets.CustomTLSSecret
@@ -81,9 +82,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		postgresCluster.Spec.Backups = perconaPGCluster.Spec.Backups
 		postgresCluster.Spec.DataSource = perconaPGCluster.Spec.DataSource
 		postgresCluster.Spec.DatabaseInitSQL = perconaPGCluster.Spec.DatabaseInitSQL
-		postgresCluster.Spec.InstanceSets = perconaPGCluster.Spec.InstanceSets
+		postgresCluster.Spec.InstanceSets = perconaPGCluster.Spec.InstanceSets.ToCrunchy()
 		postgresCluster.Spec.Users = perconaPGCluster.Spec.Users
-		postgresCluster.Spec.Proxy = perconaPGCluster.Spec.Proxy
+		postgresCluster.Spec.Proxy = perconaPGCluster.Spec.Proxy.ToCrunchy()
 
 		return nil
 	})

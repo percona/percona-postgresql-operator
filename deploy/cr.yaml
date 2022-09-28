@@ -49,20 +49,18 @@ spec:
 #          region: "ca-central-1"
 
   image: perconalab/percona-postgresql-operator:main-ppg14-postgres
+  imagePullPolicy: Always
   postgresVersion: 14
 #  port: 5432
 
+#  expose:
+#    annotations:
+#      my-annotation: value1
+#    labels:
+#      my-label: value2
+#    type: LoadBalancer
+
   instances:
-#    metadata:
-#      labels:
-#     expose:
-#       annotations:
-#         my-annotation: value1
-#       labels:
-#         my-label: value2
-#      type: NodePort
-#      nodePort: 32000
-#      loadBalancerSourceRanges: []
   - name: instance1
 #    replicas: 1
 #    resources:
@@ -106,19 +104,6 @@ spec:
         requests:
           storage: 1Gi
 
-#    patroniConfiguration:
-#      switchover:
-#        enabled: true
-#        targetInstance: hippo-instance1-wm5p
-#        type: Failover
-#      dynamicConfiguration:
-#        postgresql:
-#          parameters:
-#            max_parallel_workers: 2
-#            max_worker_processes: 2
-#            shared_buffers: 1GB
-#            work_mem: 2MB
-
   proxy:
     pgBouncer:
 #      replicas: 3
@@ -133,9 +118,7 @@ spec:
 #          my-annotation: value1
 #        labels:
 #          my-label: value2
-#        type: NodePort
-#        nodePort: 32000
-#        loadBalancerSourceRanges: []
+#        type: LoadBalancer
 #
 #      affinity:
 #        podAntiAffinity:
