@@ -254,16 +254,16 @@ pipeline {
                     steps {
                         sh """
                             mkdir -p $WORKSPACE/src/github.com/percona
-                            ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-server-mysql-operator
+                            ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
                             sg docker -c "
                                 docker run \
                                     --rm \
-                                    -v $WORKSPACE/src/github.com/percona/percona-server-mysql-operator:/go/src/github.com/percona/percona-server-mysql-operator \
-                                    -w /go/src/github.com/percona/percona-server-mysql-operator \
+                                    -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
+                                    -w /go/src/github.com/percona/percona-postgresql-operator \
                                     -e GO111MODULE=on \
                                     golang:1.17 sh -c '
                                         go install github.com/google/go-licenses@latest;
-                                        /go/bin/go-licenses csv github.com/percona/percona-server-mysql-operator/cmd/manager \
+                                        /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/manager \
                                             | cut -d , -f 3 \
                                             | sort -u \
                                             > go-licenses-new || :
@@ -277,20 +277,20 @@ pipeline {
                     steps {
                         sh '''
                             mkdir -p $WORKSPACE/src/github.com/percona
-                            ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-server-mysql-operator
+                            ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
                             sg docker -c "
                                 docker run \
                                     --rm \
-                                    -v $WORKSPACE/src/github.com/percona/percona-server-mysql-operator:/go/src/github.com/percona/percona-server-mysql-operator \
-                                    -w /go/src/github.com/percona/percona-server-mysql-operator \
+                                    -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
+                                    -w /go/src/github.com/percona/percona-postgresql-operator \
                                     -e GO111MODULE=on \
-                                    golang:1.19 sh -c 'go build -v -o percona-server-mysql-operator github.com/percona/percona-server-mysql-operator/cmd/manager'
+                                    golang:1.19 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/manager'
                             "
                         '''
 
                         withCredentials([string(credentialsId: 'GITHUB_API_TOKEN', variable: 'GITHUB_TOKEN')]) {
                             sh """
-                                golicense -plain ./percona-server-mysql-operator \
+                                golicense -plain ./percona-postgresql-operator \
                                     | grep -v 'license not found' \
                                     | sed -r 's/^[^ ]+[ ]+//' \
                                     | sort \
