@@ -1,5 +1,11 @@
 
 # Default values if not already set
+NAME ?= percona-postgresql-operator
+VERSION ?= $(shell git rev-parse --abbrev-ref HEAD | sed -e 's^/^-^g; s^[.]^-^g;' | tr '[:upper:]' '[:lower:]')
+ROOT_REPO ?= ${PWD}
+IMAGE_TAG_BASE ?= perconalab/$(NAME)
+IMAGE ?= $(IMAGE_TAG_BASE):$(VERSION)
+
 PGOROOT ?= $(CURDIR)
 PGO_BASEOS ?= ubi8
 PGO_IMAGE_PREFIX ?= crunchydata
@@ -67,7 +73,7 @@ images = postgres-operator \
 
 
 #======= Main functions =======
-all: $(images:%=%-image)
+all: build-docker-image
 
 setup:
 	PGOROOT='$(PGOROOT)' ./bin/get-deps.sh
@@ -128,6 +134,9 @@ build-crunchy-postgres-exporter:
 
 
 #======= Image builds =======
+build-docker-image:
+	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE) $(ROOT_REPO)/e2e-tests/build
+
 $(PGOROOT)/build/%/Dockerfile:
 	$(error No Dockerfile found for $* naming pattern: [$@])
 
@@ -268,7 +277,7 @@ pull: $(images:%=pull-%) ;
 pull-%:
 	$(IMG_PUSHER_PULLER) pull $(PGO_IMAGE_PREFIX)/$*:$(PGO_IMAGE_TAG)
 
-generate: generate-crd generate-crd-docs generate-deepcopy generate-rbac
+generate: generate-crd generate-deepcopy generate-rbac generate-manager generate-bundle
 
 generate-crunchy-crd:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
@@ -285,6 +294,7 @@ generate-percona-crd:
 	$(PGO_KUBE_CLIENT) kustomize ./build/crd/percona/ > ./config/crd/bases/pg.percona.com_perconapgclusters.yaml
 
 generate-crd: generate-crunchy-crd generate-percona-crd
+	cat ./config/crd/bases/pg.percona.com_perconapgclusters.yaml <(echo ---) ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml > ./deploy/crd.yaml
 
 generate-crd-docs:
 	GOBIN='$(CURDIR)/hack/tools' go install fybrik.io/crdoc@v0.5.2
@@ -300,7 +310,16 @@ generate-deepcopy:
 
 generate-rbac:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/generate-rbac.sh \
-		'./internal/...' 'config/rbac'
+		'./...' 'config/rbac/'
+	$(KUSTOMIZE) build ./config/rbac/namespace/ > ./deploy/rbac.yaml
+
+generate-manager:
+	cd ./config/manager/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/manager/ > ./deploy/operator.yaml
+
+generate-bundle:
+	cd ./config/bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/bundle/ > ./deploy/bundle.yaml
 
 # Available versions: curl -s 'https://storage.googleapis.com/kubebuilder-tools/' | grep -o '<Key>[^<]*</Key>'
 # - ENVTEST_K8S_VERSION=1.19.2
@@ -312,3 +331,21 @@ hack/tools/envtest:
 license: licenses
 licenses:
 	./bin/license_aggregator.sh ./cmd/...
+
+KUSTOMIZE = $(shell pwd)/bin/kustomize
+kustomize: ## Download kustomize locally if necessary.
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.3)
+
+# go-get-tool will 'go get' any package $2 and install it to $1.
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+define go-get-tool
+@[ -f $(1) ] || { \
+set -e ;\
+TMP_DIR=$$(mktemp -d) ;\
+cd $$TMP_DIR ;\
+go mod init tmp ;\
+echo "Downloading $(2)" ;\
+GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
+rm -rf $$TMP_DIR ;\
+}
+endef

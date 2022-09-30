@@ -1,9 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- manager.yaml
-commonLabels:
-  pg.percona.com/control-plane: postgres-operator
+- ../crd
+- ../rbac/namespace
+- ../manager
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator

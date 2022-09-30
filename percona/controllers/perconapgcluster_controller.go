@@ -30,9 +30,10 @@ type Reconciler struct {
 	Tracer   trace.Tracer
 }
 
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters/status,verbs=patch
+// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;watch
+
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
 

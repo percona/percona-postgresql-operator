@@ -89,6 +89,20 @@ rules:
   - patch
   - watch
 - apiGroups:
+  - pg.percona.com
+  resources:
+  - perconapgclusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - pg.percona.com
+  resources:
+  - perconapgclusters/status
+  verbs:
+  - patch
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets
@@ -104,9 +118,11 @@ rules:
   resources:
   - postgresclusters
   verbs:
+  - create
   - get
   - list
   - patch
+  - update
   - watch
 - apiGroups:
   - postgres-operator.crunchydata.com
