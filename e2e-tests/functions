@@ -1,0 +1,381 @@
+#!/bin/bash
+
+# set root repo relatively to a test dir
+ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
+source "${ROOT_REPO}/e2e-tests/vars.sh"
+test_name=$(basename "$(pwd)")
+
+deploy_operator() {
+	kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/bundle.yaml"
+
+	yq eval \
+		"$(printf 'select(documentIndex==1).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
+		"${DEPLOY_DIR}/operator.yaml" \
+		| kubectl -n "${NAMESPACE}" apply -f -
+
+}
+
+deploy_client() {
+	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/client.yaml"
+}
+
+apply_s3_storage_secrets() {
+	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
+}
+
+deploy_pmm_server() {
+	local platform=kubernetes
+	if [ -n "${OPENSHIFT}" ]; then
+		platform=openshift
+		oc create sa pmm-server -n "${NAMESPACE}" || :
+		oc adm policy add-scc-to-user privileged -z pmm-server -n "${NAMESPACE}" || :
+		oc create rolebinding pmm-ps-operator-namespace-only --role percona-server-for-mysql-operator-role --serviceaccount=${NAMESPACE}:pmm-server -n "${NAMESPACE}" || :
+		oc patch role/percona-server-for-mysql-operator-role --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' -n "${NAMESPACE}" || :
+		helm install monitoring --set imageTag=$IMAGE_PMM_SERVER_TAG --set imageRepo=$IMAGE_PMM_SERVER_REPO --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz -n "${NAMESPACE}"
+	else
+		helm install monitoring \
+			-n "${NAMESPACE}" \
+			--set imageTag=$IMAGE_PMM_SERVER_TAG \
+			--set imageRepo=$IMAGE_PMM_SERVER_REPO \
+			--set platform="${platform}" \
+			"https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz"
+	fi
+	SERVICE="postgres"
+	until kubectl -n "${NAMESPACE}" exec monitoring-0 -- bash -c "pgrep -x $SERVICE >/dev/null"; do
+		echo "Retry $retry"
+		sleep 5
+		let retry+=1
+		if [ $retry -ge 20 ]; then
+			echo "Max retry count $retry reached. Pmm-server can't start"
+			exit 1
+		fi
+	done
+}
+
+get_pmm_api_key() {
+	ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" exec monitoring-0 -- bash -c "printenv | grep ADMIN_PASSWORD | cut -d '=' -f2")
+	echo $(curl --insecure -X POST -H "Content-Type: application/json" -d '{"name":"operator", "role": "Admin"}' "https://admin:$ADMIN_PASSWORD@"$(get_service_ip monitoring-service)"/graph/api/auth/keys" | jq .key)
+}
+
+deploy_minio() {
+	helm uninstall -n "${NAMESPACE}" minio-service || :
+	helm repo remove minio || :
+	helm repo add minio https://helm.min.io/
+	retry 10 60 helm install minio-service \
+		-n "${NAMESPACE}" \
+		--version 8.0.5 \
+		--set accessKey=some-access-key \
+		--set secretKey=some-secret-key \
+		--set service.type=ClusterIP \
+		--set configPathmc=/tmp/.minio/ \
+		--set persistence.size=2G \
+		--set environment.MINIO_REGION=us-east-1 \
+		--set environment.MINIO_HTTP_TRACE=/tmp/trace.log \
+		--set securityContext.enabled=false \
+		minio/minio
+	MINIO_POD=$(kubectl -n "${NAMESPACE}" get pods --selector=release=minio-service -o 'jsonpath={.items[].metadata.name}')
+	wait_pod $MINIO_POD
+
+	# create bucket
+	kubectl -n "${NAMESPACE}" run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
+		bash -c 'AWS_ACCESS_KEY_ID=some-access-key AWS_SECRET_ACCESS_KEY=some-secret-key AWS_DEFAULT_REGION=us-east-1 \
+        /usr/bin/aws --endpoint-url http://minio-service:9000 s3 mb s3://operator-testing'
+}
+
+retry() {
+	local max=$1
+	local delay=$2
+	shift 2 # cut delay and max args
+	local n=1
+
+	until "$@"; do
+		if [[ $n -ge $max ]]; then
+			echo "The command '$@' has failed after $n attempts."
+			exit 1
+		fi
+		((n++))
+		sleep $delay
+	done
+}
+
+get_operator_pod() {
+	kubectl get pods -n "${NAMESPACE}" \
+		--selector=app.kubernetes.io/name=percona-server-mysql-operator \
+		-o 'jsonpath={.items[].metadata.name}'
+}
+
+get_cr() {
+	local name_suffix=$1
+
+	yq eval "$(printf '.metadata.name="%s"' "${test_name}${name_suffix:+-$name_suffix}")" "${DEPLOY_DIR}/cr.yaml" \
+		| yq eval '.spec.postgresVersion='${PG_VER}'' - \
+		| yq eval '.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}]' - \
+		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
+		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
+		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" -
+}
+
+run_psql() {
+	local command=${1}
+	local uri=${2}
+	local driver=${3:-postgres}
+	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+
+	kubectl exec ${client_container} -n ${NAMESPACE} -- \
+		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://'$uri'"
+}
+
+get_psql_user_pass() {
+	local user=${1}
+	local cluster=${2:-${test_name}}
+
+	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.password}' | base64 -d
+}
+
+get_psql_user_host() {
+	local user=${1}
+	local cluster=${2:-${test_name}}
+
+	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.host}' | base64 -d
+}
+
+run_curl() {
+	kubectl -n "${NAMESPACE}" exec mysql-client -- bash -c "curl -s -k $*"
+}
+
+get_innodb_cluster_name() {
+	echo $(get_cluster_name) | tr -cd '[^a-zA-Z0-9_]+'
+}
+
+get_mysqlsh_uri() {
+	local idx=${1:-0}
+
+	echo "root:root_password@$(get_cluster_name)-mysql-${idx}.$(get_cluster_name)-mysql.${NAMESPACE}"
+}
+
+get_gr_status() {
+	local uri="$1"
+
+	kubectl -n "${NAMESPACE}" exec $(get_operator_pod) -- mysqlsh --uri $uri --cluster --result-format json -- cluster status \
+		| sed -e 's/mysql: //' \
+		| (grep -v 'Using a password on the command line interface can be insecure.' || :)
+}
+
+get_cluster_name() {
+	kubectl -n "${NAMESPACE}" get ps -o jsonpath='{.items[0].metadata.name}'
+}
+
+get_mysql_primary_service() {
+	local cluster=$1
+
+	echo "${cluster}-mysql-primary"
+}
+
+get_mysql_headless_fqdn() {
+	local cluster=$1
+	local index=$2
+
+	echo "${cluster}-mysql-${index}.${cluster}-mysql"
+}
+
+get_orc_headless_fqdn() {
+	local cluster=$1
+	local index=$2
+
+	echo "${cluster}-orc-${index}.${cluster}-orc"
+}
+
+get_metric_values() {
+	local metric=$1
+	local instance=$2
+	local user_pass=$3
+	local start=$($date -u "+%s" -d "-1 minute")
+	local end=$($date -u "+%s")
+
+	set +o xtrace
+	retry=0
+	until run_curl "https://${user_pass}@monitoring-service/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" | jq '.data.result[0].values[][1]' | grep '^"[0-9]*"$'; do
+		sleep 1
+		let retry+=1
+		if [ $retry -ge 30 ]; then
+			echo "Max retry count $retry reached. Data about instance $instance was not collected!"
+			exit 1
+		fi
+	done
+	set -o xtrace
+}
+
+get_qan20_values() {
+	local instance=$1
+	local user_pass=$2
+	local start=$($date -u "+%Y-%m-%dT%H:%M:%S" -d "-30 minute")
+	local end=$($date -u "+%Y-%m-%dT%H:%M:%S")
+	local endpoint=monitoring-service
+
+	local payload=$(
+		cat <<EOF
+{
+   "columns":[
+      "load",
+      "num_queries",
+      "query_time"
+   ],
+   "first_seen": false,
+   "group_by": "queryid",
+   "include_only_fields": [],
+   "keyword": "",
+   "labels": [
+       {
+           "key": "cluster",
+           "value": ["monitoring"]
+   }],
+   "limit": 10,
+   "offset": 0,
+   "order_by": "-load",
+   "main_metric": "load",
+   "period_start_from": "$($date -u -d '-12 hour' '+%Y-%m-%dT%H:%M:%S%:z')",
+   "period_start_to": "$($date -u '+%Y-%m-%dT%H:%M:%S%:z')"
+}
+EOF
+	)
+
+	run_curl -XPOST -d "'$(echo ${payload} | sed 's/\n//g')'" "https://${user_pass}@${endpoint}/v0/qan/GetReport" \
+		| jq '.rows[].fingerprint'
+}
+
+get_mysql_pods() {
+	kubectl get pod -n "${NAMESPACE}" --no-headers --selector=app.kubernetes.io/component=mysql | awk '{print $1}'
+}
+
+get_mysql_users() {
+	local args=$1
+
+	run_mysql "SELECT user FROM mysql.user" "${args}" | grep -vE "mysql|root"
+}
+
+get_service_ip() {
+	local service=$1
+	while (kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.spec.type}' 2>&1 || :) | grep -q NotFound; do
+		sleep 1
+	done
+	if [ "$(kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.spec.type}')" = "ClusterIP" ]; then
+		kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.spec.clusterIP}'
+		return
+	fi
+	until kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[]}' 2>&1 | egrep -q "hostname|ip"; do
+		sleep 1
+	done
+	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].ip}'
+	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].hostname}'
+}
+
+wait_cluster_consistency() {
+	local cluster_name=${1}
+	local cluster_size=${2}
+	local orc_size=${3}
+
+	if [ -z "${orc_size}" ]; then
+		orc_size=3
+	fi
+
+	sleep 7 # wait for two reconcile loops ;)  3 sec x 2 times + 1 sec = 7 seconds
+	until [[ "$(kubectl get ps "${cluster_name}" -n "${NAMESPACE}" -o jsonpath='{.status.mysql.state}')" == "ready" &&
+	"$(kubectl get ps "${cluster_name}" -n "${NAMESPACE}" -o jsonpath='{.status.mysql.ready}')" == "${cluster_size}" &&
+	"$(kubectl get ps "${cluster_name}" -n "${NAMESPACE}" -o jsonpath='{.status.orchestrator.ready}')" == "${orc_size}" &&
+	"$(kubectl get ps "${cluster_name}" -n "${NAMESPACE}" -o jsonpath='{.status.orchestrator.state}')" == "ready" ]]; do
+		echo 'waiting for cluster readyness'
+		sleep 15
+	done
+}
+
+wait_pod() {
+	local pod=$1
+
+	set +o xtrace
+	retry=0
+	echo -n $pod
+	until kubectl get pod/$pod -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null | grep 'true'; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			kubectl describe pod/$pod -n "${NAMESPACE}"
+			kubectl logs $pod -n "${NAMESPACE}"
+			kubectl logs $(get_operator_pod) -n "${NAMESPACE}" \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| grep -v 'Getting tasks for pod' \
+				| grep -v 'Getting pods from source' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	set -o xtrace
+}
+
+check_auto_tuning() {
+	RAM_SIZE=$1
+	RDS_MEM_INSTANCE=12582880
+	CUSTOM_INNODB_SIZE=$2
+	CUSTOM_CONNECTIONS=$3
+
+	INNODB_SIZE=$(run_mysql \
+		'SELECT @@innodb_buffer_pool_size;' \
+		"-h $(get_mysql_primary_service "$(get_cluster_name)") -uroot -proot_password")
+	CONNECTIONS=$(run_mysql \
+		'SELECT @@max_connections;' \
+		"-h $(get_mysql_primary_service "$(get_cluster_name)") -uroot -proot_password")
+
+	if [[ -n ${CUSTOM_INNODB_SIZE} ]]; then
+		if [[ ${INNODB_SIZE} != ${CUSTOM_INNODB_SIZE} ]]; then
+			echo "innodb_buffer_pool_size is set to ${INNODB_SIZE}, which does not correlate with ${CUSTOM_INNODB_SIZE} from custom config"
+			exit 1
+		fi
+	else
+		if [[ 1000000000 -lt $((RAM_SIZE - $((RAM_SIZE * 75 / 100)))) ]]; then
+			if [[ ${INNODB_SIZE} != $((RAM_SIZE * 75 / 100)) ]]; then
+				echo "innodb_buffer_pool_size is set to ${INNODB_SIZE}, which does not correlate with cr.pxc.limits.memory * 0.75"
+				exit 1
+			fi
+		else
+			if [[ ${INNODB_SIZE} != $((RAM_SIZE * 50 / 100)) ]]; then
+				echo "innodb_buffer_pool_size is set to ${INNODB_SIZE}, which does not correlate with cr.pxc.limits.memory * 0.5"
+				exit 1
+			fi
+		fi
+	fi
+
+	if [[ -n ${CUSTOM_CONNECTIONS} ]]; then
+		if [[ ${CONNECTIONS} != ${CUSTOM_CONNECTIONS} ]]; then
+			echo "max_connections is set to ${AUTO_CONNECTIONS}, which does not correlate with ${CUSTOM_CONNECTIONS} from custom config"
+			exit 1
+		fi
+	else
+		if [[ ${CONNECTIONS} != $((RAM_SIZE / RDS_MEM_INSTANCE)) ]]; then
+			echo "max_connections is set to ${CONNECTIONS}, which does not correlate with cr.pxc.limits.memory / ${RDS_MEM_INSTANCE}"
+			exit 1
+		fi
+	fi
+}
+
+get_mysql_router_service() {
+	local cluster=$1
+
+	echo "${cluster}-router"
+}
+
+deploy_version_service() {
+	kubectl create configmap -n "${NAMESPACE}" versions \
+		--from-file "${TESTS_CONFIG_DIR}/operator.9.9.9.ps-operator.dep.json" \
+		--from-file "${TESTS_CONFIG_DIR}/operator.9.9.9.ps-operator.json"
+
+	kubectl apply -n "${NAMESPACE}" -f "${TESTS_CONFIG_DIR}/vs.yaml"
+}
+
+deploy_cert_manager() {
+	kubectl create namespace cert-manager || :
+	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
+	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.yaml --validate=false || : 2>/dev/null
+}

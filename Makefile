@@ -294,7 +294,7 @@ generate-percona-crd:
 	$(PGO_KUBE_CLIENT) kustomize ./build/crd/percona/ > ./config/crd/bases/pg.percona.com_perconapgclusters.yaml
 
 generate-crd: generate-crunchy-crd generate-percona-crd
-	cat ./config/crd/bases/pg.percona.com_perconapgclusters.yaml <(echo ---) ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml > ./deploy/crd.yaml
+	cat ./config/crd/bases/pg.percona.com_perconapgclusters.yaml <$(echo '---') ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml > ./deploy/crd.yaml
 
 generate-crd-docs:
 	GOBIN='$(CURDIR)/hack/tools' go install fybrik.io/crdoc@v0.5.2
