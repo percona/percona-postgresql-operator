@@ -261,14 +261,15 @@ pipeline {
                                     -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                                     -w /go/src/github.com/percona/percona-postgresql-operator \
                                     -e GO111MODULE=on \
-                                    golang:1.17 sh -c '
+                                    golang:1.19 sh -c '
                                         go install github.com/google/go-licenses@latest;
-                                        /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/manager \
+                                        /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
                                             | cut -d , -f 3 \
                                             | sort -u \
                                             > go-licenses-new || :
                                     '
                             "
+                            cat go-licenses-new
                             diff -u ./e2e-tests/license/compare/go-licenses go-licenses-new
                         """
                     }
@@ -284,7 +285,7 @@ pipeline {
                                     -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                                     -w /go/src/github.com/percona/percona-postgresql-operator \
                                     -e GO111MODULE=on \
-                                    golang:1.19 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/manager'
+                                    golang:1.19 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
                             "
                         '''
 
@@ -296,6 +297,7 @@ pipeline {
                                     | sort \
                                     | uniq \
                                     > golicense-new || true
+                                cat golicense-new
                                 diff -u ./e2e-tests/license/compare/golicense golicense-new
                             """
                         }
