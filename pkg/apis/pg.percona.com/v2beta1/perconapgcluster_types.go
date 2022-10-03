@@ -421,3 +421,20 @@ type PerconaPGClusterList struct {
 func init() {
 	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
 }
+
+const annotationPrefix = "pg.percona.com/"
+
+const (
+	// PGBackRestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
+	// backup.  The value of the annotation will be a unique identifier for a backup Job (e.g. a
+	// timestamp), which will be stored in the PostgresCluster status to properly track completion
+	// of the Job.  Also used to annotate the backup Job itself as needed to identify the backup
+	// ID associated with a specific manual backup Job.
+	AnnotationPGBackrestBackup = annotationPrefix + "pgbackrest-backup"
+
+	// PGBackRestRestore is the annotation that is added to a PerconaPGCluster to initiate an in-place
+	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a
+	// timestamp), which will be stored in the PostgresCluster status to properly track completion
+	// of the Job.
+	AnnotationPGBackRestRestore = annotationPrefix + "pgbackrest-restore"
+)

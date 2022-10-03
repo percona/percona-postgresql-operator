@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"go.opentelemetry.io/otel/trace"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -13,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/crunchydata/postgres-operator/internal/logging"
+	"github.com/crunchydata/postgres-operator/internal/naming"
 	"github.com/crunchydata/postgres-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -65,6 +67,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		postgresCluster.Default()
+
+		annotations := make(map[string]string)
+		for k, v := range perconaPGCluster.Annotations {
+			switch k {
+			case v2beta1.AnnotationPGBackrestBackup:
+				annotations[naming.PGBackRestBackup] = v
+			case v2beta1.AnnotationPGBackRestRestore:
+				annotations[naming.PGBackRestRestore] = v
+			case corev1.LastAppliedConfigAnnotation:
+				continue
+			default:
+				annotations[k] = v
+			}
+		}
+		postgresCluster.Annotations = annotations
+		postgresCluster.Labels = perconaPGCluster.Labels
 
 		postgresCluster.Spec.Image = perconaPGCluster.Spec.Image
 		postgresCluster.Spec.ImagePullPolicy = perconaPGCluster.Spec.ImagePullPolicy
