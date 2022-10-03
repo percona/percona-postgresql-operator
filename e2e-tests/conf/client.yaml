@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pg-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: pg-client
+  template:
+    metadata:
+      labels:
+        name: pg-client
+    spec:
+      containers:
+        - name: pg-client
+          image: perconalab/percona-distribution-postgresql:13.2
+          imagePullPolicy: Always
+          command:
+          - sleep
+          args:
+          - "100500"

@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
-	"github.com/crunchydata/postgres-operator/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 )
 
 type funcMarshaler func() ([]byte, error)

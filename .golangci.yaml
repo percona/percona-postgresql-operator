@@ -15,6 +15,11 @@ linters:
 linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/percona)
 
 run:
   skip-dirs:

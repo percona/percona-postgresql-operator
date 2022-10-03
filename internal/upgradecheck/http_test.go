@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 
-	"github.com/crunchydata/postgres-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/logging"
 )
 
 func init() {

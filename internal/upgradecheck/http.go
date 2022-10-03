@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/rest"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crunchydata/postgres-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/logging"
 )
 
 var (

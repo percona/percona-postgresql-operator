@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# set root repo relatively to a test dir
+ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
+source "${ROOT_REPO}/e2e-tests/vars.sh"
+test_name=$(basename "$(pwd)")
+
+deploy_operator() {
+	kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/bundle.yaml"
+
+	yq eval \
+		"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
+		"${DEPLOY_DIR}/operator.yaml" \
+		| kubectl -n "${NAMESPACE}" apply -f -
+
+}
+
+deploy_client() {
+	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/client.yaml"
+}
+
+get_cr() {
+	local name_suffix=$1
+
+	yq eval "$(printf '.metadata.name="%s"' "${test_name}${name_suffix:+-$name_suffix}")" "${DEPLOY_DIR}/cr.yaml" \
+		| yq eval '.spec.postgresVersion='${PG_VER}'' - \
+		| yq eval '.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}]' - \
+		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
+		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
+		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" -
+}
+
+run_psql() {
+	local command=${1}
+	local uri=${2}
+	local driver=${3:-postgres}
+	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+
+	kubectl exec ${client_container} -n ${NAMESPACE} -- \
+		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://'$uri'"
+}
+
+get_psql_user_pass() {
+	local user=${1}
+	local cluster=${2:-${test_name}}
+
+	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.password}' | base64 -d
+}
+
+get_psql_user_host() {
+	local user=${1}
+	local cluster=${2:-${test_name}}
+
+	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.host}' | base64 -d
+}

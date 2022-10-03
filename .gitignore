@@ -7,3 +7,4 @@ tools
 /e2e-tests/conf/gcs-credentials.json
 licenses/*
 !licenses/LICENSE.txt
+bin/
