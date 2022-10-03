@@ -111,3 +111,138 @@ Deploy the database cluster itself from `deploy/cr.yaml`
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/pg_2.0/deploy/cr.yaml
 ```
+
+### Backups/restores
+
+Backups could be triggered via the cron-like string and on-demand. The common step for both ways is to create secret for accessing the remote object storage
+
+```sh
+printf "[global]\nrepo1-s3-key=%s\nrepo1-s3-key-secret=%s\n" 'YOUR_S3_ACCESS_KEY' 'YOUR_S3_SECRET_KEY' > /tmp/repo1-secret.ini
+kubectl create secret generic your-cluster-pgbackrest-secrets --from-file=s3.conf=/tmp/repo1-secret.ini
+```
+
+If you need more than one object storage, you can increase repo index by 1 and add the incremented `repoN` options to the ini file. 
+Also GCS, Azure have own suffixes for `repoN` options and they should be preserved.
+
+Now the focus should be switched to CR part. 
+
+```yaml
+spec:
+  backups:
+    pgbackrest:
+      manual:
+        repoName: repo1
+        options:
+         - --type=full
+      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
+      configuration:
+      - secret:
+          name: your-cluster-pgbackrest-secrets
+      global:
+        repo1-path: /backrestrepo/postgres-operator/your-cluster/repo1
+      repos:
+      - name: repo1
+        s3:
+          bucket: "your-bucket"
+          endpoint: "s3.amazonaws.com"
+          region: "us-east-1"
+```
+
+The listed options do allow the user to force the operator to make on-demand backup by calling:
+
+```sh
+kubectl annotate perconapgclusters.pg.percona.com your-cluster --overwrite pg.percona.com/pgbackrest-backup="$(date)"
+```
+
+Alternatively, backup schedule could be used:
+
+```yaml
+spec:
+  backups:
+    pgbackrest:
+      repos:
+      - name: repo1
+        schedules:
+          full: "0 1 * * 0"
+          differential: "0 1 * * 1-6"
+```
+
+As for restores, the actions are pretty much the same. Add the restore section to already running CR first
+
+```yaml
+spec:
+  backups:
+    pgbackrest:
+      restore:
+        enabled: true
+        repoName: repo1
+        options:
+        - --type=time
+        - --target="2022-10-03 14:15:11+03"
+```
+where target is the time to be restored at by the backup available. You may use `kubectl patch` or `kubectl edit` for this purpose.
+
+Second, put the already familiar annotation with one small difference:
+
+```sh
+kubectl annotate perconapgclusters.pg.percona.com your-cluster --overwrite pg.percona.com/pgbackrest-restore=id1
+```
+
+Once the restore is done, please switch `enabled: true` to `enabled: false`.
+
+### Start cluster from previously saved backup
+
+It's quite a common request to be able to start the cluster up from some others cluster backup.
+Here is an example CR for that.
+
+```yaml
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGCluster
+metadata:
+  name: your-cluster-rev2
+spec:
+  image: perconalab/percona-postgresql-operator:main-ppg14-postgres
+  postgresVersion: 14
+  dataSource:
+    pgbackrest:
+      stanza: db
+      configuration:
+      - secret:
+          name: your-cluster-pgbackrest-secrets
+      global:
+        repo1-path: /backrestrepo/postgres-operator/your-cluster/repo1/
+      repo:
+        name: repo1
+        s3:
+          bucket: "your-bucket"
+          endpoint: "s3.amazonaws.com"
+          region: "us-east-1"
+  instances:
+    - dataVolumeClaimSpec:
+        accessModes:
+        - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: 1Gi
+  backups:
+    pgbackrest:
+      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
+      configuration:
+      - secret:
+          name: your-cluster-rev2-pgbackrest-secrets
+      global:
+        repo1-path: /backrestrepo/postgres-operator/your-cluster-rev2/repo1
+      repos:
+      - name: repo1
+        s3:
+          bucket: "your-other-bucket"
+          endpoint: "s3.amazonaws.com"
+          region: "us-east-1"
+  proxy:
+    pgBouncer:
+      image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
+```
+
+As it may be noticed, `dataSource` section is a key to populate already existing backup to the newly created cluster. Other options stay pretty much the same as before.
+
+Feel free to read the [upstream](https://access.crunchydata.com/documentation/postgres-operator/v5/tutorial/backup-management/) doc for more information.
