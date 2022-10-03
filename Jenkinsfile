@@ -317,9 +317,9 @@ pipeline {
                     steps {
                         prepareNode()
                         unstash "sourceFILES"
-                        CreateCluster('cluster1')
-                        runTest('init-deploy', 'cluster1')
-                        ShutdownCluster('cluster1')
+                        CreateCluster('sandbox')
+                        runTest('init-deploy', 'sandbox')
+                        ShutdownCluster('sandbox')
                     }
                 }
             }
