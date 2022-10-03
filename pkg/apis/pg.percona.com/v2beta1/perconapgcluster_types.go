@@ -298,6 +298,10 @@ type PGProxySpec struct {
 }
 
 func (p *PGProxySpec) ToCrunchy() *crunchyv1beta1.PostgresProxySpec {
+	if p == nil {
+		return nil
+	}
+
 	return &crunchyv1beta1.PostgresProxySpec{
 		PGBouncer: p.PGBouncer.ToCrunchy(),
 	}
