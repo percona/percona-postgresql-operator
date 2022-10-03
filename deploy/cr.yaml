@@ -1,7 +1,7 @@
 apiVersion: pg.percona.com/v2beta1
 kind: PerconaPGCluster
 metadata:
-  name: hippo
+  name: cluster1
 spec:
 #  secrets:
 #    customTLSSecretName:
@@ -22,14 +22,14 @@ spec:
 
 #  databaseInitSQL:
 #    key: init.sql
-#    name: hippo-init-sql
+#    name: cluster1-init-sql
 
 #  shutdown: true
 #  paused: true
 
 #  dataSource:
 #    postgresCluster:
-#      clusterName: hippo1
+#      clusterName: cluster1
 #      repoName: repo1
 #      options:
 #      - --type=time
@@ -163,7 +163,7 @@ spec:
       image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
 #      configuration:
 #        - secret:
-#            name: hippo-pgbackrest-secrets
+#            name: cluster1-pgbackrest-secrets
 #      jobs:
 #        priorityClassName: high-priority
 #        resources:
@@ -179,12 +179,12 @@ spec:
 #      global:
 #        repo1-retention-full: "14"
 #        repo1-retention-full-type: time
-#        repo1-path: /pgbackrest/postgres-operator/hippo/repo1
+#        repo1-path: /pgbackrest/postgres-operator/cluster1/repo1
 #        repo1-cipher-type: aes-256-cbc
 #        repo1-s3-uri-style: path
-#        repo2-path: /pgbackrest/postgres-operator/hippo-multi-repo/repo2
-#        repo3-path: /pgbackrest/postgres-operator/hippo-multi-repo/repo3
-#        repo4-path: /pgbackrest/postgres-operator/hippo-multi-repo/repo4
+#        repo2-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo2
+#        repo3-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo3
+#        repo4-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo4
 #      repoHost:
 #        priorityClassName: high-priority
 #
@@ -206,14 +206,14 @@ spec:
 #                 postgres-operator.crunchydata.com/role: pgbouncer
 #               topologyKey: kubernetes.io/hostname
 #
-#      manual:
-#        repoName: repo1
-#        options:
-#         - --type=full
+      manual:
+        repoName: repo1
+        options:
+         - --type=full
       repos:
       - name: repo1
-#        schedules:
-#          full: "0 1 * * 0"
+        schedules:
+          full: "0 0 * * 6"
 #          differential: "0 1 * * 1-6"
         volume:
           volumeClaimSpec:

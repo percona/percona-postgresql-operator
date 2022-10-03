@@ -7,4 +7,4 @@ commonLabels:
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator
-  newTag: k8spg-258
+  newTag: v2-main
