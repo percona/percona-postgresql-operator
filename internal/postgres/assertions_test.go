@@ -16,7 +16,7 @@
 package postgres
 
 import (
-	"github.com/crunchydata/postgres-operator/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 )
 
 func marshalMatches(actual interface{}, expected string) cmp.Comparison {

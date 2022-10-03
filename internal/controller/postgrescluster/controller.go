@@ -43,14 +43,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/crunchydata/postgres-operator/internal/logging"
-	"github.com/crunchydata/postgres-operator/internal/pgaudit"
-	"github.com/crunchydata/postgres-operator/internal/pgbackrest"
-	"github.com/crunchydata/postgres-operator/internal/pgbouncer"
-	"github.com/crunchydata/postgres-operator/internal/pgmonitor"
-	"github.com/crunchydata/postgres-operator/internal/pki"
-	"github.com/crunchydata/postgres-operator/internal/postgres"
-	"github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/internal/pgmonitor"
+	"github.com/percona/percona-postgresql-operator/internal/pki"
+	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (

@@ -27,7 +27,7 @@ import (
 
 	"gotest.tools/v3/assert"
 
-	"github.com/crunchydata/postgres-operator/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/internal/testing/require"
 )
 
 type StringSet map[string]struct{}

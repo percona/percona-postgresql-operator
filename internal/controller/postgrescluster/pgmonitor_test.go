@@ -35,11 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crunchydata/postgres-operator/internal/initialize"
-	"github.com/crunchydata/postgres-operator/internal/naming"
-	"github.com/crunchydata/postgres-operator/internal/pgmonitor"
-	"github.com/crunchydata/postgres-operator/internal/testing/require"
-	"github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/internal/pgmonitor"
+	"github.com/percona/percona-postgresql-operator/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestAddPGMonitorExporterToInstancePodSpec(t *testing.T) {
