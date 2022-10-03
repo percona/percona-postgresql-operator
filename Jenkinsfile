@@ -225,7 +225,7 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
                     sh '''
-                        DOCKER_TAG=perconalab/percona-postgres-operator:$VERSION
+                        DOCKER_TAG=perconalab/percona-postgresql-operator:$VERSION
                         docker_tag_file='./results/docker/TAG'
                         mkdir -p $(dirname ${docker_tag_file})
                         echo ${DOCKER_TAG} > "${docker_tag_file}"
@@ -305,7 +305,7 @@ pipeline {
         }
         stage('Run E2E tests') {
             parallel {
-                stage('E2E Cluster1') {
+                stage('E2E Sandbox') {
                     when {
                         expression {
                             !skipBranchBuilds
