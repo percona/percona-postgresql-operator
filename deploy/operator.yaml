@@ -48,7 +48,7 @@ spec:
           value: registry.developers.crunchydata.com/crunchydata/crunchy-pgbouncer:ubi8-1.17-0
         - name: RELATED_IMAGE_PGEXPORTER
           value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-exporter:ubi8-5.2.0-0
-        image: perconalab/percona-postgresql-operator:k8spg-258
+        image: perconalab/percona-postgresql-operator:pg-2.0
         name: operator
         securityContext:
           allowPrivilegeEscalation: false

@@ -16,7 +16,6 @@ export PG_VER="${PG_VER:-14}"
 export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbouncer"}
 export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
 export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest"}
-export IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest-repo"}
 export IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbadger"}
 export BUCKET=${BUCKET:-"pg-operator-testing"}
 
