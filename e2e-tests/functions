@@ -9,7 +9,7 @@ deploy_operator() {
 	kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/bundle.yaml"
 
 	yq eval \
-		"$(printf 'select(documentIndex==1).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
+		"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
 		"${DEPLOY_DIR}/operator.yaml" \
 		| kubectl -n "${NAMESPACE}" apply -f -
 
