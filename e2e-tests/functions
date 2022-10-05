@@ -38,20 +38,20 @@ get_cr() {
 		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
 		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
 		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" - \
-		>"${TEMP_DIR}/generic.cr.yaml"
+		>"${TEMP_DIR}/cr.yaml"
 	
 	case ${test_name} in
 	"demand-backup") 
-		yq eval '.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/generic.cr.yaml" \
+		yq eval '.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/cr.yaml" \
 			| yq eval '.spec.backups.pgbackrest.manual.repoName = "repo1"' - \
 			| yq eval '.spec.backups.pgbackrest.manual.options = ["--type=full"]' - \
 			| yq eval '.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}'/repo1"' - \
 			| yq eval '.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]' - \
 			>"${TEMP_DIR}/backup.cr.yaml"
+			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
 		;;
 	*) ;;
 	esac
-	mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
 	cat "${TEMP_DIR}/cr.yaml"
 }
 
