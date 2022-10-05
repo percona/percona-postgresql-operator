@@ -15,6 +15,16 @@ deploy_operator() {
 
 }
 
+deploy_s3_secrets() {
+	set +o xtrace
+	printf "[global]\nrepo1-s3-key=%s\nrepo1-s3-key-secret=%s\n" \
+		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_ACCESS_KEY_ID' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
+		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
+		>"${TEMP_DIR}/pgbackrest-secret.ini"
+	set -o xtrace
+	kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=s3.conf="${TEMP_DIR}/pgbackrest-secret.ini"
+}
+
 deploy_client() {
 	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/client.yaml"
 }
@@ -27,7 +37,22 @@ get_cr() {
 		| yq eval '.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}]' - \
 		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
 		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
-		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" -
+		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" - \
+		>"${TEMP_DIR}/generic.cr.yaml"
+	
+	case ${test_name} in
+	"demand-backup") 
+		yq eval '.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/generic.cr.yaml" \
+			| yq eval '.spec.backups.pgbackrest.manual.repoName = "repo1"' - \
+			| yq eval '.spec.backups.pgbackrest.manual.options = ["--type=full"]' - \
+			| yq eval '.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}'/repo1"' - \
+			| yq eval '.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]' - \
+			>"${TEMP_DIR}/backup.cr.yaml"
+		;;
+	*) ;;
+	esac
+	mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
+	cat "${TEMP_DIR}/cr.yaml"
 }
 
 run_psql() {
@@ -36,7 +61,7 @@ run_psql() {
 	local driver=${3:-postgres}
 	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 
-	kubectl exec ${client_container} -n ${NAMESPACE} -- \
+	kubectl -n ${NAMESPACE} exec ${client_container} -- \
 		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://'$uri'"
 }
 

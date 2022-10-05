@@ -207,10 +207,10 @@ pipeline {
                         }
                     }
                 }
-                withCredentials([file(credentialsId: 'cloud-secret-file-ps', variable: 'CLOUD_SECRET_FILE')]) {
+                withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
                     sh '''
-                        cp $CLOUD_SECRET_FILE e2e-tests/conf/cloud-secret.yml
-                        chmod 600 e2e-tests/conf/cloud-secret.yml
+                        cp $CLOUD_SECRET_FILE ./e2e-tests/conf/cloud-secret.yml
+                        cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
                     '''
                 }
                 stash includes: "**", name: "sourceFILES"
@@ -319,6 +319,7 @@ pipeline {
                         unstash "sourceFILES"
                         CreateCluster('sandbox')
                         runTest('init-deploy', 'sandbox')
+                        runTest('demand-backup', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }

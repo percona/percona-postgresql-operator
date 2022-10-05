@@ -21,6 +21,7 @@ export BUCKET=${BUCKET:-"pg-operator-testing"}
 
 
 date=$(which gdate || which date)
+sed=$(which gsed || which sed)
 
 if command -v oc &>/dev/null; then
 	if oc get projects; then
