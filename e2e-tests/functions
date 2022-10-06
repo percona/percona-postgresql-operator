@@ -49,8 +49,8 @@ get_cr() {
 			| yq eval '.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]' - \
 			>"${TEMP_DIR}/backup.cr.yaml"
 			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
-		;;
-	*) ;;
+			;;
+		*) ;;
 	esac
 	cat "${TEMP_DIR}/cr.yaml"
 }
