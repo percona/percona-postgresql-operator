@@ -38,8 +38,8 @@ get_cr() {
 		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
 		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
 		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" - \
-		>"${TEMP_DIR}/cr.yaml"
-	
+			>"${TEMP_DIR}/cr.yaml"
+
 	case ${test_name} in
 		"demand-backup")
 			yq eval '.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/cr.yaml" \
