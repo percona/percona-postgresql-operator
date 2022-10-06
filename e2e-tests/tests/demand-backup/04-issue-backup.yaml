@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 90
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      run_psql \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
+        "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)"
+      sleep 1
+
+      kubectl -n "${NAMESPACE}" annotate perconapgclusters.pg.percona.com "${test_name}${name_suffix:+-$name_suffix}" --overwrite "pg.percona.com/pgbackrest-backup=$($date '+%Y-%m-%d %H:%M:%S%:::z')"

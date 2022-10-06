@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "${NAMESPACE}" patch perconapgclusters.pg.percona.com "${test_name}${name_suffix:+-$name_suffix}" \
+          --type='json' \
+          -p '[{"op":"replace","path":"/spec/backups/pgbackrest/restore","value":{"enabled":true,"repoName":"repo1","options":["--type=time","\"--target='"$(kubectl -n ${NAMESPACE} get PerconaPGCluster/${test_name}${name_suffix:+-$name_suffix} -o jsonpath='{.metadata.annotations.pg\.percona\.com\/pgbackrest-backup}')"'\""]}}]'
+
+      kubectl -n "${NAMESPACE}" annotate perconapgclusters.pg.percona.com "${test_name}${name_suffix:+-$name_suffix}" --overwrite pg.percona.com/pgbackrest-restore=id1
