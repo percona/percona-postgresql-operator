@@ -49,7 +49,7 @@ get_cr() {
 				| yq eval '.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]' - \
 					>"${TEMP_DIR}/backup.cr.yaml"
 			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
-			if [[ "${test_name}" == "start-from-backup" ]]; then
+			if [[ ${test_name} == "start-from-backup" ]]; then
 				yq eval '.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/cr.yaml" \
 					| yq eval '.spec.dataSource.pgbackrest.stanza = "db"' - \
 					| yq eval '.spec.dataSource.pgbackrest.global.repo1-path = "/pgbackrest/postgres-operator/data-source/repo1"' - \
