@@ -4,6 +4,8 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
+  labels:
+    postgres-operator.crunchydata.com/control-plane: postgres-operator
   name: perconapgclusters.pg.percona.com
 spec:
   group: pg.percona.com
@@ -10526,6 +10528,7 @@ metadata:
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: 5.2.0
+    postgres-operator.crunchydata.com/control-plane: postgres-operator
   name: postgresclusters.postgres-operator.crunchydata.com
 spec:
   group: postgres-operator.crunchydata.com
@@ -22982,11 +22985,16 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
+  labels:
+    postgres-operator.crunchydata.com/control-plane: postgres-operator
   name: pgo
+  namespace: postgres-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  labels:
+    postgres-operator.crunchydata.com/control-plane: postgres-operator
   name: postgres-operator
 rules:
 - apiGroups:
@@ -23136,6 +23144,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+  labels:
+    postgres-operator.crunchydata.com/control-plane: postgres-operator
   name: postgres-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -23144,25 +23154,29 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: pgo
-  namespace: pgo
+  namespace: postgres-operator
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     pg.percona.com/control-plane: postgres-operator
+    postgres-operator.crunchydata.com/control-plane: postgres-operator
   name: pgo
+  namespace: postgres-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
       pg.percona.com/control-plane: postgres-operator
+      postgres-operator.crunchydata.com/control-plane: postgres-operator
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
         pg.percona.com/control-plane: postgres-operator
+        postgres-operator.crunchydata.com/control-plane: postgres-operator
     spec:
       containers:
       - env:

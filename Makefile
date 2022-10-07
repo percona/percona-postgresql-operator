@@ -321,6 +321,10 @@ generate-bundle:
 	cd ./config/bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
 	$(KUSTOMIZE) build ./config/bundle/ > ./deploy/bundle.yaml
 
+generate-cw-bundle:
+	cd ./config/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/default/ > ./deploy/cw-bundle.yaml
+
 # Available versions: curl -s 'https://storage.googleapis.com/kubebuilder-tools/' | grep -o '<Key>[^<]*</Key>'
 # - ENVTEST_K8S_VERSION=1.19.2
 hack/tools/envtest: SHELL = bash
