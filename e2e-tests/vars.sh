@@ -19,8 +19,8 @@ export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackres
 export IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbadger"}
 export BUCKET=${BUCKET:-"pg-operator-testing"}
 
-
 date=$(which gdate || which date)
+sed=$(which gsed || which sed)
 
 if command -v oc &>/dev/null; then
 	if oc get projects; then
