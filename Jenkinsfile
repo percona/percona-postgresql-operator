@@ -320,6 +320,7 @@ pipeline {
                         CreateCluster('sandbox')
                         runTest('init-deploy', 'sandbox')
                         runTest('demand-backup', 'sandbox')
+                        runTest('start-from-backup', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }
