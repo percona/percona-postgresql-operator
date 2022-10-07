@@ -1,7 +1,7 @@
 namespace: postgres-operator
 
 commonLabels:
-  postgres-operator.crunchydata.com/control-plane: postgres-operator
+  pg.percona.com/control-plane: postgres-operator
 
 bases:
 - ../crd
