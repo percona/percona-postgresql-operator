@@ -245,4 +245,46 @@ spec:
 
 As it may be noticed, `dataSource` section is a key to populate already existing backup to the newly created cluster. Other options stay pretty much the same as before.
 
+### Start standby cluster with cloudbased repo source
+
+Simple example for getting the matter online.
+
+```yaml
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGCluster
+metadata:
+  name: cluster-standby
+spec:
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: pgo-gcs-creds
+      global:
+        repo1-path: /pgbackrest/postgres-operator/data-source-gcs/repo1
+      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
+      repos:
+        - gcs:
+            bucket: some-bucket
+          name: repo1
+  image: perconalab/percona-postgresql-operator:main-ppg14-postgres
+  instances:
+    - dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+      name: ''
+      replicas: 1
+  port: 5432
+  postgresVersion: 14
+  standby:
+    enabled: true
+    repoName: repo1
+```
+
+Please note that `data-source-gcs` is the upstream cluster which provides data changes for our
+standby.
+
 Feel free to read the [upstream](https://access.crunchydata.com/documentation/postgres-operator/v5/tutorial/backup-management/) doc for more information.
