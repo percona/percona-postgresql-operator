@@ -14,12 +14,11 @@
 # limitations under the License.
 
 echo "Getting pgMonitor..."
-PGMONITOR_COMMIT='6eb120a38a0eefb059d5b9abc24159733870aa72'
+PGMONITOR_COMMIT='v4.7'
 
 # pgMonitor Setup
-if [[ -d ${PGOROOT?}/tools/pgmonitor ]]
-then
-    rm -rf ${PGOROOT?}/tools/pgmonitor
+if [[ -d ${PGOROOT?}/tools/pgmonitor ]]; then
+	rm -rf ${PGOROOT?}/tools/pgmonitor
 fi
 
 git clone https://github.com/CrunchyData/pgmonitor.git ${PGOROOT?}/tools/pgmonitor

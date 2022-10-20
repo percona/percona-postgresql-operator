@@ -78,16 +78,24 @@ func (r *Reconciler) reconcilePGMonitorExporter(ctx context.Context,
 		writableInstance *Instance
 		writablePod      *corev1.Pod
 		setup            string
+		pgImageSHA       string
+		exporterImageSHA string
 	)
 
 	// Find the PostgreSQL instance that can execute SQL that writes to every
 	// database. When there is none, return early.
-
 	writablePod, writableInstance = instances.writablePod(naming.ContainerDatabase)
 	if writableInstance == nil || writablePod == nil {
 		return nil
 	}
 
+	// For the writableInstance found above
+	// 1) make sure the `exporter` container is running
+	// 2) get and save the imageIDs for the `exporter` and `database` containers, and
+	// 3) exit early if we can't get the ImageID of either of those containers.
+	// We use these ImageIDs in the hash we make to see if the operator needs to rerun
+	// the `EnableExporterInPostgreSQL` funcs; that way we are always running
+	// that function against an updated and running pod.
 	if pgmonitor.ExporterEnabled(cluster) {
 		running, known := writableInstance.IsRunning(naming.ContainerPGMonitorExporter)
 		if !running || !known {
@@ -97,11 +105,15 @@ func (r *Reconciler) reconcilePGMonitorExporter(ctx context.Context,
 
 		for _, containerStatus := range writablePod.Status.ContainerStatuses {
 			if containerStatus.Name == naming.ContainerPGMonitorExporter {
-				setup = containerStatus.ImageID
+				exporterImageSHA = containerStatus.ImageID
+			}
+			if containerStatus.Name == naming.ContainerDatabase {
+				pgImageSHA = containerStatus.ImageID
 			}
 		}
-		if setup == "" {
-			// Could not get exporter container imageID
+
+		// Could not get container imageIDs
+		if exporterImageSHA == "" || pgImageSHA == "" {
 			return nil
 		}
 	}
@@ -127,11 +139,13 @@ func (r *Reconciler) reconcilePGMonitorExporter(ctx context.Context,
 		) error {
 			_, err := io.Copy(hasher, stdin)
 			if err == nil {
-				_, err = fmt.Fprint(hasher, command)
+				// Use command and image tag in hash to execute hash on image update
+				_, err = fmt.Fprint(hasher, command, pgImageSHA, exporterImageSHA)
 			}
 			return err
 		})
 	})
+
 	if err != nil {
 		return err
 	}
@@ -149,7 +163,6 @@ func (r *Reconciler) reconcilePGMonitorExporter(ctx context.Context,
 		}
 
 		// Apply the necessary SQL and record its hash in cluster.Status
-
 		if err == nil {
 			err = action(ctx, func(_ context.Context, stdin io.Reader,
 				stdout, stderr io.Writer, command ...string) error {
@@ -240,9 +253,10 @@ func (r *Reconciler) reconcileMonitoringSecret(
 // pgMonitor resources on a PodTemplateSpec
 func addPGMonitorToInstancePodSpec(
 	cluster *v1beta1.PostgresCluster,
-	template *corev1.PodTemplateSpec) error {
+	template *corev1.PodTemplateSpec,
+	exporterWebConfig *corev1.ConfigMap) error {
 
-	err := addPGMonitorExporterToInstancePodSpec(cluster, template)
+	err := addPGMonitorExporterToInstancePodSpec(cluster, template, exporterWebConfig)
 
 	return err
 }
@@ -254,7 +268,8 @@ func addPGMonitorToInstancePodSpec(
 // monitoring secret is available
 func addPGMonitorExporterToInstancePodSpec(
 	cluster *v1beta1.PostgresCluster,
-	template *corev1.PodTemplateSpec) error {
+	template *corev1.PodTemplateSpec,
+	exporterWebConfig *corev1.ConfigMap) error {
 
 	if !pgmonitor.ExporterEnabled(cluster) {
 		return nil
@@ -321,9 +336,130 @@ func addPGMonitorExporterToInstancePodSpec(
 	}
 	template.Spec.Volumes = append(template.Spec.Volumes, configVolume)
 
+	if cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret != nil {
+		configureExporterTLS(cluster, template, exporterWebConfig)
+	}
+
 	// add the proper label to support Pod discovery by Prometheus per pgMonitor configuration
 	initialize.Labels(template)
 	template.Labels[naming.LabelPGMonitorDiscovery] = "true"
 
 	return nil
+}
+
+// getExporterCertSecret retrieves the custom tls cert secret projection from the exporter spec
+// TODO (jmckulk): One day we might want to generate certs here
+func getExporterCertSecret(cluster *v1beta1.PostgresCluster) *corev1.SecretProjection {
+	if cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret != nil {
+		return cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret
+	}
+
+	return nil
+}
+
+// configureExporterTLS takes a cluster and pod template spec. If enabled, the pod template spec
+// will be updated with exporter tls configuration
+func configureExporterTLS(cluster *v1beta1.PostgresCluster, template *corev1.PodTemplateSpec, exporterWebConfig *corev1.ConfigMap) {
+	var found bool
+	var exporterContainer *corev1.Container
+	for i, container := range template.Spec.Containers {
+		if container.Name == naming.ContainerPGMonitorExporter {
+			exporterContainer = &template.Spec.Containers[i]
+			found = true
+		}
+	}
+
+	if found &&
+		pgmonitor.ExporterEnabled(cluster) &&
+		(cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret != nil) {
+		// TODO (jmckulk): params for paths and such
+		certVolume := corev1.Volume{Name: "exporter-certs"}
+		certVolume.Projected = &corev1.ProjectedVolumeSource{
+			Sources: append([]corev1.VolumeProjection{},
+				corev1.VolumeProjection{
+					Secret: getExporterCertSecret(cluster),
+				},
+			),
+		}
+
+		webConfigVolume := corev1.Volume{Name: "web-config"}
+		webConfigVolume.ConfigMap = &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: exporterWebConfig.Name,
+			},
+		}
+		template.Spec.Volumes = append(template.Spec.Volumes, certVolume, webConfigVolume)
+
+		mounts := []corev1.VolumeMount{{
+			Name:      "exporter-certs",
+			MountPath: "/certs",
+		}, {
+			Name:      "web-config",
+			MountPath: "/web-config",
+		}}
+
+		exporterContainer.VolumeMounts = append(exporterContainer.VolumeMounts, mounts...)
+		exporterContainer.Env = append(exporterContainer.Env, corev1.EnvVar{
+			// TODO (jmckulk): define path not dir
+			Name:  "WEB_CONFIG_DIR",
+			Value: "web-config/",
+		})
+	}
+}
+
+// reconcileExporterWebConfig reconciles the configmap containing the webconfig for exporter tls
+func (r *Reconciler) reconcileExporterWebConfig(ctx context.Context,
+	cluster *v1beta1.PostgresCluster) (*corev1.ConfigMap, error) {
+
+	existing := &corev1.ConfigMap{ObjectMeta: naming.ExporterWebConfigMap(cluster)}
+	err := errors.WithStack(r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
+	if client.IgnoreNotFound(err) != nil {
+		return nil, err
+	}
+
+	if !pgmonitor.ExporterEnabled(cluster) || cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret == nil {
+		// We could still have a NotFound error here so check the err.
+		// If no error that means the configmap is found and needs to be deleted
+		if err == nil {
+			err = errors.WithStack(r.deleteControlled(ctx, cluster, existing))
+		}
+		return nil, client.IgnoreNotFound(err)
+	}
+
+	intent := &corev1.ConfigMap{
+		ObjectMeta: naming.ExporterWebConfigMap(cluster),
+		Data: map[string]string{
+			"web-config.yml": `
+# Generated by postgres-operator. DO NOT EDIT.
+# Your changes will not be saved.
+
+
+# A certificate and a key file are needed to enable TLS.
+tls_server_config:
+  cert_file: /certs/tls.crt
+  key_file: /certs/tls.key`,
+		},
+	}
+
+	intent.Annotations = naming.Merge(
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+	)
+	intent.Labels = naming.Merge(
+		cluster.Spec.Metadata.GetLabelsOrNil(),
+		map[string]string{
+			naming.LabelCluster: cluster.Name,
+			naming.LabelRole:    naming.RoleMonitoring,
+		})
+
+	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+
+	err = errors.WithStack(r.setControllerReference(cluster, intent))
+	if err == nil {
+		err = errors.WithStack(r.apply(ctx, intent))
+	}
+	if err == nil {
+		return intent, nil
+	}
+
+	return nil, err
 }
