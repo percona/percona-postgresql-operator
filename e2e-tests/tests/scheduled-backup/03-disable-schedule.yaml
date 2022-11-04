@@ -1,0 +1,10 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n ${NAMESPACE} patch perconapgcluster/$(kubectl -n ${NAMESPACE} get perconapgclusters -o jsonpath='{.items[0].metadata.name}') --type json -p '[{"op":"remove","path":"/spec/backups/pgbackrest/repos/0/schedules"}]'

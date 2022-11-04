@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster_name=$(get_avaliable_cluster_name)
+      restore_from_backup=$(get_earliest_backup_name ${cluster_name})
+
+      restore_target=$(run_psql '\c myapp \\\ SELECT xmin from myApp WHERE id=100500;' "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)" | grep -Eo '[0-9]+')
+
+      kubectl -n "${NAMESPACE}" patch "perconapgclusters.pg.percona.com/${cluster_name}" --type json -p='[{"op":"add","path":"/spec/backups/pgbackrest/restore","value":{"enabled":true,"repoName":"repo1","options":["--set='${restore_from_backup}'","--type=xid","--target='${restore_target}'"]}}]'
+
+      kubectl -n "${NAMESPACE}" annotate "perconapgclusters.pg.percona.com/${cluster_name}" --overwrite pg.percona.com/pgbackrest-restore=id1

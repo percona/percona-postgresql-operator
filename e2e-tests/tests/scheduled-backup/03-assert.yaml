@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+---
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGCluster
+spec:
+  backups:
+    pgbackrest:
+      repos:
+        - name: repo1
+          s3:
+            bucket: pg-operator-testing
+            endpoint: s3.amazonaws.com
+            region: us-east-1

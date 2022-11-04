@@ -1,0 +1,40 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-restore: ''
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 6
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        postgres-operator.crunchydata.com/pgbackrest: ''
+        postgres-operator.crunchydata.com/pgbackrest-restore: ''
+    spec:
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 26
+        fsGroupChangePolicy: OnRootMismatch
+      schedulerName: default-scheduler
+      enableServiceLinks: false
+status:
+  conditions:
+    - type: Complete
+      status: 'True'
+  succeeded: 1

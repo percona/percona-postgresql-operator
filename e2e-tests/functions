@@ -75,14 +75,38 @@ run_psql() {
 
 get_psql_user_pass() {
 	local user=${1}
-	local cluster=${2:-${test_name}}
+	local cluster=${2:-$(get_avaliable_cluster_name)}
 
 	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.password}' | base64 -d
 }
 
 get_psql_user_host() {
 	local user=${1}
-	local cluster=${2:-${test_name}}
+	local cluster=${2:-$(get_avaliable_cluster_name)}
 
 	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.host}' | base64 -d
+}
+
+get_avaliable_cluster_name() {
+	kubectl -n ${NAMESPACE} get perconapgclusters -o jsonpath='{.items[0].metadata.name}'
+}
+
+get_primary_pod_name() {
+	local cluster_name=${1:-$(get_avaliable_cluster_name)}
+
+	kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/cluster=${cluster_name},postgres-operator.crunchydata.com/role=master -o jsonpath='{.items[0].metadata.name}'
+}
+
+get_latest_backup_name() {
+	local cluster_name=${1:-$(get_avaliable_cluster_name)}
+	local primary_pod=$(get_primary_pod_name ${cluster_name})
+
+	kubectl -n ${NAMESPACE} exec ${primary_pod} -c database -- pgbackrest info --output=json | jq -r '.[].backup[-1].label'
+}
+
+get_earliest_backup_name() {
+	local cluster_name=${1:-$(get_avaliable_cluster_name)}
+	local primary_pod=$(get_primary_pod_name ${cluster_name})
+
+	kubectl -n ${NAMESPACE} exec ${primary_pod} -c database -- pgbackrest info --output=json | jq -r '.[].backup[0].label'
 }

@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      
+      cluster_suffix=${RANDOM}
+
+      get_cr ${cluster_suffix} \
+        | yq eval '.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' - \
+        | yq eval '.spec.backups.pgbackrest.manual.repoName = "repo1"' - \
+        | yq eval '.spec.backups.pgbackrest.manual.options = ["--type=full"]' - \
+        | yq eval '.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}-${cluster_suffix}'/repo1"' - \
+        | yq eval '.spec.backups.pgbackrest.repos = [{"name":"repo1","schedules":{"full":"*/5 * * * *"},"s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
