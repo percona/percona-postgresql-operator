@@ -30,6 +30,8 @@ LABEL name="Percona Postgres Operator" \
       description="Percona Postgres Operator simplifies and automates all essential actions for stable and continuous database operation during the whole database lifecycle" \
       maintainer="Percona Development <info@percona.com>"
 
+RUN microdnf update -y && microdnf clean all -y
+
 COPY licenses /licenses
 
 COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
