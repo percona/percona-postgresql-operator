@@ -125,13 +125,37 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return err
 	}
 
-	p := &percona.Reconciler{
+	pc := &percona.PGClusterReconciler{
 		Client:   mgr.GetClient(),
-		Owner:    percona.ControllerName,
-		Recorder: mgr.GetEventRecorderFor(percona.ControllerName),
-		Tracer:   otel.Tracer(percona.ControllerName),
+		Owner:    percona.PGClusterControllerName,
+		Recorder: mgr.GetEventRecorderFor(percona.PGClusterControllerName),
+		Tracer:   otel.Tracer(percona.PGClusterControllerName),
 	}
-	return p.SetupWithManager(mgr)
+	if err := pc.SetupWithManager(mgr); err != nil {
+		return err
+	}
+
+	pb := &percona.PGBackupReconciler{
+		Client:   mgr.GetClient(),
+		Owner:    percona.PGBackupControllerName,
+		Recorder: mgr.GetEventRecorderFor(percona.PGBackupControllerName),
+		Tracer:   otel.Tracer(percona.PGBackupControllerName),
+	}
+	if err := pb.SetupWithManager(mgr); err != nil {
+		return err
+	}
+
+	pr := &percona.PGRestoreReconciler{
+		Client:   mgr.GetClient(),
+		Owner:    percona.PGRestoreControllerName,
+		Recorder: mgr.GetEventRecorderFor(percona.PGRestoreControllerName),
+		Tracer:   otel.Tracer(percona.PGRestoreControllerName),
+	}
+	if err := pr.SetupWithManager(mgr); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func isOpenshift(ctx context.Context, cfg *rest.Config) bool {

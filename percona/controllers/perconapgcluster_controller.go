@@ -20,12 +20,12 @@ import (
 )
 
 const (
-	// ControllerName is the name of the PostgresCluster controller
-	ControllerName = "perconapgcluster-controller"
+	// ControllerName is the name of the PerconaPGCluster controller
+	PGClusterControllerName = "perconapgcluster-controller"
 )
 
-// Reconciler holds resources for the PostgresCluster reconciler
-type Reconciler struct {
+// Reconciler holds resources for the PerconaPGCluster reconciler
+type PGClusterReconciler struct {
 	Client   client.Client
 	Owner    client.FieldOwner
 	Recorder record.EventRecorder
@@ -36,7 +36,7 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters/status,verbs=patch
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;watch
 
-func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
 
 	log.Info("Reconciling", "request", request)
@@ -112,6 +112,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
-func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
+func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGCluster{}).Complete(r)
 }
