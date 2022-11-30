@@ -26,9 +26,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -172,6 +171,7 @@ func (r *Reconciler) Reconcile(
 		primaryService           *corev1.Service
 		rootCA                   *pki.RootCertificateAuthority
 		monitoringSecret         *corev1.Secret
+		exporterWebConfig        *corev1.ConfigMap
 		err                      error
 	)
 
@@ -204,11 +204,7 @@ func (r *Reconciler) Reconcile(
 		})
 		return patchClusterStatus()
 	} else {
-		// Avoid a panic! Fixed in Kubernetes v1.21.0 and controller-runtime v0.9.0-alpha.0.
-		// - https://issue.k8s.io/99714
-		if len(cluster.Status.Conditions) > 0 {
-			meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
-		}
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
 	}
 
 	pgHBAs := postgres.NewHBAs()
@@ -310,10 +306,13 @@ func (r *Reconciler) Reconcile(
 		monitoringSecret, err = r.reconcileMonitoringSecret(ctx, cluster)
 	}
 	if err == nil {
+		exporterWebConfig, err = r.reconcileExporterWebConfig(ctx, cluster)
+	}
+	if err == nil {
 		err = r.reconcileInstanceSets(
 			ctx, cluster, clusterConfigMap, clusterReplicationSecret,
 			rootCA, clusterPodService, instanceServiceAccount, instances,
-			patroniLeaderService, primaryCertificate, clusterVolumes)
+			patroniLeaderService, primaryCertificate, clusterVolumes, exporterWebConfig)
 	}
 
 	if err == nil {
@@ -457,8 +456,8 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
-		Owns(&batchv1beta1.CronJob{}).
-		Owns(&policyv1beta1.PodDisruptionBudget{}).
+		Owns(&batchv1.CronJob{}).
+		Owns(&policyv1.PodDisruptionBudget{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, r.watchPods()).
 		Watches(&source.Kind{Type: &appsv1.StatefulSet{}},
 			r.controllerRefHandlerFuncs()). // watch all StatefulSets

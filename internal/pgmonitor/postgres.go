@@ -88,7 +88,7 @@ func DisableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor) er
 // EnableExporterInPostgreSQL runs SQL setup commands in `database` to enable
 // the exporter to retrieve metrics. pgMonitor objects are created and expected
 // extensions are installed. We also ensure that the monitoring user has the
-// current password and can login.
+// current password, optimal config and can login.
 func EnableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor,
 	monitoringSecret *corev1.Secret, database, setup string) error {
 	log := logging.FromContext(ctx)
@@ -102,6 +102,9 @@ func EnableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor,
 			// Exporter expects that extension(s) to be installed in all databases
 			// pg_stat_statements: https://access.crunchydata.com/documentation/pgmonitor/latest/exporter/
 			"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
+
+			// Run idempotent update
+			"ALTER EXTENSION pg_stat_statements UPDATE;",
 		}, "\n"),
 		map[string]string{
 			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
@@ -130,10 +133,19 @@ func EnableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor,
 				// https://github.com/CrunchyData/pgmonitor/blob/master/postgres_exporter/common/queries_nodemx.yml
 				"CREATE EXTENSION IF NOT EXISTS pgnodemx WITH SCHEMA monitor;",
 
+				// Run idempotent update
+				"ALTER EXTENSION pgnodemx UPDATE;",
+
 				// ccp_monitoring user is created in Setup.sql without a
 				// password; update the password and ensure that the ROLE
 				// can login to the database
 				`ALTER ROLE :"username" LOGIN PASSWORD :'verifier';`,
+
+				// disable JIT for only ccp_monitoring user's context to prevent:
+				// - slow executing due unnecessary inlining, optimization and emission
+				// - memory leak due to re-creating struct types during inlining
+				// and allow to enable JIT for other database users transparently
+				`ALTER ROLE :"username" SET jit = off;`,
 			}, "\n"),
 			map[string]string{
 				"database": database,

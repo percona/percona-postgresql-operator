@@ -28,7 +28,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -502,6 +502,7 @@ func (r *Reconciler) reconcileInstanceSets(
 	patroniLeaderService *corev1.Service,
 	primaryCertificate *corev1.SecretProjection,
 	clusterVolumes []corev1.PersistentVolumeClaim,
+	exporterWebConfig *corev1.ConfigMap,
 ) error {
 
 	// Go through the observed instances and check if a primary has been determined.
@@ -538,7 +539,7 @@ func (r *Reconciler) reconcileInstanceSets(
 			rootCA, clusterPodService, instanceServiceAccount,
 			patroniLeaderService, primaryCertificate,
 			findAvailableInstanceNames(*set, instances, clusterVolumes),
-			numInstancePods, clusterVolumes)
+			numInstancePods, clusterVolumes, exporterWebConfig)
 
 		if err == nil {
 			err = r.reconcileInstanceSetPodDisruptionBudget(ctx, cluster, set)
@@ -581,7 +582,7 @@ func (r *Reconciler) cleanupPodDisruptionBudgets(
 ) error {
 	selector, err := naming.AsSelector(naming.ClusterInstanceSets(cluster.Name))
 
-	pdbList := &policyv1beta1.PodDisruptionBudgetList{}
+	pdbList := &policyv1.PodDisruptionBudgetList{}
 	if err == nil {
 		err = r.Client.List(ctx, pdbList,
 			client.InNamespace(cluster.Namespace), client.MatchingLabelsSelector{
@@ -976,6 +977,7 @@ func (r *Reconciler) scaleUpInstances(
 	availableInstanceNames []string,
 	numInstancePods int,
 	clusterVolumes []corev1.PersistentVolumeClaim,
+	exporterWebConfig *corev1.ConfigMap,
 ) ([]*appsv1.StatefulSet, error) {
 	log := logging.FromContext(ctx)
 
@@ -1019,7 +1021,7 @@ func (r *Reconciler) scaleUpInstances(
 			clusterConfigMap, clusterReplicationSecret,
 			rootCA, clusterPodService, instanceServiceAccount,
 			patroniLeaderService, primaryCertificate, instances[i],
-			numInstancePods, clusterVolumes,
+			numInstancePods, clusterVolumes, exporterWebConfig,
 		)
 	}
 	if err == nil {
@@ -1048,6 +1050,7 @@ func (r *Reconciler) reconcileInstance(
 	instance *appsv1.StatefulSet,
 	numInstancePods int,
 	clusterVolumes []corev1.PersistentVolumeClaim,
+	exporterWebConfig *corev1.ConfigMap,
 ) error {
 	log := logging.FromContext(ctx).WithValues("instance", instance.Name)
 	ctx = logging.NewContext(ctx, log)
@@ -1100,7 +1103,7 @@ func (r *Reconciler) reconcileInstance(
 
 	// Add pgMonitor resources to the instance Pod spec
 	if err == nil {
-		err = addPGMonitorToInstancePodSpec(cluster, &instance.Spec.Template)
+		err = addPGMonitorToInstancePodSpec(cluster, &instance.Spec.Template, exporterWebConfig)
 	}
 
 	// add nss_wrapper init container and add nss_wrapper env vars to the database and pgbackrest

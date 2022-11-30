@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -118,7 +117,7 @@ var regexRepoIndex = regexp.MustCompile(`\d+`)
 // RepoResources is used to store various resources for pgBackRest repositories and
 // repository hosts
 type RepoResources struct {
-	cronjobs                []*batchv1beta1.CronJob
+	cronjobs                []*batchv1.CronJob
 	manualBackupJobs        []*batchv1.Job
 	replicaCreateBackupJobs []*batchv1.Job
 	hosts                   []*appsv1.StatefulSet
@@ -202,8 +201,8 @@ func (r *Reconciler) getPGBackRestResources(ctx context.Context,
 		Version: appsv1.SchemeGroupVersion.Version,
 		Kind:    "StatefulSetList",
 	}, {
-		Group:   batchv1beta1.SchemeGroupVersion.Group,
-		Version: batchv1beta1.SchemeGroupVersion.Version,
+		Group:   batchv1.SchemeGroupVersion.Group,
+		Version: batchv1.SchemeGroupVersion.Version,
 		Kind:    "CronJobList",
 	}}
 
@@ -400,7 +399,7 @@ func unstructuredToRepoResources(kind string, repoResources *RepoResources,
 			repoResources.hosts = append(repoResources.hosts, &stsList.Items[i])
 		}
 	case "CronJobList":
-		var cronList batchv1beta1.CronJobList
+		var cronList batchv1.CronJobList
 		if err := runtime.DefaultUnstructuredConverter.
 			FromUnstructured(uList.UnstructuredContent(), &cronList); err != nil {
 			return errors.WithStack(err)
@@ -829,11 +828,8 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 				Reason:             "PGBackRestRestoreComplete",
 				Message:            "pgBackRest restore completed successfully",
 			})
-			// TODO: remove guard with move to controller-runtime 0.9.0 https://issue.k8s.io/99714
-			if len(cluster.Status.Conditions) > 0 {
-				meta.RemoveStatusCondition(&cluster.Status.Conditions,
-					ConditionPGBackRestRestoreProgressing)
-			}
+			meta.RemoveStatusCondition(&cluster.Status.Conditions,
+				ConditionPGBackRestRestoreProgressing)
 
 			// The clone process used to create resources that were used only
 			// by the restore job. Clean them up if they still exist.
@@ -969,10 +965,7 @@ func (r *Reconciler) prepareForRestore(ctx context.Context,
 
 	// if everything is gone, proceed with re-bootstrapping the cluster via an in-place restore
 	if len(currentEndpoints) == 0 {
-		if len(cluster.Status.Conditions) > 0 {
-			// TODO: remove guard with move to controller-runtime 0.9.0 https://issue.k8s.io/99714
-			meta.RemoveStatusCondition(&cluster.Status.Conditions, ConditionPostgresDataInitialized)
-		}
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, ConditionPostgresDataInitialized)
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			ObservedGeneration: cluster.GetGeneration(),
 			Type:               ConditionPGBackRestRestoreProgressing,
@@ -1256,8 +1249,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 			return result, nil
 		}
 		repoHostName = repoHost.GetName()
-	} else if len(postgresCluster.Status.Conditions) > 0 {
-		// TODO: remove guard above with move to controller-runtime 0.9.0 https://issue.k8s.io/99714
+	} else {
 		// remove the dedicated repo host status if a dedicated host is not enabled
 		meta.RemoveStatusCondition(&postgresCluster.Status.Conditions, ConditionRepoHostReady)
 	}
@@ -2138,13 +2130,11 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 		manualStatus = &v1beta1.PGBackRestJobStatus{
 			ID: manualAnnotation,
 		}
-		// TODO: remove guard with move to controller-runtime 0.9.0 https://issue.k8s.io/99714
-		if len(postgresCluster.Status.Conditions) > 0 {
-			// Remove an existing manual backup condition if present.  It will be
-			// created again as needed based on the newly reconciled backup Job.
-			meta.RemoveStatusCondition(&postgresCluster.Status.Conditions,
-				ConditionManualBackupSuccessful)
-		}
+		// Remove an existing manual backup condition if present.  It will be
+		// created again as needed based on the newly reconciled backup Job.
+		meta.RemoveStatusCondition(&postgresCluster.Status.Conditions,
+			ConditionManualBackupSuccessful)
+
 		postgresCluster.Status.PGBackRest.ManualBackup = manualStatus
 	}
 
@@ -2748,7 +2738,7 @@ func getRepoVolumeStatus(repoStatus []v1beta1.RepoStatus, repoVolumes []*corev1.
 // schedules configured in the cluster definition
 func (r *Reconciler) reconcileScheduledBackups(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, sa *corev1.ServiceAccount,
-	cronjobs []*batchv1beta1.CronJob,
+	cronjobs []*batchv1.CronJob,
 ) bool {
 	log := logging.FromContext(ctx).WithValues("reconcileResource", "repoCronJob")
 	// requeue if there is an error during creation
@@ -2792,7 +2782,7 @@ func (r *Reconciler) reconcileScheduledBackups(
 func (r *Reconciler) reconcilePGBackRestCronJob(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, repo v1beta1.PGBackRestRepo,
 	backupType string, schedule *string, serviceAccount *corev1.ServiceAccount,
-	cronjobs []*batchv1beta1.CronJob,
+	cronjobs []*batchv1.CronJob,
 ) error {
 
 	log := logging.FromContext(ctx).WithValues("reconcileResource", "repoCronJob")
@@ -2880,12 +2870,12 @@ func (r *Reconciler) reconcilePGBackRestCronJob(
 	suspend := (cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown) ||
 		(cluster.Spec.Standby != nil && cluster.Spec.Standby.Enabled)
 
-	pgBackRestCronJob := &batchv1beta1.CronJob{
+	pgBackRestCronJob := &batchv1.CronJob{
 		ObjectMeta: objectmeta,
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule: *schedule,
 			Suspend:  &suspend,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: annotations,
 					Labels:      labels,
@@ -2903,7 +2893,7 @@ func (r *Reconciler) reconcilePGBackRestCronJob(
 		cluster.Spec.ImagePullSecrets
 
 	// set metadata
-	pgBackRestCronJob.SetGroupVersionKind(batchv1beta1.SchemeGroupVersion.WithKind("CronJob"))
+	pgBackRestCronJob.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("CronJob"))
 	err = errors.WithStack(r.setControllerReference(cluster, pgBackRestCronJob))
 
 	if err == nil {

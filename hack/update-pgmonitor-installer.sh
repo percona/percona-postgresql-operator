@@ -16,10 +16,10 @@
 # This script updates the Kustomize installer for monitoring with the latest Grafana,
 # Prometheus and Alert Manager configuration per the pgMonitor tag specified
 
-directory=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+directory=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # The pgMonitor tag to use to refresh the current monitoring installer
-pgmonitor_tag=v4.6-RC1
+pgmonitor_tag=v4.7
 
 # Set the directory for the monitoring Kustomize installer
 pgo_examples_monitoring_dir="${directory}/../../postgres-operator-examples/kustomize/monitoring"
@@ -36,28 +36,28 @@ git checkout "${pgmonitor_tag}"
 # Deviation from pgMonitor default!
 # Update "${DS_PROMETHEUS}" to "PROMETHEUS" in all containers dashboards
 find "grafana/containers" -type f -exec \
-    sed -i 's/${DS_PROMETHEUS}/PROMETHEUS/' {} \; 
+	sed -i 's/${DS_PROMETHEUS}/PROMETHEUS/' {} \;
 # Copy Grafana dashboards for containers
 cp -r "grafana/containers/." "${pgo_examples_monitoring_dir}/config/grafana/dashboards"
 
 # Deviation from pgMonitor default!
 # Update the dashboard location to the default for the Grafana container.
 sed -i 's#/etc/grafana/crunchy_dashboards#/etc/grafana/provisioning/dashboards#' \
-    "grafana/linux/crunchy_grafana_dashboards.yml"
+	"grafana/linux/crunchy_grafana_dashboards.yml"
 cp "grafana/linux/crunchy_grafana_dashboards.yml" "${pgo_examples_monitoring_dir}/config/grafana"
 
 # Deviation from pgMonitor default!
 # Update the URL for the Grafana data source configuration to use env vars for the Prometheus host
 # and port.
 sed -i 's#localhost:9090#$PROM_HOST:$PROM_PORT#' \
-    "grafana/common/crunchy_grafana_datasource.yml"
+	"grafana/common/crunchy_grafana_datasource.yml"
 cp "grafana/common/crunchy_grafana_datasource.yml" "${pgo_examples_monitoring_dir}/config/grafana"
 
 # Deviation from pgMonitor default!
 # Update the URL for the Grafana data source configuration to use env vars for the Prometheus host
 # and port.
 cp "prometheus/containers/crunchy-prometheus.yml.containers" "prometheus/containers/crunchy-prometheus.yml"
-cat << EOF >> prometheus/containers/crunchy-prometheus.yml
+cat <<EOF >>prometheus/containers/crunchy-prometheus.yml
 alerting:
   alertmanagers:
   - scheme: http
@@ -70,7 +70,7 @@ cp "prometheus/containers/crunchy-prometheus.yml" "${pgo_examples_monitoring_dir
 # Copy the default Alert Manager configuration
 cp "alertmanager/common/crunchy-alertmanager.yml" "${pgo_examples_monitoring_dir}/config/alertmanager"
 cp "prometheus/containers/alert-rules.d/crunchy-alert-rules-pg.yml.containers.example" \
-    "${pgo_examples_monitoring_dir}/config/alertmanager/crunchy-alert-rules-pg.yml"
+	"${pgo_examples_monitoring_dir}/config/alertmanager/crunchy-alert-rules-pg.yml"
 
 # Cleanup any temporary resources
 rm -rf "${tmp_dir}"

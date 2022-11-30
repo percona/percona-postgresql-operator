@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -489,11 +489,7 @@ func (r *Reconciler) reconcilePGBouncerDeployment(
 		}
 
 		if available == nil {
-			// Avoid a panic! Fixed in Kubernetes v1.21.0 and controller-runtime v0.9.0-alpha.0.
-			// - https://issue.k8s.io/99714
-			if len(cluster.Status.Conditions) > 0 {
-				meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.ProxyAvailable)
-			}
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.ProxyAvailable)
 		} else {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 				Type:    v1beta1.ProxyAvailable,
@@ -535,7 +531,7 @@ func (r *Reconciler) reconcilePGBouncerPodDisruptionBudget(
 	cluster *v1beta1.PostgresCluster,
 ) error {
 	deleteExistingPDB := func(cluster *v1beta1.PostgresCluster) error {
-		existing := &policyv1beta1.PodDisruptionBudget{ObjectMeta: naming.ClusterPGBouncer(cluster)}
+		existing := &policyv1.PodDisruptionBudget{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 		err := errors.WithStack(r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
 		if err == nil {
 			err = errors.WithStack(r.deleteControlled(ctx, cluster, existing))
@@ -573,7 +569,7 @@ func (r *Reconciler) reconcilePGBouncerPodDisruptionBudget(
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
 
 	selector := naming.ClusterPGBouncerSelector(cluster)
-	pdb := &policyv1beta1.PodDisruptionBudget{}
+	pdb := &policyv1.PodDisruptionBudget{}
 	if err == nil {
 		pdb, err = r.generatePodDisruptionBudget(cluster, meta, minAvailable, selector)
 	}

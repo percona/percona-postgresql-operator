@@ -55,4 +55,3 @@ See the [Documentation Contribution Guide](https://github.com/percona/k8spg-docs
 ## Code review
 
 Your contribution will be reviewed by other developers contributing to the project. The more complex your changes are, the more experts will be involved. You will receive feedback and recommendations directly on your pull request on GitHub, so keep an eye on your submission and be prepared to make further amendments. The developers might even provide some concrete suggestions on modifying your code to match the project’s expectations better.
-
