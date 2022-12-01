@@ -135,6 +135,8 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		log.Info("Waiting for backup to complete")
 
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	case v2beta1.BackupSucceeded, v2beta1.BackupFailed:
+		return reconcile.Result{}, nil
 	}
 
 	return reconcile.Result{}, nil

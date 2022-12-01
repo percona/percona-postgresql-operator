@@ -139,6 +139,8 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 		log.Info("Waiting for restore to complete")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	case v2beta1.RestoreSucceeded, v2beta1.RestoreFailed:
+		return reconcile.Result{}, nil
 	}
 
 	return reconcile.Result{}, nil
