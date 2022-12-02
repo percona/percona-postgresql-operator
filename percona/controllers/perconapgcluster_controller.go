@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,6 +108,18 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 		return nil
 	})
+
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+	}
+
+	perconaPGCluster.Status = v2beta1.PerconaPGClusterStatus{
+		PostgresClusterStatus: postgresCluster.Status,
+	}
+
+	if err := r.Client.Status().Update(ctx, perconaPGCluster); err != nil {
+		log.Error(err, "failed to update status")
+	}
 
 	return reconcile.Result{}, err
 }
