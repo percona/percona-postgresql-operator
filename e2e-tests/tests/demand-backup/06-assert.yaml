@@ -8,7 +8,7 @@ metadata:
   name: demand-backup
   generation: 2
   annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: id1
+    postgres-operator.crunchydata.com/pgbackrest-restore: demand-backup-restore
   ownerReferences:
     - apiVersion: pg.percona.com/v2beta1
       kind: PerconaPGCluster
@@ -40,3 +40,13 @@ status:
     pgBouncer:
       readyReplicas: 1
       replicas: 1
+---
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGRestore
+metadata:
+  name: demand-backup-restore
+spec:
+  clusterName: demand-backup
+  repoName: repo1
+status:
+  state: Succeeded

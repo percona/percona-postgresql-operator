@@ -1,0 +1,7 @@
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGRestore
+metadata:
+  name: demand-backup-restore
+spec:
+  clusterName: demand-backup
+  repoName: repo1
