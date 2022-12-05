@@ -3,7 +3,7 @@ kind: PerconaPGBackup
 metadata:
   name: demand-backup-full
 spec:
-  clusterName: demand-backup
+  pgCluster: demand-backup
   repoName: repo1
   options:
     - --type=full

@@ -3,5 +3,5 @@ kind: PerconaPGRestore
 metadata:
   name: demand-backup-restore
 spec:
-  clusterName: demand-backup
+  pgCluster: demand-backup
   repoName: repo1
