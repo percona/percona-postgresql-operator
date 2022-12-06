@@ -126,5 +126,5 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGCluster{}).Complete(r)
+	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGCluster{}).Owns(&v1beta1.PostgresCluster{}).Complete(r)
 }
