@@ -1,6 +1,8 @@
 package v2beta1
 
 import (
+	"os"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -442,3 +444,15 @@ const (
 	// of the Job.
 	AnnotationPGBackRestRestore = annotationPrefix + "pgbackrest-restore"
 )
+
+const DefaultVersionServiceEndpoint = "https://check.percona.com"
+
+func GetDefaultVersionServiceEndpoint() string {
+	endpoint := os.Getenv("PERCONA_VS_FALLBACK_URI")
+
+	if len(endpoint) != 0 {
+		return endpoint
+	}
+
+	return DefaultVersionServiceEndpoint
+}

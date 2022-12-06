@@ -93,8 +93,8 @@ func main() {
 
 	log.Info("starting controller runtime manager and will wait for signal to exit")
 
-	// Enable upgrade checking
-	upgradeCheckingDisabled := strings.EqualFold(os.Getenv("CHECK_FOR_UPGRADES"), "false")
+	// Disable Crunchy upgrade checking
+	upgradeCheckingDisabled := true
 	if !upgradeCheckingDisabled {
 		log.Info("upgrade checking enabled")
 		// get the URL for the check for upgrades endpoint if set in the env
@@ -103,8 +103,6 @@ func main() {
 			mgr.GetClient(), mgr.GetConfig(), isOpenshift(ctx, mgr.GetConfig()),
 			mgr.GetCache(),
 		)
-	} else {
-		log.Info("upgrade checking disabled")
 	}
 
 	assertNoError(mgr.Start(ctx))
@@ -126,10 +124,12 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	}
 
 	pc := &percona.PGClusterReconciler{
-		Client:   mgr.GetClient(),
-		Owner:    percona.PGClusterControllerName,
-		Recorder: mgr.GetEventRecorderFor(percona.PGClusterControllerName),
-		Tracer:   otel.Tracer(percona.PGClusterControllerName),
+		Client:      mgr.GetClient(),
+		Owner:       percona.PGClusterControllerName,
+		Recorder:    mgr.GetEventRecorderFor(percona.PGClusterControllerName),
+		Tracer:      otel.Tracer(percona.PGClusterControllerName),
+		Platform:    detectPlatform(ctx, mgr.GetConfig()),
+		KubeVersion: getServerVersion(ctx, mgr.GetConfig()),
 	}
 	if err := pc.SetupWithManager(mgr); err != nil {
 		return err
@@ -189,4 +189,103 @@ func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
 	}
 
 	return false
+}
+
+func isGKE(ctx context.Context, cfg *rest.Config) bool {
+	log := logging.FromContext(ctx)
+
+	const groupName, kind = "cloud.google.com", "BackendConfig"
+
+	client, err := discovery.NewDiscoveryClientForConfig(cfg)
+	assertNoError(err)
+
+	groups, err := client.ServerGroups()
+	if err != nil {
+		assertNoError(err)
+	}
+	for _, g := range groups.Groups {
+		if g.Name != groupName {
+			continue
+		}
+		for _, v := range g.Versions {
+			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
+			if err != nil {
+				assertNoError(err)
+			}
+			for _, r := range resourceList.APIResources {
+				if r.Kind == kind {
+					log.Info("detected GKE environment")
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func isEKS(ctx context.Context, cfg *rest.Config) bool {
+	log := logging.FromContext(ctx)
+
+	const groupName, kind = "vpcresources.k8s.aws", "SecurityGroupPolicy"
+
+	client, err := discovery.NewDiscoveryClientForConfig(cfg)
+	assertNoError(err)
+
+	groups, err := client.ServerGroups()
+	if err != nil {
+		assertNoError(err)
+	}
+	for _, g := range groups.Groups {
+		if g.Name != groupName {
+			continue
+		}
+		for _, v := range g.Versions {
+			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
+			if err != nil {
+				assertNoError(err)
+			}
+			for _, r := range resourceList.APIResources {
+				if r.Kind == kind {
+					log.Info("detected EKS environment")
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func detectPlatform(ctx context.Context, cfg *rest.Config) string {
+	switch {
+	case isOpenshift(ctx, cfg):
+		return "openshift"
+	case isGKE(ctx, cfg):
+		return "gke"
+	case isEKS(ctx, cfg):
+		return "eks"
+	default:
+		return "unknown"
+	}
+}
+
+// getServerVersion returns the stringified server version (i.e., the same info `kubectl version`
+// returns for the server)
+// Any errors encountered will be logged and will return an empty string
+func getServerVersion(ctx context.Context, cfg *rest.Config) string {
+	log := logging.FromContext(ctx)
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		log.V(1).Info("upgrade check issue: could not retrieve discovery client",
+			"response", err.Error())
+		return ""
+	}
+	versionInfo, err := discoveryClient.ServerVersion()
+	if err != nil {
+		log.V(1).Info("upgrade check issue: could not retrieve server version",
+			"response", err.Error())
+		return ""
+	}
+	return versionInfo.String()
 }
