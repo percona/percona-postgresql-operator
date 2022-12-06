@@ -106,6 +106,7 @@ rules:
   - perconapgrestores/status
   verbs:
   - patch
+  - update
 - apiGroups:
   - policy
   resources:
