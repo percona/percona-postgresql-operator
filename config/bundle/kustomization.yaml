@@ -7,4 +7,4 @@ resources:
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator
-  newTag: v2-main
+  newTag: backup-restore-controllers

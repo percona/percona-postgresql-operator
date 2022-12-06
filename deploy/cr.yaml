@@ -243,3 +243,10 @@ spec:
 #       - --target="2021-06-09 14:15:11-04"
 #       restore iindividual databases
 #       - --db-include=hippo
+
+  pmm:
+    enabled: false
+    image: percona/pmm-client:2.32.0
+    imagePullPolicy: IfNotPresent
+    secret: pmm-secret
+    serverHost: monitoring-service

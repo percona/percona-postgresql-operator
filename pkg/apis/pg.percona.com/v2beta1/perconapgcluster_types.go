@@ -8,6 +8,10 @@ import (
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
+func init() {
+	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -74,6 +78,9 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	OpenShift *bool `json:"openshift,omitempty"`
 
+	// +optional
+	Patroni *crunchyv1beta1.PatroniSpec `json:"patroni,omitempty"`
+
 	// Users to create inside PostgreSQL and the databases they should access.
 	// The default creates one user that can access one database matching the
 	// PostgresCluster name. An empty list creates no users. Removing a user
@@ -116,10 +123,45 @@ type PerconaPGClusterSpec struct {
 	// PostgreSQL backup configuration
 	// +kubebuilder:validation:Required
 	Backups crunchyv1beta1.Backups `json:"backups"`
+
+	// The specification of PMM sidecars.
+	// +optional
+	PMM *PMMSpec `json:"pmm,omitempty"`
 }
 
 type PerconaPGClusterStatus struct {
 	crunchyv1beta1.PostgresClusterStatus `json:",inline"`
+}
+
+type PMMSpec struct {
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// ImagePullPolicy is used to determine when Kubernetes will attempt to
+	// pull (download) container images.
+	// More info: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
+	// +kubebuilder:validation:Enum={Always,Never,IfNotPresent}
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// +kubebuilder:validation:Required
+	ServerHost string `json:"serverHost,omitempty"`
+
+	// +kubebuilder:validation:Required
+	Secret string `json:"secret,omitempty"`
+
+	// Compute resources of a PMM container.
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +optional
+	ContainerSecurityContext *corev1.SecurityContext `json:"containerSecurityContext,omitempty"`
+
+	// +optional
+	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
 }
 
 type SecretsSpec struct {
@@ -420,10 +462,6 @@ type PerconaPGClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PerconaPGCluster `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
 }
 
 const annotationPrefix = "pg.percona.com/"

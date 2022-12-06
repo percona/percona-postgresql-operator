@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      deploy_pmm_server
+
+      api_key=$(generate_pmm_api_key)
+      api_key_encoded=$(echo -n ${api_key} | base64 -w 0)
+      kubectl patch -n "${NAMESPACE}" secret pmm-secret --type merge --patch '{"data": {"PMM_API_KEY": "'${api_key_encoded}'"}}'
+    timeout: 300

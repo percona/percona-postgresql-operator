@@ -12,6 +12,7 @@ deploy_operator() {
 	yq eval \
 		"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
 		"${DEPLOY_DIR}/operator.yaml" \
+		| yq eval '.spec.template.spec.containers[0].env += {"name": "PGO_FEATURE_GATES", "value": "InstanceSidecars=true"}' - \
 		| kubectl -n "${NAMESPACE}" apply -f -
 
 }
@@ -36,6 +37,7 @@ get_cr() {
 	yq eval "$(printf '.metadata.name="%s"' "${test_name}${name_suffix:+-$name_suffix}")" "${DEPLOY_DIR}/cr.yaml" \
 		| yq eval '.spec.postgresVersion='${PG_VER}'' - \
 		| yq eval '.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}]' - \
+		| yq eval '.spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' - \
 		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
 		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
 		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" - \
@@ -86,4 +88,119 @@ get_psql_user_host() {
 	local cluster=${2:-${test_name}}
 
 	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.host}' | base64 -d
+}
+
+wait_pod() {
+	local pod=$1
+
+	set +o xtrace
+	retry=0
+	echo -n $pod
+	until kubectl get pod/$pod -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null | grep 'true'; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			kubectl describe pod/$pod -n "${NAMESPACE}"
+			kubectl logs $pod -n "${NAMESPACE}"
+			kubectl logs $(get_operator_pod) -n "${NAMESPACE}" \
+				| grep -v 'level=info' \
+				| grep -v 'level=debug' \
+				| grep -v 'Getting tasks for pod' \
+				| grep -v 'Getting pods from source' \
+				| tail -100
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+	set -o xtrace
+}
+
+get_service_ip() {
+	local service=$1
+	while (kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.spec.type}' 2>&1 || :) | grep -q NotFound; do
+		sleep 1
+	done
+	if [ "$(kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.spec.type}')" = "ClusterIP" ]; then
+		kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.spec.clusterIP}'
+		return
+	fi
+	until kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[]}' 2>&1 | egrep -q "hostname|ip"; do
+		sleep 1
+	done
+	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].ip}'
+	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].hostname}'
+}
+
+deploy_pmm_server() {
+	helm uninstall -n "${NAMESPACE}" pmm || :
+	kubectl delete clusterrolebindings.rbac.authorization.k8s.io pmm || :
+	kubectl delete clusterrole.rbac.authorization.k8s.io pmm || :
+	helm repo remove percona || :
+	helm repo add percona https://percona.github.io/percona-helm-charts/
+	helm install -n "${NAMESPACE}" pmm percona/pmm --set service.type="LoadBalancer"
+	wait_pod pmm-0
+}
+
+generate_pmm_api_key() {
+	local admin_pass=$(kubectl -n "${NAMESPACE}" get secret pmm-secret -o yaml | yq eval '.data.PMM_ADMIN_PASSWORD' - | base64 -d)
+	local pmm_ip=$(get_service_ip monitoring-service)
+	curl \
+		--insecure \
+		-X POST \
+		-H "Content-Type: application/json" \
+		-d '{"name":"operator", "role": "Admin"}' \
+		--user "admin:${admin_pass}" \
+		"https://${pmm_ip}/graph/api/auth/keys" \
+		| jq -r .key
+}
+
+function get_metric_values() {
+	local metric=$1
+	local instance=$2
+	local api_key=$3
+	local start=$($date -u "+%s" -d "-1 minute")
+	local end=$($date -u "+%s")
+	local endpoint=$(get_service_ip monitoring-service)
+
+	curl -s -k -H "Authorization: Bearer ${api_key}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
+		| jq '.data.result[0].values[][1]' \
+		| grep '^"[0-9]'
+}
+
+function get_qan20_values() {
+	local instance=$1
+	local api_key=$2
+	local start=$($date -u "+%Y-%m-%dT%H:%M:%S" -d "-30 minute")
+	local end=$($date -u "+%Y-%m-%dT%H:%M:%S")
+	local endpoint=$(get_service_ip monitoring-service)
+
+	cat >payload.json <<EOF
+{
+   "columns":[
+	  "load",
+	  "num_queries",
+	  "query_time"
+   ],
+   "first_seen": false,
+   "group_by": "queryid",
+   "include_only_fields": [],
+   "keyword": "",
+   "labels": [
+	   {
+		   "key": "cluster",
+		   "value": ["postgresql"]
+   }],
+   "limit": 10,
+   "offset": 0,
+   "order_by": "-load",
+   "main_metric": "load",
+   "period_start_from": "$($date -u -d '-12 hour' '+%Y-%m-%dT%H:%M:%S%:z')",
+   "period_start_to": "$($date -u '+%Y-%m-%dT%H:%M:%S%:z')"
+}
+EOF
+
+	curl -s -k -H "Authorization: Bearer ${api_key}" -XPOST -d @payload.json "https://$endpoint/v0/qan/GetReport" \
+		| jq '.rows[].sparkline'
+	rm -f payload.json
 }
