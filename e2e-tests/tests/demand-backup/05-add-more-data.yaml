@@ -8,7 +8,7 @@ commands:
       source ../../functions
 
       run_psql \
-        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
         "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)"
 
       data=$(run_psql '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)")

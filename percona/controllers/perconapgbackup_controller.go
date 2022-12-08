@@ -42,7 +42,8 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgbackups,verbs=get;list;watch
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgbackups/status,verbs=patch;update
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;watch
+// +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 
 func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {

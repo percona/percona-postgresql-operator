@@ -6,8 +6,9 @@ apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: demand-backup
-  generation: 2
+  generation: 3
   annotations:
+    postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full
     postgres-operator.crunchydata.com/pgbackrest-restore: demand-backup-restore
   ownerReferences:
     - apiVersion: pg.percona.com/v2beta1
@@ -23,7 +24,7 @@ status:
       readyReplicas: 1
       replicas: 1
       updatedReplicas: 1
-  observedGeneration: 2
+  observedGeneration: 3
   pgbackrest:
     manualBackup:
       finished: true
@@ -34,7 +35,7 @@ status:
         stanzaCreated: true
     restore:
       finished: true
-      id: id1
+      id: demand-backup-restore
       succeeded: 1
   proxy:
     pgBouncer:

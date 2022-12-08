@@ -18,6 +18,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -40,7 +41,8 @@ func (r *PGRestoreReconciler) SetupWithManager(mgr manager.Manager) error {
 
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgrestores,verbs=get;list;watch
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgrestores/status,verbs=patch;update
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;watch
+// +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 
 func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -154,6 +156,12 @@ func startRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGClu
 	}
 	pg.Annotations[naming.PGBackRestRestore] = pr.Name
 
+	if pg.Spec.Backups.PGBackRest.Restore == nil {
+		pg.Spec.Backups.PGBackRest.Restore = &v1beta1.PGBackRestRestore{
+			PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{},
+		}
+	}
+
 	tvar := true
 	pg.Spec.Backups.PGBackRest.Restore.Enabled = &tvar
 	pg.Spec.Backups.PGBackRest.Restore.RepoName = pr.Spec.RepoName
@@ -168,6 +176,12 @@ func startRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGClu
 
 func disableRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCluster) error {
 	orig := pg.DeepCopy()
+
+	if pg.Spec.Backups.PGBackRest.Restore == nil {
+		pg.Spec.Backups.PGBackRest.Restore = &v1beta1.PGBackRestRestore{
+			PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{},
+		}
+	}
 
 	fvar := false
 	pg.Spec.Backups.PGBackRest.Restore.Enabled = &fvar
