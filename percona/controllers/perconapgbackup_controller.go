@@ -109,38 +109,26 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "get backup job")
 		}
 
-		if jobCompleted(job) {
-			pgBackup.Status.State = v2beta1.BackupSucceeded
-
-			if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
-			}
-
-			log.Info("Backup succeeded")
-
-			return reconcile.Result{}, nil
-		}
-
-		if jobFailed(job) {
-			pgBackup.Status.State = v2beta1.BackupFailed
-
-			if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
-			}
-
+		status := checkBackupJob(job)
+		switch status {
+		case v2beta1.BackupFailed:
 			log.Info("Backup failed")
-
-			return reconcile.Result{}, nil
+		case v2beta1.BackupSucceeded:
+			log.Info("Backup succeeded")
+		default:
+			log.Info("Waiting for backup to complete")
+			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		log.Info("Waiting for backup to complete")
+		pgBackup.Status.State = status
+		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+		}
 
-		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
-	case v2beta1.BackupSucceeded, v2beta1.BackupFailed:
+		return reconcile.Result{}, nil
+	default:
 		return reconcile.Result{}, nil
 	}
-
-	return reconcile.Result{}, nil
 }
 
 func startBackup(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCluster, pb *v2beta1.PerconaPGBackup) error {
@@ -166,7 +154,7 @@ func findBackupJob(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCl
 	selector := labels.SelectorFromSet(map[string]string{
 		naming.LabelCluster:          pg.Name,
 		naming.LabelPGBackRestBackup: "manual",
-		naming.LabelPGBackRestRepo:   "repo1",
+		naming.LabelPGBackRestRepo:   pb.Spec.RepoName,
 	})
 	err := c.List(ctx, jobList, client.InNamespace(pg.Namespace), client.MatchingLabelsSelector{Selector: selector})
 	if err != nil {
@@ -187,4 +175,15 @@ func findBackupJob(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCl
 	}
 
 	return nil, ErrBackupJobNotFound
+}
+
+func checkBackupJob(job *batchv1.Job) v2beta1.PGBackupState {
+	switch {
+	case jobCompleted(job):
+		return v2beta1.BackupSucceeded
+	case jobFailed(job):
+		return v2beta1.BackupFailed
+	default:
+		return v2beta1.BackupRunning
+	}
 }

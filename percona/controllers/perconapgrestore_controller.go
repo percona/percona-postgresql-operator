@@ -111,41 +111,30 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, errors.Wrap(err, "get restore job")
 		}
 
-		if jobCompleted(job) {
-			pgRestore.Status.State = v2beta1.RestoreSucceeded
-			if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "update pgRestore status")
-			}
-
-			if err := disableRestore(ctx, r.Client, pgCluster); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "disable restore")
-			}
-
-			log.Info("Restore succeeded")
-			return reconcile.Result{}, nil
-		}
-
-		if jobFailed(job) {
-			pgRestore.Status.State = v2beta1.RestoreFailed
-			if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "update pgRestore status")
-			}
-
-			if err := disableRestore(ctx, r.Client, pgCluster); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "disable restore")
-			}
-
+		status := checkRestoreJob(job)
+		switch status {
+		case v2beta1.RestoreFailed:
 			log.Info("Restore failed")
-			return reconcile.Result{}, nil
+		case v2beta1.RestoreSucceeded:
+			log.Info("Restore succeeded")
+		default:
+			log.Info("Waiting for restore to complete")
+			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		log.Info("Waiting for restore to complete")
-		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
-	case v2beta1.RestoreSucceeded, v2beta1.RestoreFailed:
+		pgRestore.Status.State = status
+		if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "update pgRestore status")
+		}
+
+		if err := disableRestore(ctx, r.Client, pgCluster); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "disable restore")
+		}
+
+		return reconcile.Result{}, nil
+	default:
 		return reconcile.Result{}, nil
 	}
-
-	return reconcile.Result{}, nil
 }
 
 func startRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCluster, pr *v2beta1.PerconaPGRestore) error {
@@ -191,4 +180,15 @@ func disableRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGC
 	}
 
 	return nil
+}
+
+func checkRestoreJob(job *batchv1.Job) v2beta1.PGRestoreState {
+	switch {
+	case jobCompleted(job):
+		return v2beta1.RestoreSucceeded
+	case jobFailed(job):
+		return v2beta1.RestoreFailed
+	default:
+		return v2beta1.RestoreRunning
+	}
 }
