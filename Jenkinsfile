@@ -507,7 +507,7 @@ pipeline {
         always {
             script {
                 setTestsresults()
-                if (currentBuild.result != null && currentBuild.result != 'SUCCESS') {
+                if (currentBuild.result != null && currentBuild.result != 'SUCCESS' && currentBuild.result != 'NOT_BUILT') {
                     try {
                         slackSend channel: "@${AUTHOR_NAME}", color: '#FF0000', message: "[${JOB_NAME}]: build ${currentBuild.result}, ${BUILD_URL} owner: @${AUTHOR_NAME}"
                     }
@@ -523,11 +523,13 @@ pipeline {
                             comment.delete()
                         }
                     }
-                    makeReport()
-                    unstash 'URI_BASE'
-                    def URI_BASE = sh(returnStdout: true, script: "cat results/docker/URI_BASE").trim()
-                    TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${URI_BASE}-pgo-apiserver`\r\n\r\nimage: `${URI_BASE}-pgo-event`\r\n\r\nimage: `${URI_BASE}-pgo-rmdata`\r\n\r\nimage: `${URI_BASE}-pgo-scheduler`\r\n\r\nimage: `${URI_BASE}-postgres-operator`\r\n\r\nimage: `${URI_BASE}-pgo-deployer`\r\n"
-                    pullRequest.comment(TestsReport)
+                    if (currentBuild.result != 'NOT_BUILT') {
+                        makeReport()
+                        unstash 'URI_BASE'
+                        def URI_BASE = sh(returnStdout: true, script: "cat results/docker/URI_BASE").trim()
+                        TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${URI_BASE}-pgo-apiserver`\r\n\r\nimage: `${URI_BASE}-pgo-event`\r\n\r\nimage: `${URI_BASE}-pgo-rmdata`\r\n\r\nimage: `${URI_BASE}-pgo-scheduler`\r\n\r\nimage: `${URI_BASE}-postgres-operator`\r\n\r\nimage: `${URI_BASE}-pgo-deployer`\r\n"
+                        pullRequest.comment(TestsReport)
+                    }
                 }
             }
             DeleteOldClusters("$CLUSTER_NAME")
