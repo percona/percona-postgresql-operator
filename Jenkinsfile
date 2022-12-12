@@ -1,31 +1,71 @@
 GKERegion='us-central1-c'
 
-void CreateCluster(String CLUSTER_PREFIX) {
+void CreateCluster(String CLUSTER_SUFFIX) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
-            export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_PREFIX}
+            export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
+            export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+            source $HOME/google-cloud-sdk/path.bash.inc
+            ret_num=0
+            while [ \${ret_num} -lt 15 ]; do
+                ret_val=0
+                gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+                gcloud config set project $GCP_PROJECT
+                gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.21 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 && \
+                gcloud container clusters update --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX} --update-labels delete-cluster-after-hours=6 && \
+                kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
+                if [ \${ret_val} -eq 0 ]; then break; fi
+                ret_num=\$((ret_num + 1))
+            done
+            if [ \${ret_num} -eq 15 ]; then
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $GKERegion --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
+                exit 1
+            fi
+        """
+   }
+}
+
+void ShutdownCluster(String CLUSTER_SUFFIX) {
+    withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
+        sh """
+            export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
             export USE_GKE_GCLOUD_AUTH_PLUGIN=True
             source $HOME/google-cloud-sdk/path.bash.inc
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
-            gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_PREFIX} --cluster-version=1.21 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${CLUSTER_PREFIX} --no-enable-autoupgrade
-            gcloud container clusters update --zone $GKERegion $CLUSTER_NAME-${CLUSTER_PREFIX} --update-labels delete-cluster-after-hours=6
-            kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com
+            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX}
         """
    }
 }
-void ShutdownCluster(String CLUSTER_PREFIX) {
+
+void DeleteOldClusters(String FILTER) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
-            export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_PREFIX}
-            export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-            source $HOME/google-cloud-sdk/path.bash.inc
-            gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
-            gcloud config set project $GCP_PROJECT
-            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-${CLUSTER_PREFIX}
+            if [ -f $HOME/google-cloud-sdk/path.bash.inc ]; then
+                export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+                source $HOME/google-cloud-sdk/path.bash.inc
+                gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+                gcloud config set project $GCP_PROJECT
+                for GKE_CLUSTER in \$(gcloud container clusters list --format='csv[no-heading](name)' --filter="$FILTER"); do
+                    GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
+                    retry=0
+                    while [ "\$GKE_CLUSTER_STATUS" == "PROVISIONING" ]; do
+                        echo "Cluster \$GKE_CLUSTER is being provisioned, waiting before delete."
+                        sleep 10
+                        GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
+                        let retry+=1
+                        if [ \$retry -ge 60 ]; then
+                            echo "Cluster \$GKE_CLUSTER to delete is being provisioned for too long. Skipping..."
+                            break
+                        fi
+                    done
+                    gcloud container clusters delete --async --zone $GKERegion --quiet \$GKE_CLUSTER || true
+                done
+            fi
         """
    }
 }
+
 void pushLogFile(String FILE_NAME) {
     LOG_FILE_PATH="e2e-tests/logs/${FILE_NAME}.log"
     LOG_FILE_NAME="${FILE_NAME}.log"
@@ -82,7 +122,7 @@ void setTestsresults() {
     }
 }
 
-void runTest(String TEST_NAME, String CLUSTER_PREFIX) {
+void runTest(String TEST_NAME, String CLUSTER_SUFFIX) {
     def retryCount = 0
     waitUntil {
         def testUrl = "https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator/${env.GIT_BRANCH}/${env.GIT_SHORT_COMMIT}/${TEST_NAME}.log"
@@ -96,7 +136,7 @@ void runTest(String TEST_NAME, String CLUSTER_PREFIX) {
                     if [ -f "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$TEST_NAME" ]; then
                         echo Skip $TEST_NAME test
                     else
-                        export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_PREFIX}
+                        export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
                         source $HOME/google-cloud-sdk/path.bash.inc
                         ./e2e-tests/$TEST_NAME/run
                     fi
@@ -137,7 +177,7 @@ pipeline {
         GIT_SHORT_COMMIT = sh(script: 'git describe --always --dirty', , returnStdout: true).trim()
         GIT_PREV_SHORT_COMMIT = sh(script: 'git describe --always HEAD~1', , returnStdout: true).trim()
         VERSION = "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}"
-        CLUSTER_NAME = sh(script: "echo jenkins-pgo-${GIT_SHORT_COMMIT} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
+        CLUSTER_NAME = sh(script: "echo jen-pg-${env.CHANGE_ID}-${GIT_SHORT_COMMIT}-${env.BUILD_NUMBER} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
         PGO_K8S_NAME = "${env.CLUSTER_NAME}-upstream"
         AUTHOR_NAME  = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
         ECR = "119175775298.dkr.ecr.us-east-1.amazonaws.com"
@@ -145,6 +185,9 @@ pipeline {
     }
     agent {
         label 'docker'
+    }
+    options {
+        disableConcurrentBuilds(abortPrevious: true)
     }
     stages {
         stage('Prepare') {
@@ -199,6 +242,7 @@ pipeline {
                         cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
                     '''
                 }
+                DeleteOldClusters("jen-pg-$CHANGE_ID")
             }
         }
         stage('Retag previous commit images if possible'){
@@ -484,24 +528,14 @@ pipeline {
                     def URI_BASE = sh(returnStdout: true, script: "cat results/docker/URI_BASE").trim()
                     TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${URI_BASE}-pgo-apiserver`\r\n\r\nimage: `${URI_BASE}-pgo-event`\r\n\r\nimage: `${URI_BASE}-pgo-rmdata`\r\n\r\nimage: `${URI_BASE}-pgo-scheduler`\r\n\r\nimage: `${URI_BASE}-postgres-operator`\r\n\r\nimage: `${URI_BASE}-pgo-deployer`\r\n"
                     pullRequest.comment(TestsReport)
-
-                    withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
-                        sh """
-                            source $HOME/google-cloud-sdk/path.bash.inc
-                            gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
-                            gcloud config set project $GCP_PROJECT
-                            gcloud container clusters list --format='csv[no-heading](name)' --filter $CLUSTER_NAME | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
-                            sudo docker rmi -f \$(sudo docker images -q) || true
-                            sudo rm -rf $HOME/google-cloud-sdk
-                        """
-                    }
                 }
             }
-            sh '''
-                sudo docker rmi -f \$(sudo docker images -q) || true
+            DeleteOldClusters("$CLUSTER_NAME")
+            sh """
+                sudo docker system prune -fa
                 sudo rm -rf ./*
                 sudo rm -rf $HOME/google-cloud-sdk
-            '''
+            """
             deleteDir()
         }
     }
