@@ -3,3 +3,5 @@ kind: Kustomization
 
 resources:
 - generated/pg.percona.com_perconapgclusters.yaml
+- generated/pg.percona.com_perconapgbackups.yaml
+- generated/pg.percona.com_perconapgrestores.yaml

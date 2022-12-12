@@ -8,6 +8,5 @@ metadata:
   name: 02-read-from-primary
 data:
   data: |2-
+     100500
      100501
-     100502
-     100503

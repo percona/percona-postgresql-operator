@@ -95,7 +95,8 @@ rules:
 - apiGroups:
   - pg.percona.com
   resources:
-  - perconapgclusters
+  - perconapgbackups
+  - perconapgrestores
   verbs:
   - get
   - list
@@ -103,9 +104,23 @@ rules:
 - apiGroups:
   - pg.percona.com
   resources:
+  - perconapgbackups/status
   - perconapgclusters/status
+  - perconapgrestores/status
   verbs:
   - patch
+  - update
+- apiGroups:
+  - pg.percona.com
+  resources:
+  - perconapgclusters
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - policy
   resources:

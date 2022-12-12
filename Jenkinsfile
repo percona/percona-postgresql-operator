@@ -88,7 +88,7 @@ void setTestsresults() {
 void runTest(String TEST_NAME, String CLUSTER_SUFFIX) {
     def retryCount = 0
     waitUntil {
-        def testUrl = "https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator-v2/${env.GIT_BRANCH}/${env.GIT_SHORT_COMMIT}/${TEST_NAME}.log"
+        def testUrl = "https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator/${env.GIT_BRANCH}/${env.GIT_SHORT_COMMIT}/${TEST_NAME}.log"
         try {
             echo "The $TEST_NAME test was started!"
             testsReportMap[TEST_NAME] = "[failed]($testUrl)"

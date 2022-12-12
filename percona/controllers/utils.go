@@ -1,0 +1,29 @@
+package controllers
+
+import (
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+)
+
+// jobCompleted returns "true" if the Job provided completed successfully.  Otherwise it returns
+// "false".
+func jobCompleted(job *batchv1.Job) bool {
+	conditions := job.Status.Conditions
+	for i := range conditions {
+		if conditions[i].Type == batchv1.JobComplete {
+			return conditions[i].Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
+// jobFailed returns "true" if the Job provided has failed.  Otherwise it returns "false".
+func jobFailed(job *batchv1.Job) bool {
+	conditions := job.Status.Conditions
+	for i := range conditions {
+		if conditions[i].Type == batchv1.JobFailed {
+			return conditions[i].Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}

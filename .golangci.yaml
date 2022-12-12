@@ -63,7 +63,7 @@ linters-settings:
       - pkg: k8s.io/apimachinery/pkg/apis/(\w+)/(v[\w\d]+)
         alias: $1$2
       - pkg: k8s.io/apimachinery/pkg/api/errors
-        alias: apierrors
+        alias: k8serrors
     no-unaliased: true
 
 issues:

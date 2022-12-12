@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 90
+timeout: 120
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -98,6 +98,32 @@ metadata:
       blockOwnerDeletion: true
   finalizers:
     - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 1
+      replicas: 1
+      updatedReplicas: 1
+  observedGeneration: 1
+  pgbackrest:
+    repoHost:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      ready: true
+    repos:
+      - bound: true
+        name: repo1
+        replicaCreateBackupComplete: true
+        stanzaCreated: true
+  proxy:
+    pgBouncer:
+      readyReplicas: 1
+      replicas: 1
+---
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGCluster
+metadata:
+  name: init-deploy
 status:
   instances:
     - name: instance1

@@ -4,6 +4,84 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
+  name: perconapgbackups.pg.percona.com
+spec:
+  group: pg.percona.com
+  names:
+    kind: PerconaPGBackup
+    listKind: PerconaPGBackupList
+    plural: perconapgbackups
+    singular: perconapgbackup
+  scope: Namespaced
+  versions:
+  - name: v2beta1
+    schema:
+      openAPIV3Schema:
+        description: PerconaPGBackup is the CRD that defines a Percona PostgreSQL
+          Backup
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              options:
+                description: Command line options to include when running the pgBackRest
+                  backup command. https://pgbackrest.org/command.html#command-backup
+                items:
+                  type: string
+                type: array
+              pgCluster:
+                type: string
+              repoName:
+                description: The name of the pgBackRest repo to run the backup command
+                  against.
+                pattern: ^repo[1-4]
+                type: string
+            required:
+            - pgCluster
+            - repoName
+            type: object
+          status:
+            properties:
+              completed:
+                format: date-time
+                type: string
+              jobName:
+                type: string
+              state:
+                type: string
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
   name: perconapgclusters.pg.percona.com
 spec:
   group: pg.percona.com
@@ -12894,6 +12972,86 @@ spec:
                 type: object
               usersRevision:
                 description: Identifies the users that have been installed into PostgreSQL.
+                type: string
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: perconapgrestores.pg.percona.com
+spec:
+  group: pg.percona.com
+  names:
+    kind: PerconaPGRestore
+    listKind: PerconaPGRestoreList
+    plural: perconapgrestores
+    singular: perconapgrestore
+  scope: Namespaced
+  versions:
+  - name: v2beta1
+    schema:
+      openAPIV3Schema:
+        description: PerconaPGRestore is the CRD that defines a Percona PostgreSQL
+          Restore
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              options:
+                description: Command line options to include when running the pgBackRest
+                  restore command. https://pgbackrest.org/command.html#command-restore
+                items:
+                  type: string
+                type: array
+              pgCluster:
+                description: The name of the PerconaPGCluster to perform restore.
+                type: string
+              repoName:
+                description: The name of the pgBackRest repo within the source PostgresCluster
+                  that contains the backups that should be utilized to perform a pgBackRest
+                  restore when initializing the data source for the new PostgresCluster.
+                pattern: ^repo[1-4]
+                type: string
+            required:
+            - pgCluster
+            - repoName
+            type: object
+          status:
+            properties:
+              completed:
+                format: date-time
+                type: string
+              jobName:
+                type: string
+              state:
                 type: string
             type: object
         required:
@@ -28253,7 +28411,8 @@ rules:
 - apiGroups:
   - pg.percona.com
   resources:
-  - perconapgclusters
+  - perconapgbackups
+  - perconapgrestores
   verbs:
   - get
   - list
@@ -28261,9 +28420,23 @@ rules:
 - apiGroups:
   - pg.percona.com
   resources:
+  - perconapgbackups/status
   - perconapgclusters/status
+  - perconapgrestores/status
   verbs:
   - patch
+  - update
+- apiGroups:
+  - pg.percona.com
+  resources:
+  - perconapgclusters
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - policy
   resources:

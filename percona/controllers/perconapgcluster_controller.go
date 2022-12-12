@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,12 +21,12 @@ import (
 )
 
 const (
-	// ControllerName is the name of the PostgresCluster controller
-	ControllerName = "perconapgcluster-controller"
+	// ControllerName is the name of the PerconaPGCluster controller
+	PGClusterControllerName = "perconapgcluster-controller"
 )
 
-// Reconciler holds resources for the PostgresCluster reconciler
-type Reconciler struct {
+// Reconciler holds resources for the PerconaPGCluster reconciler
+type PGClusterReconciler struct {
 	Client   client.Client
 	Owner    client.FieldOwner
 	Recorder record.EventRecorder
@@ -33,10 +34,10 @@ type Reconciler struct {
 }
 
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;watch
-// +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters/status,verbs=patch
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;watch
+// +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters/status,verbs=patch;update
+// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
 
-func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
 
 	log.Info("Reconciling", "request", request)
@@ -108,10 +109,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return nil
 	})
 
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+	}
+
+	perconaPGCluster.Status = v2beta1.PerconaPGClusterStatus{
+		PostgresClusterStatus: postgresCluster.Status,
+	}
+
+	if err := r.Client.Status().Update(ctx, perconaPGCluster); err != nil {
+		log.Error(err, "failed to update status")
+	}
+
 	return reconcile.Result{}, err
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
-func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGCluster{}).Complete(r)
+func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
+	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGCluster{}).Owns(&v1beta1.PostgresCluster{}).Complete(r)
 }
