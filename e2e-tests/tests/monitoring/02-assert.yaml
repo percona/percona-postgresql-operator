@@ -1,29 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 90
----
-kind: StatefulSet
-apiVersion: apps/v1
-metadata:
-  name: monitoring-repo-host
-  labels:
-    postgres-operator.crunchydata.com/cluster: monitoring
-    postgres-operator.crunchydata.com/data: pgbackrest
-    postgres-operator.crunchydata.com/pgbackrest: ""
-    postgres-operator.crunchydata.com/pgbackrest-dedicated: ""
-  ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: monitoring
-      controller: true
-      blockOwnerDeletion: true
-status:
-  observedGeneration: 1
-  replicas: 1
-  readyReplicas: 1
-  currentReplicas: 1
-  updatedReplicas: 1
-  collisionCount: 0
+timeout: 180
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -66,8 +43,8 @@ spec:
         - name: PMM_AGENT_SERVER_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PMM_API_KEY
-              name: pmm-secret
+              key: PMM_SERVER_KEY
+              name: monitoring-pmm-secret
         - name: CLIENT_PORT_LISTEN
           value: "7777"
         - name: CLIENT_PORT_MIN
@@ -103,21 +80,10 @@ spec:
           value: "true"
         - name: PMM_AGENT_SIDECAR_SLEEP
           value: "5"
-        - name: PMM_AGENT_PRERUN_SCRIPT
-          value: pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify
-            --skip-connection-check --metrics-mode=push --username=$(DB_USER) --password='$(DB_PASS)'
-            --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --host=$(POD_NAME) --port=5432
-            --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME)
-            'Service restarted'
-        - name: DB_USER
-          value: monitoring
         - name: DB_TYPE
           value: postgresql
-        - name: DB_PASS
-          valueFrom:
-            secretKeyRef:
-              key: password
-              name: monitoring-pguser-monitoring
+        - name: PMM_AGENT_PRERUN_SCRIPT
+          value: pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify --skip-connection-check --metrics-mode=push --username=postgres --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --socket=unix:///tmp/postgres/.s.PGSQL.5432 --port=5432 --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'
         lifecycle:
           preStop:
             exec:
@@ -162,46 +128,6 @@ status:
   updatedReplicas: 1
   collisionCount: 0
 ---
-kind: Deployment
-apiVersion: apps/v1
-metadata:
-  name: monitoring-pgbouncer
-  labels:
-    postgres-operator.crunchydata.com/cluster: monitoring
-    postgres-operator.crunchydata.com/role: pgbouncer
-  annotations:
-    deployment.kubernetes.io/revision: "1"
-  ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: monitoring
-      controller: true
-      blockOwnerDeletion: true
-status:
-  observedGeneration: 1
-  replicas: 1
-  updatedReplicas: 1
-  readyReplicas: 1
----
-kind: Job
-apiVersion: batch/v1
-metadata:
-  labels:
-    postgres-operator.crunchydata.com/cluster: monitoring
-    postgres-operator.crunchydata.com/pgbackrest: ""
-    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
-  annotations:
-    postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
-  ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: monitoring
-      controller: true
-      blockOwnerDeletion: true
-status:
-  succeeded: 1
----
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
@@ -217,7 +143,6 @@ metadata:
 status:
   instances:
     - name: instance1
-      readyReplicas: 1
       replicas: 1
       updatedReplicas: 1
   observedGeneration: 1
@@ -229,7 +154,6 @@ status:
     repos:
       - bound: true
         name: repo1
-        replicaCreateBackupComplete: true
         stanzaCreated: true
   proxy:
     pgBouncer:

@@ -12,7 +12,6 @@ deploy_operator() {
 	yq eval \
 		"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
 		"${DEPLOY_DIR}/operator.yaml" \
-		| yq eval '.spec.template.spec.containers[0].env += {"name": "PGO_FEATURE_GATES", "value": "InstanceSidecars=true"}' - \
 		| kubectl -n "${NAMESPACE}" apply -f -
 
 }
@@ -41,6 +40,7 @@ get_cr() {
 		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
 		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
 		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" - \
+		| yq eval "$(printf '.spec.pmm.secret="%s"' "${test_name}-pmm-secret")" - \
 			>"${TEMP_DIR}/cr.yaml"
 
 	case ${test_name} in

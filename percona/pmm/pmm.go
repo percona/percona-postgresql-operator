@@ -89,7 +89,7 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: pmmSpec.Secret,
 						},
-						Key: "PMM_API_KEY",
+						Key: "PMM_SERVER_KEY",
 					},
 				},
 			},
@@ -163,27 +163,12 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 				Value: "5",
 			},
 			{
-				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: "pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify --skip-connection-check --metrics-mode=push --username=$(DB_USER) --password='$(DB_PASS)' --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --host=$(POD_NAME) --port=5432 --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
-			},
-			{
-				Name:  "DB_USER",
-				Value: pgc.Name,
-			},
-			{
 				Name:  "DB_TYPE",
 				Value: "postgresql",
 			},
 			{
-				Name: "DB_PASS",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: pgc.Name + "-pguser-" + pgc.Name,
-						},
-						Key: "password",
-					},
-				},
+				Name:  "PMM_AGENT_PRERUN_SCRIPT",
+				Value: "pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify --skip-connection-check --metrics-mode=push --username=postgres --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --socket=unix:///tmp/postgres/.s.PGSQL.5432 --port=5432 --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
 			},
 		},
 	}

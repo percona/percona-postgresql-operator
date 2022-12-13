@@ -10,6 +10,5 @@ commands:
       deploy_pmm_server
 
       api_key=$(generate_pmm_api_key)
-      api_key_encoded=$(echo -n ${api_key} | base64 -w 0)
-      kubectl patch -n "${NAMESPACE}" secret pmm-secret --type merge --patch '{"data": {"PMM_API_KEY": "'${api_key_encoded}'"}}'
+      kubectl create -n "${NAMESPACE}" secret generic monitoring-pmm-secret --from-literal=PMM_SERVER_KEY=${api_key}
     timeout: 300
