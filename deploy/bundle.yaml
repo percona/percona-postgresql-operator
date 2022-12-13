@@ -28831,7 +28831,7 @@ spec:
           value: registry.developers.crunchydata.com/crunchydata/crunchy-pgbouncer:ubi8-1.17-1
         - name: RELATED_IMAGE_PGEXPORTER
           value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-exporter:ubi8-5.2.0-0
-        image: perconalab/percona-postgresql-operator:backup-restore-controllers
+        image: perconalab/percona-postgresql-operator:v2-main
         imagePullPolicy: Always
         name: operator
         securityContext:
