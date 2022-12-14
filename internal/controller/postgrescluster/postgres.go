@@ -37,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/internal/postgis"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	pgpassword "github.com/percona/percona-postgresql-operator/internal/postgres/password"
@@ -231,8 +232,16 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
 
-	var pgAuditOK, postgisInstallOK bool
+	var pgAuditOK, pgStatMonitorOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
+		if pgStatMonitorOK = pgstatmonitor.EnableInPostgreSQL(ctx, exec) == nil; !pgStatMonitorOK {
+			// pg_stat_monitor can only be enabled after its shared library is loaded,
+			// but early versions of PGO do not load it automatically. Assume
+			// that an error here is because the cluster started during one of
+			// those versions and has not been restarted.
+			r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgStatMonitorDisabled",
+				"Unable to install pgStatMonitor")
+		}
 		if pgAuditOK = pgaudit.EnableInPostgreSQL(ctx, exec) == nil; !pgAuditOK {
 			// pgAudit can only be enabled after its shared library is loaded,
 			// but early versions of PGO do not load it automatically. Assume
