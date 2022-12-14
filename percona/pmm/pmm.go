@@ -131,12 +131,7 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name: "PMM_AGENT_SETUP_NODE_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.name",
-					},
-				},
+				Value: "$(POD_NAMESPACE)-$(POD_NAME)",
 			},
 			{
 				Name:  "PMM_AGENT_SETUP_METRICS_MODE",
@@ -168,7 +163,7 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: "pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify --skip-connection-check --metrics-mode=push --username=postgres --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --socket=unix:///tmp/postgres/.s.PGSQL.5432 --port=5432 --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
+				Value: "pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify --skip-connection-check --metrics-mode=push --socket=/tmp/postgres/ --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
 			},
 		},
 	}
