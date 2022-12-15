@@ -7,11 +7,22 @@ void CreateCluster(String CLUSTER_SUFFIX, String SUBNETWORK = CLUSTER_SUFFIX) {
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
             export USE_GKE_GCLOUD_AUTH_PLUGIN=True
             source $HOME/google-cloud-sdk/path.bash.inc
-            gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
-            gcloud config set project $GCP_PROJECT
-            gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $GKERegion --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
-            gcloud container clusters create --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.21 --machine-type=n1-standard-4 --preemptible --num-nodes=\$NODES_NUM --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${SUBNETWORK} --no-enable-autoupgrade
-            kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com
+            ret_num=0
+            while [ \${ret_num} -lt 15 ]; do
+                ret_val=0
+                gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+                gcloud config set project $GCP_PROJECT
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $GKERegion --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
+                gcloud container clusters create --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.21 --machine-type=n1-standard-4 --preemptible --num-nodes=\$NODES_NUM --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${SUBNETWORK} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 && \
+                gcloud container clusters update --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX} --update-labels delete-cluster-after-hours=6 && \
+                kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
+                if [ \${ret_val} -eq 0 ]; then break; fi
+                ret_num=\$((ret_num + 1))
+            done
+            if [ \${ret_num} -eq 15 ]; then
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $GKERegion --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
+                exit 1
+            fi
         """
    }
 }
@@ -25,6 +36,34 @@ void ShutdownCluster(String CLUSTER_SUFFIX) {
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
             gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX}
+        """
+   }
+}
+
+void DeleteOldClusters(String FILTER) {
+    withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
+        sh """
+            if [ -f $HOME/google-cloud-sdk/path.bash.inc ]; then
+                export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+                source $HOME/google-cloud-sdk/path.bash.inc
+                gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+                gcloud config set project $GCP_PROJECT
+                for GKE_CLUSTER in \$(gcloud container clusters list --format='csv[no-heading](name)' --filter="$FILTER"); do
+                    GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
+                    retry=0
+                    while [ "\$GKE_CLUSTER_STATUS" == "PROVISIONING" ]; do
+                        echo "Cluster \$GKE_CLUSTER is being provisioned, waiting before delete."
+                        sleep 10
+                        GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
+                        let retry+=1
+                        if [ \$retry -ge 60 ]; then
+                            echo "Cluster \$GKE_CLUSTER to delete is being provisioned for too long. Skipping..."
+                            break
+                        fi
+                    done
+                    gcloud container clusters delete --async --zone $GKERegion --quiet \$GKE_CLUSTER || true
+                done
+            fi
         """
    }
 }
@@ -180,11 +219,14 @@ pipeline {
         OPERATOR_NS = 'pg-operator'
         GIT_SHORT_COMMIT = sh(script: 'git rev-parse --short HEAD', , returnStdout: true).trim()
         VERSION = "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}"
-        CLUSTER_NAME = sh(script: "echo jenkins-pgo-${GIT_SHORT_COMMIT} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
+        CLUSTER_NAME = sh(script: "echo jen-pg-${env.CHANGE_ID}-${GIT_SHORT_COMMIT}-${env.BUILD_NUMBER} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
         AUTHOR_NAME  = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
     }
     agent {
         label 'docker'
+    }
+    options {
+        disableConcurrentBuilds(abortPrevious: true)
     }
     stages {
         stage('Prepare') {
@@ -214,6 +256,7 @@ pipeline {
                     '''
                 }
                 stash includes: "**", name: "sourceFILES"
+                DeleteOldClusters("jen-pg-$CHANGE_ID")
             }
         }
         stage('Build docker image') {
@@ -331,7 +374,7 @@ pipeline {
         always {
             script {
                 setTestsresults()
-                if (currentBuild.result != null && currentBuild.result != 'SUCCESS') {
+                if (currentBuild.result != null && currentBuild.result != 'SUCCESS' && currentBuild.result != 'NOT_BUILT') {
                     try {
                         slackSend channel: "@${AUTHOR_NAME}", color: '#FF0000', message: "[${JOB_NAME}]: build ${currentBuild.result}, ${BUILD_URL} owner: @${AUTHOR_NAME}"
                     }
@@ -347,26 +390,21 @@ pipeline {
                             comment.delete()
                         }
                     }
-                    makeReport()
-                    unstash 'IMAGE'
-                    def IMAGE = sh(returnStdout: true, script: "cat results/docker/TAG").trim()
-                    TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${IMAGE}`\r\n"
-                    pullRequest.comment(TestsReport)
+                    if (currentBuild.result != 'NOT_BUILT') {
+                        makeReport()
+                        unstash 'IMAGE'
+                        def IMAGE = sh(returnStdout: true, script: "cat results/docker/TAG").trim()
+                        TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${IMAGE}`\r\n"
+                        pullRequest.comment(TestsReport)
+                    }
                 }
             }
-            withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
-                sh """
-                    if [ -f $HOME/google-cloud-sdk/path.bash.inc ]; then
-                        source $HOME/google-cloud-sdk/path.bash.inc
-                        gcloud auth activate-service-account --key-file \$CLIENT_SECRET_FILE
-                        gcloud config set project \$GCP_PROJECT
-                        gcloud container clusters list --format='csv[no-heading](name)' --filter $CLUSTER_NAME | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
-                    fi
-                    sudo docker system prune -fa
-                    sudo rm -rf ./*
-                    sudo rm -rf $HOME/google-cloud-sdk
-                """
-            }
+            DeleteOldClusters("$CLUSTER_NAME")
+            sh """
+                sudo docker system prune -fa
+                sudo rm -rf ./*
+                sudo rm -rf $HOME/google-cloud-sdk
+            """
             deleteDir()
         }
     }
