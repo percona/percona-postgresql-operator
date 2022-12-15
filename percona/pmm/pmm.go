@@ -130,7 +130,7 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 				Value: "0.0.0.0",
 			},
 			{
-				Name: "PMM_AGENT_SETUP_NODE_NAME",
+				Name:  "PMM_AGENT_SETUP_NODE_NAME",
 				Value: "$(POD_NAMESPACE)-$(POD_NAME)",
 			},
 			{
