@@ -364,6 +364,7 @@ pipeline {
                         runTest('init-deploy', 'sandbox')
                         runTest('demand-backup', 'sandbox')
                         runTest('start-from-backup', 'sandbox')
+                        runTest('monitoring', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }

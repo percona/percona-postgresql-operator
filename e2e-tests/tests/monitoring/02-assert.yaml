@@ -1,0 +1,161 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 180
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: monitoring
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: monitoring
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  template:
+    spec:
+      containers:
+      - name: database
+      - name: replication-cert-copy
+      - env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: PMM_USER
+          value: api_key
+        - name: PMM_SERVER
+          value: monitoring-service
+        - name: PMM_AGENT_SERVER_ADDRESS
+          value: monitoring-service
+        - name: PMM_AGENT_SERVER_USERNAME
+          value: api_key
+        - name: PMM_AGENT_SERVER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PMM_SERVER_KEY
+              name: monitoring-pmm-secret
+        - name: CLIENT_PORT_LISTEN
+          value: "7777"
+        - name: CLIENT_PORT_MIN
+          value: "30100"
+        - name: CLIENT_PORT_MAX
+          value: "30105"
+        - name: PMM_AGENT_LISTEN_PORT
+          value: "7777"
+        - name: PMM_AGENT_PORTS_MIN
+          value: "30100"
+        - name: PMM_AGENT_PORTS_MAX
+          value: "30105"
+        - name: PMM_AGENT_CONFIG_FILE
+          value: /usr/local/percona/pmm2/config/pmm-agent.yaml
+        - name: PMM_AGENT_SERVER_INSECURE_TLS
+          value: "1"
+        - name: PMM_AGENT_LISTEN_ADDRESS
+          value: 0.0.0.0
+        - name: PMM_AGENT_SETUP_NODE_NAME
+          value: $(POD_NAMESPACE)-$(POD_NAME)
+        - name: PMM_AGENT_SETUP_METRICS_MODE
+          value: push
+        - name: PMM_AGENT_SETUP
+          value: "1"
+        - name: PMM_AGENT_SETUP_FORCE
+          value: "1"
+        - name: PMM_AGENT_SETUP_NODE_TYPE
+          value: container
+        - name: PMM_AGENT_SIDECAR
+          value: "true"
+        - name: PMM_AGENT_SIDECAR_SLEEP
+          value: "5"
+        - name: DB_TYPE
+          value: postgresql
+        - name: PMM_AGENT_PRERUN_SCRIPT
+          value: pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify
+            --skip-connection-check --metrics-mode=push --socket=/tmp/postgres/ --service-name=$(PMM_AGENT_SETUP_NODE_NAME)
+            --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME)
+            'Service restarted'
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - bash
+              - -c
+              - pmm-admin inventory remove node --force $(pmm-admin status --json
+                | python -c "import sys, json; print(json.load(sys.stdin)['pmm_agent_status']['node_id'])")
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /local/Status
+            port: 7777
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: pmm-client
+        ports:
+        - containerPort: 7777
+          protocol: TCP
+        - containerPort: 30100
+          protocol: TCP
+        - containerPort: 30101
+          protocol: TCP
+        - containerPort: 30102
+          protocol: TCP
+        - containerPort: 30103
+          protocol: TCP
+        - containerPort: 30104
+          protocol: TCP
+        - containerPort: 30105
+          protocol: TCP
+      - name: pgbackrest
+      - name: pgbackrest-config
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: monitoring
+  ownerReferences:
+    - apiVersion: pg.percona.com/v2beta1
+      kind: PerconaPGCluster
+      name: monitoring
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      replicas: 1
+      updatedReplicas: 1
+  observedGeneration: 1
+  pgbackrest:
+    repoHost:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      ready: true
+    repos:
+      - bound: true
+        name: repo1
+        stanzaCreated: true
+  proxy:
+    pgBouncer:
+      readyReplicas: 1
+      replicas: 1

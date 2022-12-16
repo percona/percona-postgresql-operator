@@ -121,6 +121,10 @@ undeploy:
 	$(PGO_KUBE_CLIENT) delete -k ./config/default
 
 
+run-local:
+	./bin/postgres-operator
+
+
 #======= Binary builds =======
 build-postgres-operator:
 	$(GO_BUILD) -ldflags '-X "main.versionString=$(PGO_VERSION)"' \
