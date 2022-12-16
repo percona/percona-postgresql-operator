@@ -7,7 +7,6 @@ kind: StatefulSet
 metadata:
   name: pmm
 status:
-  availableReplicas: 1
   collisionCount: 0
   currentReplicas: 1
   observedGeneration: 1
