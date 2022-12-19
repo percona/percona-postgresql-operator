@@ -17,6 +17,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -116,6 +117,16 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.Backups = perconaPGCluster.Spec.Backups
 		postgresCluster.Spec.DataSource = perconaPGCluster.Spec.DataSource
 		postgresCluster.Spec.DatabaseInitSQL = perconaPGCluster.Spec.DatabaseInitSQL
+		postgresCluster.Spec.Patroni = perconaPGCluster.Spec.Patroni
+
+		if perconaPGCluster.Spec.PMM != nil && perconaPGCluster.Spec.PMM.Enabled {
+			// TODO: Check if PMM secret exists
+			for i := 0; i < len(perconaPGCluster.Spec.InstanceSets); i++ {
+				set := &perconaPGCluster.Spec.InstanceSets[i]
+				set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(perconaPGCluster))
+			}
+		}
+
 		postgresCluster.Spec.InstanceSets = perconaPGCluster.Spec.InstanceSets.ToCrunchy()
 		postgresCluster.Spec.Users = perconaPGCluster.Spec.Users
 		postgresCluster.Spec.Proxy = perconaPGCluster.Spec.Proxy.ToCrunchy()
