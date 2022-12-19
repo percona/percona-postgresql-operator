@@ -28,6 +28,8 @@ spec:
               fieldPath: metadata.namespace
         - name: CRUNCHY_DEBUG
           value: "true"
+        - name: DISABLE_TELEMETRY
+          value: "false"
         - name: RELATED_IMAGE_POSTGRES_13
           value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-13.8-1
         - name: RELATED_IMAGE_POSTGRES_13_GIS_3.0

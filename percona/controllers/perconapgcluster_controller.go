@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
@@ -17,6 +18,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -28,10 +30,17 @@ const (
 
 // Reconciler holds resources for the PerconaPGCluster reconciler
 type PGClusterReconciler struct {
-	Client   client.Client
-	Owner    client.FieldOwner
-	Recorder record.EventRecorder
-	Tracer   trace.Tracer
+	Client      client.Client
+	Owner       client.FieldOwner
+	Recorder    record.EventRecorder
+	Tracer      trace.Tracer
+	Platform    string
+	KubeVersion string
+}
+
+// SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
+func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
+	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGCluster{}).Owns(&v1beta1.PostgresCluster{}).Complete(r)
 }
 
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;watch
@@ -40,8 +49,6 @@ type PGClusterReconciler struct {
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
-
-	log.Info("Reconciling", "request", request)
 
 	perconaPGCluster := &v2beta1.PerconaPGCluster{}
 	if err := r.Client.Get(ctx, request.NamespacedName, perconaPGCluster); err != nil {
@@ -54,7 +61,14 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	log.Info("Reconciled", "request", request)
+	vm, err := r.getVersionMeta(ctx, perconaPGCluster)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "get version meta")
+	}
+
+	if err := version.EnsureVersion(ctx, perconaPGCluster, vm); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "ensure versions")
+	}
 
 	postgresCluster := &v1beta1.PostgresCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -67,7 +81,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		postgresCluster.Default()
 
 		annotations := make(map[string]string)
@@ -135,7 +149,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	return reconcile.Result{}, err
 }
 
-// SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
-func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGCluster{}).Owns(&v1beta1.PostgresCluster{}).Complete(r)
+func (r *PGClusterReconciler) getVersionMeta(ctx context.Context, cr *v2beta1.PerconaPGCluster) (version.Meta, error) {
+	return version.Meta{
+		Apply:           "disabled",
+		OperatorVersion: version.Version,
+		CRUID:           string(cr.GetUID()),
+		KubeVersion:     r.KubeVersion,
+		Platform:        r.Platform,
+		PGVersion:       strconv.Itoa(cr.Spec.PostgresVersion),
+		BackupVersion:   "",
+		PMMVersion:      "",
+	}, nil
 }
