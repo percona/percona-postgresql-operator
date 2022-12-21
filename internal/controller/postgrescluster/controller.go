@@ -183,8 +183,12 @@ func (r *Reconciler) Reconcile(
 		if !equality.Semantic.DeepEqual(before.Status, cluster.Status) {
 			// NOTE(cbandy): Kubernetes prior to v1.16.10 and v1.17.6 does not track
 			// managed fields on the status subresource: https://issue.k8s.io/88901
+
+			o := &client.SubResourcePatchOptions{}
+			o.FieldManager = string(r.Owner)
+
 			if err := errors.WithStack(r.Client.Status().Patch(
-				ctx, cluster, client.MergeFrom(before), r.Owner)); err != nil {
+				ctx, cluster, client.MergeFrom(before), o)); err != nil {
 				log.Error(err, "patching cluster status")
 				return result, err
 			}
