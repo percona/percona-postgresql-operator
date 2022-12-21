@@ -33,7 +33,7 @@ deploy_client() {
 get_cr() {
 	local name_suffix=$1
 
-	yq eval "$(printf '.metadata.name="%s"' "${test_name}${name_suffix:+-$name_suffix}")" "${DEPLOY_DIR}/cr.yaml" \
+	yq eval "$(printf '.metadata.name="%s"' "${test_name}")" "${DEPLOY_DIR}/cr.yaml" \
 		| yq eval '.spec.postgresVersion='${PG_VER}'' - \
 		| yq eval '.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}]' - \
 		| yq eval '.spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' - \
@@ -48,14 +48,14 @@ get_cr() {
 			yq eval '.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/cr.yaml" \
 				| yq eval '.spec.backups.pgbackrest.manual.repoName = "repo1"' - \
 				| yq eval '.spec.backups.pgbackrest.manual.options = ["--type=full"]' - \
-				| yq eval '.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}'/repo1"' - \
+				| yq eval '.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo1"' - \
 				| yq eval '.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]' - \
 					>"${TEMP_DIR}/backup.cr.yaml"
 			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
 			if [[ ${test_name} == "start-from-backup" ]]; then
 				yq eval '.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/cr.yaml" \
 					| yq eval '.spec.dataSource.pgbackrest.stanza = "db"' - \
-					| yq eval '.spec.dataSource.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/demand-backup/repo1"' - \
+					| yq eval '.spec.dataSource.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/demand-backup-ppg'${PG_VER}'/repo1"' - \
 					| yq eval '.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}' - \
 						>"${TEMP_DIR}/start-from-backup.cr.yaml"
 				mv "${TEMP_DIR}/start-from-backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
