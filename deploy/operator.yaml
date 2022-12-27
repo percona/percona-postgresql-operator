@@ -3,17 +3,25 @@ kind: Deployment
 metadata:
   labels:
     pg.percona.com/control-plane: postgres-operator
-  name: pgo
+  name: percona-postgresql-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
+      app.kubernetes.io/component: operator
+      app.kubernetes.io/instance: percona-postgresql-operator
+      app.kubernetes.io/name: percona-postgresql-operator
+      app.kubernetes.io/part-of: percona-postgresql-operator
       pg.percona.com/control-plane: postgres-operator
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
+        app.kubernetes.io/component: operator
+        app.kubernetes.io/instance: percona-postgresql-operator
+        app.kubernetes.io/name: percona-postgresql-operator
+        app.kubernetes.io/part-of: percona-postgresql-operator
         pg.percona.com/control-plane: postgres-operator
     spec:
       containers:
@@ -30,29 +38,19 @@ spec:
           value: "true"
         - name: DISABLE_TELEMETRY
           value: "false"
-        - name: RELATED_IMAGE_POSTGRES_13
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-13.8-1
-        - name: RELATED_IMAGE_POSTGRES_13_GIS_3.0
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-gis:ubi8-13.8-3.0-1
-        - name: RELATED_IMAGE_POSTGRES_13_GIS_3.1
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-gis:ubi8-13.8-3.1-1
-        - name: RELATED_IMAGE_POSTGRES_14
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-14.5-1
-        - name: RELATED_IMAGE_POSTGRES_14_GIS_3.1
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-gis:ubi8-14.5-3.1-1
-        - name: RELATED_IMAGE_POSTGRES_14_GIS_3.2
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-gis:ubi8-14.5-3.2-1
-        - name: RELATED_IMAGE_PGADMIN
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-pgadmin4:ubi8-4.30-4
-        - name: RELATED_IMAGE_PGBACKREST
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-pgbackrest:ubi8-2.40-1
-        - name: RELATED_IMAGE_PGBOUNCER
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-pgbouncer:ubi8-1.17-1
-        - name: RELATED_IMAGE_PGEXPORTER
-          value: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-exporter:ubi8-5.2.0-0
-        image: perconalab/percona-postgresql-operator:v2-main
+        image: perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /metrics
+            port: metrics
+            scheme: HTTP
         name: operator
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -60,4 +58,4 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
           runAsNonRoot: true
-      serviceAccountName: pgo
+      serviceAccountName: percona-postgresql-operator

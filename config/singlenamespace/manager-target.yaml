@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pgo
+  name: percona-postgresql-operator
 spec:
   template:
     spec:
