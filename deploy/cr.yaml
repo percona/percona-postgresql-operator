@@ -48,7 +48,7 @@ spec:
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
 
-  image: perconalab/percona-postgresql-operator:main-ppg14-postgres
+  image: percona/percona-postgresql-operator:2.0.0-ppg14-postgres
   imagePullPolicy: Always
   postgresVersion: 14
 #  port: 5432
@@ -107,7 +107,7 @@ spec:
   proxy:
     pgBouncer:
 #      replicas: 3
-      image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
+      image: percona/percona-postgresql-operator:2.0.0-ppg14-pgbouncer
 #      resources:
 #        limits:
 #          cpu: 200m
@@ -160,7 +160,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
+      image: percona/percona-postgresql-operator:2.0.0-ppg14-pgbackrest
 #      configuration:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
@@ -241,7 +241,7 @@ spec:
 #       PITR restore in place
 #       - --type=time
 #       - --target="2021-06-09 14:15:11-04"
-#       restore iindividual databases
+#       restore individual databases
 #       - --db-include=hippo
 
   pmm:
@@ -250,3 +250,11 @@ spec:
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
+#  patroni:
+#    dynamicConfiguration:
+#      postgresql:
+#        parameters:
+#          max_parallel_workers: 2
+#          max_worker_processes: 2
+#          shared_buffers: 1GB
+#          work_mem: 2MB

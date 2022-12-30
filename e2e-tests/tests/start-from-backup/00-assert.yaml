@@ -20,7 +20,7 @@ kind: Deployment
 metadata:
   labels:
     pg.percona.com/control-plane: postgres-operator
-  name: pgo
+  name: percona-postgresql-operator
 spec:
   replicas: 1
   selector:
