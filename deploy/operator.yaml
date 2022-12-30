@@ -38,7 +38,7 @@ spec:
           value: "true"
         - name: DISABLE_TELEMETRY
           value: "false"
-        image: percona/percona-postgresql-operator:2.0.0
+        image: perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

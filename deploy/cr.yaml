@@ -48,7 +48,7 @@ spec:
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
 
-  image: percona/percona-postgresql-operator:2.0.0-ppg14-postgres
+  image: perconalab/percona-postgresql-operator:main-ppg14-postgres
   imagePullPolicy: Always
   postgresVersion: 14
 #  port: 5432
@@ -107,7 +107,7 @@ spec:
   proxy:
     pgBouncer:
 #      replicas: 3
-      image: percona/percona-postgresql-operator:2.0.0-ppg14-pgbouncer
+      image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
 #      resources:
 #        limits:
 #          cpu: 200m
@@ -160,7 +160,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: percona/percona-postgresql-operator:2.0.0-ppg14-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
 #      configuration:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
