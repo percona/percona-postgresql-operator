@@ -1,0 +1,11 @@
+metadata:
+  title: "Percona PostgreSQL Operator Custom Resource Options"
+  weight: 1
+  description: "Custom Resource Options"
+groups:
+  - group: pg.percona.com
+    version: v2beta1
+    kinds:
+      - name: PerconaPGCluster
+      - name: PerconaPGBackup
+      - name: PerconaPGRestore

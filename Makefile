@@ -314,6 +314,7 @@ generate-crd-docs:
 	./hack/tools/crdoc \
 		--resources ./config/crd/bases \
 		--template ./hack/api-template.tmpl \
+		--toc ./hack/toc.yaml \
 		--output ./docs/content/references/crd.md
 
 generate-deepcopy:
