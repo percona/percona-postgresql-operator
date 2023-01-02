@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: pgo
+  name: percona-postgresql-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: postgres-operator
+  name: percona-postgresql-operator
 rules:
 - apiGroups:
   - ""
@@ -170,11 +170,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: postgres-operator
+  name: service-account-percona-postgresql-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-operator
+  name: percona-postgresql-operator
 subjects:
 - kind: ServiceAccount
-  name: pgo
+  name: percona-postgresql-operator

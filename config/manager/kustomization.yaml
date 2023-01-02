@@ -3,8 +3,12 @@ kind: Kustomization
 resources:
 - manager.yaml
 commonLabels:
+  app.kubernetes.io/component: operator
+  app.kubernetes.io/instance: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql-operator
+  app.kubernetes.io/part-of: percona-postgresql-operator
   pg.percona.com/control-plane: postgres-operator
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator
-  newTag: v2-main
+  newTag: main

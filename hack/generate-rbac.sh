@@ -64,7 +64,7 @@ rules = operator["rules"].
 	end
 operator["rules"] = rules.sort_by { |rule| rule.to_a }
 
-operator["metadata"] = { "name" => "postgres-operator" }
+operator["metadata"] = { "name" => "percona-postgresql-operator" }
 IO.write(File.join(directory, "cluster", "role.yaml"), YAML.dump(operator))
 
 operator["kind"] = "Role"
