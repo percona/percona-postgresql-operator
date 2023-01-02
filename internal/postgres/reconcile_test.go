@@ -60,7 +60,7 @@ func TestDownwardAPIVolumeMount(t *testing.T) {
 }
 
 func TestInstancePod(t *testing.T) {
-  t.Skip("Needs to be fixed")
+	t.Skip("Needs to be fixed")
 
 	ctx := context.Background()
 
