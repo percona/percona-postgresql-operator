@@ -204,6 +204,7 @@ void prepareNode() {
         rm -f "${KREW}.tar.gz"
         export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
         kubectl krew install kuttl
+        printf "%s is installed" "$(kubectl kuttl --version)"
     '''
 }
 
