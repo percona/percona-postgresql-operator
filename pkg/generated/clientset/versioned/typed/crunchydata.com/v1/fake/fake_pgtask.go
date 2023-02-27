@@ -35,9 +35,9 @@ type FakePgtasks struct {
 	ns   string
 }
 
-var pgtasksResource = schema.GroupVersionResource{Group: "pg.percona.com", Version: "v1", Resource: "pgtasks"}
+var pgtasksResource = schema.GroupVersionResource{Group: "crunchydata.com", Version: "v1", Resource: "pgtasks"}
 
-var pgtasksKind = schema.GroupVersionKind{Group: "pg.percona.com", Version: "v1", Kind: "Pgtask"}
+var pgtasksKind = schema.GroupVersionKind{Group: "crunchydata.com", Version: "v1", Kind: "Pgtask"}
 
 // Get takes name of the pgtask, and returns the corresponding pgtask object, and an error if there is any.
 func (c *FakePgtasks) Get(ctx context.Context, name string, options v1.GetOptions) (result *crunchydatacomv1.Pgtask, err error) {
@@ -116,7 +116,7 @@ func (c *FakePgtasks) UpdateStatus(ctx context.Context, pgtask *crunchydatacomv1
 // Delete takes name of the pgtask and deletes it. Returns an error if one occurs.
 func (c *FakePgtasks) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(pgtasksResource, c.ns, name), &crunchydatacomv1.Pgtask{})
+		Invokes(testing.NewDeleteActionWithOptions(pgtasksResource, c.ns, name, opts), &crunchydatacomv1.Pgtask{})
 
 	return err
 }

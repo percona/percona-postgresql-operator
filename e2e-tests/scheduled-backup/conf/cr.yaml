@@ -86,6 +86,7 @@ spec:
         schedule: "*/10 * * * *"
         type: full
         storage: my-s3
+        backrestOpts: --annotation=source=e2e-scheduled-backup
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
     size: 1

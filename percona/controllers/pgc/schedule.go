@@ -108,20 +108,21 @@ func getScheduleConfigMap(name string, schedule s, newCluster *crv1.PerconaPGClu
 			StorageType: storageType,
 			Deployment:  newCluster.Name,
 			Container:   "database",
+			Options:     schedule.job.PGBackrestOpts,
 		},
 	}
 	if schedule.job.Keep > 0 {
 		keepStr := strconv.FormatInt(schedule.job.Keep, 10)
 		switch schedule.job.Type {
 		case "full":
-			scheduleTemp.PGBackRest.Options = "--repo1-retention-full=" + keepStr
+			scheduleTemp.PGBackRest.Options = scheduleTemp.PGBackRest.Options + " --repo1-retention-full=" + keepStr
 		case "diff":
-			scheduleTemp.PGBackRest.Options = "--repo1-retention-diff=" + keepStr
+			scheduleTemp.PGBackRest.Options = scheduleTemp.PGBackRest.Options + " --repo1-retention-diff=" + keepStr
 		}
 	}
 	cmSchedule, err := json.Marshal(scheduleTemp)
 	if err != nil {
-		return nil, errors.Wrap(err, "masrshal schedule template")
+		return nil, errors.Wrap(err, "marshal schedule template")
 	}
 	data := map[string]string{
 		"schedule": string(cmSchedule),

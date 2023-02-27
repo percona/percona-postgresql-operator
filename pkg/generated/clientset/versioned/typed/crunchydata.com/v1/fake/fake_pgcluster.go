@@ -35,9 +35,9 @@ type FakePgclusters struct {
 	ns   string
 }
 
-var pgclustersResource = schema.GroupVersionResource{Group: "pg.percona.com", Version: "v1", Resource: "pgclusters"}
+var pgclustersResource = schema.GroupVersionResource{Group: "crunchydata.com", Version: "v1", Resource: "pgclusters"}
 
-var pgclustersKind = schema.GroupVersionKind{Group: "pg.percona.com", Version: "v1", Kind: "Pgcluster"}
+var pgclustersKind = schema.GroupVersionKind{Group: "crunchydata.com", Version: "v1", Kind: "Pgcluster"}
 
 // Get takes name of the pgcluster, and returns the corresponding pgcluster object, and an error if there is any.
 func (c *FakePgclusters) Get(ctx context.Context, name string, options v1.GetOptions) (result *crunchydatacomv1.Pgcluster, err error) {
@@ -116,7 +116,7 @@ func (c *FakePgclusters) UpdateStatus(ctx context.Context, pgcluster *crunchydat
 // Delete takes name of the pgcluster and deletes it. Returns an error if one occurs.
 func (c *FakePgclusters) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(pgclustersResource, c.ns, name), &crunchydatacomv1.Pgcluster{})
+		Invokes(testing.NewDeleteActionWithOptions(pgclustersResource, c.ns, name, opts), &crunchydatacomv1.Pgcluster{})
 
 	return err
 }

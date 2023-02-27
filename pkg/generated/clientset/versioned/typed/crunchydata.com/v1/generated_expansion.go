@@ -17,6 +17,8 @@ limitations under the License.
 
 package v1
 
+type PerconaPGClusterExpansion interface{}
+
 type PgclusterExpansion interface{}
 
 type PgpolicyExpansion interface{}
@@ -24,5 +26,3 @@ type PgpolicyExpansion interface{}
 type PgreplicaExpansion interface{}
 
 type PgtaskExpansion interface{}
-
-type PerconaPGClusterExpansiom interface{}
