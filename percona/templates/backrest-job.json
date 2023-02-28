@@ -109,6 +109,7 @@
                         }
                     }]
                 }],
+                "affinity": <affinity>,
                 "restartPolicy": "Never"
             }
         }

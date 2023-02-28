@@ -65,6 +65,10 @@ type backrestJobTemplateFields struct {
 	PgbackrestRestoreVolumes      string
 	PgbackrestRestoreVolumeMounts string
 	Tolerations                   string
+	NodeSelector                  string
+	PodAntiAffinity               string
+	PodAntiAffinityLabelName      string
+	PodAntiAffinityLabelValue     string
 }
 
 var (
@@ -139,6 +143,10 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 		BackrestLocalAndS3Storage:     operator.IsLocalAndS3Storage(cluster),
 		PgbackrestS3VerifyTLS:         task.Spec.Parameters[config.LABEL_BACKREST_S3_VERIFY_TLS],
 		Tolerations:                   util.GetTolerations(cluster.Spec.Tolerations),
+		NodeSelector:                  operator.GetNodeAffinity(cluster.Spec.NodeAffinity.Default),
+		PodAntiAffinity:               operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentDefault, cluster.Spec.PodAntiAffinity.Default),
+		PodAntiAffinityLabelName:      config.LABEL_POD_ANTI_AFFINITY,
+		PodAntiAffinityLabelValue:     string(cluster.Spec.PodAntiAffinity.Default),
 	}
 
 	podCommandOpts, err := getCommandOptsFromPod(clientset, task, namespace)
