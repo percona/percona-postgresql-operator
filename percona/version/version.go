@@ -10,10 +10,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/percona/version/service/client"
-	"github.com/percona/percona-postgresql-operator/percona/version/service/client/version_service"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version/service/client"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version/service/client/version_service"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/pg.percona.com/v2beta1"
 )
 
 const (

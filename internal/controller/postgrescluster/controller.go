@@ -42,15 +42,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
-	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/internal/pgbouncer"
-	"github.com/percona/percona-postgresql-operator/internal/pgmonitor"
-	"github.com/percona/percona-postgresql-operator/internal/pgstatmonitor"
-	"github.com/percona/percona-postgresql-operator/internal/pki"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (

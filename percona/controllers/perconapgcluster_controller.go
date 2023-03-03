@@ -15,12 +15,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	"github.com/percona/percona-postgresql-operator/percona/version"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/pmm"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (

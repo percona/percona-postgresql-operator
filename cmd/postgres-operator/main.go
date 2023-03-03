@@ -26,13 +26,13 @@ import (
 	cruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/upgradecheck"
-	"github.com/percona/percona-postgresql-operator/internal/util"
-	percona "github.com/percona/percona-postgresql-operator/percona/controllers"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
+	percona "github.com/percona/percona-postgresql-operator/v2/percona/controllers"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/pg.percona.com/v2beta1"
 )
 
 var versionString string

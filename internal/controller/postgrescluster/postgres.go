@@ -33,16 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
-	"github.com/percona/percona-postgresql-operator/internal/pgstatmonitor"
-	"github.com/percona/percona-postgresql-operator/internal/postgis"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	pgpassword "github.com/percona/percona-postgresql-operator/internal/postgres/password"
-	"github.com/percona/percona-postgresql-operator/internal/util"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgis"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	pgpassword "github.com/percona/percona-postgresql-operator/v2/internal/postgres/password"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 // generatePostgresUserSecret returns a Secret containing a password and

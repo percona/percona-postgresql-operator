@@ -36,14 +36,14 @@ linters-settings:
       - net/http/httptest: Should be used only in tests.
       - testing/*: The "testing" packages should be used only in tests.
 
-      - github.com/percona/percona-postgresql-operator/internal/testing/*: >
+      - github.com/percona/percona-postgresql-operator/v2/internal/testing/*: >
           The "internal/testing" packages should be used only in tests.
 
   exhaustive:
     default-signifies-exhaustive: true
 
   goimports:
-    local-prefixes: github.com/percona/percona-postgresql-operator
+    local-prefixes: github.com/percona/percona-postgresql-operator/v2
 
   gomodguard:
     blocked:

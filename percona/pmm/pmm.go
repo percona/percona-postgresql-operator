@@ -4,7 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/pg.percona.com/v2beta1"
 )
 
 func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
