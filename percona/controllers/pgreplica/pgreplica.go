@@ -22,6 +22,9 @@ import (
 )
 
 func CreateReplicaResource(clientset kubeapi.Interface, cluster *crv1.PerconaPGCluster, index int) error {
+	if cluster.Spec.PGReplicas == nil {
+		return nil
+	}
 	ctx := context.TODO()
 	replica := getNewReplicaObject(cluster, &crv1.Pgreplica{}, index)
 	_, err := clientset.CrunchydataV1().Pgreplicas(cluster.Namespace).Create(ctx, replica, metav1.CreateOptions{})
@@ -195,9 +198,6 @@ func getNewReplicaObject(cluster *crv1.PerconaPGCluster, replica *crv1.Pgreplica
 		replica.ObjectMeta.Annotations[k] = v
 	}
 
-	if cluster.Spec.PGReplicas.HotStandby.Affinity != nil {
-		replica.Spec.NodeAffinity = cluster.Spec.PGReplicas.HotStandby.Affinity.NodeAffinity
-	}
 	replica.Spec.Name = labels[config.LABEL_NAME]
 	replica.Spec.ReplicaStorage = storage
 	replica.Spec.UserLabels = cluster.Spec.UserLabels

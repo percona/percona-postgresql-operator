@@ -2,7 +2,7 @@ apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   labels:
-    pgo-version: 1.3.0
+    pgo-version: 1.4.0
   name: cluster1
 spec:
 #  secretsName: cluster1-users
@@ -11,7 +11,7 @@ spec:
 #  sslReplicationSecretName: cluster1-ssl-keypair
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
-    apply: 14-recommended
+    apply: disabled
     schedule: "0 4 * * *"
   database: pgdb
   port: "5432"
@@ -41,7 +41,7 @@ spec:
 #      storageclass: ""
 #      matchLabels: ""
 #  userLabels:
-#    pgo-version: "1.3.0"
+#    pgo-version: "1.4.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
 #    imagePullPolicy: Always
@@ -52,8 +52,21 @@ spec:
 #      limits:
 #        cpu: 500m
 #        memory: "256Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
+#       nodeAffinityType: required
+#       nodeLabel:
+#         kubernetes.io/region: us-central1
+#       advanced:
+#         nodeAffinity:
+#           requiredDuringSchedulingIgnoredDuringExecution:
+#             nodeSelectorTerms:
+#             - matchExpressions:
+#               - key: kubernetes.io/e2e-az-name
+#                 operator: In
+#                 values:
+#                 - e2e-az1
+#                 - e2e-az2
     tolerations: []
     volumeSpec:
       size: 1Gi
@@ -71,7 +84,7 @@ spec:
 #    customconfig: ""
   pmm:
     enabled: false
-    image: percona/pmm-client:2.26.0
+    image: percona/pmm-client:2.29.0
 #    imagePullPolicy: Always
     serverHost: monitoring-service
     serverUser: admin
@@ -94,8 +107,8 @@ spec:
 #      limits:
 #        cpu: "1"
 #        memory: "64Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
     volumeSpec:
       size: 1Gi
       accessmode: ReadWriteOnce
@@ -116,6 +129,7 @@ spec:
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
 #    imagePullPolicy: Always
+#    exposePostgresUser: false
     size: 3
     resources:
       requests:
@@ -124,8 +138,8 @@ spec:
 #      limits:
 #        cpu: "2"
 #        memory: "512Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
     expose:
       serviceType: ClusterIP
 #      loadBalancerSourceRanges:

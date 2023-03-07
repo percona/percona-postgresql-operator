@@ -8,7 +8,7 @@ metadata:
     deployment-name: some-name
     name: some-name
     pg-cluster: some-name
-    pgo-version: 1.3.0
+    pgo-version: 1.4.0
     pgouser: admin
   name: some-name
 spec:
@@ -17,9 +17,11 @@ spec:
   port: "5432"
   user: pguser
   userLabels:
-    pgo-version: "1.3.0"
+    pgo-version: "1.4.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
+    affinity:
+     antiAffinityType: preferred
     resources:
         requests:
           memory: "128Mi"
@@ -33,12 +35,16 @@ spec:
   backup:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest
     backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg13-pgbackrest-repo
+    affinity:
+     antiAffinityType: preferred
     resources:
         requests:
           memory: "48Mi"
         limits: {}
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg13-pgbouncer
+    affinity:
+     antiAffinityType: preferred
     size: 1
     resources:
         requests:

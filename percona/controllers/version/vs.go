@@ -52,6 +52,10 @@ func (vs VersionServiceClient) GetExactVersion(cr *api.PerconaPGCluster, endpoin
 		return DepVersion{}, errors.Wrap(err, "version service apply")
 	}
 
+	if !VersionUpgradeEnabled(cr) {
+		return DepVersion{}, nil
+	}
+
 	if len(resp.Payload.Versions) == 0 {
 		return DepVersion{}, errors.New("empty versions response")
 	}

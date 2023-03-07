@@ -53,6 +53,7 @@ type Templates struct {
 	backrestRepoDeploymentTemplateData []byte
 	bouncerTemplateData                []byte
 	pgBadgerTemplateData               []byte
+	backrestJobTemplateData            []byte
 }
 
 type CronRegistry struct {
@@ -129,14 +130,14 @@ func (c *Controller) onAdd(obj interface{}) {
 	l.statusMutex.Lock()
 	defer l.statusMutex.Unlock()
 
+	newCluster.CheckAndSetDefaults()
+
 	err = version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
 	if err != nil {
 		log.Errorf("ensure version: %s", err)
 	}
-
-	newCluster.CheckAndSetDefaults()
 
 	err = c.updateTemplates(newCluster)
 	if err != nil {
@@ -230,6 +231,10 @@ func (c *Controller) updateTemplates(newCluster *crv1.PerconaPGCluster) error {
 	if err != nil {
 		return errors.Wrap(err, "update backrest repo deployment template")
 	}
+	err = template.UpdateBackrestJobTemplate(c.templates.backrestJobTemplateData, newCluster)
+	if err != nil {
+		return errors.Wrap(err, "update backrest job template")
+	}
 	err = template.UpdateBouncerTemplate(c.templates.bouncerTemplateData, newCluster, newCluster.Name)
 	if err != nil {
 		return errors.Wrap(err, "update bouncer deployment template")
@@ -272,12 +277,17 @@ func (c *Controller) setControllerTemplatesData() error {
 	}
 	pgBadgerTemplateData, err := ioutil.ReadFile(template.Path + template.PGBadgerTemplateName)
 	if err != nil {
-		return errors.Wrap(err, "new bouncer template data")
+		return errors.Wrap(err, "new pgBadger template data")
+	}
+	backrestJobTemplateData, err := ioutil.ReadFile(template.Path + template.BackrestJobTemplateName)
+	if err != nil {
+		return errors.Wrap(err, "new backrestJob template data")
 	}
 	c.templates.deploymentTemplateData = deploymentTemplateData
 	c.templates.backrestRepoDeploymentTemplateData = backrestRepodeploymentTemplateData
 	c.templates.bouncerTemplateData = bouncerTemplateData
 	c.templates.pgBadgerTemplateData = pgBadgerTemplateData
+	c.templates.backrestJobTemplateData = backrestJobTemplateData
 
 	return nil
 }
@@ -461,7 +471,12 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	}
 
 	newCluster.CheckAndSetDefaults()
-	err := c.handleInternalSecrets(newCluster)
+	err := c.updateTemplates(newCluster)
+	if err != nil {
+		log.Errorf("update perconapgcluster: update templates: %s", err)
+		return
+	}
+	err = c.handleInternalSecrets(newCluster)
 	if err != nil {
 		log.Errorf("update perconapgcluster: handle internal secrets: %s", err)
 		return
@@ -493,11 +508,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	if err != nil {
 		log.Errorf("update perconapgcluster: scheduled update: %s", err)
 	}
-	err = c.updateTemplates(newCluster)
-	if err != nil {
-		log.Errorf("update perconapgcluster: update templates: %s", err)
-		return
-	}
+
 	if !reflect.DeepEqual(oldCluster.Spec.PGPrimary.Expose, newCluster.Spec.PGPrimary.Expose) {
 		err = service.CreateOrUpdate(c.Client, newCluster, service.PGPrimaryServiceType)
 		if err != nil {

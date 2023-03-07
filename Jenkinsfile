@@ -1,28 +1,70 @@
 GKERegion='us-central1-c'
 
-void CreateCluster(String CLUSTER_PREFIX) {
+void CreateCluster(String CLUSTER_SUFFIX) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
-            export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_PREFIX}
+            export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
+            export USE_GKE_GCLOUD_AUTH_PLUGIN=True
             source $HOME/google-cloud-sdk/path.bash.inc
-            gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
-            gcloud config set project $GCP_PROJECT
-            gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_PREFIX} --cluster-version=1.20 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${CLUSTER_PREFIX} --no-enable-autoupgrade
-            kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com
+            ret_num=0
+            while [ \${ret_num} -lt 15 ]; do
+                ret_val=0
+                gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+                gcloud config set project $GCP_PROJECT
+                gcloud container clusters create --zone=${GKERegion} $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.21 --machine-type=n1-standard-4 --preemptible --num-nodes=3 --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 && \
+                kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
+                if [ \${ret_val} -eq 0 ]; then break; fi
+                ret_num=\$((ret_num + 1))
+            done
+            if [ \${ret_num} -eq 15 ]; then
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $GKERegion --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
+                exit 1
+            fi
         """
    }
 }
-void ShutdownCluster(String CLUSTER_PREFIX) {
+
+void ShutdownCluster(String CLUSTER_SUFFIX) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
-            export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_PREFIX}
+            export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
+            export USE_GKE_GCLOUD_AUTH_PLUGIN=True
             source $HOME/google-cloud-sdk/path.bash.inc
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
-            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-${CLUSTER_PREFIX}
+            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX}
         """
    }
 }
+
+void DeleteOldClusters(String FILTER) {
+    withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
+        sh """
+            if [ -f $HOME/google-cloud-sdk/path.bash.inc ]; then
+                export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+                source $HOME/google-cloud-sdk/path.bash.inc
+                gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+                gcloud config set project $GCP_PROJECT
+                for GKE_CLUSTER in \$(gcloud container clusters list --format='csv[no-heading](name)' --filter="$FILTER"); do
+                    GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
+                    retry=0
+                    while [ "\$GKE_CLUSTER_STATUS" == "PROVISIONING" ]; do
+                        echo "Cluster \$GKE_CLUSTER is being provisioned, waiting before delete."
+                        sleep 10
+                        GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
+                        let retry+=1
+                        if [ \$retry -ge 60 ]; then
+                            echo "Cluster \$GKE_CLUSTER to delete is being provisioned for too long. Skipping..."
+                            break
+                        fi
+                    done
+                    gcloud container clusters delete --async --zone $GKERegion --quiet \$GKE_CLUSTER || true
+                done
+            fi
+        """
+   }
+}
+
 void pushLogFile(String FILE_NAME) {
     LOG_FILE_PATH="e2e-tests/logs/${FILE_NAME}.log"
     LOG_FILE_NAME="${FILE_NAME}.log"
@@ -31,7 +73,7 @@ void pushLogFile(String FILE_NAME) {
         sh """
             S3_PATH=s3://percona-jenkins-artifactory-public/\$JOB_NAME/\$(git rev-parse --short HEAD)
             aws s3 ls \$S3_PATH/${LOG_FILE_NAME} || :
-            aws s3 cp --quiet ${LOG_FILE_PATH} \$S3_PATH/${LOG_FILE_NAME} || :
+            aws s3 cp --content-type text/plain --quiet ${LOG_FILE_PATH} \$S3_PATH/${LOG_FILE_NAME} || :
         """
     }
 }
@@ -65,9 +107,12 @@ testsReportMap  = [:]
 testsResultsMap = [:]
 
 void makeReport() {
+    def wholeTestAmount=sh(script: "ls -l e2e-tests/| grep ^d| egrep -v 'conf|data-migration-gcs|license|logs' | wc -l", , returnStdout: true).trim()
+    def startedTestAmount = testsReportMap.size()
     for ( test in testsReportMap ) {
         TestsReport = TestsReport + "\r\n| ${test.key} | ${test.value} |"
     }
+    TestsReport = TestsReport + "\r\n| We run $startedTestAmount out of $wholeTestAmount|"
 }
 
 void setTestsresults() {
@@ -76,7 +121,7 @@ void setTestsresults() {
     }
 }
 
-void runTest(String TEST_NAME, String CLUSTER_PREFIX) {
+void runTest(String TEST_NAME, String CLUSTER_SUFFIX) {
     def retryCount = 0
     waitUntil {
         def testUrl = "https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator/${env.GIT_BRANCH}/${env.GIT_SHORT_COMMIT}/${TEST_NAME}.log"
@@ -85,12 +130,12 @@ void runTest(String TEST_NAME, String CLUSTER_PREFIX) {
             testsReportMap[TEST_NAME] = "[failed]($testUrl)"
             popArtifactFile("${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$TEST_NAME")
 
-            timeout(time: 90, unit: 'MINUTES') {
+            timeout(time: 120, unit: 'MINUTES') {
                 sh """
                     if [ -f "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$TEST_NAME" ]; then
                         echo Skip $TEST_NAME test
                     else
-                        export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_PREFIX}
+                        export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
                         source $HOME/google-cloud-sdk/path.bash.inc
                         ./e2e-tests/$TEST_NAME/run
                     fi
@@ -108,16 +153,17 @@ void runTest(String TEST_NAME, String CLUSTER_PREFIX) {
             retryCount++
             return false
         }
+        finally {
+            pushLogFile(TEST_NAME)
+            echo "The $TEST_NAME test was finished!"
+        }
     }
-
-    pushLogFile(TEST_NAME)
-    echo "The $TEST_NAME test was finished!"
 }
 
 
-def skipBranchBulds = true
+def skipBranchBuilds = true
 if ( env.CHANGE_URL ) {
-    skipBranchBulds = false
+    skipBranchBuilds = false
 }
 def FILES_CHANGED = null
 def IMAGE_EXISTS = null
@@ -130,7 +176,7 @@ pipeline {
         GIT_SHORT_COMMIT = sh(script: 'git describe --always --dirty', , returnStdout: true).trim()
         GIT_PREV_SHORT_COMMIT = sh(script: 'git describe --always HEAD~1', , returnStdout: true).trim()
         VERSION = "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}"
-        CLUSTER_NAME = sh(script: "echo jenkins-pgo-${GIT_SHORT_COMMIT} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
+        CLUSTER_NAME = sh(script: "echo jen-pg-${env.CHANGE_ID}-${GIT_SHORT_COMMIT}-${env.BUILD_NUMBER} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
         PGO_K8S_NAME = "${env.CLUSTER_NAME}-upstream"
         AUTHOR_NAME  = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
         ECR = "119175775298.dkr.ecr.us-east-1.amazonaws.com"
@@ -139,11 +185,14 @@ pipeline {
     agent {
         label 'docker'
     }
+    options {
+        disableConcurrentBuilds(abortPrevious: true)
+    }
     stages {
         stage('Prepare') {
             when {
                 expression {
-                    !skipBranchBulds
+                    !skipBranchBuilds
                 }
             }
             steps {
@@ -183,8 +232,8 @@ pipeline {
                 '''
                 script {
                     FILES_CHANGED = sh(script: "git diff --name-only HEAD HEAD~1 | grep -Ev 'e2e-tests|Jenkinsfile' | head -1", , returnStdout: true).trim() ?: null
-                    IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $VERSION | head -1', , returnStdout: true).trim() ?: null
-                    PREVIOUS_IMAGE_EXISTS = sh(script: 'curl https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT | head -1', , returnStdout: true).trim() ?: null
+                    IMAGE_EXISTS = sh(script: '[[ $(curl -s https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $VERSION | wc -l | grep -Eo \'[0-9]+\') == 6 ]] && echo true || : ', , returnStdout: true).trim() ?: null
+                    PREVIOUS_IMAGE_EXISTS = sh(script: '[[ $(curl -s https://registry.hub.docker.com/v1/repositories/perconalab/percona-postgresql-operator/tags | jq -r \'.[].name\' | grep $GIT_BRANCH-$GIT_PREV_SHORT_COMMIT | wc -l | grep -Eo \'[0-9]+\') == 6 ]] && echo true || :  ', , returnStdout: true).trim() ?: null
                 }
                 withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
                     sh '''
@@ -192,12 +241,13 @@ pipeline {
                         cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
                     '''
                 }
+                DeleteOldClusters("jen-pg-$CHANGE_ID")
             }
         }
         stage('Retag previous commit images if possible'){
             when {
                 allOf {
-                    expression { !skipBranchBulds }
+                    expression { !skipBranchBuilds }
                     allOf {
                         expression { FILES_CHANGED == null }
                         expression { IMAGE_EXISTS == null }
@@ -236,7 +286,7 @@ pipeline {
         stage('Build docker image') {
             when {
                 allOf {
-                    expression { !skipBranchBulds }
+                    expression { !skipBranchBuilds }
                     anyOf {
                         allOf {
                             expression { FILES_CHANGED != null }
@@ -274,7 +324,7 @@ pipeline {
         stage('Save dummy URI_BASE') {
             when {
                 allOf {
-                    expression { !skipBranchBulds }
+                    expression { !skipBranchBuilds }
                     expression { IMAGE_EXISTS != null }
                 }
             }
@@ -293,7 +343,7 @@ pipeline {
         stage('GoLicenseDetector test') {
             when {
                 expression {
-                    !skipBranchBulds
+                    !skipBranchBuilds
                 }
             }
             steps {
@@ -306,8 +356,8 @@ pipeline {
                             -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                             -w /go/src/github.com/percona/percona-postgresql-operator \
                             -e GO111MODULE=on \
-                            golang:1.17 sh -c '
-                                go get github.com/google/go-licenses;
+                            golang:1.18 sh -c '
+                                go install github.com/google/go-licenses@latest;
                                 /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/apiserver \
                                     | cut -d , -f 3 \
                                     | sort -u \
@@ -336,7 +386,7 @@ pipeline {
         stage('GoLicense test') {
             when {
                 expression {
-                    !skipBranchBulds
+                    !skipBranchBuilds
                 }
             }
             steps {
@@ -349,7 +399,7 @@ pipeline {
                             -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                             -w /go/src/github.com/percona/percona-postgresql-operator \
                             -e GO111MODULE=on \
-                            golang:1.17 sh -c 'go build -v -o apiserver github.com/percona/percona-postgresql-operator/cmd/apiserver;
+                            golang:1.18 sh -c 'go build -v -o apiserver github.com/percona/percona-postgresql-operator/cmd/apiserver;
                                                go build -v -o pgo-rmdata github.com/percona/percona-postgresql-operator/cmd/pgo-rmdata;
                                                go build -v -o pgo-scheduler github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler;
                                                go build -v -o postgres-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator '
@@ -394,11 +444,11 @@ pipeline {
         stage('Run tests for operator') {
             when {
                 expression {
-                    !skipBranchBulds
+                    !skipBranchBuilds
                 }
             }
             options {
-                timeout(time: 3, unit: 'HOURS')
+                timeout(time: 5, unit: 'HOURS')
             }
             parallel {
                 stage('E2E Basic tests') {
@@ -420,12 +470,18 @@ pipeline {
                         ShutdownCluster('sandbox')
                     }
                 }
-                stage('E2E Backups') {
+                stage('E2E demand-backup') {
                     steps {
-                        CreateCluster('backups')
-                        runTest('demand-backup', 'backups')
-                        runTest('scheduled-backup', 'backups')
-                        ShutdownCluster('backups')
+                        CreateCluster('demand-backup')
+                        runTest('demand-backup', 'demand-backup')
+                        ShutdownCluster('demand-backup')
+                    }
+                }
+                stage('E2E scheduled-backup') {
+                    steps {
+                        CreateCluster('scheduled-backup')
+                        runTest('scheduled-backup', 'scheduled-backup')
+                        ShutdownCluster('scheduled-backup')
                     }
                 }
                 stage('E2E Upgrade') {
@@ -433,8 +489,14 @@ pipeline {
                         CreateCluster('upgrade')
                         runTest('upgrade', 'upgrade')
                         runTest('smart-update', 'upgrade')
-                        runTest('version-service', 'upgrade')
                         ShutdownCluster('upgrade')
+                    }
+                }
+                stage('E2E Version-service') {
+                    steps {
+                        CreateCluster('version-service')
+                        runTest('version-service', 'version-service')
+                        ShutdownCluster('version-service')
                     }
                 }
             }
@@ -444,7 +506,7 @@ pipeline {
         always {
             script {
                 setTestsresults()
-                if (currentBuild.result != null && currentBuild.result != 'SUCCESS') {
+                if (currentBuild.result != null && currentBuild.result != 'SUCCESS' && currentBuild.result != 'NOT_BUILT') {
                     try {
                         slackSend channel: "@${AUTHOR_NAME}", color: '#FF0000', message: "[${JOB_NAME}]: build ${currentBuild.result}, ${BUILD_URL} owner: @${AUTHOR_NAME}"
                     }
@@ -460,29 +522,21 @@ pipeline {
                             comment.delete()
                         }
                     }
-                    makeReport()
-                    unstash 'URI_BASE'
-                    def URI_BASE = sh(returnStdout: true, script: "cat results/docker/URI_BASE").trim()
-                    TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${URI_BASE}-pgo-apiserver`\r\n\r\nimage: `${URI_BASE}-pgo-event`\r\n\r\nimage: `${URI_BASE}-pgo-rmdata`\r\n\r\nimage: `${URI_BASE}-pgo-scheduler`\r\n\r\nimage: `${URI_BASE}-postgres-operator`\r\n\r\nimage: `${URI_BASE}-pgo-deployer`\r\n"
-                    pullRequest.comment(TestsReport)
-
-                    withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
-                        sh """
-                            source $HOME/google-cloud-sdk/path.bash.inc
-                            gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
-                            gcloud config set project $GCP_PROJECT
-                            gcloud container clusters list --format='csv[no-heading](name)' --filter $CLUSTER_NAME | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
-                            sudo docker rmi -f \$(sudo docker images -q) || true
-                            sudo rm -rf $HOME/google-cloud-sdk
-                        """
+                    if (currentBuild.result != 'NOT_BUILT') {
+                        makeReport()
+                        unstash 'URI_BASE'
+                        def URI_BASE = sh(returnStdout: true, script: "cat results/docker/URI_BASE").trim()
+                        TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${URI_BASE}-pgo-apiserver`\r\n\r\nimage: `${URI_BASE}-pgo-event`\r\n\r\nimage: `${URI_BASE}-pgo-rmdata`\r\n\r\nimage: `${URI_BASE}-pgo-scheduler`\r\n\r\nimage: `${URI_BASE}-postgres-operator`\r\n\r\nimage: `${URI_BASE}-pgo-deployer`\r\n"
+                        pullRequest.comment(TestsReport)
                     }
                 }
             }
-            sh '''
-                sudo docker rmi -f \$(sudo docker images -q) || true
+            DeleteOldClusters("$CLUSTER_NAME")
+            sh """
+                sudo docker system prune -fa
                 sudo rm -rf ./*
                 sudo rm -rf $HOME/google-cloud-sdk
-            '''
+            """
             deleteDir()
         }
     }

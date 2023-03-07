@@ -16,6 +16,9 @@ function deploy_version_service {
 		--from-file "${test_dir}/conf/operator.9.9.9.pg-operator.dep.json" \
 		--from-file "${test_dir}/conf/operator.9.9.9.pg-operator.json"
 	kubectl_bin apply -f "${test_dir}/conf/vs.yml"
+	$sed 's/version-service/version-service-cr/g' "${test_dir}/conf/vs.yml" \
+		| yq w - -d0 'spec.template.spec.containers[0].image' $(yq r -d0 "${test_dir}/conf/vs.yml" 'spec.template.spec.containers[0].image') \
+		| kubectl_bin apply -f -
 	sleep 10
 }
 
@@ -36,6 +39,8 @@ function apply_version {
 	sleep 10
 
 	wait_smart_update ${cluster} ${update_finished_log_entries}
+	kubectl_bin delete jobs --selector=pg-cluster=cluster1
+	create_backup "${cluster}" "fulldata" "full"
 
 	verify_applied_version ${cluster} ${version_to_upgrade} ${release_channel} ${db_version}
 }
@@ -54,16 +59,73 @@ function verify_applied_version {
 	diff -u "${tmp_dir}/${version_to_upgrade}-deployed-${release_channel}-images.txt" "${test_dir}/compare/${db_version}.txt"
 }
 
+function check_telemetry_transfer {
+	local cr_vs_uri=${1}
+	local cr_vs_channel=${2:-"disabled"}
+	local telemetry_state=${3:-"enabled"}
+	local cluster=minimal
+
+	yq r "${src_dir}/deploy/cr-minimal.yaml" \
+		| yq w - 'spec.upgradeOptions.versionServiceEndpoint' "${cr_vs_uri}" \
+		| yq w - 'spec.upgradeOptions.apply' ${cr_vs_channel} \
+			>${tmp_dir}/cr.minimal.apply.${cr_vs_channel}.yaml
+	spinup_pgcluster "${cluster}" "${tmp_dir}/cr.minimal.apply.${cr_vs_channel}.yaml"
+
+	kubectl_bin logs $(kubectl get pods --selector=run=version-service-cr -o jsonpath='{.items[0].metadata.name}') \
+		| grep -E 'server request payload|unary call' \
+		| grep -Eo '\{.*\}' \
+		| jq 'del(."grpc.request.content".msg.customResourceUid)' \
+		| jq 'del(."grpc.start_time")' \
+		| jq 'del(."grpc.time_ms")' \
+			>${tmp_dir}/${telemetry_state}_telemetry.version-service-cr.log.json
+
+	kubectl_bin logs $(kubectl get pods --selector=run=version-service -o jsonpath='{.items[0].metadata.name}') \
+		| grep -E 'server request payload|unary call' \
+		| grep -Eo '\{.*\}' \
+		| jq 'del(."grpc.request.content".msg.customResourceUid)' \
+		| jq 'del(."grpc.start_time")' \
+		| jq 'del(."grpc.time_ms")' \
+			>${tmp_dir}/${telemetry_state}_telemetry.version-service.log.json
+
+	diff -u ${tmp_dir}/${telemetry_state}_telemetry.version-service.log.json ${test_dir}/compare/${telemetry_state}_telemetry.version-service.log.json
+	[[ ${telemetry_state} == "disabled" && ${cr_vs_channel} == "recommended" ]] \
+		&& diff -u ${tmp_dir}/enabled_telemetry.version-service-cr.log.json ${test_dir}/compare/enabled_telemetry.version-service-cr.log.json \
+		|| diff -u ${tmp_dir}/${telemetry_state}_telemetry.version-service-cr.log.json ${test_dir}/compare/${telemetry_state}_telemetry.version-service-cr.log.json
+
+	kubectl_bin delete perconapgcluster/${cluster}
+	wait_job_completion $(kubectl_bin -n ${namespace} get job --selector=pg-cluster=${cluster},pgrmdata='true' -o jsonpath='{.items[0].metadata.name}')
+}
+
 main() {
-
 	create_namespace $namespace
-	deploy_operator
-
+	deploy_operator "" "${src_dir}/deploy/operator.yaml" "disabled" "install" "${namespace}" "false" ${VS_ENDPOINT}
 	deploy_version_service
+
+	check_telemetry_transfer "http://version-service-cr:11000" "disabled" "enabled"
+
+	kubectl_bin -n $namespace delete pod --selector=run=version-service
+	wait_deployment 'version-service'
+	kubectl_bin -n $namespace delete pod --selector=run=version-service-cr
+	wait_deployment 'version-service-cr'
+
+	# Disabling telemetry on the operator level
+	kubectl_bin -n $namespace patch deployment/postgres-operator \
+		--type json \
+		-p='[{"op":"replace","path":"/spec/template/spec/containers/1/env/7","value":{"name":"DISABLE_TELEMETRY","value":"true"}}]'
+	wait_deployment 'postgres-operator'
+
+	check_telemetry_transfer "http://version-service-cr:11000" "disabled" "disabled"
+	check_telemetry_transfer "http://version-service-cr:11000" "recommended" "disabled"
+
+	# Enabling telemetry on the operator level
+	kubectl_bin -n $namespace patch deployment/postgres-operator \
+		--type json \
+		-p='[{"op":"replace","path":"/spec/template/spec/containers/1/env/7","value":{"name":"DISABLE_TELEMETRY","value":"false"}}]'
+	wait_deployment 'postgres-operator'
 
 	desc 'Use simple recommended channel'
 	cluster="cluster1"
-	PGO_TAG='1.2.0'
+	PGO_TAG='1.3.0'
 	PG_VER='13'
 	IMAGE_PGBOUNCER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbouncer"
 	IMAGE_PG_HA="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-postgres-ha"
@@ -148,7 +210,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "${PG_VER}.6" ${PG_VER} "${VS_ENDPOINT}" 4
+	apply_version ${cluster} '9.9.9' "${PG_VER}.7" ${PG_VER} "${VS_ENDPOINT}" 4
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"

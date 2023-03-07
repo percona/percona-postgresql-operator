@@ -2,7 +2,7 @@ apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   labels:
-    pgo-version: 1.3.0
+    pgo-version: 1.4.0
   name: some-name
 spec:
 #  secretsName: some-name-users
@@ -41,8 +41,10 @@ spec:
 #      storageclass: ""
 #      matchLabels: ""
 #  userLabels:
-#    pgo-version: "1.3.0"
+#    pgo-version: "1.4.0"
   pgPrimary:
+    affinity:
+     antiAffinityType: preferred
     image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
     imagePullPolicy: Always
     resources:
@@ -81,6 +83,8 @@ spec:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
     imagePullPolicy: Always
     backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest-repo
+    affinity:
+     antiAffinityType: preferred
     resources:
       requests:
         memory: "48Mi"
@@ -107,6 +111,8 @@ spec:
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
     imagePullPolicy: Always
+    affinity:
+     antiAffinityType: preferred
     size: 3
     resources:
       requests:
