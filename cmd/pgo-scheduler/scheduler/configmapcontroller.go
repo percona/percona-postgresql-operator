@@ -60,7 +60,7 @@ func (c *Controller) onDelete(obj interface{}) {
 	c.Scheduler.DeleteSchedule(cm)
 }
 
-// onDelete is called when a configMap is updated
+// onUpdate is called when a configMap is updated
 func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 	oldCm, ok := oldObj.(*v1.ConfigMap)
 	if !ok {
