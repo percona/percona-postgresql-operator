@@ -406,6 +406,7 @@ func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.TLS.TLSSecret = pgc.Spec.SSLSecretName
 	cluster.Spec.TLS.ReplicationTLSSecret = pgc.Spec.SSLReplicationSecretName
 	cluster.Spec.PgBouncer.TLSSecret = pgc.Spec.SSLSecretName
+	cluster.Spec.PgBouncer.ServiceType = pgc.Spec.PGBouncer.Expose.ServiceType
 
 	return cluster
 }
