@@ -165,11 +165,12 @@ type Storage struct {
 }
 
 type CronJob struct {
-	Name     string `json:"name"`
-	Schedule string `json:"schedule"`
-	Keep     int64  `json:"keep"`
-	Type     string `json:"type"`
-	Storage  string `json:"storage"`
+	Name           string `json:"name"`
+	Schedule       string `json:"schedule"`
+	Keep           int64  `json:"keep"`
+	Type           string `json:"type"`
+	Storage        string `json:"storage"`
+	PGBackrestOpts string `json:"backrestOpts,omitempty"`
 }
 
 // PMMSpec contains settings for PMM

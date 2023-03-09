@@ -29,42 +29,42 @@ import (
 	rest "k8s.io/client-go/rest"
 )
 
-// PerconaPGClustersGetter has a method to return a PgclusterInterface.
+// PerconaPGClustersGetter has a method to return a PerconaPGClusterInterface.
 // A group's client should implement this interface.
 type PerconaPGClustersGetter interface {
 	PerconaPGClusters(namespace string) PerconaPGClusterInterface
 }
 
-// PgclusterInterface has methods to work with Pgcluster resources.
+// PerconaPGClusterInterface has methods to work with PerconaPGCluster resources.
 type PerconaPGClusterInterface interface {
-	Create(ctx context.Context, pgcluster *v1.PerconaPGCluster, opts metav1.CreateOptions) (*v1.PerconaPGCluster, error)
-	Update(ctx context.Context, pgcluster *v1.PerconaPGCluster, opts metav1.UpdateOptions) (*v1.PerconaPGCluster, error)
-	UpdateStatus(ctx context.Context, pgcluster *v1.PerconaPGCluster, opts metav1.UpdateOptions) (*v1.PerconaPGCluster, error)
+	Create(ctx context.Context, perconaPGCluster *v1.PerconaPGCluster, opts metav1.CreateOptions) (*v1.PerconaPGCluster, error)
+	Update(ctx context.Context, perconaPGCluster *v1.PerconaPGCluster, opts metav1.UpdateOptions) (*v1.PerconaPGCluster, error)
+	UpdateStatus(ctx context.Context, perconaPGCluster *v1.PerconaPGCluster, opts metav1.UpdateOptions) (*v1.PerconaPGCluster, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PerconaPGCluster, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PerconaPGClusterList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PerconaPGCluster, err error)
-	PgclusterExpansion
+	PerconaPGClusterExpansion
 }
 
-// perconapgclusters implements PgclusterInterface
-type perconapgclusters struct {
+// perconaPGClusters implements PerconaPGClusterInterface
+type perconaPGClusters struct {
 	client rest.Interface
 	ns     string
 }
 
-// newPgclusters returns a Pgclusters
-func newPerconaPGClusters(c *CrunchydataV1Client, namespace string) *perconapgclusters {
-	return &perconapgclusters{
+// newPerconaPGClusters returns a PerconaPGClusters
+func newPerconaPGClusters(c *CrunchydataV1Client, namespace string) *perconaPGClusters {
+	return &perconaPGClusters{
 		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
 
-// Get takes name of the pgcluster, and returns the corresponding pgcluster object, and an error if there is any.
-func (c *perconapgclusters) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PerconaPGCluster, err error) {
+// Get takes name of the perconaPGCluster, and returns the corresponding perconaPGCluster object, and an error if there is any.
+func (c *perconaPGClusters) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PerconaPGCluster, err error) {
 	result = &v1.PerconaPGCluster{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -76,8 +76,8 @@ func (c *perconapgclusters) Get(ctx context.Context, name string, options metav1
 	return
 }
 
-// List takes label and field selectors, and returns the list of perconapgclusters that match those selectors.
-func (c *perconapgclusters) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PerconaPGClusterList, err error) {
+// List takes label and field selectors, and returns the list of PerconaPGClusters that match those selectors.
+func (c *perconaPGClusters) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PerconaPGClusterList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -93,8 +93,8 @@ func (c *perconapgclusters) List(ctx context.Context, opts metav1.ListOptions) (
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested perconapgclusters.
-func (c *perconapgclusters) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a watch.Interface that watches the requested perconaPGClusters.
+func (c *perconaPGClusters) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -108,28 +108,28 @@ func (c *perconapgclusters) Watch(ctx context.Context, opts metav1.ListOptions) 
 		Watch(ctx)
 }
 
-// Create takes the representation of a pgcluster and creates it.  Returns the server's representation of the pgcluster, and an error, if there is any.
-func (c *perconapgclusters) Create(ctx context.Context, pgcluster *v1.PerconaPGCluster, opts metav1.CreateOptions) (result *v1.PerconaPGCluster, err error) {
+// Create takes the representation of a perconaPGCluster and creates it.  Returns the server's representation of the perconaPGCluster, and an error, if there is any.
+func (c *perconaPGClusters) Create(ctx context.Context, perconaPGCluster *v1.PerconaPGCluster, opts metav1.CreateOptions) (result *v1.PerconaPGCluster, err error) {
 	result = &v1.PerconaPGCluster{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("perconapgclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(pgcluster).
+		Body(perconaPGCluster).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Update takes the representation of a pgcluster and updates it. Returns the server's representation of the pgcluster, and an error, if there is any.
-func (c *perconapgclusters) Update(ctx context.Context, pgcluster *v1.PerconaPGCluster, opts metav1.UpdateOptions) (result *v1.PerconaPGCluster, err error) {
+// Update takes the representation of a perconaPGCluster and updates it. Returns the server's representation of the perconaPGCluster, and an error, if there is any.
+func (c *perconaPGClusters) Update(ctx context.Context, perconaPGCluster *v1.PerconaPGCluster, opts metav1.UpdateOptions) (result *v1.PerconaPGCluster, err error) {
 	result = &v1.PerconaPGCluster{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("perconapgclusters").
-		Name(pgcluster.Name).
+		Name(perconaPGCluster.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(pgcluster).
+		Body(perconaPGCluster).
 		Do(ctx).
 		Into(result)
 	return
@@ -137,22 +137,22 @@ func (c *perconapgclusters) Update(ctx context.Context, pgcluster *v1.PerconaPGC
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *perconapgclusters) UpdateStatus(ctx context.Context, pgcluster *v1.PerconaPGCluster, opts metav1.UpdateOptions) (result *v1.PerconaPGCluster, err error) {
+func (c *perconaPGClusters) UpdateStatus(ctx context.Context, perconaPGCluster *v1.PerconaPGCluster, opts metav1.UpdateOptions) (result *v1.PerconaPGCluster, err error) {
 	result = &v1.PerconaPGCluster{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("perconapgclusters").
-		Name(pgcluster.Name).
+		Name(perconaPGCluster.Name).
 		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(pgcluster).
+		Body(perconaPGCluster).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Delete takes name of the pgcluster and deletes it. Returns an error if one occurs.
-func (c *perconapgclusters) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+// Delete takes name of the perconaPGCluster and deletes it. Returns an error if one occurs.
+func (c *perconaPGClusters) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("perconapgclusters").
@@ -163,7 +163,7 @@ func (c *perconapgclusters) Delete(ctx context.Context, name string, opts metav1
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *perconapgclusters) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *perconaPGClusters) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -178,8 +178,8 @@ func (c *perconapgclusters) DeleteCollection(ctx context.Context, opts metav1.De
 		Error()
 }
 
-// Patch applies the patch and returns the patched pgcluster.
-func (c *perconapgclusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PerconaPGCluster, err error) {
+// Patch applies the patch and returns the patched perconaPGCluster.
+func (c *perconaPGClusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PerconaPGCluster, err error) {
 	result = &v1.PerconaPGCluster{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

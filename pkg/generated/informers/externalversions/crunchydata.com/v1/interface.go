@@ -23,6 +23,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// PerconaPGClusters returns a PerconaPGClusterInformer.
+	PerconaPGClusters() PerconaPGClusterInformer
 	// Pgclusters returns a PgclusterInformer.
 	Pgclusters() PgclusterInformer
 	// Pgpolicies returns a PgpolicyInformer.
@@ -31,8 +33,6 @@ type Interface interface {
 	Pgreplicas() PgreplicaInformer
 	// Pgtasks returns a PgtaskInformer.
 	Pgtasks() PgtaskInformer
-
-	PerconaPGClusters() PerconaPGClusterInformer
 }
 
 type version struct {
@@ -44,6 +44,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// PerconaPGClusters returns a PerconaPGClusterInformer.
+func (v *version) PerconaPGClusters() PerconaPGClusterInformer {
+	return &perconaPGClusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Pgclusters returns a PgclusterInformer.
@@ -64,9 +69,4 @@ func (v *version) Pgreplicas() PgreplicaInformer {
 // Pgtasks returns a PgtaskInformer.
 func (v *version) Pgtasks() PgtaskInformer {
 	return &pgtaskInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// PerconaPGCluster returns a PgtaskInformer.
-func (v *version) PerconaPGClusters() PerconaPGClusterInformer {
-	return &perconaPGClusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

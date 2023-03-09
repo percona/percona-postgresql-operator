@@ -21,7 +21,6 @@ import (
 	"context"
 	time "time"
 
-	//	pv1 "github.com/percona/percona-postgresql-operator/percona/apis/percona.com/v1"
 	crunchydatacomv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	versioned "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/percona/percona-postgresql-operator/pkg/generated/informers/externalversions/internalinterfaces"
@@ -33,10 +32,10 @@ import (
 )
 
 // PerconaPGClusterInformer provides access to a shared informer and lister for
-// Pgclusters.
+// PerconaPGClusters.
 type PerconaPGClusterInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.PerconaPGclusterLister
+	Lister() v1.PerconaPGClusterLister
 }
 
 type perconaPGClusterInformer struct {
@@ -45,14 +44,14 @@ type perconaPGClusterInformer struct {
 	namespace        string
 }
 
-// NewPgclusterInformer constructs a new informer for Pgcluster type.
+// NewPerconaPGClusterInformer constructs a new informer for PerconaPGCluster type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewPerconaPGClusterInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPgclusterInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewFilteredPerconaPGClusterInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPgclusterInformer constructs a new informer for Pgcluster type.
+// NewFilteredPerconaPGClusterInformer constructs a new informer for PerconaPGCluster type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPerconaPGClusterInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
@@ -62,13 +61,13 @@ func NewFilteredPerconaPGClusterInformer(client versioned.Interface, namespace s
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CrunchydataV1().Pgclusters(namespace).List(context.TODO(), options)
+				return client.CrunchydataV1().PerconaPGClusters(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CrunchydataV1().Pgclusters(namespace).Watch(context.TODO(), options)
+				return client.CrunchydataV1().PerconaPGClusters(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&crunchydatacomv1.PerconaPGCluster{},
@@ -78,13 +77,13 @@ func NewFilteredPerconaPGClusterInformer(client versioned.Interface, namespace s
 }
 
 func (f *perconaPGClusterInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPgclusterInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredPerconaPGClusterInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *perconaPGClusterInformer) Informer() cache.SharedIndexInformer {
 	return f.factory.InformerFor(&crunchydatacomv1.PerconaPGCluster{}, f.defaultInformer)
 }
 
-func (f *perconaPGClusterInformer) Lister() v1.PerconaPGclusterLister {
-	return v1.NewPerconaPGclusterLister(f.Informer().GetIndexer())
+func (f *perconaPGClusterInformer) Lister() v1.PerconaPGClusterLister {
+	return v1.NewPerconaPGClusterLister(f.Informer().GetIndexer())
 }

@@ -167,7 +167,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: perconalab/percona-postgresql-operator:main-pgo-deployer
+          image: perconalab/percona-postgresql-operator:1-x-pgo-deployer
           imagePullPolicy: Always
           env:
             - name: DEPLOY_ACTION
