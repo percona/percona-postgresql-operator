@@ -29,20 +29,20 @@ import (
 	testing "k8s.io/client-go/testing"
 )
 
-// FakePgclusters implements PgclusterInterface
+// FakePerconaPGClusters implements PerconaPGClusterInterface
 type FakePerconaPGClusters struct {
 	Fake *FakeCrunchydataV1
 	ns   string
 }
 
-var perconapgclustersResource = schema.GroupVersionResource{Group: "pg.percona.com", Version: "v1", Resource: "pgclusters"}
+var perconapgclustersResource = schema.GroupVersionResource{Group: "crunchydata.com", Version: "v1", Resource: "perconapgclusters"}
 
-var perconapgclustersKind = schema.GroupVersionKind{Group: "pg.percona.com", Version: "v1", Kind: "Pgcluster"}
+var perconapgclustersKind = schema.GroupVersionKind{Group: "crunchydata.com", Version: "v1", Kind: "PerconaPGCluster"}
 
-// Get takes name of the pgcluster, and returns the corresponding pgcluster object, and an error if there is any.
+// Get takes name of the perconaPGCluster, and returns the corresponding perconaPGCluster object, and an error if there is any.
 func (c *FakePerconaPGClusters) Get(ctx context.Context, name string, options v1.GetOptions) (result *crunchydatacomv1.PerconaPGCluster, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(pgclustersResource, c.ns, name), &crunchydatacomv1.Pgcluster{})
+		Invokes(testing.NewGetAction(perconapgclustersResource, c.ns, name), &crunchydatacomv1.PerconaPGCluster{})
 
 	if obj == nil {
 		return nil, err
@@ -50,10 +50,10 @@ func (c *FakePerconaPGClusters) Get(ctx context.Context, name string, options v1
 	return obj.(*crunchydatacomv1.PerconaPGCluster), err
 }
 
-// List takes label and field selectors, and returns the list of Pgclusters that match those selectors.
+// List takes label and field selectors, and returns the list of PerconaPGClusters that match those selectors.
 func (c *FakePerconaPGClusters) List(ctx context.Context, opts v1.ListOptions) (result *crunchydatacomv1.PerconaPGClusterList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(pgclustersResource, pgclustersKind, c.ns, opts), &crunchydatacomv1.PgclusterList{})
+		Invokes(testing.NewListAction(perconapgclustersResource, perconapgclustersKind, c.ns, opts), &crunchydatacomv1.PerconaPGClusterList{})
 
 	if obj == nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (c *FakePerconaPGClusters) List(ctx context.Context, opts v1.ListOptions) (
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &crunchydatacomv1.PerconaPGClusterList{ListMeta: obj.(*crunchydatacomv1.PgclusterList).ListMeta}
+	list := &crunchydatacomv1.PerconaPGClusterList{ListMeta: obj.(*crunchydatacomv1.PerconaPGClusterList).ListMeta}
 	for _, item := range obj.(*crunchydatacomv1.PerconaPGClusterList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -72,17 +72,17 @@ func (c *FakePerconaPGClusters) List(ctx context.Context, opts v1.ListOptions) (
 	return list, err
 }
 
-// Watch returns a watch.Interface that watches the requested pgclusters.
+// Watch returns a watch.Interface that watches the requested perconaPGClusters.
 func (c *FakePerconaPGClusters) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(pgclustersResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(perconapgclustersResource, c.ns, opts))
 
 }
 
-// Create takes the representation of a pgcluster and creates it.  Returns the server's representation of the pgcluster, and an error, if there is any.
-func (c *FakePerconaPGClusters) Create(ctx context.Context, pgcluster *crunchydatacomv1.PerconaPGCluster, opts v1.CreateOptions) (result *crunchydatacomv1.PerconaPGCluster, err error) {
+// Create takes the representation of a perconaPGCluster and creates it.  Returns the server's representation of the perconaPGCluster, and an error, if there is any.
+func (c *FakePerconaPGClusters) Create(ctx context.Context, perconaPGCluster *crunchydatacomv1.PerconaPGCluster, opts v1.CreateOptions) (result *crunchydatacomv1.PerconaPGCluster, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(pgclustersResource, c.ns, pgcluster), &crunchydatacomv1.Pgcluster{})
+		Invokes(testing.NewCreateAction(perconapgclustersResource, c.ns, perconaPGCluster), &crunchydatacomv1.PerconaPGCluster{})
 
 	if obj == nil {
 		return nil, err
@@ -90,10 +90,10 @@ func (c *FakePerconaPGClusters) Create(ctx context.Context, pgcluster *crunchyda
 	return obj.(*crunchydatacomv1.PerconaPGCluster), err
 }
 
-// Update takes the representation of a pgcluster and updates it. Returns the server's representation of the pgcluster, and an error, if there is any.
-func (c *FakePerconaPGClusters) Update(ctx context.Context, pgcluster *crunchydatacomv1.PerconaPGCluster, opts v1.UpdateOptions) (result *crunchydatacomv1.PerconaPGCluster, err error) {
+// Update takes the representation of a perconaPGCluster and updates it. Returns the server's representation of the perconaPGCluster, and an error, if there is any.
+func (c *FakePerconaPGClusters) Update(ctx context.Context, perconaPGCluster *crunchydatacomv1.PerconaPGCluster, opts v1.UpdateOptions) (result *crunchydatacomv1.PerconaPGCluster, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(pgclustersResource, c.ns, pgcluster), &crunchydatacomv1.Pgcluster{})
+		Invokes(testing.NewUpdateAction(perconapgclustersResource, c.ns, perconaPGCluster), &crunchydatacomv1.PerconaPGCluster{})
 
 	if obj == nil {
 		return nil, err
@@ -103,9 +103,9 @@ func (c *FakePerconaPGClusters) Update(ctx context.Context, pgcluster *crunchyda
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePerconaPGClusters) UpdateStatus(ctx context.Context, pgcluster *crunchydatacomv1.PerconaPGCluster, opts v1.UpdateOptions) (*crunchydatacomv1.PerconaPGCluster, error) {
+func (c *FakePerconaPGClusters) UpdateStatus(ctx context.Context, perconaPGCluster *crunchydatacomv1.PerconaPGCluster, opts v1.UpdateOptions) (*crunchydatacomv1.PerconaPGCluster, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(pgclustersResource, "status", c.ns, pgcluster), &crunchydatacomv1.Pgcluster{})
+		Invokes(testing.NewUpdateSubresourceAction(perconapgclustersResource, "status", c.ns, perconaPGCluster), &crunchydatacomv1.PerconaPGCluster{})
 
 	if obj == nil {
 		return nil, err
@@ -113,26 +113,26 @@ func (c *FakePerconaPGClusters) UpdateStatus(ctx context.Context, pgcluster *cru
 	return obj.(*crunchydatacomv1.PerconaPGCluster), err
 }
 
-// Delete takes name of the pgcluster and deletes it. Returns an error if one occurs.
+// Delete takes name of the perconaPGCluster and deletes it. Returns an error if one occurs.
 func (c *FakePerconaPGClusters) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(pgclustersResource, c.ns, name), &crunchydatacomv1.PerconaPGCluster{})
+		Invokes(testing.NewDeleteActionWithOptions(perconapgclustersResource, c.ns, name, opts), &crunchydatacomv1.PerconaPGCluster{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakePerconaPGClusters) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(pgclustersResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionAction(perconapgclustersResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &crunchydatacomv1.PerconaPGClusterList{})
 	return err
 }
 
-// Patch applies the patch and returns the patched pgcluster.
+// Patch applies the patch and returns the patched perconaPGCluster.
 func (c *FakePerconaPGClusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *crunchydatacomv1.PerconaPGCluster, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(pgclustersResource, c.ns, name, pt, data, subresources...), &crunchydatacomv1.PerconaPGCluster{})
+		Invokes(testing.NewPatchSubresourceAction(perconapgclustersResource, c.ns, name, pt, data, subresources...), &crunchydatacomv1.PerconaPGCluster{})
 
 	if obj == nil {
 		return nil, err

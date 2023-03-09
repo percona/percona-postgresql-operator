@@ -126,6 +126,7 @@ spec:
         keep: 3
         type: full
         storage: local
+#        backrestOpts: --annotation=source=scheduled-backup
   pgBouncer:
     image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
 #    imagePullPolicy: Always

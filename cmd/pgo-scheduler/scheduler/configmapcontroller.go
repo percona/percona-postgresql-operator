@@ -60,11 +60,36 @@ func (c *Controller) onDelete(obj interface{}) {
 	c.Scheduler.DeleteSchedule(cm)
 }
 
+// onUpdate is called when a configMap is updated
+func (c *Controller) onUpdate(oldObj, newObj interface{}) {
+	oldCm, ok := oldObj.(*v1.ConfigMap)
+	if !ok {
+		log.WithFields(log.Fields{}).Error("Could not convert runtime object to configmap..")
+	}
+
+	newCm, ok := newObj.(*v1.ConfigMap)
+	if !ok {
+		log.WithFields(log.Fields{}).Error("Could not convert runtime object to configmap..")
+	}
+
+	if _, ok := newCm.Labels["crunchy-scheduler"]; !ok {
+		return
+	}
+
+	c.Scheduler.DeleteSchedule(oldCm)
+	if err := c.Scheduler.AddSchedule(newCm); err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("Failed to update schedule")
+	}
+}
+
 // AddConfigMapEventHandler adds the pgcluster event handler to the pgcluster informer
 func (c *Controller) AddConfigMapEventHandler() {
 	c.Informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onAdd,
 		DeleteFunc: c.onDelete,
+		UpdateFunc: c.onUpdate,
 	})
 
 	log.Debugf("ConfigMap Controller: added event handler to informer")
