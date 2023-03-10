@@ -28,14 +28,14 @@ spec:
 #  tablespaceStorages:
 #    lake:
 #      volumeSpec:
-#        size: 1G
+#        size: 1Gi
 #        accessmode: ReadWriteOnce
 #        storagetype: dynamic
 #        storageclass: ""
 #        matchLabels: ""
 #  walStorage:
 #    volumeSpec:
-#      size: 1G
+#      size: 1Gi
 #      accessmode: ReadWriteOnce
 #      storagetype: dynamic
 #      storageclass: ""
@@ -69,7 +69,7 @@ spec:
 #                 - e2e-az2
     tolerations: []
     volumeSpec:
-      size: 1G
+      size: 1Gi
       accessmode: ReadWriteOnce
       storagetype: dynamic
       storageclass: ""
@@ -111,7 +111,7 @@ spec:
 #     affinity:
 #       antiAffinityType: preferred
     volumeSpec:
-      size: 1G
+      size: 1Gi
       accessmode: ReadWriteOnce
       storagetype: dynamic
       storageclass: ""
@@ -162,7 +162,7 @@ spec:
 #          memory: "256Mi"
       volumeSpec:
         accessmode: ReadWriteOnce
-        size: 1G
+        size: 1Gi
         storagetype: dynamic
         storageclass: ""
 #        matchLabels: ""
