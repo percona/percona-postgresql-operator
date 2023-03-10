@@ -128,6 +128,7 @@ type HotStandby struct {
 type Expose struct {
 	ServiceType              v1.ServiceType    `json:"serviceType"`
 	LoadBalancerSourceRanges []string          `json:"loadBalancerSourceRanges"`
+	LoadBalancerIP           string            `json:"loadBalancerIP"`
 	Annotations              map[string]string `json:"annotations"`
 	Labels                   map[string]string `json:"labels"`
 }

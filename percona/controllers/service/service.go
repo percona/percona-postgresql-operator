@@ -96,7 +96,7 @@ func getPrimaryServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, e
 	if len(cluster.Spec.PGPrimary.Expose.ServiceType) > 0 {
 		svcType = cluster.Spec.PGPrimary.Expose.ServiceType
 	}
-	return &corev1.Service{
+	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Name,
 			Namespace:   cluster.Namespace,
@@ -119,14 +119,20 @@ func getPrimaryServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, e
 					TargetPort: intstr.FromInt(port),
 				},
 			},
+
 			Selector: map[string]string{
 				"pg-cluster": cluster.Name,
 				"role":       "master",
 			},
-			SessionAffinity:          corev1.ServiceAffinityNone,
-			LoadBalancerSourceRanges: cluster.Spec.PGPrimary.Expose.LoadBalancerSourceRanges,
+			SessionAffinity: corev1.ServiceAffinityNone,
 		},
-	}, nil
+	}
+
+	if svcType == "LoadBalancer" {
+		svc.Spec.LoadBalancerSourceRanges = cluster.Spec.PGPrimary.Expose.LoadBalancerSourceRanges
+		svc.Spec.LoadBalancerIP = cluster.Spec.PGPrimary.Expose.LoadBalancerIP
+	}
+	return svc, nil
 }
 
 func getPGBouncerServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, error) {
@@ -148,7 +154,7 @@ func getPGBouncerServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service,
 	if len(cluster.Spec.PGBouncer.Expose.ServiceType) > 0 {
 		svcType = cluster.Spec.PGBouncer.Expose.ServiceType
 	}
-	return &corev1.Service{
+	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        svcName,
 			Namespace:   cluster.Namespace,
@@ -168,10 +174,15 @@ func getPGBouncerServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service,
 			Selector: map[string]string{
 				"service-name": svcName,
 			},
-			SessionAffinity:          corev1.ServiceAffinityNone,
-			LoadBalancerSourceRanges: cluster.Spec.PGBouncer.Expose.LoadBalancerSourceRanges,
+			SessionAffinity: corev1.ServiceAffinityNone,
 		},
-	}, nil
+	}
+
+	if svcType == "LoadBalancer" {
+		svc.Spec.LoadBalancerSourceRanges = cluster.Spec.PGBouncer.Expose.LoadBalancerSourceRanges
+		svc.Spec.LoadBalancerIP = cluster.Spec.PGBouncer.Expose.LoadBalancerIP
+	}
+	return svc, nil
 }
 
 func getReplicaServiceObject(cluster *crv1.PerconaPGCluster) (*corev1.Service, error) {

@@ -76,6 +76,7 @@ spec:
 #      matchLabels: ""
     expose:
       serviceType: ClusterIP
+#      loadBalancerIP:
 #      loadBalancerSourceRanges:
 #      annotations:
 #        pg-cluster-annot: cluster1
@@ -143,6 +144,7 @@ spec:
 #       antiAffinityType: preferred
     expose:
       serviceType: ClusterIP
+#      loadBalancerIP:
 #      loadBalancerSourceRanges:
 #      annotations:
 #        pg-cluster-annot: cluster1
