@@ -69,6 +69,7 @@ COPY installers/image/bin/pgo-deploy.sh /pgo-deploy.sh
 ADD bin/common /opt/cpm/bin
 
 ENV ANSIBLE_CONFIG="/ansible/postgres-operator/ansible.cfg"
+RUN env ANSIBLE_COLLECTIONS_PATHS=/usr/share/ansible/collections ansible-galaxy collection install community.kubernetes
 ENV HOME="/tmp"
 
 # Defines a unique directory name that will be utilized by the nss_wrapper in the UID script
