@@ -10,7 +10,7 @@ metadata:
     name: some-name-replica
     pg-cluster: some-name
     pgo-pg-database: "true"
-    pgo-version: 1.3.0
+    pgo-version: 1.4.0
     service-name: some-name-replica
     vendor: crunchydata
   name: some-name-repl1
@@ -41,7 +41,7 @@ spec:
         pg-cluster: some-name
         pg-pod-anti-affinity: preferred
         pgo-pg-database: "true"
-        pgo-version: 1.3.0
+        pgo-version: 1.4.0
         vendor: crunchydata
     spec:
       affinity:

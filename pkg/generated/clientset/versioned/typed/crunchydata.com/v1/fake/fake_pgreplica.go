@@ -35,9 +35,9 @@ type FakePgreplicas struct {
 	ns   string
 }
 
-var pgreplicasResource = schema.GroupVersionResource{Group: "pg.percona.com", Version: "v1", Resource: "pgreplicas"}
+var pgreplicasResource = schema.GroupVersionResource{Group: "crunchydata.com", Version: "v1", Resource: "pgreplicas"}
 
-var pgreplicasKind = schema.GroupVersionKind{Group: "pg.percona.com", Version: "v1", Kind: "Pgreplica"}
+var pgreplicasKind = schema.GroupVersionKind{Group: "crunchydata.com", Version: "v1", Kind: "Pgreplica"}
 
 // Get takes name of the pgreplica, and returns the corresponding pgreplica object, and an error if there is any.
 func (c *FakePgreplicas) Get(ctx context.Context, name string, options v1.GetOptions) (result *crunchydatacomv1.Pgreplica, err error) {
@@ -116,7 +116,7 @@ func (c *FakePgreplicas) UpdateStatus(ctx context.Context, pgreplica *crunchydat
 // Delete takes name of the pgreplica and deletes it. Returns an error if one occurs.
 func (c *FakePgreplicas) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(pgreplicasResource, c.ns, name), &crunchydatacomv1.Pgreplica{})
+		Invokes(testing.NewDeleteActionWithOptions(pgreplicasResource, c.ns, name, opts), &crunchydatacomv1.Pgreplica{})
 
 	return err
 }

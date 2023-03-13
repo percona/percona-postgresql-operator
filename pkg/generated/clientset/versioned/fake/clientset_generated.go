@@ -73,7 +73,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // CrunchydataV1 retrieves the CrunchydataV1Client
 func (c *Clientset) CrunchydataV1() crunchydatav1.CrunchydataV1Interface {

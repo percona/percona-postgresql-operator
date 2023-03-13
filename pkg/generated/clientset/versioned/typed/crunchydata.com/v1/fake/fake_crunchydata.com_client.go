@@ -27,6 +27,10 @@ type FakeCrunchydataV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeCrunchydataV1) PerconaPGClusters(namespace string) v1.PerconaPGClusterInterface {
+	return &FakePerconaPGClusters{c, namespace}
+}
+
 func (c *FakeCrunchydataV1) Pgclusters(namespace string) v1.PgclusterInterface {
 	return &FakePgclusters{c, namespace}
 }
@@ -41,10 +45,6 @@ func (c *FakeCrunchydataV1) Pgreplicas(namespace string) v1.PgreplicaInterface {
 
 func (c *FakeCrunchydataV1) Pgtasks(namespace string) v1.PgtaskInterface {
 	return &FakePgtasks{c, namespace}
-}
-
-func (c *FakeCrunchydataV1) PerconaPGClusters(namespace string) v1.PerconaPGClusterInterface {
-	return &FakePerconaPGClusters{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -1,0 +1,20 @@
+{
+  "system": "grpc",
+  "span.kind": "server",
+  "grpc.service": "version.VersionService",
+  "grpc.method": "Apply",
+  "grpc.request.content": {
+    "msg": {
+      "product": "pg-operator",
+      "operatorVersion": "1.4.0",
+      "apply": "disabled"
+    }
+  }
+}
+{
+  "system": "grpc",
+  "span.kind": "server",
+  "grpc.service": "version.VersionService",
+  "grpc.method": "Apply",
+  "grpc.code": "OK"
+}

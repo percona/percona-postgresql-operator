@@ -22,7 +22,7 @@ import (
 
 const (
 	templatePath      = "/"
-	defaultPGOVersion = "1.3.0"
+	defaultPGOVersion = "1.4.0"
 	S3StorageType     = crv1.StorageType("s3")
 	GCSStorageType    = crv1.StorageType("gcs")
 )
@@ -359,6 +359,7 @@ func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.SyncReplication = syncReplication
 	cluster.Spec.UserLabels = userLabels
 	cluster.Spec.Annotations.Global = specAnnotationsGlobal
+	cluster.Spec.Annotations.Postgres = pgc.Spec.PGPrimary.Annotations
 	cluster.Spec.Tolerations = pgc.Spec.PGPrimary.Tolerations
 	storageMap := map[crv1.BackrestStorageType]crv1.BackrestStorageType{
 		crv1.BackrestStorageTypeLocal: crv1.BackrestStorageTypeLocal,
@@ -405,6 +406,7 @@ func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.TLS.TLSSecret = pgc.Spec.SSLSecretName
 	cluster.Spec.TLS.ReplicationTLSSecret = pgc.Spec.SSLReplicationSecretName
 	cluster.Spec.PgBouncer.TLSSecret = pgc.Spec.SSLSecretName
+	cluster.Spec.PgBouncer.ServiceType = pgc.Spec.PGBouncer.Expose.ServiceType
 
 	return cluster
 }

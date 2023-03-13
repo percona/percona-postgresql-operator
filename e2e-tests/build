@@ -31,6 +31,7 @@ build_image() {
 		--squash \
 		--no-cache \
 		-t "${tag}" -f build/${app}/Dockerfile .
+	[[ $? != 0 ]] && exit 1
 	popd
 
 	if [[ ${push} == 'true' ]]; then

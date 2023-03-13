@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"os"
 	"strings"
 
 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
@@ -127,6 +128,7 @@ type HotStandby struct {
 type Expose struct {
 	ServiceType              v1.ServiceType    `json:"serviceType"`
 	LoadBalancerSourceRanges []string          `json:"loadBalancerSourceRanges"`
+	LoadBalancerIP           string            `json:"loadBalancerIP"`
 	Annotations              map[string]string `json:"annotations"`
 	Labels                   map[string]string `json:"labels"`
 }
@@ -164,11 +166,12 @@ type Storage struct {
 }
 
 type CronJob struct {
-	Name     string `json:"name"`
-	Schedule string `json:"schedule"`
-	Keep     int64  `json:"keep"`
-	Type     string `json:"type"`
-	Storage  string `json:"storage"`
+	Name           string `json:"name"`
+	Schedule       string `json:"schedule"`
+	Keep           int64  `json:"keep"`
+	Type           string `json:"type"`
+	Storage        string `json:"storage"`
+	PGBackrestOpts string `json:"backrestOpts,omitempty"`
 }
 
 // PMMSpec contains settings for PMM
@@ -219,6 +222,18 @@ type UpgradeOptions struct {
 	Schedule               string          `json:"schedule,omitempty"`
 }
 
+const DefaultVersionServiceEndpoint = "https://check.percona.com"
+
+func GetDefaultVersionServiceEndpoint() string {
+	endpoint := os.Getenv("PERCONA_VS_FALLBACK_URI")
+
+	if len(endpoint) != 0 {
+		return endpoint
+	}
+
+	return DefaultVersionServiceEndpoint
+}
+
 var PullPolicyAlways = "Always"
 var PullPolicyIfNotPresent = "IfNotPresent"
 
@@ -248,10 +263,15 @@ func (p *PerconaPGCluster) CheckAndSetDefaults() {
 		p.Spec.PMM.ImagePullPolicy = PullPolicyIfNotPresent
 	}
 
-	if p.Spec.UpgradeOptions != nil {
-		if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
-			p.Spec.UpgradeOptions.VersionServiceEndpoint = "https://check.percona.com"
+	if p.Spec.UpgradeOptions == nil {
+		p.Spec.UpgradeOptions = &UpgradeOptions{
+			Apply:                  UpgradeStrategyDisabled,
+			VersionServiceEndpoint: GetDefaultVersionServiceEndpoint(),
 		}
+	}
+
+	if p.Spec.UpgradeOptions.VersionServiceEndpoint == "" {
+		p.Spec.UpgradeOptions.VersionServiceEndpoint = GetDefaultVersionServiceEndpoint()
 	}
 
 	if p.Spec.UsersSecretName == "" {

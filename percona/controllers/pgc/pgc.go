@@ -130,14 +130,14 @@ func (c *Controller) onAdd(obj interface{}) {
 	l.statusMutex.Lock()
 	defer l.statusMutex.Unlock()
 
+	newCluster.CheckAndSetDefaults()
+
 	err = version.EnsureVersion(c.Client, newCluster, version.VersionServiceClient{
 		OpVersion: newCluster.ObjectMeta.Labels["pgo-version"],
 	})
 	if err != nil {
 		log.Errorf("ensure version: %s", err)
 	}
-
-	newCluster.CheckAndSetDefaults()
 
 	err = c.updateTemplates(newCluster)
 	if err != nil {

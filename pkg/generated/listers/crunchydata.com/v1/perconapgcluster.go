@@ -24,28 +24,28 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// PerconaPGclusterLister helps list PerconaPGclusters.
+// PerconaPGClusterLister helps list PerconaPGClusters.
 // All objects returned here must be treated as read-only.
-type PerconaPGclusterLister interface {
-	// List lists all PerconaPGclusters in the indexer.
+type PerconaPGClusterLister interface {
+	// List lists all PerconaPGClusters in the indexer.
 	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.PerconaPGCluster, err error)
-	// PerconaPGclusters returns an object that can list and get PerconaPGclusters.
-	Pgclusters(namespace string) PerconaPGClusterNamespaceLister
-	PgclusterListerExpansion
+	// PerconaPGClusters returns an object that can list and get PerconaPGClusters.
+	PerconaPGClusters(namespace string) PerconaPGClusterNamespaceLister
+	PerconaPGClusterListerExpansion
 }
 
-// perconaPGClusterLister implements the PerconaPGclusterLister interface.
+// perconaPGClusterLister implements the PerconaPGClusterLister interface.
 type perconaPGClusterLister struct {
 	indexer cache.Indexer
 }
 
-// NewPgclusterLister returns a new PgclusterLister.
-func NewPerconaPGclusterLister(indexer cache.Indexer) PerconaPGclusterLister {
+// NewPerconaPGClusterLister returns a new PerconaPGClusterLister.
+func NewPerconaPGClusterLister(indexer cache.Indexer) PerconaPGClusterLister {
 	return &perconaPGClusterLister{indexer: indexer}
 }
 
-// List lists all Pgclusters in the indexer.
+// List lists all PerconaPGClusters in the indexer.
 func (s *perconaPGClusterLister) List(selector labels.Selector) (ret []*v1.PerconaPGCluster, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.PerconaPGCluster))
@@ -53,18 +53,18 @@ func (s *perconaPGClusterLister) List(selector labels.Selector) (ret []*v1.Perco
 	return ret, err
 }
 
-// Pgclusters returns an object that can list and get Pgclusters.
-func (s *perconaPGClusterLister) Pgclusters(namespace string) PerconaPGClusterNamespaceLister {
+// PerconaPGClusters returns an object that can list and get PerconaPGClusters.
+func (s *perconaPGClusterLister) PerconaPGClusters(namespace string) PerconaPGClusterNamespaceLister {
 	return perconaPGClusterNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
-// PgclusterNamespaceLister helps list and get Pgclusters.
+// PerconaPGClusterNamespaceLister helps list and get PerconaPGClusters.
 // All objects returned here must be treated as read-only.
 type PerconaPGClusterNamespaceLister interface {
-	// List lists all Pgclusters in the indexer for a given namespace.
+	// List lists all PerconaPGClusters in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.PerconaPGCluster, err error)
-	// Get retrieves the Pgcluster from the indexer for a given namespace and name.
+	// Get retrieves the PerconaPGCluster from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.PerconaPGCluster, error)
 	PerconaPGClusterNamespaceListerExpansion
@@ -77,7 +77,7 @@ type perconaPGClusterNamespaceLister struct {
 	namespace string
 }
 
-// List lists all Pgclusters in the indexer for a given namespace.
+// List lists all PerconaPGClusters in the indexer for a given namespace.
 func (s perconaPGClusterNamespaceLister) List(selector labels.Selector) (ret []*v1.PerconaPGCluster, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.PerconaPGCluster))
@@ -85,7 +85,7 @@ func (s perconaPGClusterNamespaceLister) List(selector labels.Selector) (ret []*
 	return ret, err
 }
 
-// Get retrieves the Pgcluster from the indexer for a given namespace and name.
+// Get retrieves the PerconaPGCluster from the indexer for a given namespace and name.
 func (s perconaPGClusterNamespaceLister) Get(name string) (*v1.PerconaPGCluster, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
