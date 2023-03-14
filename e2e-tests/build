@@ -26,7 +26,7 @@ build_image() {
 	local tag=${2}
 	local push=${3}
 	until docker ps; do
-			sleep 1;
+		sleep 1
 	done
 
 	export DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-linux/amd64}
