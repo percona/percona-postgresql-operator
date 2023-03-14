@@ -14,13 +14,22 @@ PUSH_TO_REGISTRY=${PUSH_TO_REGISTRY:-true}
 STANDALONE_APPS_TO_BUILD=(pgo-apiserver pgo-event pgo-rmdata pgo-scheduler postgres-operator pgo-deployer)
 ECR=${ECR:-"119175775298.dkr.ecr.us-east-1.amazonaws.com"}
 
+if [[ ${DOCKER_NOCACHE:-0} == 1 ]]; then
+	no_cache="--no-cache"
+fi
+if [[ ${DOCKER_SQUASH:-1} == 1 ]]; then
+	squash="--squash"
+fi
+
 build_image() {
 	local app=${1}
 	local tag=${2}
 	local push=${3}
 	until docker ps; do
-			sleep 1;
+		sleep 1
 	done
+
+	export DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-linux/amd64}
 	export GO_LDFLAGS="-w -s -trimpath $GO_LDFLAGS"
 	pushd ${src_dir}
 	docker build \
@@ -28,8 +37,8 @@ build_image() {
 		--build-arg GIT_COMMIT=$GIT_COMMIT \
 		--build-arg GIT_BRANCH=$GIT_BRANCH \
 		--build-arg GO_LDFLAGS="$GO_LDFLAGS" \
-		--squash \
-		--no-cache \
+		$squash \
+		$no_cache \
 		-t "${tag}" -f build/${app}/Dockerfile .
 	[[ $? != 0 ]] && exit 1
 	popd
