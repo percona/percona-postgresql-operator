@@ -20,9 +20,10 @@ import (
 )
 
 func (c *Controller) handleTLS(cr *crv1.PerconaPGCluster) error {
-	if !cr.Spec.TlSOnly {
+	if !cr.TLSEnabled() {
 		return nil
 	}
+
 	err := c.createSSLByCertManager(cr)
 	if err != nil {
 		if cr.Spec.TLS != nil && cr.Spec.TLS.IssuerConf != nil {
