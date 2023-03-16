@@ -554,7 +554,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			return
 		}
 	}
-	if oldCluster.Spec.TLSOnly != newCluster.Spec.TLSOnly {
+	if oldCluster.TLSEnabled() != newCluster.TLSEnabled() || oldCluster.Spec.TLSOnly != newCluster.Spec.TLSOnly {
 		err = pgcluster.RestartPgBouncer(c.Client, newCluster)
 		if err != nil {
 			log.Errorf("update perconapgcluster: restart pgbouncer: %s", err)
