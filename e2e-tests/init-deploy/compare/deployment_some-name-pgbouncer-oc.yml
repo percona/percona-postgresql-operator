@@ -86,6 +86,8 @@ spec:
           volumeMounts:
             - mountPath: /tmp
               name: tmp
+            - mountPath: /pgconf/tls/pgbouncer
+              name: tls-pgbouncer
             - mountPath: /pgconf/
               name: pgbouncer-conf
       dnsPolicy: ClusterFirst
@@ -101,6 +103,14 @@ spec:
             medium: Memory
             sizeLimit: 1Mi
           name: tmp
+        - name: tls-pgbouncer
+          projected:
+            defaultMode: 420
+            sources:
+              - secret:
+                  name: cluster1-ssl-keypair
+              - secret:
+                  name: cluster1-ssl-ca
         - name: pgbouncer-conf
           projected:
             defaultMode: 420
