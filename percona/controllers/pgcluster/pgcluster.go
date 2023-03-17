@@ -29,7 +29,7 @@ const (
 
 func Create(clientset kubeapi.Interface, newPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	cluster := getPGCluster(newPerconaPGCluster, &crv1.Pgcluster{})
+	cluster := GetPGCluster(newPerconaPGCluster, &crv1.Pgcluster{})
 
 	_, err := clientset.CrunchydataV1().Pgclusters(newPerconaPGCluster.Namespace).Create(ctx, cluster, metav1.CreateOptions{})
 	if err != nil {
@@ -41,12 +41,18 @@ func Create(clientset kubeapi.Interface, newPerconaPGCluster *crv1.PerconaPGClus
 
 func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluster *crv1.PerconaPGCluster) error {
 	ctx := context.TODO()
-	pgCluster := getPGCluster(newPerconaPGCluster, &crv1.Pgcluster{})
+	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Get(ctx, oldPerconaPGCluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get old pgcluster resource")
+	}
+
+	pgCluster := GetPGCluster(newPerconaPGCluster, oldPGCluster)
 	if pgCluster.Annotations == nil {
 		pgCluster.Annotations = make(map[string]string)
 	}
+	pgCluster.Annotations[config.ANNOTATION_IS_UPGRADED] = "true"
 
-	err := updatePGPrimaryDeployment(clientset, pgCluster, newPerconaPGCluster, oldPerconaPGCluster)
+	err = updatePGPrimaryDeployment(clientset, pgCluster, newPerconaPGCluster, oldPerconaPGCluster)
 	if err != nil {
 		return errors.Wrapf(err, "update pgPrimary deployment")
 	}
@@ -55,16 +61,6 @@ func Update(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGCluste
 	if err != nil {
 		return errors.Wrapf(err, "update backrest shared repo deployment")
 	}
-
-	oldPGCluster, err := clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Get(ctx, oldPerconaPGCluster.Name, metav1.GetOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "get old pgcluster resource")
-	}
-	pgCluster = getPGCluster(newPerconaPGCluster, oldPGCluster)
-	if pgCluster.Annotations == nil {
-		pgCluster.Annotations = make(map[string]string)
-	}
-	pgCluster.Annotations[config.ANNOTATION_IS_UPGRADED] = "true"
 
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -80,7 +76,7 @@ func UpdateCR(clientset kubeapi.Interface, newPerconaPGCluster, oldPerconaPGClus
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	pgCluster := getPGCluster(newPerconaPGCluster, oldPGCluster)
+	pgCluster := GetPGCluster(newPerconaPGCluster, oldPGCluster)
 
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPerconaPGCluster.Namespace).Update(ctx, pgCluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -105,7 +101,7 @@ func updatePGPrimaryDeployment(clientset kubeapi.Interface, pgCluster *crv1.Pgcl
 		}
 	}
 
-	dplmnt.UpdateSpecTemplateAffinity(deployment, newPerconaPGCluster.Spec.PGPrimary.Affinity)
+	dplmnt.UpdateSpecTemplateAffinity(deployment, crv1.PodAntiAffinityDeploymentDefault, newPerconaPGCluster.Spec.PGPrimary.Affinity, pgCluster)
 
 	if !reflect.DeepEqual(oldPerconaPGCluster.Spec.PGPrimary, newPerconaPGCluster.Spec.PGPrimary) {
 		dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
@@ -144,7 +140,7 @@ func updateBackrestSharedRepoDeployment(clientset kubeapi.Interface, pgCluster *
 	if err != nil {
 		return errors.Wrap(err, "getdeployment")
 	}
-	dplmnt.UpdateSpecTemplateAffinity(deployment, newPerconaPGCluster.Spec.Backup.Affinity)
+	dplmnt.UpdateSpecTemplateAffinity(deployment, crv1.PodAntiAffinityDeploymentPgBackRest, newPerconaPGCluster.Spec.Backup.Affinity, pgCluster)
 	dplmnt.UpdateDeploymentContainer(deployment, dplmnt.ContainerDatabase,
 		newPerconaPGCluster.Spec.Backup.BackrestRepoImage,
 		newPerconaPGCluster.Spec.Backup.ImagePullPolicy)
@@ -194,7 +190,7 @@ func ChangeBouncerSize(clientset *kubeapi.Client, newPerconaPGCluster *crv1.Perc
 	if err != nil {
 		return errors.Wrapf(err, "get old pgcluster resource")
 	}
-	newPGCluster := getPGCluster(newPerconaPGCluster, oldPGCluster)
+	newPGCluster := GetPGCluster(newPerconaPGCluster, oldPGCluster)
 	newPGCluster.Spec.PgBouncer.Replicas = size
 	_, err = clientset.CrunchydataV1().Pgclusters(oldPGCluster.Namespace).Update(ctx, newPGCluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -238,7 +234,7 @@ func IsPrimary(clientset kubeapi.Interface, perconaPGCluster *crv1.PerconaPGClus
 	return false, nil
 }
 
-func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
+func GetPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgcluster {
 	metaAnnotations := map[string]string{
 		"current-primary": pgc.Name,
 	}
@@ -333,6 +329,7 @@ func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 			cluster.Spec.NodeAffinity.Default = util.GenerateNodeAffinity(nodeAffinityType, key, []string{val})
 		}
 	}
+
 	cluster.Spec.PgBouncer.ExposePostgresUser = pgc.Spec.PGBouncer.ExposePostgresUser
 	cluster.Spec.PGOImagePrefix = operator.Pgo.Cluster.CCPImagePrefix
 	if len(pgc.Spec.PGPrimary.Affinity.AntiAffinityType) == 0 && pgc.Spec.PGPrimary.Affinity.Advanced == nil {
