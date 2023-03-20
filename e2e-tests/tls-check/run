@@ -17,7 +17,7 @@ main() {
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "" "" "" "" "" "false"
 	compare_psql "select-2" '\c myapp \\\ SELECT * from myApp;' "some-name:some-name_pass@${cluster}-pgbouncer" "verify-ca"
 
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"add","path":"/spec/sslCA","value":"cluster1-ssl-ca"},{"op":"add","path":"/spec/sslSecretName","value":"cluster1-ssl-keypair"},{"op":"add","path":"/spec/sslReplicationSecretName","value":"cluster1-ssl-keypair"},{"op":"add","path":"/spec/tlsOnly","value":true}]'
+	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p '[{"op":"add","path":"/spec/tlsOnly","value":true}]'
 	sleep 260
 	kubectl_bin -n $namespace apply -f "${test_dir}/conf/client.yml"
 	wait_deployment "${cluster}-backrest-shared-repo"
