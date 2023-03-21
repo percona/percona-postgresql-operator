@@ -26,7 +26,7 @@ const (
 func UpdateBackrestJobTemplate(backrestJobTemplateData []byte, newCluster *crv1.PerconaPGCluster) error {
 	templateData := handleImagePullPolicy(backrestJobTemplateData, []byte(newCluster.Spec.Backup.ImagePullPolicy))
 
-	templateData, err := handleAffinityTemplate(templateData, newCluster.Spec.PGPrimary.Affinity, true)
+	templateData, err := handleAffinityTemplate(templateData, newCluster.Spec.Backup.Affinity, true)
 	if err != nil {
 		return errors.Wrap(err, "handle affinity template data")
 	}
