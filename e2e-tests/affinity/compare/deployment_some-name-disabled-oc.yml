@@ -239,7 +239,7 @@ spec:
                       path: tls-replication.key
                     - key: tls.crt
                       path: tls-replication.crt
-                  name: cluster1-ssl-keypair
+                  name: cluster1-replication-ssl-keypair
               - secret:
                   name: cluster1-ssl-ca
         - emptyDir:
