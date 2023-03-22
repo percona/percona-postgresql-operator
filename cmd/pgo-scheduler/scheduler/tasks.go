@@ -32,9 +32,11 @@ type pgBackRestTask struct {
 	stanza        string
 	storageType   string
 	imagePrefix   string
+	affinity      string
 }
 
 func (p pgBackRestTask) NewBackRestTask() *crv1.Pgtask {
+
 	return &crv1.Pgtask{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: p.taskName,
@@ -51,6 +53,7 @@ func (p pgBackRestTask) NewBackRestTask() *crv1.Pgtask {
 				config.LABEL_BACKREST_OPTS:         fmt.Sprintf("--stanza=%s %s", p.stanza, p.backupOptions),
 				config.LABEL_BACKREST_STORAGE_TYPE: p.storageType,
 				config.LABEL_IMAGE_PREFIX:          p.imagePrefix,
+				config.LABEL_AFFINITY_JSON:         p.affinity,
 			},
 		},
 	}

@@ -18,8 +18,9 @@ package scheduler
 import (
 	"time"
 
-	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	cv3 "github.com/robfig/cron/v3"
+
+	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 )
 
 var clientset kubeapi.Interface
@@ -39,6 +40,7 @@ type ScheduleTemplate struct {
 	Namespace  string    `json:"namespace"`
 	Type       string    `json:"type"`
 	Cluster    string    `json:"cluster"`
+	Affinity   string    `json:"affinity"`
 	PGBackRest `json:"pgbackrest,omitempty"`
 	Policy     `json:"policy,omitempty"`
 }

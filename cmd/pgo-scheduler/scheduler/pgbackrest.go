@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	"github.com/percona/percona-postgresql-operator/internal/config"
 )
 
 type BackRestBackupJob struct {
@@ -39,6 +40,7 @@ type BackRestBackupJob struct {
 	cluster     string
 	storageType string
 	options     string
+	affinity    string
 }
 
 func (s *ScheduleTemplate) NewBackRestSchedule() BackRestBackupJob {
@@ -52,6 +54,7 @@ func (s *ScheduleTemplate) NewBackRestSchedule() BackRestBackupJob {
 		cluster:     s.Cluster,
 		storageType: s.PGBackRest.StorageType,
 		options:     s.Options,
+		affinity:    s.Affinity,
 	}
 }
 
@@ -65,6 +68,7 @@ func (b BackRestBackupJob) Run() {
 		"backupType":  b.backupType,
 		"cluster":     b.cluster,
 		"storageType": b.storageType,
+		"affinity":    b.affinity,
 	})
 
 	contextLogger.Info("Running pgBackRest backup")
@@ -149,6 +153,7 @@ func (b BackRestBackupJob) Run() {
 		stanza:        b.stanza,
 		storageType:   b.storageType,
 		imagePrefix:   cluster.Spec.CCPImagePrefix,
+		affinity:      b.affinity,
 	}
 
 	_, err = clientset.CrunchydataV1().Pgtasks(b.namespace).

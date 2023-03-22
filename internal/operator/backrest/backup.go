@@ -119,6 +119,38 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 		log.Error("error getting pods from selector: 0 or more than 1 pods present")
 		return
 	}
+
+	nodeSelector := operator.GetNodeAffinity(cluster.Spec.NodeAffinity.Default)
+	podAntiAffinity := operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentDefault, cluster.Spec.PodAntiAffinity.Default)
+	podAntiAffinityLabelValue := string(cluster.Spec.PodAntiAffinity.Default)
+
+	affinityJSON, ok := task.Spec.Parameters[config.LABEL_AFFINITY_JSON]
+	if ok && len(affinityJSON) > 0 {
+		affinity := &crv1.Affinity{}
+		err := json.Unmarshal([]byte(affinityJSON), affinity)
+		if err == nil {
+			var nodeAffinityType crv1.NodeAffinityType
+			switch affinity.NodeAffinityType {
+			case "preferred":
+				nodeAffinityType = crv1.NodeAffinityTypePreferred
+			case "required":
+				nodeAffinityType = crv1.NodeAffinityTypeRequired
+			}
+
+			var nodeAffinity *v1.NodeAffinity
+			for key, val := range affinity.NodeLabel {
+				nodeAffinity = util.GenerateNodeAffinity(nodeAffinityType, key, []string{val})
+				break
+			}
+
+			nodeSelector = operator.GetNodeAffinity(nodeAffinity)
+			podAntiAffinity = operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentDefault, affinity.AntiAffinityType)
+			podAntiAffinityLabelValue = string(affinity.AntiAffinityType)
+		} else {
+			log.Error("can't umarshal affinity json for backup job, using defaults")
+		}
+	}
+
 	// create the Job to run the backrest command
 	jobFields := backrestJobTemplateFields{
 		JobName:         task.Spec.Parameters[config.LABEL_JOB_NAME],
@@ -143,10 +175,10 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 		BackrestLocalAndS3Storage:     operator.IsLocalAndS3Storage(cluster),
 		PgbackrestS3VerifyTLS:         task.Spec.Parameters[config.LABEL_BACKREST_S3_VERIFY_TLS],
 		Tolerations:                   util.GetTolerations(cluster.Spec.Tolerations),
-		NodeSelector:                  operator.GetNodeAffinity(cluster.Spec.NodeAffinity.Default),
-		PodAntiAffinity:               operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentDefault, cluster.Spec.PodAntiAffinity.Default),
+		NodeSelector:                  nodeSelector,
+		PodAntiAffinity:               podAntiAffinity,
 		PodAntiAffinityLabelName:      config.LABEL_POD_ANTI_AFFINITY,
-		PodAntiAffinityLabelValue:     string(cluster.Spec.PodAntiAffinity.Default),
+		PodAntiAffinityLabelValue:     podAntiAffinityLabelValue,
 	}
 
 	podCommandOpts, err := getCommandOptsFromPod(clientset, task, namespace)
