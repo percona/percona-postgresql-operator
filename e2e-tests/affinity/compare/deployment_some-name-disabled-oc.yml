@@ -95,7 +95,7 @@ spec:
             - name: PGHA_SYNC_REPLICATION
               value: "false"
             - name: PGHA_TLS_ENABLED
-              value: "false"
+              value: "true"
             - name: PGHA_TLS_ONLY
               value: "false"
             - name: PGHA_PASSWORD_TYPE
@@ -171,6 +171,10 @@ spec:
               name: primary-volume
             - mountPath: /pgconf/pgsuper
               name: root-volume
+            - mountPath: /pgconf/tls
+              name: tls-server
+            - mountPath: /pgconf/tls-replication
+              name: tls-replication
             - mountPath: /sshd
               name: sshd
               readOnly: true
@@ -223,6 +227,25 @@ spec:
           secret:
             defaultMode: 420
             secretName: some-name-disabled-postgres-secret
+        - name: tls-server
+          projected:
+            defaultMode: 288
+            sources:
+              - secret:
+                  name: cluster1-ssl-keypair
+              - secret:
+                  items:
+                    - key: tls.key
+                      path: tls-replication.key
+                    - key: tls.crt
+                      path: tls-replication.crt
+                  name: cluster1-replication-ssl-keypair
+              - secret:
+                  name: cluster1-ssl-ca
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 2Mi
+          name: tls-replication
         - emptyDir:
             medium: Memory
             sizeLimit: 64Mi
