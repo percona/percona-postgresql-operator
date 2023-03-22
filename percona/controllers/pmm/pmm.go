@@ -51,7 +51,7 @@ func AddOrRemovePMMContainer(cl *crv1.PerconaPGCluster, clusterName, nodeName st
 }
 
 func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName, nodeName string) v1.Container {
-	return v1.Container{
+	pmm_container := v1.Container{
 		Name:            pmmContainerName,
 		Image:           pgc.Spec.PMM.Image,
 		ImagePullPolicy: v1.PullPolicy(pgc.Spec.PMM.ImagePullPolicy),
@@ -236,6 +236,15 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName, nodeName string) v
 			getPMMAgentPrerunScript(pgc),
 		},
 	}
+	if pgc.TLSEnabled() {
+		pmm_container.VolumeMounts = []v1.VolumeMount{
+			{
+				MountPath: "/pgconf/tls",
+				Name:      "tls-server",
+			},
+		}
+	}
+	return pmm_container
 }
 
 func getPMMAgentPrerunScript(pgc *crv1.PerconaPGCluster) v1.EnvVar {
@@ -254,8 +263,9 @@ func getPMMAgentPrerunScript(pgc *crv1.PerconaPGCluster) v1.EnvVar {
 		addServiceArgs = append(addServiceArgs, []string{
 			"--tls",
 			"--tls-skip-verify",
-			"--tls-certificate-key-file=/tmp/tls.pem",
-			"--tls-ca-file=/pgconfg/tls/ca.crt",
+			"--tls-cert-file=/pgconf/tls/tls.crt",
+			"--tls-key-file=/pgconf/tls/tls.key",
+			"--tls-ca-file=/pgconf/tls/ca.crt",
 		}...)
 	}
 
@@ -263,11 +273,6 @@ func getPMMAgentPrerunScript(pgc *crv1.PerconaPGCluster) v1.EnvVar {
 	pmmAddService := fmt.Sprintf("pmm-admin add postgresql %s;", strings.Join(addServiceArgs, " "))
 	pmmAnnotate := "pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'"
 	prerunScript := pmmWait + "\n" + pmmAddService + "\n" + pmmAnnotate
-
-	if pgc.TLSEnabled() {
-		prepareTLS := "cat /pgconf/tls/tls.key /pgconf/tls/tls.crt > /tmp/tls.pem;"
-		prerunScript = prepareTLS + "\n" + prerunScript
-	}
 
 	return v1.EnvVar{
 		Name:  "PMM_AGENT_PRERUN_SCRIPT",
