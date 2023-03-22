@@ -69,6 +69,7 @@ type backrestJobTemplateFields struct {
 	PodAntiAffinity               string
 	PodAntiAffinityLabelName      string
 	PodAntiAffinityLabelValue     string
+	CustomAffinity                string
 }
 
 var (
@@ -120,6 +121,7 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 		return
 	}
 
+	var customAffinity string
 	nodeSelector := operator.GetNodeAffinity(cluster.Spec.NodeAffinity.Default)
 	podAntiAffinity := operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentDefault, cluster.Spec.PodAntiAffinity.Default)
 	podAntiAffinityLabelValue := string(cluster.Spec.PodAntiAffinity.Default)
@@ -146,6 +148,15 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 			nodeSelector = operator.GetNodeAffinity(nodeAffinity)
 			podAntiAffinity = operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentDefault, affinity.AntiAffinityType)
 			podAntiAffinityLabelValue = string(affinity.AntiAffinityType)
+
+			if affinity.Advanced != nil {
+				advanced, err := json.Marshal(affinity.Advanced)
+				if err == nil {
+					customAffinity = string(advanced)
+				} else {
+					customAffinity = ""
+				}
+			}
 		} else {
 			log.Error("can't umarshal affinity json for backup job, using defaults")
 		}
@@ -179,6 +190,7 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 		PodAntiAffinity:               podAntiAffinity,
 		PodAntiAffinityLabelName:      config.LABEL_POD_ANTI_AFFINITY,
 		PodAntiAffinityLabelValue:     podAntiAffinityLabelValue,
+		CustomAffinity:                customAffinity,
 	}
 
 	podCommandOpts, err := getCommandOptsFromPod(clientset, task, namespace)

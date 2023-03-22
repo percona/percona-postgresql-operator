@@ -92,6 +92,7 @@ func (c *Controller) handleScheduleBackup(newCluster, oldCluster *crv1.PerconaPG
 
 	return nil
 }
+
 func getScheduleConfigMap(name string, job crv1.CronJob, newCluster *crv1.PerconaPGCluster) (*v1.ConfigMap, error) {
 	storage, ok := newCluster.Spec.Backup.Storages[job.Storage]
 	if !ok && job.Storage != storageLocal {

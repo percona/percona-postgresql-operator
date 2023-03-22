@@ -36,7 +36,6 @@ type pgBackRestTask struct {
 }
 
 func (p pgBackRestTask) NewBackRestTask() *crv1.Pgtask {
-
 	return &crv1.Pgtask{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: p.taskName,
