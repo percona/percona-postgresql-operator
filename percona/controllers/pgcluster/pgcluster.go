@@ -390,7 +390,7 @@ func getPGCluster(pgc *crv1.PerconaPGCluster, cluster *crv1.Pgcluster) *crv1.Pgc
 	cluster.Spec.PGDataSource.RestoreFrom = pgc.Spec.PGDataSource.RestoreFrom
 	cluster.Spec.PGDataSource.RestoreOpts = pgc.Spec.PGDataSource.RestoreOpts
 	cluster.Spec.ServiceType = pgc.Spec.PGPrimary.Expose.ServiceType
-	cluster.Spec.TLSOnly = pgc.Spec.TlSOnly
+	cluster.Spec.TLSOnly = pgc.Spec.TLSOnly
 	cluster.Spec.Standby = pgc.Spec.Standby
 	cluster.Spec.Shutdown = pgc.Spec.Pause
 	cluster.Spec.CustomConfig = pgc.Spec.PGPrimary.Customconfig

@@ -20,9 +20,10 @@ import (
 )
 
 func (c *Controller) handleTLS(cr *crv1.PerconaPGCluster) error {
-	if !cr.Spec.TlSOnly {
+	if !cr.TLSEnabled() {
 		return nil
 	}
+
 	err := c.createSSLByCertManager(cr)
 	if err != nil {
 		if cr.Spec.TLS != nil && cr.Spec.TLS.IssuerConf != nil {
@@ -38,15 +39,20 @@ func (c *Controller) handleTLS(cr *crv1.PerconaPGCluster) error {
 }
 
 func (c *Controller) createSSLManualy(cluster *crv1.PerconaPGCluster) error {
-	ca, cert, key, err := tls.Issue([]string{cluster.Name, cluster.Name + "-pgbouncer"})
+	hosts := getDNSNames(cluster)
+
+	caCert, tlsCert, privKey, err := tls.Issue(hosts)
 	if err != nil {
 		return errors.Wrap(err, "issue TLS")
 	}
-	ctx := context.TODO()
-	caSecretName := cluster.Name + "-ssl-ca"
-	if len(cluster.Spec.SSLCA) > 0 {
-		caSecretName = cluster.Spec.SSLCA
+
+	ca, cert, key, err := tls.EncodePEM(caCert, tlsCert, privKey)
+	if err != nil {
+		return errors.Wrap(err, "encode certificates")
 	}
+
+	ctx := context.TODO()
+	caSecretName := cluster.Spec.SSLCA
 	caSecret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: caSecretName,
@@ -55,10 +61,8 @@ func (c *Controller) createSSLManualy(cluster *crv1.PerconaPGCluster) error {
 			"ca.crt": ca,
 		},
 	}
-	keyPairSecretName := cluster.Name + "-ssl-keypair"
-	if len(cluster.Spec.SSLSecretName) > 0 {
-		keyPairSecretName = cluster.Spec.SSLSecretName
-	}
+
+	keyPairSecretName := cluster.Spec.SSLSecretName
 	keyPairSecret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: keyPairSecretName,
@@ -79,6 +83,34 @@ func (c *Controller) createSSLManualy(cluster *crv1.PerconaPGCluster) error {
 		return errors.Wrapf(err, "create secret %s", keyPairSecret.Name)
 	}
 
+	if len(cluster.Spec.SSLReplicationSecretName) > 0 {
+		replCert, err := tls.GenerateCertificate(caCert, privKey, hosts, "primaryuser")
+		if err != nil {
+			return errors.Wrap(err, "generate replication TLS certificate")
+		}
+
+		_, repl, _, err := tls.EncodePEM(caCert, replCert, privKey)
+		if err != nil {
+			return errors.Wrap(err, "encode replication TLS certificate")
+		}
+
+		replicationSecret := v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: cluster.Spec.SSLReplicationSecretName,
+			},
+			Data: map[string][]byte{
+				"tls.crt": repl,
+				"tls.key": key,
+			},
+			Type: v1.SecretTypeTLS,
+		}
+
+		_, err = c.Client.CoreV1().Secrets(cluster.Namespace).Create(ctx, &replicationSecret, metav1.CreateOptions{})
+		if err != nil && !kerrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "create secret %s", replicationSecret.Name)
+		}
+	}
+
 	return nil
 }
 
@@ -92,12 +124,8 @@ func (c *Controller) createSSLByCertManager(cr *crv1.PerconaPGCluster) error {
 	caIssuerName := cr.Name + "-pgo-ca-issuer"
 	issuerKind := "Issuer"
 	issuerGroup := ""
-	dnsNames := []string{
-		cr.Name,
-		cr.Name + "-pgbouncer",
-		"*." + cr.Name,
-		"*." + cr.Name + "-pgbouncer",
-	}
+	dnsNames := getDNSNames(cr)
+
 	if cr.Spec.TLS != nil && cr.Spec.TLS.IssuerConf != nil {
 		issuerKind = cr.Spec.TLS.IssuerConf.Kind
 		issuerName = cr.Spec.TLS.IssuerConf.Name
@@ -106,18 +134,14 @@ func (c *Controller) createSSLByCertManager(cr *crv1.PerconaPGCluster) error {
 		if err := c.createIssuer(ownerReferences, cr.Namespace, caIssuerName, ""); err != nil {
 			return err
 		}
-		caSecretName := cr.Name + "-ssl-ca"
-		if len(cr.Spec.SSLCA) > 0 {
-			caSecretName = cr.Spec.SSLCA
-		}
 		caCert := &cm.Certificate{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            cr.Name + "-ssl-ca",
+				Name:            cr.Spec.SSLCA,
 				Namespace:       cr.Namespace,
 				OwnerReferences: ownerReferences,
 			},
 			Spec: cm.CertificateSpec{
-				SecretName: caSecretName,
+				SecretName: cr.Spec.SSLCA,
 				CommonName: cr.Name + "-ca",
 				DNSNames:   dnsNames,
 				IsCA:       true,
@@ -145,18 +169,15 @@ func (c *Controller) createSSLByCertManager(cr *crv1.PerconaPGCluster) error {
 			return err
 		}
 	}
-	keyPairSecretName := cr.Name + "-ssl-keypair"
-	if len(cr.Spec.SSLSecretName) > 0 {
-		keyPairSecretName = cr.Spec.SSLSecretName
-	}
+
 	kubeCert := &cm.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            cr.Name + "-ssl",
+			Name:            cr.Spec.SSLSecretName,
 			Namespace:       cr.Namespace,
 			OwnerReferences: ownerReferences,
 		},
 		Spec: cm.CertificateSpec{
-			SecretName: keyPairSecretName,
+			SecretName: cr.Spec.SSLSecretName,
 			CommonName: cr.Name + "-ssl",
 			DNSNames:   dnsNames,
 			IsCA:       false,
@@ -177,7 +198,39 @@ func (c *Controller) createSSLByCertManager(cr *crv1.PerconaPGCluster) error {
 		return errors.Wrap(err, "create certificate")
 	}
 
-	return c.waitForCerts(cr.Namespace, cr.Spec.SSLSecretName)
+	if err := c.waitForCerts(cr.Namespace, cr.Spec.SSLSecretName); err != nil {
+		return err
+	}
+
+	replicationCert := &cm.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            cr.Spec.SSLReplicationSecretName,
+			Namespace:       cr.Namespace,
+			OwnerReferences: ownerReferences,
+		},
+		Spec: cm.CertificateSpec{
+			SecretName: cr.Spec.SSLReplicationSecretName,
+			CommonName: "primaryuser",
+			DNSNames:   dnsNames,
+			IsCA:       false,
+			IssuerRef: cmmeta.ObjectReference{
+				Name:  issuerName,
+				Kind:  issuerKind,
+				Group: issuerGroup,
+			},
+		},
+	}
+
+	if cr.Spec.TLS != nil && len(cr.Spec.TLS.SANs) > 0 {
+		replicationCert.Spec.DNSNames = append(kubeCert.Spec.DNSNames, cr.Spec.TLS.SANs...)
+	}
+
+	_, err = c.Client.CMClient.Certificates(cr.Namespace).Create(context.TODO(), replicationCert, metav1.CreateOptions{})
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return errors.Wrap(err, "create certificate")
+	}
+
+	return c.waitForCerts(cr.Namespace, cr.Spec.SSLReplicationSecretName)
 }
 
 func (c *Controller) waitForCerts(namespace string, secretsList ...string) error {
@@ -236,6 +289,16 @@ func (c *Controller) createIssuer(ownRef []metav1.OwnerReference, namespace, iss
 	}
 
 	return nil
+}
+
+func getDNSNames(cr *crv1.PerconaPGCluster) []string {
+	return []string{
+		cr.Name,
+		cr.Name + "-pgbouncer",
+		"*." + cr.Name,
+		"*." + cr.Name + "-pgbouncer",
+	}
+
 }
 
 func ownerRef(ro runtime.Object, scheme *runtime.Scheme) (metav1.OwnerReference, error) {

@@ -6,9 +6,9 @@ metadata:
   name: cluster1
 spec:
 #  secretsName: cluster1-users
-#  sslCA: cluster1-ssl-ca
-#  sslSecretName: cluster1-ssl-keypair
-#  sslReplicationSecretName: cluster1-ssl-keypair
+  sslCA: cluster1-ssl-ca
+  sslSecretName: cluster1-ssl-keypair
+  sslReplicationSecretName: cluster1-replication-ssl-keypair
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
     apply: disabled

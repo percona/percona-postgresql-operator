@@ -6,9 +6,9 @@ metadata:
   name: some-name
 spec:
 #  secretsName: some-name-users
-#  sslCA: some-name-ssl-ca
-#  sslSecretName: some-name-ssl-keypair
-#  sslReplicationSecretName: some-name-ssl-keypair
+  sslCA: some-name-ssl-ca
+  sslSecretName: some-name-ssl-keypair
+  sslReplicationSecretName: some-name-replication-ssl-keypair
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
     apply: disabled

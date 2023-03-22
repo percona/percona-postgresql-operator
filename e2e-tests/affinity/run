@@ -15,7 +15,7 @@ spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 compare_kubectl "deployment/${cluster}"
 compare_kubectl "deployment/${cluster}-backrest-shared-repo"
 
-kubectl_bin delete pgcluster ${cluster}
+kubectl_bin delete perconapgcluster ${cluster}
 sleep 30
 
 cluster="some-name-required"
@@ -24,7 +24,7 @@ spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' "required"
 compare_kubectl "deployment/${cluster}"
 compare_kubectl "deployment/${cluster}-backrest-shared-repo"
 
-kubectl_bin delete pgcluster ${cluster}
+kubectl_bin delete perconapgcluster ${cluster}
 sleep 30
 
 cluster="some-name-disabled"

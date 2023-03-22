@@ -34,7 +34,7 @@ type PerconaPGClusterSpec struct {
 	TablespaceStorages       map[string]PVCStorage  `json:"tablespaceStorages"`
 	Pause                    bool                   `json:"pause"`
 	Standby                  bool                   `json:"standby"`
-	TlSOnly                  bool                   `json:"tlsOnly"`
+	TLSOnly                  bool                   `json:"tlsOnly"`
 	DisableAutofail          bool                   `json:"disableAutofail"`
 	KeepData                 bool                   `json:"keepData"`
 	KeepBackups              bool                   `json:"keepBackups"`
@@ -294,4 +294,8 @@ func (p *PerconaPGCluster) checkAndSetAffinity(clusterName string) {
 	if p.Spec.Backup.Affinity.Advanced == nil && len(p.Spec.Backup.Affinity.AntiAffinityType) == 0 {
 		p.Spec.Backup.Affinity.AntiAffinityType = "preferred"
 	}
+}
+
+func (p *PerconaPGCluster) TLSEnabled() bool {
+	return (p.Spec.SSLSecretName != "" && p.Spec.SSLCA != "")
 }

@@ -2,6 +2,8 @@ package pmm
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
@@ -231,10 +233,44 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName, nodeName string) v
 					},
 				},
 			},
-			{
-				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: "pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify --skip-connection-check --metrics-mode=push --username=postgres --password=$(DB_PASS) --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --host=$(POD_NAME) --port=5432 --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
-			},
+			getPMMAgentPrerunScript(pgc),
 		},
+	}
+}
+
+func getPMMAgentPrerunScript(pgc *crv1.PerconaPGCluster) v1.EnvVar {
+	addServiceArgs := []string{
+		"--skip-connection-check",
+		"--metrics-mode=push",
+		"--username=postgres",
+		"--password=$(DB_PASS)",
+		"--service-name=$(PMM_AGENT_SETUP_NODE_NAME)",
+		"--host=$(POD_NAME)",
+		"--port=5432",
+		"--query-source=pgstatmonitor",
+	}
+
+	if pgc.TLSEnabled() {
+		addServiceArgs = append(addServiceArgs, []string{
+			"--tls",
+			"--tls-skip-verify",
+			"--tls-certificate-key-file=/tmp/tls.pem",
+			"--tls-ca-file=/pgconfg/tls/ca.crt",
+		}...)
+	}
+
+	pmmWait := "pmm-admin status --wait=10s;"
+	pmmAddService := fmt.Sprintf("pmm-admin add postgresql %s;", strings.Join(addServiceArgs, " "))
+	pmmAnnotate := "pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'"
+	prerunScript := pmmWait + "\n" + pmmAddService + "\n" + pmmAnnotate
+
+	if pgc.TLSEnabled() {
+		prepareTLS := "cat /pgconf/tls/tls.key /pgconf/tls/tls.crt > /tmp/tls.pem;"
+		prerunScript = prepareTLS + "\n" + prerunScript
+	}
+
+	return v1.EnvVar{
+		Name:  "PMM_AGENT_PRERUN_SCRIPT",
+		Value: prerunScript,
 	}
 }
