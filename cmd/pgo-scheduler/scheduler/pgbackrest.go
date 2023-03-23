@@ -20,14 +20,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/percona/percona-postgresql-operator/internal/config"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
-
-	"github.com/percona/percona-postgresql-operator/internal/config"
 )
 
 type BackRestBackupJob struct {

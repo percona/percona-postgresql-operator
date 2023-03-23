@@ -18,9 +18,8 @@ package scheduler
 import (
 	"time"
 
-	cv3 "github.com/robfig/cron/v3"
-
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	cv3 "github.com/robfig/cron/v3"
 )
 
 var clientset kubeapi.Interface

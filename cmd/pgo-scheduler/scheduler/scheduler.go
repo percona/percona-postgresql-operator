@@ -23,9 +23,8 @@ import (
 	"time"
 
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
-	log "github.com/sirupsen/logrus"
-
 	cv3 "github.com/robfig/cron/v3"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
 

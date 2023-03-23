@@ -7,13 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler/scheduler"
+	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler/scheduler"
-	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 )
 
 type actionType string

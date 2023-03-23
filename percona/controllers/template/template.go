@@ -9,7 +9,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/operator"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
-
 	"github.com/pkg/errors"
 )
 

@@ -9,7 +9,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/service"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
-
 	"github.com/pkg/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
