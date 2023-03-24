@@ -46,6 +46,7 @@ const (
 	LABEL_CCP_IMAGE_KEY      = "ccp-image"
 	LABEL_IMAGE_PREFIX       = "image-prefix"
 	LABEL_POD_ANTI_AFFINITY  = "pg-pod-anti-affinity"
+	LABEL_AFFINITY_JSON      = "affinity-json"
 )
 
 const (

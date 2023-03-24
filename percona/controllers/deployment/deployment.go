@@ -2,14 +2,15 @@ package deployment
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/operator"
+	util "github.com/percona/percona-postgresql-operator/internal/util"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
 	"github.com/pkg/errors"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,15 +51,38 @@ func UpdateSpecTemplateLabels(labels map[string]string, deployment *appsv1.Deplo
 	for k, v := range labels {
 		deployment.Spec.Template.Labels[k] = v
 	}
-
-	return
 }
 
-func UpdateSpecTemplateAffinity(deployment *appsv1.Deployment, affinity crv1.Affinity) {
-	if affinity.Advanced == nil {
+func UpdateSpecTemplateAffinity(deployment *appsv1.Deployment, deploymentType crv1.PodAntiAffinityDeployment, affinity crv1.Affinity, cluster *crv1.Pgcluster) {
+	if affinity.Advanced != nil {
+		deployment.Spec.Template.Spec.Affinity = affinity.Advanced
 		return
 	}
-	deployment.Spec.Template.Spec.Affinity = affinity.Advanced
+
+	if affinity.NodeLabel != nil {
+		var nodeAffinityType crv1.NodeAffinityType
+		switch affinity.NodeAffinityType {
+		case "preferred":
+			nodeAffinityType = crv1.NodeAffinityTypePreferred
+		case "required":
+			nodeAffinityType = crv1.NodeAffinityTypeRequired
+		}
+		for key, val := range affinity.NodeLabel {
+			deployment.Spec.Template.Spec.Affinity.NodeAffinity = util.GenerateNodeAffinity(nodeAffinityType, key, []string{val})
+		}
+	}
+
+	var podAntiAffinity struct {
+		PodAntiAffinity *v1.PodAntiAffinity `json:"podAntiAffinity"`
+	}
+
+	antiAffinityJSON := operator.GetPodAntiAffinity(cluster, deploymentType, affinity.AntiAffinityType)
+	err := json.Unmarshal([]byte(antiAffinityJSON), &podAntiAffinity)
+	if err != nil {
+		return
+	}
+
+	deployment.Spec.Template.Spec.Affinity.PodAntiAffinity = podAntiAffinity.PodAntiAffinity
 }
 
 func UpdateDeploymentContainer(deployment *appsv1.Deployment, containerName, image, pullPolicy string) {

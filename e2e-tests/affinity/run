@@ -14,6 +14,7 @@ spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml"
 
 compare_kubectl "deployment/${cluster}"
 compare_kubectl "deployment/${cluster}-backrest-shared-repo"
+compare_kubectl "job/backrest-backup-${cluster}"
 
 kubectl_bin delete perconapgcluster ${cluster}
 sleep 30
@@ -23,6 +24,7 @@ spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' "required"
 
 compare_kubectl "deployment/${cluster}"
 compare_kubectl "deployment/${cluster}-backrest-shared-repo"
+compare_kubectl "job/backrest-backup-${cluster}"
 
 kubectl_bin delete perconapgcluster ${cluster}
 sleep 30
@@ -32,5 +34,6 @@ spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" '' '' "disabled"
 
 compare_kubectl "deployment/${cluster}"
 compare_kubectl "deployment/${cluster}-backrest-shared-repo"
+compare_kubectl "job/backrest-backup-${cluster}"
 
 destroy ${namespace}
