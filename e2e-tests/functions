@@ -752,6 +752,8 @@ compare_kubectl() {
 		| yq d - 'status' \
 		| yq d - '**.(name==suffix)' \
 		| yq d - '**.(name==NAMESPACE)' \
+		| yq d - '**.(name==COMMAND_OPTS)' \
+		| yq d - '**.(name==PODNAME)' \
 		| yq d - 'spec.volumeClaimTemplates.*.apiVersion' \
 		| yq d - 'spec.volumeClaimTemplates.*.kind' \
 		| yq d - 'metadata.ownerReferences.*.apiVersion' \

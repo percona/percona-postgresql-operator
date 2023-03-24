@@ -109,7 +109,18 @@
                         }
                     }]
                 }],
-                "affinity": <affinity>,
+                "affinity": {{if .CustomAffinity}}
+                {{.CustomAffinity}}
+                {{else}}
+                    {
+                        {{if .NodeSelector}}
+                        "nodeAffinity": {{ .NodeSelector }}
+                        {{ end }}
+                        {{if and .NodeSelector .PodAntiAffinity}},{{end}}
+                        {{.PodAntiAffinity}}
+                    }
+                {{end}}
+                ,
                 "restartPolicy": "Never"
             }
         }

@@ -47,7 +47,7 @@ RUN set -ex; \
 
 COPY --from=go_builder /usr/local/bin/pgo-scheduler /opt/cpm/bin
 COPY --from=go_builder /licenses /licenses
-COPY bin/pgo-scheduler /opt/cpm/bin
+COPY bin/pgo-scheduler/start.sh /opt/cpm/bin/
 COPY installers/ansible/roles/pgo-operator/files/pgo-configs /default-pgo-config
 COPY conf/postgres-operator/pgo.yaml /default-pgo-config/pgo.yaml
 

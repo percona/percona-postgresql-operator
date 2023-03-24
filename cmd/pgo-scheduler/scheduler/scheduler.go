@@ -23,9 +23,8 @@ import (
 	"time"
 
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
-	log "github.com/sirupsen/logrus"
-
 	cv3 "github.com/robfig/cron/v3"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -78,6 +77,7 @@ func (s *Scheduler) AddSchedule(config *v1.ConfigMap) error {
 		"label":      schedule.Label,
 		"container":  schedule.Container,
 		"options":    schedule.Options,
+		"affinity":   schedule.Affinity,
 	}).Info("Added new schedule")
 
 	s.entries[name] = id

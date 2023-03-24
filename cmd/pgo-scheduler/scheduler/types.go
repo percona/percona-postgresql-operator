@@ -39,6 +39,7 @@ type ScheduleTemplate struct {
 	Namespace  string    `json:"namespace"`
 	Type       string    `json:"type"`
 	Cluster    string    `json:"cluster"`
+	Affinity   string    `json:"affinity"`
 	PGBackRest `json:"pgbackrest,omitempty"`
 	Policy     `json:"policy,omitempty"`
 }

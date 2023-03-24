@@ -9,7 +9,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/operator"
 	"github.com/percona/percona-postgresql-operator/percona/controllers/pmm"
 	crv1 "github.com/percona/percona-postgresql-operator/pkg/apis/crunchydata.com/v1"
-
 	"github.com/pkg/errors"
 )
 
@@ -25,11 +24,6 @@ const (
 
 func UpdateBackrestJobTemplate(backrestJobTemplateData []byte, newCluster *crv1.PerconaPGCluster) error {
 	templateData := handleImagePullPolicy(backrestJobTemplateData, []byte(newCluster.Spec.Backup.ImagePullPolicy))
-
-	templateData, err := handleAffinityTemplate(templateData, newCluster.Spec.PGPrimary.Affinity, true)
-	if err != nil {
-		return errors.Wrap(err, "handle affinity template data")
-	}
 
 	t, err := template.New(BackrestJobTemplateName).Parse(string(templateData))
 	if err != nil {

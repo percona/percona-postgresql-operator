@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    backrest-command: backup
+    pg-cluster: some-name-disabled
+    pgha-backup-type: bootstrap
+    pgo-backrest: "true"
+    pgo-backrest-job: "true"
+    pgouser: admin
+    vendor: crunchydata
+  name: backrest-backup-some-name-disabled
+spec:
+  backoffLimit: 6
+  completions: 1
+  parallelism: 1
+  selector:
+    matchLabels: {}
+  template:
+    metadata:
+      labels:
+        backrest-command: backup
+        job-name: backrest-backup-some-name-disabled
+        pg-cluster: some-name-disabled
+        pgo-backrest: "true"
+        pgo-backrest-job: "true"
+        vendor: crunchydata
+      name: backrest-backup-some-name-disabled
+    spec:
+      affinity: {}
+      containers:
+        - env:
+            - name: COMMAND
+              value: backup
+            - name: MODE
+              value: pgbackrest
+            - name: PITR_TARGET
+            - name: PGBACKREST_STANZA
+            - name: PGBACKREST_DB_PATH
+            - name: PGBACKREST_REPO1_PATH
+            - name: PGBACKREST_REPO1_TYPE
+              value: posix
+            - name: PGHA_PGBACKREST_LOCAL_S3_STORAGE
+              value: "false"
+            - name: PGHA_PGBACKREST_LOCAL_GCS_STORAGE
+              value: "false"
+            - name: PGHA_PGBACKREST_S3_VERIFY_TLS
+              value: "true"
+            - name: PGBACKREST_LOG_PATH
+              value: /tmp
+          imagePullPolicy: IfNotPresent
+          name: backrest
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+      dnsPolicy: ClusterFirst
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: pgo-backrest
+      serviceAccountName: pgo-backrest
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+          name: tmp
