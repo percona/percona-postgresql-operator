@@ -92,7 +92,7 @@ function main {
 
 	delete_cluster_gracefully ${cluster}
 
-    desc 'Testing full backup/restore from s3, local'
+	desc 'Testing full backup/restore from s3, local'
 	cluster="some-name-${RANDOM}"
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config" "false" "true" "full"
