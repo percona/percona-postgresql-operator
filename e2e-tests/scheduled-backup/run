@@ -69,8 +69,7 @@ function main {
 	kubectl_bin wait "job/${cluster}-full-sch-backup" --for=condition=Complete --timeout=300s
 	restore ${cluster} "s3" "full"
 
-	kubectl_bin delete perconapgcluster/${cluster}
-	sleep 60
+	delete_cluster_gracefully ${cluster}
 
 	desc 'Testing diff backup/restore from s3'
     cluster="some-name-${RANDOM}"
@@ -80,8 +79,7 @@ function main {
 	kubectl_bin wait "job/${cluster}-diff-sch-backup" --for=condition=Complete --timeout=300s
 	restore ${cluster} "s3" "diff"
 
-	kubectl_bin delete perconapgcluster/${cluster}
-	sleep 60
+	delete_cluster_gracefully ${cluster}
 
 
 	desc 'Testing incr backup/restore from s3'
@@ -92,8 +90,7 @@ function main {
 	kubectl_bin wait "job/${cluster}-incr-sch-backup" --for=condition=Complete --timeout=300s
 	restore ${cluster} "s3" "incr"
 
-	kubectl_bin delete perconapgcluster/${cluster}
-	sleep 60
+	delete_cluster_gracefully ${cluster}
 
     desc 'Testing full backup/restore from s3, local'
 	cluster="some-name-${RANDOM}"

@@ -1215,3 +1215,11 @@ patch_secret() {
 
 	kubectl_bin patch secret $secret -p="{\"data\":{\"$key\": \"$value\"}}"
 }
+
+delete_cluster_gracefully() {
+	local cluster=${1}
+
+	kubectl_bin delete perconapgcluster/${cluster}
+	rmjob_name=$(kubectl_bin -n $namespace get jobs --selector=pg-cluster=${cluster},pgrmdata="true" -o jsonpath='{.items[0].metadata.name}')
+	wait_job_completion ${rmjob_name} false
+}

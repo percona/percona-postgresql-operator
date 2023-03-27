@@ -90,8 +90,8 @@ function main {
 
 	prepare_n_restore ${cluster} "s3" "incr"
 
-	kubectl_bin delete perconapgcluster/${cluster}
-	sleep 60
+	delete_cluster_gracefully ${cluster}
+
 	destroy_minio
 	apply_configs ${cluster}
 
@@ -102,8 +102,7 @@ function main {
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "gcs" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "gcs" "incr"
 
-	kubectl_bin delete perconapgcluster/${cluster}
-	sleep 30
+	delete_cluster_gracefully ${cluster}
 
 	gsutil -m rm -r gs://${BUCKET}/backrestrepo/${cluster}-backrest-shared-repo
 
@@ -113,16 +112,14 @@ function main {
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "posix" "full"
 
-	kubectl_bin delete perconapgcluster/${cluster}
-	sleep 60
+	delete_cluster_gracefully ${cluster}
 
 	desc 'Testing backup/restore from local with storage hybrid storage, posix'
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "local,s3" "${cluster}-custom-config"
 	prepare_n_restore ${cluster} "posix" "diff"
 
-	kubectl_bin delete perconapgcluster/${cluster}
-	sleep 60
+	delete_cluster_gracefully ${cluster}
 
 	desc 'Testing backup/restore from local with storage hybrid storage, gcs'
 	apply_configs ${cluster}
