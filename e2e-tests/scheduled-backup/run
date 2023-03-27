@@ -72,7 +72,7 @@ function main {
 	delete_cluster_gracefully ${cluster}
 
 	desc 'Testing diff backup/restore from s3'
-    cluster="some-name-${RANDOM}"
+	cluster="some-name-${RANDOM}"
 	apply_configs ${cluster}
 	spinup_pgcluster "${cluster}" "${src_dir}/deploy/cr.yaml" "s3" "${cluster}-custom-config" "false" "true" "diff"
 	sleep $(next_backup_after_sec "${cluster}-$(kubectl_bin get perconapgcluster/${cluster} -o jsonpath={.spec.backup.schedule[0].name})")
