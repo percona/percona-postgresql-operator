@@ -472,6 +472,7 @@ volumes:
 		}
 
 		t.Run("SidecarNotEnabled", func(t *testing.T) {
+			assert.NilError(t, util.AddAndSetFeatureGates(string(util.InstanceSidecars+"=false")))
 			InstancePod(ctx, cluster, sidecarInstance,
 				serverSecretProjection, clientSecretProjection, dataVolume, nil, pod)
 
