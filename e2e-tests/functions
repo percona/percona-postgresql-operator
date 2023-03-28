@@ -770,7 +770,7 @@ compare_kubectl() {
 	case $(yq r ${new_result} 'kind') in
 		'Service')
 			[[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x' ]] \
-				|| [[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x{}' ]]\
+				|| [[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x{}' ]] \
 				&& yq d -i ${new_result} 'metadata.annotations' \
 				|| :
 			;;
