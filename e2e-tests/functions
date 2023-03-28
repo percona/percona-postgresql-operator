@@ -784,8 +784,7 @@ compare_kubectl() {
 			yq d -i ${new_result} 'spec.completionMode'
 			yq d -i ${new_result} 'spec.suspend'
 			;;
-		*)
-			;;
+		*) ;;
 	esac
 
 	diff -u ${expected_result} ${new_result}
