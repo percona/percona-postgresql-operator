@@ -766,7 +766,6 @@ compare_kubectl() {
 		| yq d - '**.allocateLoadBalancerNodePorts' \
 			>${new_result}
 
-
 	case $(yq r ${new_result} 'kind') in
 		'Service')
 			[[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x' ]] \
