@@ -216,8 +216,6 @@ func TestRootIsInvalid(t *testing.T) {
 }
 
 func TestLeafCertificate(t *testing.T) {
-	t.Skip("Needs to be fixed")
-
 	serials := StringSet{}
 	root, err := NewRootCertificateAuthority()
 	assert.NilError(t, err)
