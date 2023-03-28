@@ -1,13 +1,25 @@
 name: Run tests
 on: [pull_request]
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
+  # test:
+  #   name: Test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/setup-go@v3
+  #       with:
+  #         go-version: '^1.19'
+  #     - uses: actions/checkout@v3
+  #     - name: go test
+  #       run: make check
+  go-test:
+    runs-on: ubuntu-20.04
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '^1.19'
-      - uses: actions/checkout@v3
-      - name: go test
-        run: make check
+          go-version: 1.x
+      - run: make check
+      - run: make check-generate
+
+      - name: Ensure go.mod is tidy
+        run: go mod tidy && git diff --exit-code -- go.mod
