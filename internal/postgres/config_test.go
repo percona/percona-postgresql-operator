@@ -58,8 +58,6 @@ func TestWALDirectory(t *testing.T) {
 }
 
 func TestBashSafeLink(t *testing.T) {
-	t.Skip("Needs to be fixed")
-
 	// macOS lacks `realpath` which is part of GNU coreutils.
 	if _, err := exec.LookPath("realpath"); err != nil {
 		t.Skip(`requires "realpath" executable`)
@@ -320,8 +318,6 @@ func TestBashSafeLinkPrettyYAML(t *testing.T) {
 }
 
 func TestStartupCommand(t *testing.T) {
-	t.Skip("shellcheck fails, needs to be fixed")
-
 	shellcheck := require.ShellCheck(t)
 
 	cluster := new(v1beta1.PostgresCluster)

@@ -264,8 +264,6 @@ func TestMakePGBackrestLogDir(t *testing.T) {
 }
 
 func TestReloadCommand(t *testing.T) {
-	t.Skip("shellcheck fails, needs to be fixed")
-
 	shellcheck := require.ShellCheck(t)
 
 	command := reloadCommand("some-name")
@@ -293,8 +291,6 @@ func TestReloadCommandPrettyYAML(t *testing.T) {
 }
 
 func TestRestoreCommand(t *testing.T) {
-	t.Skip("shellcheck fails, needs to be fixed")
-
 	shellcheck := require.ShellCheck(t)
 
 	pgdata := "/pgdata/pg13"
