@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -123,7 +123,7 @@ type PostgresClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=10
-	// +kubebuilder:validation:Maximum=14
+	// +kubebuilder:validation:Maximum=15
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -478,6 +478,35 @@ type PostgresInstanceSetSpec struct {
 	// More info: https://www.postgresql.org/docs/current/wal.html
 	// +optional
 	WALVolumeClaimSpec *corev1.PersistentVolumeClaimSpec `json:"walVolumeClaimSpec,omitempty"`
+
+	// The list of tablespaces volumes to mount for this postgrescluster
+	// This field requires enabling TablespaceVolumes feature gate
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	TablespaceVolumes []TablespaceVolume `json:"tablespaceVolumes,omitempty"`
+}
+
+type TablespaceVolume struct {
+	// This value goes into
+	// a. the name of a corev1.PersistentVolumeClaim,
+	// b. a label value, and
+	// c. a path name.
+	// So it must match both IsDNS1123Subdomain and IsValidLabelValue;
+	// and be valid as a file path.
+
+	// The name for the tablespace, used as the path name for the volume.
+	// Must be unique in the instance set since they become the directory names.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z][a-z0-9]*$`
+	// +kubebuilder:validation:Type=string
+	Name string `json:"name"`
+
+	// Defines a PersistentVolumeClaim for a tablespace.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+	// +kubebuilder:validation:Required
+	DataVolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"dataVolumeClaimSpec"`
 }
 
 // InstanceSidecars defines the configuration for instance sidecar containers
@@ -629,33 +658,6 @@ func init() {
 	SchemeBuilder.Register(&PostgresCluster{}, &PostgresClusterList{})
 }
 
-// Metadata contains metadata for PostgresCluster resources
-type Metadata struct {
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-// GetLabelsOrNil gets labels from a Metadata pointer, if Metadata
-// hasn't been set return nil
-func (meta *Metadata) GetLabelsOrNil() map[string]string {
-	if meta == nil {
-		return nil
-	}
-	return meta.Labels
-}
-
-// GetAnnotationsOrNil gets annotations from a Metadata pointer, if Metadata
-// hasn't been set return nil
-func (meta *Metadata) GetAnnotationsOrNil() map[string]string {
-	if meta == nil {
-		return nil
-	}
-	return meta.Annotations
-}
-
 // MonitoringSpec is a union of the supported PostgreSQL Monitoring tools
 type MonitoringSpec struct {
 	// +optional
@@ -699,4 +701,10 @@ type ExporterSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+func NewPostgresCluster() *PostgresCluster {
+	cluster := &PostgresCluster{}
+	cluster.SetGroupVersionKind(GroupVersion.WithKind("PostgresCluster"))
+	return cluster
 }

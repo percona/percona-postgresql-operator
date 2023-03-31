@@ -1,5 +1,5 @@
 This directory contains the files that are used to install [Crunchy PostgreSQL for Kubernetes][hub-listing],
-which includes PGO, the Postgres Operator from [Crunchy Data][], using [Operator Lifecycle Manager][olm].
+which includes PGO, the Postgres Operator from [Crunchy Data][], using [Operator Lifecycle Manager][OLM].
 
 The integration centers around a [ClusterServiceVersion][olm-csv] [manifest](./bundle.csv.yaml)
 that gets packaged for OperatorHub. Changes there are accepted only if they pass all the [scorecard][]
@@ -7,14 +7,15 @@ tests. Consult the [technical requirements][hub-contrib] when making changes.
 
 <!-- Requirements might have changed with https://github.com/operator-framework/community-operators/issues/4159 -->
 
-[crunchy data]: https://www.crunchydata.com
+[Crunchy Data]: https://www.crunchydata.com
 [hub-contrib]: https://operator-framework.github.io/community-operators/packaging-operator/
 [hub-listing]: https://operatorhub.io/operator/postgresql
-[olm]: https://github.com/operator-framework/operator-lifecycle-manager
+[OLM]: https://github.com/operator-framework/operator-lifecycle-manager
 [olm-csv]: https://github.com/operator-framework/operator-lifecycle-manager/blob/master/doc/design/building-your-csv.md
 [scorecard]: https://sdk.operatorframework.io/docs/testing-operators/scorecard/
-[red hat container certification]: https://redhat-connect.gitbook.io/partner-guide-for-red-hat-openshift-and-container/
-[red hat operator certification]: https://redhat-connect.gitbook.io/certified-operator-guide/
+
+[Red Hat Container Certification]: https://redhat-connect.gitbook.io/partner-guide-for-red-hat-openshift-and-container/
+[Red Hat Operator Certification]: https://redhat-connect.gitbook.io/certified-operator-guide/
 
 <!-- registry.connect.redhat.com/crunchydata/postgres-operator-bundle -->
 
@@ -68,11 +69,16 @@ seems at odds with the behavior at the other repos.
 For more information on the use of 'skips' and 'replaces', please see:
 https://olm.operatorframework.io/docs/concepts/olm-architecture/operator-catalog/creating-an-update-graph/
 
+
 Another version issue encountered was related to our attempt to both support OCP v4.6 (which is an Extended Update
 Support (EUS) release) while also limiting Kubernetes to 1.20+. The issue with this is that OCP 4.6 utilizes k8s 1.19
 and the kube minversion validation was in fact limiting the OCP version as well. Our hope was that those setting would
 be treated independently, but that was unfortunately not the case. The fix for this was to move this kube version to the
 1.19, despite its being released 3rd quarter of 2020 with 1 year of patch support.
+
+Following the lessons learned above, when bumping the Openshift supported version from v4.6 to v4.8, we will similarly
+keep the matching minimum Kubernetes version, i.e. 1.21.
+https://access.redhat.com/solutions/4870701
 
 ## Testing
 
@@ -128,13 +134,22 @@ kubectl -n "$NAMESPACE" delete operatorgroup olm-operator-group
 
 After generating and testing the OLM bundles, there are two manual steps.
 
+<<<<<<< HEAD
 1. Update the image SHA values (denoted with '<update\_(imagetype)\_SHA_value>', required for both the Red Hat 'Certified' and
    'Marketplace' bundles)
+=======
+1. Update the image SHA values (denoted with '<update_(imagetype)_SHA_value>', required for both the Red Hat 'Certified' and
+'Marketplace' bundles)
+>>>>>>> upstream/master
 2. Update the 'description.md' file to indicate which OCP versions this release of PGO was tested against.
 
 ### Troubleshooting
 
+<<<<<<< HEAD
 If, when running `make validate-bundles` you encounter an error similar to
+=======
+If, when running `make validate-bundles` you encounter an error similar  to
+>>>>>>> upstream/master
 
 `cannot find Containerfile or Dockerfile in context directory: stat /mnt/Dockerfile: permission denied`
 

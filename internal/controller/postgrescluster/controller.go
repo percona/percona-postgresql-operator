@@ -1,7 +1,7 @@
 package postgrescluster
 
 /*
-Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -72,9 +72,9 @@ type Reconciler struct {
 	) error
 }
 
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;watch
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters/status,verbs=patch
+// +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
+// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters/status",verbs={patch}
 
 // Reconcile reconciles a ConfigMap in a namespace managed by the PostgreSQL Operator
 func (r *Reconciler) Reconcile(
@@ -217,6 +217,9 @@ func (r *Reconciler) Reconcile(
 	pgaudit.PostgreSQLParameters(&pgParameters)
 	pgbackrest.PostgreSQL(cluster, &pgParameters)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
+
+	// Set huge_pages = try if a hugepages resource limit > 0, otherwise set "off"
+	postgres.SetHugePages(cluster, &pgParameters)
 
 	if err == nil {
 		rootCA, err = r.reconcileRootCertificate(ctx, cluster)
@@ -386,7 +389,7 @@ func (r *Reconciler) patch(
 // creator of such a reference have either "delete" permission on the owner or
 // "update" permission on the owner's "finalizers" subresource.
 // - https://docs.k8s.io/reference/access-authn-authz/admission-controllers/
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters/finalizers,verbs=update
+// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters/finalizers",verbs={update}
 
 // setControllerReference sets owner as a Controller OwnerReference on controlled.
 // Only one OwnerReference can be a controller, so it returns an error if another
@@ -405,19 +408,19 @@ func (r *Reconciler) setOwnerReference(
 	return controllerutil.SetOwnerReference(owner, controlled, r.Client.Scheme())
 }
 
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch
-// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch
-// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources="configmaps",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="",resources="endpoints",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="",resources="services",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="",resources="serviceaccounts",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="apps",resources="deployments",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="batch",resources="jobs",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources="roles",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources="rolebindings",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="batch",resources="cronjobs",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="policy",resources="poddisruptionbudgets",verbs={get,list,watch}
 
 // SetupWithManager adds the PostgresCluster controller to the provided runtime manager
 func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {

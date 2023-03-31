@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -68,8 +68,8 @@ func (r *Reconciler) reconcilePGBouncer(
 	return err
 }
 
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;patch
+// +kubebuilder:rbac:groups="",resources="configmaps",verbs={get}
+// +kubebuilder:rbac:groups="",resources="configmaps",verbs={create,delete,patch}
 
 // reconcilePGBouncerConfigMap writes the ConfigMap for a PgBouncer Pod.
 func (r *Reconciler) reconcilePGBouncerConfigMap(
@@ -112,7 +112,7 @@ func (r *Reconciler) reconcilePGBouncerConfigMap(
 	return configmap, err
 }
 
-// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list
+// +kubebuilder:rbac:groups="",resources="pods",verbs={get,list}
 
 // reconcilePGBouncerInPostgreSQL writes the user and other objects needed by
 // PgBouncer inside of PostgreSQL.
@@ -192,8 +192,8 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 	return err
 }
 
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;delete;patch
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={create,delete,patch}
 
 // reconcilePGBouncerSecret writes the Secret for a PgBouncer Pod.
 func (r *Reconciler) reconcilePGBouncerSecret(
@@ -520,7 +520,7 @@ func (r *Reconciler) reconcilePGBouncerDeployment(
 	return err
 }
 
-// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;patch;get;delete
+// +kubebuilder:rbac:groups="policy",resources="poddisruptionbudgets",verbs={create,patch,get,delete}
 
 // reconcilePGBouncerPodDisruptionBudget creates a PDB for the PGBouncer deployment.
 // A PDB will be created when minAvailable is determined to be greater than 0 and

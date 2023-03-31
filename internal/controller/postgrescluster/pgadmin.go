@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -225,8 +225,8 @@ func (r *Reconciler) reconcilePGAdminService(
 	return service, err
 }
 
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=create;delete;patch
+// +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={get}
+// +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={create,delete,patch}
 
 // reconcilePGAdminStatefulSet writes the StatefulSet that runs pgAdmin.
 func (r *Reconciler) reconcilePGAdminStatefulSet(
@@ -348,7 +348,7 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 	return errors.WithStack(r.apply(ctx, sts))
 }
 
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={create,patch}
 
 // reconcilePGAdminDataVolume writes the PersistentVolumeClaim for instance's
 // pgAdmin data volume.
