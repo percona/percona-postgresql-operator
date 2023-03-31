@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -297,7 +297,7 @@ func TestRestoreCommand(t *testing.T) {
 	opts := []string{
 		"--stanza=" + DefaultStanzaName, "--pg1-path=" + pgdata,
 		"--repo=1"}
-	command := RestoreCommand(pgdata, strings.Join(opts, " "))
+	command := RestoreCommand(pgdata, nil, strings.Join(opts, " "))
 
 	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
 	assert.Assert(t, len(command) > 3)
@@ -312,7 +312,7 @@ func TestRestoreCommand(t *testing.T) {
 }
 
 func TestRestoreCommandPrettyYAML(t *testing.T) {
-	b, err := yaml.Marshal(RestoreCommand("/dir", "--options"))
+	b, err := yaml.Marshal(RestoreCommand("/dir", nil, "--options"))
 	assert.NilError(t, err)
 	assert.Assert(t, strings.Contains(string(b), "\n- |"),
 		"expected literal block scalar, got:\n%s", b)
@@ -325,6 +325,29 @@ func TestServerConfig(t *testing.T) {
 	assert.Equal(t, serverConfig(cluster).String(), `
 [global]
 tls-server-address = 0.0.0.0
+tls-server-auth = pgbackrest@shoe=*
+tls-server-ca-file = /etc/pgbackrest/conf.d/~postgres-operator/tls-ca.crt
+tls-server-cert-file = /etc/pgbackrest/server/server-tls.crt
+tls-server-key-file = /etc/pgbackrest/server/server-tls.key
+
+[global:server]
+log-level-console = detail
+log-level-file = off
+log-level-stderr = error
+log-timestamp = n
+`)
+}
+
+func TestServerConfigIPv6(t *testing.T) {
+	cluster := &v1beta1.PostgresCluster{}
+	cluster.UID = "shoe"
+	cluster.Annotations = map[string]string{
+		naming.PGBackRestIPVersion: "IPv6",
+	}
+
+	assert.Equal(t, serverConfig(cluster).String(), `
+[global]
+tls-server-address = ::
 tls-server-auth = pgbackrest@shoe=*
 tls-server-ca-file = /etc/pgbackrest/conf.d/~postgres-operator/tls-ca.crt
 tls-server-cert-file = /etc/pgbackrest/server/server-tls.crt

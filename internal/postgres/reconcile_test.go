@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -56,6 +56,16 @@ func TestDownwardAPIVolumeMount(t *testing.T) {
 		Name:      "database-containerinfo",
 		MountPath: "/etc/database-containerinfo",
 		ReadOnly:  true,
+	})
+}
+
+func TestTablespaceVolumeMount(t *testing.T) {
+	mount := TablespaceVolumeMount("trial")
+
+	assert.DeepEqual(t, mount, corev1.VolumeMount{
+		Name:      "tablespace-trial",
+		MountPath: "/tablespaces/trial",
+		ReadOnly:  false,
 	})
 }
 
@@ -118,7 +128,7 @@ func TestInstancePod(t *testing.T) {
 	// without WAL volume nor WAL volume spec
 	pod := new(corev1.PodSpec)
 	InstancePod(ctx, cluster, instance,
-		serverSecretProjection, clientSecretProjection, dataVolume, nil, pod)
+		serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
 
 	assert.Assert(t, marshalMatches(pod, `
 containers:
@@ -202,7 +212,13 @@ initContainers:
   - --
   - |-
     declare -r expected_major_version="$1" pgwal_directory="$2" pgbrLog_directory="$3"
+    permissions() { while [[ -n "$1" ]]; do set "${1%/*}" "$@"; done; shift; stat -Lc '%A %4u %4g %n' "$@"; }
+    halt() { local rc=$?; >&2 echo "$@"; exit "${rc/#0/1}"; }
     results() { printf '::postgres-operator: %s::%s\n' "$@"; }
+    recreate() (
+      local tmp; tmp=$(mktemp -d -p "${1%/*}"); GLOBIGNORE='.:..'; set -x
+      chmod "$2" "${tmp}"; mv "$1"/* "${tmp}"; rmdir "$1"; mv "${tmp}" "$1"
+    )
     safelink() (
       local desired="$1" name="$2" current
       current=$(realpath "${name}")
@@ -214,21 +230,33 @@ initContainers:
     results 'uid' "$(id -u)" 'gid' "$(id -G)"
     results 'postgres path' "$(command -v postgres)"
     results 'postgres version' "${postgres_version:=$(postgres --version)}"
-    [[ "${postgres_version}" == *") ${expected_major_version}."* ]]
+    [[ "${postgres_version}" =~ ") ${expected_major_version}"($|[^0-9]) ]] ||
+    halt Expected PostgreSQL version "${expected_major_version}"
     results 'config directory' "${PGDATA:?}"
     postgres_data_directory=$([ -d "${PGDATA}" ] && postgres -C data_directory || echo "${PGDATA}")
     results 'data directory' "${postgres_data_directory}"
-    [ "${postgres_data_directory}" = "${PGDATA}" ]
+    [[ "${postgres_data_directory}" == "${PGDATA}" ]] ||
+    halt Expected matching config and data directories
     bootstrap_dir="${postgres_data_directory}_bootstrap"
     [ -d "${bootstrap_dir}" ] && results 'bootstrap directory' "${bootstrap_dir}"
     [ -d "${bootstrap_dir}" ] && postgres_data_directory="${bootstrap_dir}"
+    if [[ ! -e "${postgres_data_directory}" || -O "${postgres_data_directory}" ]]; then
     install --directory --mode=0700 "${postgres_data_directory}"
+    elif [[ -w "${postgres_data_directory}" && -g "${postgres_data_directory}" ]]; then
+    recreate "${postgres_data_directory}" '0700'
+    else (halt Permissions!); fi ||
+    halt "$(permissions "${postgres_data_directory}" ||:)"
     results 'pgBackRest log directory' "${pgbrLog_directory}"
-    install --directory --mode=0775 "${pgbrLog_directory}"
+    install --directory --mode=0775 "${pgbrLog_directory}" ||
+    halt "$(permissions "${pgbrLog_directory}" ||:)"
     install -D --mode=0600 -t "/tmp/replication" "/pgconf/tls/replication"/{tls.crt,tls.key,ca.crt}
+
     [ -f "${postgres_data_directory}/PG_VERSION" ] || exit 0
     results 'data version' "${postgres_data_version:=$(< "${postgres_data_directory}/PG_VERSION")}"
-    [ "${postgres_data_version}" = "${expected_major_version}" ]
+    [[ "${postgres_data_version}" == "${expected_major_version}" ]] ||
+    halt Expected PostgreSQL data version "${expected_major_version}"
+    [[ ! -f "${postgres_data_directory}/postgresql.conf" ]] &&
+    touch "${postgres_data_directory}/postgresql.conf"
     safelink "${pgwal_directory}" "${postgres_data_directory}/pg_wal"
     results 'wal directory' "$(realpath "${postgres_data_directory}/pg_wal")"
     rm -f "${postgres_data_directory}/recovery.signal"
@@ -329,7 +357,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, cluster, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, walVolume, pod)
+			serverSecretProjection, clientSecretProjection, dataVolume, walVolume, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)
@@ -436,7 +464,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, clusterWithConfig, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, pod)
+			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)
@@ -474,7 +502,7 @@ volumes:
 		t.Run("SidecarNotEnabled", func(t *testing.T) {
 			assert.NilError(t, util.AddAndSetFeatureGates(string(util.InstanceSidecars+"=false")))
 			InstancePod(ctx, cluster, sidecarInstance,
-				serverSecretProjection, clientSecretProjection, dataVolume, nil, pod)
+				serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
 
 			assert.Equal(t, len(pod.Containers), 2, "expected 2 containers in Pod, got %d", len(pod.Containers))
 		})
@@ -482,7 +510,7 @@ volumes:
 		t.Run("SidecarEnabled", func(t *testing.T) {
 			assert.NilError(t, util.AddAndSetFeatureGates(string(util.InstanceSidecars+"=true")))
 			InstancePod(ctx, cluster, sidecarInstance,
-				serverSecretProjection, clientSecretProjection, dataVolume, nil, pod)
+				serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
 
 			assert.Equal(t, len(pod.Containers), 3, "expected 3 containers in Pod, got %d", len(pod.Containers))
 
@@ -497,6 +525,58 @@ volumes:
 		})
 	})
 
+	t.Run("WithTablespaces", func(t *testing.T) {
+
+		clusterWithTablespaces := cluster.DeepCopy()
+		clusterWithTablespaces.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
+			{
+				TablespaceVolumes: []v1beta1.TablespaceVolume{
+					{Name: "trial"},
+					{Name: "castle"},
+				},
+			},
+		}
+
+		tablespaceVolume1 := new(corev1.PersistentVolumeClaim)
+		tablespaceVolume1.Labels = map[string]string{
+			"postgres-operator.crunchydata.com/data": "castle",
+		}
+		tablespaceVolume2 := new(corev1.PersistentVolumeClaim)
+		tablespaceVolume2.Labels = map[string]string{
+			"postgres-operator.crunchydata.com/data": "trial",
+		}
+		tablespaceVolumes := []*corev1.PersistentVolumeClaim{tablespaceVolume1, tablespaceVolume2}
+
+		InstancePod(ctx, cluster, instance,
+			serverSecretProjection, clientSecretProjection, dataVolume, nil, tablespaceVolumes, pod)
+
+		assert.Assert(t, marshalMatches(pod.Containers[0].VolumeMounts, `
+- mountPath: /pgconf/tls
+  name: cert-volume
+  readOnly: true
+- mountPath: /pgdata
+  name: postgres-data
+- mountPath: /etc/database-containerinfo
+  name: database-containerinfo
+  readOnly: true
+- mountPath: /tablespaces/castle
+  name: tablespace-castle
+- mountPath: /tablespaces/trial
+  name: tablespace-trial`), "expected tablespace mount(s) in %q container", pod.Containers[0].Name)
+
+		// InitContainer has all mountPaths, except downwardAPI and additionalConfig
+		assert.Assert(t, marshalMatches(pod.InitContainers[0].VolumeMounts, `
+- mountPath: /pgconf/tls
+  name: cert-volume
+  readOnly: true
+- mountPath: /pgdata
+  name: postgres-data
+- mountPath: /tablespaces/castle
+  name: tablespace-castle
+- mountPath: /tablespaces/trial
+  name: tablespace-trial`), "expected tablespace mount(s) in %q container", pod.InitContainers[0].Name)
+	})
+
 	t.Run("WithWALVolumeWithWALVolumeSpec", func(t *testing.T) {
 		walVolume := new(corev1.PersistentVolumeClaim)
 		walVolume.Name = "walvol"
@@ -506,7 +586,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, cluster, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, walVolume, pod)
+			serverSecretProjection, clientSecretProjection, dataVolume, walVolume, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)

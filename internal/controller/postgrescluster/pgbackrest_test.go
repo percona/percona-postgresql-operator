@@ -4,7 +4,7 @@
 package postgrescluster
 
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -528,6 +528,7 @@ topologySpreadConstraints:
 		// check returned cronjob matches set spec
 		assert.Equal(t, returnedCronJob.Name, "hippocluster-repo1-full")
 		assert.Equal(t, returnedCronJob.Spec.Schedule, testCronSchedule)
+		assert.Equal(t, returnedCronJob.Spec.ConcurrencyPolicy, batchv1.ForbidConcurrent)
 		assert.Equal(t, returnedCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Name,
 			"pgbackrest")
 		assert.Assert(t, returnedCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext != &corev1.SecurityContext{})
@@ -1371,6 +1372,7 @@ func TestReconcileManualBackup(t *testing.T) {
 
 					jobs := &batchv1.JobList{}
 					err := tClient.List(ctx, jobs, &client.ListOptions{
+						Namespace: postgresCluster.Namespace,
 						LabelSelector: naming.PGBackRestBackupJobSelector(clusterName,
 							tc.manual.RepoName, naming.BackupManual),
 					})
@@ -1417,6 +1419,7 @@ func TestReconcileManualBackup(t *testing.T) {
 					// just use a pgbackrest selector to check for the existence of any job since
 					// we might not have a repo name for tests within a manual backup defined
 					err := tClient.List(ctx, jobs, &client.ListOptions{
+						Namespace:     postgresCluster.Namespace,
 						LabelSelector: naming.PGBackRestSelector(clusterName),
 					})
 					assert.NilError(t, err)
@@ -1831,13 +1834,27 @@ func TestReconcilePostgresClusterDataSource(t *testing.T) {
 				expectedClusterCondition: nil,
 			},
 		}, {
-			desc: "invalid option: repo",
+			desc: "invalid option: --repo=",
 			dataSource: &v1beta1.DataSource{PostgresCluster: &v1beta1.PostgresClusterDataSource{
-				ClusterName: "invalid-repo-option", RepoName: "repo1",
-				Options: []string{"--repo"},
+				ClusterName: "invalid-repo-option-equals", RepoName: "repo1",
+				Options: []string{"--repo="},
 			}},
 			clusterBootstrapped: false,
-			sourceClusterName:   "invalid-repo-option",
+			sourceClusterName:   "invalid-repo-option-equals",
+			sourceClusterRepos:  []v1beta1.PGBackRestRepo{{Name: "repo1"}},
+			result: testResult{
+				configCount: 1, jobCount: 0, pvcCount: 1,
+				invalidSourceRepo: false, invalidSourceCluster: false, invalidOptions: true,
+				expectedClusterCondition: nil,
+			},
+		}, {
+			desc: "invalid option: --repo ",
+			dataSource: &v1beta1.DataSource{PostgresCluster: &v1beta1.PostgresClusterDataSource{
+				ClusterName: "invalid-repo-option-space", RepoName: "repo1",
+				Options: []string{"--repo "},
+			}},
+			clusterBootstrapped: false,
+			sourceClusterName:   "invalid-repo-option-space",
 			sourceClusterRepos:  []v1beta1.PGBackRestRepo{{Name: "repo1"}},
 			result: testResult{
 				configCount: 1, jobCount: 0, pvcCount: 1,
@@ -2543,9 +2560,8 @@ volumes:
 	})
 
 	t.Run("Resources", func(t *testing.T) {
-		cluster := &v1beta1.PostgresCluster{
-			Spec: v1beta1.PostgresClusterSpec{},
-		}
+		cluster := &v1beta1.PostgresCluster{}
+
 		t.Run("Resources not defined in jobs", func(t *testing.T) {
 			cluster.Spec.Backups = v1beta1.Backups{
 				PGBackRest: v1beta1.PGBackRestArchive{},
@@ -2618,16 +2634,9 @@ volumes:
 	})
 
 	t.Run("PriorityClassName", func(t *testing.T) {
-		cluster := &v1beta1.PostgresCluster{
-			Spec: v1beta1.PostgresClusterSpec{
-				Backups: v1beta1.Backups{
-					PGBackRest: v1beta1.PGBackRestArchive{
-						Jobs: &v1beta1.BackupJobs{
-							PriorityClassName: initialize.String("some-priority-class"),
-						},
-					},
-				},
-			},
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
+			PriorityClassName: initialize.String("some-priority-class"),
 		}
 		job, err := generateBackupJobSpecIntent(
 			cluster, v1beta1.PGBackRestRepo{},
@@ -2644,16 +2653,9 @@ volumes:
 			Operator: "Exist",
 		}}
 
-		cluster := &v1beta1.PostgresCluster{
-			Spec: v1beta1.PostgresClusterSpec{
-				Backups: v1beta1.Backups{
-					PGBackRest: v1beta1.PGBackRestArchive{
-						Jobs: &v1beta1.BackupJobs{
-							Tolerations: tolerations,
-						},
-					},
-				},
-			},
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
+			Tolerations: tolerations,
 		}
 		job, err := generateBackupJobSpecIntent(
 			cluster, v1beta1.PGBackRestRepo{},
@@ -2662,6 +2664,56 @@ volumes:
 		)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, job.Template.Spec.Tolerations, tolerations)
+	})
+
+	t.Run("TTLSecondsAfterFinished", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{}
+
+		t.Run("Undefined", func(t *testing.T) {
+			cluster.Spec.Backups.PGBackRest.Jobs = nil
+
+			spec, err := generateBackupJobSpecIntent(
+				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
+			)
+			assert.NilError(t, err)
+			assert.Assert(t, spec.TTLSecondsAfterFinished == nil)
+
+			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{}
+
+			spec, err = generateBackupJobSpecIntent(
+				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
+			)
+			assert.NilError(t, err)
+			assert.Assert(t, spec.TTLSecondsAfterFinished == nil)
+		})
+
+		t.Run("Zero", func(t *testing.T) {
+			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
+				TTLSecondsAfterFinished: initialize.Int32(0),
+			}
+
+			spec, err := generateBackupJobSpecIntent(
+				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
+			)
+			assert.NilError(t, err)
+			if assert.Check(t, spec.TTLSecondsAfterFinished != nil) {
+				assert.Equal(t, *spec.TTLSecondsAfterFinished, int32(0))
+			}
+		})
+
+		t.Run("Positive", func(t *testing.T) {
+			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
+				TTLSecondsAfterFinished: initialize.Int32(100),
+			}
+
+			spec, err := generateBackupJobSpecIntent(
+				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
+			)
+			assert.NilError(t, err)
+			if assert.Check(t, spec.TTLSecondsAfterFinished != nil) {
+				assert.Equal(t, *spec.TTLSecondsAfterFinished, int32(100))
+			}
+		})
 	})
 }
 
@@ -3351,6 +3403,7 @@ func TestPrepareForRestore(t *testing.T) {
 
 				restoreJobs := &batchv1.JobList{}
 				assert.NilError(t, r.Client.List(ctx, restoreJobs, &client.ListOptions{
+					Namespace:     cluster.Namespace,
 					LabelSelector: naming.PGBackRestRestoreJobSelector(cluster.GetName()),
 				}))
 
@@ -3624,6 +3677,7 @@ func TestReconcileScheduledBackups(t *testing.T) {
 						// check returned cronjob matches set spec
 						assert.Equal(t, returnedCronJob.Name, cronJobName)
 						assert.Equal(t, returnedCronJob.Spec.Schedule, testCronSchedule)
+						assert.Equal(t, returnedCronJob.Spec.ConcurrencyPolicy, batchv1.ForbidConcurrent)
 						assert.Equal(t, returnedCronJob.Spec.JobTemplate.Spec.Template.Spec.PriorityClassName, "some-priority-class")
 						assert.Equal(t, returnedCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Name,
 							"pgbackrest")

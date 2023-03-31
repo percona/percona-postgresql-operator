@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -62,4 +62,31 @@ type Sidecar struct {
 	// Resource requirements for a sidecar container
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// Metadata contains metadata for custom resources
+type Metadata struct {
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// GetLabelsOrNil gets labels from a Metadata pointer, if Metadata
+// hasn't been set return nil
+func (meta *Metadata) GetLabelsOrNil() map[string]string {
+	if meta == nil {
+		return nil
+	}
+	return meta.Labels
+}
+
+// GetAnnotationsOrNil gets annotations from a Metadata pointer, if Metadata
+// hasn't been set return nil
+func (meta *Metadata) GetAnnotationsOrNil() map[string]string {
+	if meta == nil {
+		return nil
+	}
+	return meta.Annotations
 }

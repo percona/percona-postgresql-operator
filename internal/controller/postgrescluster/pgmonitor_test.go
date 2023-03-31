@@ -2,7 +2,7 @@
 // +build envtest
 
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -441,7 +441,7 @@ func TestReconcilePGMonitorExporterStatus(t *testing.T) {
 		podExecCalled:   false,
 		// Status was generated manually for this test case
 		// TODO jmckulk: add code to generate status
-		status:                      v1beta1.MonitoringStatus{ExporterConfiguration: "5dbc557689"},
+		status:                      v1beta1.MonitoringStatus{ExporterConfiguration: "74476b9895"},
 		statusChangedAfterReconcile: false,
 	}} {
 		t.Run(test.name, func(t *testing.T) {
