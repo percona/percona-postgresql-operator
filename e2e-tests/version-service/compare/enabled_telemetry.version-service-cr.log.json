@@ -6,7 +6,7 @@
   "grpc.request.content": {
     "msg": {
       "product": "pg-operator",
-      "operatorVersion": "1.4.0",
+      "operatorVersion": "1.5.0",
       "apply": "disabled"
     }
   }

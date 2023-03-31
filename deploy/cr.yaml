@@ -2,7 +2,7 @@ apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   labels:
-    pgo-version: 1.4.0
+    pgo-version: 1.5.0
   name: cluster1
 spec:
 #  secretsName: cluster1-users
@@ -41,9 +41,9 @@ spec:
 #      storageclass: ""
 #      matchLabels: ""
 #  userLabels:
-#    pgo-version: "1.4.0"
+#    pgo-version: "1.5.0"
   pgPrimary:
-    image: percona/percona-postgresql-operator:1.4.0-ppg14-postgres-ha
+    image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
 #    imagePullPolicy: Always
     resources:
       requests:
@@ -98,9 +98,9 @@ spec:
 #        cpu: "1"
 #        memory: "400M"
   backup:
-    image: percona/percona-postgresql-operator:1.4.0-ppg14-pgbackrest
+    image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
 #    imagePullPolicy: Always
-    backrestRepoImage: percona/percona-postgresql-operator:1.4.0-ppg14-pgbackrest-repo
+    backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest-repo
     resources:
       requests:
         cpu: "200m"
@@ -129,7 +129,7 @@ spec:
         storage: local
 #        backrestOpts: --annotation=source=scheduled-backup
   pgBouncer:
-    image: percona/percona-postgresql-operator:1.4.0-ppg14-pgbouncer
+    image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
 #    imagePullPolicy: Always
 #    exposePostgresUser: false
     size: 3
@@ -180,7 +180,7 @@ spec:
 #          pg-cluster-label: cluster1
   pgBadger:
     enabled: false
-    image: percona/percona-postgresql-operator:1.4.0-ppg14-pgbadger
+    image: perconalab/percona-postgresql-operator:main-ppg14-pgbadger
 #    imagePullPolicy: Always
     port: 10000
 #  securityContext:

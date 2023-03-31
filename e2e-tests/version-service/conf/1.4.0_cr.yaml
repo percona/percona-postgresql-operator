@@ -2,13 +2,13 @@ apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   labels:
-    pgo-version: 1.2.0
+    pgo-version: 1.4.0
   name: cluster1
 spec:
 #  secretsName: cluster1-users
-#  sslCA: cluster1-ssl-ca
-#  sslSecretName: cluster1-ssl-keypair
-#  sslReplicationSecretName: cluster1-ssl-keypair
+  sslCA: cluster1-ssl-ca
+  sslSecretName: cluster1-ssl-keypair
+  sslReplicationSecretName: cluster1-replication-ssl-keypair
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
     apply: disabled
@@ -28,22 +28,22 @@ spec:
 #  tablespaceStorages:
 #    lake:
 #      volumeSpec:
-#        size: 1G
+#        size: 1Gi
 #        accessmode: ReadWriteOnce
 #        storagetype: dynamic
 #        storageclass: ""
 #        matchLabels: ""
 #  walStorage:
 #    volumeSpec:
-#      size: 1G
+#      size: 1Gi
 #      accessmode: ReadWriteOnce
 #      storagetype: dynamic
 #      storageclass: ""
 #      matchLabels: ""
-  userLabels:
-    pgo-version: "1.2.0"
+#  userLabels:
+#    pgo-version: "1.4.0"
   pgPrimary:
-    image: percona/percona-postgresql-operator:1.2.0-ppg14-postgres-ha
+    image: percona/percona-postgresql-operator:1.4.0-ppg14-postgres-ha
 #    imagePullPolicy: Always
     resources:
       requests:
@@ -52,17 +52,31 @@ spec:
 #      limits:
 #        cpu: 500m
 #        memory: "256Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
+#       nodeAffinityType: required
+#       nodeLabel:
+#         kubernetes.io/region: us-central1
+#       advanced:
+#         nodeAffinity:
+#           requiredDuringSchedulingIgnoredDuringExecution:
+#             nodeSelectorTerms:
+#             - matchExpressions:
+#               - key: kubernetes.io/e2e-az-name
+#                 operator: In
+#                 values:
+#                 - e2e-az1
+#                 - e2e-az2
     tolerations: []
     volumeSpec:
-      size: 1G
+      size: 1Gi
       accessmode: ReadWriteOnce
       storagetype: dynamic
       storageclass: ""
 #      matchLabels: ""
     expose:
       serviceType: ClusterIP
+#      loadBalancerIP:
 #      loadBalancerSourceRanges:
 #      annotations:
 #        pg-cluster-annot: cluster1
@@ -71,7 +85,7 @@ spec:
 #    customconfig: ""
   pmm:
     enabled: false
-    image: percona/pmm-client:2.26.0
+    image: percona/pmm-client:2.36.0
 #    imagePullPolicy: Always
     serverHost: monitoring-service
     serverUser: admin
@@ -84,9 +98,9 @@ spec:
 #        cpu: "1"
 #        memory: "400M"
   backup:
-    image: percona/percona-postgresql-operator:1.2.0-ppg14-pgbackrest
+    image: percona/percona-postgresql-operator:1.4.0-ppg14-pgbackrest
 #    imagePullPolicy: Always
-    backrestRepoImage: percona/percona-postgresql-operator:1.2.0-ppg14-pgbackrest-repo
+    backrestRepoImage: percona/percona-postgresql-operator:1.4.0-ppg14-pgbackrest-repo
     resources:
       requests:
         cpu: "200m"
@@ -94,10 +108,10 @@ spec:
 #      limits:
 #        cpu: "1"
 #        memory: "64Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
     volumeSpec:
-      size: 1G
+      size: 1Gi
       accessmode: ReadWriteOnce
       storagetype: dynamic
       storageclass: ""
@@ -113,10 +127,12 @@ spec:
         keep: 3
         type: full
         storage: local
+#        backrestOpts: --annotation=source=scheduled-backup
   pgBouncer:
-    image: percona/percona-postgresql-operator:1.2.0-ppg14-pgbouncer
+    image: percona/percona-postgresql-operator:1.4.0-ppg14-pgbouncer
 #    imagePullPolicy: Always
-    size: 0
+#    exposePostgresUser: false
+    size: 3
     resources:
       requests:
         cpu: "1"
@@ -124,10 +140,11 @@ spec:
 #      limits:
 #        cpu: "2"
 #        memory: "512Mi"
-#    affinity:
-#      antiAffinityType: preferred
+#     affinity:
+#       antiAffinityType: preferred
     expose:
       serviceType: ClusterIP
+#      loadBalancerIP:
 #      loadBalancerSourceRanges:
 #      annotations:
 #        pg-cluster-annot: cluster1
@@ -145,7 +162,7 @@ spec:
 #          memory: "256Mi"
       volumeSpec:
         accessmode: ReadWriteOnce
-        size: 1G
+        size: 1Gi
         storagetype: dynamic
         storageclass: ""
 #        matchLabels: ""
@@ -163,7 +180,7 @@ spec:
 #          pg-cluster-label: cluster1
   pgBadger:
     enabled: false
-    image: percona/percona-postgresql-operator:1.2.0-ppg14-pgbadger
+    image: percona/percona-postgresql-operator:1.4.0-ppg14-pgbadger
 #    imagePullPolicy: Always
     port: 10000
 #  securityContext:

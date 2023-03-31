@@ -8,7 +8,7 @@ metadata:
     deployment-name: cluster1
     name: cluster1
     pg-cluster: cluster1
-    pgo-version: 1.4.0
+    pgo-version: 1.5.0
     pgouser: admin
   name: cluster1
 spec:
@@ -21,7 +21,7 @@ spec:
   standby: false
   pause: false
   userLabels:
-    pgo-version: "1.4.0"
+    pgo-version: "1.5.0"
   pgPrimary:
     image: perconalab/percona-postgresql-operator:main-ppg13-postgres-ha
     affinity:

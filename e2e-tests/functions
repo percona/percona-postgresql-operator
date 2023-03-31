@@ -280,7 +280,7 @@ wait_pod_completion() {
 		if [ $retry -ge 360 ]; then
 			kubectl_bin describe pod/$pod
 			kubectl_bin logs $pod
-			kubectl_bin logs $(get_operator_pod) \
+			kubectl_bin logs $(get_operator_pod) -с operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| grep -v 'Getting tasks for pod' \
@@ -380,7 +380,7 @@ wait_job_completion() {
 		if [ $retry -ge 600 ]; then
 			kubectl_bin describe -n $ns job/$job
 			kubectl_bin logs $(kubectl_bin -n $ns get pods --selector=job-name=${job} -o jsonpath='{.items[0].metadata.name}') -n $ns
-			kubectl_bin -n $ns logs $(get_operator_pod) \
+			kubectl_bin -n $ns logs $(get_operator_pod) -c operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| tail -100
@@ -592,7 +592,7 @@ wait_for_delete() {
 		echo -n .
 		let retry+=1
 		if [ $retry -ge 120 ]; then
-			kubectl_bin logs $(get_operator_pod) \
+			kubectl_bin logs $(get_operator_pod) -c operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| grep -v 'Getting tasks for pod' \
@@ -620,7 +620,7 @@ wait_deployment() {
 		echo -n .
 		let retry+=1
 		if [ $retry -ge 360 ]; then
-			kubectl_bin logs $(get_operator_pod) \
+			kubectl_bin logs $(get_operator_pod) -c operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| tail -100
@@ -648,7 +648,7 @@ wait_generation_uniformity() {
 		echo -n .
 		let retry+=1
 		if [ $retry -ge 360 ]; then
-			kubectl_bin logs $(get_operator_pod) \
+			kubectl_bin logs $(get_operator_pod) -c operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| tail -100
@@ -672,7 +672,7 @@ wait_smart_update() {
 	set +o xtrace
 	retry=0
 
-	while [[ $(kubectl_bin logs $(get_operator_pod) operator | grep -c "Smart update finished") == ${target} ]]; do
+	while [[ $(kubectl_bin logs $(get_operator_pod) -c operator | grep -c "Smart update finished") == ${target} ]]; do
 		sleep 1
 
 		echo -n .
@@ -966,7 +966,7 @@ run_psql() {
 }
 
 destroy() {
-	kubectl_bin ${OPERATOR_NS:+-n $OPERATOR_NS} logs $(get_operator_pod) \
+	kubectl_bin ${OPERATOR_NS:+-n $OPERATOR_NS} logs $(get_operator_pod) -c operator \
 		| grep -v 'level=info' \
 		| grep -v 'level=debug' \
 		| grep -v 'Getting tasks for pod' \
