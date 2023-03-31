@@ -728,6 +728,7 @@ compare_kubectl() {
 		| yq d - 'metadata.annotations."k8s.v1.cni.cncf.io*"' \
 		| yq d - 'metadata.annotations."kubernetes.io/psp"' \
 		| yq d - 'metadata.annotations."cloud.google.com/neg"' \
+		| yq d - 'metadata.annotations."batch.kubernetes.io/job-tracking"' \
 		| yq d - '**.creationTimestamp' \
 		| yq d - '**.image' \
 		| yq d - '**.clusterIP' \
@@ -765,10 +766,25 @@ compare_kubectl() {
 		| yq d - '**.allocateLoadBalancerNodePorts' \
 			>${new_result}
 
-	if [[ $(yq r ${new_result} 'kind') == 'Service' ]] \
-		&& [[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x' || "x$(yq r ${new_result} 'metadata.annotations')" == 'x{}' ]]; then
-		yq d -i ${new_result} 'metadata.annotations'
-	fi
+	case $(yq r ${new_result} 'kind') in
+		'Service')
+			[[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x' ]] \
+				|| [[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x{}' ]] \
+				&& yq d -i ${new_result} 'metadata.annotations' \
+				|| :
+			;;
+		'Job')
+			[[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x' ]] \
+				|| [[ "x$(yq r ${new_result} 'metadata.annotations')" == 'x{}' ]] \
+				&& yq d -i ${new_result} 'metadata.annotations' \
+				|| :
+
+			yq d -i ${new_result} 'metadata.generation'
+			yq d -i ${new_result} 'spec.completionMode'
+			yq d -i ${new_result} 'spec.suspend'
+			;;
+		*) ;;
+	esac
 
 	diff -u ${expected_result} ${new_result}
 }
@@ -1214,4 +1230,12 @@ patch_secret() {
 	local value=$3
 
 	kubectl_bin patch secret $secret -p="{\"data\":{\"$key\": \"$value\"}}"
+}
+
+delete_cluster_gracefully() {
+	local cluster=${1}
+
+	kubectl_bin delete perconapgcluster/${cluster}
+	rmjob_name=$(kubectl_bin -n $namespace get jobs --selector=pg-cluster=${cluster},pgrmdata="true" -o jsonpath='{.items[0].metadata.name}')
+	wait_job_completion ${rmjob_name} false
 }
