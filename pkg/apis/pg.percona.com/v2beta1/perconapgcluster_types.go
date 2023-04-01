@@ -143,7 +143,7 @@ const (
 )
 
 type PerconaPGClusterStatus struct {
-	State                                AppState `json:"status"`
+	State                                AppState `json:"state"`
 	crunchyv1beta1.PostgresClusterStatus `json:",inline"`
 }
 

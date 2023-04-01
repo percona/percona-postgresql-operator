@@ -160,7 +160,7 @@ func (r *PGClusterReconciler) updateState(cr *v2beta1.PerconaPGCluster,
 	}
 
 	// TODO (inel): is this enough to state that the cluster is shut down
-	if *cr.Spec.Shutdown {
+	if cr.Spec.Shutdown != nil && *cr.Spec.Shutdown {
 		return v2beta1.AppStateShutdown
 	}
 
