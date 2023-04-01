@@ -165,7 +165,7 @@ func (r *PGClusterReconciler) updateState(cr *v2beta1.PerconaPGCluster,
 	}
 
 	// TODO(inel): Handle properly pgbackrest status, this is not enough
-	if !status.PGBackRest.RepoHost.Ready {
+	if status.PGBackRest != nil && status.PGBackRest.RepoHost != nil && !status.PGBackRest.RepoHost.Ready {
 		return v2beta1.AppStateInit
 	}
 
