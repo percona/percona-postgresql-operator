@@ -16,6 +16,8 @@ func init() {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=".status.state"
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //
 // PerconaPGCluster is the CRD that defines a Percona PG Cluster
@@ -131,7 +133,17 @@ type PerconaPGClusterSpec struct {
 	PMM *PMMSpec `json:"pmm,omitempty"`
 }
 
+type AppState string
+
+const (
+	AppStateInit     AppState = "initializing"
+	AppStateShutdown AppState = "shutdown"
+	AppStateReady    AppState = "ready"
+	AppStateError    AppState = "error"
+)
+
 type PerconaPGClusterStatus struct {
+	State                                AppState `json:"status"`
 	crunchyv1beta1.PostgresClusterStatus `json:",inline"`
 }
 

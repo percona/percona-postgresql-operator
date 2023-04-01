@@ -50,8 +50,8 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
 
-	perconaPGCluster := &v2beta1.PerconaPGCluster{}
-	if err := r.Client.Get(ctx, request.NamespacedName, perconaPGCluster); err != nil {
+	cr := &v2beta1.PerconaPGCluster{}
+	if err := r.Client.Get(ctx, request.NamespacedName, cr); err != nil {
 		// NotFound cannot be fixed by requeuing so ignore it. During background
 		// deletion, we receive delete events from cluster's dependents after
 		// cluster is deleted.
@@ -61,23 +61,23 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	vm, err := r.getVersionMeta(ctx, perconaPGCluster)
+	vm, err := r.getVersionMeta(ctx, cr)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get version meta")
 	}
 
-	if err := version.EnsureVersion(ctx, perconaPGCluster, vm); err != nil {
+	if err := version.EnsureVersion(ctx, cr, vm); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "ensure versions")
 	}
 
 	postgresCluster := &v1beta1.PostgresCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      perconaPGCluster.Name,
-			Namespace: perconaPGCluster.Namespace,
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(perconaPGCluster, postgresCluster, r.Client.Scheme()); err != nil {
+	if err := controllerutil.SetControllerReference(cr, postgresCluster, r.Client.Scheme()); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -85,7 +85,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Default()
 
 		annotations := make(map[string]string)
-		for k, v := range perconaPGCluster.Annotations {
+		for k, v := range cr.Annotations {
 			switch k {
 			case v2beta1.AnnotationPGBackrestBackup:
 				annotations[naming.PGBackRestBackup] = v
@@ -98,39 +98,39 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			}
 		}
 		postgresCluster.Annotations = annotations
-		postgresCluster.Labels = perconaPGCluster.Labels
+		postgresCluster.Labels = cr.Labels
 
-		postgresCluster.Spec.Image = perconaPGCluster.Spec.Image
-		postgresCluster.Spec.ImagePullPolicy = perconaPGCluster.Spec.ImagePullPolicy
-		postgresCluster.Spec.ImagePullSecrets = perconaPGCluster.Spec.ImagePullSecrets
+		postgresCluster.Spec.Image = cr.Spec.Image
+		postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
+		postgresCluster.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
 
-		postgresCluster.Spec.PostgresVersion = perconaPGCluster.Spec.PostgresVersion
-		postgresCluster.Spec.Port = perconaPGCluster.Spec.Port
-		postgresCluster.Spec.OpenShift = perconaPGCluster.Spec.OpenShift
-		postgresCluster.Spec.Paused = perconaPGCluster.Spec.Paused
-		postgresCluster.Spec.Shutdown = perconaPGCluster.Spec.Shutdown
-		postgresCluster.Spec.Standby = perconaPGCluster.Spec.Standby
-		postgresCluster.Spec.Service = perconaPGCluster.Spec.Expose.ToCrunchy()
+		postgresCluster.Spec.PostgresVersion = cr.Spec.PostgresVersion
+		postgresCluster.Spec.Port = cr.Spec.Port
+		postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
+		postgresCluster.Spec.Paused = cr.Spec.Paused
+		postgresCluster.Spec.Shutdown = cr.Spec.Shutdown
+		postgresCluster.Spec.Standby = cr.Spec.Standby
+		postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
 
-		postgresCluster.Spec.CustomReplicationClientTLSSecret = perconaPGCluster.Spec.Secrets.CustomReplicationClientTLSSecret
-		postgresCluster.Spec.CustomTLSSecret = perconaPGCluster.Spec.Secrets.CustomTLSSecret
+		postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
+		postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 
-		postgresCluster.Spec.Backups = perconaPGCluster.Spec.Backups
-		postgresCluster.Spec.DataSource = perconaPGCluster.Spec.DataSource
-		postgresCluster.Spec.DatabaseInitSQL = perconaPGCluster.Spec.DatabaseInitSQL
-		postgresCluster.Spec.Patroni = perconaPGCluster.Spec.Patroni
+		postgresCluster.Spec.Backups = cr.Spec.Backups
+		postgresCluster.Spec.DataSource = cr.Spec.DataSource
+		postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
+		postgresCluster.Spec.Patroni = cr.Spec.Patroni
 
-		if perconaPGCluster.Spec.PMM != nil && perconaPGCluster.Spec.PMM.Enabled {
+		if cr.Spec.PMM != nil && cr.Spec.PMM.Enabled {
 			// TODO: Check if PMM secret exists
-			for i := 0; i < len(perconaPGCluster.Spec.InstanceSets); i++ {
-				set := &perconaPGCluster.Spec.InstanceSets[i]
-				set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(perconaPGCluster))
+			for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+				set := &cr.Spec.InstanceSets[i]
+				set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
 			}
 		}
 
-		postgresCluster.Spec.InstanceSets = perconaPGCluster.Spec.InstanceSets.ToCrunchy()
-		postgresCluster.Spec.Users = perconaPGCluster.Spec.Users
-		postgresCluster.Spec.Proxy = perconaPGCluster.Spec.Proxy.ToCrunchy()
+		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
+		postgresCluster.Spec.Users = cr.Spec.Users
+		postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
 
 		return nil
 	})
@@ -139,17 +139,48 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
-	perconaPGCluster.Status = v2beta1.PerconaPGClusterStatus{
+	cr.Status = v2beta1.PerconaPGClusterStatus{
+		State:                 r.updateState(cr, &postgresCluster.Status),
 		PostgresClusterStatus: postgresCluster.Status,
 	}
 
-	if err := r.Client.Status().Update(ctx, perconaPGCluster); err != nil {
+	if err := r.Client.Status().Update(ctx, cr); err != nil {
 		log.Error(err, "failed to update status")
 	}
 
 	return reconcile.Result{}, err
 }
 
+func (r *PGClusterReconciler) updateState(cr *v2beta1.PerconaPGCluster,
+	status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
+	for _, cond := range status.Conditions {
+		if cond.Status == metav1.ConditionFalse {
+			return v2beta1.AppStateError
+		}
+	}
+
+	// TODO (inel): is this enough to state that the cluster is shut down
+	if *cr.Spec.Shutdown {
+		return v2beta1.AppStateShutdown
+	}
+
+	// TODO(inel): Handle properly pgbackrest status, this is not enough
+	if !status.PGBackRest.RepoHost.Ready {
+		return v2beta1.AppStateInit
+	}
+
+	if status.Proxy.PGBouncer.ReadyReplicas != status.Proxy.PGBouncer.Replicas {
+		return v2beta1.AppStateInit
+	}
+
+	for _, is := range status.InstanceSets {
+		if is.Replicas != is.ReadyReplicas {
+			return v2beta1.AppStateInit
+		}
+	}
+
+	return v2beta1.AppStateReady
+}
 func (r *PGClusterReconciler) getVersionMeta(ctx context.Context, cr *v2beta1.PerconaPGCluster) (version.Meta, error) {
 	return version.Meta{
 		Apply:           "disabled",
