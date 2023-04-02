@@ -153,11 +153,11 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 func (r *PGClusterReconciler) updateState(cr *v2beta1.PerconaPGCluster,
 	status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
-	for _, cond := range status.Conditions {
-		if cond.Status == metav1.ConditionFalse {
-			return v2beta1.AppStateError
-		}
-	}
+	// for _, cond := range status.Conditions {
+	// 	if cond.Status == metav1.ConditionFalse {
+	// 		return v2beta1.AppStateError
+	// 	}
+	// }
 
 	// TODO (inel): is this enough to state that the cluster is shut down
 	if cr.Spec.Shutdown != nil && *cr.Spec.Shutdown {
