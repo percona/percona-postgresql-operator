@@ -7,4 +7,4 @@ resources:
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator
-  newTag: k8spg-295-additional-columns
+  newTag: main
