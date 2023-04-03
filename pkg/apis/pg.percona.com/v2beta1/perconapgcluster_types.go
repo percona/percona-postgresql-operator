@@ -16,6 +16,7 @@ func init() {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=".status.host"
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=".status.state"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -145,6 +146,7 @@ const (
 
 type PerconaPGClusterStatus struct {
 	State                                AppState `json:"state"`
+	Host                                 string   `json:"host"`
 	crunchyv1beta1.PostgresClusterStatus `json:",inline"`
 }
 
