@@ -20,7 +20,7 @@ spec:
       name: Endpoint
       type: string
     - jsonPath: .status.state
-      name: State
+      name: Status
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
