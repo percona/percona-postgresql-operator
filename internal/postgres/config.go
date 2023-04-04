@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -22,10 +22,32 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
+	// bashHalt is a Bash function that prints its arguments to stderr then
+	// exits with a non-zero status. It uses the exit status of the prior
+	// command if that was not zero.
+	bashHalt = `halt() { local rc=$?; >&2 echo "$@"; exit "${rc/#0/1}"; }`
+
+	// bashPermissions is a Bash function that prints the permissions of a file
+	// or directory and all its parent directories, except the root directory.
+	bashPermissions = `permissions() {` +
+		` while [[ -n "$1" ]]; do set "${1%/*}" "$@"; done; shift;` +
+		` stat -Lc '%A %4u %4g %n' "$@";` +
+		` }`
+
+	// bashRecreateDirectory is a Bash function that moves the contents of an
+	// existing directory into a newly created directory of the same name.
+	bashRecreateDirectory = `
+recreate() (
+  local tmp; tmp=$(mktemp -d -p "${1%/*}"); GLOBIGNORE='.:..'; set -x
+  chmod "$2" "${tmp}"; mv "$1"/* "${tmp}"; rmdir "$1"; mv "${tmp}" "$1"
+)
+`
+
 	// bashSafeLink is a Bash function that moves an existing file or directory
 	// and replaces it with a symbolic link.
 	bashSafeLink = `
@@ -40,6 +62,9 @@ safelink() (
 
 	// dataMountPath is where to mount the main data volume.
 	dataMountPath = "/pgdata"
+
+	// dataMountPath is where to mount the main data volume.
+	tablespaceMountPath = "/tablespaces"
 
 	// walMountPath is where to mount the optional WAL volume.
 	walMountPath = "/pgwal"
@@ -180,14 +205,64 @@ func startupCommand(
 	version := fmt.Sprint(cluster.Spec.PostgresVersion)
 	walDir := WALDirectory(cluster, instance)
 
+	// If the user requests tablespaces, we want to make sure the directories exist with the
+	// correct owner and permissions.
+	tablespaceCmd := ""
+	if util.DefaultMutableFeatureGate.Enabled(util.TablespaceVolumes) {
+		// This command checks if a dir exists and if not, creates it;
+		// if the dir does exist, then we `recreate` it to make sure the owner is correct;
+		// if the dir exists with the wrong owner and is not writeable, we error.
+		// This is the same behavior we use for the main PGDATA directory.
+		// Note: Postgres requires the tablespace directory to be "an existing, empty directory
+		// that is owned by the PostgreSQL operating system user."
+		// - https://www.postgresql.org/docs/current/manage-ag-tablespaces.html
+		// However, unlike the PGDATA directory, Postgres will _not_ error out
+		// if the permissions are wrong on the tablespace directory.
+		// Instead, when a tablespace is created in Postgres, Postgres will `chmod` the
+		// tablespace directory to match permissions on the PGDATA directory (either 700 or 750).
+		// Postgres setting the tablespace directory permissions:
+		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/backend/commands/tablespace.c;hb=REL_14_0#l600
+		// Postgres choosing directory permissions:
+		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/common/file_perm.c;hb=REL_14_0#l27
+		// Note: This permission change seems to happen only when the tablespace is created in Postgres.
+		// If the user manually `chmod`'ed the directory after the creation of the tablespace, Postgres
+		// would not attempt to change the directory permissions.
+		// Note: as noted below, we mount the tablespace directory to the mountpoint `/tablespaces/NAME`,
+		// and so we add the subdirectory `data` in order to set the permissions.
+		checkInstallRecreateCmd := strings.Join([]string{
+			`if [[ ! -e "${tablespace_dir}" || -O "${tablespace_dir}" ]]; then`,
+			`install --directory --mode=0700 "${tablespace_dir}"`,
+			`elif [[ -w "${tablespace_dir}" && -g "${tablespace_dir}" ]]; then`,
+			`recreate "${tablespace_dir}" '0700'`,
+			`else (halt Permissions!); fi ||`,
+			`halt "$(permissions "${tablespace_dir}" ||:)"`,
+		}, "\n")
+
+		for _, tablespace := range instance.TablespaceVolumes {
+			// The path for tablespaces volumes is /tablespaces/NAME/data
+			// -- the `data` path is added so that we can arrange the permissions.
+			tablespaceCmd = tablespaceCmd + "\ntablespace_dir=/tablespaces/" + tablespace.Name + "/data" + "\n" +
+				checkInstallRecreateCmd
+		}
+	}
+
 	args := []string{version, walDir, naming.PGBackRestPGDataLogPath}
 	script := strings.Join([]string{
 		`declare -r expected_major_version="$1" pgwal_directory="$2" pgbrLog_directory="$3"`,
 
+		// Function to print the permissions of a file or directory and its parents.
+		bashPermissions,
+
+		// Function to print a message to stderr then exit non-zero.
+		bashHalt,
+
 		// Function to log values in a basic structured format.
 		`results() { printf '::postgres-operator: %s::%s\n' "$@"; }`,
 
-		// Function to change a directory symlink while keeping the directory content.
+		// Function to change the owner of an existing directory.
+		strings.TrimSpace(bashRecreateDirectory),
+
+		// Function to change a directory symlink while keeping the directory contents.
 		strings.TrimSpace(bashSafeLink),
 
 		// Log the effective user ID and all the group IDs.
@@ -198,14 +273,16 @@ func startupCommand(
 		// match the cluster spec.
 		`results 'postgres path' "$(command -v postgres)"`,
 		`results 'postgres version' "${postgres_version:=$(postgres --version)}"`,
-		`[[ "${postgres_version}" == *") ${expected_major_version}."* ]]`,
+		`[[ "${postgres_version}" =~ ") ${expected_major_version}"($|[^0-9]) ]] ||`,
+		`halt Expected PostgreSQL version "${expected_major_version}"`,
 
 		// Abort when the configured data directory is not $PGDATA.
 		// - https://www.postgresql.org/docs/current/runtime-config-file-locations.html
 		`results 'config directory' "${PGDATA:?}"`,
 		`postgres_data_directory=$([ -d "${PGDATA}" ] && postgres -C data_directory || echo "${PGDATA}")`,
 		`results 'data directory' "${postgres_data_directory}"`,
-		`[ "${postgres_data_directory}" = "${PGDATA}" ]`,
+		`[[ "${postgres_data_directory}" == "${PGDATA}" ]] ||`,
+		`halt Expected matching config and data directories`,
 
 		// Determine if the data directory has been prepared for bootstrapping the cluster
 		`bootstrap_dir="${postgres_data_directory}_bootstrap"`,
@@ -214,15 +291,33 @@ func startupCommand(
 
 		// PostgreSQL requires its directory to be writable by only itself.
 		// Pod "securityContext.fsGroup" sets g+w on directories for *some*
-		// storage providers.
+		// storage providers. Ensure the current user owns the directory, and
+		// remove group permissions.
 		// - https://www.postgresql.org/docs/current/creating-cluster.html
-		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/backend/utils/init/miscinit.c;hb=REL_13_0#l319
+		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/backend/postmaster/postmaster.c;hb=REL_10_0#l1522
+		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/backend/utils/init/miscinit.c;hb=REL_14_0#l349
 		// - https://issue.k8s.io/93802#issuecomment-717646167
+		//
+		// When the directory does not exist, create it with the correct permissions.
+		// When the directory has the correct owner, set the correct permissions.
+		`if [[ ! -e "${postgres_data_directory}" || -O "${postgres_data_directory}" ]]; then`,
 		`install --directory --mode=0700 "${postgres_data_directory}"`,
+		//
+		// The directory exists but its owner is wrong. When it is writable,
+		// the set-group-ID bit indicates that "fsGroup" probably ran on its
+		// contents making them safe to use. In this case, we can make a new
+		// directory (owned by this user) and refill it.
+		`elif [[ -w "${postgres_data_directory}" && -g "${postgres_data_directory}" ]]; then`,
+		`recreate "${postgres_data_directory}" '0700'`,
+		//
+		// The directory exists, its owner is wrong, and it is not writable.
+		`else (halt Permissions!); fi ||`,
+		`halt "$(permissions "${postgres_data_directory}" ||:)"`,
 
 		// Create the pgBackRest log directory.
 		`results 'pgBackRest log directory' "${pgbrLog_directory}"`,
-		`install --directory --mode=0775 "${pgbrLog_directory}"`,
+		`install --directory --mode=0775 "${pgbrLog_directory}" ||`,
+		`halt "$(permissions "${pgbrLog_directory}" ||:)"`,
 
 		// Copy replication client certificate files
 		// from the /pgconf/tls/replication directory to the /tmp/replication directory in order
@@ -237,13 +332,22 @@ func startupCommand(
 			naming.ReplicationCert, naming.ReplicationPrivateKey,
 			naming.ReplicationCACert),
 
+		tablespaceCmd,
 		// When the data directory is empty, there's nothing more to do.
 		`[ -f "${postgres_data_directory}/PG_VERSION" ] || exit 0`,
 
 		// Abort when the data directory is not empty and its version does not
 		// match the cluster spec.
 		`results 'data version' "${postgres_data_version:=$(< "${postgres_data_directory}/PG_VERSION")}"`,
-		`[ "${postgres_data_version}" = "${expected_major_version}" ]`,
+		`[[ "${postgres_data_version}" == "${expected_major_version}" ]] ||`,
+		`halt Expected PostgreSQL data version "${expected_major_version}"`,
+
+		// For a restore from datasource:
+		// Patroni will complain if there's no `postgresql.conf` file
+		// and PGDATA may be missing that file if this is a restored database
+		// where the conf file was kept elsewhere.
+		`[[ ! -f "${postgres_data_directory}/postgresql.conf" ]] &&`,
+		`touch "${postgres_data_directory}/postgresql.conf"`,
 
 		// Safely move the WAL directory onto the intended volume. PostgreSQL
 		// always writes WAL files in the "pg_wal" directory inside the data

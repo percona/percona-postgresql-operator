@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -37,7 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-// +kubebuilder:rbac:groups="",resources=endpoints,verbs=deletecollection
+// +kubebuilder:rbac:groups="",resources="endpoints",verbs={deletecollection}
 
 func (r *Reconciler) deletePatroniArtifacts(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
@@ -138,7 +138,7 @@ func (r *Reconciler) handlePatroniRestarts(
 	return nil
 }
 
-// +kubebuilder:rbac:groups="",resources=services,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources="services",verbs={create,patch}
 
 // reconcilePatroniDistributedConfiguration sets labels and ownership on the
 // objects Patroni creates for its distributed configuration.
@@ -181,7 +181,7 @@ func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 	return err
 }
 
-// +kubebuilder:rbac:resources=pods,verbs=get;list
+// +kubebuilder:rbac:resources="pods",verbs={get,list}
 
 func (r *Reconciler) reconcilePatroniDynamicConfiguration(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
@@ -312,7 +312,7 @@ func (r *Reconciler) reconcilePatroniLeaderLease(
 	return service, err
 }
 
-// +kubebuilder:rbac:groups="",resources=endpoints,verbs=get
+// +kubebuilder:rbac:groups="",resources="endpoints",verbs={get}
 
 // reconcilePatroniStatus populates cluster.Status.Patroni with observations.
 func (r *Reconciler) reconcilePatroniStatus(

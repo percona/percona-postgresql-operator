@@ -2,7 +2,7 @@
 // +build envtest
 
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -747,6 +747,7 @@ func TestReconcileMoveDirectories(t *testing.T) {
 
 	moveJobs := &batchv1.JobList{}
 	err = r.Client.List(ctx, moveJobs, &client.ListOptions{
+		Namespace:     cluster.Namespace,
 		LabelSelector: naming.DirectoryMoveJobLabels(cluster.Name).AsSelector(),
 	})
 	assert.NilError(t, err)

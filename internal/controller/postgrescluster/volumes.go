@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -39,7 +39,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=list
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={list}
 
 // observePersistentVolumeClaims reads all PVCs for cluster from the Kubernetes
 // API and sets the PersistentVolumeResizing condition as appropriate.
@@ -190,7 +190,7 @@ func (r *Reconciler) configureExistingPVCs(
 	return volumes, err
 }
 
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={create,patch}
 
 // configureExistingPGVolumes first searches the observed volumes list to see
 // if the existing pgData volume defined in the spec is already updated. If not,
@@ -243,7 +243,7 @@ func (r *Reconciler) configureExistingPGVolumes(
 	return volumes, nil
 }
 
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={create,patch}
 
 // configureExistingPGWALVolume first searches the observed volumes list to see
 // if the existing pg_wal volume defined in the spec is already updated. If not,
@@ -295,7 +295,7 @@ func (r *Reconciler) configureExistingPGWALVolume(
 	return volumes, nil
 }
 
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={create,patch}
 
 // configureExistingRepoVolumes first searches the observed volumes list to see
 // if the existing pgBackRest repo volume defined in the spec is already updated.
@@ -345,7 +345,7 @@ func (r *Reconciler) configureExistingRepoVolumes(
 	return volumes, nil
 }
 
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=list
+// +kubebuilder:rbac:groups="batch",resources="jobs",verbs={list}
 
 // reconcileDirMoveJobs creates the existing volume move Jobs as defined in
 // the PostgresCluster spec. A boolean value is return to indicate whether
@@ -358,6 +358,7 @@ func (r *Reconciler) reconcileDirMoveJobs(ctx context.Context,
 
 		moveJobs := &batchv1.JobList{}
 		if err := r.Client.List(ctx, moveJobs, &client.ListOptions{
+			Namespace:     cluster.Namespace,
 			LabelSelector: naming.DirectoryMoveJobLabels(cluster.Name).AsSelector(),
 		}); err != nil {
 			return false, errors.WithStack(err)
@@ -398,7 +399,7 @@ func (r *Reconciler) reconcileDirMoveJobs(ctx context.Context,
 	return false, nil
 }
 
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;patch;delete
+// +kubebuilder:rbac:groups="batch",resources="jobs",verbs={create,patch,delete}
 
 // reconcileMovePGDataDir creates a Job to move the provided pgData directory
 // in the given volume to the expected location before the PostgresCluster is
@@ -522,7 +523,7 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 	return true, nil
 }
 
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;patch;delete
+// +kubebuilder:rbac:groups="batch",resources="jobs",verbs={create,patch,delete}
 
 // reconcileMoveWalDir creates a Job to move the provided pg_wal directory
 // in the given volume to the expected location before the PostgresCluster is
@@ -640,7 +641,7 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 	return true, nil
 }
 
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;patch;delete
+// +kubebuilder:rbac:groups="batch",resources="jobs",verbs={create,patch,delete}
 
 // reconcileMoveRepoDir creates a Job to move the provided pgBackRest repo
 // directory in the given volume to the expected location before the
