@@ -161,7 +161,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 func (r *PGClusterReconciler) updateHost(ctx context.Context, cr *v2beta1.PerconaPGCluster) (string, error) {
 	svcName := cr.Name + "-pgbouncer"
 
-	if cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
+	if cr.Spec.Proxy.PGBouncer.ServiceExpose != nil && cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
 		return svcName + "." + cr.Namespace, nil
 	}
 
