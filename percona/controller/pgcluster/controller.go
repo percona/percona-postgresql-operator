@@ -155,10 +155,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 func (r *PGClusterReconciler) updateState(cr *v2beta1.PerconaPGCluster,
 	status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
 
-	if cr.Spec.Shutdown != nil && *cr.Spec.Shutdown {
-		return v2beta1.AppStateShutdown
-	}
-
 	if status.PGBackRest != nil && status.PGBackRest.RepoHost != nil && !status.PGBackRest.RepoHost.Ready {
 		return v2beta1.AppStateInit
 	}

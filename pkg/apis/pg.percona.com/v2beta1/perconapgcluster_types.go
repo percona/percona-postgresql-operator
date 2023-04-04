@@ -139,7 +139,6 @@ type AppState string
 
 const (
 	AppStateInit     AppState = "initializing"
-	AppStateShutdown AppState = "shutdown"
 	AppStateReady    AppState = "ready"
 	AppStateError    AppState = "error"
 )
