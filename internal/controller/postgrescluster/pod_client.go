@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -39,7 +39,7 @@ func newPodClient(config *rest.Config) (rest.Interface, error) {
 	return apiutil.RESTClientForGVK(gvk, false, config, codecs)
 }
 
-// +kubebuilder:rbac:groups="",resources=pods/exec,verbs=create
+// +kubebuilder:rbac:groups="",resources="pods/exec",verbs={create}
 
 func newPodExecutor(config *rest.Config) (podExecutor, error) {
 	client, err := newPodClient(config)

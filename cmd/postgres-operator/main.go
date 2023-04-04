@@ -1,7 +1,7 @@
 package main
 
 /*
-Copyright 2017 - 2022 Crunchy Data Solutions, Inc.
+Copyright 2017 - 2023 Crunchy Data Solutions, Inc.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -98,11 +98,8 @@ func main() {
 	if !upgradeCheckingDisabled {
 		log.Info("upgrade checking enabled")
 		// get the URL for the check for upgrades endpoint if set in the env
-		upgradeCheckURL := os.Getenv("CHECK_FOR_UPGRADES_URL")
-		go upgradecheck.CheckForUpgradesScheduler(ctx, versionString, upgradeCheckURL,
-			mgr.GetClient(), mgr.GetConfig(), isOpenshift(ctx, mgr.GetConfig()),
-			mgr.GetCache(),
-		)
+		assertNoError(upgradecheck.ManagedScheduler(mgr,
+			isOpenshift(ctx, mgr.GetConfig()), os.Getenv("CHECK_FOR_UPGRADES_URL"), versionString))
 	}
 
 	assertNoError(mgr.Start(ctx))

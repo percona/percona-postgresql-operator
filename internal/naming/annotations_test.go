@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -29,4 +29,5 @@ func TestAnnotationsValid(t *testing.T) {
 	assert.Assert(t, nil == validation.IsQualifiedName(PGBackRestConfigHash))
 	assert.Assert(t, nil == validation.IsQualifiedName(PGBackRestCurrentConfig))
 	assert.Assert(t, nil == validation.IsQualifiedName(PGBackRestRestore))
+	assert.Assert(t, nil == validation.IsQualifiedName(PGBackRestIPVersion))
 }
