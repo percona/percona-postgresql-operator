@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -35,13 +35,11 @@ const (
 // exporter to be accessible
 func PostgreSQLHBAs(inCluster *v1beta1.PostgresCluster, outHBAs *postgres.HBAs) {
 	if ExporterEnabled(inCluster) {
-		// Kubernetes does guarantee localhost resolves to loopback:
-		// https://kubernetes.io/docs/concepts/cluster-administration/networking/
-		// https://releases.k8s.io/v1.21.0/pkg/kubelet/kubelet_pods.go#L343
-		outHBAs.Mandatory = append(outHBAs.Mandatory, *postgres.NewHBA().TCP().
-			User(MonitoringUser).Network("127.0.0.0/8").Method("md5"))
-		outHBAs.Mandatory = append(outHBAs.Mandatory, *postgres.NewHBA().TCP().
-			User(MonitoringUser).Network("::1/128").Method("md5"))
+		// Limit the monitoring user to local connections using SCRAM.
+		outHBAs.Mandatory = append(outHBAs.Mandatory,
+			*postgres.NewHBA().TCP().User(MonitoringUser).Method("scram-sha-256").Network("127.0.0.0/8"),
+			*postgres.NewHBA().TCP().User(MonitoringUser).Method("scram-sha-256").Network("::1/128"),
+			*postgres.NewHBA().TCP().User(MonitoringUser).Method("reject"))
 	}
 }
 
@@ -88,7 +86,7 @@ func DisableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor) er
 // EnableExporterInPostgreSQL runs SQL setup commands in `database` to enable
 // the exporter to retrieve metrics. pgMonitor objects are created and expected
 // extensions are installed. We also ensure that the monitoring user has the
-// current password, optimal config and can login.
+// current password and can login.
 func EnableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor,
 	monitoringSecret *corev1.Secret, database, setup string) error {
 	log := logging.FromContext(ctx)
@@ -140,12 +138,6 @@ func EnableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor,
 				// password; update the password and ensure that the ROLE
 				// can login to the database
 				`ALTER ROLE :"username" LOGIN PASSWORD :'verifier';`,
-
-				// disable JIT for only ccp_monitoring user's context to prevent:
-				// - slow executing due unnecessary inlining, optimization and emission
-				// - memory leak due to re-creating struct types during inlining
-				// and allow to enable JIT for other database users transparently
-				`ALTER ROLE :"username" SET jit = off;`,
 			}, "\n"),
 			map[string]string{
 				"database": database,

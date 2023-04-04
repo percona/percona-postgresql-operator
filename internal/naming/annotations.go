@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -50,4 +50,12 @@ const (
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.
 	PGBackRestRestore = annotationPrefix + "pgbackrest-restore"
+
+	// PGBackRestIPVersion is an annotation used to indicate whether an IPv6 wildcard address should be
+	// used for the pgBackRest "tls-server-address" or not. If the user wants to use IPv6, the value
+	// should be "IPv6". As of right now, if the annotation is not present or if the annotation's value
+	// is anything other than "IPv6", the "tls-server-address" will default to IPv4 (0.0.0.0). The need
+	// for this annotation is due to an issue in pgBackRest (#1841) where using a wildcard address to
+	// bind all addresses does not work in certain IPv6 environments.
+	PGBackRestIPVersion = annotationPrefix + "pgbackrest-ip-version"
 )

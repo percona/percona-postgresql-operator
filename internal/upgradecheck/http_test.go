@@ -1,7 +1,5 @@
-package upgradecheck
-
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -14,6 +12,8 @@ package upgradecheck
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+
+package upgradecheck
 
 import (
 	"context"
@@ -30,6 +30,7 @@ import (
 	"gotest.tools/v3/assert"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
@@ -54,14 +55,6 @@ var funcFoo func() (*http.Response, error)
 // Do is the mock request that will return a mock success
 func (m *MockClient) Do(req *http.Request) (*http.Response, error) {
 	return funcFoo()
-}
-
-type MockCacheClient struct {
-	works bool
-}
-
-func (cc *MockCacheClient) WaitForCacheSync(ctx context.Context) bool {
-	return cc.works
 }
 
 func TestCheckForUpgrades(t *testing.T) {
@@ -89,7 +82,7 @@ func TestCheckForUpgrades(t *testing.T) {
 			}, nil
 		}
 
-		res, header, err := checkForUpgrades(ctx, "4.7.3", backoff,
+		res, header, err := checkForUpgrades(ctx, "", "4.7.3", backoff,
 			fakeClient, cfg, false)
 		assert.NilError(t, err)
 		assert.Equal(t, res, `{"pgo_versions":[{"tag":"v5.0.4"},{"tag":"v5.0.3"},{"tag":"v5.0.2"},{"tag":"v5.0.1"},{"tag":"v5.0.0"}]}`)
@@ -104,31 +97,13 @@ func TestCheckForUpgrades(t *testing.T) {
 			return &http.Response{}, errors.New("whoops")
 		}
 
-		res, header, err := checkForUpgrades(ctx, "4.7.3", backoff,
+		res, header, err := checkForUpgrades(ctx, "", "4.7.3", backoff,
 			fakeClient, cfg, false)
 		// Two failed calls because of env var
 		assert.Equal(t, counter, 2)
 		assert.Equal(t, res, "")
 		assert.Equal(t, err.Error(), `whoops`)
 		checkData(t, header)
-	})
-
-	t.Run("recovers from panic", func(t *testing.T) {
-		var counter int
-		// A panicking call
-		funcFoo = func() (*http.Response, error) {
-			counter++
-			panic(fmt.Errorf("oh no!"))
-		}
-
-		res, header, err := checkForUpgrades(ctx, "4.7.3", backoff,
-			fakeClient, cfg, false)
-		// One call because of panic
-		assert.Equal(t, counter, 1)
-		assert.Equal(t, res, "")
-		assert.Equal(t, err.Error(), `oh no!`)
-		// no http response returned, so don't perform full check
-		assert.Assert(t, header == "")
 	})
 
 	t.Run("total failure, bad StatusCode", func(t *testing.T) {
@@ -142,7 +117,7 @@ func TestCheckForUpgrades(t *testing.T) {
 			}, nil
 		}
 
-		res, header, err := checkForUpgrades(ctx, "4.7.3", backoff,
+		res, header, err := checkForUpgrades(ctx, "", "4.7.3", backoff,
 			fakeClient, cfg, false)
 		assert.Equal(t, res, "")
 		// Two failed calls because of env var
@@ -171,7 +146,7 @@ func TestCheckForUpgrades(t *testing.T) {
 			}, nil
 		}
 
-		res, header, err := checkForUpgrades(ctx, "4.7.3", backoff,
+		res, header, err := checkForUpgrades(ctx, "", "4.7.3", backoff,
 			fakeClient, cfg, false)
 		assert.Equal(t, counter, 2)
 		assert.NilError(t, err)
@@ -186,11 +161,9 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 	_, server := setupVersionServer(t, true)
 	defer server.Close()
 	cfg := &rest.Config{Host: server.URL}
-	const testUpgradeCheckURL = "http://localhost:8080"
 
 	t.Run("panic from checkForUpgrades doesn't bubble up", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := context.Background()
 
 		// capture logs
 		var calls []string
@@ -205,44 +178,18 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 			panic(fmt.Errorf("oh no!"))
 		}
 
-		go CheckForUpgradesScheduler(ctx, "4.7.3", testUpgradeCheckURL, fakeClient, cfg, false,
-			&MockCacheClient{works: true})
-		time.Sleep(1 * time.Second)
-		cancel()
+		s := CheckForUpgradesScheduler{
+			Client: fakeClient,
+			Config: cfg,
+		}
+		s.check(ctx)
 
-		// Sleeping leads to some non-deterministic results, but we expect at least 1 execution
-		// plus one log for the failure to apply the configmap
-		assert.Assert(t, len(calls) >= 2)
-		assert.Assert(t, cmp.Contains(calls[1], `could not complete upgrade check`))
-	})
-
-	t.Run("cache sync fail leads to log and exit", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		// capture logs
-		var calls []string
-		ctx = logging.NewContext(ctx, funcr.NewJSON(func(object string) {
-			calls = append(calls, object)
-		}, funcr.Options{
-			Verbosity: 1,
-		}))
-
-		// Set loop time to 1s and sleep for 2s before sending the done signal -- though the cache sync
-		// failure will exit the func before the sleep ends
-		upgradeCheckPeriod = 1 * time.Second
-		go CheckForUpgradesScheduler(ctx, "4.7.3", testUpgradeCheckURL, fakeClient, cfg, false,
-			&MockCacheClient{works: false})
-		time.Sleep(2 * time.Second)
-		cancel()
-
-		assert.Assert(t, len(calls) == 1)
-		assert.Assert(t, cmp.Contains(calls[0], `unable to sync cache for upgrade check`))
+		assert.Equal(t, len(calls), 2)
+		assert.Assert(t, cmp.Contains(calls[1], `encountered panic in upgrade check`))
 	})
 
 	t.Run("successful log each loop, ticker works", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := context.Background()
 
 		// capture logs
 		var calls []string
@@ -262,11 +209,14 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 		}
 
 		// Set loop time to 1s and sleep for 2s before sending the done signal
-		upgradeCheckPeriod = 1 * time.Second
-		go CheckForUpgradesScheduler(ctx, "4.7.3", testUpgradeCheckURL, fakeClient, cfg, false,
-			&MockCacheClient{works: true})
-		time.Sleep(2 * time.Second)
-		cancel()
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		s := CheckForUpgradesScheduler{
+			Client:  fakeClient,
+			Config:  cfg,
+			Refresh: 1 * time.Second,
+		}
+		assert.ErrorIs(t, context.DeadlineExceeded, s.Start(ctx))
 
 		// Sleeping leads to some non-deterministic results, but we expect at least 2 executions
 		// plus one log for the failure to apply the configmap
@@ -275,4 +225,12 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 		assert.Assert(t, cmp.Contains(calls[1], `{\"pgo_versions\":[{\"tag\":\"v5.0.4\"},{\"tag\":\"v5.0.3\"},{\"tag\":\"v5.0.2\"},{\"tag\":\"v5.0.1\"},{\"tag\":\"v5.0.0\"}]}`))
 		assert.Assert(t, cmp.Contains(calls[3], `{\"pgo_versions\":[{\"tag\":\"v5.0.4\"},{\"tag\":\"v5.0.3\"},{\"tag\":\"v5.0.2\"},{\"tag\":\"v5.0.1\"},{\"tag\":\"v5.0.0\"}]}`))
 	})
+}
+
+func TestCheckForUpgradesSchedulerLeaderOnly(t *testing.T) {
+	// CheckForUpgradesScheduler should implement this interface.
+	var s manager.LeaderElectionRunnable = new(CheckForUpgradesScheduler)
+
+	assert.Assert(t, s.NeedLeaderElection(),
+		"expected to only run on the leader")
 }

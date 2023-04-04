@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -35,8 +35,8 @@ const (
 	rootCertFile    = "ca.crt"
 )
 
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
 // reconcileRootCertificate ensures the root certificate, stored
 // in the relevant secret, has been created and is not 'bad' due
@@ -103,8 +103,8 @@ func (r *Reconciler) reconcileRootCertificate(
 	return root, err
 }
 
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
 // reconcileClusterCertificate first checks if a custom certificate
 // secret is configured. If so, that secret projection is returned.
@@ -188,8 +188,8 @@ func (r *Reconciler) reconcileClusterCertificate(
 	return clusterCertSecretProjection(intent), err
 }
 
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
 // instanceCertificate populates intent with the DNS leaf certificate and
 // returns it. It also ensures the leaf certificate, stored in the relevant

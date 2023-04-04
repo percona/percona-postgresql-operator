@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -325,6 +325,17 @@ func InstancePostgresDataVolume(instance *appsv1.StatefulSet) metav1.ObjectMeta 
 	}
 }
 
+// InstanceTablespaceDataVolume returns the ObjectMeta for the tablespace data
+// volume for instance.
+func InstanceTablespaceDataVolume(instance *appsv1.StatefulSet, tablespaceName string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: instance.GetNamespace(),
+		Name: instance.GetName() +
+			"-" + tablespaceName +
+			"-tablespace",
+	}
+}
+
 // InstancePostgresWALVolume returns the ObjectMeta for the PostgreSQL WAL
 // volume for instance.
 func InstancePostgresWALVolume(instance *appsv1.StatefulSet) metav1.ObjectMeta {
@@ -350,6 +361,15 @@ func ExporterWebConfigMap(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name + "-exporter-web-config",
+	}
+}
+
+// OperatorConfigurationSecret returns the ObjectMeta necessary to lookup the
+// Secret containing PGO configuration.
+func OperatorConfigurationSecret() metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: config.PGONamespace(),
+		Name:      "pgo-config",
 	}
 }
 

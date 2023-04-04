@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -18,6 +18,7 @@ package pgbackrest
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,7 +177,7 @@ func MakePGBackrestLogDir(template *corev1.PodTemplateSpec,
 //   - Renames the data directory as needed to bootstrap the cluster using the restored database.
 //     This ensures compatibility with the "existing" bootstrap method that is included in the
 //     Patroni config when bootstrapping a cluster using an existing data directory.
-func RestoreCommand(pgdata string, args ...string) []string {
+func RestoreCommand(pgdata string, tablespaceVolumes []*corev1.PersistentVolumeClaim, args ...string) []string {
 
 	// After pgBackRest restores files, PostgreSQL starts in recovery to finish
 	// replaying WAL files. "hot_standby" is "on" (by default) so we can detect
@@ -204,8 +205,15 @@ func RestoreCommand(pgdata string, args ...string) []string {
 	// The 'pg_ctl' timeout is set to a very large value (1 year) to ensure there
 	// are no timeouts when starting or stopping Postgres.
 
-	const restoreScript = `declare -r pgdata="$1" opts="$2"
-install --directory --mode=0700 "${pgdata}"
+	tablespaceCmd := ""
+	for _, tablespaceVolume := range tablespaceVolumes {
+		tablespaceCmd = tablespaceCmd + fmt.Sprintf(
+			"\ninstall --directory --mode=0700 '/tablespaces/%s/data'",
+			tablespaceVolume.Labels[naming.LabelData])
+	}
+
+	restoreScript := `declare -r pgdata="$1" opts="$2"
+install --directory --mode=0700 "${pgdata}"` + tablespaceCmd + `
 rm -f "${pgdata}/postmaster.pid"
 bash -xc "pgbackrest restore ${opts}"
 rm -f "${pgdata}/patroni.dynamic.json"
@@ -464,6 +472,16 @@ func serverConfig(cluster *v1beta1.PostgresCluster) iniSectionSet {
 	// - https://releases.k8s.io/v1.18.0/pkg/kubelet/kubelet_pods.go#L327
 	// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L345
 	global.Set("tls-server-address", "0.0.0.0")
+
+	// NOTE (dsessler7): As pointed out by Chris above, there is an issue in
+	// pgBackRest (#1841), where using a wildcard address to bind all addresses
+	// does not work in certain IPv6 environments. Until this is fixed, we are
+	// going to workaround the issue by allowing the user to add an annotation to
+	// enable IPv6. We will check for that annotation here and override the
+	// "tls-server-address" setting accordingly.
+	if strings.EqualFold(cluster.Annotations[naming.PGBackRestIPVersion], "ipv6") {
+		global.Set("tls-server-address", "::")
+	}
 
 	// The client certificate for this cluster is allowed to connect for any stanza.
 	// Without the wildcard "*", the "pgbackrest info" and "pgbackrest repo-ls"

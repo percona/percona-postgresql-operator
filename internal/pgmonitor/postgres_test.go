@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -46,8 +46,10 @@ func TestPostgreSQLHBA(t *testing.T) {
 		outHBAs := postgres.HBAs{}
 		PostgreSQLHBAs(inCluster, &outHBAs)
 
-		assert.Equal(t, outHBAs.Mandatory[0].String(), `host all "ccp_monitoring" "127.0.0.0/8" md5`)
-		assert.Equal(t, outHBAs.Mandatory[1].String(), `host all "ccp_monitoring" "::1/128" md5`)
+		assert.Equal(t, len(outHBAs.Mandatory), 3)
+		assert.Equal(t, outHBAs.Mandatory[0].String(), `host all "ccp_monitoring" "127.0.0.0/8" scram-sha-256`)
+		assert.Equal(t, outHBAs.Mandatory[1].String(), `host all "ccp_monitoring" "::1/128" scram-sha-256`)
+		assert.Equal(t, outHBAs.Mandatory[2].String(), `host all "ccp_monitoring" all reject`)
 	})
 }
 

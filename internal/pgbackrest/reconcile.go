@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -28,6 +28,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -301,6 +302,14 @@ func addServerContainerAndVolume(
 	postgresMounts := map[string]corev1.VolumeMount{
 		postgres.DataVolumeMount().Name: postgres.DataVolumeMount(),
 		postgres.WALVolumeMount().Name:  postgres.WALVolumeMount(),
+	}
+	if util.DefaultMutableFeatureGate.Enabled(util.TablespaceVolumes) {
+		for _, instance := range cluster.Spec.InstanceSets {
+			for _, vol := range instance.TablespaceVolumes {
+				tablespaceVolumeMount := postgres.TablespaceVolumeMount(vol.Name)
+				postgresMounts[tablespaceVolumeMount.Name] = tablespaceVolumeMount
+			}
+		}
 	}
 	for i := range pod.Volumes {
 		if mount, ok := postgresMounts[pod.Volumes[i].Name]; ok {

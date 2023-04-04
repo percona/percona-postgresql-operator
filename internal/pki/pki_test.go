@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -490,6 +490,9 @@ func strictOpenSSLVerify(t *testing.T, openssl string, root, leaf Certificate) {
 	output, _ := exec.Command(openssl, "verify", "-help").CombinedOutput()
 	if !strings.Contains(string(output), "-x509_strict") {
 		t.Skip(`requires "-x509_strict" flag`)
+	}
+	if !strings.Contains(string(output), "-no-CAfile") {
+		t.Skip(`requires a flag to ignore system certificates`)
 	}
 
 	verify := func(t testing.TB, args ...string) {

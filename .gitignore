@@ -10,3 +10,4 @@ licenses/*
 bin/
 /testing/kuttl/e2e-generated/
 /testing/kuttl/e2e-generated-other/
+/testing/kuttl/e2e-generated*/
