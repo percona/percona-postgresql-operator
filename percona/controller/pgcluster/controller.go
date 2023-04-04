@@ -141,7 +141,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	cr.Status = v2beta1.PerconaPGClusterStatus{
 		State:                 r.updateState(cr, &postgresCluster.Status),
-		Host:                  cr.Name + "-pgBouncer." + cr.Namespace,
+		Host:                  cr.Name + "-pgbouncer." + cr.Namespace,
 		PostgresClusterStatus: postgresCluster.Status,
 	}
 
