@@ -2,12 +2,15 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -120,20 +123,18 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.DatabaseInitSQL = perconaPGCluster.Spec.DatabaseInitSQL
 		postgresCluster.Spec.Patroni = perconaPGCluster.Spec.Patroni
 
-		if perconaPGCluster.Spec.PMM != nil && perconaPGCluster.Spec.PMM.Enabled {
-			// TODO: Check if PMM secret exists
-			for i := 0; i < len(perconaPGCluster.Spec.InstanceSets); i++ {
-				set := &perconaPGCluster.Spec.InstanceSets[i]
-				set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(perconaPGCluster))
-			}
+		if err := r.addPMMSidecar(ctx, perconaPGCluster); err != nil {
+			return errors.Wrap(err, "failed to add pmm sidecar")
 		}
-
 		postgresCluster.Spec.InstanceSets = perconaPGCluster.Spec.InstanceSets.ToCrunchy()
 		postgresCluster.Spec.Users = perconaPGCluster.Spec.Users
 		postgresCluster.Spec.Proxy = perconaPGCluster.Spec.Proxy.ToCrunchy()
 
 		return nil
 	})
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "create or update PostgresCluster")
+	}
 
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
@@ -161,4 +162,41 @@ func (r *PGClusterReconciler) getVersionMeta(ctx context.Context, cr *v2beta1.Pe
 		BackupVersion:   "",
 		PMMVersion:      "",
 	}, nil
+}
+
+func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
+		return nil
+	}
+
+	log := logging.FromContext(ctx)
+
+	if cr.Spec.PMM.Secret == "" {
+		log.Info(fmt.Sprintf("Can't enable PMM: `.spec.pmm.secret` is empty in %s", cr.Name))
+		return nil
+	}
+
+	pmmSecret := new(corev1.Secret)
+	if err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      cr.Spec.PMM.Secret,
+		Namespace: cr.Namespace,
+	}, pmmSecret); err != nil {
+		if k8serrors.IsNotFound(err) {
+			log.Info(fmt.Sprintf("Can't enable PMM: %s secret doesn't exist", cr.Spec.PMM.Secret))
+			return nil
+		}
+		return errors.Wrap(err, "failed to get pmm secret")
+	}
+
+	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
+		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
+		return nil
+	}
+
+	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+		set := &cr.Spec.InstanceSets[i]
+		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
+	}
+
+	return nil
 }
