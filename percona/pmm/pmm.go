@@ -7,6 +7,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 )
 
+// #nosec G101
+
 const (
 	SecretKey = "PMM_SERVER_KEY"
 )
