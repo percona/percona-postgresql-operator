@@ -24,24 +24,28 @@ const (
 type DepVersion struct{}
 
 type Meta struct {
-	Apply           string
-	OperatorVersion string
-	PGVersion       string
-	KubeVersion     string
-	Platform        string
-	PMMVersion      string
-	BackupVersion   string
-	CRUID           string
+	Apply              string
+	OperatorVersion    string
+	PGVersion          string
+	KubeVersion        string
+	Platform           string
+	PMMVersion         string
+	BackupVersion      string
+	CRUID              string
+	PMMEnabled         bool
+	HelmDeployCR       bool
+	HelmDeployOperator bool
+	SidecarsUsed       bool
 }
 
-func EnsureVersion(ctx context.Context, cr *v2beta1.PerconaPGCluster, meta Meta) error {
+func EnsureVersion(ctx context.Context, meta Meta) error {
 	log := logging.FromContext(ctx)
 
 	if !telemetryEnabled() {
 		return nil
 	}
 
-	_, err := fetchVersions(ctx, cr, v2beta1.GetDefaultVersionServiceEndpoint(), meta)
+	_, err := fetchVersions(ctx, v2beta1.GetDefaultVersionServiceEndpoint(), meta)
 	if err != nil {
 		// we don't return here to not block execution just because we can't phone home
 		log.Error(err, fmt.Sprintf("failed to send telemetry to %s", v2beta1.GetDefaultVersionServiceEndpoint()))
@@ -58,7 +62,7 @@ func telemetryEnabled() bool {
 	return true
 }
 
-func fetchVersions(ctx context.Context, cr *v2beta1.PerconaPGCluster, endpoint string, vm Meta) (DepVersion, error) {
+func fetchVersions(ctx context.Context, endpoint string, vm Meta) (DepVersion, error) {
 	requestURL, err := url.Parse(endpoint)
 	if err != nil {
 		return DepVersion{}, errors.Wrap(err, "parse endpoint")
@@ -71,18 +75,22 @@ func fetchVersions(ctx context.Context, cr *v2beta1.PerconaPGCluster, endpoint s
 	})
 
 	applyParams := &version_service.VersionServiceApplyParams{
-		Apply:             vm.Apply,
-		BackupVersion:     &vm.BackupVersion,
-		CustomResourceUID: &vm.CRUID,
-		DatabaseVersion:   &vm.PGVersion,
-		KubeVersion:       &vm.KubeVersion,
-		NamespaceUID:      new(string),
-		OperatorVersion:   vm.OperatorVersion,
-		Platform:          &vm.Platform,
-		PmmVersion:        &vm.PMMVersion,
-		Product:           productName,
-		Context:           ctx,
-		HTTPClient:        &http.Client{Timeout: 10 * time.Second},
+		Apply:              vm.Apply,
+		BackupVersion:      &vm.BackupVersion,
+		CustomResourceUID:  &vm.CRUID,
+		DatabaseVersion:    &vm.PGVersion,
+		KubeVersion:        &vm.KubeVersion,
+		NamespaceUID:       new(string),
+		OperatorVersion:    vm.OperatorVersion,
+		Platform:           &vm.Platform,
+		PmmVersion:         &vm.PMMVersion,
+		PmmEnabled:         &vm.PMMEnabled,
+		HelmDeployCr:       &vm.HelmDeployCR,
+		HelmDeployOperator: &vm.HelmDeployOperator,
+		SidecarsUsed:       &vm.SidecarsUsed,
+		Product:            productName,
+		Context:            ctx,
+		HTTPClient:         &http.Client{Timeout: 10 * time.Second},
 	}
 	applyParams = applyParams.WithTimeout(10 * time.Second)
 
