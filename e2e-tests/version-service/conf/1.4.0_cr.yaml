@@ -40,8 +40,8 @@ spec:
 #      storagetype: dynamic
 #      storageclass: ""
 #      matchLabels: ""
-#  userLabels:
-#    pgo-version: "1.4.0"
+  userLabels:
+    pgo-version: "1.4.0"
   pgPrimary:
     image: percona/percona-postgresql-operator:1.4.0-ppg14-postgres-ha
 #    imagePullPolicy: Always
@@ -179,7 +179,7 @@ spec:
 #        labels:
 #          pg-cluster-label: cluster1
   pgBadger:
-    enabled: false
+    enabled: true
     image: percona/percona-postgresql-operator:1.4.0-ppg14-pgbadger
 #    imagePullPolicy: Always
     port: 10000
