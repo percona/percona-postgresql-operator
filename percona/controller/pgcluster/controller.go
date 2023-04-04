@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -139,9 +140,14 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
+	host, err := r.updateHost(ctx, cr)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "get app host")
+	}
+
 	cr.Status = v2beta1.PerconaPGClusterStatus{
 		State:                 r.updateState(cr, &postgresCluster.Status),
-		Host:                  cr.Name + "-pgbouncer." + cr.Namespace,
+		Host:                  host,
 		PostgresClusterStatus: postgresCluster.Status,
 	}
 
@@ -150,6 +156,30 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return reconcile.Result{}, err
+}
+
+func (r *PGClusterReconciler) updateHost(ctx context.Context, cr *v2beta1.PerconaPGCluster) (string, error) {
+	svcName := cr.Name + "-pgbouncer"
+
+	if cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
+		return svcName + "." + cr.Namespace, nil
+	}
+
+	svc := &corev1.Service{}
+	err := r.Client.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: svcName}, svc)
+	if err != nil {
+		return "", errors.Wrapf(err, "get %s service", svcName)
+	}
+
+	var host string
+	for _, i := range svc.Status.LoadBalancer.Ingress {
+		host = i.IP
+		if len(i.Hostname) > 0 {
+			host = i.Hostname
+		}
+	}
+
+	return host, nil
 }
 
 func (r *PGClusterReconciler) updateState(cr *v2beta1.PerconaPGCluster,
