@@ -202,16 +202,11 @@ endif
 
 pgo-base-docker: pgo-base-build
 
-#======== Percona Test =======
-test-percona: envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
-
+#======== Utility =======
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
-
-#======== Utility =======
 .PHONY: check
 check: envtest
 	PGO_NAMESPACE="postgres-operator" KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO_TEST) -coverprofile cover.out ./... 
