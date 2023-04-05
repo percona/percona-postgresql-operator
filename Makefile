@@ -213,7 +213,7 @@ envtest: ## Download envtest-setup locally if necessary.
 
 #======== Utility =======
 .PHONY: check
-check:
+check: envtest
 	PGO_NAMESPACE="postgres-operator" $(GO_TEST) -cover ./...
 
 # Available versions: curl -s 'https://storage.googleapis.com/kubebuilder-tools/' | grep -o '<Key>[^<]*</Key>'
