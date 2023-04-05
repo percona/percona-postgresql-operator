@@ -5,11 +5,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	// gs "github.com/onsi/gomega/gstruct"
-	// appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	// k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	// "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -51,7 +47,7 @@ var _ = Describe("PG Cluster", Ordered, func() {
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 	})
 
-	Context("", func() {
+	Context("Reconcile controller", func() {
 		It("Controller should reconcile", func() {
 			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())

@@ -1,16 +1,6 @@
 name: Run tests
 on: [pull_request]
 jobs:
-  # test:
-  #   name: Test
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #     - uses: actions/setup-go@v4
-  #       with:
-  #         go-version: '^1.19'
-  #     - uses: actions/checkout@v3
-  #     - name: go test
-  #       run: make check
   test:
     name: Test
     runs-on: ubuntu-20.04
