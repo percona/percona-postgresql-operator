@@ -10,4 +10,17 @@ jobs:
           go-version: '^1.19'
       - uses: actions/checkout@v3
       - name: go test
-        run: make test
+        run: make check
+  envtest:
+    name: Envtest
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1.19'
+      - uses: actions/checkout@v3
+      - name: envtest
+        run: ENVTEST_K8S_VERSION=1.21 make test-percona
