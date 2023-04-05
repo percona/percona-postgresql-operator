@@ -49,6 +49,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
+	"github.com/percona/percona-postgresql-operator/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -209,6 +210,7 @@ func (r *Reconciler) Reconcile(
 	}
 
 	pgHBAs := postgres.NewHBAs()
+	pmm.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgbouncer.PostgreSQL(cluster, &pgHBAs)
 
