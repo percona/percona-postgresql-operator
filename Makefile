@@ -214,7 +214,7 @@ envtest: ## Download envtest-setup locally if necessary.
 #======== Utility =======
 .PHONY: check
 check: envtest
-	PGO_NAMESPACE="postgres-operator" $(GO_TEST) -cover ./...
+	PGO_NAMESPACE="postgres-operator" KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO_TEST) -coverprofile cover.out ./... 
 
 # Available versions: curl -s 'https://storage.googleapis.com/kubebuilder-tools/' | grep -o '<Key>[^<]*</Key>'
 # - KUBEBUILDER_ATTACH_CONTROL_PLANE_OUTPUT=true
