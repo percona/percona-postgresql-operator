@@ -202,6 +202,14 @@ endif
 
 pgo-base-docker: pgo-base-build
 
+#======== Percona Test =======
+test: fmt vet envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
+
+ENVTEST = $(shell pwd)/bin/setup-envtest
+envtest: ## Download envtest-setup locally if necessary.
+	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+
 
 #======== Utility =======
 .PHONY: check
@@ -346,7 +354,7 @@ generate-versionservice-client: swagger
 	swagger generate client -f $(VERSION_SERVICE_CLIENT_PATH)/version.swagger.yaml -c $(VERSION_SERVICE_CLIENT_PATH)/client -m $(VERSION_SERVICE_CLIENT_PATH)/client/models
 
 # Available versions: curl -s 'https://storage.googleapis.com/kubebuilder-tools/' | grep -o '<Key>[^<]*</Key>'
-# - ENVTEST_K8S_VERSION=1.19.2
+ENVTEST_K8S_VERSION=1.21
 hack/tools/envtest: SHELL = bash
 hack/tools/envtest:
 	source '$(shell $(GO) list -f '{{ .Dir }}' -m 'sigs.k8s.io/controller-runtime')/hack/setup-envtest.sh' && fetch_envtest_tools $@
