@@ -135,12 +135,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 		return nil
 	})
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "update/create PostgresCluster")
+	}
 
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
-	host, err := r.updateHost(ctx, cr)
+	host, err := r.getHost(ctx, cr)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get app host")
 	}
@@ -158,10 +161,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	return reconcile.Result{}, err
 }
 
-func (r *PGClusterReconciler) updateHost(ctx context.Context, cr *v2beta1.PerconaPGCluster) (string, error) {
+func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2beta1.PerconaPGCluster) (string, error) {
 	svcName := cr.Name + "-pgbouncer"
 
-	if cr.Spec.Proxy.PGBouncer.ServiceExpose != nil && cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
+	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
 		return svcName + "." + cr.Namespace, nil
 	}
 
