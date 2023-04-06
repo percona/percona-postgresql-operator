@@ -5,9 +5,12 @@ jobs:
     name: Test
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/setup-go@v4
+      - name: Clone the code
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
         with:
           go-version: '^1.19'
       - uses: actions/checkout@v3
-      - name: go test
-        run: make check
+      - name: envtest
+        run: ENVTEST_K8S_VERSION=1.21 make check
