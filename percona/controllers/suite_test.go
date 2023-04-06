@@ -55,7 +55,7 @@ var _ = BeforeSuite(func() {
 		util.PGBouncerSidecars: {Default: true},
 	}
 
-	util.DefaultMutableFeatureGate.Add(features)
+	Expect(util.DefaultMutableFeatureGate.Add(features)).To(Succeed())
 
 	var err error
 	cfg, err = testEnv.Start()
