@@ -149,7 +149,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	cr.Status = v2beta1.PerconaPGClusterStatus{
-		State:                 r.getState(cr, &postgresCluster.Status),
+		State:                 r.getState(&postgresCluster.Status),
 		Host:                  host,
 		PostgresClusterStatus: postgresCluster.Status,
 	}
@@ -185,8 +185,7 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2beta1.PerconaPG
 	return host, nil
 }
 
-func (r *PGClusterReconciler) getState(cr *v2beta1.PerconaPGCluster,
-	status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
+func (r *PGClusterReconciler) getState(status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
 
 	if status.PGBackRest != nil && status.PGBackRest.RepoHost != nil && !status.PGBackRest.RepoHost.Ready {
 		return v2beta1.AppStateInit

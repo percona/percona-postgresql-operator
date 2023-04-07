@@ -55,7 +55,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 	pgBouncerSVC := &corev1.Service{}
 	It("should create pgbouncer service", func() {
 		// This service is created by Cruncy PGO,
-		// but we need it in order to reconcile succesfully.
+		// but we need it in order to reconcile successfully.
 		pgBouncerSVC = &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      crName + "-pgbouncer",
