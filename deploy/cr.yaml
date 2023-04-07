@@ -111,7 +111,7 @@ spec:
 
   proxy:
     pgBouncer:
-#      replicas: 3
+      replicas: 3
       image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
 #      resources:
 #        limits:
