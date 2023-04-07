@@ -21,9 +21,9 @@ metadata:
 status:
   instances:
     - name: instance1
-      readyReplicas: 1
-      replicas: 1
-      updatedReplicas: 1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
   observedGeneration: 3
   pgbackrest:
     manualBackup:
@@ -39,8 +39,8 @@ status:
       succeeded: 1
   proxy:
     pgBouncer:
-      readyReplicas: 1
-      replicas: 1
+      readyReplicas: 3
+      replicas: 3
 ---
 apiVersion: pg.percona.com/v2beta1
 kind: PerconaPGRestore

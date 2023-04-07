@@ -1,30 +1,29 @@
-**Checklist:**
+**CHANGE DESCRIPTION**
+---
+**Problem:**
+*Short explanation of the problem.*
 
- <!--- Make sure your PR is documented and tested before submission. Put an `x` in all the boxes that apply: -->
- - [ ] Have you added an explanation of what your changes do and why you'd like them to be included?
- - [ ] Have you updated or added documentation for the change, as applicable?
- - [ ] Have you tested your changes on all related environments with successful results, as applicable?
-   - [ ] Have you added automated tests?
+**Cause:**
+*Short explanation of the root cause of the issue if applicable.*
 
+**Solution:**
+*Short explanation of the solution we are providing with this PR.*
 
+**CHECKLIST**
+---
+**Jira**
+- [ ] Is the Jira ticket created and referenced properly?
+- [ ] Does the Jira ticket have the proper statuses for documentation (`Needs Doc`) and QA (`Needs QA`)?
+- [ ] Does the Jira ticket link to the proper milestone (Fix Version field)?
 
-**Type of Changes:**
+**Tests**
+- [ ] Is an E2E test/test case added for the new feature/change?
+- [ ] Are unit tests added where appropriate?
 
- <!--- What types of changes does your code introduce? Put an `x` in all the boxes that apply: -->
- - [ ] New feature
- - [ ] Bug fix
- - [ ] Documentation
- - [ ] Testing enhancement
- - [ ] Other
-
-
-**What is the current behavior (link to any open issues here)?**
-
-
-
-**What is the new behavior (if this is a feature change)?**
-- [ ] Breaking change (fix or feature that would cause existing functionality to change)
-
-
-
-**Other Information**:
+**Config/Logging/Testability**
+- [ ] Are all needed new/changed options added to default YAML files?
+- [ ] Are the manifests (crd/bundle) regenerated if needed?
+- [ ] Did we add proper logging messages for operator actions?
+- [ ] Did we ensure compatibility with the previous version or cluster upgrade process?
+- [ ] Does the change support oldest and newest supported PG version?
+- [ ] Does the change support oldest and newest supported Kubernetes version?

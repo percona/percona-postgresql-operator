@@ -1,4 +1,4 @@
-package pgcluster
+package controllers
 
 import (
 	"context"
@@ -197,6 +197,11 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		set := &cr.Spec.InstanceSets[i]
 		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
 	}
+
+	cr.Spec.Users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
+		Name:    pmm.MonitoringUser,
+		Options: "SUPERUSER",
+	})
 
 	return nil
 }

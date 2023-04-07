@@ -1,4 +1,4 @@
-package pgcluster
+package controllers
 
 import (
 	"context"

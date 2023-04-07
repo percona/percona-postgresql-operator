@@ -1,4 +1,4 @@
-package pgbackup
+package controllers
 
 import (
 	"context"
@@ -17,9 +17,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -141,10 +139,6 @@ func startBackup(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGClus
 	}
 	pg.Annotations[naming.PGBackRestBackup] = pb.Name
 
-	if pg.Spec.Backups.PGBackRest.Manual == nil {
-		pg.Spec.Backups.PGBackRest.Manual = &v1beta1.PGBackRestManualBackup{}
-	}
-
 	pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
 	pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options
 
@@ -185,9 +179,9 @@ func findBackupJob(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCl
 
 func checkBackupJob(job *batchv1.Job) v2beta1.PGBackupState {
 	switch {
-	case controller.JobCompleted(job):
+	case jobCompleted(job):
 		return v2beta1.BackupSucceeded
-	case controller.JobFailed(job):
+	case jobFailed(job):
 		return v2beta1.BackupFailed
 	default:
 		return v2beta1.BackupRunning

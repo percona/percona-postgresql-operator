@@ -1,4 +1,4 @@
-package pgrestore
+package controllers
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -185,9 +184,9 @@ func disableRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGC
 
 func checkRestoreJob(job *batchv1.Job) v2beta1.PGRestoreState {
 	switch {
-	case controller.JobCompleted(job):
+	case jobCompleted(job):
 		return v2beta1.RestoreSucceeded
-	case controller.JobFailed(job):
+	case jobFailed(job):
 		return v2beta1.RestoreFailed
 	default:
 		return v2beta1.RestoreRunning
