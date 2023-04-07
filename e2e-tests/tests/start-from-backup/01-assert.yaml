@@ -40,9 +40,9 @@ metadata:
       blockOwnerDeletion: true
 status:
   observedGeneration: 1
-  replicas: 1
-  updatedReplicas: 1
-  readyReplicas: 1
+  replicas: 3
+  updatedReplicas: 3
+  readyReplicas: 3
 ---
 kind: Job
 apiVersion: batch/v1
@@ -78,9 +78,9 @@ metadata:
 status:
   instances:
     - name: instance1
-      readyReplicas: 1
-      replicas: 1
-      updatedReplicas: 1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
   observedGeneration: 1
   pgbackrest:
     repos:
@@ -91,8 +91,8 @@ status:
       id: ~pgo-bootstrap-start-from-backup
   proxy:
     pgBouncer:
-      readyReplicas: 1
-      replicas: 1
+      readyReplicas: 3
+      replicas: 3
 ---
 apiVersion: pg.percona.com/v2beta1
 kind: PerconaPGCluster
@@ -101,9 +101,9 @@ metadata:
 status:
   instances:
     - name: instance1
-      readyReplicas: 1
-      replicas: 1
-      updatedReplicas: 1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
   observedGeneration: 1
   pgbackrest:
     repos:
@@ -114,5 +114,5 @@ status:
       id: ~pgo-bootstrap-start-from-backup
   proxy:
     pgBouncer:
-      readyReplicas: 1
-      replicas: 1
+      readyReplicas: 3
+      replicas: 3
