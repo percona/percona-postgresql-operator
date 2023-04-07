@@ -105,7 +105,7 @@ spec:
               - bash
               - -c
               - pmm-admin inventory remove node --force $(pmm-admin status --json
-                | python -c "import sys, json; print(json.load(sys.stdin)['pmm_agent_status']['node_id'])")
+                | jq -r '.pmm_agent_status.node_id')
         livenessProbe:
           failureThreshold: 3
           httpGet:
