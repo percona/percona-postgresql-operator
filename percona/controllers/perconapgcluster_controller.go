@@ -1,4 +1,4 @@
-package pgcluster
+package controllers
 
 import (
 	"context"
@@ -126,6 +126,11 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 				set := &perconaPGCluster.Spec.InstanceSets[i]
 				set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(perconaPGCluster))
 			}
+
+			perconaPGCluster.Spec.Users = append(perconaPGCluster.Spec.Users, v1beta1.PostgresUserSpec{
+				Name:    pmm.MonitoringUser,
+				Options: "SUPERUSER",
+			})
 		}
 
 		postgresCluster.Spec.InstanceSets = perconaPGCluster.Spec.InstanceSets.ToCrunchy()

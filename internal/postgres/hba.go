@@ -25,7 +25,7 @@ func NewHBAs() HBAs {
 	return HBAs{
 		Mandatory: []HostBasedAuthentication{
 			// The "postgres" superuser must always be able to connect locally.
-			*NewHBA().Local().User("postgres").Method("trust"),
+			*NewHBA().Local().User("postgres").Method("peer"),
 
 			// The replication user must always connect over TLS using certificate
 			// authentication. Patroni also connects to the "postgres" database
