@@ -8,51 +8,52 @@ kind: ClusterServiceVersion
 metadata:
   name: '' # generate.sh
   annotations:
-    support: crunchydata.com
+    support: percona.com
     olm.properties: '[]'
 
     # The following affect how the package is indexed at OperatorHub.io:
     # https://operatorhub.io/?category=Database
     # https://sdk.operatorframework.io/docs/advanced-topics/operator-capabilities/operator-capabilities/
     categories: Database
-    capabilities: Auto Pilot
-    description: Production Postgres Made Easy
-
+    capabilities: Deep Insights
+    description: >-
+      Percona Operator for PostgreSQL manages the lifecycle of Percona PostgreSQL
+      cluster instances.
     # The following appear on the details page at OperatorHub.io:
     # https://operatorhub.io/operator/postgresql
     createdAt: 2019-12-31 19:40Z
-    repository: https://github.com/CrunchyData/postgres-operator
+    repository: https://github.com/percona/percona-postgresql-operator
     containerImage: # kustomize config/operator
     alm-examples: |- # kustomize config/examples
 
 spec:
   # The following affect how the package is indexed at OperatorHub.io:
   # https://operatorhub.io/
-  displayName: Crunchy Postgres for Kubernetes
+  displayName: Percona Operator for PostgreSQL
   provider:
     # These values become labels on the PackageManifest.
-    name: Crunchy Data
-    url: https://www.crunchydata.com/
+    name: Percona
+    url: https://www.percona.com/
   keywords:
     - postgres
     - postgresql
     - database
     - sql
     - operator
-    - crunchy data
+    - percona
 
   # The following appear on the details page at OperatorHub.io:
   # https://operatorhub.io/operator/postgresql
   description: |- # description.md
   version: '' # generate.sh
   links:
-    - name: Crunchy Data
-      url: https://www.crunchydata.com/
+    - name: Percona
+      url: https://www.percona.com/
     - name: Documentation
-      url: https://access.crunchydata.com/documentation/postgres-operator/v5/
+      url: https://docs.percona.com/percona-operator-for-postgresql/index.html
   maintainers:
-    - name: Crunchy Data
-      email: info@crunchydata.com
+    - name: Percona
+      email: info@percona.com
 
   # https://olm.operatorframework.io/docs/best-practices/common/
   # Note: The minKubeVersion must correspond to the lowest supported OCP version

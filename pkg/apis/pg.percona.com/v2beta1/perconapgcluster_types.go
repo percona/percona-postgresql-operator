@@ -242,7 +242,6 @@ type SecretsSpec struct {
 // +listType=map
 // +listMapKey=name
 // +kubebuilder:validation:MinItems=1
-// +operator-sdk:csv:customresourcedefinitions:type=spec,order=2
 type PGInstanceSets []PGInstanceSetSpec
 
 func (p PGInstanceSets) ToCrunchy() []crunchyv1beta1.PostgresInstanceSetSpec {

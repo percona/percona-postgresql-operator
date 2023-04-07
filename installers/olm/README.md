@@ -134,22 +134,13 @@ kubectl -n "$NAMESPACE" delete operatorgroup olm-operator-group
 
 After generating and testing the OLM bundles, there are two manual steps.
 
-<<<<<<< HEAD
-1. Update the image SHA values (denoted with '<update\_(imagetype)\_SHA_value>', required for both the Red Hat 'Certified' and
-   'Marketplace' bundles)
-=======
 1. Update the image SHA values (denoted with '<update_(imagetype)_SHA_value>', required for both the Red Hat 'Certified' and
 'Marketplace' bundles)
->>>>>>> upstream/master
 2. Update the 'description.md' file to indicate which OCP versions this release of PGO was tested against.
 
 ### Troubleshooting
 
-<<<<<<< HEAD
 If, when running `make validate-bundles` you encounter an error similar to
-=======
-If, when running `make validate-bundles` you encounter an error similar  to
->>>>>>> upstream/master
 
 `cannot find Containerfile or Dockerfile in context directory: stat /mnt/Dockerfile: permission denied`
 

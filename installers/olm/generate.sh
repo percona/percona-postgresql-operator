@@ -13,28 +13,16 @@ go_api_directory=$(cd ../../pkg/apis && pwd)
 
 # The 'operators.operatorframework.io.bundle.package.v1' package name for each
 # bundle (updated for the 'certified' and 'marketplace' bundles).
-package_name='postgresql'
+package_name='percona-postgresql-operator'
 
 # The project name used by operator-sdk for initial bundle generation.
-project_name='postgresoperator'
+project_name='percona-postgresql-operator'
 
 # The prefix for the 'clusterserviceversion.yaml' file.
 # Per OLM guidance, the filename for the clusterserviceversion.yaml must be prefixed
 # with the Operator's package name for the 'redhat' and 'marketplace' bundles.
 # https://github.com/redhat-openshift-ecosystem/certification-releases/blob/main/4.9/ga/troubleshooting.md#get-supported-versions
-file_name='postgresoperator'
-case "${DISTRIBUTION}" in
-	# https://redhat-connect.gitbook.io/certified-operator-guide/appendix/what-if-ive-already-published-a-community-operator
-	'redhat') 
-		file_name='crunchy-postgres-operator'
-		package_name='crunchy-postgres-operator'
-		;;
-	# https://github.com/redhat-openshift-ecosystem/certification-releases/blob/main/4.9/ga/ci-pipeline.md#bundle-structure
-	'marketplace') 
-		file_name='crunchy-postgres-operator-rhmp'
-		package_name='crunchy-postgres-operator-rhmp'
-		;;
-esac
+file_name='percona-postgresql-operator'
 
 operator_yamls=$(kubectl kustomize "config/${DISTRIBUTION}")
 operator_crds=$(yq <<< "${operator_yamls}" --slurp --yaml-roundtrip 'map(select(.kind == "CustomResourceDefinition"))')
@@ -86,9 +74,9 @@ yq --yaml-roundtrip < bundle.annotations.yaml > "${bundle_directory}/metadata/an
 	--arg package "${package_name}" \
 '
 	.annotations["operators.operatorframework.io.bundle.package.v1"] = $package |
-	.annotations["org.opencontainers.image.authors"] = "info@crunchydata.com" |
-	.annotations["org.opencontainers.image.url"] = "https://crunchydata.com" |
-	.annotations["org.opencontainers.image.vendor"] = "Crunchy Data" |
+	.annotations["org.opencontainers.image.authors"] = "info@percona.com" |
+	.annotations["org.opencontainers.image.url"] = "https://percona.com" |
+	.annotations["org.opencontainers.image.vendor"] = "Percona" |
 .'
 else
 yq --yaml-roundtrip < bundle.annotations.yaml > "${bundle_directory}/metadata/annotations.yaml" \
@@ -171,14 +159,10 @@ case "${DISTRIBUTION}" in
 		yq --in-place --yaml-roundtrip \
 		'
 			.metadata.annotations.certified = "true" |
-			.metadata.annotations["containerImage"] = "registry.connect.redhat.com/crunchydata/postgres-operator@sha256:<update_operator_SHA_value>" |
-			.metadata.annotations["containerImage"] = "registry.connect.redhat.com/crunchydata/postgres-operator@sha256:<update_operator_SHA_value>" |
+			.metadata.annotations["containerImage"] = "registry.connect.redhat.com/percona/percona-postgresql-operator@sha256:<update_operator_SHA_value>" |
+			.metadata.annotations["containerImage"] = "registry.connect.redhat.com/percona/percona-postgresql-operator@sha256:<update_operator_SHA_value>" |
 		.' \
 			"${bundle_directory}/manifests/${file_name}.clusterserviceversion.yaml"
-
-  		# Finally, add related images. NOTE: SHA values will need to be updated
-		# -https://github.com/redhat-openshift-ecosystem/certification-releases/blob/main/4.9/ga/troubleshooting.md#digest-pinning
-		cat bundle.relatedImages.yaml >> "${bundle_directory}/manifests/${file_name}.clusterserviceversion.yaml"
 		;;
 	'marketplace')
 		# Annotations needed when targeting Red Hat Marketplace
@@ -186,17 +170,13 @@ case "${DISTRIBUTION}" in
 		yq --in-place --yaml-roundtrip \
 				--arg package_url "https://marketplace.redhat.com/en-us/operators/${file_name}" \
 		'
-				.metadata.annotations["containerImage"] = "registry.connect.redhat.com/crunchydata/postgres-operator@sha256:<update_operator_SHA_value>" |
+				.metadata.annotations["containerImage"] = "registry.connect.redhat.com/percona/percona-postgresql-operator@sha256:<update_operator_SHA_value>" |
 				.metadata.annotations["marketplace.openshift.io/remote-workflow"] =
 						"\($package_url)/pricing?utm_source=openshift_console" |
 				.metadata.annotations["marketplace.openshift.io/support-workflow"] =
 						"\($package_url)/support?utm_source=openshift_console" |
 		.' \
 			"${bundle_directory}/manifests/${file_name}.clusterserviceversion.yaml"
-
-  		# Finally, add related images. NOTE: SHA values will need to be updated
-		# -https://github.com/redhat-openshift-ecosystem/certification-releases/blob/main/4.9/ga/troubleshooting.md#digest-pinning
-		cat bundle.relatedImages.yaml >> "${bundle_directory}/manifests/${file_name}.clusterserviceversion.yaml"
 		;;
 esac
 
