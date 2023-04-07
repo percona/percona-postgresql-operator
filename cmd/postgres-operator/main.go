@@ -31,7 +31,9 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/upgradecheck"
 	"github.com/percona/percona-postgresql-operator/internal/util"
-	percona "github.com/percona/percona-postgresql-operator/percona/controllers"
+	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
+	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
+	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 )
 
@@ -120,11 +122,11 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return err
 	}
 
-	pc := &percona.PGClusterReconciler{
+	pc := &pgcluster.PGClusterReconciler{
 		Client:      mgr.GetClient(),
-		Owner:       percona.PGClusterControllerName,
-		Recorder:    mgr.GetEventRecorderFor(percona.PGClusterControllerName),
-		Tracer:      otel.Tracer(percona.PGClusterControllerName),
+		Owner:       pgcluster.PGClusterControllerName,
+		Recorder:    mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
+		Tracer:      otel.Tracer(pgcluster.PGClusterControllerName),
 		Platform:    detectPlatform(ctx, mgr.GetConfig()),
 		KubeVersion: getServerVersion(ctx, mgr.GetConfig()),
 	}
@@ -132,21 +134,21 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return err
 	}
 
-	pb := &percona.PGBackupReconciler{
+	pb := &pgbackup.PGBackupReconciler{
 		Client:   mgr.GetClient(),
-		Owner:    percona.PGBackupControllerName,
-		Recorder: mgr.GetEventRecorderFor(percona.PGBackupControllerName),
-		Tracer:   otel.Tracer(percona.PGBackupControllerName),
+		Owner:    pgbackup.PGBackupControllerName,
+		Recorder: mgr.GetEventRecorderFor(pgbackup.PGBackupControllerName),
+		Tracer:   otel.Tracer(pgbackup.PGBackupControllerName),
 	}
 	if err := pb.SetupWithManager(mgr); err != nil {
 		return err
 	}
 
-	pr := &percona.PGRestoreReconciler{
+	pr := &pgrestore.PGRestoreReconciler{
 		Client:   mgr.GetClient(),
-		Owner:    percona.PGRestoreControllerName,
-		Recorder: mgr.GetEventRecorderFor(percona.PGRestoreControllerName),
-		Tracer:   otel.Tracer(percona.PGRestoreControllerName),
+		Owner:    pgrestore.PGRestoreControllerName,
+		Recorder: mgr.GetEventRecorderFor(pgrestore.PGRestoreControllerName),
+		Tracer:   otel.Tracer(pgrestore.PGRestoreControllerName),
 	}
 	if err := pr.SetupWithManager(mgr); err != nil {
 		return err
