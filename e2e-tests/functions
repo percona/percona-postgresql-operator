@@ -17,7 +17,7 @@ IMAGE_PG_HA=${IMAGE_PG_HA:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres-ha"}
 IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest"}
 IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest-repo"}
 IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbadger"}
-IMAGE_PMM=${IMAGE_PMM:-"perconalab/pmm-client:2.29.1"}
+IMAGE_PMM=${IMAGE_PMM:-"perconalab/pmm-client:2.36.0"}
 PMM_SERVER_VER=${PMM_SERVER_VER:-"9.9.9"}
 IMAGE_PMM_SERVER_REPO=${IMAGE_PMM_SERVER_REPO:-"perconalab/pmm-server"}
 IMAGE_PMM_SERVER_TAG=${IMAGE_PMM_SERVER_TAG:-"dev-latest"}
@@ -280,7 +280,7 @@ wait_pod_completion() {
 		if [ $retry -ge 360 ]; then
 			kubectl_bin describe pod/$pod
 			kubectl_bin logs $pod
-			kubectl_bin logs $(get_operator_pod) \
+			kubectl_bin logs $(get_operator_pod) -с operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| grep -v 'Getting tasks for pod' \
@@ -380,7 +380,7 @@ wait_job_completion() {
 		if [ $retry -ge 600 ]; then
 			kubectl_bin describe -n $ns job/$job
 			kubectl_bin logs $(kubectl_bin -n $ns get pods --selector=job-name=${job} -o jsonpath='{.items[0].metadata.name}') -n $ns
-			kubectl_bin -n $ns logs $(get_operator_pod) \
+			kubectl_bin -n $ns logs $(get_operator_pod) -c operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| tail -100
@@ -592,7 +592,7 @@ wait_for_delete() {
 		echo -n .
 		let retry+=1
 		if [ $retry -ge 120 ]; then
-			kubectl_bin logs $(get_operator_pod) \
+			kubectl_bin logs $(get_operator_pod) -c operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| grep -v 'Getting tasks for pod' \
@@ -620,7 +620,7 @@ wait_deployment() {
 		echo -n .
 		let retry+=1
 		if [ $retry -ge 360 ]; then
-			kubectl_bin logs $(get_operator_pod) \
+			kubectl_bin logs $(get_operator_pod) -c operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| tail -100
@@ -648,7 +648,7 @@ wait_generation_uniformity() {
 		echo -n .
 		let retry+=1
 		if [ $retry -ge 360 ]; then
-			kubectl_bin logs $(get_operator_pod) \
+			kubectl_bin logs $(get_operator_pod) -c operator \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| tail -100
@@ -672,7 +672,7 @@ wait_smart_update() {
 	set +o xtrace
 	retry=0
 
-	while [[ $(kubectl_bin logs $(get_operator_pod) operator | grep -c "Smart update finished") == ${target} ]]; do
+	while [[ $(kubectl_bin logs $(get_operator_pod) -c operator | grep -c "Smart update finished") == ${target} ]]; do
 		sleep 1
 
 		echo -n .
@@ -966,7 +966,7 @@ run_psql() {
 }
 
 destroy() {
-	kubectl_bin ${OPERATOR_NS:+-n $OPERATOR_NS} logs $(get_operator_pod) \
+	kubectl_bin ${OPERATOR_NS:+-n $OPERATOR_NS} logs $(get_operator_pod) -c operator \
 		| grep -v 'level=info' \
 		| grep -v 'level=debug' \
 		| grep -v 'Getting tasks for pod' \

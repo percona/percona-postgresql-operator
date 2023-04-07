@@ -1,5 +1,0 @@
-percona/percona-postgresql-operator:1.3.0-ppg13-pgbackrest
-percona/percona-postgresql-operator:1.3.0-ppg13-pgbackrest-repo
-percona/percona-postgresql-operator:1.3.0-ppg13-pgbadger
-percona/percona-postgresql-operator:1.3.0-ppg13-pgbouncer
-percona/percona-postgresql-operator:1.3.0-ppg13-postgres-ha
