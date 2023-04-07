@@ -155,9 +155,11 @@ rules:
   resources:
   - postgresclusters
   verbs:
+  - create
   - get
   - list
   - patch
+  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io
