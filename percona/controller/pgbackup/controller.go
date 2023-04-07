@@ -19,7 +19,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -140,10 +139,6 @@ func startBackup(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGClus
 		pg.Annotations = make(map[string]string)
 	}
 	pg.Annotations[naming.PGBackRestBackup] = pb.Name
-
-	if pg.Spec.Backups.PGBackRest.Manual == nil {
-		pg.Spec.Backups.PGBackRest.Manual = &v1beta1.PGBackRestManualBackup{}
-	}
 
 	pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
 	pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options

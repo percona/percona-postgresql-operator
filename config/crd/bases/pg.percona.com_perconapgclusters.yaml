@@ -1436,6 +1436,12 @@ spec:
                                   type: string
                               type: object
                             type: array
+                          ttlSecondsAfterFinished:
+                            description: 'Limit the lifetime of a Job that has finished.
+                              More info: https://kubernetes.io/docs/concepts/workloads/controllers/job'
+                            format: int32
+                            minimum: 60
+                            type: integer
                         type: object
                       manual:
                         description: Defines details for manual pgBackRest backup
@@ -1456,8 +1462,7 @@ spec:
                         - repoName
                         type: object
                       metadata:
-                        description: Metadata contains metadata for PostgresCluster
-                          resources
+                        description: Metadata contains metadata for custom resources
                         properties:
                           annotations:
                             additionalProperties:
@@ -8193,8 +8198,7 @@ spec:
                           type: string
                       type: object
                     metadata:
-                      description: Metadata contains metadata for PostgresCluster
-                        resources
+                      description: Metadata contains metadata for custom resources
                       properties:
                         annotations:
                           additionalProperties:
@@ -10334,7 +10338,7 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 14
+                maximum: 15
                 minimum: 10
                 type: integer
               proxy:
@@ -11605,8 +11609,7 @@ spec:
                           environment variable. More info: https://kubernetes.io/docs/concepts/containers/images'
                         type: string
                       metadata:
-                        description: Metadata contains metadata for PostgresCluster
-                          resources
+                        description: Metadata contains metadata for custom resources
                         properties:
                           annotations:
                             additionalProperties:

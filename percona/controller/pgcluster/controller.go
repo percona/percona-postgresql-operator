@@ -127,6 +127,11 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 				set := &cr.Spec.InstanceSets[i]
 				set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
 			}
+
+			cr.Spec.Users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
+				Name:    pmm.MonitoringUser,
+				Options: "SUPERUSER",
+			})
 		}
 
 		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()

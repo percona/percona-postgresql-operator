@@ -1,11 +1,16 @@
 package pmm
 
 import (
+	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 )
+
+const MonitoringUser = "monitor"
 
 func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 	ports := []corev1.ContainerPort{{ContainerPort: 7777}}
@@ -45,6 +50,13 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 						"pmm-admin inventory remove node --force $(pmm-admin status --json | python -c \"import sys, json; print(json.load(sys.stdin)['pmm_agent_status']['node_id'])\")",
 					},
 				},
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "cert-volume",
+				MountPath: "/pgconf/tls",
+				ReadOnly:  true,
 			},
 		},
 		Env: []corev1.EnvVar{
@@ -122,6 +134,18 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 				Value: "/usr/local/percona/pmm2/config/pmm-agent.yaml",
 			},
 			{
+				Name:  "PMM_AGENT_LOG_LEVEL",
+				Value: "info",
+			},
+			{
+				Name:  "PMM_AGENT_DEBUG",
+				Value: "false",
+			},
+			{
+				Name:  "PMM_AGENT_TRACE",
+				Value: "false",
+			},
+			{
 				Name:  "PMM_AGENT_SERVER_INSECURE_TLS",
 				Value: "1",
 			},
@@ -162,9 +186,48 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 				Value: "postgresql",
 			},
 			{
+				Name:  "DB_USER",
+				Value: MonitoringUser,
+			},
+			{
+				Name: "DB_PASS",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: pgc.Name + "-pguser-" + MonitoringUser,
+						},
+						Key: "password",
+					},
+				},
+			},
+			{
 				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: "pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify --skip-connection-check --metrics-mode=push --socket=/tmp/postgres/ --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
+				Value: agentPrerunScript(),
 			},
 		},
 	}
+}
+
+func agentPrerunScript() string {
+	wait := "pmm-admin status --wait=10s"
+	annotate := "pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'"
+
+	addServiceArgs := []string{
+		"--username=$(DB_USER)",
+		"--password='$(DB_PASS)'",
+		"--host=127.0.0.1",
+		"--port=5432",
+		"--tls-cert-file=/pgconf/tls/tls.crt",
+		"--tls-key-file=/pgconf/tls/tls.key",
+		"--tls-ca-file=/pgconf/tls/ca.crt",
+		"--tls-skip-verify",
+		"--skip-connection-check",
+		"--metrics-mode=push",
+		"--service-name=$(PMM_AGENT_SETUP_NODE_NAME)",
+		"--query-source=pgstatmonitor",
+	}
+	addService := fmt.Sprintf("pmm-admin add postgresql %s", strings.Join(addServiceArgs, " "))
+
+	return wait + "; " + addService + "; " + annotate
+
 }
