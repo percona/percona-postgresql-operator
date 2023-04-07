@@ -39,6 +39,7 @@ function apply_version {
 	sleep 10
 
 	wait_smart_update ${cluster} ${update_finished_log_entries}
+	wait_deployment ${cluster}
 	kubectl_bin delete jobs --selector=pg-cluster=cluster1
 	create_backup "${cluster}" "fulldata" "full"
 
