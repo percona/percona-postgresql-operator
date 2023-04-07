@@ -153,7 +153,7 @@ deploy_pmm_server() {
 	local platform=kubernetes
 	helm uninstall -n "${NAMESPACE}" pmm || :
 	helm install monitoring -n "${NAMESPACE}" --set imageTag=$IMAGE_PMM_SERVER_TAG --set service.type="LoadBalancer" \
-			--set imageRepo=$IMAGE_PMM_SERVER_REPO --set platform="${platform}" "https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz"
+		--set imageRepo=$IMAGE_PMM_SERVER_REPO --set platform="${platform}" "https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz"
 	wait_pod monitoring-0
 }
 
