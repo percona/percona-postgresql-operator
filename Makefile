@@ -202,11 +202,14 @@ endif
 
 pgo-base-docker: pgo-base-build
 
-
 #======== Utility =======
+ENVTEST = $(shell pwd)/bin/setup-envtest
+envtest: ## Download envtest-setup locally if necessary.
+	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+
 .PHONY: check
-check:
-	PGO_NAMESPACE="postgres-operator" $(GO_TEST) -cover ./...
+check: envtest
+	PGO_NAMESPACE="postgres-operator" KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO_TEST) -coverprofile cover.out ./... 
 
 # Available versions: curl -s 'https://storage.googleapis.com/kubebuilder-tools/' | grep -o '<Key>[^<]*</Key>'
 # - KUBEBUILDER_ATTACH_CONTROL_PLANE_OUTPUT=true
