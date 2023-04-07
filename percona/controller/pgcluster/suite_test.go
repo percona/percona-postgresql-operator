@@ -1,4 +1,4 @@
-package controllers
+package pgcluster
 
 import (
 	"os"
@@ -45,7 +45,7 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -97,7 +97,7 @@ func crunchyReconciler() *postgrescluster.Reconciler {
 }
 
 func readDefaultCR(name, namespace string) (*v2beta1.PerconaPGCluster, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "deploy", "cr.yaml"))
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
 	if err != nil {
 		return nil, err
 	}
