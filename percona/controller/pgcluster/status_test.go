@@ -149,7 +149,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					err := k8sClient.Get(ctx, crNamespacedName, cr)
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-				Expect(cr.Status.Host).Should(Equal(pgBouncerSVC.Name + "." + ns))
+				Expect(cr.Status.Host).Should(Equal(pgBouncerSVC.Name + "." + ns + ".svc"))
 			})
 		})
 
