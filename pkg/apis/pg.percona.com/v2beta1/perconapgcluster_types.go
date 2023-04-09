@@ -144,9 +144,10 @@ const (
 )
 
 type PerconaPGClusterStatus struct {
-	State                                AppState `json:"state"`
-	Host                                 string   `json:"host"`
 	crunchyv1beta1.PostgresClusterStatus `json:",inline"`
+	State                                AppState `json:"state"`
+	// +optional
+	Host string `json:"host"`
 }
 
 type PMMSpec struct {
