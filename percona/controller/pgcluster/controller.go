@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -50,16 +49,22 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).
 		For(&v2beta1.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
-		Owns(&corev1.Service{}).
-		Watches(&source.Kind{Type: &corev1.Service{}}, r.testWatch()).
+		Watches(&source.Kind{Type: &corev1.Service{}}, r.watchServices()).
 		Complete(r)
 }
 
-func (r *PGClusterReconciler) testWatch() handler.Funcs {
+func (r *PGClusterReconciler) watchServices() handler.Funcs {
 	return handler.Funcs{
 		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
-			fmt.Println("AAAAAAAA")
-			fmt.Printf("Old object: %s", e.ObjectOld.GetName())
+			labels := e.ObjectNew.GetLabels()
+			crName := labels[naming.LabelCluster]
+
+			if e.ObjectNew.GetName() == crName+"-pgbouncer" {
+				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+					Namespace: e.ObjectNew.GetNamespace(),
+					Name:      crName,
+				}})
+			}
 		},
 	}
 }
