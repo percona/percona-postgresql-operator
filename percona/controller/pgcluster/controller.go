@@ -87,12 +87,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, err
 	}
 
-	vm, err := r.getVersionMeta(ctx, cr)
-	if err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "get version meta")
-	}
-
-	if err := version.EnsureVersion(ctx, cr, vm); err != nil {
+	if err := version.EnsureVersion(ctx, cr, r.getVersionMeta(cr)); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "ensure versions")
 	}
 
@@ -107,7 +102,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, err
 	}
 
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		postgresCluster.Default()
 
 		annotations := make(map[string]string)
@@ -233,7 +228,7 @@ func (r *PGClusterReconciler) getState(status *v1beta1.PostgresClusterStatus) v2
 
 	return v2beta1.AppStateReady
 }
-func (r *PGClusterReconciler) getVersionMeta(ctx context.Context, cr *v2beta1.PerconaPGCluster) (version.Meta, error) {
+func (r *PGClusterReconciler) getVersionMeta(cr *v2beta1.PerconaPGCluster) version.Meta {
 	return version.Meta{
 		Apply:           "disabled",
 		OperatorVersion: version.Version,
@@ -243,5 +238,5 @@ func (r *PGClusterReconciler) getVersionMeta(ctx context.Context, cr *v2beta1.Pe
 		PGVersion:       strconv.Itoa(cr.Spec.PostgresVersion),
 		BackupVersion:   "",
 		PMMVersion:      "",
-	}, nil
+	}
 }
