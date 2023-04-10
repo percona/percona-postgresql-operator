@@ -15,7 +15,17 @@ spec:
     singular: perconapgcluster
   scope: Namespaced
   versions:
-  - name: v2beta1
+  - additionalPrinterColumns:
+    - jsonPath: .status.host
+      name: Endpoint
+      type: string
+    - jsonPath: .status.state
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v2beta1
     schema:
       openAPIV3Schema:
         description: PerconaPGCluster is the CRD that defines a Percona PG Cluster
@@ -13583,6 +13593,8 @@ spec:
                 description: Identifies the databases that have been installed into
                   PostgreSQL.
                 type: string
+              host:
+                type: string
               instances:
                 description: Current state of PostgreSQL instances.
                 items:
@@ -13861,6 +13873,8 @@ spec:
               startupInstanceSet:
                 description: The instance set associated with the startupInstance
                 type: string
+              state:
+                type: string
               userInterface:
                 description: Current state of the PostgreSQL user interface.
                 properties:
@@ -13876,6 +13890,8 @@ spec:
               usersRevision:
                 description: Identifies the users that have been installed into PostgreSQL.
                 type: string
+            required:
+            - state
             type: object
         required:
         - metadata
