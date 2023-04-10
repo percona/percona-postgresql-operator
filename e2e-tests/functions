@@ -40,6 +40,7 @@ get_cr() {
 		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
 		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
 		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" - \
+		| yq eval "$(printf '.spec.pmm.image="%s"' "${IMAGE_PMM}")" - \
 		| yq eval "$(printf '.spec.pmm.secret="%s"' "${test_name}-pmm-secret")" - \
 			>"${TEMP_DIR}/cr.yaml"
 
@@ -132,26 +133,40 @@ get_service_ip() {
 	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].hostname}'
 }
 
+wait_for_delete() {
+	local res="$1"
+
+	echo -n "$res - "
+	retry=0
+	until (kubectl get $res -n "${NAMESPACE}" || :) 2>&1 | grep NotFound; do
+		sleep 1
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 120 ]; then
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+	done
+}
+
 deploy_pmm_server() {
+	local platform=kubernetes
 	helm uninstall -n "${NAMESPACE}" pmm || :
-	kubectl delete clusterrolebindings.rbac.authorization.k8s.io pmm || :
-	kubectl delete clusterrole.rbac.authorization.k8s.io pmm || :
-	helm repo remove percona || :
-	helm repo add percona https://percona.github.io/percona-helm-charts/
-	helm install -n "${NAMESPACE}" pmm percona/pmm --set service.type="LoadBalancer"
-	wait_pod pmm-0
+	helm install monitoring -n "${NAMESPACE}" --set imageTag=$IMAGE_PMM_SERVER_TAG --set service.type="LoadBalancer" \
+		--set imageRepo=$IMAGE_PMM_SERVER_REPO --set platform="${platform}" "https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz"
+	wait_pod monitoring-0
 }
 
 generate_pmm_api_key() {
-	local admin_pass=$(kubectl -n "${NAMESPACE}" get secret pmm-secret -o yaml | yq eval '.data.PMM_ADMIN_PASSWORD' - | base64 -d)
-	local pmm_ip=$(get_service_ip monitoring-service)
+	local ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" exec monitoring-0 -- bash -c "printenv | grep ADMIN_PASSWORD | cut -d '=' -f2")
+	local PMM_SERVICE_IP=$(get_service_ip monitoring-service)
 	curl \
 		--insecure \
 		-X POST \
 		-H "Content-Type: application/json" \
 		-d '{"name":"operator", "role": "Admin"}' \
-		--user "admin:${admin_pass}" \
-		"https://${pmm_ip}/graph/api/auth/keys" \
+		--user "admin:${ADMIN_PASSWORD}" \
+		"https://${PMM_SERVICE_IP}/graph/api/auth/keys" \
 		| jq -r .key
 }
 
