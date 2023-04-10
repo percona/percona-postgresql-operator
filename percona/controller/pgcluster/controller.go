@@ -2,15 +2,11 @@ package pgcluster
 
 import (
 	"context"
-	"os"
-	"strconv"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,9 +16,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -66,13 +60,8 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	vm, err := r.getVersionMeta(ctx, perconaPGCluster)
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "get version meta")
-	}
-
-	if err := version.EnsureVersion(ctx, vm); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "ensure versions")
+	if err := r.reconcileVersion(ctx, perconaPGCluster); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile version")
 	}
 
 	postgresCluster := &v1beta1.PostgresCluster{
@@ -86,7 +75,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		postgresCluster.Default()
 
 		annotations := make(map[string]string)
@@ -153,72 +142,4 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return reconcile.Result{}, err
-}
-
-func (r *PGClusterReconciler) getVersionMeta(ctx context.Context, cr *v2beta1.PerconaPGCluster) (version.Meta, error) {
-	vm := version.Meta{
-		Apply:           "disabled",
-		OperatorVersion: version.Version,
-		CRUID:           string(cr.GetUID()),
-		KubeVersion:     r.KubeVersion,
-		Platform:        r.Platform,
-		PGVersion:       strconv.Itoa(cr.Spec.PostgresVersion),
-		BackupVersion:   "",
-		PMMVersion:      "",
-		PMMEnabled:      cr.Spec.PMM != nil && cr.Spec.PMM.Enabled,
-	}
-	if _, ok := cr.Labels["helm.sh/chart"]; ok {
-		vm.HelmDeployCR = true
-	}
-	for _, set := range cr.Spec.InstanceSets {
-		if len(set.Sidecars) > 0 {
-			vm.SidecarsUsed = true
-			break
-		}
-	}
-	operatorDepl, err := r.getOperatorDeployment(ctx)
-	if err != nil {
-		return version.Meta{}, errors.Wrap(err, "failed to get operator deployment")
-	}
-	if _, ok := operatorDepl.Labels["helm.sh/chart"]; ok {
-		vm.HelmDeployOperator = true
-	}
-	return vm, nil
-}
-
-func (r *PGClusterReconciler) getOperatorDeployment(ctx context.Context) (*appsv1.Deployment, error) {
-	ns, err := k8s.GetOperatorNamespace()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get operator namespace")
-	}
-	name, err := os.Hostname()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get operator hostname")
-	}
-
-	pod := new(corev1.Pod)
-	err = r.Client.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, pod)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get operator pod")
-	}
-	if len(pod.OwnerReferences) == 0 {
-		return nil, errors.New("operator pod has no owner reference")
-	}
-
-	rs := new(appsv1.ReplicaSet)
-	err = r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.OwnerReferences[0].Name}, rs)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get operator replicaset")
-	}
-	if len(rs.OwnerReferences) == 0 {
-		return nil, errors.New("operator replicaset has no owner reference")
-	}
-
-	depl := new(appsv1.Deployment)
-	err = r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: rs.OwnerReferences[0].Name}, depl)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get operator deployment")
-	}
-
-	return depl, nil
 }

@@ -7,6 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -58,12 +59,15 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	Expect(os.Setenv("DISABLE_TELEMETRY", "true")).To(Succeed())
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+	Expect(os.Unsetenv("DISABLE_TELEMETRY")).To(Succeed())
 })
 
 func reconciler() *PGClusterReconciler {
@@ -81,6 +85,23 @@ func readDefaultCR(name, namespace string) (*v2beta1.PerconaPGCluster, error) {
 	}
 
 	cr := &v2beta1.PerconaPGCluster{}
+
+	if err := yaml.Unmarshal(data, cr); err != nil {
+		return nil, err
+	}
+
+	cr.Name = name
+	cr.Namespace = namespace
+	return cr, nil
+}
+
+func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &appsv1.Deployment{}
 
 	if err := yaml.Unmarshal(data, cr); err != nil {
 		return nil, err
