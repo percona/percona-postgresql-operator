@@ -3,7 +3,6 @@ package pgcluster
 import (
 	"context"
 	"strconv"
-	"time"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
@@ -43,7 +42,11 @@ type PGClusterReconciler struct {
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGCluster{}).Owns(&v1beta1.PostgresCluster{}).Complete(r)
+	return builder.ControllerManagedBy(mgr).
+		For(&v2beta1.PerconaPGCluster{}).
+		Owns(&v1beta1.PostgresCluster{}).
+		Owns(&corev1.Service{}).
+		Complete(r)
 }
 
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;watch
@@ -53,8 +56,6 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
 
-	rr := ctrl.Result{RequeueAfter: 5 * time.Second}
-
 	cr := &v2beta1.PerconaPGCluster{}
 	if err := r.Client.Get(ctx, request.NamespacedName, cr); err != nil {
 		// NotFound cannot be fixed by requeuing so ignore it. During background
@@ -63,16 +64,16 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		if err = client.IgnoreNotFound(err); err != nil {
 			log.Error(err, "unable to fetch PerconaPGCluster")
 		}
-		return rr, err
+		return ctrl.Result{}, err
 	}
 
 	vm, err := r.getVersionMeta(ctx, cr)
 	if err != nil {
-		return rr, errors.Wrap(err, "get version meta")
+		return ctrl.Result{}, errors.Wrap(err, "get version meta")
 	}
 
 	if err := version.EnsureVersion(ctx, cr, vm); err != nil {
-		return rr, errors.Wrap(err, "ensure versions")
+		return ctrl.Result{}, errors.Wrap(err, "ensure versions")
 	}
 
 	postgresCluster := &v1beta1.PostgresCluster{
@@ -83,7 +84,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if err := controllerutil.SetControllerReference(cr, postgresCluster, r.Client.Scheme()); err != nil {
-		return rr, err
+		return ctrl.Result{}, err
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
@@ -145,16 +146,16 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return nil
 	})
 	if err != nil {
-		return rr, errors.Wrap(err, "update/create PostgresCluster")
+		return ctrl.Result{}, errors.Wrap(err, "update/create PostgresCluster")
 	}
 
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
-		return rr, errors.Wrap(err, "get PostgresCluster")
+		return ctrl.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
 	host, err := r.getHost(ctx, cr)
 	if err != nil {
-		return rr, errors.Wrap(err, "get app host")
+		return ctrl.Result{}, errors.Wrap(err, "get app host")
 	}
 
 	cr.Status = v2beta1.PerconaPGClusterStatus{
@@ -167,7 +168,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		log.Error(err, "failed to update status")
 	}
 
-	return rr, err
+	return ctrl.Result{}, err
 }
 
 func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2beta1.PerconaPGCluster) (string, error) {
