@@ -16,6 +16,10 @@ func init() {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=".status.host"
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=".status.state"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //
 // PerconaPGCluster is the CRD that defines a Percona PG Cluster
@@ -64,7 +68,7 @@ type PerconaPGClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=10
-	// +kubebuilder:validation:Maximum=14
+	// +kubebuilder:validation:Maximum=15
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -131,8 +135,19 @@ type PerconaPGClusterSpec struct {
 	PMM *PMMSpec `json:"pmm,omitempty"`
 }
 
+type AppState string
+
+const (
+	AppStateInit  AppState = "initializing"
+	AppStateReady AppState = "ready"
+	AppStateError AppState = "error"
+)
+
 type PerconaPGClusterStatus struct {
 	crunchyv1beta1.PostgresClusterStatus `json:",inline"`
+	State                                AppState `json:"state"`
+	// +optional
+	Host string `json:"host"`
 }
 
 type PMMSpec struct {

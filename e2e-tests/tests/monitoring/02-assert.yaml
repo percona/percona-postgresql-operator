@@ -59,6 +59,12 @@ spec:
           value: "30105"
         - name: PMM_AGENT_CONFIG_FILE
           value: /usr/local/percona/pmm2/config/pmm-agent.yaml
+        - name: PMM_AGENT_LOG_LEVEL
+          value: info
+        - name: PMM_AGENT_DEBUG
+          value: "false"
+        - name: PMM_AGENT_TRACE
+          value: "false"
         - name: PMM_AGENT_SERVER_INSECURE_TLS
           value: "1"
         - name: PMM_AGENT_LISTEN_ADDRESS
@@ -79,11 +85,19 @@ spec:
           value: "5"
         - name: DB_TYPE
           value: postgresql
+        - name: DB_USER
+          value: monitor
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: monitoring-pguser-monitor
         - name: PMM_AGENT_PRERUN_SCRIPT
-          value: pmm-admin status --wait=10s; pmm-admin add postgresql --tls-skip-verify
-            --skip-connection-check --metrics-mode=push --socket=/tmp/postgres/ --service-name=$(PMM_AGENT_SETUP_NODE_NAME)
-            --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME)
-            'Service restarted'
+          value: pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER)
+            --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt
+            --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify
+            --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 
+            --query-source=pgstatmonitor; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'
         lifecycle:
           preStop:
             exec:
@@ -91,7 +105,7 @@ spec:
               - bash
               - -c
               - pmm-admin inventory remove node --force $(pmm-admin status --json
-                | python -c "import sys, json; print(json.load(sys.stdin)['pmm_agent_status']['node_id'])")
+                | jq -r '.pmm_agent_status.node_id')
         livenessProbe:
           failureThreshold: 3
           httpGet:

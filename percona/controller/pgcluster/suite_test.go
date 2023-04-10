@@ -1,13 +1,16 @@
 package pgcluster
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -39,7 +42,6 @@ func TestAPIs(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
@@ -93,6 +95,30 @@ func readDefaultCR(name, namespace string) (*v2beta1.PerconaPGCluster, error) {
 	cr.Name = name
 	cr.Namespace = namespace
 	return cr, nil
+}
+
+func updateCrunchyPGClusterCR(ctx context.Context, nn types.NamespacedName, update func(*v1beta1.PostgresCluster)) {
+	pgc := &v1beta1.PostgresCluster{}
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, nn, pgc)
+		return err == nil
+	}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+
+	update(pgc)
+
+	Expect(k8sClient.Status().Update(ctx, pgc)).Should(Succeed())
+}
+
+func updatePerconaPGClusterCR(ctx context.Context, nn types.NamespacedName, update func(*v2beta1.PerconaPGCluster)) {
+	cr := &v2beta1.PerconaPGCluster{}
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, nn, cr)
+		return err == nil
+	}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+
+	update(cr)
+
+	Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
 }
 
 func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
