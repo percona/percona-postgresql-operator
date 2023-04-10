@@ -2,6 +2,7 @@ package pgcluster
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -10,12 +11,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
@@ -45,9 +50,18 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).
 		For(&v2beta1.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
-		// Owns(&corev1.Service{}).
-		For(&corev1.Service{}).
+		Owns(&corev1.Service{}).
+		Watches(&source.Kind{Type: &corev1.Service{}}, r.testWatch()).
 		Complete(r)
+}
+
+func (r *PGClusterReconciler) testWatch() handler.Funcs {
+	return handler.Funcs{
+		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			fmt.Println("AAAAAAAA")
+			fmt.Printf("Old object: %s", e.ObjectOld.GetName())
+		},
+	}
 }
 
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;watch
