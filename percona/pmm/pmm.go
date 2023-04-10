@@ -47,7 +47,7 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 					Command: []string{
 						"bash",
 						"-c",
-						"pmm-admin inventory remove node --force $(pmm-admin status --json | python -c \"import sys, json; print(json.load(sys.stdin)['pmm_agent_status']['node_id'])\")",
+						"pmm-admin inventory remove node --force $(pmm-admin status --json | jq -r '.pmm_agent_status.node_id')",
 					},
 				},
 			},

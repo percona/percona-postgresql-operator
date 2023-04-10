@@ -1,0 +1,32 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      instance=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[].metadata.name}')
+      node_id=$(kubectl exec -n "${NAMESPACE}" $instance -c pmm-client -- pmm-admin status --json | jq -r '.pmm_agent_status.node_id')
+
+      node_id_exist=$(kubectl exec -n "${NAMESPACE}" monitoring-0 -- pmm-admin --server-url=https://admin:admin@$(get_service_ip monitoring-service)/ --server-insecure-tls inventory list nodes --node-type=CONTAINER_NODE | grep $node_id | awk '{print $4}')
+
+      if [ -z "$node_id_exist" ]; then
+          echo "Can't get $node_id node_id from PMM server"
+          exit 1
+      fi
+
+      get_cr \
+        | yq eval '.spec.shutdown=true' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
+
+      wait_for_delete "pod/$instance"
+
+      is_node_id_exist=$(kubectl exec -n "${NAMESPACE}" monitoring-0 -- pmm-admin --server-url=https://admin:admin@$(get_service_ip monitoring-service)/ --server-insecure-tls inventory list nodes --node-type=CONTAINER_NODE | grep $node_id | awk '{print $4}')
+
+      if [ -n "$is_node_id_exist" ]; then
+         echo  "The $instance pod was not deleted from server inventory"
+         exit 1
+      fi
+    timeout: 120
