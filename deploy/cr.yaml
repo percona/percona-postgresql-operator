@@ -157,7 +157,7 @@ spec:
 #      customTLSSecret:
 #        name: keycloakdb-pgbouncer.tls
 #
-#      configuration:
+#      config:
 #        global:
 #          pool_mode: transaction
 
