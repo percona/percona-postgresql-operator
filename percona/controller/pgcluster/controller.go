@@ -45,7 +45,8 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).
 		For(&v2beta1.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
-		Owns(&corev1.Service{}).
+		// Owns(&corev1.Service{}).
+		For(&corev1.Service{}).
 		Complete(r)
 }
 
