@@ -2,6 +2,8 @@ apiVersion: pg.percona.com/v2beta1
 kind: PerconaPGCluster
 metadata:
   name: cluster1
+#  finalizers:
+#  - percona.com/delete-pvc
 spec:
 #  secrets:
 #    customTLSSecret:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
@@ -87,6 +88,14 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			log.Error(err, "unable to fetch PerconaPGCluster")
 		}
 		return ctrl.Result{}, err
+	}
+
+	if cr.DeletionTimestamp != nil {
+		err := r.runFinalizers(ctx, cr)
+		if err != nil {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	if err := version.EnsureVersion(ctx, cr, r.getVersionMeta(cr)); err != nil {
@@ -221,6 +230,7 @@ func (r *PGClusterReconciler) getState(status *v1beta1.PostgresClusterStatus) v2
 
 	return v2beta1.AppStateReady
 }
+
 func (r *PGClusterReconciler) getVersionMeta(cr *v2beta1.PerconaPGCluster) version.Meta {
 	return version.Meta{
 		Apply:           "disabled",
