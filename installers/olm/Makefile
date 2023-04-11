@@ -1,6 +1,9 @@
 .DEFAULT_GOAL := help
 .SUFFIXES:
 
+# Default shell should be checked for version compatibility. The following make file is build upon bash 5.1
+# SHELL := $(shell bash -c '$$(shell_path=; for shell in $$(which -a bash); do version=$$($$shell --version | sed -r 's/.*(([0-9].){2}[0-9]+)\([0-9]+)-release.*/\1/g' | grep -E '([0-9].){2}[0-9]+'); case $${shell_path} in (5.*|4.*) shell_path=${shell};; (*);; esac; done; [[ "x$${shell_path}" != "x" ]] && echo $${shell_path} || exit 1'))
+
 CONTAINER ?= docker
 PGO_VERSION ?= 2.1.0
 REPLACES_VERSION ?= 2.0.0
@@ -68,7 +71,7 @@ tools/$(SYSTEM)/jq:
 	install -d '$(dir $@)'
 	curl -fSL -o '$@' "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-$$(SYSTEM='$(SYSTEM)'; \
 		case "$$SYSTEM" in \
-			(linux-*) echo "$${SYSTEM/-amd/}";; (darwin-*) echo "$${SYSTEM/darwin/osx}";; (*) echo '$(SYSTEM)';; \
+			(linux-*) echo "$${SYSTEM/-amd/}";; (darwin-*) echo "$${SYSTEM/darwin-*/osx-amd64}";; (*) echo '$(SYSTEM)';; \
 		esac)"
 	chmod u+x '$@'
 
@@ -82,7 +85,7 @@ tools/$(SYSTEM)/kubectl:
 tools: tools/$(SYSTEM)/operator-sdk
 tools/$(SYSTEM)/operator-sdk:
 	install -d '$(dir $@)'
-	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-sdk/releases/download/v1.18.0/operator-sdk_$(OS_KERNEL)_$(OS_MACHINE)'
+	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-sdk/releases/download/v1.19.1/operator-sdk_$(OS_KERNEL)_$(OS_MACHINE)'
 	chmod u+x '$@'
 
 tools: tools/$(SYSTEM)/opm

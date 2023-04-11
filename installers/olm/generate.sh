@@ -135,7 +135,7 @@ yq --yaml-roundtrip < bundle.csv.yaml > "${bundle_directory}/manifests/${file_na
 	--arg version "${PGO_VERSION}" \
 	--arg replaces "${REPLACES_VERSION}" \
 	--arg description "$(< description.md)" \
-	--arg icon "$(base64 ../seal.svg | tr -d '\n')" \
+	--arg icon "$(cat ../seal.svg | base64 | tr -d '\n')" \
 	--arg stem "${csv_stem}" \
 '
 	.metadata.annotations["alm-examples"] = $examples |
