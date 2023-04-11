@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	pbVersion "github.com/Percona-Lab/percona-version-service/versionpb"
 	gwRuntime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -210,8 +211,9 @@ func (vs *fakeVS) Start(t *testing.T) error {
 		return errors.Wrap(err, "failed to register gateway")
 	}
 	gwServer := &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", vs.addr, vs.gwPort),
-		Handler: gwmux,
+		Addr:              fmt.Sprintf("%s:%d", vs.addr, vs.gwPort),
+		Handler:           gwmux,
+		ReadHeaderTimeout: time.Second * 10,
 	}
 	gwLis, err := net.Listen("tcp", gwServer.Addr)
 	if err != nil {
