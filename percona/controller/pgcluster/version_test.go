@@ -13,7 +13,6 @@ import (
 	gwRuntime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/pkg/errors"
 	"go.nhat.io/grpcmock"
 	"google.golang.org/grpc"
@@ -21,6 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/percona/percona-postgresql-operator/percona/version"
 )
 
 var _ = Describe("Ensure Version", Ordered, func() {
@@ -102,7 +103,7 @@ var _ = Describe("Ensure Version", Ordered, func() {
 			It("should succeed while using default version service endpoint", func() {
 				Expect(os.Setenv("PERCONA_VS_FALLBACK_URI", defaultEndpoint)).To(Succeed())
 
-				vm := reconciler().getVersionMeta(ctx, cr, operatorDepl)
+				vm := reconciler().getVersionMeta(cr, operatorDepl)
 				Expect(version.EnsureVersion(ctx, vm)).To(Succeed())
 			})
 		})
@@ -115,7 +116,7 @@ var _ = Describe("Ensure Version", Ordered, func() {
 			It("should fail while using unimplemented version service endpoint", func() {
 				Expect(os.Setenv("PERCONA_VS_FALLBACK_URI", unimplEndpoint)).To(Succeed())
 
-				vm := reconciler().getVersionMeta(ctx, cr, operatorDepl)
+				vm := reconciler().getVersionMeta(cr, operatorDepl)
 				Expect(version.EnsureVersion(ctx, vm)).NotTo(BeNil())
 			})
 		})

@@ -26,7 +26,7 @@ func (r *PGClusterReconciler) reconcileVersion(ctx context.Context, cr *v2beta1.
 	if err != nil {
 		return errors.Wrap(err, "failed to get operator deployment")
 	}
-	vm := r.getVersionMeta(ctx, cr, operatorDepl)
+	vm := r.getVersionMeta(cr, operatorDepl)
 
 	if err := version.EnsureVersion(ctx, vm); err != nil {
 		// we don't return here to not block execution just because we can't phone home
@@ -36,7 +36,7 @@ func (r *PGClusterReconciler) reconcileVersion(ctx context.Context, cr *v2beta1.
 	return nil
 }
 
-func (r *PGClusterReconciler) getVersionMeta(ctx context.Context, cr *v2beta1.PerconaPGCluster, operatorDepl *appsv1.Deployment) version.Meta {
+func (r *PGClusterReconciler) getVersionMeta(cr *v2beta1.PerconaPGCluster, operatorDepl *appsv1.Deployment) version.Meta {
 	vm := version.Meta{
 		Apply:           "disabled",
 		OperatorVersion: version.Version,
