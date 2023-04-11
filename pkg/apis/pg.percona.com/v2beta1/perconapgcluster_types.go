@@ -107,12 +107,12 @@ type PerconaPGClusterSpec struct {
 	// are suspended.
 	// Other resources, such as Services and Volumes, remain in place.
 	// +optional
-	Shutdown *bool `json:"shutdown,omitempty"`
+	Pause *bool `json:"pause,omitempty"`
 
 	// Suspends the rollout and reconciliation of changes made to the
 	// PostgresCluster spec.
 	// +optional
-	Paused *bool `json:"paused,omitempty"`
+	Unmanaged *bool `json:"unmanaged,omitempty"`
 
 	// Specifies a data source for bootstrapping the PostgreSQL cluster.
 	// +optional

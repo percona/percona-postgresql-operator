@@ -443,13 +443,13 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 		*out = new(v1beta1.DatabaseInitSQL)
 		**out = **in
 	}
-	if in.Shutdown != nil {
-		in, out := &in.Shutdown, &out.Shutdown
+	if in.Pause != nil {
+		in, out := &in.Pause, &out.Pause
 		*out = new(bool)
 		**out = **in
 	}
-	if in.Paused != nil {
-		in, out := &in.Paused, &out.Paused
+	if in.Unmanaged != nil {
+		in, out := &in.Unmanaged, &out.Unmanaged
 		*out = new(bool)
 		**out = **in
 	}

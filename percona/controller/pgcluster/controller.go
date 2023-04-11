@@ -128,8 +128,8 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.PostgresVersion = cr.Spec.PostgresVersion
 		postgresCluster.Spec.Port = cr.Spec.Port
 		postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
-		postgresCluster.Spec.Paused = cr.Spec.Paused
-		postgresCluster.Spec.Shutdown = cr.Spec.Shutdown
+		postgresCluster.Spec.Paused = cr.Spec.Unmanaged
+		postgresCluster.Spec.Shutdown = cr.Spec.Pause
 		postgresCluster.Spec.Standby = cr.Spec.Standby
 		postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
 
