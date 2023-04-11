@@ -2,10 +2,12 @@ package pgcluster
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -140,17 +142,8 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
 		postgresCluster.Spec.Patroni = cr.Spec.Patroni
 
-		if cr.Spec.PMM != nil && cr.Spec.PMM.Enabled {
-			// TODO: Check if PMM secret exists
-			for i := 0; i < len(cr.Spec.InstanceSets); i++ {
-				set := &cr.Spec.InstanceSets[i]
-				set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
-			}
-
-			cr.Spec.Users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
-				Name:    pmm.MonitoringUser,
-				Options: "SUPERUSER",
-			})
+		if err := r.addPMMSidecar(ctx, cr); err != nil {
+			return errors.Wrap(err, "failed to add pmm sidecar")
 		}
 
 		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
@@ -226,4 +219,46 @@ func (r *PGClusterReconciler) getState(status *v1beta1.PostgresClusterStatus) v2
 	}
 
 	return v2beta1.AppStateReady
+}
+
+func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
+		return nil
+	}
+
+	log := logging.FromContext(ctx)
+
+	if cr.Spec.PMM.Secret == "" {
+		log.Info(fmt.Sprintf("Can't enable PMM: `.spec.pmm.secret` is empty in %s", cr.Name))
+		return nil
+	}
+
+	pmmSecret := new(corev1.Secret)
+	if err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      cr.Spec.PMM.Secret,
+		Namespace: cr.Namespace,
+	}, pmmSecret); err != nil {
+		if k8serrors.IsNotFound(err) {
+			log.Info(fmt.Sprintf("Can't enable PMM: %s secret doesn't exist", cr.Spec.PMM.Secret))
+			return nil
+		}
+		return errors.Wrap(err, "failed to get pmm secret")
+	}
+
+	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
+		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
+		return nil
+	}
+
+	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+		set := &cr.Spec.InstanceSets[i]
+		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
+	}
+
+	cr.Spec.Users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
+		Name:    pmm.MonitoringUser,
+		Options: "SUPERUSER",
+	})
+
+	return nil
 }

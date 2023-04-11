@@ -9,16 +9,21 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.opentelemetry.io/otel"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/featuregate"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	//+kubebuilder:scaffold:imports
@@ -46,6 +51,14 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
+
+	features := map[featuregate.Feature]featuregate.FeatureSpec{
+		util.TablespaceVolumes: {Default: true},
+		util.InstanceSidecars:  {Default: true},
+		util.PGBouncerSidecars: {Default: true},
+	}
+
+	Expect(util.DefaultMutableFeatureGate.Add(features)).To(Succeed())
 
 	var err error
 	cfg, err = testEnv.Start()
@@ -78,6 +91,15 @@ func reconciler() *PGClusterReconciler {
 		Platform:    "unknown",
 		KubeVersion: "1.25",
 	})
+}
+
+func crunchyReconciler() *postgrescluster.Reconciler {
+	return &postgrescluster.Reconciler{
+		Client:   k8sClient,
+		Owner:    postgrescluster.ControllerName,
+		Recorder: new(record.FakeRecorder),
+		Tracer:   otel.Tracer("test"),
+	}
 }
 
 func readDefaultCR(name, namespace string) (*v2beta1.PerconaPGCluster, error) {
