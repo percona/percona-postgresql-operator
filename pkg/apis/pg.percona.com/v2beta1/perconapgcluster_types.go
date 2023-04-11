@@ -138,9 +138,11 @@ type PerconaPGClusterSpec struct {
 type AppState string
 
 const (
-	AppStateInit  AppState = "initializing"
-	AppStateReady AppState = "ready"
-	AppStateError AppState = "error"
+	AppStateInit     AppState = "initializing"
+	AppStatePaused   AppState = "paused"
+	AppStateStopping AppState = "stopping"
+	AppStateReady    AppState = "ready"
+	AppStateError    AppState = "error"
 )
 
 type PerconaPGClusterStatus struct {

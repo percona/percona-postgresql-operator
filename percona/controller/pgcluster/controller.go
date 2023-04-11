@@ -174,7 +174,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	cr.Status = v2beta1.PerconaPGClusterStatus{
-		State:                 r.getState(&postgresCluster.Status),
+		State:                 r.getState(cr, &postgresCluster.Status),
 		Host:                  host,
 		PostgresClusterStatus: postgresCluster.Status,
 	}
@@ -210,7 +210,20 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2beta1.PerconaPG
 	return host, nil
 }
 
-func (r *PGClusterReconciler) getState(status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
+func (r *PGClusterReconciler) getState(cr *v2beta1.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
+	var wanted, ready int
+	for _, is := range status.InstanceSets {
+		wanted = wanted + int(is.Replicas)
+		ready = ready + int(is.ReadyReplicas)
+	}
+
+	if cr.Spec.Pause != nil && *cr.Spec.Pause {
+		if ready > wanted {
+			return v2beta1.AppStateStopping
+		}
+
+		return v2beta1.AppStatePaused
+	}
 
 	if status.PGBackRest != nil && status.PGBackRest.RepoHost != nil && !status.PGBackRest.RepoHost.Ready {
 		return v2beta1.AppStateInit
@@ -220,10 +233,8 @@ func (r *PGClusterReconciler) getState(status *v1beta1.PostgresClusterStatus) v2
 		return v2beta1.AppStateInit
 	}
 
-	for _, is := range status.InstanceSets {
-		if is.Replicas != is.ReadyReplicas {
-			return v2beta1.AppStateInit
-		}
+	if ready < wanted {
+		return v2beta1.AppStateInit
 	}
 
 	return v2beta1.AppStateReady
