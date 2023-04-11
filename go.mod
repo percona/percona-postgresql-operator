@@ -28,16 +28,16 @@ require (
 	gotest.tools/v3 v3.4.0
 	k8s.io/api v0.26.3
 	k8s.io/apimachinery v0.26.3
-	k8s.io/client-go v0.25.4
-	k8s.io/component-base v0.25.4
-	sigs.k8s.io/controller-runtime v0.13.1
+	k8s.io/client-go v0.26.3
+	k8s.io/component-base v0.26.3
+	sigs.k8s.io/controller-runtime v0.14.6
 	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.2.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -71,9 +71,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
@@ -86,7 +84,7 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.21.0 // indirect
+	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.4.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
@@ -100,10 +98,9 @@ require (
 	google.golang.org/grpc v1.52.0-dev // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.25.4 // indirect
+	k8s.io/apiextensions-apiserver v0.26.1 // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221205233837-bacb3aba404b // indirect
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448 // indirect
