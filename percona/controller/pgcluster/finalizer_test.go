@@ -60,7 +60,9 @@ var _ = Describe("Finalizers", Ordered, func() {
 
 			It("should create PVCs", func() {
 				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
 
 				pvcList := corev1.PersistentVolumeClaimList{}
 				Eventually(func() bool {
