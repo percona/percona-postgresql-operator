@@ -86,7 +86,17 @@ spec:
     singular: perconapgcluster
   scope: Namespaced
   versions:
-  - name: v2beta1
+  - additionalPrinterColumns:
+    - jsonPath: .status.host
+      name: Endpoint
+      type: string
+    - jsonPath: .status.state
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v2beta1
     schema:
       openAPIV3Schema:
         description: PerconaPGCluster is the CRD that defines a Percona PG Cluster
@@ -10170,9 +10180,11 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
-              paused:
-                description: Suspends the rollout and reconciliation of changes made
-                  to the PostgresCluster spec.
+              pause:
+                description: Whether or not the PostgreSQL cluster should be stopped.
+                  When this is true, workloads are scaled to zero and CronJobs are
+                  suspended. Other resources, such as Services and Volumes, remain
+                  in place.
                 type: boolean
               pmm:
                 description: The specification of PMM sidecars.
@@ -13476,12 +13488,6 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                 type: object
-              shutdown:
-                description: Whether or not the PostgreSQL cluster should be stopped.
-                  When this is true, workloads are scaled to zero and CronJobs are
-                  suspended. Other resources, such as Services and Volumes, remain
-                  in place.
-                type: boolean
               standby:
                 description: Run this cluster as a read-only copy of an existing cluster
                   or archive.
@@ -13508,6 +13514,10 @@ spec:
                     pattern: ^repo[1-4]
                     type: string
                 type: object
+              unmanaged:
+                description: Suspends the rollout and reconciliation of changes made
+                  to the PostgresCluster spec.
+                type: boolean
               users:
                 description: Users to create inside PostgreSQL and the databases they
                   should access. The default creates one user that can access one
@@ -13653,6 +13663,8 @@ spec:
               databaseRevision:
                 description: Identifies the databases that have been installed into
                   PostgreSQL.
+                type: string
+              host:
                 type: string
               instances:
                 description: Current state of PostgreSQL instances.
@@ -13932,6 +13944,8 @@ spec:
               startupInstanceSet:
                 description: The instance set associated with the startupInstance
                 type: string
+              state:
+                type: string
               userInterface:
                 description: Current state of the PostgreSQL user interface.
                 properties:
@@ -13947,6 +13961,8 @@ spec:
               usersRevision:
                 description: Identifies the users that have been installed into PostgreSQL.
                 type: string
+            required:
+            - state
             type: object
         required:
         - metadata
