@@ -10180,9 +10180,11 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
-              paused:
-                description: Suspends the rollout and reconciliation of changes made
-                  to the PostgresCluster spec.
+              pause:
+                description: Whether or not the PostgreSQL cluster should be stopped.
+                  When this is true, workloads are scaled to zero and CronJobs are
+                  suspended. Other resources, such as Services and Volumes, remain
+                  in place.
                 type: boolean
               pmm:
                 description: The specification of PMM sidecars.
@@ -13486,12 +13488,6 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                 type: object
-              shutdown:
-                description: Whether or not the PostgreSQL cluster should be stopped.
-                  When this is true, workloads are scaled to zero and CronJobs are
-                  suspended. Other resources, such as Services and Volumes, remain
-                  in place.
-                type: boolean
               standby:
                 description: Run this cluster as a read-only copy of an existing cluster
                   or archive.
@@ -13518,6 +13514,10 @@ spec:
                     pattern: ^repo[1-4]
                     type: string
                 type: object
+              unmanaged:
+                description: Suspends the rollout and reconciliation of changes made
+                  to the PostgresCluster spec.
+                type: boolean
               users:
                 description: Users to create inside PostgreSQL and the databases they
                   should access. The default creates one user that can access one

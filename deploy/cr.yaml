@@ -29,8 +29,8 @@ spec:
 #    key: init.sql
 #    name: cluster1-init-sql
 
-#  shutdown: true
-#  paused: true
+#  pause: true
+#  unmanaged: true
 
 #  dataSource:
 #    postgresCluster:
