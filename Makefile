@@ -291,7 +291,7 @@ pull: $(images:%=pull-%) ;
 pull-%:
 	$(IMG_PUSHER_PULLER) pull $(PGO_IMAGE_PREFIX)/$*:$(PGO_IMAGE_TAG)
 
-generate: generate-crd generate-deepcopy generate-rbac generate-manager generate-bundle
+generate: kustomize generate-crd generate-deepcopy generate-rbac generate-manager generate-bundle
 
 generate-crunchy-crd:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
@@ -341,12 +341,16 @@ generate-cw-bundle:
 	cd ./config/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
 	$(KUSTOMIZE) build ./config/default/ > ./deploy/cw-bundle.yaml
 
+SWAGGER = $(shell pwd)/bin/swagger
+swagger: ## Download swagger locally if necessary.
+	$(call go-get-tool,$(SWAGGER),github.com/go-swagger/go-swagger/cmd/swagger@latest)
+
 VERSION_SERVICE_CLIENT_PATH = ./percona/version/service
 generate-versionservice-client: swagger
 	rm $(VERSION_SERVICE_CLIENT_PATH)/version.swagger.yaml || :
 	curl https://raw.githubusercontent.com/Percona-Lab/percona-version-service/main/api/version.swagger.yaml --output $(VERSION_SERVICE_CLIENT_PATH)/version.swagger.yaml
 	rm -rf $(VERSION_SERVICE_CLIENT_PATH)/client
-	swagger generate client -f $(VERSION_SERVICE_CLIENT_PATH)/version.swagger.yaml -c $(VERSION_SERVICE_CLIENT_PATH)/client -m $(VERSION_SERVICE_CLIENT_PATH)/client/models
+	$(SWAGGER) generate client -f $(VERSION_SERVICE_CLIENT_PATH)/version.swagger.yaml -c $(VERSION_SERVICE_CLIENT_PATH)/client -m $(VERSION_SERVICE_CLIENT_PATH)/client/models
 
 # Available versions: curl -s 'https://storage.googleapis.com/kubebuilder-tools/' | grep -o '<Key>[^<]*</Key>'
 # - ENVTEST_K8S_VERSION=1.19.2
@@ -362,10 +366,6 @@ licenses:
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.3)
-
-SWAGGER = $(shell pwd)/bin/swagger
-swagger: ## Download swagger locally if necessary.
-	$(call go-get-tool,$(SWAGGER),github.com/go-swagger/go-swagger/cmd/swagger@latest)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
