@@ -12,6 +12,12 @@ import (
 
 const MonitoringUser = "monitor"
 
+// #nosec G101
+
+const (
+	SecretKey = "PMM_SERVER_KEY"
+)
+
 func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 	ports := []corev1.ContainerPort{{ContainerPort: 7777}}
 	for port := 30100; port <= 30105; port++ {
@@ -101,7 +107,7 @@ func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: pmmSpec.Secret,
 						},
-						Key: "PMM_SERVER_KEY",
+						Key: SecretKey,
 					},
 				},
 			},
