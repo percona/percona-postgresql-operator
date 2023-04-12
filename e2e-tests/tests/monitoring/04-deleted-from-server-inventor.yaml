@@ -18,7 +18,7 @@ commands:
       fi
 
       get_cr \
-        | yq eval '.spec.shutdown=true' - \
+        | yq eval '.spec.pause=true' - \
         | kubectl -n "${NAMESPACE}" apply -f -
 
       wait_for_delete "pod/$instance"
