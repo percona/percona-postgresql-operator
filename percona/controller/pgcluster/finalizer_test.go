@@ -121,7 +121,9 @@ var _ = Describe("Finalizers", Ordered, func() {
 
 			It("should reconcile PerconaPGCluster", func() {
 				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
 
 				pvcList := corev1.PersistentVolumeClaimList{}
 				Eventually(func() bool {
@@ -136,15 +138,15 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(len(pvcList.Items)).Should(Equal(4))
 			})
 
-			fmt.Println()
-
 			It("should delete PerconaPGCluster", func() {
 				Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
 				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should not delete PVCs", func() {
