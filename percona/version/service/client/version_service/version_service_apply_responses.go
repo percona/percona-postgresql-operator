@@ -46,7 +46,8 @@ func NewVersionServiceApplyOK() *VersionServiceApplyOK {
 	return &VersionServiceApplyOK{}
 }
 
-/*VersionServiceApplyOK handles this case with default header values.
+/*
+VersionServiceApplyOK describes a response with status code 200, with default header values.
 
 A successful response.
 */
@@ -54,7 +55,41 @@ type VersionServiceApplyOK struct {
 	Payload *models.VersionVersionResponse
 }
 
+// IsSuccess returns true when this version service apply o k response has a 2xx status code
+func (o *VersionServiceApplyOK) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this version service apply o k response has a 3xx status code
+func (o *VersionServiceApplyOK) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this version service apply o k response has a 4xx status code
+func (o *VersionServiceApplyOK) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this version service apply o k response has a 5xx status code
+func (o *VersionServiceApplyOK) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this version service apply o k response a status code equal to that given
+func (o *VersionServiceApplyOK) IsCode(code int) bool {
+	return code == 200
+}
+
+// Code gets the status code for the version service apply o k response
+func (o *VersionServiceApplyOK) Code() int {
+	return 200
+}
+
 func (o *VersionServiceApplyOK) Error() string {
+	return fmt.Sprintf("[GET /versions/v1/{product}/{operatorVersion}/{apply}][%d] versionServiceApplyOK  %+v", 200, o.Payload)
+}
+
+func (o *VersionServiceApplyOK) String() string {
 	return fmt.Sprintf("[GET /versions/v1/{product}/{operatorVersion}/{apply}][%d] versionServiceApplyOK  %+v", 200, o.Payload)
 }
 
@@ -81,7 +116,8 @@ func NewVersionServiceApplyDefault(code int) *VersionServiceApplyDefault {
 	}
 }
 
-/*VersionServiceApplyDefault handles this case with default header values.
+/*
+VersionServiceApplyDefault describes a response with status code -1, with default header values.
 
 An unexpected error response
 */
@@ -91,12 +127,41 @@ type VersionServiceApplyDefault struct {
 	Payload *models.GooglerpcStatus
 }
 
+// IsSuccess returns true when this version service apply default response has a 2xx status code
+func (o *VersionServiceApplyDefault) IsSuccess() bool {
+	return o._statusCode/100 == 2
+}
+
+// IsRedirect returns true when this version service apply default response has a 3xx status code
+func (o *VersionServiceApplyDefault) IsRedirect() bool {
+	return o._statusCode/100 == 3
+}
+
+// IsClientError returns true when this version service apply default response has a 4xx status code
+func (o *VersionServiceApplyDefault) IsClientError() bool {
+	return o._statusCode/100 == 4
+}
+
+// IsServerError returns true when this version service apply default response has a 5xx status code
+func (o *VersionServiceApplyDefault) IsServerError() bool {
+	return o._statusCode/100 == 5
+}
+
+// IsCode returns true when this version service apply default response a status code equal to that given
+func (o *VersionServiceApplyDefault) IsCode(code int) bool {
+	return o._statusCode == code
+}
+
 // Code gets the status code for the version service apply default response
 func (o *VersionServiceApplyDefault) Code() int {
 	return o._statusCode
 }
 
 func (o *VersionServiceApplyDefault) Error() string {
+	return fmt.Sprintf("[GET /versions/v1/{product}/{operatorVersion}/{apply}][%d] VersionService_Apply default  %+v", o._statusCode, o.Payload)
+}
+
+func (o *VersionServiceApplyDefault) String() string {
 	return fmt.Sprintf("[GET /versions/v1/{product}/{operatorVersion}/{apply}][%d] VersionService_Apply default  %+v", o._statusCode, o.Payload)
 }
 

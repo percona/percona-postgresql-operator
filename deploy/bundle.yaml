@@ -31558,6 +31558,7 @@ rules:
   - apps
   resources:
   - deployments
+  - replicasets
   - statefulsets
   verbs:
   - create
