@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -16,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 var _ = Describe("Finalizers", Ordered, func() {
@@ -81,6 +83,26 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
 			})
 
+			It("should delete PostgresCluster", func() {
+				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should wait for PostgresCluster to be deleted", func() {
+				postgresCluster := &v1beta1.PostgresCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      cr.Name,
+						Namespace: cr.Namespace,
+					},
+				}
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster)
+					return k8serrors.IsNotFound(err)
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+			})
+
 			It("should run finalizer", func() {
 				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -103,6 +125,21 @@ var _ = Describe("Finalizers", Ordered, func() {
 					By(fmt.Sprintf("checking pvc/%s", pvc.Name))
 					Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
 				}
+			})
+
+			It("should delete user secrets", func() {
+				secretList := corev1.SecretList{}
+				Eventually(func() bool {
+					err := k8sClient.List(ctx, &secretList, &client.ListOptions{
+						Namespace: cr.Namespace,
+						LabelSelector: labels.SelectorFromSet(map[string]string{
+							"postgres-operator.crunchydata.com/cluster": cr.Name,
+							"postgres-operator.crunchydata.com/role":    "pguser",
+						}),
+					})
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+				Expect(len(secretList.Items)).Should(Equal(0))
 			})
 		})
 
@@ -164,6 +201,21 @@ var _ = Describe("Finalizers", Ordered, func() {
 					By(fmt.Sprintf("checking pvc/%s", pvc.Name))
 					Expect(pvc.DeletionTimestamp).Should(BeNil())
 				}
+			})
+
+			It("should not delete user secrets", func() {
+				secretList := corev1.SecretList{}
+				Eventually(func() bool {
+					err := k8sClient.List(ctx, &secretList, &client.ListOptions{
+						Namespace: cr.Namespace,
+						LabelSelector: labels.SelectorFromSet(map[string]string{
+							"postgres-operator.crunchydata.com/cluster": cr.Name,
+							"postgres-operator.crunchydata.com/role":    "pguser",
+						}),
+					})
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+				Expect(len(secretList.Items)).Should(Equal(1))
 			})
 		})
 	})

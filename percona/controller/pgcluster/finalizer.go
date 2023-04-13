@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 )
 
@@ -23,7 +24,7 @@ func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2beta1.Percona
 	err := r.Client.List(ctx, &pvcList, &client.ListOptions{
 		Namespace: cr.Namespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"postgres-operator.crunchydata.com/cluster": cr.Name,
+			naming.LabelCluster: cr.Name,
 		}),
 	})
 	if err != nil {
@@ -41,8 +42,46 @@ func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2beta1.Percona
 	return nil
 }
 
+func (r *PGClusterReconciler) deleteUserSecrets(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+
+	secretList := corev1.SecretList{}
+
+	err := r.Client.List(ctx, &secretList, &client.ListOptions{
+		Namespace: cr.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelCluster: cr.Name,
+			naming.LabelRole:    naming.RolePostgresUser,
+		}),
+	})
+	if err != nil {
+		return errors.Wrap(err, "get secret list")
+	}
+
+	for i, secret := range secretList.Items {
+		log.Info("Deleting secret", "name", secret.Name)
+		if err := r.Client.Delete(ctx, &secretList.Items[i]); err != nil {
+			return errors.Wrapf(err, "delete secret %s", secret.Name)
+		}
+	}
+
+	return nil
+}
+
+func (r *PGClusterReconciler) deletePVCAndSecrets(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+	if err := r.deletePVC(ctx, cr); err != nil {
+		return err
+	}
+
+	if err := r.deleteUserSecrets(ctx, cr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
-	if err := r.runFinalizer(ctx, cr, v2beta1.FinalizerDeletePVC, r.deletePVC); err != nil {
+	if err := r.runFinalizer(ctx, cr, v2beta1.FinalizerDeletePVC, r.deletePVCAndSecrets); err != nil {
 		return errors.Wrapf(err, "run finalizer %s", v2beta1.FinalizerDeletePVC)
 	}
 

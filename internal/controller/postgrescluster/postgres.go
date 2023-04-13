@@ -177,9 +177,11 @@ func (r *Reconciler) generatePostgresUserSecret(
 			naming.LabelPostgresUser: username,
 		})
 
-	err := errors.WithStack(r.setControllerReference(cluster, intent))
+	// K8SPG-328: Keep this commented in case of conflicts.
+	// We don't want to delete secrets if custom resource is deleted.
+	// err := errors.WithStack(r.setControllerReference(cluster, intent))
 
-	return intent, err
+	return intent, nil
 }
 
 // reconcilePostgresDatabases creates databases inside of PostgreSQL.

@@ -90,7 +90,24 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, err
 	}
 
+	postgresCluster := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+		},
+	}
+
 	if cr.DeletionTimestamp != nil {
+		// We're deleting PostgresCluster explicitly to let Crunchy controller run its finalizers and not mess with us.
+		if err := r.Client.Delete(ctx, postgresCluster); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "delete postgres cluster")
+		}
+
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err == nil {
+			log.Info("Waiting for PostgresCluster to be deleted")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+
 		err := r.runFinalizers(ctx, cr)
 		if err != nil {
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, err
@@ -100,13 +117,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := version.EnsureVersion(ctx, cr, r.getVersionMeta(cr)); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "ensure versions")
-	}
-
-	postgresCluster := &v1beta1.PostgresCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name,
-			Namespace: cr.Namespace,
-		},
 	}
 
 	if err := controllerutil.SetControllerReference(cr, postgresCluster, r.Client.Scheme()); err != nil {
