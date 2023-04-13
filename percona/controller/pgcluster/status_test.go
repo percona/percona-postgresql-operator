@@ -107,13 +107,50 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 			})
 		})
 
+		When("The cluster is paused", Ordered, func() {
+			It("should pause the cluster", func() {
+				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2beta1.PerconaPGCluster) {
+					t := true
+					cr.Spec.Pause = &t
+				})
+			})
+
+			When("And PG running pods are lower than specified pods", func() {
+				It("state should be stopping", func() {
+					updateCrunchyPGClusterCR(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
+						pgc.Status.InstanceSets = append(pgc.Status.InstanceSets, v1beta1.PostgresInstanceSetStatus{
+							ReadyReplicas: 1,
+							Replicas:      0,
+						})
+					})
+
+					reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStateStopping)
+				})
+			})
+
+			When("And PG running pods are lower than specified pods", func() {
+				It("state should be paused", func() {
+					updateCrunchyPGClusterCR(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
+						pgc.Status.InstanceSets[0].ReadyReplicas = 0
+					})
+
+					reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStatePaused)
+				})
+			})
+
+			It("should unpause the cluster", func() {
+				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2beta1.PerconaPGCluster) {
+					t := false
+					cr.Spec.Pause = &t
+				})
+			})
+		})
+
 		When("PG running pods are lower than specified pods", func() {
 			It("state should be initializing", func() {
 				updateCrunchyPGClusterCR(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
-					pgc.Status.InstanceSets = append(pgc.Status.InstanceSets, v1beta1.PostgresInstanceSetStatus{
-						ReadyReplicas: 0,
-						Replicas:      1,
-					})
+					pgc.Status.InstanceSets[0].Replicas = 1
+					pgc.Status.InstanceSets[0].ReadyReplicas = 0
 				})
 
 				reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStateInit)

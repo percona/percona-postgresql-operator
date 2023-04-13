@@ -36,7 +36,6 @@ func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2beta1.Percona
 		if err := r.Client.Delete(ctx, &pvcList.Items[i]); err != nil {
 			return errors.Wrapf(err, "delete PVC %s", pvc.Name)
 		}
-
 	}
 
 	return nil

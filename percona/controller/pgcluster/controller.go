@@ -3,7 +3,6 @@ package pgcluster
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -27,7 +26,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -75,6 +73,7 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters/status,verbs=patch;update
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
@@ -108,15 +107,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 
-		err := r.runFinalizers(ctx, cr)
-		if err != nil {
+		if err := r.runFinalizers(ctx, cr); err != nil {
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, err
 		}
+
 		return reconcile.Result{}, nil
 	}
 
-	if err := version.EnsureVersion(ctx, cr, r.getVersionMeta(cr)); err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "ensure versions")
+	if err := r.reconcileVersion(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile version")
 	}
 
 	if err := controllerutil.SetControllerReference(cr, postgresCluster, r.Client.Scheme()); err != nil {
@@ -149,8 +148,8 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.PostgresVersion = cr.Spec.PostgresVersion
 		postgresCluster.Spec.Port = cr.Spec.Port
 		postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
-		postgresCluster.Spec.Paused = cr.Spec.Paused
-		postgresCluster.Spec.Shutdown = cr.Spec.Shutdown
+		postgresCluster.Spec.Paused = cr.Spec.Unmanaged
+		postgresCluster.Spec.Shutdown = cr.Spec.Pause
 		postgresCluster.Spec.Standby = cr.Spec.Standby
 		postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
 
@@ -186,7 +185,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	cr.Status = v2beta1.PerconaPGClusterStatus{
-		State:                 r.getState(&postgresCluster.Status),
+		State:                 r.getState(cr, &postgresCluster.Status),
 		Host:                  host,
 		PostgresClusterStatus: postgresCluster.Status,
 	}
@@ -222,7 +221,20 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2beta1.PerconaPG
 	return host, nil
 }
 
-func (r *PGClusterReconciler) getState(status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
+func (r *PGClusterReconciler) getState(cr *v2beta1.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
+	var wanted, ready int
+	for _, is := range status.InstanceSets {
+		wanted = wanted + int(is.Replicas)
+		ready = ready + int(is.ReadyReplicas)
+	}
+
+	if cr.Spec.Pause != nil && *cr.Spec.Pause {
+		if ready > wanted {
+			return v2beta1.AppStateStopping
+		}
+
+		return v2beta1.AppStatePaused
+	}
 
 	if status.PGBackRest != nil && status.PGBackRest.RepoHost != nil && !status.PGBackRest.RepoHost.Ready {
 		return v2beta1.AppStateInit
@@ -232,26 +244,11 @@ func (r *PGClusterReconciler) getState(status *v1beta1.PostgresClusterStatus) v2
 		return v2beta1.AppStateInit
 	}
 
-	for _, is := range status.InstanceSets {
-		if is.Replicas != is.ReadyReplicas {
-			return v2beta1.AppStateInit
-		}
+	if ready < wanted {
+		return v2beta1.AppStateInit
 	}
 
 	return v2beta1.AppStateReady
-}
-
-func (r *PGClusterReconciler) getVersionMeta(cr *v2beta1.PerconaPGCluster) version.Meta {
-	return version.Meta{
-		Apply:           "disabled",
-		OperatorVersion: version.Version,
-		CRUID:           string(cr.GetUID()),
-		KubeVersion:     r.KubeVersion,
-		Platform:        r.Platform,
-		PGVersion:       strconv.Itoa(cr.Spec.PostgresVersion),
-		BackupVersion:   "",
-		PMMVersion:      "",
-	}
 }
 
 func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
