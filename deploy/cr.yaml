@@ -55,7 +55,7 @@ spec:
 
   image: perconalab/percona-postgresql-operator:main-ppg15-postgres
   imagePullPolicy: Always
-  postgresVersion: 14
+  postgresVersion: 15
 #  port: 5432
 
 #  expose:
