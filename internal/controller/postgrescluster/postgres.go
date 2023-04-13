@@ -177,9 +177,11 @@ func (r *Reconciler) generatePostgresUserSecret(
 			naming.LabelPostgresUser: username,
 		})
 
-	err := errors.WithStack(r.setControllerReference(cluster, intent))
+	// K8SPG-328: Keep this commented in case of conflicts.
+	// We don't want to delete secrets if custom resource is deleted.
+	// err := errors.WithStack(r.setControllerReference(cluster, intent))
 
-	return intent, err
+	return intent, nil
 }
 
 // reconcilePostgresDatabases creates databases inside of PostgreSQL.
@@ -548,7 +550,9 @@ func (r *Reconciler) reconcilePostgresDataVolume(
 
 	pvc.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"))
 
-	err = errors.WithStack(r.setControllerReference(cluster, pvc))
+	// K8SPG-328: Keep this commented in case of conflicts.
+	// We don't want to delete PVCs if custom resource is deleted.
+	// err = errors.WithStack(r.setControllerReference(cluster, pvc))
 
 	pvc.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
@@ -613,7 +617,9 @@ func (r *Reconciler) reconcileTablespaceVolumes(
 
 		pvc.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"))
 
-		err = errors.WithStack(r.setControllerReference(cluster, pvc))
+		// K8SPG-328: Keep this commented in case of conflicts.
+		// We don't want to delete PVCs if custom resource is deleted.
+		// err = errors.WithStack(r.setControllerReference(cluster, pvc))
 
 		pvc.Annotations = naming.Merge(
 			cluster.Spec.Metadata.GetAnnotationsOrNil(),
@@ -723,7 +729,9 @@ func (r *Reconciler) reconcilePostgresWALVolume(
 		return pvc, err
 	}
 
-	err = errors.WithStack(r.setControllerReference(cluster, pvc))
+	// K8SPG-328: Keep this commented in case of conflicts.
+	// We don't want to delete PVCs if custom resource is deleted.
+	// err = errors.WithStack(r.setControllerReference(cluster, pvc))
 
 	pvc.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),

@@ -511,3 +511,7 @@ func GetDefaultVersionServiceEndpoint() string {
 
 	return DefaultVersionServiceEndpoint
 }
+
+const (
+	FinalizerDeletePVC = "percona.com/delete-pvc"
+)

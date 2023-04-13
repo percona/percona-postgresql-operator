@@ -231,9 +231,11 @@ func (r *Reconciler) configureExistingPGVolumes(
 			}
 			volume.SetGroupVersionKind(corev1.SchemeGroupVersion.
 				WithKind("PersistentVolumeClaim"))
-			if err := r.setControllerReference(cluster, volume); err != nil {
-				return volumes, err
-			}
+			// K8SPG-328: Keep this commented in case of conflicts.
+			// We don't want to delete PVCs if custom resource is deleted.
+			// if err := r.setControllerReference(cluster, volume); err != nil {
+			// 	return volumes, err
+			// }
 			if err := errors.WithStack(r.apply(ctx, volume)); err != nil {
 				return volumes, err
 			}
@@ -284,9 +286,11 @@ func (r *Reconciler) configureExistingPGWALVolume(
 		}
 		volume.SetGroupVersionKind(corev1.SchemeGroupVersion.
 			WithKind("PersistentVolumeClaim"))
-		if err := r.setControllerReference(cluster, volume); err != nil {
-			return volumes, err
-		}
+		// K8SPG-328: Keep this commented in case of conflicts.
+		// We don't want to delete PVCs if custom resource is deleted.
+		// if err := r.setControllerReference(cluster, volume); err != nil {
+		// 	return volumes, err
+		// }
 		if err := errors.WithStack(r.apply(ctx, volume)); err != nil {
 			return volumes, err
 		}
@@ -333,9 +337,11 @@ func (r *Reconciler) configureExistingRepoVolumes(
 			//volume.ObjectMeta = naming.PGBackRestRepoVolume(cluster, cluster.Spec.Backups.PGBackRest.Repos[0].Name)
 			volume.SetGroupVersionKind(corev1.SchemeGroupVersion.
 				WithKind("PersistentVolumeClaim"))
-			if err := r.setControllerReference(cluster, volume); err != nil {
-				return volumes, err
-			}
+			// K8SPG-328: Keep this commented in case of conflicts.
+			// We don't want to delete PVCs if custom resource is deleted.
+			// if err := r.setControllerReference(cluster, volume); err != nil {
+			// 	return volumes, err
+			// }
 			if err := errors.WithStack(r.apply(ctx, volume)); err != nil {
 				return volumes, err
 			}

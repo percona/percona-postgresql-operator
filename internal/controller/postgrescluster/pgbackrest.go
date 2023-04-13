@@ -652,11 +652,12 @@ func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresC
 		Spec:       *spec,
 	}
 
-	// set ownership references
-	if err := controllerutil.SetControllerReference(postgresCluster, repoVol,
-		r.Client.Scheme()); err != nil {
-		return nil, err
-	}
+	// K8SPG-328: Keep this commented in case of conflicts.
+	// We don't want to delete PVCs if custom resource is deleted.
+	// if err := controllerutil.SetControllerReference(postgresCluster, repoVol,
+	// 	r.Client.Scheme()); err != nil {
+	// 	return nil, err
+	// }
 
 	return repoVol, nil
 }
