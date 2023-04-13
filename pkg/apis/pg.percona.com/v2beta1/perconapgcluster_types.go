@@ -514,4 +514,5 @@ func GetDefaultVersionServiceEndpoint() string {
 
 const (
 	FinalizerDeletePVC = "percona.com/delete-pvc"
+	FinalizerDeleteSSL = "percona.com/delete-ssl"
 )
