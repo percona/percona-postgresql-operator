@@ -3,6 +3,7 @@ package pgcluster
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
@@ -71,7 +72,7 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters/status,verbs=patch;update
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -88,15 +89,33 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileVersion(ctx, cr); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "reconcile version")
-	}
-
 	postgresCluster := &v1beta1.PostgresCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,
 			Namespace: cr.Namespace,
 		},
+	}
+
+	if cr.DeletionTimestamp != nil {
+		// We're deleting PostgresCluster explicitly to let Crunchy controller run its finalizers and not mess with us.
+		if err := r.Client.Delete(ctx, postgresCluster); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "delete postgres cluster")
+		}
+
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err == nil {
+			log.Info("Waiting for PostgresCluster to be deleted")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+
+		if err := r.runFinalizers(ctx, cr); err != nil {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, err
+		}
+
+		return reconcile.Result{}, nil
+	}
+
+	if err := r.reconcileVersion(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile version")
 	}
 
 	if err := controllerutil.SetControllerReference(cr, postgresCluster, r.Client.Scheme()); err != nil {
