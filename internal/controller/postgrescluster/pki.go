@@ -160,9 +160,11 @@ func (r *Reconciler) reconcileClusterCertificate(
 			naming.LabelClusterCertificate: "postgres-tls",
 		})
 
-	if err == nil {
-		err = errors.WithStack(r.setControllerReference(cluster, intent))
-	}
+	// K8SPG-330: Keep this commented in case of conflicts.
+	// We don't want to delete TLS secrets on cluster deletion.
+	// if err == nil {
+	// 	err = errors.WithStack(r.setControllerReference(cluster, intent))
+	// }
 
 	if err == nil {
 		intent.Data[keyCertificate], err = leaf.Certificate.MarshalText()

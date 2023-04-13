@@ -221,9 +221,11 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Type = corev1.SecretTypeOpaque
 
-	if err == nil {
-		err = errors.WithStack(r.setControllerReference(cluster, intent))
-	}
+	// K8SPG-330: Keep this commented in case of conflicts.
+	// We don't want to delete TLS secrets on cluster deletion.
+	// if err == nil {
+	// 	err = errors.WithStack(r.setControllerReference(cluster, intent))
+	// }
 
 	intent.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),

@@ -1335,10 +1335,12 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	instanceCerts := &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
 	instanceCerts.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 
+	// K8SPG-330: Keep this commented in case of conflicts.
+	// We don't want to delete TLS secrets on cluster deletion.
 	// TODO(cbandy): Instance StatefulSet as owner?
-	if err == nil {
-		err = errors.WithStack(r.setControllerReference(cluster, instanceCerts))
-	}
+	// if err == nil {
+	// 	err = errors.WithStack(r.setControllerReference(cluster, instanceCerts))
+	// }
 
 	instanceCerts.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
