@@ -81,14 +81,14 @@ get_psql_user_pass() {
 	local user=${1}
 	local cluster=${2:-${test_name}}
 
-	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.password}' | base64 -d
+	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" --template='{{.data.password | base64decode}}'
 }
 
 get_psql_user_host() {
 	local user=${1}
 	local cluster=${2:-${test_name}}
 
-	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" -o jsonpath='{.data.host}' | base64 -d
+	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" --template='{{.data.host | base64decode }}'
 }
 
 wait_pod() {
