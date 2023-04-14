@@ -18,6 +18,8 @@ func init() {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=".status.host"
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=".status.state"
+// +kubebuilder:printcolumn:name="Postgres",type=string,JSONPath=".status.postgres.ready"
+// +kubebuilder:printcolumn:name="PGBouncer",type=string,JSONPath=".status.pgbouncer.ready"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -175,8 +177,6 @@ type PGBouncerStatus struct {
 }
 
 type PerconaPGClusterStatus struct {
-	crunchyv1beta1.PostgresClusterStatus `json:",inline"`
-
 	Postgres  PostgresStatus  `json:"postgres"`
 	PGBouncer PGBouncerStatus `json:"pgbouncer"`
 	State     AppState        `json:"state"`
