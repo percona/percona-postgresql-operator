@@ -71,15 +71,14 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2beta1.Perc
 		return errors.Wrap(err, "get app host")
 	}
 
-	var size, ready int32
-	for _, is := range status.InstanceSets {
-		size = size + is.Replicas
-		ready = ready + is.ReadyReplicas
-	}
+	pgStatusFromCruncy := func() v2beta1.PostgresStatus {
+		var size, ready int32
+		for _, is := range status.InstanceSets {
+			size = size + is.Replicas
+			ready = ready + is.ReadyReplicas
+		}
 
-	pgStatusFromCruncy := func() []v2beta1.PostgresInstanceSetStatus {
 		ss := make([]v2beta1.PostgresInstanceSetStatus, 0, len(status.InstanceSets))
-
 		for _, is := range status.InstanceSets {
 			ss = append(ss, v2beta1.PostgresInstanceSetStatus{
 				Name:  is.Name,
@@ -88,15 +87,15 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2beta1.Perc
 			})
 		}
 
-		return ss
+		return v2beta1.PostgresStatus{
+			Size:         size,
+			Ready:        ready,
+			InstanceSets: ss,
+		}
 	}
 
 	cr.Status = v2beta1.PerconaPGClusterStatus{
-		Postgres: v2beta1.PostgresStatus{
-			Size:         size,
-			Ready:        ready,
-			InstanceSets: pgStatusFromCruncy(),
-		},
+		Postgres: pgStatusFromCruncy(),
 		PGBouncer: v2beta1.PGBouncerStatus{
 			Size:  status.Proxy.PGBouncer.Replicas,
 			Ready: status.Proxy.PGBouncer.ReadyReplicas,
