@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	gs "github.com/onsi/gomega/gstruct"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,13 +52,21 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 		})
 
+		It("should reconcile and create Crunchy PostgreCluster", func() {
+			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("status.postgres should reflect Crunchy instanceSets status", func() {
 			updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
-				pgc.Status.InstanceSets = append(pgc.Status.InstanceSets, v1beta1.PostgresInstanceSetStatus{
-					ReadyReplicas: 0,
-					Replicas:      1,
-				},
+				pgc.Status.InstanceSets = append(pgc.Status.InstanceSets,
 					v1beta1.PostgresInstanceSetStatus{
+						Name:          "instance1",
+						ReadyReplicas: 0,
+						Replicas:      1,
+					},
+					v1beta1.PostgresInstanceSetStatus{
+						Name:          "instance2",
 						ReadyReplicas: 3,
 						Replicas:      3,
 					},
@@ -66,17 +75,25 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 
 			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
-			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
 				err = k8sClient.Get(ctx, crNamespacedName, cr)
 				return err == nil
 			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 
-			Expect(cr.Status.Postgres.Ready).Should(Equal(3))
-			Expect(cr.Status.Postgres.Size).Should(Equal(4))
+			Expect(cr.Status.Postgres.Ready).Should(Equal(int32(3)))
+			Expect(cr.Status.Postgres.Size).Should(Equal(int32(4)))
 			Expect(cr.Status.Postgres.InstanceSets).Should(HaveLen(2))
+			Expect(cr.Status.Postgres.InstanceSets).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"Name":  Equal("instance1"),
+				"Ready": Equal(int32(0)),
+				"Size":  Equal(int32(1)),
+			})))
+			Expect(cr.Status.Postgres.InstanceSets).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"Name":  Equal("instance2"),
+				"Ready": Equal(int32(3)),
+				"Size":  Equal(int32(3)),
+			})))
 		})
 	})
 
@@ -90,6 +107,11 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 		})
 
+		It("should reconcile and create Crunchy PostgreCluster", func() {
+			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("status.pgbouncer should match Crunchy pgbouncer status", func() {
 			updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
 				pgc.Status.Proxy.PGBouncer.ReadyReplicas = 0
@@ -98,16 +120,14 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 
 			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
-			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
 				err = k8sClient.Get(ctx, crNamespacedName, cr)
 				return err == nil
 			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 
-			Expect(cr.Status.PGBouncer.Ready).Should(Equal(0))
-			Expect(cr.Status.PGBouncer.Size).Should(Equal(1))
+			Expect(cr.Status.PGBouncer.Ready).Should(Equal(int32(0)))
+			Expect(cr.Status.PGBouncer.Size).Should(Equal(int32(1)))
 		})
 	})
 
