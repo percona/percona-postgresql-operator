@@ -13914,6 +13914,39 @@ spec:
                       type: object
                     type: array
                 type: object
+              pgbouncer:
+                properties:
+                  ready:
+                    format: int32
+                    type: integer
+                  size:
+                    format: int32
+                    type: integer
+                type: object
+              postgres:
+                properties:
+                  instances:
+                    items:
+                      properties:
+                        name:
+                          type: string
+                        ready:
+                          format: int32
+                          type: integer
+                        size:
+                          format: int32
+                          type: integer
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  ready:
+                    format: int32
+                    type: integer
+                  size:
+                    format: int32
+                    type: integer
+                type: object
               postgresVersion:
                 description: Stores the current PostgreSQL major version following
                   a successful major PostgreSQL upgrade.
@@ -13962,6 +13995,8 @@ spec:
                 description: Identifies the users that have been installed into PostgreSQL.
                 type: string
             required:
+            - pgbouncer
+            - postgres
             - state
             type: object
         required:

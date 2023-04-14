@@ -145,9 +145,41 @@ const (
 	AppStateError    AppState = "error"
 )
 
+type PostgresInstanceSetStatus struct {
+	Name string `json:"name"`
+
+	// +kubebuilder:validation:Required
+	Size int32 `json:"size,omitempty"`
+
+	// +kubebuilder:validation:Required
+	Ready int32 `json:"ready,omitempty"`
+}
+
+type PostgresStatus struct {
+	// +kubebuilder:validation:Required
+	Size int32 `json:"size,omitempty"`
+
+	// +kubebuilder:validation:Required
+	Ready int32 `json:"ready,omitempty"`
+
+	// +kubebuilder:validation:Required
+	InstanceSets []PostgresInstanceSetStatus `json:"instances,omitempty"`
+}
+
+type PGBouncerStatus struct {
+	// +kubebuilder:validation:Required
+	Size int32 `json:"size,omitempty"`
+
+	// +kubebuilder:validation:Required
+	Ready int32 `json:"ready,omitempty"`
+}
+
 type PerconaPGClusterStatus struct {
 	crunchyv1beta1.PostgresClusterStatus `json:",inline"`
-	State                                AppState `json:"state"`
+
+	Postgres  PostgresStatus  `json:"postgres"`
+	PGBouncer PGBouncerStatus `json:"pgbouncer"`
+	State     AppState        `json:"state"`
 	// +optional
 	Host string `json:"host"`
 }
