@@ -251,7 +251,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		})
 
 		pgBouncerSVC := &corev1.Service{}
-		It("should retireve pbbouncer service", func() {
+		It("should retrieve pbbouncer service", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: crName + "-pgbouncer", Namespace: ns}, pgBouncerSVC)
 				return err == nil
