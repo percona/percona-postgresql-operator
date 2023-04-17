@@ -11,6 +11,8 @@ spec:
     kind: PerconaPGBackup
     listKind: PerconaPGBackupList
     plural: perconapgbackups
+    shortNames:
+    - pg-backup
     singular: perconapgbackup
   scope: Namespaced
   versions:
@@ -13988,6 +13990,8 @@ spec:
     kind: PerconaPGRestore
     listKind: PerconaPGRestoreList
     plural: perconapgrestores
+    shortNames:
+    - pg-restore
     singular: perconapgrestore
   scope: Namespaced
   versions:

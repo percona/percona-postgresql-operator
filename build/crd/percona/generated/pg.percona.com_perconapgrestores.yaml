@@ -12,6 +12,8 @@ spec:
     kind: PerconaPGRestore
     listKind: PerconaPGRestoreList
     plural: perconapgrestores
+    shortNames:
+    - pg-restore
     singular: perconapgrestore
   scope: Namespaced
   versions:
