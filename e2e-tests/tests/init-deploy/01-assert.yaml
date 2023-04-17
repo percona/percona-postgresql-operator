@@ -125,7 +125,6 @@ kind: PerconaPGCluster
 metadata:
   name: init-deploy
 status:
-  host: init-deploy-pgbouncer.pgo.svc
   pgbouncer:
     ready: 3
     size: 3

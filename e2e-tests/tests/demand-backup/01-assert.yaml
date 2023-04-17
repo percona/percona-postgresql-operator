@@ -96,7 +96,6 @@ kind: PerconaPGCluster
 metadata:
   name: demand-backup
 status:
-  host: demand-backup-pgbouncer.pgo.svc
   pgbouncer:
     ready: 3
     size: 3
