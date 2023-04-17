@@ -96,17 +96,15 @@ kind: PerconaPGCluster
 metadata:
   name: demand-backup
 status:
-  instances:
+  host: demand-backup-pgbouncer.pgo.svc
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
     - name: instance1
-      readyReplicas: 3
-      replicas: 3
-      updatedReplicas: 3
-  observedGeneration: 1
-  pgbackrest:
-    repos:
-      - name: repo1
-        stanzaCreated: true
-  proxy:
-    pgBouncer:
-      readyReplicas: 3
-      replicas: 3
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready
