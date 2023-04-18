@@ -1,12 +1,16 @@
 .DEFAULT_GOAL := help
 .SUFFIXES:
 
-# Default shell should be checked for version compatibility. The following make file is build upon bash 5.1
-# SHELL := $(shell bash -c '$$(shell_path=; for shell in $$(which -a bash); do version=$$($$shell --version | sed -r 's/.*(([0-9].){2}[0-9]+)\([0-9]+)-release.*/\1/g' | grep -E '([0-9].){2}[0-9]+'); case $${shell_path} in (5.*|4.*) shell_path=${shell};; (*);; esac; done; [[ "x$${shell_path}" != "x" ]] && echo $${shell_path} || exit 1'))
-
 CONTAINER ?= docker
 PGO_VERSION ?= 2.1.0
 REPLACES_VERSION ?= 2.0.0
+
+SHELL := /bin/bash
+
+ifeq ($(shell bash -c 'echo $$BASH_VERSION | cut -d "." -f1'), 5)
+else
+    $(error You need to use bash 5.x+ for this Makefile)
+endif
 
 OS_KERNEL  ?= $(shell bash -c 'echo $${1,,}' - `uname -s`)
 OS_MACHINE ?= $(shell bash -c 'echo $${1/x86_/amd}' - `uname -m`)
