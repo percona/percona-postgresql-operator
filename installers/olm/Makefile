@@ -117,3 +117,9 @@ validate-%-directory:
 
 validate-%-image:
 	./validate-image.sh '$(CONTAINER)' 'bundles/$*'
+
+.PHONY: build-bundle-images
+build-bundle-images: $(distros:%=build-%-image)
+
+build-%-image:
+	./build-image.sh '$(CONTAINER)' 'bundles/$*' '$*' '$(PGO_VERSION)'
