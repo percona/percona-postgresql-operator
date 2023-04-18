@@ -179,76 +179,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
-	host, err := r.getHost(ctx, cr)
-	if err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "get app host")
-	}
-
-	cr.Status = v2beta1.PerconaPGClusterStatus{
-		State:                 r.getState(cr, &postgresCluster.Status),
-		Host:                  host,
-		PostgresClusterStatus: postgresCluster.Status,
-	}
-
-	if err := r.Client.Status().Update(ctx, cr); err != nil {
-		log.Error(err, "failed to update status")
-	}
+	err = r.updateStatus(ctx, cr, &postgresCluster.Status)
 
 	return ctrl.Result{}, err
-}
-
-func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2beta1.PerconaPGCluster) (string, error) {
-	svcName := cr.Name + "-pgbouncer"
-
-	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
-		return svcName + "." + cr.Namespace + ".svc", nil
-	}
-
-	svc := &corev1.Service{}
-	err := r.Client.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: svcName}, svc)
-	if err != nil {
-		return "", errors.Wrapf(err, "get %s service", svcName)
-	}
-
-	var host string
-	for _, i := range svc.Status.LoadBalancer.Ingress {
-		host = i.IP
-		if len(i.Hostname) > 0 {
-			host = i.Hostname
-		}
-	}
-
-	return host, nil
-}
-
-func (r *PGClusterReconciler) getState(cr *v2beta1.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
-	var wanted, ready int
-	for _, is := range status.InstanceSets {
-		wanted = wanted + int(is.Replicas)
-		ready = ready + int(is.ReadyReplicas)
-	}
-
-	if cr.Spec.Pause != nil && *cr.Spec.Pause {
-		if ready > wanted {
-			return v2beta1.AppStateStopping
-		}
-
-		return v2beta1.AppStatePaused
-	}
-
-	if status.PGBackRest != nil && status.PGBackRest.RepoHost != nil && !status.PGBackRest.RepoHost.Ready {
-		return v2beta1.AppStateInit
-	}
-
-	if status.Proxy.PGBouncer.ReadyReplicas != status.Proxy.PGBouncer.Replicas {
-		return v2beta1.AppStateInit
-	}
-
-	if ready < wanted {
-		return v2beta1.AppStateInit
-	}
-
-	return v2beta1.AppStateReady
 }
 
 func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
