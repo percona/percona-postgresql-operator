@@ -408,9 +408,11 @@ func (r *Reconciler) reconcileReplicationSecret(
 			naming.LabelClusterCertificate: "replication-client-tls",
 		})
 
-	if err := errors.WithStack(r.setControllerReference(cluster, intent)); err != nil {
-		return nil, err
-	}
+	// K8SPG-330: Keep this commented in case of conflicts.
+	// We don't want to delete TLS secrets on cluster deletion.
+	// if err := errors.WithStack(r.setControllerReference(cluster, intent)); err != nil {
+	// 	return nil, err
+	// }
 	if err == nil {
 		intent.Data[naming.ReplicationCert], err = leaf.Certificate.MarshalText()
 		err = errors.WithStack(err)

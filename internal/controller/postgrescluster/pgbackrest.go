@@ -1923,9 +1923,11 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	err := errors.WithStack(client.IgnoreNotFound(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(intent), existing)))
 
-	if err == nil {
-		err = r.setControllerReference(cluster, intent)
-	}
+	// K8SPG-330: Keep this commented in case of conflicts.
+	// We don't want to delete TLS secrets on cluster deletion.
+	// if err == nil {
+	// 	err = r.setControllerReference(cluster, intent)
+	// }
 	if err == nil {
 		err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
 	}
