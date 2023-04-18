@@ -119,7 +119,7 @@ func readDefaultCR(name, namespace string) (*v2beta1.PerconaPGCluster, error) {
 	return cr, nil
 }
 
-func updateCrunchyPGClusterCR(ctx context.Context, nn types.NamespacedName, update func(*v1beta1.PostgresCluster)) {
+func updateCrunchyPGClusterStatus(ctx context.Context, nn types.NamespacedName, update func(*v1beta1.PostgresCluster)) {
 	pgc := &v1beta1.PostgresCluster{}
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, nn, pgc)

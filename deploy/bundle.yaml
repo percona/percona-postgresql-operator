@@ -11,6 +11,8 @@ spec:
     kind: PerconaPGBackup
     listKind: PerconaPGBackupList
     plural: perconapgbackups
+    shortNames:
+    - pg-backup
     singular: perconapgbackup
   scope: Namespaced
   versions:
@@ -83,6 +85,8 @@ spec:
     kind: PerconaPGCluster
     listKind: PerconaPGClusterList
     plural: perconapgclusters
+    shortNames:
+    - pg
     singular: perconapgcluster
   scope: Namespaced
   versions:
@@ -92,6 +96,12 @@ spec:
       type: string
     - jsonPath: .status.state
       name: Status
+      type: string
+    - jsonPath: .status.postgres.ready
+      name: Postgres
+      type: string
+    - jsonPath: .status.pgbouncer.ready
+      name: PGBouncer
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -13582,386 +13592,46 @@ spec:
             type: object
           status:
             properties:
-              conditions:
-                description: 'conditions represent the observations of postgrescluster''s
-                  current state. Known .status.conditions.type are: "PersistentVolumeResizing",
-                  "Progressing", "ProxyAvailable"'
-                items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource. --- This struct is intended for direct
-                    use as an array at the field path .status.conditions.  For example,
-                    \n type FooStatus struct{ // Represents the observations of a
-                    foo's current state. // Known .status.conditions.type are: \"Available\",
-                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
-                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
-                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
-                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
-                  properties:
-                    lastTransitionTime:
-                      description: lastTransitionTime is the last time the condition
-                        transitioned from one status to another. This should be when
-                        the underlying condition changed.  If that is not known, then
-                        using the time when the API field changed is acceptable.
-                      format: date-time
-                      type: string
-                    message:
-                      description: message is a human readable message indicating
-                        details about the transition. This may be an empty string.
-                      maxLength: 32768
-                      type: string
-                    observedGeneration:
-                      description: observedGeneration represents the .metadata.generation
-                        that the condition was set based upon. For instance, if .metadata.generation
-                        is currently 12, but the .status.conditions[x].observedGeneration
-                        is 9, the condition is out of date with respect to the current
-                        state of the instance.
-                      format: int64
-                      minimum: 0
-                      type: integer
-                    reason:
-                      description: reason contains a programmatic identifier indicating
-                        the reason for the condition's last transition. Producers
-                        of specific condition types may define expected values and
-                        meanings for this field, and whether the values are considered
-                        a guaranteed API. The value should be a CamelCase string.
-                        This field may not be empty.
-                      maxLength: 1024
-                      minLength: 1
-                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
-                      type: string
-                    status:
-                      description: status of the condition, one of True, False, Unknown.
-                      enum:
-                      - "True"
-                      - "False"
-                      - Unknown
-                      type: string
-                    type:
-                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
-                        --- Many .condition.type values are consistent across resources
-                        like Available, but because arbitrary conditions can be useful
-                        (see .node.status.conditions), the ability to deconflict is
-                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
-                      maxLength: 316
-                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
-                      type: string
-                  required:
-                  - lastTransitionTime
-                  - message
-                  - reason
-                  - status
-                  - type
-                  type: object
-                type: array
-                x-kubernetes-list-map-keys:
-                - type
-                x-kubernetes-list-type: map
-              databaseInitSQL:
-                description: DatabaseInitSQL state of custom database initialization
-                  in the cluster
-                type: string
-              databaseRevision:
-                description: Identifies the databases that have been installed into
-                  PostgreSQL.
-                type: string
               host:
                 type: string
-              instances:
-                description: Current state of PostgreSQL instances.
-                items:
-                  properties:
-                    name:
-                      type: string
-                    readyReplicas:
-                      description: Total number of ready pods.
-                      format: int32
-                      type: integer
-                    replicas:
-                      description: Total number of pods.
-                      format: int32
-                      type: integer
-                    updatedReplicas:
-                      description: Total number of pods that have the desired specification.
-                      format: int32
-                      type: integer
-                  required:
-                  - name
-                  type: object
-                type: array
-                x-kubernetes-list-map-keys:
-                - name
-                x-kubernetes-list-type: map
-              monitoring:
-                description: Current state of PostgreSQL cluster monitoring tool configuration
+              pgbouncer:
                 properties:
-                  exporterConfiguration:
-                    type: string
-                type: object
-              observedGeneration:
-                description: observedGeneration represents the .metadata.generation
-                  on which the status was based.
-                format: int64
-                minimum: 0
-                type: integer
-              patroni:
-                properties:
-                  switchover:
-                    description: Tracks the execution of the switchover requests.
-                    type: string
-                  switchoverTimeline:
-                    description: Tracks the current timeline during switchovers
-                    format: int64
+                  ready:
+                    format: int32
                     type: integer
-                  systemIdentifier:
-                    description: The PostgreSQL system identifier reported by Patroni.
-                    type: string
+                  size:
+                    format: int32
+                    type: integer
                 type: object
-              pgbackrest:
-                description: Status information for pgBackRest
+              postgres:
                 properties:
-                  manualBackup:
-                    description: Status information for manual backups
-                    properties:
-                      active:
-                        description: The number of actively running manual backup
-                          Pods.
-                        format: int32
-                        type: integer
-                      completionTime:
-                        description: Represents the time the manual backup Job was
-                          determined by the Job controller to be completed.  This
-                          field is only set if the backup completed successfully.
-                          Additionally, it is represented in RFC3339 form and is in
-                          UTC.
-                        format: date-time
-                        type: string
-                      failed:
-                        description: The number of Pods for the manual backup Job
-                          that reached the "Failed" phase.
-                        format: int32
-                        type: integer
-                      finished:
-                        description: Specifies whether or not the Job is finished
-                          executing (does not indicate success or failure).
-                        type: boolean
-                      id:
-                        description: A unique identifier for the manual backup as
-                          provided using the "pgbackrest-backup" annotation when initiating
-                          a backup.
-                        type: string
-                      startTime:
-                        description: Represents the time the manual backup Job was
-                          acknowledged by the Job controller. It is represented in
-                          RFC3339 form and is in UTC.
-                        format: date-time
-                        type: string
-                      succeeded:
-                        description: The number of Pods for the manual backup Job
-                          that reached the "Succeeded" phase.
-                        format: int32
-                        type: integer
-                    required:
-                    - finished
-                    - id
-                    type: object
-                  repoHost:
-                    description: Status information for the pgBackRest dedicated repository
-                      host
-                    properties:
-                      apiVersion:
-                        description: 'APIVersion defines the versioned schema of this
-                          representation of an object. Servers should convert recognized
-                          schemas to the latest internal value, and may reject unrecognized
-                          values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-                        type: string
-                      kind:
-                        description: 'Kind is a string value representing the REST
-                          resource this object represents. Servers may infer this
-                          from the endpoint the client submits requests to. Cannot
-                          be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-                        type: string
-                      ready:
-                        description: Whether or not the pgBackRest repository host
-                          is ready for use
-                        type: boolean
-                    type: object
-                  repos:
-                    description: Status information for pgBackRest repositories
+                  instances:
                     items:
-                      description: RepoStatus the status of a pgBackRest repository
                       properties:
-                        bound:
-                          description: Whether or not the pgBackRest repository PersistentVolumeClaim
-                            is bound to a volume
-                          type: boolean
                         name:
-                          description: The name of the pgBackRest repository
                           type: string
-                        replicaCreateBackupComplete:
-                          description: ReplicaCreateBackupReady indicates whether
-                            a backup exists in the repository as needed to bootstrap
-                            replicas.
-                          type: boolean
-                        repoOptionsHash:
-                          description: A hash of the required fields in the spec for
-                            defining an Azure, GCS or S3 repository, Utilizd to detect
-                            changes to these fields and then execute pgBackRest stanza-create
-                            commands accordingly.
-                          type: string
-                        stanzaCreated:
-                          description: Specifies whether or not a stanza has been
-                            successfully created for the repository
-                          type: boolean
-                        volume:
-                          description: The name of the volume the containing the pgBackRest
-                            repository
-                          type: string
+                        ready:
+                          format: int32
+                          type: integer
+                        size:
+                          format: int32
+                          type: integer
                       required:
                       - name
                       type: object
                     type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                  restore:
-                    description: Status information for in-place restores
-                    properties:
-                      active:
-                        description: The number of actively running manual backup
-                          Pods.
-                        format: int32
-                        type: integer
-                      completionTime:
-                        description: Represents the time the manual backup Job was
-                          determined by the Job controller to be completed.  This
-                          field is only set if the backup completed successfully.
-                          Additionally, it is represented in RFC3339 form and is in
-                          UTC.
-                        format: date-time
-                        type: string
-                      failed:
-                        description: The number of Pods for the manual backup Job
-                          that reached the "Failed" phase.
-                        format: int32
-                        type: integer
-                      finished:
-                        description: Specifies whether or not the Job is finished
-                          executing (does not indicate success or failure).
-                        type: boolean
-                      id:
-                        description: A unique identifier for the manual backup as
-                          provided using the "pgbackrest-backup" annotation when initiating
-                          a backup.
-                        type: string
-                      startTime:
-                        description: Represents the time the manual backup Job was
-                          acknowledged by the Job controller. It is represented in
-                          RFC3339 form and is in UTC.
-                        format: date-time
-                        type: string
-                      succeeded:
-                        description: The number of Pods for the manual backup Job
-                          that reached the "Succeeded" phase.
-                        format: int32
-                        type: integer
-                    required:
-                    - finished
-                    - id
-                    type: object
-                  scheduledBackups:
-                    description: Status information for scheduled backups
-                    items:
-                      properties:
-                        active:
-                          description: The number of actively running manual backup
-                            Pods.
-                          format: int32
-                          type: integer
-                        completionTime:
-                          description: Represents the time the manual backup Job was
-                            determined by the Job controller to be completed.  This
-                            field is only set if the backup completed successfully.
-                            Additionally, it is represented in RFC3339 form and is
-                            in UTC.
-                          format: date-time
-                          type: string
-                        cronJobName:
-                          description: The name of the associated pgBackRest scheduled
-                            backup CronJob
-                          type: string
-                        failed:
-                          description: The number of Pods for the manual backup Job
-                            that reached the "Failed" phase.
-                          format: int32
-                          type: integer
-                        repo:
-                          description: The name of the associated pgBackRest repository
-                          type: string
-                        startTime:
-                          description: Represents the time the manual backup Job was
-                            acknowledged by the Job controller. It is represented
-                            in RFC3339 form and is in UTC.
-                          format: date-time
-                          type: string
-                        succeeded:
-                          description: The number of Pods for the manual backup Job
-                            that reached the "Succeeded" phase.
-                          format: int32
-                          type: integer
-                        type:
-                          description: The pgBackRest backup type for this Job
-                          type: string
-                      type: object
-                    type: array
+                  ready:
+                    format: int32
+                    type: integer
+                  size:
+                    format: int32
+                    type: integer
                 type: object
-              postgresVersion:
-                description: Stores the current PostgreSQL major version following
-                  a successful major PostgreSQL upgrade.
-                type: integer
-              proxy:
-                description: Current state of the PostgreSQL proxy.
-                properties:
-                  pgBouncer:
-                    properties:
-                      postgresRevision:
-                        description: Identifies the revision of PgBouncer assets that
-                          have been installed into PostgreSQL.
-                        type: string
-                      readyReplicas:
-                        description: Total number of ready pods.
-                        format: int32
-                        type: integer
-                      replicas:
-                        description: Total number of non-terminated pods.
-                        format: int32
-                        type: integer
-                    type: object
-                type: object
-              startupInstance:
-                description: The instance that should be started first when bootstrapping
-                  and/or starting a PostgresCluster.
-                type: string
-              startupInstanceSet:
-                description: The instance set associated with the startupInstance
-                type: string
               state:
                 type: string
-              userInterface:
-                description: Current state of the PostgreSQL user interface.
-                properties:
-                  pgAdmin:
-                    description: The state of the pgAdmin user interface.
-                    properties:
-                      usersRevision:
-                        description: Hash that indicates which users have been installed
-                          into pgAdmin.
-                        type: string
-                    type: object
-                type: object
-              usersRevision:
-                description: Identifies the users that have been installed into PostgreSQL.
-                type: string
             required:
+            - pgbouncer
+            - postgres
             - state
             type: object
         required:
@@ -13986,6 +13656,8 @@ spec:
     kind: PerconaPGRestore
     listKind: PerconaPGRestoreList
     plural: perconapgrestores
+    shortNames:
+    - pg-restore
     singular: perconapgrestore
   scope: Namespaced
   versions:

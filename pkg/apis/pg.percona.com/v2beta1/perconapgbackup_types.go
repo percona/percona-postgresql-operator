@@ -10,6 +10,7 @@ func init() {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=pg-backup
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //
 // PerconaPGBackup is the CRD that defines a Percona PostgreSQL Backup

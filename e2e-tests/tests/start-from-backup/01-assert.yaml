@@ -99,20 +99,14 @@ kind: PerconaPGCluster
 metadata:
   name: start-from-backup
 status:
-  instances:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
     - name: instance1
-      readyReplicas: 3
-      replicas: 3
-      updatedReplicas: 3
-  observedGeneration: 1
-  pgbackrest:
-    repos:
-      - name: repo1
-        stanzaCreated: true
-    restore:
-      finished: true
-      id: ~pgo-bootstrap-start-from-backup
-  proxy:
-    pgBouncer:
-      readyReplicas: 3
-      replicas: 3
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready
