@@ -135,7 +135,7 @@ yq --yaml-roundtrip < bundle.csv.yaml > "${bundle_directory}/manifests/${file_na
 	--arg version "${PGO_VERSION}" \
 	--arg replaces "${REPLACES_VERSION}" \
 	--arg description "$(< description.md)" \
-	--arg icon "$(cat ../seal.svg | base64 | tr -d '\n')" \
+	--arg icon "$(base64 ../icon.png | tr -d '\n')" \
 	--arg stem "${csv_stem}" \
 '
 	.metadata.annotations["alm-examples"] = $examples |
@@ -147,7 +147,7 @@ yq --yaml-roundtrip < bundle.csv.yaml > "${bundle_directory}/manifests/${file_na
 
 	.spec.customresourcedefinitions.owned = $crds |
 	.spec.description = $description |
-	.spec.icon = [{ mediatype: "image/svg+xml", base64data: $icon }] |
+	.spec.icon = [{ mediatype: "image/png", base64data: $icon }] |
 
 	.spec.install.spec.permissions = [{ serviceAccountName: $account, rules: $rules }] |
 	.spec.install.spec.deployments = [( $deployment | { name: .metadata.name, spec } )] |

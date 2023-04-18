@@ -12,6 +12,8 @@ func init() {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=pg-restore
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +operator-sdk:csv:customresourcedefinitions:order=3
+// +operator-sdk:csv:customresourcedefinitions:resources={{CronJob,v1beta1},{Job,v1}}
 //
 // PerconaPGRestore is the CRD that defines a Percona PostgreSQL Restore
 type PerconaPGRestore struct {
