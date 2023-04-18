@@ -91,15 +91,17 @@ deletenamespaces:
 
 # Install the postgrescluster CRD
 install:
-	$(PGO_KUBE_CLIENT) apply --server-side -k ./config/crd
+	$(PGO_KUBE_CLIENT) apply --server-side -f ./deploy/crd.yaml
+	$(PGO_KUBE_CLIENT) apply --server-side -f ./deploy/rbac.yaml
 
 # Delete the postgrescluster CRD
 uninstall:
-	$(PGO_KUBE_CLIENT) delete -k ./config/crd
+	$(PGO_KUBE_CLIENT) delete -f ./deploy/crd.yaml
+	$(PGO_KUBE_CLIENT) delete -f ./deploy/rbac.yaml
 
 # Deploy the PostgreSQL Operator (enables the postgrescluster controller)
 deploy:
-	$(PGO_KUBE_CLIENT) apply --server-side -k ./config/default
+	$(PGO_KUBE_CLIENT) apply -f ./deploy/operator.yaml
 
 # Deploy the PostgreSQL Operator locally
 deploy-dev: build-postgres-operator createnamespaces
@@ -118,7 +120,7 @@ deploy-dev: build-postgres-operator createnamespaces
 
 # Undeploy the PostgreSQL Operator
 undeploy:
-	$(PGO_KUBE_CLIENT) delete -k ./config/default
+	$(PGO_KUBE_CLIENT) delete -f ./deploy/operator.yaml
 
 
 run-local:

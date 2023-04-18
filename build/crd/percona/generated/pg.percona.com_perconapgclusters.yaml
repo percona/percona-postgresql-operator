@@ -12,6 +12,8 @@ spec:
     kind: PerconaPGCluster
     listKind: PerconaPGClusterList
     plural: perconapgclusters
+    shortNames:
+    - pg
     singular: perconapgcluster
   scope: Namespaced
   versions:

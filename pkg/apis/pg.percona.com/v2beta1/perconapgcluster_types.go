@@ -16,6 +16,7 @@ func init() {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=pg
 // +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=".status.host"
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=".status.state"
 // +kubebuilder:printcolumn:name="Postgres",type=string,JSONPath=".status.postgres.ready"
