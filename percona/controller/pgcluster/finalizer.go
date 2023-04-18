@@ -169,7 +169,7 @@ func (r *PGClusterReconciler) runFinalizer(ctx context.Context, cr *v2beta1.Perc
 		return errors.Wrapf(err, "run finalizer %s", finalizer)
 	}
 
-	if controllerutil.RemoveFinalizer(cr, v2beta1.FinalizerDeletePVC) {
+	if controllerutil.RemoveFinalizer(cr, finalizer) {
 		if err := r.Client.Patch(ctx, cr, client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "remove finalizers")
 		}
