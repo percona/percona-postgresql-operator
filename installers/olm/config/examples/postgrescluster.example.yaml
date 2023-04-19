@@ -3,9 +3,9 @@ kind: PerconaPGCluster
 metadata:
   name: example
 spec:
-  image: perconalab/percona-postgresql-operator:main-ppg14-postgres
+  image: perconalab/percona-postgresql-operator:main-ppg15-postgres
   imagePullPolicy: Always
-  postgresVersion: 14
+  postgresVersion: 15
   instances:
   - name: instance1
     dataVolumeClaimSpec:
@@ -16,10 +16,10 @@ spec:
           storage: 1Gi
   proxy:
     pgBouncer:
-      image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
+      image: perconalab/percona-postgresql-operator:main-ppg15-pgbouncer
   backups:
     pgbackrest:
-      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-ppg15-pgbackrest
       manual:
         repoName: repo1
         options:
