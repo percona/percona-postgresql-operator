@@ -48,25 +48,34 @@ func (r *PGClusterReconciler) getVersionMeta(cr *v2beta1.PerconaPGCluster, opera
 		PMMVersion:      "",
 		PMMEnabled:      cr.Spec.PMM != nil && cr.Spec.PMM.Enabled,
 	}
+
 	if _, ok := cr.Labels["helm.sh/chart"]; ok {
 		vm.HelmDeployCR = true
 	}
+
 	for _, set := range cr.Spec.InstanceSets {
 		if len(set.Sidecars) > 0 {
 			vm.SidecarsUsed = true
 			break
 		}
 	}
-	if _, ok := operatorDepl.Labels["helm.sh/chart"]; ok {
-		vm.HelmDeployOperator = true
+
+	if operatorDepl != nil {
+		if _, ok := operatorDepl.Labels["helm.sh/chart"]; ok {
+			vm.HelmDeployOperator = true
+		}
 	}
+
 	return vm
 }
 
 func (r *PGClusterReconciler) getOperatorDeployment(ctx context.Context) (*appsv1.Deployment, error) {
 	ns, err := k8s.GetOperatorNamespace()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get operator namespace")
+		// if operator is running outside of k8s, this will fail to get namespace
+		// but we don't want to fail everything because of that.
+		//nolint:nilerr
+		return nil, nil
 	}
 	name, err := os.Hostname()
 	if err != nil {

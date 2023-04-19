@@ -219,4 +219,122 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 		})
 	})
+
+	Context(v2beta1.FinalizerDeleteSSL, Ordered, func() {
+		When("with finalizer", func() {
+			crName := ns + "-with-delete-tls"
+			crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+			cr, err := readDefaultCR(crName, ns)
+			It("should read defautl cr.yaml", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			controllerutil.AddFinalizer(cr, v2beta1.FinalizerDeleteSSL)
+
+			It("should create PerconaPGCluster", func() {
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should reconcile PerconaPGCluster", func() {
+				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should delete PerconaPGCluster", func() {
+				Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
+			})
+
+			It("should reconcile PerconaPGCluster", func() {
+				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should wait for PostgresCluster to be deleted", func() {
+				postgresCluster := &v1beta1.PostgresCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      cr.Name,
+						Namespace: cr.Namespace,
+					},
+				}
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster)
+					return k8serrors.IsNotFound(err)
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+			})
+
+			It("should run finalizer", func() {
+				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should delete TLS secrets", func() {
+				secretList := corev1.SecretList{}
+				Eventually(func() bool {
+					err := k8sClient.List(ctx, &secretList, &client.ListOptions{
+						Namespace: cr.Namespace,
+						LabelSelector: labels.SelectorFromSet(map[string]string{
+							"postgres-operator.crunchydata.com/cluster": cr.Name,
+						}),
+					})
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+				Expect(len(secretList.Items)).Should(Equal(1))
+			})
+		})
+
+		When("without finalizer", func() {
+			crName := ns + "-without-delete-tls"
+			crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+			cr, err := readDefaultCR(crName, ns)
+			It("should read defautl cr.yaml", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			controllerutil.RemoveFinalizer(cr, v2beta1.FinalizerDeleteSSL)
+
+			It("should create PerconaPGCluster", func() {
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should reconcile PerconaPGCluster", func() {
+				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should delete PerconaPGCluster", func() {
+				Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
+			})
+
+			It("should reconcile PerconaPGCluster", func() {
+				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should not delete TLS secrets", func() {
+				secretList := corev1.SecretList{}
+				Eventually(func() bool {
+					err := k8sClient.List(ctx, &secretList, &client.ListOptions{
+						Namespace: cr.Namespace,
+						LabelSelector: labels.SelectorFromSet(map[string]string{
+							"postgres-operator.crunchydata.com/cluster": cr.Name,
+						}),
+					})
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+				Expect(len(secretList.Items)).Should(Equal(8))
+			})
+		})
+	})
 })

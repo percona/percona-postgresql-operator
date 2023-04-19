@@ -4,6 +4,7 @@ metadata:
   name: cluster1
 #  finalizers:
 #  - percona.com/delete-pvc
+#  - percona.com/delete-ssl
 spec:
 #  secrets:
 #    customTLSSecret:
