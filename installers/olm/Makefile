@@ -2,8 +2,15 @@
 .SUFFIXES:
 
 CONTAINER ?= docker
-PGO_VERSION ?= 5.4.0
-REPLACES_VERSION ?= 5.3.0
+PGO_VERSION ?= 2.1.0
+REPLACES_VERSION ?= 2.0.0
+
+SHELL := /bin/bash
+
+ifeq ($(shell bash -c 'echo $$BASH_VERSION | cut -d "." -f1'), 5)
+else
+    $(error You need to use bash 5.x+ for this Makefile)
+endif
 
 OS_KERNEL  ?= $(shell bash -c 'echo $${1,,}' - `uname -s`)
 OS_MACHINE ?= $(shell bash -c 'echo $${1/x86_/amd}' - `uname -m`)
@@ -68,7 +75,7 @@ tools/$(SYSTEM)/jq:
 	install -d '$(dir $@)'
 	curl -fSL -o '$@' "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-$$(SYSTEM='$(SYSTEM)'; \
 		case "$$SYSTEM" in \
-			(linux-*) echo "$${SYSTEM/-amd/}";; (darwin-*) echo "$${SYSTEM/darwin/osx}";; (*) echo '$(SYSTEM)';; \
+			(linux-*) echo "$${SYSTEM/-amd/}";; (darwin-*) echo "$${SYSTEM/darwin-*/osx-amd64}";; (*) echo '$(SYSTEM)';; \
 		esac)"
 	chmod u+x '$@'
 
@@ -82,7 +89,7 @@ tools/$(SYSTEM)/kubectl:
 tools: tools/$(SYSTEM)/operator-sdk
 tools/$(SYSTEM)/operator-sdk:
 	install -d '$(dir $@)'
-	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-sdk/releases/download/v1.18.0/operator-sdk_$(OS_KERNEL)_$(OS_MACHINE)'
+	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-sdk/releases/download/v1.19.1/operator-sdk_$(OS_KERNEL)_$(OS_MACHINE)'
 	chmod u+x '$@'
 
 tools: tools/$(SYSTEM)/opm
@@ -110,3 +117,9 @@ validate-%-directory:
 
 validate-%-image:
 	./validate-image.sh '$(CONTAINER)' 'bundles/$*'
+
+.PHONY: build-bundle-images
+build-bundle-images: $(distros:%=build-%-image)
+
+build-%-image:
+	./build-image.sh '$(CONTAINER)' 'bundles/$*' '$*' '$(PGO_VERSION)'

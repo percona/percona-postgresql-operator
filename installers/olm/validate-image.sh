@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # vim: set noexpandtab :
 set -eu
+set -o xtrace
 
 push_trap_exit() {
 	local -a array
@@ -11,7 +12,7 @@ push_trap_exit() {
 
 # Store anything in a single temporary directory that gets cleaned up.
 TMPDIR=$(mktemp -d)
-push_trap_exit "rm -rf '${TMPDIR}'"
+push_trap_exit "sudo rm -rf '${TMPDIR}'"
 export TMPDIR
 
 validate_bundle_image() {

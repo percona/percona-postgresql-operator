@@ -1,23 +1,42 @@
-apiVersion: postgres-operator.crunchydata.com/v1beta1
-kind: PostgresCluster
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGCluster
 metadata:
   name: example
 spec:
-  postgresVersion: 13
+  image: perconalab/percona-postgresql-operator:main-ppg15-postgres
+  imagePullPolicy: Always
+  postgresVersion: 15
   instances:
-    - replicas: 1
-      dataVolumeClaimSpec:
-        accessModes: [ReadWriteOnce]
-        resources:
-          requests:
-            storage: 1Gi
+  - name: instance1
+    dataVolumeClaimSpec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+  proxy:
+    pgBouncer:
+      image: perconalab/percona-postgresql-operator:main-ppg15-pgbouncer
   backups:
     pgbackrest:
+      image: perconalab/percona-postgresql-operator:main-ppg15-pgbackrest
+      manual:
+        repoName: repo1
+        options:
+         - --type=full
       repos:
       - name: repo1
+        schedules:
+          full: "0 0 * * 6"
         volume:
           volumeClaimSpec:
-            accessModes: ["ReadWriteOnce"]
+            accessModes:
+            - ReadWriteOnce
             resources:
               requests:
                 storage: 1Gi
+  pmm:
+    enabled: false
+    image: percona/pmm-client:2.32.0
+    secret: example-pmm-secret
+    serverHost: monitoring-service

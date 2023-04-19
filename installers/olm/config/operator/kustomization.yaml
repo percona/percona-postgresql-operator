@@ -3,6 +3,3 @@ kind: Kustomization
 
 resources:
 - ../../../../config/default
-
-patches:
-- path: target-namespace.yaml

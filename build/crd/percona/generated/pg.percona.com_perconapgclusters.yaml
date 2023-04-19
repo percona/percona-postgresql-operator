@@ -7092,12 +7092,7 @@ spec:
                     type: string
                 type: object
               image:
-                description: The image name to use for PostgreSQL containers. When
-                  omitted, the value comes from an operator environment variable.
-                  For standard PostgreSQL images, the format is RELATED_IMAGE_POSTGRES_{postgresVersion},
-                  e.g. RELATED_IMAGE_POSTGRES_13. For PostGIS enabled PostgreSQL images,
-                  the format is RELATED_IMAGE_POSTGRES_{postgresVersion}_GIS_{postGISVersion},
-                  e.g. RELATED_IMAGE_POSTGRES_13_GIS_3.1.
+                description: The image name to use for PostgreSQL containers.
                 type: string
               imagePullPolicy:
                 description: 'ImagePullPolicy is used to determine when Kubernetes

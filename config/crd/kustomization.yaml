@@ -4,4 +4,4 @@ kind: Kustomization
 resources:
   - bases/postgres-operator.crunchydata.com_postgresclusters.yaml
   - bases/pg.percona.com_perconapgclusters.yaml
-  - bases/postgres-operator.crunchydata.com_pgupgrades.yaml
+  # - bases/postgres-operator.crunchydata.com_pgupgrades.yaml

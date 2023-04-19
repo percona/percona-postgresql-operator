@@ -22,8 +22,9 @@ func init() {
 // +kubebuilder:printcolumn:name="Postgres",type=string,JSONPath=".status.postgres.ready"
 // +kubebuilder:printcolumn:name="PGBouncer",type=string,JSONPath=".status.pgbouncer.ready"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +operator-sdk:csv:customresourcedefinitions:order=1
+// +operator-sdk:csv:customresourcedefinitions:resources={{ConfigMap,v1},{Secret,v1},{Service,v1},{CronJob,v1beta1},{Deployment,v1},{Job,v1},{StatefulSet,v1},{PersistentVolumeClaim,v1}}
 //
 // PerconaPGCluster is the CRD that defines a Percona PG Cluster
 type PerconaPGCluster struct {
@@ -35,12 +36,7 @@ type PerconaPGCluster struct {
 }
 
 type PerconaPGClusterSpec struct {
-	// The image name to use for PostgreSQL containers. When omitted, the value
-	// comes from an operator environment variable. For standard PostgreSQL images,
-	// the format is RELATED_IMAGE_POSTGRES_{postgresVersion},
-	// e.g. RELATED_IMAGE_POSTGRES_13. For PostGIS enabled PostgreSQL images,
-	// the format is RELATED_IMAGE_POSTGRES_{postgresVersion}_GIS_{postGISVersion},
-	// e.g. RELATED_IMAGE_POSTGRES_13_GIS_3.1.
+	// The image name to use for PostgreSQL containers.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	Image string `json:"image,omitempty"`
@@ -49,6 +45,7 @@ type PerconaPGClusterSpec struct {
 	// pull (download) container images.
 	// More info: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
 	// +kubebuilder:validation:Enum={Always,Never,IfNotPresent}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
@@ -72,7 +69,7 @@ type PerconaPGClusterSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:validation:Maximum=15
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	PostgresVersion int `json:"postgresVersion"`
 
 	Secrets SecretsSpec `json:"secrets,omitempty"`
@@ -123,17 +120,21 @@ type PerconaPGClusterSpec struct {
 
 	// Specifies one or more sets of PostgreSQL pods that replicate data for
 	// this cluster.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	InstanceSets PGInstanceSets `json:"instances"`
 
 	// The specification of a proxy that connects to PostgreSQL.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
 	Proxy *PGProxySpec `json:"proxy,omitempty"`
 
 	// PostgreSQL backup configuration
 	// +kubebuilder:validation:Required
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	Backups crunchyv1beta1.Backups `json:"backups"`
 
 	// The specification of PMM sidecars.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
 	PMM *PMMSpec `json:"pmm,omitempty"`
 }
@@ -178,10 +179,17 @@ type PGBouncerStatus struct {
 }
 
 type PerconaPGClusterStatus struct {
-	Postgres  PostgresStatus  `json:"postgres"`
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	Postgres PostgresStatus `json:"postgres"`
+
+	// +operator-sdk:csv:customresourcedefinitions:type=status
 	PGBouncer PGBouncerStatus `json:"pgbouncer"`
-	State     AppState        `json:"state"`
+
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	State AppState `json:"state"`
+
 	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Host string `json:"host"`
 }
 
@@ -242,7 +250,6 @@ type SecretsSpec struct {
 // +listType=map
 // +listMapKey=name
 // +kubebuilder:validation:MinItems=1
-// +operator-sdk:csv:customresourcedefinitions:type=spec,order=2
 type PGInstanceSets []PGInstanceSetSpec
 
 func (p PGInstanceSets) ToCrunchy() []crunchyv1beta1.PostgresInstanceSetSpec {
