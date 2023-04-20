@@ -180,12 +180,33 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
 		postgresCluster.Spec.Patroni = cr.Spec.Patroni
 
+		users := make([]v1beta1.PostgresUserSpec, 0)
+		for _, user := range cr.Spec.Users {
+			if user.Name == pmm.MonitoringUser {
+				log.Info(pmm.MonitoringUser + " user is reserved, it'll be ignored.")
+				continue
+			}
+
+			users = append(users, user)
+		}
+
+		if cr.Spec.PMM.Enabled {
+			users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
+				Name:    pmm.MonitoringUser,
+				Options: "SUPERUSER",
+				Password: &v1beta1.PostgresPasswordSpec{
+					Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
+				},
+			})
+		}
+
+		postgresCluster.Spec.Users = users
+
 		if err := r.addPMMSidecar(ctx, cr); err != nil {
 			return errors.Wrap(err, "failed to add pmm sidecar")
 		}
 
 		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
-		postgresCluster.Spec.Users = cr.Spec.Users
 		postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
 
 		return nil
@@ -265,11 +286,6 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 
 		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
 	}
-
-	cr.Spec.Users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
-		Name:    pmm.MonitoringUser,
-		Options: "SUPERUSER",
-	})
 
 	return nil
 }
