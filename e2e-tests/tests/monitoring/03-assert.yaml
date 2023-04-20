@@ -1,0 +1,16 @@
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGCluster
+metadata:
+  name: monitoring
+status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+      - name: instance1
+        ready: 3
+        size: 3
+    ready: 3
+    size: 3
+  state: ready
