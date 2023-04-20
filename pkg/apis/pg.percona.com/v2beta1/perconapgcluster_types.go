@@ -523,6 +523,12 @@ type PerconaPGClusterList struct {
 	Items           []PerconaPGCluster `json:"items"`
 }
 
+const labelPrefix = "pg.percona.com/"
+
+const (
+	LabelPMMSecret = labelPrefix + "pmm-secret"
+)
+
 const annotationPrefix = "pg.percona.com/"
 
 const (
@@ -538,6 +544,14 @@ const (
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.
 	AnnotationPGBackRestRestore = annotationPrefix + "pgbackrest-restore"
+
+	// PMMSecretHash is the annotation that is added to instance annotations to
+	// rollout restart PG pods in case PMM credentials are rotated.
+	AnnotationPMMSecretHash = annotationPrefix + "pmm-secret-hash"
+
+	// MonitorSecretHas is the annotation that is added to instance annotations to
+	// rollout restart PG pods in case monitor user password is rotated.
+	AnnotationMonitorSecretHash = annotationPrefix + "monitor-secret-hash"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"
