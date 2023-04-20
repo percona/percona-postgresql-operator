@@ -28,7 +28,7 @@ operator_yamls=$(kubectl kustomize "config/${DISTRIBUTION}")
 operator_crds=$(yq <<< "${operator_yamls}" --slurp --yaml-roundtrip 'map(select(.kind == "CustomResourceDefinition"))')
 operator_deployments=$(yq <<< "${operator_yamls}" --slurp --yaml-roundtrip 'map(select(.kind == "Deployment"))')
 operator_accounts=$(yq <<< "${operator_yamls}" --slurp --yaml-roundtrip 'map(select(.kind == "ServiceAccount"))')
-operator_roles=$(yq <<< "${operator_yamls}" --slurp --yaml-roundtrip 'map(select(.kind == "ClusterRole"))')
+operator_roles=$(yq <<< "${operator_yamls}" --slurp --yaml-roundtrip 'map(select(.kind == "Role"))')
 
 # Recreate the Operator SDK project.
 [ ! -d "${project_directory}" ] || rm -r "${project_directory}"
