@@ -11,6 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 )
 
 var _ = Describe("PG Cluster", Ordered, func() {
@@ -171,6 +174,25 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
 
 				Expect(havePMMSidecar(sts)).To(BeTrue())
+			})
+
+			It("should have PMM secret hash", func() {
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
+				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(v2beta1.AnnotationPMMSecretHash))
+			})
+
+			It("should label PMM secret", func() {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cluster1-pmm-secret",
+						Namespace: ns,
+					},
+				}
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), secret)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(secret.Labels).To(HaveKeyWithValue(v2beta1.LabelPMMSecret, "true"))
+				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
 			})
 		})
 
