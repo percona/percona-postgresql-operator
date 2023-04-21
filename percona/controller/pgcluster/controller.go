@@ -25,6 +25,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -51,6 +52,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		For(&v2beta1.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
 		Watches(&source.Kind{Type: &corev1.Service{}}, r.watchServices()).
+		Watches(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()).
 		Complete(r)
 }
 
@@ -61,6 +63,23 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 			crName := labels[naming.LabelCluster]
 
 			if e.ObjectNew.GetName() == crName+"-pgbouncer" {
+				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+					Namespace: e.ObjectNew.GetNamespace(),
+					Name:      crName,
+				}})
+			}
+		},
+	}
+}
+
+func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
+	return handler.Funcs{
+		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			labels := e.ObjectNew.GetLabels()
+			crName := labels[naming.LabelCluster]
+
+			_, ok := labels[v2beta1.LabelPMMSecret]
+			if ok {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      crName,
@@ -161,12 +180,33 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
 		postgresCluster.Spec.Patroni = cr.Spec.Patroni
 
+		users := make([]v1beta1.PostgresUserSpec, 0)
+		for _, user := range cr.Spec.Users {
+			if user.Name == pmm.MonitoringUser {
+				log.Info(pmm.MonitoringUser + " user is reserved, it'll be ignored.")
+				continue
+			}
+
+			users = append(users, user)
+		}
+
+		if cr.Spec.PMM.Enabled {
+			users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
+				Name:    pmm.MonitoringUser,
+				Options: "SUPERUSER",
+				Password: &v1beta1.PostgresPasswordSpec{
+					Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
+				},
+			})
+		}
+
+		postgresCluster.Spec.Users = users
+
 		if err := r.addPMMSidecar(ctx, cr); err != nil {
 			return errors.Wrap(err, "failed to add pmm sidecar")
 		}
 
 		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
-		postgresCluster.Spec.Users = cr.Spec.Users
 		postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
 
 		return nil
@@ -213,15 +253,39 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		return nil
 	}
 
-	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
-		set := &cr.Spec.InstanceSets[i]
-		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
+	if pmmSecret.Labels == nil {
+		pmmSecret.Labels = make(map[string]string)
 	}
 
-	cr.Spec.Users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
-		Name:    pmm.MonitoringUser,
-		Options: "SUPERUSER",
-	})
+	_, pmmSecretLabelOK := pmmSecret.Labels[v2beta1.LabelPMMSecret]
+	_, clusterLabelOK := pmmSecret.Labels[naming.LabelCluster]
+	if !pmmSecretLabelOK || !clusterLabelOK {
+		orig := pmmSecret.DeepCopy()
+		pmmSecret.Labels[v2beta1.LabelPMMSecret] = "true"
+		pmmSecret.Labels[naming.LabelCluster] = cr.Name
+		if err := r.Client.Patch(ctx, pmmSecret, client.MergeFrom(orig)); err != nil {
+			return errors.Wrap(err, "label PMM secret")
+		}
+	}
+
+	pmmSecretHash, err := k8s.ObjectHash(pmmSecret)
+	if err != nil {
+		return errors.Wrap(err, "hash PMM secret")
+	}
+
+	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+		set := &cr.Spec.InstanceSets[i]
+
+		if set.Metadata == nil {
+			set.Metadata = &v1beta1.Metadata{}
+		}
+		if set.Metadata.Annotations == nil {
+			set.Metadata.Annotations = make(map[string]string)
+		}
+		set.Metadata.Annotations[v2beta1.AnnotationPMMSecretHash] = pmmSecretHash
+
+		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
+	}
 
 	return nil
 }
