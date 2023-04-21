@@ -1,6 +1,11 @@
 # Percona Operator for PostgreSQL
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+![Docker Pulls](https://img.shields.io/docker/pulls/percona/percona-postgresql-operator)
+![Docker Image Size (tag)](https://img.shields.io/docker/image-size/percona/percona-postgresql-operator/2)
+![GitHub tag (latest by SemVer)](https://img.shields.io/github/v/tag/percona/percona-postgresql-operator?include_prereleases&sort=semver)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/percona/percona-postgresql-operator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/percona/percona-postgresql-operator)](https://goreportcard.com/report/github.com/percona/percona-postgresql-operator)
 
 ## Introduction
 
@@ -76,24 +81,15 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
   - Override your PostgreSQL configuration for each cluster
   - Use your own custom images, re-define the image for each container separately
 
-## Deployment Requirements
+## Status
 
-The Operator is validated for deployment on Kubernetes, GKE and EKS clusters. The Operator is cloud native and storage agnostic, working with a wide variety of storage classes, hostPath, and NFS.
+**This project is in the tech preview state right now. Don't use it on production.**
 
-The Operator includes various components that get deployed to your Kubernetes cluster as shown in the following diagram and detailed in the Design section of the documentation for the version you are running.
+# Architecture
 
-### Supported Platforms
+Percona Operators are based on the [Operator SDK](https://github.com/operator-framework/operator-sdk) and leverage Kubernetes primitives to follow best CNCF practices.
 
-The following platforms were tested and are officially supported by the Operator:
-
-- Google Kubernetes Engine (GKE) 1.21 - 1.24
-
-Other Kubernetes platforms may also work but have not been tested.
-
-### Storage
-
-The Operator is tested with a variety of different types of Kubernetes storage and Storage Classes, as well as hostPath and NFS.
-The variety of different Storage Classes available for Kubernetes is too wide to verify the Operator functionality in each one. With that said, the Operator is designed to be storage class agnostic and has been demonstrated to work with additional Storage Classes.
+Please read more about architecture and design decisions [here](https://docs.percona.com/percona-operator-for-postgresql/2.0/architecture.html).
 
 ## Quickstart installation
 
@@ -104,189 +100,25 @@ Quickly making the Operator up and running with cloud native PostgreSQL includes
 Deploy the operator from `deploy/bundle.yam`
 
 ```sh
-kubectl apply --server-side -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/pg_2.0/deploy/bundle.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/main/deploy/bundle.yaml
 ```
 
 Deploy the database cluster itself from `deploy/cr.yaml`
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/pg_2.0/deploy/cr.yaml
+kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/main/deploy/cr.yaml
 ```
 
-### Backups/restores
+# Contributing
 
-Backups could be triggered via the cron-like string and on-demand. The common step for both ways is to create secret for accessing the remote object storage
+Percona welcomes and encourages community contributions to help improve Percona Operator for PostgreSQL.
 
-```sh
-printf "[global]\nrepo1-s3-key=%s\nrepo1-s3-key-secret=%s\n" 'YOUR_S3_ACCESS_KEY' 'YOUR_S3_SECRET_KEY' > /tmp/repo1-secret.ini
-kubectl create secret generic your-cluster-pgbackrest-secrets --from-file=s3.conf=/tmp/repo1-secret.ini
-```
+See the [Contribution Guide](CONTRIBUTING.md) for more information.
 
-If you need more than one object storage, you can increase repo index by 1 and add the incremented `repoN` options to the ini file.
-Also GCS, Azure have own suffixes for `repoN` options and they should be preserved.
+## Roadmap
 
-Now the focus should be switched to CR part.
+We have an experimental public roadmap which can be found [here](https://github.com/percona/roadmap/projects/1). Please feel free to contribute and propose new features by following the roadmap [guidelines](https://github.com/percona/roadmap).
 
-```yaml
-spec:
-  backups:
-    pgbackrest:
-      manual:
-        repoName: repo1
-        options:
-          - --type=full
-      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
-      configuration:
-        - secret:
-            name: your-cluster-pgbackrest-secrets
-      global:
-        repo1-path: /backrestrepo/postgres-operator/your-cluster/repo1
-      repos:
-        - name: repo1
-          s3:
-            bucket: "your-bucket"
-            endpoint: "s3.amazonaws.com"
-            region: "us-east-1"
-```
+# Submitting Bug Reports
 
-The listed options do allow the user to force the operator to make on-demand backup by calling:
-
-```sh
-kubectl annotate perconapgclusters.pg.percona.com your-cluster --overwrite pg.percona.com/pgbackrest-backup="$(date)"
-```
-
-Alternatively, backup schedule could be used:
-
-```yaml
-spec:
-  backups:
-    pgbackrest:
-      repos:
-        - name: repo1
-          schedules:
-            full: "0 1 * * 0"
-            differential: "0 1 * * 1-6"
-```
-
-As for restores, the actions are pretty much the same. Add the restore section to already running CR first
-
-```yaml
-spec:
-  backups:
-    pgbackrest:
-      restore:
-        enabled: true
-        repoName: repo1
-        options:
-          - --type=time
-          - --target="2022-10-03 14:15:11+03"
-```
-
-where target is the time to be restored at by the backup available. You may use `kubectl patch` or `kubectl edit` for this purpose.
-
-Second, put the already familiar annotation with one small difference:
-
-```sh
-kubectl annotate perconapgclusters.pg.percona.com your-cluster --overwrite pg.percona.com/pgbackrest-restore=id1
-```
-
-Once the restore is done, please switch `enabled: true` to `enabled: false`.
-
-### Start cluster from previously saved backup
-
-It's quite a common request to be able to start the cluster up from some others cluster backup.
-Here is an example CR for that.
-
-```yaml
-apiVersion: pg.percona.com/v2beta1
-kind: PerconaPGCluster
-metadata:
-  name: your-cluster-rev2
-spec:
-  image: perconalab/percona-postgresql-operator:main-ppg14-postgres
-  postgresVersion: 14
-  dataSource:
-    pgbackrest:
-      stanza: db
-      configuration:
-        - secret:
-            name: your-cluster-pgbackrest-secrets
-      global:
-        repo1-path: /backrestrepo/postgres-operator/your-cluster/repo1/
-      repo:
-        name: repo1
-        s3:
-          bucket: "your-bucket"
-          endpoint: "s3.amazonaws.com"
-          region: "us-east-1"
-  instances:
-    - dataVolumeClaimSpec:
-        accessModes:
-          - "ReadWriteOnce"
-        resources:
-          requests:
-            storage: 1Gi
-  backups:
-    pgbackrest:
-      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
-      configuration:
-        - secret:
-            name: your-cluster-rev2-pgbackrest-secrets
-      global:
-        repo1-path: /backrestrepo/postgres-operator/your-cluster-rev2/repo1
-      repos:
-        - name: repo1
-          s3:
-            bucket: "your-other-bucket"
-            endpoint: "s3.amazonaws.com"
-            region: "us-east-1"
-  proxy:
-    pgBouncer:
-      image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
-```
-
-As it may be noticed, `dataSource` section is a key to populate already existing backup to the newly created cluster. Other options stay pretty much the same as before.
-
-### Start standby cluster with cloudbased repo source
-
-Simple example for getting the matter online.
-
-```yaml
-apiVersion: pg.percona.com/v2beta1
-kind: PerconaPGCluster
-metadata:
-  name: cluster-standby
-spec:
-  backups:
-    pgbackrest:
-      configuration:
-        - secret:
-            name: pgo-gcs-creds
-      global:
-        repo1-path: /pgbackrest/postgres-operator/data-source-gcs/repo1
-      image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
-      repos:
-        - gcs:
-            bucket: some-bucket
-          name: repo1
-  image: perconalab/percona-postgresql-operator:main-ppg14-postgres
-  instances:
-    - dataVolumeClaimSpec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-      name: ""
-      replicas: 1
-  port: 5432
-  postgresVersion: 14
-  standby:
-    enabled: true
-    repoName: repo1
-```
-
-Please note that `data-source-gcs` is the upstream cluster which provides data changes for our
-standby.
-
-Feel free to read the [upstream](https://access.crunchydata.com/documentation/postgres-operator/v5/tutorial/backup-management/) doc for more information.
+If you find a bug in Percona Docker Images or in one of the related projects, please submit a report to that project's [JIRA](https://jira.percona.com/browse/K8SPG) issue tracker. Learn more about submitting bugs, new features ideas and improvements in the [Contribution Guide](CONTRIBUTING.md).
