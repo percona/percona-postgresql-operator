@@ -21,10 +21,11 @@ deploy_operator() {
 				"${TEMP_DIR}/operator.yaml" \
 				| yq eval 'select(documentIndex==0).metadata.labels["helm.sh/chart"]="fake-operator-chart"' - \
 					>"${TEMP_DIR}/vs.operator.yaml"
+
+			mv "${TEMP_DIR}/vs.operator.yaml" "${TEMP_DIR}/operator.yaml"
 			;;
 		*) ;;
 	esac
-	mv "${TEMP_DIR}/vs.operator.yaml" "${TEMP_DIR}/operator.yaml"
 
 	kubectl -n "${NAMESPACE}" apply -f ${TEMP_DIR}/operator.yaml
 }
