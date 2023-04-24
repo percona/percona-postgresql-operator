@@ -62,6 +62,10 @@ func (r *PGClusterReconciler) getState(cr *v2beta1.PerconaPGCluster, status *v1b
 		return v2beta1.AppStateInit
 	}
 
+	if size == 0 {
+		return v2beta1.AppStateInit
+	}
+
 	return v2beta1.AppStateReady
 }
 
