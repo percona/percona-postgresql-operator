@@ -1,7 +1,8 @@
 package k8s
 
 import (
-	"crypto/md5"
+
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -43,6 +44,7 @@ func ObjectHash(obj runtime.Object) (string, error) {
 		return "", err
 	}
 
-	hash := md5.Sum(data)
+
+	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
 }
