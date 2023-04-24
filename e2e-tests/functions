@@ -12,7 +12,7 @@ deploy_operator() {
 	yq eval \
 		"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
 		"${DEPLOY_DIR}/operator.yaml" \
-			>"${TEMP_DIR}/operator.yaml"
+		>"${TEMP_DIR}/operator.yaml"
 
 	case ${test_name} in
 		telemetry-transfer)
