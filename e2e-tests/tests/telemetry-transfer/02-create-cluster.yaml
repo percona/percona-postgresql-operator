@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | kubectl -n "${NAMESPACE}" apply -f -
+        # | yq eval '.spec.pmm.enabled=true' - \
+        # | yq eval '.spec.instances[0].sidecars=[{"name":"testcontainer","image":"busybox","command":["sleep","infinity"]}]' - \
+        # | yq eval '.metadata.labels={"helm.sh/chart":"fake-chart-to-verify-telemetry-transfer"}' - \
