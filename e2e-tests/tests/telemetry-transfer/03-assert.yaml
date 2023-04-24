@@ -1,0 +1,16 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 03-verify-tramsferred-keys
+data:
+  keys: |-
+    [
+      "apply",
+      "customResourceUid",
+      "databaseVersion",
+      "helmDeployOperator",
+      "kubeVersion",
+      "operatorVersion",
+      "platform",
+      "product"
+    ]

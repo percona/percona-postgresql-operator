@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      CR_ID=$(kubectl -n ${NAMESPACE} get perconapgcluster/${test_name} --template='{{.metadata.uid}}')
+      TRANSFERRED_KEYS=$(kubectl -n ${NAMESPACE} logs -l run=version-service| grep ${CR_ID} | tail -n1 | grep -Eo '\{.*\}$' | jq '."grpc.request.content".msg | keys')
+      kubectl create configmap -n "${NAMESPACE}" 03-verify-tramsferred-keys --from-literal=keys="${TRANSFERRED_KEYS}"

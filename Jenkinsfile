@@ -367,6 +367,7 @@ pipeline {
                         runTest('demand-backup', 'sandbox')
                         runTest('start-from-backup', 'sandbox')
                         runTest('monitoring', 'sandbox')
+                        runTest('telemetry-transfer', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }
