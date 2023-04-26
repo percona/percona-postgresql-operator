@@ -81,7 +81,7 @@ get_cr() {
 				| .spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo1"
 				| .spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
 				' "${TEMP_DIR}/cr.yaml" \
-			>"${TEMP_DIR}/backup.cr.yaml"
+				>"${TEMP_DIR}/backup.cr.yaml"
 			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
 			if [[ ${test_name} == "start-from-backup" ]]; then
 				yq eval '
@@ -104,7 +104,7 @@ get_cr() {
 				| .spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
 				| .spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'${BUCKET}'"}}]
 				' "${TEMP_DIR}/cr.yaml" \
-			>"${TEMP_DIR}/backup.cr.yaml"
+				>"${TEMP_DIR}/backup.cr.yaml"
 			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
 			;;
 		*) ;;
