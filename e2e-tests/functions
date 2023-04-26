@@ -88,7 +88,7 @@ get_cr() {
 					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]
 					| .spec.dataSource.pgbackrest.stanza = "db"
 					| .spec.dataSource.pgbackrest.global.repo1-path = "/cluster-source/demand-backup-ppg'${PG_VER}'/repo1"
-					| .spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}
+					| .spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
 					' "${TEMP_DIR}/cr.yaml" \
 					>"${TEMP_DIR}/start-from-backup.cr.yaml"
 				mv "${TEMP_DIR}/start-from-backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
