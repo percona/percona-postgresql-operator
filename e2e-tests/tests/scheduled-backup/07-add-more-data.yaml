@@ -9,9 +9,9 @@ commands:
 
       PITR_TARGET_TIME=$(run_psql \
         'select now();' \
-        "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)" | $sed -r 's/^ ([0-9.+-: ]+$)/\1/g')
+        "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)")
 
-      kubectl -n ${NAMESPACE} create configmap pitr-target --from-literal=pitr="${PITR_TARGET_TIME}"
+      kubectl -n ${NAMESPACE} create configmap pitr-target --from-literal=pitr="${PITR_TARGET_TIME/ /}"
 
       run_psql \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
