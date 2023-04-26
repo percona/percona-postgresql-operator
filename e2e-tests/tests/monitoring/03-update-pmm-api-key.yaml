@@ -9,5 +9,5 @@ commands:
       source ../../functions
 
       api_key=$(generate_pmm_api_key)
-      kubectl -n ${NAMESPACE} patch secret monitoring-pmm-secret --type merge --patch '{"stringData": {"pmmserverkey": "'${api_key}'"}}'
+      kubectl -n ${NAMESPACE} patch secret monitoring-pmm-secret --type merge --patch '{"stringData": {"PMM_SERVER_KEY": "'${api_key}'"}}'
       sleep 5
