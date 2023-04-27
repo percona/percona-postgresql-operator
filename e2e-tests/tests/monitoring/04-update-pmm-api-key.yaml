@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      api_key=$(generate_pmm_api_key)
+      [[ -n ${api_key} && ${api_key} != null ]] \
+        &&  kubectl -n ${NAMESPACE} patch secret monitoring-pmm-secret --type merge --patch '{"stringData": {"PMM_SERVER_KEY": "'${api_key}'"}}' \
+        || true
+
+      sleep 5
