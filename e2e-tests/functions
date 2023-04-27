@@ -199,7 +199,6 @@ deploy_pmm_server() {
 	helm uninstall -n "${NAMESPACE}" pmm || :
 	helm install monitoring -n "${NAMESPACE}" --set imageTag=$IMAGE_PMM_SERVER_TAG --set service.type="LoadBalancer" \
 		--set imageRepo=$IMAGE_PMM_SERVER_REPO --set platform="${platform}" "https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz"
-	wait_pod monitoring-0
 }
 
 generate_pmm_api_key() {
@@ -209,7 +208,7 @@ generate_pmm_api_key() {
 		--insecure \
 		-X POST \
 		-H "Content-Type: application/json" \
-		-d '{"name":"operator", "role": "Admin"}' \
+		-d '{"name":"'${RANDOM}'", "role": "Admin"}' \
 		--user "admin:${ADMIN_PASSWORD}" \
 		"https://${PMM_SERVICE_IP}/graph/api/auth/keys" \
 		| jq -r .key
