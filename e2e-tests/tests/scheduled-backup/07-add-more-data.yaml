@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      PITR_TARGET_TIME=$(run_psql \
+        'select now();' \
+        "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)")
+
+      kubectl -n ${NAMESPACE} create configmap pitr-target --from-literal=pitr="${PITR_TARGET_TIME/ /}"
+
+      run_psql \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
+        "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)"
+
+      data=$(run_psql '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)")
+
+      kubectl create configmap -n "${NAMESPACE}" 07-add-more-data --from-literal=data="${data}"

@@ -36,8 +36,19 @@ deploy_s3_secrets() {
 		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_ACCESS_KEY_ID' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
 		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
 		>"${TEMP_DIR}/pgbackrest-secret.ini"
+
+	case ${test_name} in
+		scheduled-backup)
+			printf 'repo2-gcs-key=/etc/pgbackrest/conf.d/gcs-key.json\n' >>"${TEMP_DIR}/pgbackrest-secret.ini"
+			yq eval '.stringData["credentials.json"]' ${TESTS_CONFIG_DIR}/cloud-secret-minio-gw.yml >${TEMP_DIR}/gcs-key.json
+			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini" --from-file=gcs-key.json=${TEMP_DIR}/gcs-key.json
+			;;
+		*)
+			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini"
+			;;
+	esac
+
 	set -o xtrace
-	kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=s3.conf="${TEMP_DIR}/pgbackrest-secret.ini"
 }
 
 deploy_client() {
@@ -47,34 +58,54 @@ deploy_client() {
 get_cr() {
 	local name_suffix=$1
 
-	yq eval "$(printf '.metadata.name="%s"' "${test_name}")" "${DEPLOY_DIR}/cr.yaml" \
-		| yq eval '.spec.postgresVersion='${PG_VER}'' - \
-		| yq eval '.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}]' - \
-		| yq eval '.spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' - \
-		| yq eval "$(printf '.spec.image="%s"' "${IMAGE_POSTGRESQL}")" - \
-		| yq eval "$(printf '.spec.backups.pgbackrest.image="%s"' "${IMAGE_BACKREST}")" - \
-		| yq eval "$(printf '.spec.proxy.pgBouncer.image="%s"' "${IMAGE_PGBOUNCER}")" - \
-		| yq eval "$(printf '.spec.pmm.image="%s"' "${IMAGE_PMM}")" - \
-		| yq eval "$(printf '.spec.pmm.secret="%s"' "${test_name}-pmm-secret")" - \
-			>"${TEMP_DIR}/cr.yaml"
+	yq eval '
+		'$(printf .metadata.name="%s" \"${test_name}\")'
+		| .metadata.labels={"e2e":"'${test_name}'"}
+		| .spec.postgresVersion='${PG_VER}'
+		| .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}]
+		| .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]
+		| '$(printf .spec.image="%s" \"${IMAGE_POSTGRESQL}\")'
+		| '$(printf .spec.backups.pgbackrest.image="%s" \"${IMAGE_BACKREST}\")'
+		| '$(printf .spec.proxy.pgBouncer.image="%s" \"${IMAGE_PGBOUNCER}\")'
+		| '$(printf .spec.pmm.image="%s" \"${IMAGE_PMM}\")'
+		| '$(printf .spec.pmm.secret="%s" \"${test_name}-pmm-secret\")'
+		' "${DEPLOY_DIR}/cr.yaml" \
+		>"${TEMP_DIR}/cr.yaml"
 
 	case ${test_name} in
 		"demand-backup" | "start-from-backup")
-			yq eval '.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/cr.yaml" \
-				| yq eval '.spec.backups.pgbackrest.manual.repoName = "repo1"' - \
-				| yq eval '.spec.backups.pgbackrest.manual.options = ["--type=full"]' - \
-				| yq eval '.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo1"' - \
-				| yq eval '.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]' - \
-					>"${TEMP_DIR}/backup.cr.yaml"
+			yq eval '
+				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]
+				| .spec.backups.pgbackrest.manual.repoName = "repo1"
+				| .spec.backups.pgbackrest.manual.options = ["--type=full"]
+				| .spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo1"
+				| .spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
+				' "${TEMP_DIR}/cr.yaml" \
+				>"${TEMP_DIR}/backup.cr.yaml"
 			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
 			if [[ ${test_name} == "start-from-backup" ]]; then
-				yq eval '.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]' "${TEMP_DIR}/cr.yaml" \
-					| yq eval '.spec.dataSource.pgbackrest.stanza = "db"' - \
-					| yq eval '.spec.dataSource.pgbackrest.global.repo1-path = "/cluster-source/demand-backup-ppg'${PG_VER}'/repo1"' - \
-					| yq eval '.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}' - \
-						>"${TEMP_DIR}/start-from-backup.cr.yaml"
+				yq eval '
+					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]
+					| .spec.dataSource.pgbackrest.stanza = "db"
+					| .spec.dataSource.pgbackrest.global.repo1-path = "/cluster-source/demand-backup-ppg'${PG_VER}'/repo1"
+					| .spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
+					' "${TEMP_DIR}/cr.yaml" \
+					>"${TEMP_DIR}/start-from-backup.cr.yaml"
 				mv "${TEMP_DIR}/start-from-backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
 			fi
+			;;
+		scheduled-backup)
+			yq eval '
+				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]
+				| .spec.backups.pgbackrest.manual.repoName = "repo1"
+				| .spec.backups.pgbackrest.manual.options = ["--type=full"]
+				| .spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo1"
+				| .spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo2"
+				| .spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
+				| .spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'${BUCKET}'"}}]
+				' "${TEMP_DIR}/cr.yaml" \
+				>"${TEMP_DIR}/backup.cr.yaml"
+			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
 			;;
 		*) ;;
 	esac

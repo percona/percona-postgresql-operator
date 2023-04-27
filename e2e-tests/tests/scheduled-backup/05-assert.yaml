@@ -1,0 +1,40 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 500
+---
+kind: CronJob
+apiVersion: batch/v1
+metadata:
+  name: scheduled-backup-repo2-full
+  labels:
+    postgres-operator.crunchydata.com/cluster: scheduled-backup
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-cronjob: full
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo2
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: scheduled-backup
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  schedule: '*/5 * * * *'
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: scheduled-backup
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-cronjob: full
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo2
+  ownerReferences:
+    - apiVersion: batch/v1
+      kind: CronJob
+      controller: true
+      blockOwnerDeletion: true
+status:
+  conditions:
+    - type: Complete
+      status: 'True'
+  succeeded: 1
