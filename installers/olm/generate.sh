@@ -72,17 +72,27 @@ kubectl kustomize "${project_directory}/config/scorecard" \
 if [ ${DISTRIBUTION} == 'community' ]; then
 yq --yaml-roundtrip < bundle.annotations.yaml > "${bundle_directory}/metadata/annotations.yaml" \
 	--arg package "${package_name}" \
+	--arg package_channel "${PACKAGE_CHANNEL}" \
+	--arg openshift_supported_versions "${OPENSHIFT_VERSIONS}" \
 '
 	.annotations["operators.operatorframework.io.bundle.package.v1"] = $package |
 	.annotations["org.opencontainers.image.authors"] = "info@percona.com" |
 	.annotations["org.opencontainers.image.url"] = "https://percona.com" |
 	.annotations["org.opencontainers.image.vendor"] = "Percona" |
+	.annotations["operators.operatorframework.io.bundle.channels.v1"] = $package_channel |
+	.annotations["operators.operatorframework.io.bundle.channel.default.v1"] = $package_channel |
+	.annotations["com.redhat.openshift.versions"] = $openshift_supported_versions |
 .'
 else
 yq --yaml-roundtrip < bundle.annotations.yaml > "${bundle_directory}/metadata/annotations.yaml" \
 	--arg package "${package_name}" \
+	--arg package_channel "${PACKAGE_CHANNEL}" \
+	--arg openshift_supported_versions "${OPENSHIFT_VERSIONS}" \
 '
 	.annotations["operators.operatorframework.io.bundle.package.v1"] = $package |
+	.annotations["operators.operatorframework.io.bundle.channels.v1"] = $package_channel |
+	.annotations["operators.operatorframework.io.bundle.channel.default.v1"] = $package_channel |
+	.annotations["com.redhat.openshift.versions"] = $openshift_supported_versions |
 .'
 fi
 
@@ -133,17 +143,20 @@ yq --yaml-roundtrip < bundle.csv.yaml > "${bundle_directory}/manifests/${file_na
 	--argjson crds "${crd_descriptions}" \
 	--arg examples "${crd_examples}" \
 	--arg version "${PGO_VERSION}" \
-	--arg replaces "${REPLACES_VERSION}" \
+	--arg minKubeVer "${MIN_KUBE_VERSION}" \
 	--arg description "$(< description.md)" \
-	--arg icon "$(base64 ../icon.png | tr -d '\n')" \
+	--arg icon "$(base64 -i ../icon.png | tr -d '\n')" \
 	--arg stem "${csv_stem}" \
+	--arg timestamp "$(date -u '+%FT%T%Z')" \
 '
 	.metadata.annotations["alm-examples"] = $examples |
 	.metadata.annotations["containerImage"] = ($deployment.spec.template.spec.containers[0].image) |
+	.metadata.annotations["olm.skipRange"] = "<v\($version)" |
+	.metadata.annotations["createdAt"] = $timestamp |
 
 	.metadata.name = "\($stem).v\($version)" |
 	.spec.version = $version |
-	.spec.replaces = "\($stem).v\($replaces)" |
+	.spec.minKubeVersion = $minKubeVer |
 
 	.spec.customresourcedefinitions.owned = $crds |
 	.spec.description = $description |

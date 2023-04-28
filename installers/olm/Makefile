@@ -3,7 +3,9 @@
 
 CONTAINER ?= docker
 PGO_VERSION ?= 2.1.0
-REPLACES_VERSION ?= 2.0.0
+OPENSHIFT_VERSIONS ?= v4.10-v4.12
+PACKAGE_CHANNEL ?= preview
+MIN_KUBE_VERSION ?= 1.22.0
 
 SHELL := /bin/bash
 
@@ -19,8 +21,9 @@ SYSTEM = $(OS_KERNEL)-$(OS_MACHINE)
 export PATH := $(CURDIR)/tools/$(SYSTEM):$(PATH)
 
 export PGO_VERSION
-
-export REPLACES_VERSION
+export OPENSHIFT_VERSIONS
+export PACKAGE_CHANNEL
+export MIN_KUBE_VERSION
 
 distros = community redhat marketplace
 
