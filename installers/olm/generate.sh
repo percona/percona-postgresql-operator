@@ -151,7 +151,7 @@ yq --yaml-roundtrip < bundle.csv.yaml > "${bundle_directory}/manifests/${file_na
 '
 	.metadata.annotations["alm-examples"] = $examples |
 	.metadata.annotations["containerImage"] = ($deployment.spec.template.spec.containers[0].image) |
-	.metadata.annotations["olm.skipRange"] = "<v\($version)" |
+	.metadata.annotations["olm.skipRange"] = ">=2.0.0 <v\($version)" |
 	.metadata.annotations["createdAt"] = $timestamp |
 
 	.metadata.name = "\($stem).v\($version)" |
