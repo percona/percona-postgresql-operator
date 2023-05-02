@@ -1,7 +1,5 @@
 # Percona Operator for PostgreSQL
 
-<div align="center">
-
 ![Percona Kubernetes Operators](kubernetes.png)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -10,8 +8,6 @@
 ![GitHub tag (latest by SemVer)](https://img.shields.io/github/v/tag/percona/percona-postgresql-operator?include_prereleases&sort=semver)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/percona/percona-postgresql-operator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/percona-postgresql-operator)](https://goreportcard.com/report/github.com/percona/percona-postgresql-operator)
-
-</div>
 
 ## Introduction
 
