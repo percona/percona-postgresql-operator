@@ -1,0 +1,40 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    backrest-command: backup
+    pgha-backup-type: bootstrap
+    pgo-backrest: 'true'
+    pgo-backrest-job: 'true'
+    pgouser: admin
+    vendor: crunchydata
+status:
+  conditions:
+    - type: Complete
+      status: 'True'
+  succeeded: 1
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    pgo-pg-database: 'true'
+    pgo-version: 1.4.0
+    vendor: crunchydata
+  annotations:
+    deployment.kubernetes.io/revision: '1'
+status:
+  observedGeneration: 1
+  replicas: 1
+  updatedReplicas: 1
+  readyReplicas: 1
+  availableReplicas: 1
+  conditions:
+    - type: Available
+      status: 'True'
+    - type: Progressing
+      status: 'True'

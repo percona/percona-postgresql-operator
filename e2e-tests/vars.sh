@@ -22,6 +22,7 @@ export IMAGE_PMM=${IMAGE_PMM:-"perconalab/pmm-client:dev-latest"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
 export IMAGE_PMM_SERVER_REPO=${IMAGE_PMM_SERVER_REPO:-"perconalab/pmm-server"}
 export IMAGE_PMM_SERVER_TAG=${IMAGE_PMM_SERVER_TAG:-"dev-latest"}
+export PGV1_TAG=1.4.0
 
 date=$(which gdate || which date)
 sed=$(which gsed || which sed)

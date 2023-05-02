@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      POSTGRES_V1_CLUSTER_NAME=$(kubectl -n ${NAMESPACE} get configmap/v1-cluster-name --template='{{index .data "v1-cluster-name"}}')
+
+      get_cr \
+        | yq eval '
+            .spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]
+            | .spec.backups.pgbackrest.global.repo1-path="/backrestrepo/'${POSTGRES_V1_CLUSTER_NAME}'-backrest-shared-repo/"
+            | .spec.backups.pgbackrest.repos=[{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
+            | .spec.dataSource.postgresCluster.repoName="repo1"
+            ' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
+      sleep 5
+      kubectl -n ${NAMESPACE} wait --for=condition=Complete job/migration-backup-s3-pgbackrest-restore --timeout=300s
