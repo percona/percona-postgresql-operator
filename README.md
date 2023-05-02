@@ -1,8 +1,8 @@
 # Percona Operator for PostgreSQL
 
-![Percona Kubernetes Operators](kubernetes.png)
-
 <div align="center">
+
+![Percona Kubernetes Operators](kubernetes.png)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 ![Docker Pulls](https://img.shields.io/docker/pulls/percona/percona-postgresql-operator)
@@ -11,6 +11,8 @@
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/percona/percona-postgresql-operator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/percona-postgresql-operator)](https://goreportcard.com/report/github.com/percona/percona-postgresql-operator)
 
+</div>
+
 ## Introduction
 
 Percona Operator for PostgreSQL automates and simplifies deploying and managing open source PostgreSQL clusters on Kubernetes. Percona Operator for PostgreSQL is based on [Postgres Operator](https://crunchydata.github.io/postgres-operator/latest/) developed by Crunchy Data.
@@ -18,15 +20,11 @@ Percona Operator for PostgreSQL automates and simplifies deploying and managing 
 Whether you need to get a simple PostgreSQL cluster up and running, need to deploy a high availability, fault tolerant cluster in production, or are running your own database-as-a-service, the Operator provides the essential features you need to keep your clusters healthy:
 
 - PostgreSQL cluster provisioning
-- High availability
-- Disaster recovery
-- Communication security
+- High availability and disaster recovery
 - Automated user management with password rotation
-- Automated updates management
+- Automated updates
 - Support for both asynchronous and synchronous replication
-- Connection pooling with [pgBouncer](https://access.crunchydata.com/documentation/postgres-operator/latest/tutorial/pgbouncer/)
 - Scheduled and manual backups
-- Multi-Namespace Support
 - Integrated monitoring with [Percona Monitoring and Management](https://www.percona.com/software/database-tools/percona-monitoring-and-management)
 
 ## Status
