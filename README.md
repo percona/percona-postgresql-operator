@@ -1,6 +1,6 @@
 # Percona Operator for PostgreSQL
 
-![Percona Kubernetes Operators](kubernetes.png)
+![Percona Kubernetes Operators](kubernetes.svg)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 ![Docker Pulls](https://img.shields.io/docker/pulls/percona/percona-postgresql-operator)
