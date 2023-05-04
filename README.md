@@ -135,7 +135,7 @@ See the [Contribution Guide](CONTRIBUTING.md) for more information.
 
 You can get early access to new product features, invite-only ”ask me anything” sessions with Percona Kubernetes experts, and monthly swag raffles. Interested? Fill in the form at [percona.com/k8s](https://www.percona.com/k8s).
 
-## Roadmap
+# Roadmap
 
 We have an experimental public roadmap which can be found [here](https://github.com/percona/roadmap/projects/1). Please feel free to contribute and propose new features by following the roadmap [guidelines](https://github.com/percona/roadmap).
 
