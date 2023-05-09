@@ -35,7 +35,7 @@ catalog_source() (
 	# Wait for Pod to exist and be healthy.
 	for _ in $(seq 10); do
 		[ '[]' != "$( kc get pod --selector="olm.catalogSource=${source_name}" --output=jsonpath='{.items}' )" ] &&
-			break || sleep 1s
+			break || sleep 1
 	done
 	if ! kc wait --for='condition=ready' --timeout='30s' pod --selector="olm.catalogSource=${source_name}"; then
 		kc logs --previous --tail='-1' --selector="olm.catalogSource=${source_name}"
@@ -70,12 +70,12 @@ operator() (
 	target_namespaces=("${@:4}")
 
 	package_name=$(yq \
-		--raw-output '.annotations["operators.operatorframework.io.bundle.package.v1"]' \
+		eval '.annotations["operators.operatorframework.io.bundle.package.v1"]' \
 		"${bundle_directory}"/*/annotations.yaml)
 	channel_name=$(yq \
-		--raw-output '.annotations["operators.operatorframework.io.bundle.channels.v1"]' \
+		eval '.annotations["operators.operatorframework.io.bundle.channels.v1"]' \
 		"${bundle_directory}"/*/annotations.yaml)
-	csv_name=$(yq --raw-output '.metadata.name' \
+	csv_name=$(yq eval '.metadata.name' \
 		"${bundle_directory}"/*/*.clusterserviceversion.yaml)
 
 	kc() { kubectl --namespace="$operator_namespace" "$@"; }
@@ -106,7 +106,7 @@ operator() (
 	# Wait for the InstallPlan to exist and be healthy.
 	for _ in $(seq 10); do
 		[ '[]' != "$( kc get installplan --output=jsonpath="{.items}" )" ] &&
-			break || sleep 1s
+			break || sleep 1
 	done
 	if ! kc wait --for='condition=installed' --timeout='30s' installplan --all; then
 		subscription_uid="$( kc get subscription "$package_name" --output=jsonpath='{.metadata.uid}' )"
@@ -120,7 +120,7 @@ operator() (
 	# Wait for Deployment to exist and be healthy.
 	for _ in $(seq 10); do
 		[ '[]' != "$( kc get deploy --selector="olm.owner=$csv_name" --output=jsonpath='{.items}' )" ] &&
-			break || sleep 1s
+			break || sleep 1
 	done
 	if ! kc wait --for='condition=available' --timeout='30s' deploy --selector="olm.owner=$csv_name"; then
 		kc describe pod --selector="olm.owner=$csv_name"
