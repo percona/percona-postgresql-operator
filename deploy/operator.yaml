@@ -42,7 +42,7 @@ spec:
           value: "true"
         - name: DISABLE_TELEMETRY
           value: "false"
-        image: perconalab/percona-postgresql-operator:main
+        image: perconalab/percona-postgresql-operator:k8spg-359-improvement-user-defined-secret-name
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
