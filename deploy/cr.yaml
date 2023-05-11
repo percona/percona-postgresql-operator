@@ -27,6 +27,7 @@ spec:
 #      options: "SUPERUSER"
 #      password:
 #        type: ASCII
+#      secretName: "rhino-credentials"
 
 #  databaseInitSQL:
 #    key: init.sql
