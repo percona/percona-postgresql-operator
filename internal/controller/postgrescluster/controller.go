@@ -466,6 +466,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, r.watchPods()).
+		Watches(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()).
 		Watches(&source.Kind{Type: &appsv1.StatefulSet{}},
 			r.controllerRefHandlerFuncs()). // watch all StatefulSets
 		Complete(r)

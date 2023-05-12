@@ -141,3 +141,87 @@ func TestWatchPodsUpdate(t *testing.T) {
 		queue.Done(item)
 	})
 }
+
+func TestSecretsUpdate(t *testing.T) {
+	queue := controllertest.Queue{Interface: workqueue.New()}
+	reconciler := &Reconciler{}
+
+	update := reconciler.watchSecrets().UpdateFunc
+	assert.Assert(t, update != nil)
+
+	// No metadata; no reconcile.
+	update(event.UpdateEvent{
+		ObjectOld: &corev1.Secret{},
+		ObjectNew: &corev1.Secret{},
+	}, queue)
+	assert.Equal(t, queue.Len(), 0)
+
+	// Cluster label, but nothing else; no reconcile.
+	update(event.UpdateEvent{
+		ObjectOld: &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"postgres-operator.crunchydata.com/cluster": "starfish",
+				},
+			},
+		},
+		ObjectNew: &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"postgres-operator.crunchydata.com/cluster": "starfish",
+				},
+			},
+		},
+	}, queue)
+	assert.Equal(t, queue.Len(), 0)
+
+	// Secret data not changed; no reconcile.
+	update(event.UpdateEvent{
+		ObjectOld: &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"postgres-operator.crunchydata.com/cluster": "starfish",
+				},
+			},
+			Data: map[string][]byte{
+				"password": []byte("secret"),
+			},
+		},
+		ObjectNew: &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"postgres-operator.crunchydata.com/cluster": "starfish",
+				},
+			},
+			Data: map[string][]byte{
+				"password": []byte("secret"),
+			},
+		},
+	}, queue)
+	assert.Equal(t, queue.Len(), 0)
+
+	// Secret data changed; one reconcile.
+	update(event.UpdateEvent{
+		ObjectOld: &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"postgres-operator.crunchydata.com/cluster": "starfish",
+				},
+			},
+			Data: map[string][]byte{
+				"password": []byte("secret"),
+			},
+		},
+		ObjectNew: &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"postgres-operator.crunchydata.com/cluster": "starfish",
+				},
+			},
+			Data: map[string][]byte{
+				"password": []byte("secret-updated"),
+			},
+		},
+	}, queue)
+	assert.Equal(t, queue.Len(), 1)
+}
