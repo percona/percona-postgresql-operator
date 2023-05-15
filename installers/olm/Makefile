@@ -6,7 +6,7 @@ PGO_VERSION ?= 2.1.0
 OPENSHIFT_VERSIONS ?= v4.10-v4.12
 PACKAGE_CHANNEL ?= preview
 MIN_KUBE_VERSION ?= 1.23.0
-DOCKER_DEFAULT_PLATFORM ?=linux/amd64
+DOCKER_DEFAULT_PLATFORM ?= linux/amd64
 SHELL := /bin/bash
 
 ifeq ($(shell bash -c 'echo $$BASH_VERSION | cut -d "." -f1'), 5)
