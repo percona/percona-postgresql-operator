@@ -25,7 +25,3 @@ This Kuttl routine runs through the following steps:
 - 09: Connects to the cluster with the user-defined password (both with env vars and with the URI) for the custom user
 - 10: Change the custom user's password and verifier (using Kuttl's update object method on the secret's `stringData` field) and verify that the password changes by asserting that the `uri` field is not blank (using KUTTL's `errors` method, which makes sure that a state is _not_ met by a certain time)
 - 11: Connects to the cluster with the second user-defined password (both with env vars and with the URI) for the custom user
-
-### Custom user secret name
-
-- 12: Verify the postgrescluster spec with a custom user secret names generate creds
