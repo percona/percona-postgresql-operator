@@ -16,9 +16,6 @@
 package postgrescluster
 
 import (
-	"reflect"
-
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -54,24 +51,6 @@ func (*Reconciler) watchPods() handler.Funcs {
 			if len(cluster) != 0 &&
 				(patroni.PodRequiresRestart(e.ObjectOld) ||
 					patroni.PodRequiresRestart(e.ObjectNew)) {
-				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
-					Namespace: e.ObjectNew.GetNamespace(),
-					Name:      cluster,
-				}})
-				return
-			}
-		},
-	}
-}
-
-func (*Reconciler) watchSecrets() handler.Funcs {
-	return handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
-			labels := e.ObjectNew.GetLabels()
-			cluster := labels[naming.LabelCluster]
-
-			if len(cluster) != 0 &&
-				!reflect.DeepEqual(e.ObjectNew.(*corev1.Secret).Data, e.ObjectOld.(*corev1.Secret).Data) {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      cluster,
