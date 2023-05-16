@@ -3,6 +3,7 @@ package pgcluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -16,6 +17,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -38,16 +40,21 @@ const (
 
 // Reconciler holds resources for the PerconaPGCluster reconciler
 type PGClusterReconciler struct {
-	Client      client.Client
-	Owner       client.FieldOwner
-	Recorder    record.EventRecorder
-	Tracer      trace.Tracer
-	Platform    string
-	KubeVersion string
+	Client            client.Client
+	Owner             client.FieldOwner
+	Recorder          record.EventRecorder
+	Tracer            trace.Tracer
+	Platform          string
+	KubeVersion       string
+	CrunchyController controller.Controller
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
+	if err := r.CrunchyController.Watch(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()); err != nil {
+		return errors.Wrap(err, "unable to watch secrets")
+	}
+
 	return builder.ControllerManagedBy(mgr).
 		For(&v2beta1.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
@@ -78,12 +85,13 @@ func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 
-			_, ok := labels[v2beta1.LabelPMMSecret]
-			if ok {
+			if len(crName) != 0 &&
+				!reflect.DeepEqual(e.ObjectNew.(*corev1.Secret).Data, e.ObjectOld.(*corev1.Secret).Data) {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      crName,
 				}})
+				return
 			}
 		},
 	}

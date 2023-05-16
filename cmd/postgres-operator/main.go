@@ -20,10 +20,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	cruntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
@@ -108,6 +110,26 @@ func main() {
 	log.Info("signal received, exiting")
 }
 
+// This manager is needed to receive a crunchy controller without modifying the crunchy code.
+// It should be used in the `(r *postgrescluster.Reconciler) SetupWithManager(mgr manager.Manager)` method.
+// A Crunchy controller is received when `controller.New` is called which uses the `Add` method.
+// This manager has a custom `Add` method which additionally sets a controller to the manager if provided.
+type customManager struct {
+	manager.Manager
+
+	ctrl controller.Controller
+}
+
+func (m *customManager) Add(r manager.Runnable) error {
+	if err := m.Manager.Add(r); err != nil {
+		return err
+	}
+	if ctrl, ok := r.(controller.Controller); ok {
+		m.ctrl = ctrl
+	}
+	return nil
+}
+
 // addControllersToManager adds all PostgreSQL Operator controllers to the provided controller
 // runtime manager.
 func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
@@ -118,17 +140,22 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Tracer:      otel.Tracer(postgrescluster.ControllerName),
 		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
 	}
-	if err := r.SetupWithManager(mgr); err != nil {
+	cm := &customManager{Manager: mgr}
+	if err := r.SetupWithManager(cm); err != nil {
 		return err
+	}
+	if cm.ctrl == nil {
+		return errors.New("missing controller in manager")
 	}
 
 	pc := &pgcluster.PGClusterReconciler{
-		Client:      mgr.GetClient(),
-		Owner:       pgcluster.PGClusterControllerName,
-		Recorder:    mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
-		Tracer:      otel.Tracer(pgcluster.PGClusterControllerName),
-		Platform:    detectPlatform(ctx, mgr.GetConfig()),
-		KubeVersion: getServerVersion(ctx, mgr.GetConfig()),
+		Client:            mgr.GetClient(),
+		Owner:             pgcluster.PGClusterControllerName,
+		Recorder:          mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
+		Tracer:            otel.Tracer(pgcluster.PGClusterControllerName),
+		Platform:          detectPlatform(ctx, mgr.GetConfig()),
+		KubeVersion:       getServerVersion(ctx, mgr.GetConfig()),
+		CrunchyController: cm.ctrl,
 	}
 	if err := pc.SetupWithManager(mgr); err != nil {
 		return err
