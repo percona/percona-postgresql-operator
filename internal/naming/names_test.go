@@ -174,6 +174,13 @@ func TestClusterNamesUniqueAndValid(t *testing.T) {
 				assert.Assert(t, !strings.HasPrefix(name, prefix), "%q may collide", name)
 			}
 		})
+
+		t.Run("PostgresCustomUserSecretName", func(t *testing.T) {
+			value := PostgresCustomUserSecretName(cluster, "some-secret-name")
+
+			assert.Equal(t, value.Namespace, cluster.Namespace)
+			assert.Assert(t, nil == validation.IsDNS1123Label(value.Name))
+		})
 	})
 
 	t.Run("ServiceAccounts", func(t *testing.T) {

@@ -525,6 +525,15 @@ func PostgresUserSecret(cluster *v1beta1.PostgresCluster, username string) metav
 	}
 }
 
+// PostgresCustomUserSecretName returns the ObjectMeta necessary to lookup a Secret
+// containing a PostgreSQL user and its connection information.
+func PostgresCustomUserSecretName(cluster *v1beta1.PostgresCluster, name string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      name,
+	}
+}
+
 // PostgresTLSSecret returns the ObjectMeta necessary to lookup the Secret
 // containing the default Postgres TLS certificates and key
 func PostgresTLSSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
