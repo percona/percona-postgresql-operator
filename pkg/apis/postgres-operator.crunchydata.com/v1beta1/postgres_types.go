@@ -67,4 +67,8 @@ type PostgresUserSpec struct {
 	// Properties of the password generated for this user.
 	// +optional
 	Password *PostgresPasswordSpec `json:"password,omitempty"`
+
+	// The secret name to generate user, password, connection info this PostgreSQL user.
+	// +optional
+	SecretName PostgresIdentifier `json:"secretName,omitempty"`
 }

@@ -51,6 +51,7 @@ Users and databases can be customized in the `spec.users` section of the custom 
 - For any users added in `spec.users`, PGO will created a Secret of the format `<clusterName>-pguser-<userName>`. This will contain the user credentials.
   - If no databases are specified, `dbname` and `uri` will not be present in the Secret.
   - If at least one `spec.users.databases` is specified, the first database in the list will be populated into the connection credentials.
+- For any users which has custom secret name added in `spec.users`, PGO will created a Secret with that name. This will contain the user credentials.
 - To prevent accidental data loss, PGO does not automatically drop users. We will see how to drop a user below.
 - Similarly, to prevent accidental data loss PGO does not automatically drop databases. We will see how to drop a database below.
 - Role attributes are not automatically dropped if you remove them. You will have to set the inverse attribute to drop them (e.g. `NOSUPERUSER`).
