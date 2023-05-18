@@ -15973,6 +15973,12 @@ spec:
                       required:
                       - type
                       type: object
+                    secretName:
+                      description: The secret name to generate user, password, connection
+                        info this PostgreSQL user.
+                      maxLength: 63
+                      minLength: 1
+                      type: string
                   required:
                   - name
                   type: object
