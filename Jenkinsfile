@@ -365,6 +365,7 @@ pipeline {
                         CreateCluster('sandbox')
                         runTest('init-deploy', 'sandbox')
                         runTest('demand-backup', 'sandbox')
+                        runTest('scaling', 'sandbox')
                         runTest('scheduled-backup', 'sandbox')
                         runTest('start-from-backup', 'sandbox')
                         runTest('monitoring', 'sandbox')
