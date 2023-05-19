@@ -91,7 +91,6 @@ func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      crName,
 				}})
-				return
 			}
 		},
 	}
