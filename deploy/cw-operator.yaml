@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/part-of: percona-postgresql-operator
     pg.percona.com/control-plane: postgres-operator
   name: percona-postgresql-operator
+  namespace: pg-operator
 spec:
   replicas: 1
   selector:
@@ -30,11 +31,6 @@ spec:
     spec:
       containers:
       - env:
-        - name: PGO_TARGET_NAMESPACE
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
         - name: PGO_NAMESPACE
           valueFrom:
             fieldRef:

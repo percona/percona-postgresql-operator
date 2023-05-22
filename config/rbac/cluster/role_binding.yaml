@@ -10,3 +10,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: percona-postgresql-operator
+  namespace: pg-operator

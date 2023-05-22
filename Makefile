@@ -293,7 +293,7 @@ pull: $(images:%=pull-%) ;
 pull-%:
 	$(IMG_PUSHER_PULLER) pull $(PGO_IMAGE_PREFIX)/$*:$(PGO_IMAGE_TAG)
 
-generate: kustomize generate-crd generate-deepcopy generate-rbac generate-manager generate-bundle
+generate: kustomize generate-crd generate-deepcopy generate-rbac generate-manager generate-bundle generate-cw
 
 generate-crunchy-crd:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
@@ -332,16 +332,25 @@ generate-rbac:
 	$(KUSTOMIZE) build ./config/rbac/namespace/ > ./deploy/rbac.yaml
 
 generate-manager:
-	cd ./config/manager/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	$(KUSTOMIZE) build ./config/manager/ > ./deploy/operator.yaml
+	cd ./config/manager/namespace/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/manager/namespace/ > ./deploy/operator.yaml
 
 generate-bundle:
 	cd ./config/bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
 	$(KUSTOMIZE) build ./config/bundle/ > ./deploy/bundle.yaml
 
+generate-cw: generate-cw-rbac generate-cw-manager generate-cw-bundle
+
+generate-cw-rbac:
+	$(KUSTOMIZE) build ./config/rbac/cluster/ > ./deploy/cw-rbac.yaml
+
+generate-cw-manager:
+	cd ./config/manager/cluster && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/manager/cluster/ > ./deploy/cw-operator.yaml
+
 generate-cw-bundle:
-	cd ./config/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	$(KUSTOMIZE) build ./config/default/ > ./deploy/cw-bundle.yaml
+	cd ./config/cw-bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/cw-bundle/ > ./deploy/cw-bundle.yaml
 
 SWAGGER = $(shell pwd)/bin/swagger
 swagger: ## Download swagger locally if necessary.

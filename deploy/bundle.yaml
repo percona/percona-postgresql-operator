@@ -30337,11 +30337,12 @@ spec:
     spec:
       containers:
       - env:
-        - name: PGO_NAMESPACE
+        - name: PGO_TARGET_NAMESPACE
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: metadata.namespace
-        - name: PGO_TARGET_NAMESPACE
+        - name: PGO_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
