@@ -15,7 +15,16 @@ status:
   updatedReplicas: 1
 ---
 apiVersion: v1
-kind: Secret
-type: Opaque
-metadata:
-  name: monitoring-pmm-secret
+count: 1
+involvedObject:
+  apiVersion: v1
+  kind: Service
+  name: monitoring-service
+kind: Event
+message: Ensured load balancer
+reason: EnsuredLoadBalancer
+reportingComponent: ""
+reportingInstance: ""
+source:
+  component: service-controller
+type: Normal

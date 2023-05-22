@@ -1,0 +1,104 @@
+{
+  "versions": [
+    {
+      "operator": "9.9.9",
+      "product": "pg-operator",
+      "matrix": {
+        "postgresql": {
+          "12.14": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg12-postgres",
+            "image_hash": "950b63972fb5ddcdb50adca3306b3894ae6c2c64d16c36096101a64a6bc9bbb2",
+            "status": "available",
+            "critical": false
+          },
+          "13.10": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg13-postgres",
+            "image_hash": "e728d6f70b427e7752703cb20b38b456090e47079535d2f62ef224f7544bddfd",
+            "status": "available",
+            "critical": false
+          },
+          "14.7": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg14-postgres",
+            "image_hash": "1f1ae0278071f3331db3fbd368baa0ef2c28fadd497e2d8fb7ad5904f5113945",
+            "status": "available",
+            "critical": false
+          },
+          "15.2": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg15-postgres",
+            "image_hash": "a00da56a3a907b585a6eab8b4522864285878291240e07914c060eefbbc7c543",
+            "status": "recommended",
+            "critical": false
+          }
+        },
+        "pmm": {
+          "2.37.0": {
+            "image_path": "percona/pmm-client:2.37.0",
+            "image_hash": "e1e2f4cbfd4ce4be5d883330d810e9962a62531e2da07f1b115077a49ff97ed5",
+            "status": "recommended",
+            "critical": false
+          }
+        },
+        "pgbackrest": {
+          "12.14": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg12-pgbackrest",
+            "image_hash": "8b3515ad7bd0fd572d2ee3334eeb8f6c213baf39be65ff2c1dde5c1b50fe4ea2",
+            "status": "available",
+            "critical": false
+          },
+          "13.10": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg13-pgbackrest",
+            "image_hash": "05fb839203eecc2f3151bf72df3bccc31d5d6409d6bc7ba288fcdf06896c5029",
+            "status": "available",
+            "critical": false
+          },
+          "14.7": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg14-pgbackrest",
+            "image_hash": "80df91c4d8d9092351ff33f2d476df74366c4eb82c296dbc4edb307fc0407171",
+            "status": "available",
+            "critical": false
+          },
+          "15.2": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg15-pgbackrest",
+            "image_hash": "06ca64615c324ae97c79e95349f33995cc47843caa452ce9740ea4ccd3a455e1",
+            "status": "recommended",
+            "critical": false
+          }
+        },
+        "pgbouncer": {
+          "12.14": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg12-pgbouncer",
+            "image_hash": "cd52276253214f37f66714dcd5a9fcafa21e2aff02048e8fda2f3d5affba13ca",
+            "status": "available",
+            "critical": false
+          },
+          "13.10": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg13-pgbouncer",
+            "image_hash": "cdeb1de7882067a49d20024a7959cadb5efa627420bad6a95e4036b1643aa7a4",
+            "status": "available",
+            "critical": false
+          },
+          "14.7": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg14-pgbouncer",
+            "image_hash": "c144eb7bf7c0f332785ec49785f5c974325c9bd467488d9e624ca8d744da4cfc",
+            "status": "available",
+            "critical": false
+          },
+          "15.2": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0-ppg15-pgbouncer",
+            "image_hash": "ff89002b697ad820e638410e8851d8b71ec2b2c1b008dc18ec0aaf69ff03da91",
+            "status": "recommended",
+            "critical": false
+          }
+        },
+        "operator": {
+          "9.9.9": {
+            "image_path": "percona/percona-postgresql-operator:2.1.0",
+            "image_hash": "538076c55e2fb2e7c8964a793dfaf56dea4ce276e839e0cd8ac7da54966784a8",
+            "status": "recommended",
+            "critical": false
+          }
+        }
+      }
+    }
+  ]
+}

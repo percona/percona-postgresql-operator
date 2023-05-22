@@ -3,8 +3,10 @@
 
 CONTAINER ?= docker
 PGO_VERSION ?= 2.1.0
-REPLACES_VERSION ?= 2.0.0
-
+OPENSHIFT_VERSIONS ?= v4.10-v4.12
+PACKAGE_CHANNEL ?= preview
+MIN_KUBE_VERSION ?= 1.23.0
+DOCKER_DEFAULT_PLATFORM ?= linux/amd64
 SHELL := /bin/bash
 
 ifeq ($(shell bash -c 'echo $$BASH_VERSION | cut -d "." -f1'), 5)
@@ -19,8 +21,10 @@ SYSTEM = $(OS_KERNEL)-$(OS_MACHINE)
 export PATH := $(CURDIR)/tools/$(SYSTEM):$(PATH)
 
 export PGO_VERSION
-
-export REPLACES_VERSION
+export OPENSHIFT_VERSIONS
+export PACKAGE_CHANNEL
+export MIN_KUBE_VERSION
+export DOCKER_DEFAULT_PLATFORM
 
 distros = community redhat marketplace
 

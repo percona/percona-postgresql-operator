@@ -1,0 +1,39 @@
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: monitoring
+  generation: 2
+  ownerReferences:
+    - apiVersion: pg.percona.com/v2beta1
+      kind: PerconaPGCluster
+      name: monitoring
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: monitoring
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+    postgres-operator.crunchydata.com/patroni: monitoring-ha
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+status:
+  phase: Running
+  conditions:
+    - type: Initialized
+      status: 'True'
+    - type: Ready
+      status: 'True'
+    - type: ContainersReady
+      status: 'True'
+    - type: PodScheduled
+      status: 'True'

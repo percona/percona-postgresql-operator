@@ -1,6 +1,7 @@
 package k8s
 
 import (
+
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -42,6 +43,7 @@ func ObjectHash(obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil

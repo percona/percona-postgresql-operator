@@ -13,8 +13,7 @@ void CreateCluster(String CLUSTER_SUFFIX, String SUBNETWORK = CLUSTER_SUFFIX) {
                 gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                 gcloud config set project $GCP_PROJECT
                 gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $GKERegion --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
-                gcloud container clusters create --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.21 --machine-type=n1-standard-4 --preemptible --num-nodes=\$NODES_NUM --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${SUBNETWORK} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 && \
-                gcloud container clusters update --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX} --update-labels delete-cluster-after-hours=6 && \
+                gcloud container clusters create --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.22 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=\$NODES_NUM --network=jenkins-pg-vpc --subnetwork=jenkins-pg-${SUBNETWORK} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 && \
                 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
                 if [ \${ret_val} -eq 0 ]; then break; fi
                 ret_num=\$((ret_num + 1))
@@ -306,7 +305,7 @@ pipeline {
                                      -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                                      -w /go/src/github.com/percona/percona-postgresql-operator \
                                      -e GO111MODULE=on \
-                                     golang:1.19 sh -c '
+                                     golang:1.20 sh -c '
                                          go install github.com/google/go-licenses@latest;
                                          /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
                                              | cut -d , -f 3 \
@@ -330,7 +329,7 @@ pipeline {
                                      -w /go/src/github.com/percona/percona-postgresql-operator \
                                      -e GO111MODULE=on \
                                      -e GOFLAGS='-buildvcs=false' \
-                                     golang:1.19 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
+                                     golang:1.20 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
                              "
                          '''
 
@@ -366,8 +365,11 @@ pipeline {
                         CreateCluster('sandbox')
                         runTest('init-deploy', 'sandbox')
                         runTest('demand-backup', 'sandbox')
+                        runTest('scaling', 'sandbox')
+                        runTest('scheduled-backup', 'sandbox')
                         runTest('start-from-backup', 'sandbox')
                         runTest('monitoring', 'sandbox')
+                        runTest('telemetry-transfer', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }

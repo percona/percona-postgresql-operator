@@ -1,0 +1,18 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 05-verify-tramsferred-helm-cr
+data:
+  keys: |-
+    [
+      "apply",
+      "customResourceUid",
+      "databaseVersion",
+      "helmDeployCr",
+      "helmDeployOperator",
+      "kubeVersion",
+      "operatorVersion",
+      "platform",
+      "pmmEnabled",
+      "product"
+    ]

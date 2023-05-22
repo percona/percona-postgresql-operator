@@ -1,0 +1,18 @@
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGCluster
+metadata:
+  name: scheduled-backup
+spec:
+  backups:
+    pgbackrest:
+      repos:
+        - name: repo1
+          s3:
+            bucket: pg-operator-testing
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+          schedules:
+            full: "*/5 * * * *"
+        - gcs:
+            bucket: pg-operator-testing
+          name: repo2

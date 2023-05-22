@@ -1,0 +1,8 @@
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  labels:
+    run: version-service
+status:
+  phase: Running

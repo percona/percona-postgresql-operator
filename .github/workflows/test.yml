@@ -8,9 +8,9 @@ jobs:
       - name: Clone the code
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: '^1.19'
+          go-version: '^1.20'
       - uses: actions/checkout@v3
       - name: envtest
-        run: ENVTEST_K8S_VERSION=1.21 make check
+        run: ENVTEST_K8S_VERSION=1.22 make check

@@ -29,4 +29,9 @@ commands:
          echo  "The $instance pod was not deleted from server inventory"
          exit 1
       fi
+
+      get_cr \
+        | yq eval '.spec.pause=false' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
+
     timeout: 120

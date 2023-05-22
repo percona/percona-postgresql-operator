@@ -8,7 +8,4 @@ commands:
       source ../../functions
 
       deploy_pmm_server
-
-      api_key=$(generate_pmm_api_key)
-      kubectl create -n "${NAMESPACE}" secret generic monitoring-pmm-secret --from-literal=PMM_SERVER_KEY=${api_key}
     timeout: 300
