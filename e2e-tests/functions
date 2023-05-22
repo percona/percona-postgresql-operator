@@ -136,6 +136,18 @@ get_psql_user_host() {
 	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" --template='{{.data.host | base64decode }}'
 }
 
+get_instance_set_pods() {
+	local instance=${1:-instance1}
+
+	kubectl get pods -n ${NAMESPACE} --selector postgres-operator.crunchydata.com/instance-set=${instance} -o custom-columns='NAME:.metadata.name' --no-headers
+}
+
+get_psql_pod_host() {
+	local pod=${1}
+
+	echo "${pod}.${test_name}-pods.${NAMESPACE}.svc"
+}
+
 wait_pod() {
 	local pod=$1
 
@@ -214,7 +226,7 @@ generate_pmm_api_key() {
 		| jq -r .key
 }
 
-function get_metric_values() {
+get_metric_values() {
 	local metric=$1
 	local instance=$2
 	local api_key=$3
@@ -227,7 +239,7 @@ function get_metric_values() {
 		| grep '^"[0-9]'
 }
 
-function get_qan20_values() {
+get_qan20_values() {
 	local instance=$1
 	local api_key=$2
 	local start=$($date -u "+%Y-%m-%dT%H:%M:%S" -d "-30 minute")
