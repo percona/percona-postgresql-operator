@@ -1,0 +1,43 @@
+[
+  {
+    "op": "add",
+    "path": "/spec/versions/1",
+    "value": {
+      "deprecated": true,
+      "name": "v1",
+      "schema": {
+        "openAPIV3Schema": {
+          "properties": {
+            "spec": {
+              "type": "object",
+              "x-kubernetes-preserve-unknown-fields": true
+            },
+            "status": {
+              "properties": {
+                "state": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-preserve-unknown-fields": true
+            }
+          },
+          "type": "object"
+        }
+      },
+      "served": true,
+      "storage": false,
+      "subresources": {
+        "status": {},
+        "scale": {
+          "specReplicasPath": ".spec.pgReplicas.hotStandby.size",
+          "statusReplicasPath": ".status.ready",
+          "labelSelectorPath": ".status.labelSelectorPath"
+        }
+      }
+    }
+  }
+]
