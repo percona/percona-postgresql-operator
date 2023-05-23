@@ -55,12 +55,12 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
-            - name: PGO_NAMESPACE
+            - name: PGO_TARGET_NAMESPACE
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.namespace
-            - name: PGO_TARGET_NAMESPACE
+            - name: PGO_NAMESPACE
               valueFrom:
                 fieldRef:
                   apiVersion: v1
