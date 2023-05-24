@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -31,6 +32,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/upgradecheck"
 	"github.com/percona/percona-postgresql-operator/internal/util"
+	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
@@ -118,17 +120,22 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Tracer:      otel.Tracer(postgrescluster.ControllerName),
 		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
 	}
-	if err := r.SetupWithManager(mgr); err != nil {
+	cm := &perconaController.CustomManager{Manager: mgr}
+	if err := r.SetupWithManager(cm); err != nil {
 		return err
+	}
+	if cm.Controller() == nil {
+		return errors.New("missing controller in manager")
 	}
 
 	pc := &pgcluster.PGClusterReconciler{
-		Client:      mgr.GetClient(),
-		Owner:       pgcluster.PGClusterControllerName,
-		Recorder:    mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
-		Tracer:      otel.Tracer(pgcluster.PGClusterControllerName),
-		Platform:    detectPlatform(ctx, mgr.GetConfig()),
-		KubeVersion: getServerVersion(ctx, mgr.GetConfig()),
+		Client:            mgr.GetClient(),
+		Owner:             pgcluster.PGClusterControllerName,
+		Recorder:          mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
+		Tracer:            otel.Tracer(pgcluster.PGClusterControllerName),
+		Platform:          detectPlatform(ctx, mgr.GetConfig()),
+		KubeVersion:       getServerVersion(ctx, mgr.GetConfig()),
+		CrunchyController: cm.Controller(),
 	}
 	if err := pc.SetupWithManager(mgr); err != nil {
 		return err
