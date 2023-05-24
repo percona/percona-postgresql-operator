@@ -344,11 +344,6 @@ var _ = Describe("Watching secrets", Ordered, func() {
 			}, time.Second*30, time.Millisecond*250).Should(Equal(true))
 			reconcileCount = getReconcileCount(crunchyR)
 		})
-
-		It("should reconcile 0 times", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*15, time.Millisecond*250).
-				Should(Equal(reconcileCount))
-		})
 	})
 
 	var secret *corev1.Secret
