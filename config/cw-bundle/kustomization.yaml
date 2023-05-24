@@ -9,4 +9,4 @@ resources:
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator
-  newTag: main
+  newTag: k8spg-355

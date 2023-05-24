@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/instance: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql-operator
     app.kubernetes.io/part-of: percona-postgresql-operator
-    pg.percona.com/control-plane: postgres-operator
+    pgv2.percona.com/control-plane: postgres-operator
   name: percona-postgresql-operator
   namespace: pg-operator
 spec:
@@ -17,7 +17,7 @@ spec:
       app.kubernetes.io/instance: percona-postgresql-operator
       app.kubernetes.io/name: percona-postgresql-operator
       app.kubernetes.io/part-of: percona-postgresql-operator
-      pg.percona.com/control-plane: postgres-operator
+      pgv2.percona.com/control-plane: postgres-operator
   strategy:
     type: Recreate
   template:
@@ -27,7 +27,7 @@ spec:
         app.kubernetes.io/instance: percona-postgresql-operator
         app.kubernetes.io/name: percona-postgresql-operator
         app.kubernetes.io/part-of: percona-postgresql-operator
-        pg.percona.com/control-plane: postgres-operator
+        pgv2.percona.com/control-plane: postgres-operator
     spec:
       containers:
       - env:

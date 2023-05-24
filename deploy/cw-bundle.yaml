@@ -9,9 +9,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: perconapgbackups.pg.percona.com
+  name: perconapgbackups.pgv2.percona.com
 spec:
-  group: pg.percona.com
+  group: pgv2.percona.com
   names:
     kind: PerconaPGBackup
     listKind: PerconaPGBackupList
@@ -83,9 +83,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: perconapgclusters.pg.percona.com
+  name: perconapgclusters.pgv2.percona.com
 spec:
-  group: pg.percona.com
+  group: pgv2.percona.com
   names:
     kind: PerconaPGCluster
     listKind: PerconaPGClusterList
@@ -13648,31 +13648,6 @@ spec:
     storage: true
     subresources:
       status: {}
-  - deprecated: true
-    name: v1
-    schema:
-      openAPIV3Schema:
-        properties:
-          spec:
-            type: object
-            x-kubernetes-preserve-unknown-fields: true
-          status:
-            properties:
-              message:
-                type: string
-              state:
-                type: string
-            type: object
-            x-kubernetes-preserve-unknown-fields: true
-        type: object
-    served: true
-    storage: false
-    subresources:
-      scale:
-        labelSelectorPath: .status.labelSelectorPath
-        specReplicasPath: .spec.pgReplicas.hotStandby.size
-        statusReplicasPath: .status.ready
-      status: {}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -13680,9 +13655,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: perconapgrestores.pg.percona.com
+  name: perconapgrestores.pgv2.percona.com
 spec:
-  group: pg.percona.com
+  group: pgv2.percona.com
   names:
     kind: PerconaPGRestore
     listKind: PerconaPGRestoreList
@@ -30214,7 +30189,7 @@ rules:
   - patch
   - watch
 - apiGroups:
-  - pg.percona.com
+  - pgv2.percona.com
   resources:
   - perconapgbackups
   - perconapgrestores
@@ -30223,7 +30198,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - pg.percona.com
+  - pgv2.percona.com
   resources:
   - perconapgbackups/status
   - perconapgclusters/status
@@ -30232,7 +30207,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - pg.percona.com
+  - pgv2.percona.com
   resources:
   - perconapgclusters
   verbs:
@@ -30320,7 +30295,7 @@ metadata:
     app.kubernetes.io/instance: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql-operator
     app.kubernetes.io/part-of: percona-postgresql-operator
-    pg.percona.com/control-plane: postgres-operator
+    pgv2.percona.com/control-plane: postgres-operator
   name: percona-postgresql-operator
   namespace: pg-operator
 spec:
@@ -30331,7 +30306,7 @@ spec:
       app.kubernetes.io/instance: percona-postgresql-operator
       app.kubernetes.io/name: percona-postgresql-operator
       app.kubernetes.io/part-of: percona-postgresql-operator
-      pg.percona.com/control-plane: postgres-operator
+      pgv2.percona.com/control-plane: postgres-operator
   strategy:
     type: Recreate
   template:
@@ -30341,7 +30316,7 @@ spec:
         app.kubernetes.io/instance: percona-postgresql-operator
         app.kubernetes.io/name: percona-postgresql-operator
         app.kubernetes.io/part-of: percona-postgresql-operator
-        pg.percona.com/control-plane: postgres-operator
+        pgv2.percona.com/control-plane: postgres-operator
     spec:
       containers:
       - env:
