@@ -293,7 +293,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 
 		wg.Add(1)
 		go func() {
-			mgr.Start(mgrCtx)
+			Expect(mgr.Start(mgrCtx)).To(Succeed())
 			wg.Done()
 		}()
 	})
