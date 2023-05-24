@@ -238,6 +238,8 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 
 	log := logging.FromContext(ctx)
 
+	log.Info("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
 	if cr.Spec.PMM.Secret == "" {
 		log.Info(fmt.Sprintf("Can't enable PMM: `.spec.pmm.secret` is empty in %s", cr.Name))
 		return nil
