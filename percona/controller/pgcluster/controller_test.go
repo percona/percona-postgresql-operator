@@ -319,11 +319,11 @@ var _ = Describe("Watching secrets", Ordered, func() {
 
 			Eventually(func() error {
 				return k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v2beta1.PerconaPGCluster))
-			}).Should(BeNil())
+			}, time.Second*15, time.Millisecond*250).Should(BeNil())
 
 			Eventually(func() error {
 				return k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v1beta1.PostgresCluster))
-			}).Should(BeNil())
+			}, time.Second*15, time.Millisecond*250).Should(BeNil())
 		})
 
 		It("should wait until PostgresCluster will stop to Reconcile multiple times", func() {
@@ -364,7 +364,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
 			Eventually(func() error {
 				return k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), new(corev1.Secret))
-			}).Should(BeNil())
+			}, time.Second*15, time.Millisecond*250).Should(BeNil())
 		})
 
 		It("should reconcile 0 times", func() {
@@ -387,7 +387,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 					return false
 				}
 				return string(newSecret.Data["some-data"]) == "updated-data"
-			}, time.Second*15).Should(BeTrue())
+			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 		})
 
 		It("should reconcile 1 time", func() {
@@ -408,7 +408,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 					return false
 				}
 				return string(newSecret.Data["some-data"]) == "updated-data-2"
-			}, time.Second*15).Should(BeTrue())
+			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 		})
 
 		It("should reconcile 2 times", func() {
@@ -432,7 +432,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 					return false
 				}
 				return string(newSecret.Data["some-data"]) == "updated-data-3"
-			}, time.Second*15).Should(BeTrue())
+			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 		})
 
 		It("should reconcile 2 times", func() {
