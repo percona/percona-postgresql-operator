@@ -33,6 +33,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/upgradecheck"
 	"github.com/percona/percona-postgresql-operator/internal/util"
+	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
@@ -140,11 +141,11 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Tracer:      otel.Tracer(postgrescluster.ControllerName),
 		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
 	}
-	cm := &customManager{Manager: mgr}
+	cm := &perconaController.CustomManager{Manager: mgr}
 	if err := r.SetupWithManager(cm); err != nil {
 		return err
 	}
-	if cm.ctrl == nil {
+	if cm.Controller() == nil {
 		return errors.New("missing controller in manager")
 	}
 
@@ -155,7 +156,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Tracer:            otel.Tracer(pgcluster.PGClusterControllerName),
 		Platform:          detectPlatform(ctx, mgr.GetConfig()),
 		KubeVersion:       getServerVersion(ctx, mgr.GetConfig()),
-		CrunchyController: cm.ctrl,
+		CrunchyController: cm.Controller(),
 	}
 	if err := pc.SetupWithManager(mgr); err != nil {
 		return err
