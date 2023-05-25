@@ -123,17 +123,15 @@ run_psql() {
 }
 
 get_psql_user_pass() {
-	local user=${1}
-	local cluster=${2:-${test_name}}
+	local secret_name=${1}
 
-	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" --template='{{.data.password | base64decode}}'
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.password | base64decode}}'
 }
 
 get_psql_user_host() {
-	local user=${1}
-	local cluster=${2:-${test_name}}
+  local secret_name=${1}
 
-	kubectl -n ${NAMESPACE} get "secret/${cluster}-pguser-${user}" --template='{{.data.host | base64decode }}'
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.host | base64decode }}'
 }
 
 get_instance_set_pods() {
