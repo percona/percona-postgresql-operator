@@ -310,7 +310,7 @@ func (r *PGClusterReconciler) handleMonitorUserChange(ctx context.Context, cr *v
 	log := logging.FromContext(ctx)
 
 	secret := new(corev1.Secret)
-	n := cr.Name + "-" + naming.RolePostgresUser + "" + pmm.MonitoringUser
+	n := cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser
 
 	if err := r.Client.Get(ctx, types.NamespacedName{
 		Name:      n,
