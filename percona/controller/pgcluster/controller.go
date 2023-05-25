@@ -326,27 +326,27 @@ func (r *PGClusterReconciler) handleMonitorUserChange(ctx context.Context, cr *v
 	secretString := fmt.Sprintln(secret.Data)
 	currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
 
-	if _, ok := secret.Annotations[v2beta1.AnnotationMonitorOldUserHash]; !ok {
-		// This means that the secret is freshly created
+	// if _, ok := secret.Annotations[v2beta1.AnnotationMonitorOldUserHash]; !ok {
+	// 	// This means that the secret is freshly created
 
-		if secret.Annotations == nil {
-			secret.Annotations = make(map[string]string)
-		}
-		secret.Annotations[v2beta1.AnnotationMonitorOldUserHash] = currentHash
+	// 	if secret.Annotations == nil {
+	// 		secret.Annotations = make(map[string]string)
+	// 	}
+	// 	secret.Annotations[v2beta1.AnnotationMonitorOldUserHash] = currentHash
 
-		err := r.Client.Update(ctx, secret)
-		if err != nil {
-			return errors.Wrap(err, "update monitor user secret")
-		}
-		log.Info("AAAAAA Monitor user secret update")
+	// 	err := r.Client.Update(ctx, secret)
+	// 	if err != nil {
+	// 		return errors.Wrap(err, "update monitor user secret")
+	// 	}
+	// 	log.Info("AAAAAA Monitor user secret update")
 
-		return nil
-	}
+	// 	return nil
+	// }
 
-	if currentHash == secret.Annotations[v2beta1.AnnotationMonitorOldUserHash] {
-		// Monitor user has not been changed
-		return nil
-	}
+	// if currentHash == secret.Annotations[v2beta1.AnnotationMonitorOldUserHash] {
+	// 	// Monitor user has not been changed
+	// 	return nil
+	// }
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
@@ -357,6 +357,8 @@ func (r *PGClusterReconciler) handleMonitorUserChange(ctx context.Context, cr *v
 		if set.Metadata.Annotations == nil {
 			set.Metadata.Annotations = make(map[string]string)
 		}
+
+		// If the currentHash is the same  is the on the STS, restart will not  happen
 		set.Metadata.Annotations[v2beta1.AnnotationMonitorUserSecretHash] = currentHash
 
 		log.Info(fmt.Sprintf("AAAAAAA STS %s secret hash updated", set.Name))
