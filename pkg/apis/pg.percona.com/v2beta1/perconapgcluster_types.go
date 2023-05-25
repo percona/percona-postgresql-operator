@@ -548,6 +548,12 @@ const (
 	// PMMSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case PMM credentials are rotated.
 	AnnotationPMMSecretHash = annotationPrefix + "pmm-secret-hash"
+
+	AnnotationMonitorOldUserHash = annotationPrefix + "monitor-old-user-hash"
+
+	// MonitorUserSecretHash is the annotation that is added to instance annotations to
+	// rollout restart PG pods in case monitor user password is changed.
+	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-hash"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"
