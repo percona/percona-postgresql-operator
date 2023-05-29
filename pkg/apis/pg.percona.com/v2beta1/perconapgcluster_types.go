@@ -551,7 +551,7 @@ const (
 
 	// MonitorUserSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case monitor user password is changed.
-	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-hash"
+	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-secret-hash"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"
