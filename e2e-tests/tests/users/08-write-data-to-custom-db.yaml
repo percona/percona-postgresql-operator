@@ -13,4 +13,4 @@ commands:
 
       run_psql \
         'INSERT INTO customApp (id) VALUES (100500)' \
-        "rhino:'$(get_psql_user_pass rhino-credentials)'@$(get_psql_user_host rhino-credentials):5432/zoo"
+        "rhino:$(get_psql_user_pass rhino-credentials)@$(get_psql_user_host rhino-credentials):5432/zoo"
