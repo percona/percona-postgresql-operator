@@ -214,7 +214,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return errors.Wrap(err, "failed to add pmm sidecar")
 		}
 
-		if err := r.handleMonitorUserChange(ctx, cr); err != nil {
+		if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
 			return err
 		}
 
@@ -302,7 +302,7 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 	return nil
 }
 
-func (r *PGClusterReconciler) handleMonitorUserChange(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
 	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
 		return nil
 	}
@@ -320,33 +320,11 @@ func (r *PGClusterReconciler) handleMonitorUserChange(ctx context.Context, cr *v
 			log.V(1).Info(fmt.Sprintf("Secret %s not found", n))
 			return nil
 		}
-		return errors.Wrap(err, "failed to get pmm secret")
+		return errors.Wrap(err, "failed to get monitor user secret")
 	}
 
 	secretString := fmt.Sprintln(secret.Data)
 	currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
-
-	// if _, ok := secret.Annotations[v2beta1.AnnotationMonitorOldUserHash]; !ok {
-	// 	// This means that the secret is freshly created
-
-	// 	if secret.Annotations == nil {
-	// 		secret.Annotations = make(map[string]string)
-	// 	}
-	// 	secret.Annotations[v2beta1.AnnotationMonitorOldUserHash] = currentHash
-
-	// 	err := r.Client.Update(ctx, secret)
-	// 	if err != nil {
-	// 		return errors.Wrap(err, "update monitor user secret")
-	// 	}
-	// 	log.Info("AAAAAA Monitor user secret update")
-
-	// 	return nil
-	// }
-
-	// if currentHash == secret.Annotations[v2beta1.AnnotationMonitorOldUserHash] {
-	// 	// Monitor user has not been changed
-	// 	return nil
-	// }
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
@@ -360,8 +338,6 @@ func (r *PGClusterReconciler) handleMonitorUserChange(ctx context.Context, cr *v
 
 		// If the currentHash is the same  is the on the STS, restart will not  happen
 		set.Metadata.Annotations[v2beta1.AnnotationMonitorUserSecretHash] = currentHash
-
-		log.Info(fmt.Sprintf("AAAAAAA STS %s secret hash updated", set.Name))
 	}
 
 	return nil
