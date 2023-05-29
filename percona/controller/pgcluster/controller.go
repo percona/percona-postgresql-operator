@@ -325,6 +325,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	}
 
 	secretString := fmt.Sprintln(secret.Data)
+	// #nosec G401
 	currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {

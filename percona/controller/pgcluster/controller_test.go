@@ -305,6 +305,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
 			secretString := fmt.Sprintln(monitorUserSecret.Data)
+			// #nosec G401
 			currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
 
 			stsList := &appsv1.StatefulSetList{}
@@ -343,6 +344,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
 			secretString := fmt.Sprintln(monitorUserSecret.Data)
+			// #nosec G401
 			currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
 
 			err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
