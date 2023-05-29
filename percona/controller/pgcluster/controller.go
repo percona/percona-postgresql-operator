@@ -2,6 +2,7 @@ package pgcluster
 
 import (
 	"context"
+	// #nosec G501
 	"crypto/md5"
 	"fmt"
 	"reflect"
