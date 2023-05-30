@@ -5,13 +5,12 @@ ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 test_name=$(basename "$(pwd)")
 
-create_namespace()
-{
-  local namespace=$1
-  if [[ ${CLEAN_NAMESPACE} == 1 ]]; then
-    kubectl delete namespace $namespace --ignore-not-found || :
-    kubectl wait --for=delete namespace "$namespace" || :
-  fi
+create_namespace() {
+	local namespace=$1
+	if [[ ${CLEAN_NAMESPACE} == 1 ]]; then
+		kubectl delete namespace $namespace --ignore-not-found || :
+		kubectl wait --for=delete namespace "$namespace" || :
+	fi
 
 	kubectl create namespace $namespace
 }
