@@ -370,6 +370,7 @@ pipeline {
                         runTest('start-from-backup', 'sandbox')
                         runTest('monitoring', 'sandbox')
                         runTest('telemetry-transfer', 'sandbox')
+                        runTest('users', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }

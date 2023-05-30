@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=json -p '[{"op":"add", "path":"/spec/users","value":[{"name":"rhino","databases":["zoo"],"options":"SUPERUSER","password":{"type":"ASCII"},"secretName":"rhino-credentials"}]}]'

@@ -9,4 +9,4 @@ commands:
 
       run_psql \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100504)' \
-        "postgres:$(get_psql_user_pass postgres)@$(get_psql_user_host postgres)"
+        "postgres:$(get_psql_user_pass scaling-pguser-postgres)@$(get_psql_user_host scaling-pguser-postgres)"
