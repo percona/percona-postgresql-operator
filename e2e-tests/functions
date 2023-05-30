@@ -5,14 +5,38 @@ ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 test_name=$(basename "$(pwd)")
 
-deploy_operator() {
-	kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
-	kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/rbac.yaml"
+create_namespace()
+{
+  local namespace=$1
+  if [[ ${CLEAN_NAMESPACE} == 1 ]]; then
+    kubectl delete namespace $namespace --ignore-not-found || :
+    kubectl wait --for=delete namespace "$namespace" || :
+  fi
 
-	yq eval \
-		"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
-		"${DEPLOY_DIR}/operator.yaml" \
-		>"${TEMP_DIR}/operator.yaml"
+  kubectl create namespace $namespace
+}
+
+deploy_operator() {
+  if [ -n "$OPERATOR_NS" ]; then
+    create_namespace $OPERATOR_NS
+	  kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	  kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/cw-rbac.yaml"
+
+    yq eval \
+      "$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
+      "${DEPLOY_DIR}/cw-operator.yaml" \
+      >"${TEMP_DIR}/operator.yaml"
+  else
+    kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	  kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/rbac.yaml"
+
+    yq eval \
+      "$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
+      "${DEPLOY_DIR}/operator.yaml" \
+      >"${TEMP_DIR}/operator.yaml"
+
+  fi
+
 
 	case ${test_name} in
 		telemetry-transfer)
@@ -26,8 +50,11 @@ deploy_operator() {
 			;;
 		*) ;;
 	esac
-
-	kubectl -n "${NAMESPACE}" apply -f ${TEMP_DIR}/operator.yaml
+  if [ -n "$OPERATOR_NS" ]; then
+	  kubectl -n "${OPERATOR_NS}" apply -f ${TEMP_DIR}/operator.yaml
+	else
+	  kubectl -n "${NAMESPACE}" apply -f ${TEMP_DIR}/operator.yaml
+	fi
 }
 
 deploy_s3_secrets() {
@@ -159,7 +186,7 @@ wait_pod() {
 		if [ $retry -ge 360 ]; then
 			kubectl describe pod/$pod -n "${NAMESPACE}"
 			kubectl logs $pod -n "${NAMESPACE}"
-			kubectl logs $(get_operator_pod) -n "${NAMESPACE}" \
+			kubectl logs $(get_operator_pod) ${OPERATOR_NS:+-n $OPERATOR_NS} \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| grep -v 'Getting tasks for pod' \

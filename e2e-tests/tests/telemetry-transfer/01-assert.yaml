@@ -15,65 +15,10 @@ spec:
     singular: perconapgcluster
   scope: Namespaced
 ---
-kind: Deployment
-apiVersion: apps/v1
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
 metadata:
-  name: percona-postgresql-operator
-  generation: 1
-  labels:
-    helm.sh/chart: fake-operator-chart
-    app.kubernetes.io/component: operator
-    app.kubernetes.io/instance: percona-postgresql-operator
-    app.kubernetes.io/name: percona-postgresql-operator
-    app.kubernetes.io/part-of: percona-postgresql-operator
-    pg.percona.com/control-plane: postgres-operator
-  annotations:
-    deployment.kubernetes.io/revision: '1'
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/component: operator
-      app.kubernetes.io/instance: percona-postgresql-operator
-      app.kubernetes.io/name: percona-postgresql-operator
-      app.kubernetes.io/part-of: percona-postgresql-operator
-      pg.percona.com/control-plane: postgres-operator
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        app.kubernetes.io/component: operator
-        app.kubernetes.io/instance: percona-postgresql-operator
-        app.kubernetes.io/name: percona-postgresql-operator
-        app.kubernetes.io/part-of: percona-postgresql-operator
-        pg.percona.com/control-plane: postgres-operator
-    spec:
-      containers:
-        - name: operator
-          ports:
-            - name: metrics
-              containerPort: 8080
-              protocol: TCP
-          env:
-            - name: PGO_TARGET_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.namespace
-            - name: PGO_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.namespace
-            - name: CRUNCHY_DEBUG
-              value: 'true'
-            - name: DISABLE_TELEMETRY
-              value: 'false'
-            - name: PERCONA_VS_FALLBACK_URI
-              value: http://version-service:11000
-status:
-  observedGeneration: 1
-  replicas: 1
-  updatedReplicas: 1
-  readyReplicas: 1
-  availableReplicas: 1
+  name: check-operator-deploy-status
+timeout: 120
+commands:
+  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1
