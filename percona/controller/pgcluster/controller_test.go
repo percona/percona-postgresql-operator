@@ -270,6 +270,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 	})
 
 	It("should create PerconaPGCluster with pmm enabled", func() {
+		cr.Spec.PMM.Enabled = true
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 	})
 
@@ -289,11 +290,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 	}
 
 	When("PMM is enabled", Ordered, func() {
-		It("should update PG cluster and reconcile", func() {
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).Should(Succeed())
-			cr.Spec.PMM.Enabled = true
-			Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
-
+		It("should reconcile", func() {
 			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
