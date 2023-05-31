@@ -42,9 +42,9 @@ deploy_operator() {
 		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
 		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/rbac.yaml"
 		yq eval \
-			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
-			"${DEPLOY_DIR}/operator.yaml" \
-			>"${TEMP_DIR}/operator.yaml"
+		"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
+		"${DEPLOY_DIR}/operator.yaml" \
+		>"${TEMP_DIR}/operator.yaml"
 
 		case ${test_name} in
       telemetry-transfer)
