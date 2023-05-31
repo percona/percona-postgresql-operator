@@ -20,21 +20,14 @@ deploy_operator() {
 		create_namespace $OPERATOR_NS
 		kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
 		kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/cw-rbac.yaml"
-
-		yq eval \
-			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
-			"${DEPLOY_DIR}/cw-operator.yaml" \
-			>"${TEMP_DIR}/operator.yaml"
 	else
 		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
 		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/rbac.yaml"
-
-		yq eval \
+	fi
+	yq eval \
 			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
 			"${DEPLOY_DIR}/operator.yaml" \
 			>"${TEMP_DIR}/operator.yaml"
-
-	fi
 
 	case ${test_name} in
 		telemetry-transfer)
