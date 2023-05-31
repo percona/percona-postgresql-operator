@@ -8,7 +8,6 @@ metadata:
     app.kubernetes.io/part-of: percona-postgresql-operator
     pgv2.percona.com/control-plane: postgres-operator
   name: percona-postgresql-operator
-  namespace: pg-operator
 spec:
   replicas: 1
   selector:

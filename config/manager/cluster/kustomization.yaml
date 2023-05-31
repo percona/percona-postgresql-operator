@@ -5,12 +5,4 @@ resources:
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator
-  newTag: k8spg-355
-patchesJson6902:
-- patch: |-
-    - op: add
-      path: /metadata/namespace
-      value: pg-operator
-  target:
-    kind: Deployment
-    name: percona-postgresql-operator
+  newTag: main

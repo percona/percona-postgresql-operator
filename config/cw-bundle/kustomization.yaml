@@ -3,10 +3,9 @@ kind: Kustomization
 resources:
 - ../crd
 - ../rbac/cluster
-- ../namespace
 - ../manager/cluster
 
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator
-  newTag: k8spg-355
+  newTag: main
