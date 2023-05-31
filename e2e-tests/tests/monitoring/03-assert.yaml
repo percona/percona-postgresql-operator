@@ -134,10 +134,9 @@ spec:
       - name: pgbackrest
       - name: pgbackrest-config
 status:
-  observedGeneration: 1
+  observedGeneration: 2
   replicas: 1
   readyReplicas: 1
-  currentReplicas: 1
   updatedReplicas: 1
   collisionCount: 0
 ---
@@ -158,7 +157,7 @@ status:
     - name: instance1
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 1
+  observedGeneration: 2
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
