@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      run_psql \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
+        "postgres:default-db-password@$(get_psql_user_host users-pguser-postgres)"

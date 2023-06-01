@@ -3,7 +3,7 @@ kind: Kustomization
 resources:
 - ../crd
 - ../rbac/namespace
-- ../manager
+- ../manager/namespace
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator

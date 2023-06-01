@@ -52,7 +52,12 @@ func (r *Reconciler) generatePostgresUserSecret(
 	cluster *v1beta1.PostgresCluster, spec *v1beta1.PostgresUserSpec, existing *corev1.Secret,
 ) (*corev1.Secret, error) {
 	username := string(spec.Name)
-	intent := &corev1.Secret{ObjectMeta: naming.PostgresUserSecret(cluster, username)}
+	intent := &corev1.Secret{}
+	if spec.SecretName != "" {
+		intent = &corev1.Secret{ObjectMeta: naming.PostgresCustomUserSecretName(cluster, string(spec.SecretName))}
+	} else {
+		intent = &corev1.Secret{ObjectMeta: naming.PostgresUserSecret(cluster, username)}
+	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	initialize.ByteMap(&intent.Data)
 

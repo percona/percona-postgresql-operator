@@ -13573,6 +13573,12 @@ spec:
                       required:
                       - type
                       type: object
+                    secretName:
+                      description: The secret name to generate user, password, connection
+                        info this PostgreSQL user.
+                      maxLength: 63
+                      minLength: 1
+                      type: string
                   required:
                   - name
                   type: object
@@ -13636,6 +13642,31 @@ spec:
     served: true
     storage: true
     subresources:
+      status: {}
+  - deprecated: true
+    name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            properties:
+              message:
+                type: string
+              state:
+                type: string
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+        type: object
+    served: true
+    storage: false
+    subresources:
+      scale:
+        labelSelectorPath: .status.labelSelectorPath
+        specReplicasPath: .spec.pgReplicas.hotStandby.size
+        statusReplicasPath: .status.ready
       status: {}
 ---
 apiVersion: apiextensions.k8s.io/v1
@@ -29689,6 +29720,12 @@ spec:
                       required:
                       - type
                       type: object
+                    secretName:
+                      description: The secret name to generate user, password, connection
+                        info this PostgreSQL user.
+                      maxLength: 63
+                      minLength: 1
+                      type: string
                   required:
                   - name
                   type: object

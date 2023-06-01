@@ -1,0 +1,138 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: scaling-repo-host
+  labels:
+    postgres-operator.crunchydata.com/cluster: scaling
+    postgres-operator.crunchydata.com/data: pgbackrest
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-dedicated: ''
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: scaling
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: scaling
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: scaling
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: scaling-pgbouncer
+  labels:
+    postgres-operator.crunchydata.com/cluster: scaling
+    postgres-operator.crunchydata.com/role: pgbouncer
+  annotations:
+    deployment.kubernetes.io/revision: '1'
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: scaling
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 4
+  replicas: 3
+  updatedReplicas: 3
+  readyReplicas: 3
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: scaling
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: scaling
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: scaling
+  ownerReferences:
+    - apiVersion: pg.percona.com/v2beta1
+      kind: PerconaPGCluster
+      name: scaling
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  observedGeneration: 4
+  pgbackrest:
+    repoHost:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      ready: true
+    repos:
+      - bound: true
+        name: repo1
+        replicaCreateBackupComplete: true
+        stanzaCreated: true
+  proxy:
+    pgBouncer:
+      readyReplicas: 3
+      replicas: 3
+---
+apiVersion: pg.percona.com/v2beta1
+kind: PerconaPGCluster
+metadata:
+  name: scaling
+status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready

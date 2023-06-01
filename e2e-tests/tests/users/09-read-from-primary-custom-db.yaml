@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      data=$(run_psql 'SELECT * from customApp;' "rhino:'$(get_psql_user_pass rhino-credentials)'@$(get_psql_user_host rhino-credentials):5432/zoo")
+
+      kubectl create configmap -n "${NAMESPACE}" 09-read-from-primary-custom-db --from-literal=data="${data}"
