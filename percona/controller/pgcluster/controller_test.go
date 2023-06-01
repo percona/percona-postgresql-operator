@@ -298,7 +298,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 		})
 
 		It("Instance sets should have monitor user secret hash annotation", func() {
-			nn := types.NamespacedName{Namespace: ns, Name: ns + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser}
+			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
 			secretString := fmt.Sprintln(monitorUserSecret.Data)
@@ -337,7 +337,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 		})
 
 		It("Instance sets should have updated user secret hash annotation", func() {
-			nn := types.NamespacedName{Namespace: ns, Name: ns + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser}
+			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
 			secretString := fmt.Sprintln(monitorUserSecret.Data)
