@@ -39,11 +39,11 @@ const (
 
 // sqlAuthenticationQuery returns the SECURITY DEFINER function that allows
 // PgBouncer to access non-privileged and non-system user credentials.
-func sqlAuthenticationQuery(sqlFunctionName string) string {
+func sqlAuthenticationQuery(sqlFunctionName string, exposeSuperusers bool) string {
 	// Only a subset of authorization identifiers should be accessible to
 	// PgBouncer.
 	// - https://www.postgresql.org/docs/current/catalog-pg-authid.html
-	sqlAuthorizationConditions := strings.Join([]string{
+	conditions := []string{
 		// Only those with permission to login.
 		`pg_authid.rolcanlogin`,
 		// No superusers. This is important: allowing superusers would make the
@@ -55,7 +55,14 @@ func sqlAuthenticationQuery(sqlFunctionName string) string {
 		`pg_authid.rolname <> ` + util.SQLQuoteLiteral(postgresqlUser),
 		// Those without a password expiration or an expiration in the future.
 		`(pg_authid.rolvaliduntil IS NULL OR pg_authid.rolvaliduntil >= CURRENT_TIMESTAMP)`,
-	}, "\n    AND ")
+	}
+
+	// Remove NOT pg_authid.rolsuper
+	if exposeSuperusers {
+		conditions = append(conditions[:1], conditions[2:]...)
+	}
+
+	sqlAuthorizationConditions := strings.Join(conditions, "\n    AND ")
 
 	return strings.TrimSpace(`
 CREATE OR REPLACE FUNCTION ` + sqlFunctionName + `(username TEXT)
@@ -131,7 +138,7 @@ SELECT pg_catalog.format('DROP OWNED BY %I CASCADE', :'username')
 // function that allows it to authenticate clients using their password stored
 // in PostgreSQL.
 func EnableInPostgreSQL(
-	ctx context.Context, exec postgres.Executor, clusterSecret *corev1.Secret,
+	ctx context.Context, exec postgres.Executor, clusterSecret *corev1.Secret, exposeSuperusers bool,
 ) error {
 	log := logging.FromContext(ctx)
 
@@ -175,7 +182,7 @@ REVOKE ALL PRIVILEGES
 			// a user's password-based authentication and works with PgBouncer's
 			// "auth_query" setting. Only the one user is allowed to execute it.
 			// - https://www.pgbouncer.org/config.html#auth_query
-			sqlAuthenticationQuery(`:"namespace".get_auth`),
+			sqlAuthenticationQuery(`:"namespace".get_auth`, exposeSuperusers),
 			strings.TrimSpace(`
 REVOKE ALL PRIVILEGES
     ON FUNCTION :"namespace".get_auth(username TEXT) FROM PUBLIC, :"username";

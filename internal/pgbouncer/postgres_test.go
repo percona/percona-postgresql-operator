@@ -28,7 +28,7 @@ import (
 )
 
 func TestSQLAuthenticationQuery(t *testing.T) {
-	assert.Equal(t, sqlAuthenticationQuery("some.fn_name"),
+	assert.Equal(t, sqlAuthenticationQuery("some.fn_name", false),
 		`CREATE OR REPLACE FUNCTION some.fn_name(username TEXT)
 RETURNS TABLE(username TEXT, password TEXT) AS '
   SELECT rolname::TEXT, rolpassword::TEXT
@@ -36,6 +36,20 @@ RETURNS TABLE(username TEXT, password TEXT) AS '
   WHERE pg_authid.rolname = $1
     AND pg_authid.rolcanlogin
     AND NOT pg_authid.rolsuper
+    AND NOT pg_authid.rolreplication
+    AND pg_authid.rolname <> ''_crunchypgbouncer''
+    AND (pg_authid.rolvaliduntil IS NULL OR pg_authid.rolvaliduntil >= CURRENT_TIMESTAMP)'
+LANGUAGE SQL STABLE SECURITY DEFINER;`)
+}
+
+func TestSQLAuthenticationQueryWithExposedSuperusers(t *testing.T) {
+	assert.Equal(t, sqlAuthenticationQuery("some.fn_name", true),
+		`CREATE OR REPLACE FUNCTION some.fn_name(username TEXT)
+RETURNS TABLE(username TEXT, password TEXT) AS '
+  SELECT rolname::TEXT, rolpassword::TEXT
+  FROM pg_catalog.pg_authid
+  WHERE pg_authid.rolname = $1
+    AND pg_authid.rolcanlogin
     AND NOT pg_authid.rolreplication
     AND pg_authid.rolname <> ''_crunchypgbouncer''
     AND (pg_authid.rolvaliduntil IS NULL OR pg_authid.rolvaliduntil >= CURRENT_TIMESTAMP)'
@@ -189,7 +203,72 @@ COMMIT;`))
 	}
 
 	ctx := context.Background()
-	assert.Equal(t, expected, EnableInPostgreSQL(ctx, exec, secret))
+	assert.Equal(t, expected, EnableInPostgreSQL(ctx, exec, secret, false))
+}
+
+func TestEnableInPostgreSQLWithExposedSuperusers(t *testing.T) {
+	expected := errors.New("whoops")
+	secret := new(corev1.Secret)
+	secret.Data = map[string][]byte{
+		"pgbouncer-verifier": []byte("digest$and==:whatnot"),
+	}
+
+	exec := func(
+		_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error {
+		assert.Assert(t, stdout != nil, "should capture stdout")
+		assert.Assert(t, stderr != nil, "should capture stderr")
+		assert.Assert(t, strings.Contains(strings.Join(command, "\n"),
+			`SELECT datname FROM pg_catalog.pg_database`,
+		), "expected all databases and templates")
+
+		b, err := io.ReadAll(stdin)
+		assert.NilError(t, err)
+		assert.Equal(t, string(b), strings.TrimSpace(`
+SET client_min_messages = WARNING;
+BEGIN;
+SELECT pg_catalog.format('CREATE ROLE %I NOLOGIN', :'username')
+ WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'username')
+\gexec
+SELECT pg_catalog.format('REVOKE ALL PRIVILEGES ON SCHEMA %I FROM %I', nspname, :'username')
+  FROM pg_catalog.pg_namespace
+ WHERE pg_catalog.has_schema_privilege(:'username', oid, 'CREATE, USAGE')
+   AND nspname NOT IN ('pg_catalog', :'namespace')
+\gexec
+CREATE SCHEMA IF NOT EXISTS :"namespace";
+REVOKE ALL PRIVILEGES
+    ON SCHEMA :"namespace" FROM PUBLIC, :"username";
+ GRANT USAGE
+    ON SCHEMA :"namespace" TO :"username";
+CREATE OR REPLACE FUNCTION :"namespace".get_auth(username TEXT)
+RETURNS TABLE(username TEXT, password TEXT) AS '
+  SELECT rolname::TEXT, rolpassword::TEXT
+  FROM pg_catalog.pg_authid
+  WHERE pg_authid.rolname = $1
+    AND pg_authid.rolcanlogin
+    AND NOT pg_authid.rolreplication
+    AND pg_authid.rolname <> ''_crunchypgbouncer''
+    AND (pg_authid.rolvaliduntil IS NULL OR pg_authid.rolvaliduntil >= CURRENT_TIMESTAMP)'
+LANGUAGE SQL STABLE SECURITY DEFINER;
+REVOKE ALL PRIVILEGES
+    ON FUNCTION :"namespace".get_auth(username TEXT) FROM PUBLIC, :"username";
+ GRANT EXECUTE
+    ON FUNCTION :"namespace".get_auth(username TEXT) TO :"username";
+ALTER ROLE :"username" SET search_path TO :'namespace';
+ALTER ROLE :"username" LOGIN PASSWORD :'verifier';
+COMMIT;`))
+
+		gomega.NewWithT(t).Expect(command).To(gomega.ContainElements(
+			`--set=namespace=pgbouncer`,
+			`--set=username=_crunchypgbouncer`,
+			`--set=verifier=digest$and==:whatnot`,
+		), "expected query parameters")
+
+		return expected
+	}
+
+	ctx := context.Background()
+	assert.Equal(t, expected, EnableInPostgreSQL(ctx, exec, secret, true))
 }
 
 func TestPostgreSQLHBAs(t *testing.T) {

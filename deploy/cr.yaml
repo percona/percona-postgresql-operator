@@ -20,7 +20,9 @@ spec:
 
 #  openshift: true
 
-#  users:
+  users:
+  - name: egegunes
+    options: "SUPERUSER"
 #    - name: rhino
 #      databases:
 #        - zoo
@@ -117,6 +119,7 @@ spec:
     pgBouncer:
       replicas: 3
       image: perconalab/percona-postgresql-operator:main-ppg15-pgbouncer
+#      exposeSuperusers: false
 #      resources:
 #        limits:
 #          cpu: 200m
