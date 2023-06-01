@@ -7,6 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	gs "github.com/onsi/gomega/gstruct"
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +19,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/internal/pmm"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -438,6 +440,143 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		It("should reconcile 2 times", func() {
 			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*15, time.Millisecond*250).
 				Should(Equal(reconcileCount + 2))
+		})
+	})
+})
+
+var _ = Describe("Users", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "users-test"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	When("Cluster without PMM is created", Ordered, func() {
+		cr, err := readDefaultCR(crName, ns)
+		It("should read defautl cr.yaml and create PerconaPGCluster without PMM", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		})
+
+		It("should add default user", func() {
+			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			secList := &corev1.SecretList{}
+
+			labels := map[string]string{
+				"postgres-operator.crunchydata.com/cluster": cr.Name,
+				"postgres-operator.crunchydata.com/role":    naming.RolePostgresUser,
+			}
+			err = k8sClient.List(ctx, secList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(secList.Items).NotTo(BeEmpty())
+			Expect(secList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+					"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + cr.Name),
+				}),
+			})))
+		})
+
+		When("PMM is enabled on a running cluster", func() {
+			It("should enable PMM and update the cluster", func() {
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).Should(Succeed())
+				cr.Spec.PMM.Enabled = true
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+			})
+
+			It("should add monitor user along side the default user", func() {
+				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+
+				secList := &corev1.SecretList{}
+
+				labels := map[string]string{
+					"postgres-operator.crunchydata.com/cluster": cr.Name,
+					"postgres-operator.crunchydata.com/role":    naming.RolePostgresUser,
+				}
+				err = k8sClient.List(ctx, secList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(secList.Items).NotTo(BeEmpty())
+				Expect(secList.Items).Should(ContainElements(
+					gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+						"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+							"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser),
+						}),
+					}),
+					gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+						"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+							"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + cr.Name),
+						}),
+					}),
+				))
+			})
+		})
+
+		It("should delete cr", func() {
+			Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
+		})
+	})
+
+	When("Cluster with PMM is created", Ordered, func() {
+		cr, err := readDefaultCR(crName, ns)
+		It("should read defautl cr.yaml and create PerconaPGCluster with PMM enabled", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			cr.Spec.PMM.Enabled = true
+			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		})
+
+		It("should create defaul and monitor user", func() {
+			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			secList := &corev1.SecretList{}
+
+			labels := map[string]string{
+				"postgres-operator.crunchydata.com/cluster": cr.Name,
+				"postgres-operator.crunchydata.com/role":    naming.RolePostgresUser,
+			}
+			err = k8sClient.List(ctx, secList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(secList.Items).NotTo(BeEmpty())
+			Expect(secList.Items).Should(ContainElements(
+				gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+					"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+						"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser),
+					}),
+				}),
+				gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+					"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+						"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + cr.Name),
+					}),
+				}),
+			))
 		})
 	})
 })
