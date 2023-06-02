@@ -23,42 +23,14 @@ deploy_operator() {
 		yq eval \
 			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
 			"${DEPLOY_DIR}/cw-operator.yaml" \
-			>"${TEMP_DIR}/operator.yaml"
-
-		case ${test_name} in
-			telemetry-transfer)
-				yq eval \
-					"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].env[3]={"name":"PERCONA_VS_FALLBACK_URI","value":"%s"}' "http://$(get_service_ip version-service):11000")" \
-					"${TEMP_DIR}/operator.yaml" \
-					| yq eval 'select(documentIndex==0).metadata.labels["helm.sh/chart"]="fake-operator-chart"' - \
-						>"${TEMP_DIR}/vs.operator.yaml"
-
-				mv "${TEMP_DIR}/vs.operator.yaml" "${TEMP_DIR}/operator.yaml"
-				;;
-			*) ;;
-		esac
-		kubectl -n "${OPERATOR_NS}" apply -f ${TEMP_DIR}/operator.yaml
+			| kubectl -n "${OPERATOR_NS}" apply -f -
 	else
 		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
 		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/rbac.yaml"
 		yq eval \
 			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
 			"${DEPLOY_DIR}/operator.yaml" \
-			>"${TEMP_DIR}/operator.yaml"
-
-		case ${test_name} in
-			telemetry-transfer)
-				yq eval \
-					"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].env[4]={"name":"PERCONA_VS_FALLBACK_URI","value":"%s"}' "http://$(get_service_ip version-service):11000")" \
-					"${TEMP_DIR}/operator.yaml" \
-					| yq eval 'select(documentIndex==0).metadata.labels["helm.sh/chart"]="fake-operator-chart"' - \
-						>"${TEMP_DIR}/vs.operator.yaml"
-
-				mv "${TEMP_DIR}/vs.operator.yaml" "${TEMP_DIR}/operator.yaml"
-				;;
-			*) ;;
-		esac
-		kubectl -n "${NAMESPACE}" apply -f ${TEMP_DIR}/operator.yaml
+			| kubectl -n "${NAMESPACE}" apply -f -
 	fi
 }
 
