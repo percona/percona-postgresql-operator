@@ -7,8 +7,8 @@ linters:
     - gci
     - gofumpt
     - scopelint
-  enable:
     - depguard
+  enable:
     - gomodguard
     - gosimple
     - importas
