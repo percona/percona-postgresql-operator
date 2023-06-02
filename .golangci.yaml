@@ -27,6 +27,11 @@ linters-settings:
       - prefix(github.com/percona)
 
   depguard:
+    rules:
+      main:
+        allow:
+          - $gostd
+          - github.com/OpenPeeDeeP
     include-go-root: true
     packages-with-error-message:
       - io/ioutil: >
