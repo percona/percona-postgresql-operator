@@ -255,11 +255,6 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		return errors.Wrap(err, "failed to get pmm secret")
 	}
 
-	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
-		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
-		return nil
-	}
-
 	if pmmSecret.Labels == nil {
 		pmmSecret.Labels = make(map[string]string)
 	}
@@ -274,6 +269,11 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 			return errors.Wrap(err, "label PMM secret")
 		}
 	}
+
+	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
+        log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
+        return nil
+    }
 
 	pmmSecretHash, err := k8s.ObjectHash(pmmSecret)
 	if err != nil {
