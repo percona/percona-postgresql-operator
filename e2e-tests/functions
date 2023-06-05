@@ -632,6 +632,29 @@ wait_deployment() {
 	set -o xtrace
 }
 
+function compare_generation() {
+	local generation="$1"
+	local resource="${2:-deployment}"
+	local name="$3"
+	local current_generation
+
+	current_generation=$(kubectl_bin get "${resource}" "${name}" -o jsonpath='{.metadata.generation}')
+	set +o xtrace
+	retry=0
+	until [[ ${generation} == "${current_generation}" ]]; do
+		sleep 1
+		current_generation=$(kubectl_bin get "${resource}" "${name}" -o jsonpath='{.metadata.generation}')
+		echo -n .
+		let retry+=1
+		if [ $retry -ge 360 ]; then
+			echo "max retry count $retry reached. something went wrong with operator or kubernetes cluster"
+			echo "Generation for resource type ${resource} with name ${name} is: ${current_generation}, but should be: ${generation}!"
+			exit 1
+		fi
+	done
+	set -o xtrace
+}
+
 wait_generation_uniformity() {
 	local cluster=$1
 	local target_revision=$2
