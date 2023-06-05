@@ -1,12 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-patchesJson6902:
-  - path: patches/perconapgclusters-v1.json
-    target:
-      name: perconapgclusters.pg.percona.com
-
 resources:
-- generated/pg.percona.com_perconapgclusters.yaml
-- generated/pg.percona.com_perconapgbackups.yaml
-- generated/pg.percona.com_perconapgrestores.yaml
+- generated/pgv2.percona.com_perconapgclusters.yaml
+- generated/pgv2.percona.com_perconapgbackups.yaml
+- generated/pgv2.percona.com_perconapgrestores.yaml
