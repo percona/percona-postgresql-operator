@@ -36,7 +36,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
 )
 
 var versionString string

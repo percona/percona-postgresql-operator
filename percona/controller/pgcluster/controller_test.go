@@ -19,7 +19,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 

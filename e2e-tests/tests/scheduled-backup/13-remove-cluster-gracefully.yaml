@@ -1,7 +1,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 delete:
-- apiVersion: pg.percona.com/v2beta1
+- apiVersion: pgv2.percona.com/v2beta1
   kind: PerconaPGCluster
   metadata:
     name: scheduled-backup
