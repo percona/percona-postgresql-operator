@@ -22,3 +22,12 @@ metadata:
 timeout: 120
 commands:
   - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1
+
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: check-operator-deploy-PERCONA_VS_FALLBACK_URI
+timeout: 120
+commands:
+  - script: kubectl get deployment percona-postgresql-operator -o yaml -n ${OPERATOR_NS:-$NAMESPACE} | grep PERCONA_VS_FALLBACK_URI
