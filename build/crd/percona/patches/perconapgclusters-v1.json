@@ -1,7 +1,7 @@
 [
   {
     "op": "add",
-    "path": "/spec/versions/1",
+    "path": "/spec/versions/2",
     "value": {
       "deprecated": true,
       "name": "v1",

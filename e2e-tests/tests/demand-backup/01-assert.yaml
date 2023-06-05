@@ -68,7 +68,7 @@ kind: PostgresCluster
 metadata:
   name: demand-backup
   ownerReferences:
-    - apiVersion: pg.percona.com/v2beta1
+    - apiVersion: pgv2.percona.com/v2beta1
       kind: PerconaPGCluster
       name: demand-backup
       controller: true
@@ -91,7 +91,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pg.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2beta1
 kind: PerconaPGCluster
 metadata:
   name: demand-backup
