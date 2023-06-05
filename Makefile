@@ -305,12 +305,12 @@ generate-crunchy-crd:
 generate-percona-crd:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
 		crd:crdVersions='v1' \
-		paths='./pkg/apis/pg.percona.com/...' \
+		paths='./pkg/apis/pgv2.percona.com/...' \
 		output:dir='build/crd/percona/generated' # build/crd/generated/{group}_{plural}.yaml
-	$(PGO_KUBE_CLIENT) kustomize ./build/crd/percona/ > ./config/crd/bases/pg.percona.com_perconapgclusters.yaml
+	$(PGO_KUBE_CLIENT) kustomize ./build/crd/percona/ > ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml
 
 generate-crd: generate-crunchy-crd generate-percona-crd
-	cat ./config/crd/bases/pg.percona.com_perconapgclusters.yaml > ./deploy/crd.yaml
+	cat ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml > ./deploy/crd.yaml
 	echo --- >> ./deploy/crd.yaml
 	cat ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml >> ./deploy/crd.yaml
 

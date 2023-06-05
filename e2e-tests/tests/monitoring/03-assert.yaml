@@ -146,7 +146,7 @@ kind: PostgresCluster
 metadata:
   name: monitoring
   ownerReferences:
-    - apiVersion: pg.percona.com/v2beta1
+    - apiVersion: pgv2.percona.com/v2beta1
       kind: PerconaPGCluster
       name: monitoring
       controller: true
