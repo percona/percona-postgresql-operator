@@ -132,7 +132,6 @@ run_psql() {
 	local password=${3}
 	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 
-
 	kubectl -n ${NAMESPACE} exec ${client_container} -- \
 		bash -c "printf '$command\n' | PGPASSWORD="\'$password\'" psql -v ON_ERROR_STOP=1 -t -q $uri"
 }
