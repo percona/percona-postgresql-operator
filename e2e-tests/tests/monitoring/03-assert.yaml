@@ -44,13 +44,6 @@ spec:
     pgBouncer:
       port: 5432
       replicas: 3
-  users:
-    - name: postgres
-      password:
-        type: AlphaNumeric
-    - name: monitoring
-      password:
-        type: AlphaNumeric
 status:
   pgbouncer:
     ready: 3
@@ -63,3 +56,23 @@ status:
     ready: 3
     size: 3
   state: ready
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: monitoring
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: monitoring
+status:
+  conditions:
+    - type: Complete
+      status: 'True'
+  succeeded: 1
