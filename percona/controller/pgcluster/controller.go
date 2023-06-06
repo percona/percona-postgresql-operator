@@ -206,20 +206,22 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 					Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
 				},
 			})
+
+			if cr.Spec.Users == nil || len(cr.Spec.Users) == 0 {
+				// Add default user: <cluster-name>-pguser-<cluster-name>
+				postgresCluster.Spec.Users = append(postgresCluster.Spec.Users, v1beta1.PostgresUserSpec{
+					Name: v1beta1.PostgresIdentifier(cr.Name),
+					Databases: []v1beta1.PostgresIdentifier{
+						v1beta1.PostgresIdentifier(cr.Name),
+					},
+					Password: &v1beta1.PostgresPasswordSpec{
+						Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
+					},
+				})
+			}
 		}
 
 		postgresCluster.Spec.Users = users
-
-		// Add default user: <cluster-name>-pguser-<cluster-name>
-		postgresCluster.Spec.Users = append(postgresCluster.Spec.Users, v1beta1.PostgresUserSpec{
-			Name: v1beta1.PostgresIdentifier(cr.Name),
-			Databases: []v1beta1.PostgresIdentifier{
-				v1beta1.PostgresIdentifier(cr.Name),
-			},
-			Password: &v1beta1.PostgresPasswordSpec{
-				Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
-			},
-		})
 
 		if err := r.addPMMSidecar(ctx, cr); err != nil {
 			return errors.Wrap(err, "failed to add pmm sidecar")
