@@ -271,9 +271,9 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 	}
 
 	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
-        log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
-        return nil
-    }
+		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
+		return nil
+	}
 
 	pmmSecretHash, err := k8s.ObjectHash(pmmSecret)
 	if err != nil {
