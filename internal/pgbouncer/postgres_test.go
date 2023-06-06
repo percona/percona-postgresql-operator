@@ -50,7 +50,7 @@ RETURNS TABLE(username TEXT, password TEXT) AS '
   FROM pg_catalog.pg_authid
   WHERE pg_authid.rolname = $1
     AND pg_authid.rolcanlogin
-    AND NOT pg_authid.rolreplication
+    AND (NOT pg_authid.rolreplication OR pg_authid.rolname = ''postgres'')
     AND pg_authid.rolname <> ''_crunchypgbouncer''
     AND (pg_authid.rolvaliduntil IS NULL OR pg_authid.rolvaliduntil >= CURRENT_TIMESTAMP)'
 LANGUAGE SQL STABLE SECURITY DEFINER;`)
@@ -246,7 +246,7 @@ RETURNS TABLE(username TEXT, password TEXT) AS '
   FROM pg_catalog.pg_authid
   WHERE pg_authid.rolname = $1
     AND pg_authid.rolcanlogin
-    AND NOT pg_authid.rolreplication
+    AND (NOT pg_authid.rolreplication OR pg_authid.rolname = ''postgres'')
     AND pg_authid.rolname <> ''_crunchypgbouncer''
     AND (pg_authid.rolvaliduntil IS NULL OR pg_authid.rolvaliduntil >= CURRENT_TIMESTAMP)'
 LANGUAGE SQL STABLE SECURITY DEFINER;
