@@ -190,9 +190,8 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		users := make([]v1beta1.PostgresUserSpec, 0)
 
 		for _, user := range cr.Spec.Users {
-			un := string(user.Name)
-			if un == pmm.MonitoringUser || un == cr.Name {
-				log.Info(un + " user is reserved, it'll be ignored.")
+			if user.Name == pmm.MonitoringUser {
+				log.Info(pmm.MonitoringUser + " user is reserved, it'll be ignored.")
 				continue
 			}
 			users = append(users, user)
