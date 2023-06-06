@@ -438,6 +438,10 @@ type PGBouncerSpec struct {
 	// +optional
 	CustomTLSSecret *corev1.SecretProjection `json:"customTLSSecret,omitempty"`
 
+	// Allow SUPERUSERs to connect through PGBouncer.
+	// +optional
+	ExposeSuperusers bool `json:"exposeSuperusers,omitempty"`
+
 	// Name of a container image that can run PgBouncer 1.15 or newer. Changing
 	// this value causes PgBouncer to restart. The image may also be set using
 	// the RELATED_IMAGE_PGBOUNCER environment variable.
@@ -499,6 +503,7 @@ func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
 		Config:                    p.Config,
 		Containers:                p.Sidecars,
 		CustomTLSSecret:           p.CustomTLSSecret,
+		ExposeSuperusers:          p.ExposeSuperusers,
 		Image:                     p.Image,
 		Port:                      p.Port,
 		PriorityClassName:         p.PriorityClassName,
@@ -548,6 +553,10 @@ const (
 	// PMMSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case PMM credentials are rotated.
 	AnnotationPMMSecretHash = annotationPrefix + "pmm-secret-hash"
+
+	// MonitorUserSecretHash is the annotation that is added to instance annotations to
+	// rollout restart PG pods in case monitor user password is changed.
+	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-secret-hash"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"

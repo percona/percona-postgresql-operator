@@ -120,6 +120,8 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
 	clusterSecret *corev1.Secret,
 ) error {
+	log := logging.FromContext(ctx)
+
 	var pod *corev1.Pod
 
 	// Find the PostgreSQL instance that can execute SQL that writes to every
@@ -139,8 +141,16 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 	// PostgreSQL is available for writes. Prepare to either add or remove
 	// PgBouncer objects.
 
+	var exposeSuperusers bool
+	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
+		exposeSuperusers = cluster.Spec.Proxy.PGBouncer.ExposeSuperusers
+		if exposeSuperusers {
+			log.Info("Superusers are exposed through PGBouncer")
+		}
+	}
+
 	action := func(ctx context.Context, exec postgres.Executor) error {
-		return errors.WithStack(pgbouncer.EnableInPostgreSQL(ctx, exec, clusterSecret))
+		return errors.WithStack(pgbouncer.EnableInPostgreSQL(ctx, exec, clusterSecret, exposeSuperusers))
 	}
 	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
 		// PgBouncer is disabled.
