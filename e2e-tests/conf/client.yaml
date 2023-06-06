@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: pg-client
-          image: perconalab/percona-distribution-postgresql:13.2
+          image: perconalab/percona-distribution-postgresql:15
           imagePullPolicy: Always
           command:
           - sleep
