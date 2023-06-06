@@ -40,7 +40,6 @@ spec:
     secret: monitoring-pmm-secret
     serverHost: monitoring-service
   port: 5432
-  postgresVersion: 14
   proxy:
     pgBouncer:
       port: 5432
