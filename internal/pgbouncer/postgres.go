@@ -57,8 +57,11 @@ func sqlAuthenticationQuery(sqlFunctionName string, exposeSuperusers bool) strin
 		`(pg_authid.rolvaliduntil IS NULL OR pg_authid.rolvaliduntil >= CURRENT_TIMESTAMP)`,
 	}
 
-	// Remove NOT pg_authid.rolsuper
 	if exposeSuperusers {
+		// Allow postgres user explicitly
+		conditions[2] = `(NOT pg_authid.rolreplication OR pg_authid.rolname = 'postgres')`
+
+		// Remove NOT pg_authid.rolsuper
 		conditions = append(conditions[:1], conditions[2:]...)
 	}
 
