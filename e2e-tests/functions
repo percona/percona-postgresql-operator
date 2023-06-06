@@ -116,20 +116,38 @@ get_cr() {
 	cat "${TEMP_DIR}/cr.yaml"
 }
 
-run_psql() {
+run_psql_local() {
 	local command=${1}
 	local uri=${2}
 	local driver=${3:-postgres}
 	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 
+
 	kubectl -n ${NAMESPACE} exec ${client_container} -- \
 		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://'$uri'"
+}
+
+run_psql() {
+	local command=${1}
+	local uri=${2}
+	local password=${3}
+	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+
+
+	kubectl -n ${NAMESPACE} exec ${client_container} -- \
+		bash -c "printf '$command\n' | PGPASSWORD="\'$password\'" psql -v ON_ERROR_STOP=1 -t -q $uri"
 }
 
 get_psql_user_pass() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.password | base64decode}}'
+}
+
+get_pgbouncer_host() {
+	local secret_name=${1}
+
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}"  -o jsonpath={.data.pgbouncer-host} | base64 -d
 }
 
 get_psql_user_host() {

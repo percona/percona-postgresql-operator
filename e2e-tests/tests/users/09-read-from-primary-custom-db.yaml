@@ -7,7 +7,12 @@ commands:
       set -o xtrace
 
       source ../../functions
+
       password=$(get_psql_user_pass rhino-credentials)
-      data=$(run_psql 'SELECT * from customApp;' "rhino:$password@$(get_psql_user_host rhino-credentials):5432/zoo")
+      user='rhino'
+      db_name='zoo'
+      hostname=$(get_pgbouncer_host rhino-credentials)
+
+      data=$(run_psql 'SELECT * from app.customApp;' "-h $hostname -U $user -d $db_name" "$password")
 
       kubectl create configmap -n "${NAMESPACE}" 09-read-from-primary-custom-db --from-literal=data="${data}"
