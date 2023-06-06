@@ -145,7 +145,7 @@ get_psql_user_pass() {
 get_pgbouncer_host() {
 	local secret_name=${1}
 
-	kubectl -n ${NAMESPACE} get "secret/${secret_name}"  -o jsonpath={.data.pgbouncer-host} | base64 -d
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" -o jsonpath={.data.pgbouncer-host} | base64 -d
 }
 
 get_psql_user_host() {
