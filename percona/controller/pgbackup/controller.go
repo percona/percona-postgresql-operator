@@ -18,7 +18,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
 const (
@@ -38,7 +38,7 @@ type PGBackupReconciler struct {
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
 func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGBackup{}).Complete(r)
+	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGBackup{}).Complete(r)
 }
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=get;list;watch
@@ -50,7 +50,7 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("request", request)
 
-	pgBackup := &v2beta1.PerconaPGBackup{}
+	pgBackup := &v2.PerconaPGBackup{}
 	if err := r.Client.Get(ctx, request.NamespacedName, pgBackup); err != nil {
 		// NotFound cannot be fixed by requeuing so ignore it. During background
 		// deletion, we receive delete events from cluster's dependents after
@@ -61,30 +61,30 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	if pgBackup.Status.State == v2beta1.BackupSucceeded || pgBackup.Status.State == v2beta1.BackupFailed {
+	if pgBackup.Status.State == v2.BackupSucceeded || pgBackup.Status.State == v2.BackupFailed {
 		return reconcile.Result{}, nil
 	}
 
-	pgCluster := &v2beta1.PerconaPGCluster{}
+	pgCluster := &v2.PerconaPGCluster{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
 	switch pgBackup.Status.State {
-	case v2beta1.BackupNew:
+	case v2.BackupNew:
 		if err := startBackup(ctx, r.Client, pgCluster, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "start backup")
 		}
 
-		pgBackup.Status.State = v2beta1.BackupStarting
+		pgBackup.Status.State = v2.BackupStarting
 		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 
 		log.Info("Backup is starting")
 		return reconcile.Result{}, nil
-	case v2beta1.BackupStarting:
+	case v2.BackupStarting:
 		job, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
 		if err != nil {
 			if errors.Is(err, ErrBackupJobNotFound) {
@@ -95,7 +95,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "find backup job")
 		}
 
-		pgBackup.Status.State = v2beta1.BackupRunning
+		pgBackup.Status.State = v2.BackupRunning
 		pgBackup.Status.JobName = job.Name
 
 		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
@@ -103,7 +103,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		}
 
 		return reconcile.Result{}, nil
-	case v2beta1.BackupRunning:
+	case v2.BackupRunning:
 		job := &batchv1.Job{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job)
 		if err != nil {
@@ -112,9 +112,9 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		status := checkBackupJob(job)
 		switch status {
-		case v2beta1.BackupFailed:
+		case v2.BackupFailed:
 			log.Info("Backup failed")
-		case v2beta1.BackupSucceeded:
+		case v2.BackupSucceeded:
 			log.Info("Backup succeeded")
 		default:
 			log.Info("Waiting for backup to complete")
@@ -132,7 +132,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	}
 }
 
-func startBackup(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCluster, pb *v2beta1.PerconaPGBackup) error {
+func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) error {
 	orig := pg.DeepCopy()
 
 	if pg.Annotations == nil {
@@ -150,7 +150,7 @@ func startBackup(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGClus
 	return nil
 }
 
-func findBackupJob(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCluster, pb *v2beta1.PerconaPGBackup) (*batchv1.Job, error) {
+func findBackupJob(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) (*batchv1.Job, error) {
 	jobList := &batchv1.JobList{}
 	selector := labels.SelectorFromSet(map[string]string{
 		naming.LabelCluster:          pg.Name,
@@ -178,13 +178,13 @@ func findBackupJob(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCl
 	return nil, ErrBackupJobNotFound
 }
 
-func checkBackupJob(job *batchv1.Job) v2beta1.PGBackupState {
+func checkBackupJob(job *batchv1.Job) v2.PGBackupState {
 	switch {
 	case controller.JobCompleted(job):
-		return v2beta1.BackupSucceeded
+		return v2.BackupSucceeded
 	case controller.JobFailed(job):
-		return v2beta1.BackupFailed
+		return v2.BackupFailed
 	default:
-		return v2beta1.BackupRunning
+		return v2.BackupRunning
 	}
 }

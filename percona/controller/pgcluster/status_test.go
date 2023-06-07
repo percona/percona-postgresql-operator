@@ -13,7 +13,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -155,7 +155,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					}
 				})
 
-				reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStateInit)
+				reconcileAndAssertState(ctx, crNamespacedName, cr, v2.AppStateInit)
 			})
 		})
 
@@ -166,13 +166,13 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					pgc.Status.Proxy.PGBouncer.Replicas = 1
 				})
 
-				reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStateInit)
+				reconcileAndAssertState(ctx, crNamespacedName, cr, v2.AppStateInit)
 			})
 		})
 
 		When("The cluster is paused", Ordered, func() {
 			It("should pause the cluster", func() {
-				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2beta1.PerconaPGCluster) {
+				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2.PerconaPGCluster) {
 					t := true
 					cr.Spec.Pause = &t
 				})
@@ -187,7 +187,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 						})
 					})
 
-					reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStateStopping)
+					reconcileAndAssertState(ctx, crNamespacedName, cr, v2.AppStateStopping)
 				})
 			})
 
@@ -197,12 +197,12 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 						pgc.Status.InstanceSets[0].ReadyReplicas = 0
 					})
 
-					reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStatePaused)
+					reconcileAndAssertState(ctx, crNamespacedName, cr, v2.AppStatePaused)
 				})
 			})
 
 			It("should unpause the cluster", func() {
-				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2beta1.PerconaPGCluster) {
+				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2.PerconaPGCluster) {
 					t := false
 					cr.Spec.Pause = &t
 				})
@@ -216,7 +216,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					pgc.Status.InstanceSets[0].ReadyReplicas = 0
 				})
 
-				reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStateInit)
+				reconcileAndAssertState(ctx, crNamespacedName, cr, v2.AppStateInit)
 			})
 		})
 
@@ -228,7 +228,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					pgc.Status.InstanceSets[0].ReadyReplicas = 1
 				})
 
-				reconcileAndAssertState(ctx, crNamespacedName, cr, v2beta1.AppStateReady)
+				reconcileAndAssertState(ctx, crNamespacedName, cr, v2.AppStateReady)
 			})
 		})
 	})
@@ -260,8 +260,8 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 
 		When("PGBouncer expose type is not LoadBalancer", func() {
 			It("status host should be <pgbouncer-svc>.namespace", func() {
-				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2beta1.PerconaPGCluster) {
-					cr.Spec.Proxy.PGBouncer.ServiceExpose = &v2beta1.ServiceExpose{
+				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2.PerconaPGCluster) {
+					cr.Spec.Proxy.PGBouncer.ServiceExpose = &v2.ServiceExpose{
 						Type: string(corev1.ServiceTypeClusterIP),
 					}
 				})
@@ -293,8 +293,8 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					})
 				Expect(k8sClient.Status().Update(ctx, pgBouncerSVC)).Should(Succeed())
 
-				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2beta1.PerconaPGCluster) {
-					cr.Spec.Proxy.PGBouncer.ServiceExpose = &v2beta1.ServiceExpose{
+				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2.PerconaPGCluster) {
+					cr.Spec.Proxy.PGBouncer.ServiceExpose = &v2.ServiceExpose{
 						Type: string(corev1.ServiceTypeLoadBalancer),
 					}
 				})
@@ -312,7 +312,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 	})
 })
 
-func reconcileAndAssertState(ctx context.Context, nn types.NamespacedName, cr *v2beta1.PerconaPGCluster, expectedState v2beta1.AppState) {
+func reconcileAndAssertState(ctx context.Context, nn types.NamespacedName, cr *v2.PerconaPGCluster, expectedState v2.AppState) {
 	_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: nn})
 	Expect(err).NotTo(HaveOccurred())
 

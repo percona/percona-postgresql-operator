@@ -17,7 +17,7 @@ spec:
     singular: perconapgbackup
   scope: Namespaced
   versions:
-  - name: v2beta1
+  - name: v2
     schema:
       openAPIV3Schema:
         description: PerconaPGBackup is the CRD that defines a Percona PostgreSQL

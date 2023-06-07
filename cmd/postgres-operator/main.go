@@ -36,7 +36,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
 var versionString string
@@ -89,7 +89,7 @@ func main() {
 	assertNoError(err)
 
 	// Add Percona custom resource types to scheme
-	assertNoError(v2beta1.AddToScheme(mgr.GetScheme()))
+	assertNoError(v2.AddToScheme(mgr.GetScheme()))
 
 	// add all PostgreSQL Operator controllers to the runtime manager
 	err = addControllersToManager(ctx, mgr)

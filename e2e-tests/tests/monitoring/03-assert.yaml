@@ -2,7 +2,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 180
 ---
-apiVersion: pgv2.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   labels:
