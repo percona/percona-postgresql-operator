@@ -754,9 +754,11 @@ var _ = Describe("Version labels", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stsList.Items).NotTo(BeEmpty())
 
-		for _, sts := range stsList.Items {
-			Expect(sts.Labels).To(HaveKeyWithValue(v2beta1.LabelOperatorVersion, cr.Spec.CRVersion))
-		}
+		Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+			"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"Labels": HaveKeyWithValue(v2beta1.LabelOperatorVersion, cr.Spec.CRVersion),
+			}),
+		})))
 	})
 
 	It("should label PGBouncer deployments", func() {
@@ -769,9 +771,11 @@ var _ = Describe("Version labels", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(depList.Items).NotTo(BeEmpty())
 
-		for _, dep := range depList.Items {
-			Expect(dep.Labels).To(HaveKeyWithValue(v2beta1.LabelOperatorVersion, cr.Spec.CRVersion))
-		}
+		Expect(depList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+			"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"Labels": HaveKeyWithValue(v2beta1.LabelOperatorVersion, cr.Spec.CRVersion),
+			}),
+		})))
 	})
 
 	It("should label PGBackRest statefulsets", func() {
@@ -784,8 +788,10 @@ var _ = Describe("Version labels", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stsList.Items).NotTo(BeEmpty())
 
-		for _, sts := range stsList.Items {
-			Expect(sts.Labels).To(HaveKeyWithValue(v2beta1.LabelOperatorVersion, cr.Spec.CRVersion))
-		}
+		Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+			"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"Labels": HaveKeyWithValue(v2beta1.LabelOperatorVersion, cr.Spec.CRVersion),
+			}),
+		})))
 	})
 })
