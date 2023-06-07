@@ -369,6 +369,7 @@ pipeline {
                         runTest('scheduled-backup', 'sandbox')
                         runTest('start-from-backup', 'sandbox')
                         runTest('monitoring', 'sandbox')
+                        runTest('operator-self-healing', 'sandbox')
                         runTest('telemetry-transfer', 'sandbox')
                         runTest('users', 'sandbox')
                         ShutdownCluster('sandbox')

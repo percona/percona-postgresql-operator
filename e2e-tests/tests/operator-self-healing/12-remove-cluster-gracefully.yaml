@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+- apiVersion: pgv2.percona.com/v2beta1
+  kind: PerconaPGCluster
+  metadata:
+    name: operator-self-healing
+- apiVersion: postgres-operator.crunchydata.com/v1beta1
+  kind: PostgresCluster
+  metadata:
+    name: operator-self-healing

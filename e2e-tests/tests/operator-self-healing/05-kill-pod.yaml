@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      init_pod=$(get_operator_pod)
+      kill_pod $init_pod
+      sleep 10 # wait a bit for pod to be killed
+      wait_deployment percona-postgresql-operator "${NAMESPACE}"
+
+      if [ "$init_pod" == "$(get_operator_pod)" ]; then
+        echo "operator pod was not killed! something went wrong."
+        return 1
+      fi

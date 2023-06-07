@@ -30,6 +30,10 @@ deploy_operator() {
 	kubectl -n "${NAMESPACE}" apply -f ${TEMP_DIR}/operator.yaml
 }
 
+get_operator_pod() {
+    echo $(kubectl get pods -n "${NAMESPACE}" --selector=app.kubernetes.io/name=percona-postgresql-operator -o jsonpath='{.items[].metadata.name}')
+}
+
 deploy_s3_secrets() {
 	set +o xtrace
 	printf "[global]\nrepo1-s3-key=%s\nrepo1-s3-key-secret=%s\n" \
@@ -272,4 +276,87 @@ EOF
 	curl -s -k -H "Authorization: Bearer ${api_key}" -XPOST -d @payload.json "https://$endpoint/v0/qan/GetReport" \
 		| jq '.rows[].sparkline'
 	rm -f payload.json
+}
+
+deploy_chaos_mesh() {
+    destroy_chaos_mesh
+
+    helm repo add chaos-mesh https://charts.chaos-mesh.org
+    helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version 2.5.1
+    sleep 10
+}
+
+destroy_chaos_mesh() {
+    local chaos_mesh_ns=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}' | sed 's/NAMESPACE//')
+
+    for i in $(kubectl api-resources | grep chaos-mesh | awk '{print $1}'); do timeout 30 kubectl delete ${i} --all --all-namespaces || :; done
+    if [ -n "${chaos_mesh_ns}" ]; then
+        helm uninstall chaos-mesh --namespace ${chaos_mesh_ns} || :
+    fi
+    timeout 30 kubectl delete crd $(kubectl get crd | grep 'chaos-mesh.org' | awk '{print $1}') || :
+    timeout 30 kubectl delete clusterrolebinding $(kubectl get clusterrolebinding | grep 'chaos-mesh' | awk '{print $1}') || :
+    timeout 30 kubectl delete clusterrole $(kubectl get clusterrole | grep 'chaos-mesh' | awk '{print $1}') || :
+    timeout 30 kubectl delete MutatingWebhookConfiguration $(kubectl get MutatingWebhookConfiguration | grep 'chaos-mesh' | awk '{print $1}') || :
+    timeout 30 kubectl delete ValidatingWebhookConfiguration $(kubectl get ValidatingWebhookConfiguration | grep 'chaos-mesh' | awk '{print $1}') || :
+    timeout 30 kubectl delete ValidatingWebhookConfiguration $(kubectl get ValidatingWebhookConfiguration | grep 'validate-auth' | awk '{print $1}') || :
+}
+
+kill_pod() {
+    local pod=$1
+
+    yq eval '
+        .metadata.name = "chaos-operator-pod-kill" |
+        del(.spec.selector.pods.test-namespace) |
+        .spec.selector.pods.'${NAMESPACE}'[0] = "'$pod'"' ${TESTS_CONFIG_DIR}/chaos-pod-kill.yml \
+        | kubectl apply --namespace ${NAMESPACE} -f -
+    sleep 5
+}
+
+failure_pod() {
+    local pod=$1
+
+    yq eval '
+        .metadata.name = "chaos-operator-pod-failure" |
+        del(.spec.selector.pods.test-namespace) |
+        .spec.selector.pods.'${NAMESPACE}'[0] = "'$pod'"' ${TESTS_CONFIG_DIR}/chaos-pod-failure.yml \
+        | kubectl apply --namespace ${NAMESPACE} -f -
+    sleep 5
+}
+
+network_loss() {
+    local pod=$1
+
+    yq eval '
+        .metadata.name = "chaos-operator-network-loss" |
+        del(.spec.selector.pods.test-namespace) |
+        .spec.selector.pods.'${NAMESPACE}'[0] = "'$pod'"' ${TESTS_CONFIG_DIR}/chaos-network-loss.yml \
+        | kubectl apply --namespace ${NAMESPACE} -f -
+		sleep 5
+}
+
+wait_deployment() {
+    local name=$1
+    local target_namespace=${2:-"$namespace"}
+
+    sleep 10
+    set +o xtrace
+    retry=0
+    echo -n $name
+    until [ -n "$(kubectl -n ${target_namespace} get deployment $name -o jsonpath='{.status.replicas}')" \
+        -a "$(kubectl -n ${target_namespace} get deployment $name -o jsonpath='{.status.replicas}')" \
+        == "$(kubectl -n ${target_namespace} get deployment $name -o jsonpath='{.status.readyReplicas}')" ]; do
+        sleep 1
+        echo -n .
+        let retry+=1
+        if [ $retry -ge 360 ]; then
+            kubectl logs $(get_operator_pod) -c operator \
+                | grep -v 'level=info' \
+                | grep -v 'level=debug' \
+                | tail -100
+            echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+            exit 1
+        fi
+    done
+    echo
+    set -o xtrace
 }

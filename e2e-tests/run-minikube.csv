@@ -1,5 +1,6 @@
 demand-backup
 init-deploy
+operator-self-healing
 scaling
 scheduled-backup
 start-from-backup

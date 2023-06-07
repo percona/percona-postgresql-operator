@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq eval '.spec.proxy.pgBouncer.replicas=3' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
