@@ -7,6 +7,6 @@ commands:
 
       source ../../functions
 
-      run_psql \
+      run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
         "postgres:default-db-password@$(get_psql_user_host users-pguser-postgres)"

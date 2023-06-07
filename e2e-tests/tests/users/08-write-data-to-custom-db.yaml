@@ -7,10 +7,16 @@ commands:
 
       source ../../functions
 
-      run_psql \
-        'CREATE TABLE IF NOT EXISTS customApp (id int PRIMARY KEY);' \
-        "rhino:$(get_psql_user_pass rhino-credentials)@$(get_psql_user_host rhino-credentials):5432/zoo"
+      password=$(get_psql_user_pass rhino-credentials)
+      user='rhino'
+      db_name='zoo'
+      hostname=$(get_pgbouncer_host rhino-credentials)
+
 
       run_psql \
-        'INSERT INTO customApp (id) VALUES (100500)' \
-        "rhino:$(get_psql_user_pass rhino-credentials)@$(get_psql_user_host rhino-credentials):5432/zoo"
+        'CREATE SCHEMA app  CREATE TABLE IF NOT EXISTS customApp (id int PRIMARY KEY);' \
+        "-h $hostname -U $user -d $db_name" "$password"
+      run_psql \
+        'INSERT INTO app.customApp (id) VALUES (100500)' \
+        "-h $hostname -U $user -d $db_name" "$password"
+        

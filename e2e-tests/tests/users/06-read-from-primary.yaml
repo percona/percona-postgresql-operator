@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      data=$(run_psql '\c myapp \\\ SELECT * from myApp;' "postgres:default-db-password@$(get_psql_user_host users-pguser-postgres)")
+      data=$(run_psql_local '\c myapp \\\ SELECT * from myApp;' "postgres:default-db-password@$(get_psql_user_host users-pguser-postgres)")
 
       kubectl create configmap -n "${NAMESPACE}" 06-read-from-primary --from-literal=data="${data}"
       kubectl get configmap -n "${NAMESPACE}" 06-read-from-primary -o yaml
