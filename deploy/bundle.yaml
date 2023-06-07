@@ -4439,6 +4439,11 @@ spec:
                 required:
                 - pgbackrest
                 type: object
+              crVersion:
+                description: Version of the operator. Update this to new version after
+                  operator upgrade to apply changes to Kubernetes objects. Default
+                  is the latest version.
+                type: string
               dataSource:
                 description: Specifies a data source for bootstrapping the PostgreSQL
                   cluster.

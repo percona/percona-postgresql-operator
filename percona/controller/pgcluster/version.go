@@ -39,7 +39,7 @@ func (r *PGClusterReconciler) reconcileVersion(ctx context.Context, cr *v2beta1.
 func (r *PGClusterReconciler) getVersionMeta(cr *v2beta1.PerconaPGCluster, operatorDepl *appsv1.Deployment) version.Meta {
 	vm := version.Meta{
 		Apply:           "disabled",
-		OperatorVersion: version.Version,
+		OperatorVersion: v2beta1.Version,
 		CRUID:           string(cr.GetUID()),
 		KubeVersion:     r.KubeVersion,
 		Platform:        r.Platform,
