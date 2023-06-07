@@ -3,7 +3,6 @@ apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: monitoring
-  generation: 3
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2beta1
       kind: PerconaPGCluster
