@@ -190,12 +190,12 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.Patroni = cr.Spec.Patroni
 
 		users := make([]v1beta1.PostgresUserSpec, 0)
+
 		for _, user := range cr.Spec.Users {
 			if user.Name == pmm.MonitoringUser {
 				log.Info(pmm.MonitoringUser + " user is reserved, it'll be ignored.")
 				continue
 			}
-
 			users = append(users, user)
 		}
 
@@ -207,6 +207,19 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 					Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
 				},
 			})
+
+			if cr.Spec.Users == nil || len(cr.Spec.Users) == 0 {
+				// Add default user: <cluster-name>-pguser-<cluster-name>
+				postgresCluster.Spec.Users = append(postgresCluster.Spec.Users, v1beta1.PostgresUserSpec{
+					Name: v1beta1.PostgresIdentifier(cr.Name),
+					Databases: []v1beta1.PostgresIdentifier{
+						v1beta1.PostgresIdentifier(cr.Name),
+					},
+					Password: &v1beta1.PostgresPasswordSpec{
+						Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
+					},
+				})
+			}
 		}
 
 		postgresCluster.Spec.Users = users
@@ -261,11 +274,6 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		return errors.Wrap(err, "failed to get pmm secret")
 	}
 
-	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
-		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
-		return nil
-	}
-
 	if pmmSecret.Labels == nil {
 		pmmSecret.Labels = make(map[string]string)
 	}
@@ -279,6 +287,11 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		if err := r.Client.Patch(ctx, pmmSecret, client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "label PMM secret")
 		}
+	}
+
+	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
+		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
+		return nil
 	}
 
 	pmmSecretHash, err := k8s.ObjectHash(pmmSecret)

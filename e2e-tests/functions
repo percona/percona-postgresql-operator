@@ -5,29 +5,33 @@ ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 test_name=$(basename "$(pwd)")
 
+create_namespace() {
+	local namespace=$1
+	if [[ ${CLEAN_NAMESPACE} == 1 ]]; then
+		kubectl delete namespace $namespace --ignore-not-found || :
+		kubectl wait --for=delete namespace "$namespace" || :
+	fi
+
+	kubectl create namespace $namespace
+}
+
 deploy_operator() {
-	kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
-	kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/rbac.yaml"
-
-	yq eval \
-		"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
-		"${DEPLOY_DIR}/operator.yaml" \
-		>"${TEMP_DIR}/operator.yaml"
-
-	case ${test_name} in
-		telemetry-transfer)
-			yq eval \
-				"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].env[4]={"name":"PERCONA_VS_FALLBACK_URI","value":"%s"}' "http://version-service:11000")" \
-				"${TEMP_DIR}/operator.yaml" \
-				| yq eval 'select(documentIndex==0).metadata.labels["helm.sh/chart"]="fake-operator-chart"' - \
-					>"${TEMP_DIR}/vs.operator.yaml"
-
-			mv "${TEMP_DIR}/vs.operator.yaml" "${TEMP_DIR}/operator.yaml"
-			;;
-		*) ;;
-	esac
-
-	kubectl -n "${NAMESPACE}" apply -f ${TEMP_DIR}/operator.yaml
+	if [ -n "$OPERATOR_NS" ]; then
+		create_namespace $OPERATOR_NS
+		kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+		kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/cw-rbac.yaml"
+		yq eval \
+			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
+			"${DEPLOY_DIR}/cw-operator.yaml" \
+			| kubectl -n "${OPERATOR_NS}" apply -f -
+	else
+		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/rbac.yaml"
+		yq eval \
+			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
+			"${DEPLOY_DIR}/operator.yaml" \
+			| kubectl -n "${NAMESPACE}" apply -f -
+	fi
 }
 
 deploy_s3_secrets() {
@@ -112,7 +116,7 @@ get_cr() {
 	cat "${TEMP_DIR}/cr.yaml"
 }
 
-run_psql() {
+run_psql_local() {
 	local command=${1}
 	local uri=${2}
 	local driver=${3:-postgres}
@@ -122,10 +126,26 @@ run_psql() {
 		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://'$uri'"
 }
 
+run_psql() {
+	local command=${1}
+	local uri=${2}
+	local password=${3}
+	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+
+	kubectl -n ${NAMESPACE} exec ${client_container} -- \
+		bash -c "printf '$command\n' | PGPASSWORD="\'$password\'" psql -v ON_ERROR_STOP=1 -t -q $uri"
+}
+
 get_psql_user_pass() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.password | base64decode}}'
+}
+
+get_pgbouncer_host() {
+	local secret_name=${1}
+
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" -o jsonpath={.data.pgbouncer-host} | base64 -d
 }
 
 get_psql_user_host() {
@@ -159,7 +179,7 @@ wait_pod() {
 		if [ $retry -ge 360 ]; then
 			kubectl describe pod/$pod -n "${NAMESPACE}"
 			kubectl logs $pod -n "${NAMESPACE}"
-			kubectl logs $(get_operator_pod) -n "${NAMESPACE}" \
+			kubectl logs $(get_operator_pod) ${OPERATOR_NS:+-n $OPERATOR_NS} \
 				| grep -v 'level=info' \
 				| grep -v 'level=debug' \
 				| grep -v 'Getting tasks for pod' \
