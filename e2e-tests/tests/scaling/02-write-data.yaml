@@ -7,10 +7,10 @@ commands:
 
       source ../../functions
 
-      run_psql \
+      run_psql_local \
         'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
         "postgres:$(get_psql_user_pass scaling-pguser-postgres)@$(get_psql_user_host scaling-pguser-postgres)"
       
-      run_psql \
+      run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
         "postgres:$(get_psql_user_pass scaling-pguser-postgres)@$(get_psql_user_host scaling-pguser-postgres)"

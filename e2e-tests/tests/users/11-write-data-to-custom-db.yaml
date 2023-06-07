@@ -7,6 +7,11 @@ commands:
 
       source ../../functions
 
+      password=$(get_psql_user_pass rhino-credentials)
+      user='rhino'
+      db_name='zoo'
+      hostname=$(get_pgbouncer_host rhino-credentials)
+
       run_psql \
-        'INSERT INTO customApp (id) VALUES (100501)' \
-        "rhino:custom-db-password@$(get_psql_user_host rhino-credentials):5432/zoo"
+        'INSERT INTO app.customApp (id) VALUES (100501)' \
+        "-h $hostname -U $user -d $db_name" "$password"
