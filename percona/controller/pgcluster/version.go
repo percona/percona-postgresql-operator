@@ -13,7 +13,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/version"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
 )
 
 func (r *PGClusterReconciler) reconcileVersion(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {

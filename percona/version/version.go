@@ -11,7 +11,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/percona/version/service/client"
 	"github.com/percona/percona-postgresql-operator/percona/version/service/client/version_service"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
 )
 
 const (

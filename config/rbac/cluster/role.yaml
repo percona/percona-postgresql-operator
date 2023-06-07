@@ -90,7 +90,7 @@ rules:
   - patch
   - watch
 - apiGroups:
-  - pg.percona.com
+  - pgv2.percona.com
   resources:
   - perconapgbackups
   - perconapgrestores
@@ -99,7 +99,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - pg.percona.com
+  - pgv2.percona.com
   resources:
   - perconapgbackups/status
   - perconapgclusters/status
@@ -108,7 +108,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - pg.percona.com
+  - pgv2.percona.com
   resources:
   - perconapgclusters
   verbs:

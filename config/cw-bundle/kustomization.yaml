@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
 - ../crd
 - ../rbac/cluster
-- ../namespace
 - ../manager/cluster
 
 images:

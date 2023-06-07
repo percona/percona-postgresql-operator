@@ -2,6 +2,8 @@ package pgcluster
 
 import (
 	"context"
+	// #nosec G501
+	"crypto/md5"
 	"fmt"
 	"reflect"
 	"time"
@@ -29,7 +31,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pg.percona.com/v2beta1"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -96,8 +98,8 @@ func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 	}
 }
 
-// +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters,verbs=get;list;watch
-// +kubebuilder:rbac:groups=pg.percona.com,resources=perconapgclusters/status,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/status,verbs=patch;update
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
 
@@ -213,6 +215,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return errors.Wrap(err, "failed to add pmm sidecar")
 		}
 
+		if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
+			return err
+		}
+
 		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
 		postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
 
@@ -292,6 +298,48 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		set.Metadata.Annotations[v2beta1.AnnotationPMMSecretHash] = pmmSecretHash
 
 		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
+	}
+
+	return nil
+}
+
+func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
+		return nil
+	}
+
+	log := logging.FromContext(ctx)
+
+	secret := new(corev1.Secret)
+	n := cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser
+
+	if err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      n,
+		Namespace: cr.Namespace,
+	}, secret); err != nil {
+		if k8serrors.IsNotFound(err) {
+			log.V(1).Info(fmt.Sprintf("Secret %s not found", n))
+			return nil
+		}
+		return errors.Wrap(err, "failed to get monitor user secret")
+	}
+
+	secretString := fmt.Sprintln(secret.Data)
+	// #nosec G401
+	currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
+
+	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+		set := &cr.Spec.InstanceSets[i]
+
+		if set.Metadata == nil {
+			set.Metadata = &v1beta1.Metadata{}
+		}
+		if set.Metadata.Annotations == nil {
+			set.Metadata.Annotations = make(map[string]string)
+		}
+
+		// If the currentHash is the same  is the on the STS, restart will not  happen
+		set.Metadata.Annotations[v2beta1.AnnotationMonitorUserSecretHash] = currentHash
 	}
 
 	return nil

@@ -13711,6 +13711,9 @@ spec:
                             type: boolean
                         type: object
                         x-kubernetes-map-type: atomic
+                      exposeSuperusers:
+                        description: Allow SUPERUSERs to connect through PGBouncer.
+                        type: boolean
                       image:
                         description: 'Name of a container image that can run PgBouncer
                           1.15 or newer. Changing this value causes PgBouncer to restart.

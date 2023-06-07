@@ -1,4 +1,4 @@
-apiVersion: pg.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2beta1
 kind: PerconaPGCluster
 metadata:
   name: cluster1
@@ -117,6 +117,7 @@ spec:
     pgBouncer:
       replicas: 3
       image: perconalab/percona-postgresql-operator:main-ppg15-pgbouncer
+#      exposeSuperusers: true
 #      resources:
 #        limits:
 #          cpu: 200m
