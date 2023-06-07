@@ -7,6 +7,7 @@ commands:
       set -o xtrace
 
       source ../../functions
-
       deploy_operator
       deploy_client
+      kubectl -n ${OPERATOR_NS:-$NAMESPACE} set env deploy/percona-postgresql-operator PERCONA_VS_FALLBACK_URI="http://$(get_service_ip version-service):11000"
+      kubectl -n ${OPERATOR_NS:-$NAMESPACE} patch deploy/percona-postgresql-operator --patch '{"metadata":{"labels": {"helm.sh/chart": "fake-operator-chart"}}}'
