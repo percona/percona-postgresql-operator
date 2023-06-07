@@ -15,20 +15,10 @@ spec:
     singular: perconapgcluster
   scope: Namespaced
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
 metadata:
-  labels:
-    pgv2.percona.com/control-plane: postgres-operator
-  name: percona-postgresql-operator
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      pgv2.percona.com/control-plane: postgres-operator
-  strategy:
-    type: Recreate
-  template:
-    metadata:
-      labels:
-        pgv2.percona.com/control-plane: postgres-operator
+  name: check-operator-deploy-status
+timeout: 120
+commands:
+  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1

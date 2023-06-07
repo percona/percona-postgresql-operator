@@ -205,6 +205,7 @@ void prepareNode() {
         # v0.15.0 kuttl version
         kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/a67f31ecb2e62f15149ca66d096357050f07b77d/plugins/kuttl.yaml
         printf "%s is installed" "$(kubectl kuttl --version)"
+        kubectl krew install assert
     '''
 }
 

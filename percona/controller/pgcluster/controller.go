@@ -2,6 +2,8 @@ package pgcluster
 
 import (
 	"context"
+	// #nosec G501
+	"crypto/md5"
 	"fmt"
 	"reflect"
 	"time"
@@ -188,12 +190,12 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		postgresCluster.Spec.Patroni = cr.Spec.Patroni
 
 		users := make([]v1beta1.PostgresUserSpec, 0)
+
 		for _, user := range cr.Spec.Users {
 			if user.Name == pmm.MonitoringUser {
 				log.Info(pmm.MonitoringUser + " user is reserved, it'll be ignored.")
 				continue
 			}
-
 			users = append(users, user)
 		}
 
@@ -205,12 +207,29 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 					Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
 				},
 			})
+
+			if cr.Spec.Users == nil || len(cr.Spec.Users) == 0 {
+				// Add default user: <cluster-name>-pguser-<cluster-name>
+				postgresCluster.Spec.Users = append(postgresCluster.Spec.Users, v1beta1.PostgresUserSpec{
+					Name: v1beta1.PostgresIdentifier(cr.Name),
+					Databases: []v1beta1.PostgresIdentifier{
+						v1beta1.PostgresIdentifier(cr.Name),
+					},
+					Password: &v1beta1.PostgresPasswordSpec{
+						Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
+					},
+				})
+			}
 		}
 
 		postgresCluster.Spec.Users = users
 
 		if err := r.addPMMSidecar(ctx, cr); err != nil {
 			return errors.Wrap(err, "failed to add pmm sidecar")
+		}
+
+		if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
+			return err
 		}
 
 		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
@@ -255,11 +274,6 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		return errors.Wrap(err, "failed to get pmm secret")
 	}
 
-	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
-		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
-		return nil
-	}
-
 	if pmmSecret.Labels == nil {
 		pmmSecret.Labels = make(map[string]string)
 	}
@@ -273,6 +287,11 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		if err := r.Client.Patch(ctx, pmmSecret, client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "label PMM secret")
 		}
+	}
+
+	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
+		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
+		return nil
 	}
 
 	pmmSecretHash, err := k8s.ObjectHash(pmmSecret)
@@ -292,6 +311,48 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		set.Metadata.Annotations[v2beta1.AnnotationPMMSecretHash] = pmmSecretHash
 
 		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
+	}
+
+	return nil
+}
+
+func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
+		return nil
+	}
+
+	log := logging.FromContext(ctx)
+
+	secret := new(corev1.Secret)
+	n := cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser
+
+	if err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      n,
+		Namespace: cr.Namespace,
+	}, secret); err != nil {
+		if k8serrors.IsNotFound(err) {
+			log.V(1).Info(fmt.Sprintf("Secret %s not found", n))
+			return nil
+		}
+		return errors.Wrap(err, "failed to get monitor user secret")
+	}
+
+	secretString := fmt.Sprintln(secret.Data)
+	// #nosec G401
+	currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
+
+	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+		set := &cr.Spec.InstanceSets[i]
+
+		if set.Metadata == nil {
+			set.Metadata = &v1beta1.Metadata{}
+		}
+		if set.Metadata.Annotations == nil {
+			set.Metadata.Annotations = make(map[string]string)
+		}
+
+		// If the currentHash is the same  is the on the STS, restart will not  happen
+		set.Metadata.Annotations[v2beta1.AnnotationMonitorUserSecretHash] = currentHash
 	}
 
 	return nil

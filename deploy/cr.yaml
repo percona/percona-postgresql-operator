@@ -117,6 +117,7 @@ spec:
     pgBouncer:
       replicas: 3
       image: perconalab/percona-postgresql-operator:main-ppg15-pgbouncer
+#      exposeSuperusers: true
 #      resources:
 #        limits:
 #          cpu: 200m
