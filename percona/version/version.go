@@ -14,11 +14,6 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
-const (
-	Version     = "2.1.0"
-	ProductName = "pg-operator"
-)
-
 type DepVersion struct{}
 
 type Meta struct {
@@ -71,7 +66,7 @@ func fetchVersions(ctx context.Context, endpoint string, vm Meta) (DepVersion, e
 		HelmDeployCr:       &vm.HelmDeployCR,
 		HelmDeployOperator: &vm.HelmDeployOperator,
 		SidecarsUsed:       &vm.SidecarsUsed,
-		Product:            ProductName,
+		Product:            v2.ProductName,
 		Context:            ctx,
 		HTTPClient:         &http.Client{Timeout: 10 * time.Second},
 	}

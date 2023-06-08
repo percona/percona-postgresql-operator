@@ -657,8 +657,9 @@ var _ = Describe("Users", Ordered, func() {
 			})
 		})
 
-		It("should delete cr", func() {
+		It("should delete cr and all secrets", func() {
 			Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
+			Expect(k8sClient.DeleteAllOf(context.Background(), &corev1.Secret{}, client.InNamespace(ns)))
 		})
 	})
 
@@ -699,5 +700,99 @@ var _ = Describe("Users", Ordered, func() {
 				}),
 			))
 		})
+	})
+})
+
+var _ = Describe("Version labels", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "ver-labels"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster", func() {
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should label PostgreSQL statefulsets", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":         "postgres",
+			"postgres-operator.crunchydata.com/instance-set": "instance1",
+			"postgres-operator.crunchydata.com/cluster":      crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+			"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"Labels": HaveKeyWithValue(v2.LabelOperatorVersion, cr.Spec.CRVersion),
+			}),
+		})))
+	})
+
+	It("should label PGBouncer deployments", func() {
+		depList := &appsv1.DeploymentList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/role":    "pgbouncer",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, depList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(depList.Items).NotTo(BeEmpty())
+
+		Expect(depList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+			"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"Labels": HaveKeyWithValue(v2.LabelOperatorVersion, cr.Spec.CRVersion),
+			}),
+		})))
+	})
+
+	It("should label PGBackRest statefulsets", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":    "pgbackrest",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+			"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
+				"Labels": HaveKeyWithValue(v2.LabelOperatorVersion, cr.Spec.CRVersion),
+			}),
+		})))
 	})
 })
