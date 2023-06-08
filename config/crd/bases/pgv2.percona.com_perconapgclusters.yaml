@@ -16,7 +16,7 @@ spec:
     singular: perconapgbackup
   scope: Namespaced
   versions:
-  - name: v2beta1
+  - name: v2
     schema:
       openAPIV3Schema:
         description: PerconaPGBackup is the CRD that defines a Percona PostgreSQL
@@ -106,7 +106,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v2beta1
+    name: v2
     schema:
       openAPIV3Schema:
         description: PerconaPGCluster is the CRD that defines a Percona PG Cluster
@@ -11725,6 +11725,9 @@ spec:
                             - LoadBalancer
                             type: string
                         type: object
+                      exposeSuperusers:
+                        description: Allow SUPERUSERs to connect through PGBouncer.
+                        type: boolean
                       image:
                         description: 'Name of a container image that can run PgBouncer
                           1.15 or newer. Changing this value causes PgBouncer to restart.
@@ -13662,7 +13665,7 @@ spec:
     singular: perconapgrestore
   scope: Namespaced
   versions:
-  - name: v2beta1
+  - name: v2
     schema:
       openAPIV3Schema:
         description: PerconaPGRestore is the CRD that defines a Percona PostgreSQL

@@ -18,7 +18,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -37,7 +37,7 @@ type PGRestoreReconciler struct {
 
 // SetupWithManager adds the perconapgrestore controller to the provided runtime manager
 func (r *PGRestoreReconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&v2beta1.PerconaPGRestore{}).Complete(r)
+	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGRestore{}).Complete(r)
 }
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores,verbs=get;list;watch
@@ -49,7 +49,7 @@ func (r *PGRestoreReconciler) SetupWithManager(mgr manager.Manager) error {
 func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("request", request)
 
-	pgRestore := &v2beta1.PerconaPGRestore{}
+	pgRestore := &v2.PerconaPGRestore{}
 	if err := r.Client.Get(ctx, request.NamespacedName, pgRestore); err != nil {
 		// NotFound cannot be fixed by requeuing so ignore it. During background
 		// deletion, we receive delete events from cluster's dependents after
@@ -60,24 +60,24 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	if pgRestore.Status.State == v2beta1.RestoreSucceeded || pgRestore.Status.State == v2beta1.RestoreFailed {
+	if pgRestore.Status.State == v2.RestoreSucceeded || pgRestore.Status.State == v2.RestoreFailed {
 		return reconcile.Result{}, nil
 	}
 
-	pgCluster := &v2beta1.PerconaPGCluster{}
+	pgCluster := &v2.PerconaPGCluster{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: pgRestore.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
 	switch pgRestore.Status.State {
-	case v2beta1.RestoreNew:
+	case v2.RestoreNew:
 		if restore := pgCluster.Spec.Backups.PGBackRest.Restore; restore != nil && *restore.Enabled {
 			log.Info("Waiting for another restore to finish")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		pgRestore.Status.State = v2beta1.RestoreStarting
+		pgRestore.Status.State = v2.RestoreStarting
 		if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGRestore status")
 		}
@@ -88,7 +88,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 		log.Info("Restore is starting")
 		return reconcile.Result{}, nil
-	case v2beta1.RestoreStarting:
+	case v2.RestoreStarting:
 		job := &batchv1.Job{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: pgCluster.Name + "-pgbackrest-restore", Namespace: pgCluster.Namespace}, job)
 		if err != nil {
@@ -99,13 +99,13 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, errors.Wrap(err, "get restore job")
 		}
 
-		pgRestore.Status.State = v2beta1.RestoreRunning
+		pgRestore.Status.State = v2.RestoreRunning
 		if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGRestore status")
 		}
 
 		return reconcile.Result{}, nil
-	case v2beta1.RestoreRunning:
+	case v2.RestoreRunning:
 		job := &batchv1.Job{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: pgCluster.Name + "-pgbackrest-restore", Namespace: pgCluster.Namespace}, job)
 		if err != nil {
@@ -114,9 +114,9 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 		status := checkRestoreJob(job)
 		switch status {
-		case v2beta1.RestoreFailed:
+		case v2.RestoreFailed:
 			log.Info("Restore failed")
-		case v2beta1.RestoreSucceeded:
+		case v2.RestoreSucceeded:
 			log.Info("Restore succeeded")
 		default:
 			log.Info("Waiting for restore to complete")
@@ -138,7 +138,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 }
 
-func startRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCluster, pr *v2beta1.PerconaPGRestore) error {
+func startRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pr *v2.PerconaPGRestore) error {
 	orig := pg.DeepCopy()
 
 	if pg.Annotations == nil {
@@ -164,7 +164,7 @@ func startRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGClu
 	return nil
 }
 
-func disableRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGCluster) error {
+func disableRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster) error {
 	orig := pg.DeepCopy()
 
 	if pg.Spec.Backups.PGBackRest.Restore == nil {
@@ -183,13 +183,13 @@ func disableRestore(ctx context.Context, c client.Client, pg *v2beta1.PerconaPGC
 	return nil
 }
 
-func checkRestoreJob(job *batchv1.Job) v2beta1.PGRestoreState {
+func checkRestoreJob(job *batchv1.Job) v2.PGRestoreState {
 	switch {
 	case controller.JobCompleted(job):
-		return v2beta1.RestoreSucceeded
+		return v2.RestoreSucceeded
 	case controller.JobFailed(job):
-		return v2beta1.RestoreFailed
+		return v2.RestoreFailed
 	default:
-		return v2beta1.RestoreRunning
+		return v2.RestoreRunning
 	}
 }

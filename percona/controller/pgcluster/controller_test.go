@@ -24,7 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -190,7 +190,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 			It("should have PMM secret hash", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(v2beta1.AnnotationPMMSecretHash))
+				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(v2.AnnotationPMMSecretHash))
 			})
 
 			It("should label PMM secret", func() {
@@ -203,7 +203,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), secret)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(secret.Labels).To(HaveKeyWithValue(v2beta1.LabelPMMSecret, "true"))
+				Expect(secret.Labels).To(HaveKeyWithValue(v2.LabelPMMSecret, "true"))
 				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
 			})
 		})
@@ -316,7 +316,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 
 			Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 				"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
-					"Annotations": HaveKeyWithValue(v2beta1.AnnotationMonitorUserSecretHash, currentHash),
+					"Annotations": HaveKeyWithValue(v2.AnnotationMonitorUserSecretHash, currentHash),
 				}),
 			})))
 
@@ -350,7 +350,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 
 			Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 				"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
-					"Annotations": HaveKeyWithValue(v2beta1.AnnotationMonitorUserSecretHash, currentHash),
+					"Annotations": HaveKeyWithValue(v2.AnnotationMonitorUserSecretHash, currentHash),
 				}),
 			})))
 		})
@@ -401,7 +401,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		Expect(err).To(Not(HaveOccurred()))
 		mgr, err := runtime.CreateRuntimeManager(ns, cfg, true)
 		Expect(err).To(Succeed())
-		Expect(v2beta1.AddToScheme(mgr.GetScheme())).To(Succeed())
+		Expect(v2.AddToScheme(mgr.GetScheme())).To(Succeed())
 
 		r.Client = mgr.GetClient()
 		crunchyR.Client = mgr.GetClient()
@@ -441,7 +441,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 
 			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v2beta1.PerconaPGCluster))
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v2.PerconaPGCluster))
 			}, time.Second*15, time.Millisecond*250).Should(BeNil())
 
 			Eventually(func() error {
