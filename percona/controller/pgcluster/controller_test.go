@@ -657,8 +657,9 @@ var _ = Describe("Users", Ordered, func() {
 			})
 		})
 
-		It("should delete cr", func() {
+		It("should delete cr and all secrets", func() {
 			Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
+			Expect(k8sClient.DeleteAllOf(context.Background(), &corev1.Secret{}, client.InNamespace(ns)))
 		})
 	})
 
