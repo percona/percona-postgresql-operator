@@ -24,7 +24,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/util"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
@@ -68,7 +68,7 @@ var _ = BeforeSuite(func() {
 	err = v1beta1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = v2beta1.AddToScheme(scheme.Scheme)
+	err = v2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -102,13 +102,13 @@ func crunchyReconciler() *postgrescluster.Reconciler {
 	}
 }
 
-func readDefaultCR(name, namespace string) (*v2beta1.PerconaPGCluster, error) {
+func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
 	if err != nil {
 		return nil, err
 	}
 
-	cr := &v2beta1.PerconaPGCluster{}
+	cr := &v2.PerconaPGCluster{}
 
 	if err := yaml.Unmarshal(data, cr); err != nil {
 		return nil, err
@@ -131,8 +131,8 @@ func updateCrunchyPGClusterStatus(ctx context.Context, nn types.NamespacedName, 
 	Expect(k8sClient.Status().Update(ctx, pgc)).Should(Succeed())
 }
 
-func updatePerconaPGClusterCR(ctx context.Context, nn types.NamespacedName, update func(*v2beta1.PerconaPGCluster)) {
-	cr := &v2beta1.PerconaPGCluster{}
+func updatePerconaPGClusterCR(ctx context.Context, nn types.NamespacedName, update func(*v2.PerconaPGCluster)) {
+	cr := &v2.PerconaPGCluster{}
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, nn, cr)
 		return err == nil

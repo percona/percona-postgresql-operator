@@ -31,7 +31,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -58,7 +58,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	}
 
 	return builder.ControllerManagedBy(mgr).
-		For(&v2beta1.PerconaPGCluster{}).
+		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
 		Watches(&source.Kind{Type: &corev1.Service{}}, r.watchServices()).
 		Watches(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()).
@@ -106,7 +106,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
 
-	cr := &v2beta1.PerconaPGCluster{}
+	cr := &v2.PerconaPGCluster{}
 	if err := r.Client.Get(ctx, request.NamespacedName, cr); err != nil {
 		// NotFound cannot be fixed by requeuing so ignore it. During background
 		// deletion, we receive delete events from cluster's dependents after
@@ -158,9 +158,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		annotations := make(map[string]string)
 		for k, v := range cr.Annotations {
 			switch k {
-			case v2beta1.AnnotationPGBackrestBackup:
+			case v2.AnnotationPGBackrestBackup:
 				annotations[naming.PGBackRestBackup] = v
-			case v2beta1.AnnotationPGBackRestRestore:
+			case v2.AnnotationPGBackRestRestore:
 				annotations[naming.PGBackRestRestore] = v
 			case corev1.LastAppliedConfigAnnotation:
 				continue
@@ -252,7 +252,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	return ctrl.Result{}, err
 }
 
-func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
 		return nil
 	}
@@ -280,11 +280,11 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		pmmSecret.Labels = make(map[string]string)
 	}
 
-	_, pmmSecretLabelOK := pmmSecret.Labels[v2beta1.LabelPMMSecret]
+	_, pmmSecretLabelOK := pmmSecret.Labels[v2.LabelPMMSecret]
 	_, clusterLabelOK := pmmSecret.Labels[naming.LabelCluster]
 	if !pmmSecretLabelOK || !clusterLabelOK {
 		orig := pmmSecret.DeepCopy()
-		pmmSecret.Labels[v2beta1.LabelPMMSecret] = "true"
+		pmmSecret.Labels[v2.LabelPMMSecret] = "true"
 		pmmSecret.Labels[naming.LabelCluster] = cr.Name
 		if err := r.Client.Patch(ctx, pmmSecret, client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "label PMM secret")
@@ -310,7 +310,7 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 		if set.Metadata.Annotations == nil {
 			set.Metadata.Annotations = make(map[string]string)
 		}
-		set.Metadata.Annotations[v2beta1.AnnotationPMMSecretHash] = pmmSecretHash
+		set.Metadata.Annotations[v2.AnnotationPMMSecretHash] = pmmSecretHash
 
 		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
 	}
@@ -318,7 +318,7 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2beta1.Per
 	return nil
 }
 
-func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
 		return nil
 	}
@@ -354,7 +354,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 		}
 
 		// If the currentHash is the same  is the on the STS, restart will not  happen
-		set.Metadata.Annotations[v2beta1.AnnotationMonitorUserSecretHash] = currentHash
+		set.Metadata.Annotations[v2.AnnotationMonitorUserSecretHash] = currentHash
 	}
 
 	return nil

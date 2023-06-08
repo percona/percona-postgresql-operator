@@ -7,11 +7,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2beta1.PerconaPGCluster) (string, error) {
+func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
 	svcName := cr.Name + "-pgbouncer"
 
 	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
@@ -35,7 +35,7 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2beta1.PerconaPG
 	return host, nil
 }
 
-func (r *PGClusterReconciler) getState(cr *v2beta1.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) v2beta1.AppState {
+func (r *PGClusterReconciler) getState(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) v2.AppState {
 	var size, ready int
 	for _, is := range status.InstanceSets {
 		size = size + int(is.Replicas)
@@ -44,63 +44,63 @@ func (r *PGClusterReconciler) getState(cr *v2beta1.PerconaPGCluster, status *v1b
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		if ready > size {
-			return v2beta1.AppStateStopping
+			return v2.AppStateStopping
 		}
 
-		return v2beta1.AppStatePaused
+		return v2.AppStatePaused
 	}
 
 	if status.PGBackRest != nil && status.PGBackRest.RepoHost != nil && !status.PGBackRest.RepoHost.Ready {
-		return v2beta1.AppStateInit
+		return v2.AppStateInit
 	}
 
 	if status.Proxy.PGBouncer.ReadyReplicas != status.Proxy.PGBouncer.Replicas {
-		return v2beta1.AppStateInit
+		return v2.AppStateInit
 	}
 
 	if ready < size {
-		return v2beta1.AppStateInit
+		return v2.AppStateInit
 	}
 
 	if size == 0 {
-		return v2beta1.AppStateInit
+		return v2.AppStateInit
 	}
 
-	return v2beta1.AppStateReady
+	return v2.AppStateReady
 }
 
-func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2beta1.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) error {
+func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) error {
 	host, err := r.getHost(ctx, cr)
 	if err != nil {
 		return errors.Wrap(err, "get app host")
 	}
 
-	pgStatusFromCruncy := func() v2beta1.PostgresStatus {
+	pgStatusFromCruncy := func() v2.PostgresStatus {
 		var size, ready int32
 		for _, is := range status.InstanceSets {
 			size = size + is.Replicas
 			ready = ready + is.ReadyReplicas
 		}
 
-		ss := make([]v2beta1.PostgresInstanceSetStatus, 0, len(status.InstanceSets))
+		ss := make([]v2.PostgresInstanceSetStatus, 0, len(status.InstanceSets))
 		for _, is := range status.InstanceSets {
-			ss = append(ss, v2beta1.PostgresInstanceSetStatus{
+			ss = append(ss, v2.PostgresInstanceSetStatus{
 				Name:  is.Name,
 				Size:  is.Replicas,
 				Ready: is.ReadyReplicas,
 			})
 		}
 
-		return v2beta1.PostgresStatus{
+		return v2.PostgresStatus{
 			Size:         size,
 			Ready:        ready,
 			InstanceSets: ss,
 		}
 	}
 
-	cr.Status = v2beta1.PerconaPGClusterStatus{
+	cr.Status = v2.PerconaPGClusterStatus{
 		Postgres: pgStatusFromCruncy(),
-		PGBouncer: v2beta1.PGBouncerStatus{
+		PGBouncer: v2.PGBouncerStatus{
 			Size:  status.Proxy.PGBouncer.Replicas,
 			Ready: status.Proxy.PGBouncer.ReadyReplicas,
 		},

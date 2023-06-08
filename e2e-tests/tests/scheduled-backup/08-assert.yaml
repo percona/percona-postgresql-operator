@@ -10,7 +10,7 @@ metadata:
   annotations:
     postgres-operator.crunchydata.com/pgbackrest-restore: s3-restore
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2beta1
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: scheduled-backup
       controller: true
@@ -40,7 +40,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv2.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: s3-restore

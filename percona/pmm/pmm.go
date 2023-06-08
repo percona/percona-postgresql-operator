@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
 const MonitoringUser = "monitor"
@@ -18,7 +18,7 @@ const (
 	SecretKey = "PMM_SERVER_KEY"
 )
 
-func SidecarContainer(pgc *v2beta1.PerconaPGCluster) corev1.Container {
+func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 	ports := []corev1.ContainerPort{{ContainerPort: 7777}}
 	for port := 30100; port <= 30105; port++ {
 		ports = append(ports, corev1.ContainerPort{ContainerPort: int32(port)})
