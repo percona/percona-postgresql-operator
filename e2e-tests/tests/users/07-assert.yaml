@@ -3,7 +3,7 @@ kind: PostgresCluster
 metadata:
   name: users
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2beta1
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: users
       controller: true
@@ -31,7 +31,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv2.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: users

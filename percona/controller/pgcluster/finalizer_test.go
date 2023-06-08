@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -45,7 +45,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 		_ = k8sClient.Delete(ctx, namespace)
 	})
 
-	Context(v2beta1.FinalizerDeletePVC, Ordered, func() {
+	Context(v2.FinalizerDeletePVC, Ordered, func() {
 		crName := ns + "-with-delete-pvc"
 		crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
 		When("with finalizer", func() {
@@ -54,7 +54,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			controllerutil.AddFinalizer(cr, v2beta1.FinalizerDeletePVC)
+			controllerutil.AddFinalizer(cr, v2.FinalizerDeletePVC)
 
 			It("should create PerconaPGCluster", func() {
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
@@ -220,7 +220,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 		})
 	})
 
-	Context(v2beta1.FinalizerDeleteSSL, Ordered, func() {
+	Context(v2.FinalizerDeleteSSL, Ordered, func() {
 		When("with finalizer", func() {
 			crName := ns + "-with-delete-tls"
 			crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
@@ -230,7 +230,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			controllerutil.AddFinalizer(cr, v2beta1.FinalizerDeleteSSL)
+			controllerutil.AddFinalizer(cr, v2.FinalizerDeleteSSL)
 
 			It("should create PerconaPGCluster", func() {
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
@@ -298,7 +298,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			controllerutil.RemoveFinalizer(cr, v2beta1.FinalizerDeleteSSL)
+			controllerutil.RemoveFinalizer(cr, v2.FinalizerDeleteSSL)
 
 			It("should create PerconaPGCluster", func() {
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
