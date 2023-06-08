@@ -14,6 +14,11 @@ func init() {
 	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
 }
 
+const (
+	Version     = "2.2.0"
+	ProductName = "pg-operator"
+)
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=pg
@@ -36,6 +41,12 @@ type PerconaPGCluster struct {
 }
 
 type PerconaPGClusterSpec struct {
+	// Version of the operator. Update this to new version after operator
+	// upgrade to apply changes to Kubernetes objects. Default is the latest
+	// version.
+	// +optional
+	CRVersion string `json:"crVersion,omitempty"`
+
 	// The image name to use for PostgreSQL containers.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
@@ -137,6 +148,38 @@ type PerconaPGClusterSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
 	PMM *PMMSpec `json:"pmm,omitempty"`
+}
+
+func (cr *PerconaPGCluster) Default() {
+	if len(cr.Spec.CRVersion) == 0 {
+		cr.Spec.CRVersion = Version
+	}
+
+	for i := range cr.Spec.InstanceSets {
+		if cr.Spec.InstanceSets[i].Metadata == nil {
+			cr.Spec.InstanceSets[i].Metadata = new(crunchyv1beta1.Metadata)
+		}
+		if cr.Spec.InstanceSets[i].Metadata.Labels == nil {
+			cr.Spec.InstanceSets[i].Metadata.Labels = make(map[string]string)
+		}
+		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
+	}
+
+	if cr.Spec.Proxy.PGBouncer.Metadata == nil {
+		cr.Spec.Proxy.PGBouncer.Metadata = new(crunchyv1beta1.Metadata)
+	}
+	if cr.Spec.Proxy.PGBouncer.Metadata.Labels == nil {
+		cr.Spec.Proxy.PGBouncer.Metadata.Labels = make(map[string]string)
+	}
+	cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
+
+	if cr.Spec.Backups.PGBackRest.Metadata == nil {
+		cr.Spec.Backups.PGBackRest.Metadata = new(crunchyv1beta1.Metadata)
+	}
+	if cr.Spec.Backups.PGBackRest.Metadata.Labels == nil {
+		cr.Spec.Backups.PGBackRest.Metadata.Labels = make(map[string]string)
+	}
+	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 }
 
 type AppState string
@@ -531,7 +574,8 @@ type PerconaPGClusterList struct {
 const labelPrefix = "pgv2.percona.com/"
 
 const (
-	LabelPMMSecret = labelPrefix + "pmm-secret"
+	LabelOperatorVersion = labelPrefix + "version"
+	LabelPMMSecret       = labelPrefix + "pmm-secret"
 )
 
 const annotationPrefix = "pgv2.percona.com/"

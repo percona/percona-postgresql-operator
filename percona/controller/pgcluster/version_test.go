@@ -23,6 +23,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/percona/percona-postgresql-operator/percona/version"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
 var _ = Describe("Ensure Version", Ordered, func() {
@@ -161,14 +162,14 @@ func (vs *fakeVS) Apply(_ context.Context, req any) (any, error) {
 		DatabaseVersion:    "14",
 		KubeVersion:        reconciler().KubeVersion,
 		NamespaceUid:       "",
-		OperatorVersion:    version.Version,
+		OperatorVersion:    v2.Version,
 		Platform:           reconciler().Platform,
 		PmmVersion:         "",
 		PmmEnabled:         true,
 		HelmDeployCr:       true,
 		HelmDeployOperator: true,
 		SidecarsUsed:       true,
-		Product:            version.ProductName,
+		Product:            v2.ProductName,
 	}
 
 	if !reflect.DeepEqual(have, want) {
