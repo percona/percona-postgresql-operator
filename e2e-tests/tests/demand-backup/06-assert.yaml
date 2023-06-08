@@ -11,7 +11,7 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full
     postgres-operator.crunchydata.com/pgbackrest-restore: demand-backup-restore
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2beta1
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: demand-backup
       controller: true
@@ -42,7 +42,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv2.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: demand-backup-restore

@@ -21,7 +21,7 @@ metadata:
 status:
   succeeded: 1
 ---
-apiVersion: pgv2.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   name: demand-backup-full

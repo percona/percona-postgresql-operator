@@ -13,10 +13,10 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/version"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
-func (r *PGClusterReconciler) reconcileVersion(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcileVersion(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if !telemetryEnabled() {
 		return nil
 	}
@@ -36,7 +36,7 @@ func (r *PGClusterReconciler) reconcileVersion(ctx context.Context, cr *v2beta1.
 	return nil
 }
 
-func (r *PGClusterReconciler) getVersionMeta(cr *v2beta1.PerconaPGCluster, operatorDepl *appsv1.Deployment) version.Meta {
+func (r *PGClusterReconciler) getVersionMeta(cr *v2.PerconaPGCluster, operatorDepl *appsv1.Deployment) version.Meta {
 	vm := version.Meta{
 		Apply:           "disabled",
 		OperatorVersion: version.Version,

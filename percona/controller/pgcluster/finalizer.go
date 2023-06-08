@@ -13,12 +13,12 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
-type finalizerFunc func(context.Context, *v2beta1.PerconaPGCluster) error
+type finalizerFunc func(context.Context, *v2.PerconaPGCluster) error
 
-func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
 	pvcList := corev1.PersistentVolumeClaimList{}
@@ -43,7 +43,7 @@ func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2beta1.Percona
 	return nil
 }
 
-func (r *PGClusterReconciler) deleteUserSecrets(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+func (r *PGClusterReconciler) deleteUserSecrets(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
 	secretList := corev1.SecretList{}
@@ -69,7 +69,7 @@ func (r *PGClusterReconciler) deleteUserSecrets(ctx context.Context, cr *v2beta1
 	return nil
 }
 
-func (r *PGClusterReconciler) deleteTLSSecrets(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+func (r *PGClusterReconciler) deleteTLSSecrets(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
 	secrets := []corev1.Secret{
@@ -131,7 +131,7 @@ func (r *PGClusterReconciler) deleteTLSSecrets(ctx context.Context, cr *v2beta1.
 	return nil
 }
 
-func (r *PGClusterReconciler) deletePVCAndSecrets(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
+func (r *PGClusterReconciler) deletePVCAndSecrets(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if err := r.deletePVC(ctx, cr); err != nil {
 		return err
 	}
@@ -143,19 +143,19 @@ func (r *PGClusterReconciler) deletePVCAndSecrets(ctx context.Context, cr *v2bet
 	return nil
 }
 
-func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2beta1.PerconaPGCluster) error {
-	if err := r.runFinalizer(ctx, cr, v2beta1.FinalizerDeletePVC, r.deletePVCAndSecrets); err != nil {
-		return errors.Wrapf(err, "run finalizer %s", v2beta1.FinalizerDeletePVC)
+func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeletePVC, r.deletePVCAndSecrets); err != nil {
+		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeletePVC)
 	}
 
-	if err := r.runFinalizer(ctx, cr, v2beta1.FinalizerDeleteSSL, r.deleteTLSSecrets); err != nil {
-		return errors.Wrapf(err, "run finalizer %s", v2beta1.FinalizerDeleteSSL)
+	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeleteSSL, r.deleteTLSSecrets); err != nil {
+		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeleteSSL)
 	}
 
 	return nil
 }
 
-func (r *PGClusterReconciler) runFinalizer(ctx context.Context, cr *v2beta1.PerconaPGCluster, finalizer string, f finalizerFunc) error {
+func (r *PGClusterReconciler) runFinalizer(ctx context.Context, cr *v2.PerconaPGCluster, finalizer string, f finalizerFunc) error {
 	if !controllerutil.ContainsFinalizer(cr, finalizer) {
 		return nil
 	}
