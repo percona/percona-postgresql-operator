@@ -33,7 +33,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v2beta1
+    name: v2
     schema:
       openAPIV3Schema:
         description: PerconaPGCluster is the CRD that defines a Percona PG Cluster
@@ -4366,6 +4366,11 @@ spec:
                 required:
                 - pgbackrest
                 type: object
+              crVersion:
+                description: Version of the operator. Update this to new version after
+                  operator upgrade to apply changes to Kubernetes objects. Default
+                  is the latest version.
+                type: string
               dataSource:
                 description: Specifies a data source for bootstrapping the PostgreSQL
                   cluster.
@@ -11652,6 +11657,9 @@ spec:
                             - LoadBalancer
                             type: string
                         type: object
+                      exposeSuperusers:
+                        description: Allow SUPERUSERs to connect through PGBouncer.
+                        type: boolean
                       image:
                         description: 'Name of a container image that can run PgBouncer
                           1.15 or newer. Changing this value causes PgBouncer to restart.

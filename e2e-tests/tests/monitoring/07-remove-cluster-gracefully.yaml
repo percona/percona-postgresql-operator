@@ -1,7 +1,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 delete:
-- apiVersion: pgv2.percona.com/v2beta1
+- apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
     name: monitoring

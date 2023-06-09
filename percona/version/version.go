@@ -11,12 +11,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/percona/version/service/client"
 	"github.com/percona/percona-postgresql-operator/percona/version/service/client/version_service"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2beta1"
-)
-
-const (
-	Version     = "2.1.0"
-	ProductName = "pg-operator"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
 type DepVersion struct{}
@@ -37,9 +32,9 @@ type Meta struct {
 }
 
 func EnsureVersion(ctx context.Context, meta Meta) error {
-	_, err := fetchVersions(ctx, v2beta1.GetDefaultVersionServiceEndpoint(), meta)
+	_, err := fetchVersions(ctx, v2.GetDefaultVersionServiceEndpoint(), meta)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to send telemetry to %s", v2beta1.GetDefaultVersionServiceEndpoint()))
+		return errors.Wrap(err, fmt.Sprintf("failed to send telemetry to %s", v2.GetDefaultVersionServiceEndpoint()))
 	}
 
 	return nil
@@ -71,7 +66,7 @@ func fetchVersions(ctx context.Context, endpoint string, vm Meta) (DepVersion, e
 		HelmDeployCr:       &vm.HelmDeployCR,
 		HelmDeployOperator: &vm.HelmDeployOperator,
 		SidecarsUsed:       &vm.SidecarsUsed,
-		Product:            ProductName,
+		Product:            v2.ProductName,
 		Context:            ctx,
 		HTTPClient:         &http.Client{Timeout: 10 * time.Second},
 	}

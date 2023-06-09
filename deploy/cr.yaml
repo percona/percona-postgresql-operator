@@ -1,4 +1,4 @@
-apiVersion: pgv2.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: cluster1
@@ -6,6 +6,7 @@ metadata:
 #  - percona.com/delete-pvc
 #  - percona.com/delete-ssl
 spec:
+  crVersion: 2.2.0
 #  secrets:
 #    customTLSSecret:
 #      name: cluster1-cert
