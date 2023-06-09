@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 120
+timeout: 180
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -91,7 +91,7 @@ kind: PostgresCluster
 metadata:
   name: operator-self-healing
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2beta1
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: operator-self-healing
       controller: true
@@ -120,7 +120,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv2.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: operator-self-healing

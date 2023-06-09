@@ -23,7 +23,7 @@ status:
   updatedReplicas: 3
   readyReplicas: 3
 ---
-apiVersion: pgv2.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: operator-self-healing
