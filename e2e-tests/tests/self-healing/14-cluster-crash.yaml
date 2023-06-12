@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 120
+timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -8,5 +8,5 @@ commands:
 
       source ../../functions
 
-      destroy_chaos_mesh
-    timeout: 120
+      kill_pods "label" "postgres-operator.crunchydata.com/cluster" "self-healing"
+      sleep 30 # wait for crash

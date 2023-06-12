@@ -8,12 +8,11 @@ commands:
 
       source ../../functions
 
-      init_pod=$(get_operator_pod)
+      init_pod=$(get_pod_by_role self-healing master name)
       kill_pods pod $init_pod
       sleep 10 # wait a bit for pod to be killed
-      wait_deployment percona-postgresql-operator "${NAMESPACE}"
 
-      if [ "$init_pod" == "$(get_operator_pod)" ]; then
-        echo "operator pod was not killed! something went wrong."
+      if [ "$init_pod" == "$(get_pod_by_role self-healing master name)" ]; then
+        echo "master pod was not killed! something went wrong."
         exit 1
       fi

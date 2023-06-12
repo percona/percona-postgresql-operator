@@ -321,14 +321,25 @@ destroy_chaos_mesh() {
     timeout 30 kubectl delete ValidatingWebhookConfiguration $(kubectl get ValidatingWebhookConfiguration | grep 'validate-auth' | awk '{print $1}') || :
 }
 
-kill_pod() {
-    local pod=$1
+kill_pods() {
+	local selector=$1
+    local pod_label=$2
+	local label_value=$3
 
-    yq eval '
-        .metadata.name = "chaos-operator-pod-kill" |
-        del(.spec.selector.pods.test-namespace) |
-        .spec.selector.pods.'${NAMESPACE}'[0] = "'$pod'"' ${TESTS_CONFIG_DIR}/chaos-pod-kill.yml \
-        | kubectl apply --namespace ${NAMESPACE} -f -
+	if [ "${selector}" == "pod" ]; then
+		yq eval '
+			.metadata.name = "chaos-pod-kill-'${RANDOM}'" |
+			del(.spec.selector.pods.test-namespace) |
+			.spec.selector.pods.'${NAMESPACE}'[0] = "'${pod_label}'"' ${TESTS_CONFIG_DIR}/chaos-pod-kill.yml \
+			| kubectl apply --namespace ${NAMESPACE} -f -
+	elif [ "${selector}" == "label" ]; then
+		yq eval '
+			.metadata.name = "chaos-kill-label-'${RANDOM}'" |
+			.spec.mode = "all" |
+			del(.spec.selector.pods) |
+			.spec.selector.labelSelectors."'${pod_label}'" = "'${label_value}'"' ${TESTS_CONFIG_DIR}/chaos-pod-kill.yml \
+			| kubectl apply --namespace ${NAMESPACE} -f -
+	fi
     sleep 5
 }
 
@@ -336,9 +347,9 @@ failure_pod() {
     local pod=$1
 
     yq eval '
-        .metadata.name = "chaos-operator-pod-failure" |
+        .metadata.name = "chaos-pod-failure-'${RANDOM}'" |
         del(.spec.selector.pods.test-namespace) |
-        .spec.selector.pods.'${NAMESPACE}'[0] = "'$pod'"' ${TESTS_CONFIG_DIR}/chaos-pod-failure.yml \
+        .spec.selector.pods.'${NAMESPACE}'[0] = "'${pod}'"' ${TESTS_CONFIG_DIR}/chaos-pod-failure.yml \
         | kubectl apply --namespace ${NAMESPACE} -f -
     sleep 5
 }
@@ -347,9 +358,9 @@ network_loss() {
     local pod=$1
 
     yq eval '
-        .metadata.name = "chaos-operator-network-loss" |
+        .metadata.name = "chaos-pod-network-loss-'${RANDOM}'" |
         del(.spec.selector.pods.test-namespace) |
-        .spec.selector.pods.'${NAMESPACE}'[0] = "'$pod'"' ${TESTS_CONFIG_DIR}/chaos-network-loss.yml \
+        .spec.selector.pods.'${NAMESPACE}'[0] = "'${pod}'"' ${TESTS_CONFIG_DIR}/chaos-network-loss.yml \
         | kubectl apply --namespace ${NAMESPACE} -f -
 		sleep 5
 }
@@ -379,4 +390,21 @@ wait_deployment() {
     done
     echo
     set -o xtrace
+}
+
+get_pod_by_role() {
+    local cluster=${1}
+    local role=${2}
+    local parameter=${3}
+
+    case ${parameter} in
+        'name')
+            local jsonpath="{.items[].metadata.name}"
+            ;;
+        'IP')
+            local jsonpath="{.items[].status.podIP}"
+            ;;
+    esac
+
+    echo "$(kubectl get pods --namespace ${NAMESPACE} --selector=postgres-operator.crunchydata.com/role=${role},postgres-operator.crunchydata.com/cluster=${cluster} -o 'jsonpath='${jsonpath}'')"
 }
