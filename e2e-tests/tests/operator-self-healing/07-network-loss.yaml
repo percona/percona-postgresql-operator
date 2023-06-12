@@ -8,5 +8,5 @@ commands:
 
       source ../../functions
 
-      network_loss $(get_operator_pod)
-      wait_deployment percona-postgresql-operator "${NAMESPACE}"
+      network_loss "${OPERATOR_NS:-$NAMESPACE}" "$(get_operator_pod)"
+      sleep 30 # wait for network loss to happen

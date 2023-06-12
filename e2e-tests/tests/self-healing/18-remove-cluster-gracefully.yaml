@@ -9,3 +9,19 @@ delete:
   kind: PostgresCluster
   metadata:
     name: self-healing
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      destroy_operator
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      destroy_operator

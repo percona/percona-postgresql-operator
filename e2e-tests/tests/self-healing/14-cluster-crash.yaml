@@ -8,5 +8,5 @@ commands:
 
       source ../../functions
 
-      kill_pods "label" "postgres-operator.crunchydata.com/cluster" "self-healing"
+      kill_pods "${NAMESPACE}" "label" "postgres-operator.crunchydata.com/cluster" "self-healing"
       sleep 30 # wait for crash

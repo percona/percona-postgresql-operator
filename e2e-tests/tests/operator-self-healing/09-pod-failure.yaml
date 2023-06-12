@@ -8,5 +8,5 @@ commands:
 
       source ../../functions
 
-      failure_pod $(get_operator_pod)
-      wait_deployment percona-postgresql-operator "${NAMESPACE}"
+      failure_pod "${OPERATOR_NS:-$NAMESPACE}" "$(get_operator_pod)"
+      sleep 30 # wait for pod failure to happen

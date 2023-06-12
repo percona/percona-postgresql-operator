@@ -9,7 +9,7 @@ commands:
       source ../../functions
 
       init_pod=$(get_pod_by_role self-healing master name)
-      kill_pods pod $init_pod
+      kill_pods "${NAMESPACE}" "pod" "$init_pod"
       sleep 10 # wait a bit for pod to be killed
 
       if [ "$init_pod" == "$(get_pod_by_role self-healing master name)" ]; then

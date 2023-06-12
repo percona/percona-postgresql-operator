@@ -16,6 +16,8 @@ create_namespace() {
 }
 
 deploy_operator() {
+	destroy_operator
+
 	if [ -n "$OPERATOR_NS" ]; then
 		create_namespace $OPERATOR_NS
 		kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
@@ -34,8 +36,15 @@ deploy_operator() {
 	fi
 }
 
+destroy_operator() {
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" delete deployment percona-postgresql-operator --force --grace-period=0 || true
+	if [ -n "$OPERATOR_NS" ]; then
+		kubectl delete namespace $OPERATOR_NS --force --grace-period=0 || true
+	fi
+}
+
 get_operator_pod() {
-	echo $(kubectl get pods -n "${NAMESPACE}" --selector=app.kubernetes.io/name=percona-postgresql-operator -o jsonpath='{.items[].metadata.name}')
+	echo $(kubectl get pods -n "${OPERATOR_NS:-$NAMESPACE}" --selector=app.kubernetes.io/name=percona-postgresql-operator -o jsonpath='{.items[].metadata.name}')
 }
 
 deploy_s3_secrets() {
@@ -322,46 +331,49 @@ destroy_chaos_mesh() {
 }
 
 kill_pods() {
-	local selector=$1
-	local pod_label=$2
-	local label_value=$3
+	local ns=$1
+	local selector=$2
+	local pod_label=$3
+	local label_value=$4
 
 	if [ "${selector}" == "pod" ]; then
 		yq eval '
 			.metadata.name = "chaos-pod-kill-'${RANDOM}'" |
 			del(.spec.selector.pods.test-namespace) |
-			.spec.selector.pods.'${NAMESPACE}'[0] = "'${pod_label}'"' ${TESTS_CONFIG_DIR}/chaos-pod-kill.yml \
-			| kubectl apply --namespace ${NAMESPACE} -f -
+			.spec.selector.pods.'${ns}'[0] = "'${pod_label}'"' ${TESTS_CONFIG_DIR}/chaos-pod-kill.yml \
+			| kubectl apply --namespace ${ns} -f -
 	elif [ "${selector}" == "label" ]; then
 		yq eval '
 			.metadata.name = "chaos-kill-label-'${RANDOM}'" |
 			.spec.mode = "all" |
 			del(.spec.selector.pods) |
 			.spec.selector.labelSelectors."'${pod_label}'" = "'${label_value}'"' ${TESTS_CONFIG_DIR}/chaos-pod-kill.yml \
-			| kubectl apply --namespace ${NAMESPACE} -f -
+			| kubectl apply --namespace ${ns} -f -
 	fi
 	sleep 5
 }
 
 failure_pod() {
-	local pod=$1
+	local ns=$1
+	local pod=$2
 
 	yq eval '
         .metadata.name = "chaos-pod-failure-'${RANDOM}'" |
         del(.spec.selector.pods.test-namespace) |
-        .spec.selector.pods.'${NAMESPACE}'[0] = "'${pod}'"' ${TESTS_CONFIG_DIR}/chaos-pod-failure.yml \
-		| kubectl apply --namespace ${NAMESPACE} -f -
+        .spec.selector.pods.'${ns}'[0] = "'${pod}'"' ${TESTS_CONFIG_DIR}/chaos-pod-failure.yml \
+		| kubectl apply --namespace ${ns} -f -
 	sleep 5
 }
 
 network_loss() {
-	local pod=$1
+	local ns=$1
+	local pod=$2
 
 	yq eval '
         .metadata.name = "chaos-pod-network-loss-'${RANDOM}'" |
         del(.spec.selector.pods.test-namespace) |
-        .spec.selector.pods.'${NAMESPACE}'[0] = "'${pod}'"' ${TESTS_CONFIG_DIR}/chaos-network-loss.yml \
-		| kubectl apply --namespace ${NAMESPACE} -f -
+        .spec.selector.pods.'${ns}'[0] = "'${pod}'"' ${TESTS_CONFIG_DIR}/chaos-network-loss.yml \
+		| kubectl apply --namespace ${ns} -f -
 	sleep 5
 }
 

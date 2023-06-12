@@ -8,5 +8,5 @@ commands:
 
       source ../../functions
 
-      failure_pod "$(get_pod_by_role self-healing master name)"
+      failure_pod "${NAMESPACE}" "$(get_pod_by_role self-healing master name)"
       sleep 10 # wait a bit for pod to be killed
