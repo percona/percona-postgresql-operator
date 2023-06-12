@@ -467,7 +467,6 @@ pipeline {
                         prepareNode()
                         unstash "sourceFILES"
                         clusterRunner('cluster4')
->>>>>>> main
                     }
                 }
             }
