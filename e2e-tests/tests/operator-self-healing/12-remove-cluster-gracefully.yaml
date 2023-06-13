@@ -4,11 +4,11 @@ delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
-    name: init-deploy
+    name: operator-self-healing
 - apiVersion: postgres-operator.crunchydata.com/v1beta1
   kind: PostgresCluster
   metadata:
-    name: init-deploy
+    name: operator-self-healing
 commands:
   - script: |-
       set -o errexit

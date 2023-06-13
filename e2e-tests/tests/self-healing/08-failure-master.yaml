@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      failure_pod "${NAMESPACE}" "$(get_pod_by_role self-healing master name)"
+      sleep 10 # wait a bit for pod to be killed

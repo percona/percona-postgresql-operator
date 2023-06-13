@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kill_pods "${NAMESPACE}" "label" "postgres-operator.crunchydata.com/cluster" "self-healing"
+      sleep 30 # wait for crash

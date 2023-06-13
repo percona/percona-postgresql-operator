@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      pods=$(get_instance_set_pods instance1)
+      i=1
+      for pod in $pods; do
+          data=$(run_psql_local '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass self-healing-pguser-postgres)@$(get_psql_pod_host ${pod})")
+          kubectl create configmap -n "${NAMESPACE}" 07-read-from-${i} --from-literal=data="${data}"
+          i=$((i+1))
+      done
