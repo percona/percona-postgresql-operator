@@ -16,3 +16,6 @@ bin/
 *.test
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+kubeconfig
+gke_gcloud_auth_plugin_cache
