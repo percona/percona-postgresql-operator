@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      network_loss "${OPERATOR_NS:-$NAMESPACE}" "$(get_operator_pod)"
+      sleep 30 # wait for network loss to happen

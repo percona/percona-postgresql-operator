@@ -1,0 +1,41 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: operator-self-healing-pgbouncer
+  labels:
+    postgres-operator.crunchydata.com/cluster: operator-self-healing
+    postgres-operator.crunchydata.com/role: pgbouncer
+  annotations:
+    deployment.kubernetes.io/revision: '1'
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: operator-self-healing
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 2
+  replicas: 5
+  updatedReplicas: 5
+  readyReplicas: 5
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: operator-self-healing
+status:
+  pgbouncer:
+    ready: 5
+    size: 5
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready
