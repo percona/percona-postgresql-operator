@@ -26,15 +26,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.16.0
 	golang.org/x/crypto v0.9.0
 	gotest.tools/v3 v3.4.0
-	k8s.io/api v0.26.3
-	k8s.io/apimachinery v0.27.2
-	k8s.io/client-go v0.26.3
-	k8s.io/component-base v0.26.3
+	k8s.io/api v0.27.3
+	k8s.io/apimachinery v0.27.3
+	k8s.io/client-go v0.27.3
+	k8s.io/component-base v0.27.3
 	sigs.k8s.io/controller-runtime v0.14.6
 	sigs.k8s.io/yaml v1.3.0
 )
-
-require github.com/rogpeppe/go-internal v1.6.1 // indirect
 
 require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
