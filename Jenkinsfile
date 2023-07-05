@@ -226,12 +226,6 @@ void runTest(Integer TEST_ID) {
 
 void prepareNode() {
     sh '''
-        sudo yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
-        sudo percona-release enable-only tools
-        sudo yum install -y percona-xtrabackup-80 jq | true
-    '''
-
-    sh '''
         if [ ! -d $HOME/google-cloud-sdk/bin ]; then
             rm -rf $HOME/google-cloud-sdk
             curl https://sdk.cloud.google.com | bash
@@ -244,8 +238,12 @@ void prepareNode() {
             | sudo tar -C /usr/local/bin --strip-components 1 --wildcards -zxvpf - '*/oc'
         curl -s -L https://github.com/mitchellh/golicense/releases/latest/download/golicense_0.2.0_linux_x86_64.tar.gz \
             | sudo tar -C /usr/local/bin --wildcards -zxvpf -
-        sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/v4.29.1/yq_linux_amd64 > /usr/local/bin/yq"
+
+        sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/v4.27.2/yq_linux_amd64 > /usr/local/bin/yq"
         sudo chmod +x /usr/local/bin/yq
+        sudo sh -c "curl -s -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /usr/local/bin/jq"
+        sudo chmod +x /usr/local/bin/jq
+
         cd "$(mktemp -d)"
         OS="$(uname | tr '[:upper:]' '[:lower:]')"
         ARCH="$(uname -m | sed -e 's/x86_64/amd64/')"
