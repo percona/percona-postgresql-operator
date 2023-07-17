@@ -123,6 +123,12 @@ rules:
   - update
   - watch
 - apiGroups:
+  - pgv2.percona.com
+  resources:
+  - perconapgclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets

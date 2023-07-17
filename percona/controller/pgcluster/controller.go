@@ -99,6 +99,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 }
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs={update}
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/status,verbs=patch;update
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
