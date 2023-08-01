@@ -27,7 +27,7 @@ require (
 	golang.org/x/crypto v0.9.0
 	gotest.tools/v3 v3.4.0
 	k8s.io/api v0.26.3
-	k8s.io/apimachinery v0.27.2
+	k8s.io/apimachinery v0.27.4
 	k8s.io/client-go v0.26.3
 	k8s.io/component-base v0.26.3
 	sigs.k8s.io/controller-runtime v0.14.6
