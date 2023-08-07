@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export ROOT_REPO=${ROOT_REPO:-${PWD}}
 
