@@ -727,6 +727,7 @@ func ScaleClusterDeployments(clientset kubernetes.Interface, cluster crv1.Pgclus
 	}
 
 	for _, deployment := range deploymentList.Items {
+		_replicas := replicas
 
 		// determine if the deployment is a primary, replica, or supporting service (pgBackRest,
 		// pgBouncer, etc.)
@@ -746,7 +747,7 @@ func ScaleClusterDeployments(clientset kubernetes.Interface, cluster crv1.Pgclus
 			// if the replica total is greater than 0, set number of pgBouncer
 			// replicas to the number that is specified in the cluster entry
 			if replicas > 0 {
-				replicas = int(cluster.Spec.PgBouncer.Replicas)
+				_replicas = int(cluster.Spec.PgBouncer.Replicas)
 			}
 		case deployment.Labels[config.LABEL_PGO_BACKREST_REPO] == "true":
 			clusterInfo.PGBackRestRepoDeployment = deployment.Name
@@ -763,19 +764,19 @@ func ScaleClusterDeployments(clientset kubernetes.Interface, cluster crv1.Pgclus
 			}
 		}
 
-		log.Debugf("scaling deployment %s to %d for cluster %s", deployment.Name, replicas,
+		log.Debugf("scaling deployment %s to %d for cluster %s", deployment.Name, _replicas,
 			clusterName)
 
 		// Scale the deployment according to the number of replicas specified.  If an error is
 		// encountered, log it and move on to scaling the next deployment
-		patch, err := kubeapi.NewMergePatch().Add("spec", "replicas")(replicas).Bytes()
+		patch, err := kubeapi.NewMergePatch().Add("spec", "replicas")(_replicas).Bytes()
 		if err == nil {
 			log.Debugf("patching deployment %s: %s", deployment.GetName(), patch)
 			_, err = clientset.AppsV1().Deployments(namespace).
 				Patch(ctx, deployment.GetName(), types.MergePatchType, patch, metav1.PatchOptions{})
 		}
 		if err != nil {
-			log.Errorf("Error scaling deployment %s to %d: %v", deployment.Name, replicas, err)
+			log.Errorf("Error scaling deployment %s to %d: %v", deployment.Name, _replicas, err)
 		}
 	}
 	return
