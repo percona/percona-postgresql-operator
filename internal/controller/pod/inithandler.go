@@ -173,6 +173,12 @@ func (c *Controller) handleBootstrapInit(newPod *apiv1.Pod, cluster *crv1.Pgclus
 	// create the pgBackRest stanza
 	backrestoperator.StanzaCreate(newPod.ObjectMeta.Namespace, clusterName, c.Client)
 
+	// now scale any replicas deployments to 1
+	_, err := clusteroperator.ScaleClusterDeployments(c.Client, *cluster, 1, false, true, false, false)
+	if err != nil {
+		log.Error(err)
+	}
+
 	// if this is a pgbouncer enabled cluster, add a pgbouncer
 	// Note: we only warn if we cannot create the pgBouncer, so eecution can
 	// continue

@@ -727,6 +727,7 @@ func ScaleClusterDeployments(clientset kubernetes.Interface, cluster crv1.Pgclus
 	}
 
 	for _, deployment := range deploymentList.Items {
+		replicas := replicas
 
 		// determine if the deployment is a primary, replica, or supporting service (pgBackRest,
 		// pgBouncer, etc.)
