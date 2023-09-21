@@ -30,7 +30,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 )
 
-var tmpDirSizeLimit = resource.MustParse("16Mi")
+var tmpDirSizeLimit = resource.MustParse("1024Mi")
 
 const (
 	// devSHMDir is the directory used for allocating shared memory segments,
