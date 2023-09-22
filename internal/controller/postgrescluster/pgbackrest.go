@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -606,10 +607,18 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 		&repo.Spec.Template)
 
 	sizeLimit := resource.MustParse("16Mi")
-	if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
-		limit, ok := postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources.Limits[corev1.ResourceEphemeralStorage]
-		if ok {
-			sizeLimit = limit
+	version, ok := repo.Labels[naming.LabelVersion]
+	if ok {
+		v, err := gover.NewVersion(version)
+		if err == nil && v.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.3.0"))) {
+			sizeLimit = resource.MustParse("1.5Gi")
+
+			if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
+				limit, ok := postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources.Limits[corev1.ResourceEphemeralStorage]
+				if ok {
+					sizeLimit = limit
+				}
+			}
 		}
 	}
 
@@ -1159,10 +1168,17 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		&restoreJob.Spec.Template)
 
 	sizeLimit := resource.MustParse("16Mi")
-	if cluster.Spec.Backups.PGBackRest.Restore != nil {
-		limit, ok := cluster.Spec.Backups.PGBackRest.Restore.Resources.Limits[corev1.ResourceEphemeralStorage]
-		if ok {
-			sizeLimit = limit
+	version, ok := restoreJob.Labels[naming.LabelVersion]
+	if ok {
+		v, err := gover.NewVersion(version)
+		if err == nil && v.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.3.0"))) {
+			sizeLimit = resource.MustParse("1.5Gi")
+			if cluster.Spec.Backups.PGBackRest.Restore != nil {
+				limit, ok := cluster.Spec.Backups.PGBackRest.Restore.Resources.Limits[corev1.ResourceEphemeralStorage]
+				if ok {
+					sizeLimit = limit
+				}
+			}
 		}
 	}
 

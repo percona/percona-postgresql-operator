@@ -12,6 +12,7 @@ require (
 	github.com/go-openapi/validate v0.22.1
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
+	github.com/hashicorp/go-version v1.6.0
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
 	github.com/pkg/errors v0.9.1
