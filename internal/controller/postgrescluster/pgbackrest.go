@@ -31,6 +31,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -604,7 +605,15 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 		postgresCluster.Spec.ImagePullPolicy,
 		&repo.Spec.Template)
 
-	addTMPEmptyDir(&repo.Spec.Template)
+	sizeLimit := resource.MustParse("16Mi")
+	if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
+		limit, ok := postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources.Limits[corev1.ResourceEphemeralStorage]
+		if ok {
+			sizeLimit = limit
+		}
+	}
+
+	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
 
 	// set ownership references
 	if err := controllerutil.SetControllerReference(postgresCluster, repo,
@@ -1149,7 +1158,15 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		cluster.Spec.ImagePullPolicy,
 		&restoreJob.Spec.Template)
 
-	addTMPEmptyDir(&restoreJob.Spec.Template)
+	sizeLimit := resource.MustParse("16Mi")
+	if cluster.Spec.Backups.PGBackRest.Restore != nil {
+		limit, ok := cluster.Spec.Backups.PGBackRest.Restore.Resources.Limits[corev1.ResourceEphemeralStorage]
+		if ok {
+			sizeLimit = limit
+		}
+	}
+
+	addTMPEmptyDir(&restoreJob.Spec.Template, sizeLimit)
 
 	return errors.WithStack(r.apply(ctx, restoreJob))
 }

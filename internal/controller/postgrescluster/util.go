@@ -30,8 +30,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 )
 
-var tmpDirSizeLimit = resource.MustParse("1024Mi")
-
 const (
 	// devSHMDir is the directory used for allocating shared memory segments,
 	// which are needed by Postgres
@@ -152,13 +150,13 @@ func addDevSHM(template *corev1.PodTemplateSpec) {
 //   - As the pgBackRest lock directory (this is the default lock location for pgBackRest)
 //   - The location where the replication client certificates can be loaded with the proper
 //     permissions set
-func addTMPEmptyDir(template *corev1.PodTemplateSpec) {
+func addTMPEmptyDir(template *corev1.PodTemplateSpec, sizeLimit resource.Quantity) {
 
 	template.Spec.Volumes = append(template.Spec.Volumes, corev1.Volume{
 		Name: "tmp",
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{
-				SizeLimit: &tmpDirSizeLimit,
+				SizeLimit: &sizeLimit,
 			},
 		},
 	})

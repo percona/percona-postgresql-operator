@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1119,10 +1120,15 @@ func (r *Reconciler) reconcileInstance(
 			&instance.Spec.Template)
 
 	}
+
+	sizeLimit, ok := spec.Resources.Limits[corev1.ResourceEphemeralStorage]
+	if !ok {
+		sizeLimit = resource.MustParse("16Mi")
+	}
 	// add an emptyDir volume to the PodTemplateSpec and an associated '/tmp' volume mount to
 	// all containers included within that spec
 	if err == nil {
-		addTMPEmptyDir(&instance.Spec.Template)
+		addTMPEmptyDir(&instance.Spec.Template, sizeLimit)
 	}
 
 	// mount shared memory to the Postgres instance
