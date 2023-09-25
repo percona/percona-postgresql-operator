@@ -604,7 +604,13 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 		postgresCluster.Spec.ImagePullPolicy,
 		&repo.Spec.Template)
 
-	addTMPEmptyDir(&repo.Spec.Template)
+	resources := corev1.ResourceRequirements{}
+	if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
+		resources = postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources
+	}
+	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
+
+	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
 
 	// set ownership references
 	if err := controllerutil.SetControllerReference(postgresCluster, repo,
@@ -1149,7 +1155,13 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		cluster.Spec.ImagePullPolicy,
 		&restoreJob.Spec.Template)
 
-	addTMPEmptyDir(&restoreJob.Spec.Template)
+	resources := corev1.ResourceRequirements{}
+	if cluster.Spec.Backups.PGBackRest.Restore != nil {
+		resources = cluster.Spec.Backups.PGBackRest.Restore.Resources
+	}
+	sizeLimit := getTMPSizeLimit(restoreJob.Labels[naming.LabelVersion], resources)
+
+	addTMPEmptyDir(&restoreJob.Spec.Template, sizeLimit)
 
 	return errors.WithStack(r.apply(ctx, restoreJob))
 }
