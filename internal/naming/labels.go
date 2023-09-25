@@ -20,7 +20,10 @@ import (
 )
 
 const (
-	labelPrefix = "postgres-operator.crunchydata.com/"
+	labelPrefix        = "postgres-operator.crunchydata.com/"
+	perconaLabelPrefix = "pgv2.percona.com/"
+
+	LabelVersion = perconaLabelPrefix + "version"
 
 	// LabelCluster et al. provides the fundamental labels for Postgres instances
 	LabelCluster     = labelPrefix + "cluster"

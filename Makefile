@@ -101,7 +101,8 @@ uninstall:
 
 # Deploy the PostgreSQL Operator (enables the postgrescluster controller)
 deploy:
-	$(PGO_KUBE_CLIENT) apply -f ./deploy/operator.yaml
+	yq eval '(.spec.template.spec.containers[] | select(.name=="operator")).image = "$(IMAGE)"' ./deploy/operator.yaml \
+		| $(PGO_KUBE_CLIENT) apply -f -
 
 # Deploy the PostgreSQL Operator locally
 deploy-dev: build-postgres-operator createnamespaces

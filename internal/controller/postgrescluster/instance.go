@@ -1119,10 +1119,13 @@ func (r *Reconciler) reconcileInstance(
 			&instance.Spec.Template)
 
 	}
+
+	sizeLimit := getTMPSizeLimit(instance.Labels[naming.LabelVersion], spec.Resources)
+
 	// add an emptyDir volume to the PodTemplateSpec and an associated '/tmp' volume mount to
 	// all containers included within that spec
 	if err == nil {
-		addTMPEmptyDir(&instance.Spec.Template)
+		addTMPEmptyDir(&instance.Spec.Template, sizeLimit)
 	}
 
 	// mount shared memory to the Postgres instance
