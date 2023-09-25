@@ -534,7 +534,7 @@ func TestGetTMPSizeLimit(t *testing.T) {
 	// Test case 1: version is empty string
 	version := ""
 	resources := corev1.ResourceRequirements{}
-	expected := tmpDirSizeLimitLT230
+	expected := tmpDirSizeLimitLT220
 	result := getTMPSizeLimit(version, resources)
 	if result != expected {
 		t.Errorf("result: %+v, expected: %+v", result, expected)
@@ -543,7 +543,7 @@ func TestGetTMPSizeLimit(t *testing.T) {
 	// Test case 2: version < 2.3.0
 	version = "2.2.0"
 	resources = corev1.ResourceRequirements{}
-	expected = tmpDirSizeLimitLT230
+	expected = tmpDirSizeLimitLT220
 	result = getTMPSizeLimit(version, resources)
 	if result != expected {
 		t.Errorf("result: %+v, expected: %+v", result, expected)

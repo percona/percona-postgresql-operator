@@ -120,7 +120,7 @@ var (
 	// OperatorVersion220 is the version 2.2.0 of the Operator
 	operatorVersion220 = gover.Must(gover.NewVersion("2.2.0"))
 
-	// TMPDirSizeLimitLT230 is the size limit for the /tmp directory for Operator versions < 2.2.0
+	// TMPDirSizeLimitLT220 is the size limit for the /tmp directory for Operator versions < 2.2.0
 	tmpDirSizeLimitLT220 = resource.MustParse("16Mi")
 
 	// TMPDirSizeLimitGTE230 is the size limit for the /tmp directory for Operator versions >= 2.2.0
@@ -130,11 +130,11 @@ var (
 func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) resource.Quantity {
 	currVersion, err := gover.NewVersion(version)
 	if err != nil {
-		return tmpDirSizeLimitLT230
+		return tmpDirSizeLimitLT220
 	}
 
-	if currVersion.LessThan(operatorVersion230) {
-		return tmpDirSizeLimitLT230
+	if currVersion.LessThan(operatorVersion220) {
+		return tmpDirSizeLimitLT220
 	}
 
 	ephemeralLimit, ok := resources.Limits[corev1.ResourceEphemeralStorage]
@@ -142,7 +142,7 @@ func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) reso
 		return ephemeralLimit
 	}
 
-	return tmpDirSizeLimitGTE230
+	return tmpDirSizeLimitGTE220
 }
 
 // addDevSHM adds the shared memory "directory" to a Pod, which is needed by
