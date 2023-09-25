@@ -23,14 +23,12 @@ import (
 	"strings"
 	"time"
 
-	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1122,18 +1120,7 @@ func (r *Reconciler) reconcileInstance(
 
 	}
 
-	sizeLimit := resource.MustParse("16Mi")
-	version, ok := instance.Labels[naming.LabelVersion]
-	if ok {
-		v, err := gover.NewVersion(version)
-		if err == nil && v.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.3.0"))) {
-			sizeLimit = resource.MustParse("1.5Gi")
-			limit, ok := spec.Resources.Limits[corev1.ResourceEphemeralStorage]
-			if ok {
-				sizeLimit = limit
-			}
-		}
-	}
+	sizeLimit := getTMPSizeLimit(instance.Labels[naming.LabelVersion], spec.Resources)
 
 	// add an emptyDir volume to the PodTemplateSpec and an associated '/tmp' volume mount to
 	// all containers included within that spec

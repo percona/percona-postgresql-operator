@@ -20,6 +20,7 @@ import (
 	"hash/fnv"
 	"io"
 
+	gover "github.com/hashicorp/go-version"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -114,6 +115,35 @@ export NSS_WRAPPER_GROUP="${NSS_WRAPPER_GROUP}"
 echo "nss_wrapper: environment configured"
 `
 )
+
+var (
+	// OperatorVersion230 is the version 2.3.0 of the Operator
+	operatorVersion230 = gover.Must(gover.NewVersion("2.3.0"))
+
+	// TMPDirSizeLimitLT230 is the size limit for the /tmp directory for Operator versions < 2.3.0
+	tmpDirSizeLimitLT230 = resource.MustParse("16Mi")
+
+	// TMPDirSizeLimitGTE230 is the size limit for the /tmp directory for Operator versions >= 2.3.0
+	tmpDirSizeLimitGTE230 = resource.MustParse("1.5Gi")
+)
+
+func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) resource.Quantity {
+	currVersion, err := gover.NewVersion(version)
+	if err != nil {
+		return tmpDirSizeLimitLT230
+	}
+
+	if currVersion.LessThan(operatorVersion230) {
+		return tmpDirSizeLimitLT230
+	}
+
+	ephemeralLimit, ok := resources.Limits[corev1.ResourceEphemeralStorage]
+	if ok {
+		return ephemeralLimit
+	}
+
+	return tmpDirSizeLimitGTE230
+}
 
 // addDevSHM adds the shared memory "directory" to a Pod, which is needed by
 // Postgres to allocate shared memory segments. This is a special directory

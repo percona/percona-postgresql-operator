@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -32,7 +31,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -606,21 +604,11 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 		postgresCluster.Spec.ImagePullPolicy,
 		&repo.Spec.Template)
 
-	sizeLimit := resource.MustParse("16Mi")
-	version, ok := repo.Labels[naming.LabelVersion]
-	if ok {
-		v, err := gover.NewVersion(version)
-		if err == nil && v.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.3.0"))) {
-			sizeLimit = resource.MustParse("1.5Gi")
-
-			if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
-				limit, ok := postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources.Limits[corev1.ResourceEphemeralStorage]
-				if ok {
-					sizeLimit = limit
-				}
-			}
-		}
+	resources := corev1.ResourceRequirements{}
+	if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
+		resources = postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources
 	}
+	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
 
 	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
 
@@ -1167,20 +1155,11 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		cluster.Spec.ImagePullPolicy,
 		&restoreJob.Spec.Template)
 
-	sizeLimit := resource.MustParse("16Mi")
-	version, ok := restoreJob.Labels[naming.LabelVersion]
-	if ok {
-		v, err := gover.NewVersion(version)
-		if err == nil && v.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.3.0"))) {
-			sizeLimit = resource.MustParse("1.5Gi")
-			if cluster.Spec.Backups.PGBackRest.Restore != nil {
-				limit, ok := cluster.Spec.Backups.PGBackRest.Restore.Resources.Limits[corev1.ResourceEphemeralStorage]
-				if ok {
-					sizeLimit = limit
-				}
-			}
-		}
+	resources := corev1.ResourceRequirements{}
+	if cluster.Spec.Backups.PGBackRest.Restore != nil {
+		resources = cluster.Spec.Backups.PGBackRest.Restore.Resources
 	}
+	sizeLimit := getTMPSizeLimit(restoreJob.Labels[naming.LabelVersion], resources)
 
 	addTMPEmptyDir(&restoreJob.Spec.Template, sizeLimit)
 
