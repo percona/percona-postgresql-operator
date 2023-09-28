@@ -154,7 +154,7 @@ func (r *Reconciler) applyRepoHostIntent(ctx context.Context, postgresCluster *v
 // applying the PostgresCluster controller's fully specified intent for the PersistentVolumeClaim
 // representing a repository.
 func (r *Reconciler) applyRepoVolumeIntent(ctx context.Context,
-	postgresCluster *v1beta1.PostgresCluster, spec *corev1.PersistentVolumeClaimSpec,
+	postgresCluster *v1beta1.PostgresCluster, spec corev1.PersistentVolumeClaimSpec,
 	repoName string, repoResources *RepoResources) (*corev1.PersistentVolumeClaim, error) {
 
 	repo, err := r.generateRepoVolumeIntent(postgresCluster, spec, repoName, repoResources)
@@ -622,7 +622,7 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 }
 
 func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresCluster,
-	spec *corev1.PersistentVolumeClaimSpec, repoName string,
+	spec corev1.PersistentVolumeClaimSpec, repoName string,
 	repoResources *RepoResources) (*corev1.PersistentVolumeClaim, error) {
 
 	annotations := naming.Merge(
@@ -655,7 +655,7 @@ func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresC
 			Kind:       "PersistentVolumeClaim",
 		},
 		ObjectMeta: meta,
-		Spec:       *spec,
+		Spec:       spec,
 	}
 
 	// K8SPG-328: Keep this commented in case of conflicts.
@@ -1093,9 +1093,16 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		}
 	}
 
+	// Check to see if huge pages have been requested in the spec. If they have, include 'huge_pages = try'
+	// in the restore command. If they haven't, include 'huge_pages = off'.
+	hugePagesSetting := "off"
+	if postgres.HugePagesRequested(cluster) {
+		hugePagesSetting = "try"
+	}
+
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
-	cmd := pgbackrest.RestoreCommand(pgdata, pgtablespaceVolumes, strings.Join(opts, " "))
+	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, pgtablespaceVolumes, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
 	dataVolumeMount := postgres.DataVolumeMount()
@@ -2501,7 +2508,7 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 		if repo.Volume == nil {
 			continue
 		}
-		repo, err := r.applyRepoVolumeIntent(ctx, postgresCluster, &repo.Volume.VolumeClaimSpec,
+		repo, err := r.applyRepoVolumeIntent(ctx, postgresCluster, repo.Volume.VolumeClaimSpec,
 			repo.Name, repoResources)
 		if err != nil {
 			log.Error(err, errMsg)

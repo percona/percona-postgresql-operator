@@ -1,0 +1,16 @@
+namespace: postgres-operator
+
+commonLabels:
+  app.kubernetes.io/name: pgo
+  # The version below should match the version on the PostgresCluster CRD
+  app.kubernetes.io/version: 5.4.2
+  postgres-operator.crunchydata.com/control-plane: postgres-operator
+
+bases:
+- ../crd
+- ../rbac/cluster
+- ../manager
+
+#patchesJson6902:
+#- target: { group: apps, version: v1, kind: Deployment, name: pgo }
+#  path: selectors.yaml
