@@ -2,6 +2,7 @@ package pgbackup
 
 import (
 	"context"
+	"path"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,6 +20,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -97,6 +99,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		pgBackup.Status.State = v2.BackupRunning
 		pgBackup.Status.JobName = job.Name
+		pgBackup.Status.Destination = getDestination(pgCluster, pgBackup)
 
 		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
@@ -130,6 +133,36 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	default:
 		return reconcile.Result{}, nil
 	}
+}
+
+func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
+	destination := ""
+	repoName := pb.Spec.RepoName
+	var repo *v1beta1.PGBackRestRepo
+	for _, r := range pg.Spec.Backups.PGBackRest.Repos {
+		if repoName == r.Name {
+			repo = &r
+			break
+		}
+	}
+	if repo == nil {
+		return ""
+	}
+
+	repoPath := pg.Spec.Backups.PGBackRest.Global[repo.Name+"-path"]
+
+	switch {
+	case repo.S3 != nil:
+		destination = "s3://" + path.Join(repo.S3.Bucket, repoPath)
+	case repo.GCS != nil:
+		destination = "s3://" + path.Join(repo.GCS.Bucket, repoPath)
+	case repo.Azure != nil:
+		destination = "azure://" + path.Join(repo.Azure.Container, repoPath)
+	default:
+		return ""
+	}
+
+	return destination
 }
 
 func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) error {

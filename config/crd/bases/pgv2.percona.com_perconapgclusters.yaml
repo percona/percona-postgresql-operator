@@ -16,7 +16,32 @@ spec:
     singular: perconapgbackup
   scope: Namespaced
   versions:
-  - name: v2
+  - additionalPrinterColumns:
+    - description: Cluster name
+      jsonPath: .spec.pgCluster
+      name: Cluster
+      type: string
+    - description: Repo name
+      jsonPath: .spec.repoName
+      name: Repo
+      type: string
+    - description: Backup destination
+      jsonPath: .status.destination
+      name: Destination
+      type: string
+    - description: Job status
+      jsonPath: .status.state
+      name: Status
+      type: string
+    - description: Completed time
+      jsonPath: .status.completed
+      name: Completed
+      type: date
+    - description: Created time
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v2
     schema:
       openAPIV3Schema:
         description: PerconaPGBackup is the CRD that defines a Percona PostgreSQL
@@ -57,6 +82,8 @@ spec:
             properties:
               completed:
                 format: date-time
+                type: string
+              destination:
                 type: string
               jobName:
                 type: string
