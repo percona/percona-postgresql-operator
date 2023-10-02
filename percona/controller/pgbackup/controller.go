@@ -139,9 +139,9 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 	destination := ""
 	repoName := pb.Spec.RepoName
 	var repo *v1beta1.PGBackRestRepo
-	for _, r := range pg.Spec.Backups.PGBackRest.Repos {
+	for i, r := range pg.Spec.Backups.PGBackRest.Repos {
 		if repoName == r.Name {
-			repo = &r
+			repo = &pg.Spec.Backups.PGBackRest.Repos[i]
 			break
 		}
 	}
