@@ -15,6 +15,7 @@ func init() {
 // +kubebuilder:printcolumn:name="Repo",type=string,JSONPath=".spec.repoName",description="Repo name"
 // +kubebuilder:printcolumn:name="Destination",type=string,JSONPath=".status.destination",description="Backup destination"
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=".status.state",description="Job status"
+// +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".status.backupType",description="Backup type"
 // +kubebuilder:printcolumn:name="Completed",type=date,JSONPath=".status.completed",description="Completed time"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp",description="Created time"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -67,4 +68,13 @@ type PerconaPGBackupStatus struct {
 	State       PGBackupState `json:"state,omitempty"`
 	CompletedAt *metav1.Time  `json:"completed,omitempty"`
 	Destination string        `json:"destination,omitempty"`
+	BackupType  PGBackupType  `json:"backupType,omitempty"`
 }
+
+type PGBackupType string
+
+const (
+	PGBackupTypeFull         PGBackupType = "full"
+	PGBackupTypeDifferential PGBackupType = "differential"
+	PGBackupTypeIncremental  PGBackupType = "incremental"
+)

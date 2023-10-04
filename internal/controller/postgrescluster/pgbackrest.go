@@ -106,9 +106,13 @@ const (
 
 // backup types
 const (
-	full         = "full"
-	differential = "diff"
-	incremental  = "incr"
+	Full         = "full"
+	Differential = "diff"
+	Incremental  = "incr"
+	// K8SPG-422: we need to keep these constants exported
+	//full         = "full"
+	//differential = "diff"
+	//incremental  = "incr"
 )
 
 // regexRepoIndex is the regex used to obtain the repo index from a pgBackRest repo name
@@ -344,11 +348,11 @@ func (r *Reconciler) cleanupRepoResources(ctx context.Context,
 func backupScheduleFound(repo v1beta1.PGBackRestRepo, backupType string) bool {
 	if repo.BackupSchedules != nil {
 		switch backupType {
-		case full:
+		case Full:
 			return repo.BackupSchedules.Full != nil
-		case differential:
+		case Differential:
 			return repo.BackupSchedules.Differential != nil
-		case incremental:
+		case Incremental:
 			return repo.BackupSchedules.Incremental != nil
 		default:
 			return false
@@ -2804,21 +2808,21 @@ func (r *Reconciler) reconcileScheduledBackups(
 			// next if the repo level schedule is not nil, create the CronJob.
 			if repo.BackupSchedules.Full != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
-					full, repo.BackupSchedules.Full, sa, cronjobs); err != nil {
+					Full, repo.BackupSchedules.Full, sa, cronjobs); err != nil {
 					log.Error(err, "unable to reconcile Full backup for "+repo.Name)
 					requeue = true
 				}
 			}
 			if repo.BackupSchedules.Differential != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
-					differential, repo.BackupSchedules.Differential, sa, cronjobs); err != nil {
+					Differential, repo.BackupSchedules.Differential, sa, cronjobs); err != nil {
 					log.Error(err, "unable to reconcile Differential backup for "+repo.Name)
 					requeue = true
 				}
 			}
 			if repo.BackupSchedules.Incremental != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
-					incremental, repo.BackupSchedules.Incremental, sa, cronjobs); err != nil {
+					Incremental, repo.BackupSchedules.Incremental, sa, cronjobs); err != nil {
 					log.Error(err, "unable to reconcile Incremental backup for "+repo.Name)
 					requeue = true
 				}

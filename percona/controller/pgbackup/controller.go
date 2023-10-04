@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -16,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
@@ -43,8 +43,8 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGBackup{}).Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=get;list;watch
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
@@ -75,8 +75,15 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 	switch pgBackup.Status.State {
 	case v2.BackupNew:
-		if err := startBackup(ctx, r.Client, pgCluster, pgBackup); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "start backup")
+		// start backup only if backup job doesn't exist
+		_, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
+		if err != nil {
+			if !errors.Is(err, ErrBackupJobNotFound) {
+				return reconcile.Result{}, errors.Wrap(err, "find backup job")
+			}
+			if err := startBackup(ctx, r.Client, pgCluster, pgBackup); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "start backup")
+			}
 		}
 
 		pgBackup.Status.State = v2.BackupStarting
@@ -100,6 +107,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		pgBackup.Status.State = v2.BackupRunning
 		pgBackup.Status.JobName = job.Name
 		pgBackup.Status.Destination = getDestination(pgCluster, pgBackup)
+		pgBackup.Status.BackupType = getBackupType(job)
 
 		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
@@ -165,6 +173,20 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 	return destination
 }
 
+func getBackupType(job *batchv1.Job) v2.PGBackupType {
+	v := job.GetLabels()[naming.LabelPGBackRestBackup]
+	switch v {
+	case postgrescluster.Differential:
+		return v2.PGBackupTypeDifferential
+	case postgrescluster.Incremental:
+		return v2.PGBackupTypeIncremental
+	case postgrescluster.Full:
+		return v2.PGBackupTypeFull
+	default:
+		return v2.PGBackupType(v)
+	}
+}
+
 func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) error {
 	orig := pg.DeepCopy()
 
@@ -184,13 +206,21 @@ func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, 
 }
 
 func findBackupJob(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) (*batchv1.Job, error) {
+	if jobName := pb.GetAnnotations()[v2.AnnotationPGBackrestBackupJobName]; jobName != "" {
+		job := new(batchv1.Job)
+		err := c.Get(ctx, types.NamespacedName{Name: jobName, Namespace: pb.Namespace}, job)
+		if err != nil {
+			return nil, errors.Wrap(err, "get backup job by .status.jobName")
+		}
+		return job, nil
+	}
+
 	jobList := &batchv1.JobList{}
-	selector := labels.SelectorFromSet(map[string]string{
-		naming.LabelCluster:          pg.Name,
-		naming.LabelPGBackRestBackup: "manual",
-		naming.LabelPGBackRestRepo:   pb.Spec.RepoName,
-	})
-	err := c.List(ctx, jobList, client.InNamespace(pg.Namespace), client.MatchingLabelsSelector{Selector: selector})
+	err := c.List(ctx, jobList,
+		client.InNamespace(pg.Namespace),
+		client.MatchingLabelsSelector{
+			Selector: naming.PGBackRestBackupJobSelector(pg.Name, pb.Spec.RepoName, naming.BackupManual),
+		})
 	if err != nil {
 		return nil, errors.Wrap(err, "get backup jobs")
 	}

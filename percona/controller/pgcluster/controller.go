@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,6 +63,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&v1beta1.PostgresCluster{}).
 		Watches(&source.Kind{Type: &corev1.Service{}}, r.watchServices()).
 		Watches(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()).
+		Watches(&source.Kind{Type: &batchv1.Job{}}, r.watchBackupJobs()).
 		Complete(r)
 }
 
@@ -72,6 +74,24 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 			crName := labels[naming.LabelCluster]
 
 			if e.ObjectNew.GetName() == crName+"-pgbouncer" {
+				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+					Namespace: e.ObjectNew.GetNamespace(),
+					Name:      crName,
+				}})
+			}
+		},
+	}
+}
+
+func (r *PGClusterReconciler) watchBackupJobs() handler.Funcs {
+	return handler.Funcs{
+		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			labels := e.ObjectNew.GetLabels()
+			crName := labels[naming.LabelCluster]
+			repoName := labels[naming.LabelPGBackRestRepo]
+
+			if len(crName) != 0 && len(repoName) != 0 &&
+				!reflect.DeepEqual(e.ObjectNew.(*batchv1.Job).Status, e.ObjectOld.(*batchv1.Job).Status) {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      crName,
@@ -146,6 +166,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcileVersion(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile version")
+	}
+
+	if err := r.reconcileBackupJobs(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile backup jobs")
 	}
 
 	if err := controllerutil.SetControllerReference(cr, postgresCluster, r.Client.Scheme()); err != nil {

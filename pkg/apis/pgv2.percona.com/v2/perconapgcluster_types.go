@@ -581,24 +581,28 @@ const (
 const annotationPrefix = "pgv2.percona.com/"
 
 const (
-	// PGBackRestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
+	// AnnotationPGBackrestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
 	// backup.  The value of the annotation will be a unique identifier for a backup Job (e.g. a
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.  Also used to annotate the backup Job itself as needed to identify the backup
 	// ID associated with a specific manual backup Job.
 	AnnotationPGBackrestBackup = annotationPrefix + "pgbackrest-backup"
 
-	// PGBackRestRestore is the annotation that is added to a PerconaPGCluster to initiate an in-place
+	// AnnotationPGBackrestBackupJobName is the annotation that is added to a PerconaPGClusterBackup.
+	// The value of the annotation will be a name of an existing backup job
+	AnnotationPGBackrestBackupJobName = AnnotationPGBackrestBackup + "-job-name"
+
+	// AnnotationPGBackRestRestore is the annotation that is added to a PerconaPGCluster to initiate an in-place
 	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.
 	AnnotationPGBackRestRestore = annotationPrefix + "pgbackrest-restore"
 
-	// PMMSecretHash is the annotation that is added to instance annotations to
+	// AnnotationPMMSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case PMM credentials are rotated.
 	AnnotationPMMSecretHash = annotationPrefix + "pmm-secret-hash"
 
-	// MonitorUserSecretHash is the annotation that is added to instance annotations to
+	// AnnotationMonitorUserSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case monitor user password is changed.
 	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-secret-hash"
 )
