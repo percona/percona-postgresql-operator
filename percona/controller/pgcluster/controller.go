@@ -253,7 +253,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 }
 
 func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.PMMEnabled() {
+	if !cr.PMMEnabled() {
 		return nil
 	}
 
@@ -319,7 +319,7 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaP
 }
 
 func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.PMMEnabled() {
+	if !cr.PMMEnabled() {
 		return nil
 	}
 
