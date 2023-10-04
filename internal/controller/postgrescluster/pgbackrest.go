@@ -2296,10 +2296,11 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 
 	// set gvk and ownership refs
 	backupJob.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
-	if err := controllerutil.SetControllerReference(postgresCluster, backupJob,
-		r.Client.Scheme()); err != nil {
-		return errors.WithStack(err)
-	}
+	// K8SPG-432: we should set controller reference to PerconaPGBackup
+	//if err := controllerutil.SetControllerReference(postgresCluster, backupJob,
+	//	r.Client.Scheme()); err != nil {
+	//	return errors.WithStack(err)
+	//}
 
 	// server-side apply the backup Job intent
 	if err := r.apply(ctx, backupJob); err != nil {
@@ -2472,10 +2473,11 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 
 	// set gvk and ownership refs
 	backupJob.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
-	if err := controllerutil.SetControllerReference(postgresCluster, backupJob,
-		r.Client.Scheme()); err != nil {
-		return errors.WithStack(err)
-	}
+	// K8SPG-432: we should set controller reference to PerconaPGBackup
+	//if err := controllerutil.SetControllerReference(postgresCluster, backupJob,
+	//	r.Client.Scheme()); err != nil {
+	//	return errors.WithStack(err)
+	//}
 
 	if err := r.apply(ctx, backupJob); err != nil {
 		return errors.WithStack(err)

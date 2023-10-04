@@ -85,6 +85,16 @@ rules:
   - batch
   resources:
   - cronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - batch
+  resources:
   - jobs
   verbs:
   - create
@@ -92,6 +102,7 @@ rules:
   - get
   - list
   - patch
+  - update
   - watch
 - apiGroups:
   - pgv2.percona.com
