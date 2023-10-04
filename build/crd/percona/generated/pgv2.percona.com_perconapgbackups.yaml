@@ -34,6 +34,10 @@ spec:
       jsonPath: .status.state
       name: Status
       type: string
+    - description: Backup type
+      jsonPath: .status.backupType
+      name: Type
+      type: string
     - description: Completed time
       jsonPath: .status.completed
       name: Completed
@@ -81,6 +85,8 @@ spec:
             type: object
           status:
             properties:
+              backupType:
+                type: string
               completed:
                 format: date-time
                 type: string

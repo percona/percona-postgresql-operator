@@ -33,6 +33,10 @@ spec:
       jsonPath: .status.state
       name: Status
       type: string
+    - description: Backup type
+      jsonPath: .status.backupType
+      name: Type
+      type: string
     - description: Completed time
       jsonPath: .status.completed
       name: Completed
@@ -80,6 +84,8 @@ spec:
             type: object
           status:
             properties:
+              backupType:
+                type: string
               completed:
                 format: date-time
                 type: string
@@ -30224,8 +30230,8 @@ rules:
   - pgv2.percona.com
   resources:
   - perconapgbackups
-  - perconapgrestores
   verbs:
+  - create
   - get
   - list
   - watch
@@ -30233,9 +30239,8 @@ rules:
   - pgv2.percona.com
   resources:
   - perconapgbackups/status
-  - perconapgclusters/status
-  - perconapgrestores/status
   verbs:
+  - create
   - patch
   - update
 - apiGroups:
@@ -30248,6 +30253,22 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - pgv2.percona.com
+  resources:
+  - perconapgclusters/status
+  - perconapgrestores/status
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - pgv2.percona.com
+  resources:
+  - perconapgrestores
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - policy
