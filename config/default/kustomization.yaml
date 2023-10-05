@@ -1,0 +1,12 @@
+namespace: postgres-operator
+
+commonLabels:
+  app.kubernetes.io/name: pgo
+  # The version below should match the version on the PostgresCluster CRD
+  app.kubernetes.io/version: 5.4.2
+  postgres-operator.crunchydata.com/control-plane: postgres-operator
+
+bases:
+- ../crd
+- ../rbac/cluster
+- ../manager
