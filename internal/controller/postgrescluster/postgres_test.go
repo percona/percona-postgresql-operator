@@ -60,7 +60,9 @@ func TestGeneratePostgresUserSecret(t *testing.T) {
 
 		if assert.Check(t, secret != nil) {
 			assert.Equal(t, secret.Namespace, cluster.Namespace)
-			assert.Assert(t, metav1.IsControlledBy(secret, cluster))
+			// K8SPG-328: Keep this commented in case of conflicts.
+			// We don't want to delete secrets if custom resource is deleted.
+			//assert.Assert(t, metav1.IsControlledBy(secret, cluster))
 			assert.DeepEqual(t, secret.Labels, map[string]string{
 				"postgres-operator.crunchydata.com/cluster": "hippo2",
 				"postgres-operator.crunchydata.com/role":    "pguser",
@@ -269,7 +271,9 @@ func TestReconcilePostgresVolumes(t *testing.T) {
 		pvc, err := reconciler.reconcilePostgresDataVolume(ctx, cluster, spec, instance, nil)
 		assert.NilError(t, err)
 
-		assert.Assert(t, metav1.IsControlledBy(pvc, cluster))
+		// K8SPG-328: Keep this commented in case of conflicts.
+		// We don't want to delete PVCs if custom resource is deleted.
+		//assert.Assert(t, metav1.IsControlledBy(pvc, cluster))
 
 		assert.Equal(t, pvc.Labels[naming.LabelCluster], cluster.Name)
 		assert.Equal(t, pvc.Labels[naming.LabelInstance], instance.Name)
@@ -309,7 +313,9 @@ volumeMode: Filesystem
 			pvc, err := reconciler.reconcilePostgresWALVolume(ctx, cluster, spec, instance, observed, nil)
 			assert.NilError(t, err)
 
-			assert.Assert(t, metav1.IsControlledBy(pvc, cluster))
+			// K8SPG-328: Keep this commented in case of conflicts.
+			// We don't want to delete PVCs if custom resource is deleted.
+			//assert.Assert(t, metav1.IsControlledBy(pvc, cluster))
 
 			assert.Equal(t, pvc.Labels[naming.LabelCluster], cluster.Name)
 			assert.Equal(t, pvc.Labels[naming.LabelInstance], instance.Name)
@@ -407,18 +413,20 @@ volumeMode: Filesystem
 					assert.NilError(t, err)
 					assert.Assert(t, returned == nil)
 
-					key, fetched := client.ObjectKeyFromObject(pvc), &corev1.PersistentVolumeClaim{}
-					if err := tClient.Get(ctx, key, fetched); err == nil {
-						assert.Assert(t, fetched.DeletionTimestamp != nil, "expected deleted")
-					} else {
-						assert.Assert(t, apierrors.IsNotFound(err), "expected NotFound, got %v", err)
-					}
-
-					// Pods will redeploy while the PVC is scheduled for deletion.
-					observed.Pods = nil
-					returned, err = reconciler.reconcilePostgresWALVolume(ctx, cluster, spec, instance, observed, nil)
-					assert.NilError(t, err)
-					assert.Assert(t, returned == nil)
+					// K8SPG-328: Keep this commented in case of conflicts.
+					// We don't want to delete PVCs if custom resource is deleted.
+					//key, fetched := client.ObjectKeyFromObject(pvc), &corev1.PersistentVolumeClaim{}
+					//if err := tClient.Get(ctx, key, fetched); err == nil {
+					//	assert.Assert(t, fetched.DeletionTimestamp != nil, "expected deleted")
+					//} else {
+					//	assert.Assert(t, apierrors.IsNotFound(err), "expected NotFound, got %v", err)
+					//}
+					//
+					//// Pods will redeploy while the PVC is scheduled for deletion.
+					//observed.Pods = nil
+					//returned, err = reconciler.reconcilePostgresWALVolume(ctx, cluster, spec, instance, observed, nil)
+					//assert.NilError(t, err)
+					//assert.Assert(t, returned == nil)
 				})
 			})
 		})
