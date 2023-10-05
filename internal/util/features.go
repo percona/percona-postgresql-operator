@@ -53,7 +53,7 @@ const (
 // - https://releases.k8s.io/v1.20.0/pkg/features/kube_features.go#L729-732
 var pgoFeatures = map[featuregate.Feature]featuregate.FeatureSpec{
 	BridgeIdentifiers: {Default: false, PreRelease: featuregate.Alpha},
-	InstanceSidecars:  {Default: true, PreRelease: featuregate.Alpha},
+	InstanceSidecars:  {Default: false, PreRelease: featuregate.Alpha},
 	PGBouncerSidecars: {Default: false, PreRelease: featuregate.Alpha},
 	TablespaceVolumes: {Default: false, PreRelease: featuregate.Alpha},
 }
