@@ -57,6 +57,9 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	if err := r.CrunchyController.Watch(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
+	if err := r.CrunchyController.Watch(&source.Kind{Type: &batchv1.Job{}}, r.watchBackupJobs()); err != nil {
+		return errors.Wrap(err, "unable to watch jobs")
+	}
 
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
