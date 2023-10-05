@@ -65,6 +65,11 @@ func main() {
 	// Set any supplied feature gates; panic on any unrecognized feature gate
 	err := util.AddAndSetFeatureGates(os.Getenv("PGO_FEATURE_GATES"))
 	assertNoError(err)
+	// Needed for PMM
+	err = util.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(util.InstanceSidecars): true,
+	})
+	assertNoError(err)
 
 	otelFlush, err := initOpenTelemetry()
 	assertNoError(err)
@@ -82,6 +87,18 @@ func main() {
 	ctx := cruntime.SetupSignalHandler()
 	log := logging.FromContext(ctx)
 	log.V(1).Info("debug flag set to true")
+
+	// We are forcing `InstanceSidecars` feature to be enabled.
+	// It's necessary to get actual feature gate values instead of using
+	// `PGO_FEATURE_GATES` env var to print logs
+	var featureGates []string
+	for k := range util.DefaultMutableFeatureGate.GetAll() {
+		f := string(k) + "=" + strconv.FormatBool(util.DefaultMutableFeatureGate.Enabled(k))
+		featureGates = append(featureGates, f)
+	}
+
+	log.Info("feature gates enabled",
+		"PGO_FEATURE_GATES", strings.Join(featureGates, ","))
 
 	cruntime.SetLogger(log)
 
