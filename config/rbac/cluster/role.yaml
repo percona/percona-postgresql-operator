@@ -108,6 +108,7 @@ rules:
   - create
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - pgv2.percona.com

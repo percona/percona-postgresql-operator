@@ -127,7 +127,17 @@ PerconaPGBackup is the CRD that defines a Percona PostgreSQL Backup
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>backupType</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
         <td><b>completed</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>destination</b></td>
         <td>string</td>
         <td></td>
         <td>false</td>

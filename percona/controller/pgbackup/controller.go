@@ -43,7 +43,7 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGBackup{}).Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
@@ -71,6 +71,13 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+	}
+	if pgBackup.Labels == nil {
+		pgBackup.Labels = make(map[string]string)
+	}
+	pgBackup.Labels[naming.LabelCluster] = pgCluster.Name
+	if err := r.Client.Update(ctx, pgBackup); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 	}
 
 	switch pgBackup.Status.State {
@@ -175,7 +182,10 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 }
 
 func getBackupType(job *batchv1.Job) v2.PGBackupType {
-	v := job.GetLabels()[naming.LabelPGBackRestBackup]
+	v := job.GetLabels()[naming.LabelPGBackRestCronJob]
+	if v == "" {
+		v = job.GetLabels()[naming.LabelPGBackRestBackup]
+	}
 	switch v {
 	case postgrescluster.Differential:
 		return v2.PGBackupTypeDifferential
