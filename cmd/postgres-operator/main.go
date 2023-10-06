@@ -23,9 +23,12 @@ import (
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
+	uzap "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	cruntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
@@ -72,7 +75,13 @@ func main() {
 	assertNoError(err)
 	defer otelFlush()
 
-	initLogging()
+	opts := zap.Options{
+		Encoder: getLogEncoder(),
+		Level:   getLogLevel(),
+	}
+	l := zap.New(zap.UseFlagOptions(&opts))
+	logging.SetLogSink(l.GetSink())
+	cruntime.SetLogger(l)
 
 	// create a context that will be used to stop all controllers on a SIGTERM or SIGINT
 	ctx := cruntime.SetupSignalHandler()
@@ -312,4 +321,41 @@ func getServerVersion(ctx context.Context, cfg *rest.Config) string {
 		return ""
 	}
 	return versionInfo.String()
+}
+
+func getLogEncoder() zapcore.Encoder {
+	consoleEnc := zapcore.NewConsoleEncoder(uzap.NewDevelopmentEncoderConfig())
+
+	s, found := os.LookupEnv("LOG_STRUCTURED")
+	if !found {
+		return consoleEnc
+	}
+
+	useJson, err := strconv.ParseBool(s)
+	if err != nil {
+		return consoleEnc
+	}
+	if !useJson {
+		return consoleEnc
+	}
+
+	return zapcore.NewJSONEncoder(uzap.NewProductionEncoderConfig())
+}
+
+func getLogLevel() zapcore.LevelEnabler {
+	l, found := os.LookupEnv("LOG_LEVEL")
+	if !found {
+		return zapcore.InfoLevel
+	}
+
+	switch strings.ToUpper(l) {
+	case "DEBUG":
+		return zapcore.DebugLevel
+	case "INFO":
+		return zapcore.InfoLevel
+	case "ERROR":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
+	}
 }
