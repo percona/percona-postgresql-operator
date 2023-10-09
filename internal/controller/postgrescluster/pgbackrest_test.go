@@ -921,15 +921,16 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 	assert.Equal(t, len(jobs.Items), 1, "expected 1 job")
 	backupJob := jobs.Items[0]
 
-	var foundOwnershipRef bool
-	// verify ownership refs
-	for _, ref := range backupJob.ObjectMeta.GetOwnerReferences() {
-		if ref.Name == clusterName {
-			foundOwnershipRef = true
-			break
-		}
-	}
-	assert.Assert(t, foundOwnershipRef)
+	// K8SPG-432: we should set controller reference to PerconaPGBackup
+	//var foundOwnershipRef bool
+	//// verify ownership refs
+	//for _, ref := range backupJob.ObjectMeta.GetOwnerReferences() {
+	//	if ref.Name == clusterName {
+	//		foundOwnershipRef = true
+	//		break
+	//	}
+	//}
+	//assert.Assert(t, foundOwnershipRef)
 
 	var foundConfigAnnotation, foundHashAnnotation bool
 	// verify annotations
@@ -1379,15 +1380,16 @@ func TestReconcileManualBackup(t *testing.T) {
 					assert.NilError(t, err)
 					assert.Assert(t, len(jobs.Items) == 1)
 
-					var foundOwnershipRef bool
-					for _, r := range jobs.Items[0].GetOwnerReferences() {
-						if r.Kind == "PostgresCluster" && r.Name == clusterName &&
-							r.UID == postgresCluster.GetUID() {
-							foundOwnershipRef = true
-							break
-						}
-					}
-					assert.Assert(t, foundOwnershipRef)
+					// K8SPG-432: we should set controller reference to PerconaPGBackup
+					//var foundOwnershipRef bool
+					//for _, r := range jobs.Items[0].GetOwnerReferences() {
+					//	if r.Kind == "PostgresCluster" && r.Name == clusterName &&
+					//		r.UID == postgresCluster.GetUID() {
+					//		foundOwnershipRef = true
+					//		break
+					//	}
+					//}
+					//assert.Assert(t, foundOwnershipRef)
 
 					// verify image pull secret
 					assert.Assert(t, len(jobs.Items[0].Spec.Template.Spec.ImagePullSecrets) > 0)
