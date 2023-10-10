@@ -10,4 +10,4 @@ spec:
       - name: operator
         env:
         - name: WATCH_NAMESPACE
-          valueFrom: { fieldRef: { apiVersion: v1, fieldPath: metadata.namespace } }
+          value: ""
