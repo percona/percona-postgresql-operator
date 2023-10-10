@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-	ll "log"
 	"os"
 	"strconv"
 
@@ -82,8 +81,6 @@ func (r *PGClusterReconciler) getOperatorDeployment(ctx context.Context) (*appsv
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get operator hostname")
 	}
-
-	ll.Printf("AAAAAAAAAAA namespace: %s, hostname: %s", ns, name)
 
 	pod := new(corev1.Pod)
 	err = r.Client.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, pod)
