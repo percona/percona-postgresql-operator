@@ -27,9 +27,6 @@ func CreateRuntimeManager(namespaces string, config *rest.Config,
 
 	nn := strings.Split(namespaces, ",")
 
-	println("AAAAAAAAAAAA namespaces 1: " + nn[0])
-	println("AAAAAAAAAAAA namespaces 2: " + nn[1])
-
 	options := manager.Options{
 		SyncPeriod: &refreshInterval,
 		Scheme:     pgoScheme,
