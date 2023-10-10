@@ -20,6 +20,8 @@ if [[ ${DOCKER_SQUASH:-1} == 1 ]]; then
 	squash="--squash"
 fi
 
+BUILD_COMPONENT=${COMPONENT:-"postgres-operator"}
+
 build_operator() {
 	if [ "${RELEASE:-1}" = 0 ]; then
 		GO_LDFLAGS="-race"
@@ -35,7 +37,7 @@ build_operator() {
 		--build-arg GO_LDFLAGS="${GO_LDFLAGS}" \
 		$squash \
 		$no_cache \
-		-t "${IMAGE}" -f build/postgres-operator/Dockerfile .
+		-t "${IMAGE}" -f build/${BUILD_COMPONENT}/Dockerfile .
 	popd || exit
 
 	if [ "${DOCKER_PUSH:-1}" = 1 ]; then

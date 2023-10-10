@@ -433,6 +433,11 @@ type PostgresInstanceSetSpec struct {
 	// +optional
 	Containers []corev1.Container `json:"containers,omitempty"`
 
+	// Additional init containers for PostgreSQL instance pods. Changing this value causes
+	// PostgreSQL to restart.
+	// +optional
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
+
 	// Defines a PersistentVolumeClaim for PostgreSQL data.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 	// +kubebuilder:validation:Required
@@ -485,6 +490,11 @@ type PostgresInstanceSetSpec struct {
 	// +listMapKey=name
 	// +optional
 	TablespaceVolumes []TablespaceVolume `json:"tablespaceVolumes,omitempty"`
+
+	// The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes
+	// PostgreSQL to restart.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 type TablespaceVolume struct {

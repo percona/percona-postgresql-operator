@@ -2,6 +2,8 @@ package pgcluster
 
 import (
 	"context"
+	"strings"
+
 	// #nosec G501
 	"crypto/md5"
 	"fmt"
@@ -232,6 +234,22 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 		if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
 			return err
+		}
+
+		if cr.Spec.CustomExtensions.Storage.Secret != nil {
+			extensions := make([]string, 0)
+			for _, extension := range cr.Spec.CustomExtensions.Extensions {
+				key := GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
+				extensions = append(extensions, key)
+			}
+			container := ExtensionInstallerContainer(cr.Spec.PostgresVersion, &cr.Spec.CustomExtensions, strings.Join(extensions, ","))
+
+			for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+				set := &cr.Spec.InstanceSets[i]
+				set.InitContainers = append(set.InitContainers, ExtensionRelocatorContainer(cr.Spec.Image, cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion))
+				set.InitContainers = append(set.InitContainers, container)
+				set.VolumeMounts = append(set.VolumeMounts, ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
+			}
 		}
 
 		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()

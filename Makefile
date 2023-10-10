@@ -351,6 +351,9 @@ envtest: ## Download envtest-setup locally if necessary.
 build-docker-image:
 	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE) $(ROOT_REPO)/e2e-tests/build
 
+build-extension-installer-image:
+	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE)-ext-installer COMPONENT=extension-installer $(ROOT_REPO)/e2e-tests/build
+
 generate: kustomize generate-crd generate-deepcopy generate-rbac generate-manager generate-bundle generate-cw
 
 generate-crd: generate-crunchy-crd generate-percona-crd

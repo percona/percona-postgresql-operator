@@ -232,6 +232,11 @@ PerconaPGCluster is the CRD that defines a Percona PG Cluster
         <td>Version of the operator. Update this to new version after operator upgrade to apply changes to Kubernetes objects. Default is the latest version.</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspeccustomextensions">customExtensions</a></b></td>
+        <td>object</td>
+        <td>The specification of custom extensions.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#perconapgclusterspecdatasource">dataSource</a></b></td>
         <td>object</td>
         <td>Specifies a data source for bootstrapping the PostgreSQL cluster.</td>
@@ -795,7 +800,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -2530,7 +2535,7 @@ Resource limits for backup jobs. Includes manual, scheduled and replica create b
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -3952,7 +3957,7 @@ Resource requirements for a pgBackRest repository host
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -4221,7 +4226,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -5603,7 +5609,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -5775,7 +5781,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -5868,7 +5874,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -5930,6 +5936,11 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td>Scheduling constraints of a PostgreSQL pod. Changing this value causes PostgreSQL to restart. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindex">initContainers</a></b></td>
+        <td>[]object</td>
+        <td>Additional init containers for PostgreSQL instance pods. Changing this value causes PostgreSQL to restart.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexmetadata">metadata</a></b></td>
         <td>object</td>
         <td>Metadata contains metadata for custom resources</td>
@@ -5973,6 +5984,11 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td><b><a href="#perconapgclusterspecinstancesindextopologyspreadconstraintsindex">topologySpreadConstraints</a></b></td>
         <td>[]object</td>
         <td>Topology spread constraints of a PostgreSQL pod. Changing this value causes PostgreSQL to restart. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexvolumemountsindex">volumeMounts</a></b></td>
+        <td>[]object</td>
+        <td>The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes PostgreSQL to restart.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexwalvolumeclaimspec">walVolumeClaimSpec</a></b></td>
@@ -6157,7 +6173,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -7447,6 +7463,2037 @@ A label selector requirement is a selector that contains values, a key, and an o
 </table>
 
 
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+A single application container that you want to run within a pod.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>args</b></td>
+        <td>[]string</td>
+        <td>Arguments to the entrypoint. The container image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Entrypoint array. Not executed within a shell. The container image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindex">env</a></b></td>
+        <td>[]object</td>
+        <td>List of environment variables to set in the container. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvfromindex">envFrom</a></b></td>
+        <td>[]object</td>
+        <td>List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>image</b></td>
+        <td>string</td>
+        <td>Container image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>imagePullPolicy</b></td>
+        <td>string</td>
+        <td>Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycle">lifecycle</a></b></td>
+        <td>object</td>
+        <td>Actions that the management system should take in response to container lifecycle events. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobe">livenessProbe</a></b></td>
+        <td>object</td>
+        <td>Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexportsindex">ports</a></b></td>
+        <td>[]object</td>
+        <td>List of ports to expose from the container. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default "0.0.0.0" address inside a container will be accessible from the network. Modifying this array with strategic merge patch may corrupt the data. For more information See https://github.com/kubernetes/kubernetes/issues/108255. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobe">readinessProbe</a></b></td>
+        <td>object</td>
+        <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexresources">resources</a></b></td>
+        <td>object</td>
+        <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security options the container should be run with. If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobe">startupProbe</a></b></td>
+        <td>object</td>
+        <td>StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>stdin</b></td>
+        <td>boolean</td>
+        <td>Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>stdinOnce</b></td>
+        <td>boolean</td>
+        <td>Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationMessagePath</b></td>
+        <td>string</td>
+        <td>Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationMessagePolicy</b></td>
+        <td>string</td>
+        <td>Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>tty</b></td>
+        <td>boolean</td>
+        <td>Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexvolumedevicesindex">volumeDevices</a></b></td>
+        <td>[]object</td>
+        <td>volumeDevices is the list of block devices to be used by the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexvolumemountsindex">volumeMounts</a></b></td>
+        <td>[]object</td>
+        <td>Pod volumes to mount into the container's filesystem. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>workingDir</b></td>
+        <td>string</td>
+        <td>Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].env[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+EnvVar represents an environment variable present in a Container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the environment variable. Must be a C_IDENTIFIER.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Variable references $(VAR_NAME) are expanded using the previously defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to "".</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">valueFrom</a></b></td>
+        <td>object</td>
+        <td>Source for the environment variable's value. Cannot be used if value is not empty.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">
+  PerconaPGCluster.spec.instances[index].initContainers[index].env[index].valueFrom
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Source for the environment variable's value. Cannot be used if value is not empty.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefromconfigmapkeyref">configMapKeyRef</a></b></td>
+        <td>object</td>
+        <td>Selects a key of a ConfigMap.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefromfieldref">fieldRef</a></b></td>
+        <td>object</td>
+        <td>Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefromresourcefieldref">resourceFieldRef</a></b></td>
+        <td>object</td>
+        <td>Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefromsecretkeyref">secretKeyRef</a></b></td>
+        <td>object</td>
+        <td>Selects a key of a secret in the pod's namespace</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefromconfigmapkeyref">
+  PerconaPGCluster.spec.instances[index].initContainers[index].env[index].valueFrom.configMapKeyRef
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Selects a key of a ConfigMap.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>The key to select.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>Specify whether the ConfigMap or its key must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefromfieldref">
+  PerconaPGCluster.spec.instances[index].initContainers[index].env[index].valueFrom.fieldRef
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fieldPath</b></td>
+        <td>string</td>
+        <td>Path of the field to select in the specified API version.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>apiVersion</b></td>
+        <td>string</td>
+        <td>Version of the schema the FieldPath is written in terms of, defaults to "v1".</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefromresourcefieldref">
+  PerconaPGCluster.spec.instances[index].initContainers[index].env[index].valueFrom.resourceFieldRef
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resource</b></td>
+        <td>string</td>
+        <td>Required: resource to select</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>containerName</b></td>
+        <td>string</td>
+        <td>Container name: required for volumes, optional for env vars</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>divisor</b></td>
+        <td>int or string</td>
+        <td>Specifies the output format of the exposed resources, defaults to "1"</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefromsecretkeyref">
+  PerconaPGCluster.spec.instances[index].initContainers[index].env[index].valueFrom.secretKeyRef
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Selects a key of a secret in the pod's namespace
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>The key of the secret to select from.  Must be a valid secret key.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>Specify whether the Secret or its key must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvfromindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].envFrom[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+EnvFromSource represents the source of a set of ConfigMaps
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvfromindexconfigmapref">configMapRef</a></b></td>
+        <td>object</td>
+        <td>The ConfigMap to select from</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>prefix</b></td>
+        <td>string</td>
+        <td>An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvfromindexsecretref">secretRef</a></b></td>
+        <td>object</td>
+        <td>The Secret to select from</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvfromindexconfigmapref">
+  PerconaPGCluster.spec.instances[index].initContainers[index].envFrom[index].configMapRef
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvfromindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The ConfigMap to select from
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>Specify whether the ConfigMap must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexenvfromindexsecretref">
+  PerconaPGCluster.spec.instances[index].initContainers[index].envFrom[index].secretRef
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexenvfromindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Secret to select from
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>Specify whether the Secret must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecycle">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Actions that the management system should take in response to container lifecycle events. Cannot be updated.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststart">postStart</a></b></td>
+        <td>object</td>
+        <td>PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestop">preStop</a></b></td>
+        <td>object</td>
+        <td>PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The Pod's termination grace period countdown begins before the PreStop hook is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period (unless delayed by finalizers). Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststart">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.postStart
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycle">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststartexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststarttcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststartexec">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.postStart.exec
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststart">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpget">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.postStart.httpGet
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststart">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpgethttpheadersindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.postStart.httpGet.httpHeaders[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststarttcpsocket">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.postStart.tcpSocket
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecyclepoststart">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestop">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.preStop
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycle">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The Pod's termination grace period countdown begins before the PreStop hook is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period (unless delayed by finalizers). Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestopexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestophttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestoptcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestopexec">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.preStop.exec
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestop">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestophttpget">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.preStop.httpGet
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestop">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestophttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestophttpgethttpheadersindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.preStop.httpGet.httpHeaders[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestophttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestoptcpsocket">
+  PerconaPGCluster.spec.instances[index].initContainers[index].lifecycle.preStop.tcpSocket
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlifecycleprestop">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlivenessprobe">
+  PerconaPGCluster.spec.instances[index].initContainers[index].livenessProbe
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobeexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>failureThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobegrpc">grpc</a></b></td>
+        <td>object</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobehttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>initialDelaySeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>periodSeconds</b></td>
+        <td>integer</td>
+        <td>How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>successThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobetcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>TCPSocket specifies an action involving a TCP port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationGracePeriodSeconds</b></td>
+        <td>integer</td>
+        <td>Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>timeoutSeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlivenessprobeexec">
+  PerconaPGCluster.spec.instances[index].initContainers[index].livenessProbe.exec
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlivenessprobegrpc">
+  PerconaPGCluster.spec.instances[index].initContainers[index].livenessProbe.grpc
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+GRPC specifies an action involving a GRPC port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>integer</td>
+        <td>Port number of the gRPC service. Number must be in the range 1 to 65535.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>service</b></td>
+        <td>string</td>
+        <td>Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md). 
+ If this is not specified, the default behavior is defined by gRPC.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlivenessprobehttpget">
+  PerconaPGCluster.spec.instances[index].initContainers[index].livenessProbe.httpGet
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobehttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlivenessprobehttpgethttpheadersindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].livenessProbe.httpGet.httpHeaders[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobehttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexlivenessprobetcpsocket">
+  PerconaPGCluster.spec.instances[index].initContainers[index].livenessProbe.tcpSocket
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexlivenessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+TCPSocket specifies an action involving a TCP port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexportsindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].ports[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerPort represents a network port in a single container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>containerPort</b></td>
+        <td>integer</td>
+        <td>Number of port to expose on the pod's IP address. This must be a valid port number, 0 < x < 65536.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>hostIP</b></td>
+        <td>string</td>
+        <td>What host IP to bind the external port to.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostPort</b></td>
+        <td>integer</td>
+        <td>Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>protocol</b></td>
+        <td>string</td>
+        <td>Protocol for port. Must be UDP, TCP, or SCTP. Defaults to "TCP".</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexreadinessprobe">
+  PerconaPGCluster.spec.instances[index].initContainers[index].readinessProbe
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobeexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>failureThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobegrpc">grpc</a></b></td>
+        <td>object</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobehttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>initialDelaySeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>periodSeconds</b></td>
+        <td>integer</td>
+        <td>How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>successThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobetcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>TCPSocket specifies an action involving a TCP port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationGracePeriodSeconds</b></td>
+        <td>integer</td>
+        <td>Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>timeoutSeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexreadinessprobeexec">
+  PerconaPGCluster.spec.instances[index].initContainers[index].readinessProbe.exec
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexreadinessprobegrpc">
+  PerconaPGCluster.spec.instances[index].initContainers[index].readinessProbe.grpc
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+GRPC specifies an action involving a GRPC port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>integer</td>
+        <td>Port number of the gRPC service. Number must be in the range 1 to 65535.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>service</b></td>
+        <td>string</td>
+        <td>Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md). 
+ If this is not specified, the default behavior is defined by gRPC.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexreadinessprobehttpget">
+  PerconaPGCluster.spec.instances[index].initContainers[index].readinessProbe.httpGet
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobehttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexreadinessprobehttpgethttpheadersindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].readinessProbe.httpGet.httpHeaders[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobehttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexreadinessprobetcpsocket">
+  PerconaPGCluster.spec.instances[index].initContainers[index].readinessProbe.tcpSocket
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexreadinessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+TCPSocket specifies an action involving a TCP port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexresizepolicyindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].resizePolicy[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexresources">
+  PerconaPGCluster.spec.instances[index].initContainers[index].resources
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexresourcesclaimsindex">claims</a></b></td>
+        <td>[]object</td>
+        <td>Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container. 
+ This is an alpha field and requires enabling the DynamicResourceAllocation feature gate. 
+ This field is immutable. It can only be set for containers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>limits</b></td>
+        <td>map[string]int or string</td>
+        <td>Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>requests</b></td>
+        <td>map[string]int or string</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexresourcesclaimsindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].resources.claims[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexresources">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ResourceClaim references one entry in PodSpec.ResourceClaims.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexsecuritycontext">
+  PerconaPGCluster.spec.instances[index].initContainers[index].securityContext
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security options the container should be run with. If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>allowPrivilegeEscalation</b></td>
+        <td>boolean</td>
+        <td>AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontextcapabilities">capabilities</a></b></td>
+        <td>object</td>
+        <td>The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>privileged</b></td>
+        <td>boolean</td>
+        <td>Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>procMount</b></td>
+        <td>string</td>
+        <td>procMount denotes the type of proc mount to use for the containers. The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>readOnlyRootFilesystem</b></td>
+        <td>boolean</td>
+        <td>Whether this container has a read-only root filesystem. Default is false. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options from the PodSecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexsecuritycontextcapabilities">
+  PerconaPGCluster.spec.instances[index].initContainers[index].securityContext.capabilities
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>add</b></td>
+        <td>[]string</td>
+        <td>Added capabilities</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>drop</b></td>
+        <td>[]string</td>
+        <td>Removed capabilities</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexsecuritycontextselinuxoptions">
+  PerconaPGCluster.spec.instances[index].initContainers[index].securityContext.seLinuxOptions
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexsecuritycontextseccompprofile">
+  PerconaPGCluster.spec.instances[index].initContainers[index].securityContext.seccompProfile
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexsecuritycontextwindowsoptions">
+  PerconaPGCluster.spec.instances[index].initContainers[index].securityContext.windowsOptions
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options from the PodSecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexstartupprobe">
+  PerconaPGCluster.spec.instances[index].initContainers[index].startupProbe
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobeexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>failureThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobegrpc">grpc</a></b></td>
+        <td>object</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobehttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>initialDelaySeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>periodSeconds</b></td>
+        <td>integer</td>
+        <td>How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>successThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobetcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>TCPSocket specifies an action involving a TCP port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationGracePeriodSeconds</b></td>
+        <td>integer</td>
+        <td>Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>timeoutSeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexstartupprobeexec">
+  PerconaPGCluster.spec.instances[index].initContainers[index].startupProbe.exec
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexstartupprobegrpc">
+  PerconaPGCluster.spec.instances[index].initContainers[index].startupProbe.grpc
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+GRPC specifies an action involving a GRPC port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>integer</td>
+        <td>Port number of the gRPC service. Number must be in the range 1 to 65535.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>service</b></td>
+        <td>string</td>
+        <td>Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md). 
+ If this is not specified, the default behavior is defined by gRPC.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexstartupprobehttpget">
+  PerconaPGCluster.spec.instances[index].initContainers[index].startupProbe.httpGet
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobehttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexstartupprobehttpgethttpheadersindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].startupProbe.httpGet.httpHeaders[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobehttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexstartupprobetcpsocket">
+  PerconaPGCluster.spec.instances[index].initContainers[index].startupProbe.tcpSocket
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindexstartupprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+TCPSocket specifies an action involving a TCP port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexvolumedevicesindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].volumeDevices[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+volumeDevice describes a mapping of a raw block device within a container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>devicePath</b></td>
+        <td>string</td>
+        <td>devicePath is the path inside of the container that the device will be mapped to.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>name must match the name of a persistentVolumeClaim in the pod</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexinitcontainersindexvolumemountsindex">
+  PerconaPGCluster.spec.instances[index].initContainers[index].volumeMounts[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+VolumeMount describes a mounting of a Volume within a container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>mountPath</b></td>
+        <td>string</td>
+        <td>Path within the container at which the volume should be mounted.  Must not contain ':'.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>This must match the Name of a Volume.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>mountPropagation</b></td>
+        <td>string</td>
+        <td>mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>readOnly</b></td>
+        <td>boolean</td>
+        <td>Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subPath</b></td>
+        <td>string</td>
+        <td>Path within the volume from which the container's volume should be mounted. Defaults to "" (volume's root).</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subPathExpr</b></td>
+        <td>string</td>
+        <td>Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to "" (volume's root). SubPathExpr and SubPath are mutually exclusive.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="perconapgclusterspecinstancesindexmetadata">
   PerconaPGCluster.spec.instances[index].metadata
   <sup><sup><a href="#perconapgclusterspecinstancesindex">↩ Parent</a></sup></sup>
@@ -7512,7 +9559,7 @@ Compute resources of a PostgreSQL container.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -7619,9 +9666,19 @@ A single application container that you want to run within a pod.
         <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexsecuritycontext">securityContext</a></b></td>
@@ -8164,7 +10221,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -8339,7 +10396,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -8413,7 +10470,7 @@ Periodic probe of container liveness. Container will be restarted if the probe f
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexlivenessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexlivenessprobehttpget">httpGet</a></b></td>
@@ -8488,7 +10545,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -8582,7 +10639,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -8703,7 +10760,7 @@ Periodic probe of container service readiness. Container will be removed from se
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexreadinessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexreadinessprobehttpget">httpGet</a></b></td>
@@ -8778,7 +10835,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -8872,7 +10929,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -8915,6 +10972,38 @@ TCPSocket specifies an action involving a TCP port.
 </table>
 
 
+<h3 id="perconapgclusterspecinstancesindexsidecarsindexresizepolicyindex">
+  PerconaPGCluster.spec.instances[index].sidecars[index].resizePolicy[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexsidecarsindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="perconapgclusterspecinstancesindexsidecarsindexresources">
   PerconaPGCluster.spec.instances[index].sidecars[index].resources
   <sup><sup><a href="#perconapgclusterspecinstancesindexsidecarsindex">↩ Parent</a></sup></sup>
@@ -8948,7 +11037,7 @@ Compute Resources required by this container. Cannot be updated. More info: http
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -9159,7 +11248,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -9196,7 +11285,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -9238,7 +11327,7 @@ StartupProbe indicates that the Pod has successfully initialized. If specified, 
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexstartupprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexstartupprobehttpget">httpGet</a></b></td>
@@ -9313,7 +11402,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -9407,7 +11496,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -9622,7 +11711,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -9711,6 +11801,58 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>values</b></td>
         <td>[]string</td>
         <td>values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexvolumemountsindex">
+  PerconaPGCluster.spec.instances[index].volumeMounts[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+VolumeMount describes a mounting of a Volume within a container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>mountPath</b></td>
+        <td>string</td>
+        <td>Path within the container at which the volume should be mounted.  Must not contain ':'.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>This must match the Name of a Volume.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>mountPropagation</b></td>
+        <td>string</td>
+        <td>mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>readOnly</b></td>
+        <td>boolean</td>
+        <td>Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subPath</b></td>
+        <td>string</td>
+        <td>Path within the volume from which the container's volume should be mounted. Defaults to "" (volume's root).</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subPathExpr</b></td>
+        <td>string</td>
+        <td>Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to "" (volume's root). SubPathExpr and SubPath are mutually exclusive.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -9890,7 +12032,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -9987,6 +12129,203 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>values</b></td>
         <td>[]string</td>
         <td>values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspeccustomextensions">
+  PerconaPGCluster.spec.customExtensions
+  <sup><sup><a href="#perconapgclusterspec">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The specification of custom extensions.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspeccustomextensionsextensionsindex">extensions</a></b></td>
+        <td>[]object</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>image</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>imagePullPolicy</b></td>
+        <td>string</td>
+        <td>PullPolicy describes a policy for if/when to pull a container image</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspeccustomextensionsstorage">storage</a></b></td>
+        <td>object</td>
+        <td></td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspeccustomextensionsextensionsindex">
+  PerconaPGCluster.spec.customExtensions.extensions[index]
+  <sup><sup><a href="#perconapgclusterspeccustomextensions">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>checksum</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>version</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspeccustomextensionsstorage">
+  PerconaPGCluster.spec.customExtensions.storage
+  <sup><sup><a href="#perconapgclusterspeccustomextensions">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>bucket</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>region</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspeccustomextensionsstoragesecret">secret</a></b></td>
+        <td>object</td>
+        <td>Adapts a secret into a projected volume. 
+ The contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>enum</td>
+        <td></td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspeccustomextensionsstoragesecret">
+  PerconaPGCluster.spec.customExtensions.storage.secret
+  <sup><sup><a href="#perconapgclusterspeccustomextensionsstorage">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Adapts a secret into a projected volume. 
+ The contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspeccustomextensionsstoragesecretitemsindex">items</a></b></td>
+        <td>[]object</td>
+        <td>items if unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>optional field specify whether the Secret or its key must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspeccustomextensionsstoragesecretitemsindex">
+  PerconaPGCluster.spec.customExtensions.storage.secret.items[index]
+  <sup><sup><a href="#perconapgclusterspeccustomextensionsstoragesecret">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Maps a string key to a path within a volume.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>key is the key to project.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>path is the relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>mode</b></td>
+        <td>integer</td>
+        <td>mode is Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -10477,7 +12816,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -12165,7 +14504,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -13528,7 +15867,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -14171,7 +16510,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -14208,7 +16547,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -14252,7 +16591,7 @@ Compute resources of a PMM container.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -16190,7 +18529,7 @@ Compute resources of a PgBouncer container. Changing this value causes PgBouncer
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -16297,9 +18636,19 @@ A single application container that you want to run within a pod.
         <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexsecuritycontext">securityContext</a></b></td>
@@ -16842,7 +19191,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -17017,7 +19366,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -17091,7 +19440,7 @@ Periodic probe of container liveness. Container will be restarted if the probe f
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexlivenessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexlivenessprobehttpget">httpGet</a></b></td>
@@ -17166,7 +19515,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -17260,7 +19609,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -17381,7 +19730,7 @@ Periodic probe of container service readiness. Container will be removed from se
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexreadinessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexreadinessprobehttpget">httpGet</a></b></td>
@@ -17456,7 +19805,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -17550,7 +19899,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -17593,6 +19942,38 @@ TCPSocket specifies an action involving a TCP port.
 </table>
 
 
+<h3 id="perconapgclusterspecproxypgbouncersidecarsindexresizepolicyindex">
+  PerconaPGCluster.spec.proxy.pgBouncer.sidecars[index].resizePolicy[index]
+  <sup><sup><a href="#perconapgclusterspecproxypgbouncersidecarsindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="perconapgclusterspecproxypgbouncersidecarsindexresources">
   PerconaPGCluster.spec.proxy.pgBouncer.sidecars[index].resources
   <sup><sup><a href="#perconapgclusterspecproxypgbouncersidecarsindex">↩ Parent</a></sup></sup>
@@ -17626,7 +20007,7 @@ Compute Resources required by this container. Cannot be updated. More info: http
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -17837,7 +20218,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -17874,7 +20255,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -17916,7 +20297,7 @@ StartupProbe indicates that the Pod has successfully initialized. If specified, 
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexstartupprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexstartupprobehttpget">httpGet</a></b></td>
@@ -17991,7 +20372,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -18085,7 +20466,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -18300,7 +20681,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -20381,7 +22763,7 @@ Resource requirements for the PGUpgrade container.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -21136,7 +23518,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
     <tbody><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecbackupspgbackrestreposindexvolumevolumeclaimspecresourcesclaimsindex">claims</a></b></td>
@@ -22962,7 +25344,7 @@ Resource limits for backup jobs. Includes manual, scheduled and replica create b
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -24384,7 +26766,7 @@ Resource requirements for a pgBackRest repository host
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -24653,7 +27035,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -26035,7 +28418,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -26207,7 +28590,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -26300,7 +28683,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -26367,6 +28750,11 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td>Custom sidecars for PostgreSQL instance pods. Changing this value causes PostgreSQL to restart.</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindex">initContainers</a></b></td>
+        <td>[]object</td>
+        <td>Additional init containers for PostgreSQL instance pods. Changing this value causes PostgreSQL to restart.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexmetadata">metadata</a></b></td>
         <td>object</td>
         <td>Metadata contains metadata for custom resources</td>
@@ -26415,6 +28803,11 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td><b><a href="#postgresclusterspecinstancesindextopologyspreadconstraintsindex">topologySpreadConstraints</a></b></td>
         <td>[]object</td>
         <td>Topology spread constraints of a PostgreSQL pod. Changing this value causes PostgreSQL to restart. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexvolumemountsindex">volumeMounts</a></b></td>
+        <td>[]object</td>
+        <td>The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes PostgreSQL to restart.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexwalvolumeclaimspec">walVolumeClaimSpec</a></b></td>
@@ -26508,7 +28901,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
     <tbody><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexdatavolumeclaimspecresourcesclaimsindex">claims</a></b></td>
@@ -27963,9 +30356,19 @@ A single application container that you want to run within a pod.
         <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexcontainersindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexsecuritycontext">securityContext</a></b></td>
@@ -28508,7 +30911,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -28683,7 +31086,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -28757,7 +31160,7 @@ Periodic probe of container liveness. Container will be restarted if the probe f
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexlivenessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexlivenessprobehttpget">httpGet</a></b></td>
@@ -28832,7 +31235,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -28926,7 +31329,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -29047,7 +31450,7 @@ Periodic probe of container service readiness. Container will be removed from se
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexreadinessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexreadinessprobehttpget">httpGet</a></b></td>
@@ -29122,7 +31525,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -29216,7 +31619,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -29259,6 +31662,38 @@ TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported
 </table>
 
 
+<h3 id="postgresclusterspecinstancesindexcontainersindexresizepolicyindex">
+  PostgresCluster.spec.instances[index].containers[index].resizePolicy[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="postgresclusterspecinstancesindexcontainersindexresources">
   PostgresCluster.spec.instances[index].containers[index].resources
   <sup><sup><a href="#postgresclusterspecinstancesindexcontainersindex">↩ Parent</a></sup></sup>
@@ -29292,7 +31727,7 @@ Compute Resources required by this container. Cannot be updated. More info: http
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -29502,7 +31937,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -29539,7 +31974,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -29581,7 +32016,7 @@ StartupProbe indicates that the Pod has successfully initialized. If specified, 
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexstartupprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexstartupprobehttpget">httpGet</a></b></td>
@@ -29656,7 +32091,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -29750,7 +32185,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -29877,6 +32312,2037 @@ VolumeMount describes a mounting of a Volume within a container.
 </table>
 
 
+<h3 id="postgresclusterspecinstancesindexinitcontainersindex">
+  PostgresCluster.spec.instances[index].initContainers[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+A single application container that you want to run within a pod.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>args</b></td>
+        <td>[]string</td>
+        <td>Arguments to the entrypoint. The container image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Entrypoint array. Not executed within a shell. The container image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindex">env</a></b></td>
+        <td>[]object</td>
+        <td>List of environment variables to set in the container. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvfromindex">envFrom</a></b></td>
+        <td>[]object</td>
+        <td>List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>image</b></td>
+        <td>string</td>
+        <td>Container image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>imagePullPolicy</b></td>
+        <td>string</td>
+        <td>Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycle">lifecycle</a></b></td>
+        <td>object</td>
+        <td>Actions that the management system should take in response to container lifecycle events. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobe">livenessProbe</a></b></td>
+        <td>object</td>
+        <td>Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexportsindex">ports</a></b></td>
+        <td>[]object</td>
+        <td>List of ports to expose from the container. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default "0.0.0.0" address inside a container will be accessible from the network. Modifying this array with strategic merge patch may corrupt the data. For more information See https://github.com/kubernetes/kubernetes/issues/108255. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobe">readinessProbe</a></b></td>
+        <td>object</td>
+        <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexresources">resources</a></b></td>
+        <td>object</td>
+        <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security options the container should be run with. If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobe">startupProbe</a></b></td>
+        <td>object</td>
+        <td>StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>stdin</b></td>
+        <td>boolean</td>
+        <td>Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>stdinOnce</b></td>
+        <td>boolean</td>
+        <td>Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationMessagePath</b></td>
+        <td>string</td>
+        <td>Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationMessagePolicy</b></td>
+        <td>string</td>
+        <td>Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>tty</b></td>
+        <td>boolean</td>
+        <td>Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexvolumedevicesindex">volumeDevices</a></b></td>
+        <td>[]object</td>
+        <td>volumeDevices is the list of block devices to be used by the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexvolumemountsindex">volumeMounts</a></b></td>
+        <td>[]object</td>
+        <td>Pod volumes to mount into the container's filesystem. Cannot be updated.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>workingDir</b></td>
+        <td>string</td>
+        <td>Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvindex">
+  PostgresCluster.spec.instances[index].initContainers[index].env[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+EnvVar represents an environment variable present in a Container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the environment variable. Must be a C_IDENTIFIER.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Variable references $(VAR_NAME) are expanded using the previously defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to "".</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">valueFrom</a></b></td>
+        <td>object</td>
+        <td>Source for the environment variable's value. Cannot be used if value is not empty.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">
+  PostgresCluster.spec.instances[index].initContainers[index].env[index].valueFrom
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Source for the environment variable's value. Cannot be used if value is not empty.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefromconfigmapkeyref">configMapKeyRef</a></b></td>
+        <td>object</td>
+        <td>Selects a key of a ConfigMap.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefromfieldref">fieldRef</a></b></td>
+        <td>object</td>
+        <td>Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefromresourcefieldref">resourceFieldRef</a></b></td>
+        <td>object</td>
+        <td>Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefromsecretkeyref">secretKeyRef</a></b></td>
+        <td>object</td>
+        <td>Selects a key of a secret in the pod's namespace</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefromconfigmapkeyref">
+  PostgresCluster.spec.instances[index].initContainers[index].env[index].valueFrom.configMapKeyRef
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Selects a key of a ConfigMap.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>The key to select.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>Specify whether the ConfigMap or its key must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefromfieldref">
+  PostgresCluster.spec.instances[index].initContainers[index].env[index].valueFrom.fieldRef
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fieldPath</b></td>
+        <td>string</td>
+        <td>Path of the field to select in the specified API version.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>apiVersion</b></td>
+        <td>string</td>
+        <td>Version of the schema the FieldPath is written in terms of, defaults to "v1".</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefromresourcefieldref">
+  PostgresCluster.spec.instances[index].initContainers[index].env[index].valueFrom.resourceFieldRef
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resource</b></td>
+        <td>string</td>
+        <td>Required: resource to select</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>containerName</b></td>
+        <td>string</td>
+        <td>Container name: required for volumes, optional for env vars</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>divisor</b></td>
+        <td>int or string</td>
+        <td>Specifies the output format of the exposed resources, defaults to "1"</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefromsecretkeyref">
+  PostgresCluster.spec.instances[index].initContainers[index].env[index].valueFrom.secretKeyRef
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexenvindexvaluefrom">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Selects a key of a secret in the pod's namespace
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>The key of the secret to select from.  Must be a valid secret key.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>Specify whether the Secret or its key must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvfromindex">
+  PostgresCluster.spec.instances[index].initContainers[index].envFrom[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+EnvFromSource represents the source of a set of ConfigMaps
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvfromindexconfigmapref">configMapRef</a></b></td>
+        <td>object</td>
+        <td>The ConfigMap to select from</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>prefix</b></td>
+        <td>string</td>
+        <td>An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexenvfromindexsecretref">secretRef</a></b></td>
+        <td>object</td>
+        <td>The Secret to select from</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvfromindexconfigmapref">
+  PostgresCluster.spec.instances[index].initContainers[index].envFrom[index].configMapRef
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexenvfromindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The ConfigMap to select from
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>Specify whether the ConfigMap must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexenvfromindexsecretref">
+  PostgresCluster.spec.instances[index].initContainers[index].envFrom[index].secretRef
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexenvfromindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Secret to select from
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>Specify whether the Secret must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecycle">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Actions that the management system should take in response to container lifecycle events. Cannot be updated.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststart">postStart</a></b></td>
+        <td>object</td>
+        <td>PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestop">preStop</a></b></td>
+        <td>object</td>
+        <td>PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The Pod's termination grace period countdown begins before the PreStop hook is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period (unless delayed by finalizers). Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststart">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.postStart
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycle">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststartexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststarttcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststartexec">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.postStart.exec
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststart">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpget">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.postStart.httpGet
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststart">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpgethttpheadersindex">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.postStart.httpGet.httpHeaders[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststarthttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststarttcpsocket">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.postStart.tcpSocket
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecyclepoststart">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecycleprestop">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.preStop
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycle">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The Pod's termination grace period countdown begins before the PreStop hook is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period (unless delayed by finalizers). Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestopexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestophttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestoptcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecycleprestopexec">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.preStop.exec
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestop">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecycleprestophttpget">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.preStop.httpGet
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestop">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestophttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecycleprestophttpgethttpheadersindex">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.preStop.httpGet.httpHeaders[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestophttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlifecycleprestoptcpsocket">
+  PostgresCluster.spec.instances[index].initContainers[index].lifecycle.preStop.tcpSocket
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlifecycleprestop">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlivenessprobe">
+  PostgresCluster.spec.instances[index].initContainers[index].livenessProbe
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobeexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>failureThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobegrpc">grpc</a></b></td>
+        <td>object</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobehttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>initialDelaySeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>periodSeconds</b></td>
+        <td>integer</td>
+        <td>How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>successThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobetcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>TCPSocket specifies an action involving a TCP port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationGracePeriodSeconds</b></td>
+        <td>integer</td>
+        <td>Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>timeoutSeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlivenessprobeexec">
+  PostgresCluster.spec.instances[index].initContainers[index].livenessProbe.exec
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlivenessprobegrpc">
+  PostgresCluster.spec.instances[index].initContainers[index].livenessProbe.grpc
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+GRPC specifies an action involving a GRPC port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>integer</td>
+        <td>Port number of the gRPC service. Number must be in the range 1 to 65535.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>service</b></td>
+        <td>string</td>
+        <td>Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md). 
+ If this is not specified, the default behavior is defined by gRPC.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlivenessprobehttpget">
+  PostgresCluster.spec.instances[index].initContainers[index].livenessProbe.httpGet
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobehttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlivenessprobehttpgethttpheadersindex">
+  PostgresCluster.spec.instances[index].initContainers[index].livenessProbe.httpGet.httpHeaders[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobehttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexlivenessprobetcpsocket">
+  PostgresCluster.spec.instances[index].initContainers[index].livenessProbe.tcpSocket
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexlivenessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+TCPSocket specifies an action involving a TCP port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexportsindex">
+  PostgresCluster.spec.instances[index].initContainers[index].ports[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerPort represents a network port in a single container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>containerPort</b></td>
+        <td>integer</td>
+        <td>Number of port to expose on the pod's IP address. This must be a valid port number, 0 < x < 65536.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>hostIP</b></td>
+        <td>string</td>
+        <td>What host IP to bind the external port to.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostPort</b></td>
+        <td>integer</td>
+        <td>Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>protocol</b></td>
+        <td>string</td>
+        <td>Protocol for port. Must be UDP, TCP, or SCTP. Defaults to "TCP".</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexreadinessprobe">
+  PostgresCluster.spec.instances[index].initContainers[index].readinessProbe
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobeexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>failureThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobegrpc">grpc</a></b></td>
+        <td>object</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobehttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>initialDelaySeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>periodSeconds</b></td>
+        <td>integer</td>
+        <td>How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>successThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobetcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>TCPSocket specifies an action involving a TCP port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationGracePeriodSeconds</b></td>
+        <td>integer</td>
+        <td>Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>timeoutSeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexreadinessprobeexec">
+  PostgresCluster.spec.instances[index].initContainers[index].readinessProbe.exec
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexreadinessprobegrpc">
+  PostgresCluster.spec.instances[index].initContainers[index].readinessProbe.grpc
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+GRPC specifies an action involving a GRPC port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>integer</td>
+        <td>Port number of the gRPC service. Number must be in the range 1 to 65535.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>service</b></td>
+        <td>string</td>
+        <td>Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md). 
+ If this is not specified, the default behavior is defined by gRPC.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexreadinessprobehttpget">
+  PostgresCluster.spec.instances[index].initContainers[index].readinessProbe.httpGet
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobehttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexreadinessprobehttpgethttpheadersindex">
+  PostgresCluster.spec.instances[index].initContainers[index].readinessProbe.httpGet.httpHeaders[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobehttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexreadinessprobetcpsocket">
+  PostgresCluster.spec.instances[index].initContainers[index].readinessProbe.tcpSocket
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexreadinessprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+TCPSocket specifies an action involving a TCP port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexresizepolicyindex">
+  PostgresCluster.spec.instances[index].initContainers[index].resizePolicy[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexresources">
+  PostgresCluster.spec.instances[index].initContainers[index].resources
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexresourcesclaimsindex">claims</a></b></td>
+        <td>[]object</td>
+        <td>Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container. 
+ This is an alpha field and requires enabling the DynamicResourceAllocation feature gate. 
+ This field is immutable. It can only be set for containers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>limits</b></td>
+        <td>map[string]int or string</td>
+        <td>Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>requests</b></td>
+        <td>map[string]int or string</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexresourcesclaimsindex">
+  PostgresCluster.spec.instances[index].initContainers[index].resources.claims[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexresources">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ResourceClaim references one entry in PodSpec.ResourceClaims.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexsecuritycontext">
+  PostgresCluster.spec.instances[index].initContainers[index].securityContext
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security options the container should be run with. If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>allowPrivilegeEscalation</b></td>
+        <td>boolean</td>
+        <td>AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontextcapabilities">capabilities</a></b></td>
+        <td>object</td>
+        <td>The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>privileged</b></td>
+        <td>boolean</td>
+        <td>Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>procMount</b></td>
+        <td>string</td>
+        <td>procMount denotes the type of proc mount to use for the containers. The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>readOnlyRootFilesystem</b></td>
+        <td>boolean</td>
+        <td>Whether this container has a read-only root filesystem. Default is false. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options from the PodSecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexsecuritycontextcapabilities">
+  PostgresCluster.spec.instances[index].initContainers[index].securityContext.capabilities
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>add</b></td>
+        <td>[]string</td>
+        <td>Added capabilities</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>drop</b></td>
+        <td>[]string</td>
+        <td>Removed capabilities</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexsecuritycontextselinuxoptions">
+  PostgresCluster.spec.instances[index].initContainers[index].securityContext.seLinuxOptions
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexsecuritycontextseccompprofile">
+  PostgresCluster.spec.instances[index].initContainers[index].securityContext.seccompProfile
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexsecuritycontextwindowsoptions">
+  PostgresCluster.spec.instances[index].initContainers[index].securityContext.windowsOptions
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options from the PodSecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexstartupprobe">
+  PostgresCluster.spec.instances[index].initContainers[index].startupProbe
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobeexec">exec</a></b></td>
+        <td>object</td>
+        <td>Exec specifies the action to take.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>failureThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobegrpc">grpc</a></b></td>
+        <td>object</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobehttpget">httpGet</a></b></td>
+        <td>object</td>
+        <td>HTTPGet specifies the http request to perform.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>initialDelaySeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>periodSeconds</b></td>
+        <td>integer</td>
+        <td>How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>successThreshold</b></td>
+        <td>integer</td>
+        <td>Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobetcpsocket">tcpSocket</a></b></td>
+        <td>object</td>
+        <td>TCPSocket specifies an action involving a TCP port.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>terminationGracePeriodSeconds</b></td>
+        <td>integer</td>
+        <td>Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>timeoutSeconds</b></td>
+        <td>integer</td>
+        <td>Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexstartupprobeexec">
+  PostgresCluster.spec.instances[index].initContainers[index].startupProbe.exec
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Exec specifies the action to take.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>command</b></td>
+        <td>[]string</td>
+        <td>Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexstartupprobegrpc">
+  PostgresCluster.spec.instances[index].initContainers[index].startupProbe.grpc
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+GRPC specifies an action involving a GRPC port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>integer</td>
+        <td>Port number of the gRPC service. Number must be in the range 1 to 65535.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>service</b></td>
+        <td>string</td>
+        <td>Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md). 
+ If this is not specified, the default behavior is defined by gRPC.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexstartupprobehttpget">
+  PostgresCluster.spec.instances[index].initContainers[index].startupProbe.httpGet
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPGet specifies the http request to perform.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Host name to connect to, defaults to the pod IP. You probably want to set "Host" in httpHeaders instead.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobehttpgethttpheadersindex">httpHeaders</a></b></td>
+        <td>[]object</td>
+        <td>Custom headers to set in the request. HTTP allows repeated headers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>Path to access on the HTTP server.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scheme</b></td>
+        <td>string</td>
+        <td>Scheme to use for connecting to the host. Defaults to HTTP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexstartupprobehttpgethttpheadersindex">
+  PostgresCluster.spec.instances[index].initContainers[index].startupProbe.httpGet.httpHeaders[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobehttpget">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+HTTPHeader describes a custom header to be used in HTTP probes
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>The header field value</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexstartupprobetcpsocket">
+  PostgresCluster.spec.instances[index].initContainers[index].startupProbe.tcpSocket
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindexstartupprobe">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+TCPSocket specifies an action involving a TCP port.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>port</b></td>
+        <td>int or string</td>
+        <td>Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>host</b></td>
+        <td>string</td>
+        <td>Optional: Host name to connect to, defaults to the pod IP.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexvolumedevicesindex">
+  PostgresCluster.spec.instances[index].initContainers[index].volumeDevices[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+volumeDevice describes a mapping of a raw block device within a container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>devicePath</b></td>
+        <td>string</td>
+        <td>devicePath is the path inside of the container that the device will be mapped to.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>name must match the name of a persistentVolumeClaim in the pod</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexinitcontainersindexvolumemountsindex">
+  PostgresCluster.spec.instances[index].initContainers[index].volumeMounts[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexinitcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+VolumeMount describes a mounting of a Volume within a container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>mountPath</b></td>
+        <td>string</td>
+        <td>Path within the container at which the volume should be mounted.  Must not contain ':'.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>This must match the Name of a Volume.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>mountPropagation</b></td>
+        <td>string</td>
+        <td>mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>readOnly</b></td>
+        <td>boolean</td>
+        <td>Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subPath</b></td>
+        <td>string</td>
+        <td>Path within the volume from which the container's volume should be mounted. Defaults to "" (volume's root).</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subPathExpr</b></td>
+        <td>string</td>
+        <td>Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to "" (volume's root). SubPathExpr and SubPath are mutually exclusive.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="postgresclusterspecinstancesindexmetadata">
   PostgresCluster.spec.instances[index].metadata
   <sup><sup><a href="#postgresclusterspecinstancesindex">↩ Parent</a></sup></sup>
@@ -29942,7 +34408,7 @@ Compute resources of a PostgreSQL container.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -30062,7 +34528,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -30301,7 +34767,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -30491,7 +34957,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -30585,6 +35052,58 @@ A label selector requirement is a selector that contains values, a key, and an o
 </table>
 
 
+<h3 id="postgresclusterspecinstancesindexvolumemountsindex">
+  PostgresCluster.spec.instances[index].volumeMounts[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+VolumeMount describes a mounting of a Volume within a container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>mountPath</b></td>
+        <td>string</td>
+        <td>Path within the container at which the volume should be mounted.  Must not contain ':'.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>This must match the Name of a Volume.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>mountPropagation</b></td>
+        <td>string</td>
+        <td>mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>readOnly</b></td>
+        <td>boolean</td>
+        <td>Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subPath</b></td>
+        <td>string</td>
+        <td>Path within the volume from which the container's volume should be mounted. Defaults to "" (volume's root).</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subPathExpr</b></td>
+        <td>string</td>
+        <td>Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to "" (volume's root). SubPathExpr and SubPath are mutually exclusive.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="postgresclusterspecinstancesindexwalvolumeclaimspec">
   PostgresCluster.spec.instances[index].walVolumeClaimSpec
   <sup><sup><a href="#postgresclusterspecinstancesindex">↩ Parent</a></sup></sup>
@@ -30668,7 +35187,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
     <tbody><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexwalvolumeclaimspecresourcesclaimsindex">claims</a></b></td>
@@ -31886,7 +36405,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -33574,7 +38093,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -34937,7 +39456,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -35809,7 +40328,7 @@ Changing this value causes PostgreSQL and the exporter to restart. More info: ht
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -37724,9 +42243,19 @@ A single application container that you want to run within a pod.
         <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexsecuritycontext">securityContext</a></b></td>
@@ -38269,7 +42798,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -38444,7 +42973,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -38518,7 +43047,7 @@ Periodic probe of container liveness. Container will be restarted if the probe f
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexlivenessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexlivenessprobehttpget">httpGet</a></b></td>
@@ -38593,7 +43122,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -38687,7 +43216,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -38808,7 +43337,7 @@ Periodic probe of container service readiness. Container will be removed from se
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexreadinessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexreadinessprobehttpget">httpGet</a></b></td>
@@ -38883,7 +43412,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -38977,7 +43506,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -39020,6 +43549,38 @@ TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported
 </table>
 
 
+<h3 id="postgresclusterspecproxypgbouncercontainersindexresizepolicyindex">
+  PostgresCluster.spec.proxy.pgBouncer.containers[index].resizePolicy[index]
+  <sup><sup><a href="#postgresclusterspecproxypgbouncercontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="postgresclusterspecproxypgbouncercontainersindexresources">
   PostgresCluster.spec.proxy.pgBouncer.containers[index].resources
   <sup><sup><a href="#postgresclusterspecproxypgbouncercontainersindex">↩ Parent</a></sup></sup>
@@ -39053,7 +43614,7 @@ Compute Resources required by this container. Cannot be updated. More info: http
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -39263,7 +43824,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -39300,7 +43861,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -39342,7 +43903,7 @@ StartupProbe indicates that the Pod has successfully initialized. If specified, 
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexstartupprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexstartupprobehttpget">httpGet</a></b></td>
@@ -39417,7 +43978,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -39511,7 +44072,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -39777,7 +44338,7 @@ Compute resources of a PgBouncer container. Changing this value causes PgBouncer
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -39971,7 +44532,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -40092,7 +44653,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -40580,7 +45142,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -42374,7 +46936,7 @@ Compute resources of a pgAdmin container. Changing this value causes pgAdmin to 
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -42569,7 +47131,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>

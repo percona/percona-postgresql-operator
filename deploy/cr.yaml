@@ -58,7 +58,7 @@ spec:
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
 
-  image: perconalab/percona-postgresql-operator:main-ppg15-postgres
+  image: perconalab/percona-postgresql-operator:k8spg-375-postgres
   imagePullPolicy: Always
   postgresVersion: 15
 #  port: 5432
@@ -273,3 +273,16 @@ spec:
 #          max_worker_processes: 2
 #          shared_buffers: 1GB
 #          work_mem: 2MB
+
+#  customExtensions:
+#    image: perconalab/percona-postgresql-operator:main-ext-installer
+#    imagePullPolicy: Always
+#    storage:
+#      type: s3
+#      bucket: pg-extensions
+#      region: eu-central-1
+#      secret:
+#        name: cluster1-extensions-secret
+#    extensions:
+#    - name: pg_cron
+#      version: 1.6.1

@@ -148,6 +148,11 @@ type PerconaPGClusterSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
 	PMM *PMMSpec `json:"pmm,omitempty"`
+
+	// The specification of custom extensions.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// +optional
+	CustomExtensions CustomExtensionsSpec `json:"customExtensions,omitempty"`
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -271,6 +276,27 @@ func (cr *PerconaPGCluster) PMMEnabled() bool {
 	return cr.Spec.PMM != nil && cr.Spec.PMM.Enabled
 }
 
+type ExtensionSpec struct {
+	Name     string `json:"name,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Checksum string `json:"checksum,omitempty"`
+}
+
+type CustomExtensionsStorageSpec struct {
+	// +kubebuilder:validation:Enum={s3,gcs,azure}
+	Type   string                   `json:"type,omitempty"`
+	Bucket string                   `json:"bucket,omitempty"`
+	Region string                   `json:"region,omitempty"`
+	Secret *corev1.SecretProjection `json:"secret,omitempty"`
+}
+
+type CustomExtensionsSpec struct {
+	Image           string                      `json:"image,omitempty"`
+	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
+	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
+	Extensions      []ExtensionSpec             `json:"extensions,omitempty"`
+}
+
 type SecretsSpec struct {
 	// The secret containing the Certificates and Keys to encrypt PostgreSQL
 	// traffic will need to contain the server TLS certificate, TLS key and the
@@ -347,6 +373,11 @@ type PGInstanceSetSpec struct {
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
 
+	// Additional init containers for PostgreSQL instance pods. Changing this value causes
+	// PostgreSQL to restart.
+	// +optional
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
+
 	// Priority class name for the PostgreSQL pod. Changing this value causes
 	// PostgreSQL to restart.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
@@ -388,6 +419,11 @@ type PGInstanceSetSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 	// +kubebuilder:validation:Required
 	DataVolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"dataVolumeClaimSpec"`
+
+	// The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes
+	// PostgreSQL to restart.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -396,6 +432,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Name:                      p.Name,
 		Affinity:                  p.Affinity,
 		Containers:                p.Sidecars,
+		InitContainers:            p.InitContainers,
 		PriorityClassName:         p.PriorityClassName,
 		Replicas:                  p.Replicas,
 		MinAvailable:              p.MinAvailable,
@@ -404,6 +441,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
 		WALVolumeClaimSpec:        p.WALVolumeClaimSpec,
 		DataVolumeClaimSpec:       p.DataVolumeClaimSpec,
+		VolumeMounts:              p.VolumeMounts,
 	}
 }
 
