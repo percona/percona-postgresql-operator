@@ -2,7 +2,7 @@
 // +build envtest
 
 /*
- Copyright 2021 - 2022 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -173,6 +173,7 @@ metadata:
   name: carlos
 spec:
   postgresVersion: 13
+  image: postgres
   instances:
   - name: samba
     dataVolumeClaimSpec:
@@ -183,6 +184,7 @@ spec:
           storage: 1Gi
   backups:
     pgbackrest:
+      image: pgbackrest
       repos:
       - name: repo1
         volume:
@@ -376,6 +378,7 @@ metadata:
   name: carlos
 spec:
   postgresVersion: 13
+  image: postgres
   instances:
   - name: samba
     dataVolumeClaimSpec:
@@ -386,6 +389,7 @@ spec:
           storage: 1Gi
   backups:
     pgbackrest:
+      image: pgbackrest
       repos:
       - name: repo1
         volume:
