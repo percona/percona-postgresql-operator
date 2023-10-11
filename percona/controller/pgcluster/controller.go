@@ -229,7 +229,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			users = append(users, user)
 		}
 
-		if cr.Spec.PMM.Enabled {
+		if cr.PMMEnabled() {
 			users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
 				Name:    pmm.MonitoringUser,
 				Options: "SUPERUSER",
@@ -281,7 +281,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 }
 
 func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
+	if !cr.PMMEnabled() {
 		return nil
 	}
 
@@ -347,7 +347,7 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaP
 }
 
 func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
+	if !cr.PMMEnabled() {
 		return nil
 	}
 
