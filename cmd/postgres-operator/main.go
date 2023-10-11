@@ -18,13 +18,17 @@ limitations under the License.
 import (
 	"context"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
+	uzap "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	cruntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
@@ -61,17 +65,40 @@ func main() {
 	// Set any supplied feature gates; panic on any unrecognized feature gate
 	err := util.AddAndSetFeatureGates(os.Getenv("PGO_FEATURE_GATES"))
 	assertNoError(err)
+	// Needed for PMM
+	err = util.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(util.InstanceSidecars): true,
+	})
+	assertNoError(err)
 
 	otelFlush, err := initOpenTelemetry()
 	assertNoError(err)
 	defer otelFlush()
 
-	initLogging()
+	opts := zap.Options{
+		Encoder: getLogEncoder(),
+		Level:   getLogLevel(),
+	}
+	l := zap.New(zap.UseFlagOptions(&opts))
+	logging.SetLogSink(l.GetSink())
+	cruntime.SetLogger(l)
 
 	// create a context that will be used to stop all controllers on a SIGTERM or SIGINT
 	ctx := cruntime.SetupSignalHandler()
 	log := logging.FromContext(ctx)
 	log.V(1).Info("debug flag set to true")
+
+	// We are forcing `InstanceSidecars` feature to be enabled.
+	// It's necessary to get actual feature gate values instead of using
+	// `PGO_FEATURE_GATES` env var to print logs
+	var featureGates []string
+	for k := range util.DefaultMutableFeatureGate.GetAll() {
+		f := string(k) + "=" + strconv.FormatBool(util.DefaultMutableFeatureGate.Enabled(k))
+		featureGates = append(featureGates, f)
+	}
+
+	log.Info("feature gates enabled",
+		"PGO_FEATURE_GATES", strings.Join(featureGates, ","))
 
 	cruntime.SetLogger(log)
 
@@ -294,4 +321,41 @@ func getServerVersion(ctx context.Context, cfg *rest.Config) string {
 		return ""
 	}
 	return versionInfo.String()
+}
+
+func getLogEncoder() zapcore.Encoder {
+	consoleEnc := zapcore.NewConsoleEncoder(uzap.NewDevelopmentEncoderConfig())
+
+	s, found := os.LookupEnv("LOG_STRUCTURED")
+	if !found {
+		return consoleEnc
+	}
+
+	useJson, err := strconv.ParseBool(s)
+	if err != nil {
+		return consoleEnc
+	}
+	if !useJson {
+		return consoleEnc
+	}
+
+	return zapcore.NewJSONEncoder(uzap.NewProductionEncoderConfig())
+}
+
+func getLogLevel() zapcore.LevelEnabler {
+	l, found := os.LookupEnv("LOG_LEVEL")
+	if !found {
+		return zapcore.InfoLevel
+	}
+
+	switch strings.ToUpper(l) {
+	case "DEBUG":
+		return zapcore.DebugLevel
+	case "INFO":
+		return zapcore.InfoLevel
+	case "ERROR":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
+	}
 }
