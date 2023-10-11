@@ -426,7 +426,10 @@ check_passwords_leak() {
 	local passwords
 	local pods
 
-	secrets=$(kubectl -n "${NAMESPACE}" get secrets -o json | jq -r '.items[] | select(.data."password"? != null) | .data."password"' ; kubectl -n "${NAMESPACE}" get secrets -o json | jq -r '.items[] | select(.data."pgbouncer-password"? != null) | .data."pgbouncer-password"')
+	secrets=$(
+		kubectl -n "${NAMESPACE}" get secrets -o json | jq -r '.items[] | select(.data."password"? != null) | .data."password"'
+		kubectl -n "${NAMESPACE}" get secrets -o json | jq -r '.items[] | select(.data."pgbouncer-password"? != null) | .data."pgbouncer-password"'
+	)
 
 	passwords="$(for i in $secrets; do base64 -d <<< $i; echo; done) $secrets"
 	pods=$(kubectl -n "${NAMESPACE}" get pods -o name | awk -F "/" '{print $2}')
