@@ -311,7 +311,10 @@ func (r *Reconciler) cleanupRepoResources(ctx context.Context,
 			for _, repo := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 				if repo.Name == owned.GetLabels()[naming.LabelPGBackRestRepo] {
 					if backupScheduleFound(repo,
-						owned.GetLabels()[naming.LabelPGBackRestCronJob]) {
+						owned.GetLabels()[naming.LabelPGBackRestCronJob]) ||
+						// K8SPG-410: we shouldn't delete jobs created by the cronjob,
+						// because we assign it to be owned by the PerconaPGBackup
+						owned.GetKind() == "Job" {
 						delete = false
 						ownedNoDelete = append(ownedNoDelete, owned)
 					}

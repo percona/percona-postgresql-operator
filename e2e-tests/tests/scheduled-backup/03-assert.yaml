@@ -8,3 +8,16 @@ metadata:
   name: 03-read-from-primary
 data:
   data: ' 100500'
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  generation: 1
+  labels:
+    postgres-operator.crunchydata.com/cluster: scheduled-backup
+spec:
+  pgCluster: scheduled-backup
+  repoName: repo1
+status:
+  backupType: replica-create
+  state: Succeeded
