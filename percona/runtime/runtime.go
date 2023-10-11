@@ -30,7 +30,7 @@ func CreateRuntimeManager(namespaces string, config *rest.Config,
 	}
 
 	nn := strings.Split(namespaces, ",")
-	if len(nn) > 0 && nn[0] != ""{
+	if len(nn) > 0 && nn[0] != "" {
 		options.NewCache = cache.MultiNamespacedCacheBuilder(nn)
 	} else {
 		options.Namespace = ""
