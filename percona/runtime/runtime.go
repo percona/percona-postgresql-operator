@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	// "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -25,15 +24,18 @@ func CreateRuntimeManager(namespaces string, config *rest.Config,
 		return nil, err
 	}
 
-	nn := strings.Split(namespaces, ",")
-
-	println("AAAAAAAAAAAAAA: " + nn[0])
-
 	options := manager.Options{
 		SyncPeriod: &refreshInterval,
 		Scheme:     pgoScheme,
-		NewCache:   cache.MultiNamespacedCacheBuilder(nn),
 	}
+
+	nn := strings.Split(namespaces, ",")
+	if len(nn) > 0 && nn[0] != ""{
+		options.NewCache = cache.MultiNamespacedCacheBuilder(nn)
+	} else {
+		options.Namespace = ""
+	}
+
 	if disableMetrics {
 		options.HealthProbeBindAddress = "0"
 		options.MetricsBindAddress = "0"

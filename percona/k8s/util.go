@@ -22,7 +22,6 @@ func GetWatchNamespace() (string, error) {
 		return "", fmt.Errorf("%s must be set", WatchNamespaceEnvVar)
 	}
 
-	println("AAAAAAAAAAAAAA: " + ns)
 	return ns, nil
 }
 
