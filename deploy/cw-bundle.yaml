@@ -7153,6 +7153,13 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
+                  loadBalancerSourceRanges:
+                    description: LoadBalancerSourceRanges is a list of IP CIDRs allowed
+                      access to load. This field will be ignored if the cloud-provider
+                      does not support the feature.
+                    items:
+                      type: string
+                    type: array
                   nodePort:
                     description: The port on which this service is exposed when type
                       is NodePort or LoadBalancer. Value must be in-range and not
@@ -11713,6 +11720,13 @@ spec:
                             additionalProperties:
                               type: string
                             type: object
+                          loadBalancerSourceRanges:
+                            description: LoadBalancerSourceRanges is a list of IP
+                              CIDRs allowed access to load. This field will be ignored
+                              if the cloud-provider does not support the feature.
+                            items:
+                              type: string
+                            type: array
                           nodePort:
                             description: The port on which this service is exposed
                               when type is NodePort or LoadBalancer. Value must be

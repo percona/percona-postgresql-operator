@@ -13802,6 +13802,11 @@ Specification of the service that exposes the PostgreSQL primary instance.
         <td></td>
         <td>false</td>
       </tr><tr>
+        <td><b>loadBalancerSourceRanges</b></td>
+        <td>[]string</td>
+        <td>LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load. This field will be ignored if the cloud-provider does not support the feature.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b>nodePort</b></td>
         <td>integer</td>
         <td>The port on which this service is exposed when type is NodePort or LoadBalancer. Value must be in-range and not in use or the operation will fail. If unspecified, a port will be allocated if this Service requires one. - https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport</td>
@@ -16100,6 +16105,11 @@ Specification of the service that exposes PgBouncer.
         <td><b>labels</b></td>
         <td>map[string]string</td>
         <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>loadBalancerSourceRanges</b></td>
+        <td>[]string</td>
+        <td>LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load. This field will be ignored if the cloud-provider does not support the feature.</td>
         <td>false</td>
       </tr><tr>
         <td><b>nodePort</b></td>
