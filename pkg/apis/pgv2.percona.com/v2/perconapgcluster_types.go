@@ -440,8 +440,9 @@ func (s *ServiceExpose) ToCrunchy() *crunchyv1beta1.ServiceSpec {
 			Annotations: s.Annotations,
 			Labels:      s.Labels,
 		},
-		NodePort: s.NodePort,
-		Type:     s.Type,
+		NodePort:                 s.NodePort,
+		Type:                     s.Type,
+		LoadBalancerSourceRanges: s.LoadBalancerSourceRanges,
 	}
 }
 
