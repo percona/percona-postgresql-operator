@@ -17,7 +17,14 @@ const WatchNamespaceEnvVar = "WATCH_NAMESPACE"
 
 // GetWatchNamespace returns the namespace the operator should be watching for changes
 func GetWatchNamespace() (string, error) {
-	ns, found := os.LookupEnv(WatchNamespaceEnvVar)
+	// This is needed in order to preserve backwards compatibility with the
+	// users that are using the PGO_TARGET_NAMESPACE env var.
+	ns, found := os.LookupEnv("PGO_TARGET_NAMESPACE")
+	if found {
+		return ns, nil
+	}
+
+	ns, found = os.LookupEnv(WatchNamespaceEnvVar)
 	if !found {
 		return "", fmt.Errorf("%s must be set", WatchNamespaceEnvVar)
 	}
