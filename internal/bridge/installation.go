@@ -103,9 +103,9 @@ func ManagedInstallationReconciler(m manager.Manager, newClient func() *Client) 
 		)).
 		//
 		// Wake periodically even when that Secret does not exist.
-		Watches(
+		WatchesRawSource(
 			runtime.NewTickerImmediate(time.Hour, event.GenericEvent{}),
-			handler.EnqueueRequestsFromMapFunc(func(client.Object) []reconcile.Request {
+			handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 				return []reconcile.Request{{NamespacedName: reconciler.SecretRef}}
 			}),
 		).

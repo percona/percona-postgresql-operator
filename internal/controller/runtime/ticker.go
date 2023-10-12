@@ -60,7 +60,7 @@ func (t ticker) Start(
 				return
 			}
 		}
-		h.Generic(t.GenericEvent, q)
+		h.Generic(ctx, t.GenericEvent, q)
 	}
 
 	if t.Immediate {

@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -60,7 +59,7 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v1beta1.PGUpgrade{}).
 		Owns(&batchv1.Job{}).
 		Watches(
-			&source.Kind{Type: v1beta1.NewPostgresCluster()},
+			v1beta1.NewPostgresCluster(),
 			r.watchPostgresClusters(),
 		).
 		Complete(r)
@@ -105,13 +104,13 @@ func (r *PGUpgradeReconciler) watchPostgresClusters() handler.Funcs {
 	}
 
 	return handler.Funcs{
-		CreateFunc: func(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+		CreateFunc: func(_ context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 			handle(e.Object, q)
 		},
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(_ context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			handle(e.ObjectNew, q)
 		},
-		DeleteFunc: func(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+		DeleteFunc: func(_ context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
 			handle(e.Object, q)
 		},
 	}
