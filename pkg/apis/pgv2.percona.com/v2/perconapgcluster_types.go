@@ -267,6 +267,10 @@ type PMMSpec struct {
 	RuntimeClassName *string `json:"runtimeClassName,omitempty"`
 }
 
+func (cr *PerconaPGCluster) PMMEnabled() bool {
+	return cr.Spec.PMM != nil && cr.Spec.PMM.Enabled
+}
+
 type SecretsSpec struct {
 	// The secret containing the Certificates and Keys to encrypt PostgreSQL
 	// traffic will need to contain the server TLS certificate, TLS key and the
