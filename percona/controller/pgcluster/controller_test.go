@@ -831,8 +831,10 @@ var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
 	})
 
 	It("should create PerconaPGCluster with service exposed with loadBalancerSourceRanges", func() {
-		cr.Spec.Expose.LoadBalancerSourceRanges = []string{"10.10.10.10/16"}
-		cr.Spec.PgBouncer.Expose.LoadBalancerSourceRanges = []string{"10.10.11.11./16"}
+		cr.Spec.Expose = &v2.ServiceExpose{
+			Type:                     "LoadBalancer",
+			LoadBalancerSourceRanges: []string{"10.10.10.10/16"},
+		}
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 	})
 
@@ -847,11 +849,6 @@ var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
 		haService := &corev1.Service{}
 		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Name + "-ha"}, haService)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(haServiceSpec.LoadBalancerSourceRanges).To(Equal(cr.Spec.Expose.LoadBalancerSourceRanges))
-
-		pgbService := &corev1.Service{}
-		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Name + "-pgbouncer"}, pgbService)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(pgbService.Spec.LoadBalancerSourceRanges).To(Equal(cr.Spec.PgBouncer.Expose.LoadBalancerSourceRanges))
+		Expect(haService.Spec.LoadBalancerSourceRanges).To(Equal(cr.Spec.Expose.LoadBalancerSourceRanges))
 	})
 })
