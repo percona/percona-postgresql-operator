@@ -799,3 +799,60 @@ var _ = Describe("Version labels", Ordered, func() {
 		})))
 	})
 })
+
+var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "lb-source-ranges"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster with service exposed with loadBalancerSourceRanges", func() {
+		cr.Spec.Expose.LoadBalancerSourceRanges = []string{"10.10.10.10/16"}
+		cr.Spec.PgBouncer.Expose.LoadBalancerSourceRanges = []string{"10.10.11.11./16"}
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+
+	It("should reconcile", func() {
+		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create services with loadBalancerSourceRanges ", func() {
+		haService:= &corev1.Service{} 
+		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Name + "-ha"}, haService)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(haServiceSpec.LoadBalancerSourceRanges).To(Equal(cr.Spec.Expose.LoadBalancerSourceRanges))
+
+		pgbService:= &corev1.Service{} 
+		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Name + "-pgbouncer"}, pgbService)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pgbService.Spec.LoadBalancerSourceRanges).To(Equal(cr.Spec.PgBouncer.Expose.LoadBalancerSourceRanges))
+	})
+})
