@@ -39829,6 +39829,11 @@ Specification of the service that exposes PgBouncer.
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>loadBalancerSourceRanges</b></td>
+        <td>[]string</td>
+        <td>LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load. This field will be ignored if the cloud-provider does not support the feature.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncerservicemetadata">metadata</a></b></td>
         <td>object</td>
         <td>Metadata contains metadata for custom resources</td>
@@ -40200,6 +40205,11 @@ Specification of the service that exposes the PostgreSQL primary instance.
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>loadBalancerSourceRanges</b></td>
+        <td>[]string</td>
+        <td>LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load. This field will be ignored if the cloud-provider does not support the feature.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecservicemetadata">metadata</a></b></td>
         <td>object</td>
         <td>Metadata contains metadata for custom resources</td>
@@ -42416,6 +42426,11 @@ Specification of the service that exposes pgAdmin.
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>loadBalancerSourceRanges</b></td>
+        <td>[]string</td>
+        <td>LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load. This field will be ignored if the cloud-provider does not support the feature.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecuserinterfacepgadminservicemetadata">metadata</a></b></td>
         <td>object</td>
         <td>Metadata contains metadata for custom resources</td>

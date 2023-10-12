@@ -13811,6 +13811,13 @@ spec:
                       service:
                         description: Specification of the service that exposes PgBouncer.
                         properties:
+                          loadBalancerSourceRanges:
+                            description: LoadBalancerSourceRanges is a list of IP
+                              CIDRs allowed access to load. This field will be ignored
+                              if the cloud-provider does not support the feature.
+                            items:
+                              type: string
+                            type: array
                           metadata:
                             description: Metadata contains metadata for custom resources
                             properties:
@@ -14137,6 +14144,13 @@ spec:
                 description: Specification of the service that exposes the PostgreSQL
                   primary instance.
                 properties:
+                  loadBalancerSourceRanges:
+                    description: LoadBalancerSourceRanges is a list of IP CIDRs allowed
+                      access to load. This field will be ignored if the cloud-provider
+                      does not support the feature.
+                    items:
+                      type: string
+                    type: array
                   metadata:
                     description: Metadata contains metadata for custom resources
                     properties:
@@ -15695,6 +15709,13 @@ spec:
                       service:
                         description: Specification of the service that exposes pgAdmin.
                         properties:
+                          loadBalancerSourceRanges:
+                            description: LoadBalancerSourceRanges is a list of IP
+                              CIDRs allowed access to load. This field will be ignored
+                              if the cloud-provider does not support the feature.
+                            items:
+                              type: string
+                            type: array
                           metadata:
                             description: Metadata contains metadata for custom resources
                             properties:
