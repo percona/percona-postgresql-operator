@@ -836,7 +836,6 @@ var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 	})
 
-
 	It("should reconcile", func() {
 		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -845,12 +844,12 @@ var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
 	})
 
 	It("should create services with loadBalancerSourceRanges ", func() {
-		haService:= &corev1.Service{} 
+		haService := &corev1.Service{}
 		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Name + "-ha"}, haService)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(haServiceSpec.LoadBalancerSourceRanges).To(Equal(cr.Spec.Expose.LoadBalancerSourceRanges))
 
-		pgbService:= &corev1.Service{} 
+		pgbService := &corev1.Service{}
 		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Name + "-pgbouncer"}, pgbService)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pgbService.Spec.LoadBalancerSourceRanges).To(Equal(cr.Spec.PgBouncer.Expose.LoadBalancerSourceRanges))
