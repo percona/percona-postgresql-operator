@@ -30324,6 +30324,8 @@ spec:
     spec:
       containers:
       - env:
+        - name: WATCH_NAMESPACE
+          value: ""
         - name: PGO_NAMESPACE
           valueFrom:
             fieldRef:
