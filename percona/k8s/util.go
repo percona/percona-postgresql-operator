@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 
@@ -11,6 +12,25 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+const WatchNamespaceEnvVar = "WATCH_NAMESPACE"
+
+// GetWatchNamespace returns the namespace the operator should be watching for changes
+func GetWatchNamespace() (string, error) {
+	// This is needed in order to preserve backwards compatibility with the
+	// users that are using the PGO_TARGET_NAMESPACE env var.
+	ns, found := os.LookupEnv("PGO_TARGET_NAMESPACE")
+	if found {
+		return ns, nil
+	}
+
+	ns, found = os.LookupEnv(WatchNamespaceEnvVar)
+	if !found {
+		return "", fmt.Errorf("%s must be set", WatchNamespaceEnvVar)
+	}
+
+	return ns, nil
+}
 
 // GetOperatorNamespace returns the namespace of the operator pod
 func GetOperatorNamespace() (string, error) {

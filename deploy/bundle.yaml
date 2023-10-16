@@ -30358,7 +30358,7 @@ spec:
     spec:
       containers:
       - env:
-        - name: PGO_TARGET_NAMESPACE
+        - name: WATCH_NAMESPACE
           valueFrom:
             fieldRef:
               apiVersion: v1
