@@ -152,7 +152,17 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, err
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	backupRunning, err := isBackupRunning(ctx, r.Client, cr)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "is backup running")
+	}
+
+	if backupRunning && cr.Spec.Pause != nil && *cr.Spec.Pause {
+		*cr.Spec.Pause = false
+		log.Info("Backup is running. Can't pause cluster", "cluster", cr.Name)
+	}
+
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		postgresCluster.Default()
 
 		annotations := make(map[string]string)
@@ -358,4 +368,23 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	}
 
 	return nil
+}
+
+func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
+	backupList := &v2.PerconaPGBackupList{}
+	if err := cl.List(ctx, backupList, &client.ListOptions{
+		Namespace: cr.Namespace}); err != nil {
+		return false, errors.Wrap(err, "list backups")
+	}
+
+	for _, backup := range backupList.Items {
+		if backup.Spec.PGCluster != cr.Name {
+			continue
+		}
+		if backup.Status.State == v2.BackupStarting || backup.Status.State == v2.BackupRunning {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

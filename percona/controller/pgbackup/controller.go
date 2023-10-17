@@ -5,11 +5,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"go.opentelemetry.io/otel/trace"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -19,6 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -30,10 +29,7 @@ var ErrBackupJobNotFound = errors.New("backup Job not found")
 
 // Reconciler holds resources for the PerconaPGBackup reconciler
 type PGBackupReconciler struct {
-	Client   client.Client
-	Owner    client.FieldOwner
-	Recorder record.EventRecorder
-	Tracer   trace.Tracer
+	Client client.Client
 }
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
@@ -73,6 +69,10 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 	switch pgBackup.Status.State {
 	case v2.BackupNew:
+		if pgCluster.Spec.Pause != nil && *pgCluster.Spec.Pause {
+			log.Info("Can't start backup. PostgresCluster is paused", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
+			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		}
 		if err := startBackup(ctx, r.Client, pgCluster, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "start backup")
 		}
@@ -139,6 +139,10 @@ func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, 
 		pg.Annotations = make(map[string]string)
 	}
 	pg.Annotations[naming.PGBackRestBackup] = pb.Name
+
+	if pg.Spec.Backups.PGBackRest.Manual == nil {
+		pg.Spec.Backups.PGBackRest.Manual = new(v1beta1.PGBackRestManualBackup)
+	}
 
 	pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
 	pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options
