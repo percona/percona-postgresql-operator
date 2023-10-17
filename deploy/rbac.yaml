@@ -114,6 +114,12 @@ rules:
 - apiGroups:
   - pgv2.percona.com
   resources:
+  - perconapgclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - pgv2.percona.com
+  resources:
   - perconapgclusters
   verbs:
   - create
