@@ -53,21 +53,21 @@ type PGClusterReconciler struct {
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
-	if err := r.CrunchyController.Watch(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()); err != nil {
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), r.watchSecrets()); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
 
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
-		Watches(&source.Kind{Type: &corev1.Service{}}, r.watchServices()).
-		Watches(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()).
+		Watches(&corev1.Service{}, r.watchServices()).
+		Watches(&corev1.Secret{}, r.watchSecrets()).
 		Complete(r)
 }
 
 func (r *PGClusterReconciler) watchServices() handler.Funcs {
 	return handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 
@@ -83,7 +83,7 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 
 func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 	return handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 

@@ -758,6 +758,7 @@ func TestReconcilePGAdminUsers(t *testing.T) {
 
 		pod.DeletionTimestamp = new(metav1.Time)
 		*pod.DeletionTimestamp = metav1.Now()
+		pod.ObjectMeta.Finalizers = []string{"kubernetes"}
 		pod.Status.ContainerStatuses =
 			[]corev1.ContainerStatus{{Name: naming.ContainerPGAdmin}}
 		pod.Status.ContainerStatuses[0].State.Running =
