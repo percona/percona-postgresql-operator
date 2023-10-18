@@ -55,6 +55,11 @@ type ServiceSpec struct {
 	// +kubebuilder:default=ClusterIP
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	Type string `json:"type"`
+
+	// LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
+	// This field will be ignored if the cloud-provider does not support the feature.
+	// +optional
+	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
 }
 
 // Sidecar defines the configuration of a sidecar container

@@ -20,3 +20,7 @@ bin/
 
 kubeconfig
 gke_gcloud_auth_plugin_cache
+
+### VisualStudioCode ###
+.vscode/*
+.history

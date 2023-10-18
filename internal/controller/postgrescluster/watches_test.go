@@ -16,6 +16,7 @@
 package postgrescluster
 
 import (
+	"context"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -28,21 +29,23 @@ import (
 )
 
 func TestWatchPodsUpdate(t *testing.T) {
-	queue := controllertest.Queue{Interface: workqueue.New()}
+	queue := &controllertest.Queue{Interface: workqueue.New()}
 	reconciler := &Reconciler{}
 
 	update := reconciler.watchPods().UpdateFunc
 	assert.Assert(t, update != nil)
 
+	ctx := context.Background()
+
 	// No metadata; no reconcile.
-	update(event.UpdateEvent{
+	update(ctx, event.UpdateEvent{
 		ObjectOld: &corev1.Pod{},
 		ObjectNew: &corev1.Pod{},
 	}, queue)
 	assert.Equal(t, queue.Len(), 0)
 
 	// Cluster label, but nothing else; no reconcile.
-	update(event.UpdateEvent{
+	update(ctx, event.UpdateEvent{
 		ObjectOld: &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -61,7 +64,7 @@ func TestWatchPodsUpdate(t *testing.T) {
 	assert.Equal(t, queue.Len(), 0)
 
 	// Cluster standby leader changed; one reconcile by label.
-	update(event.UpdateEvent{
+	update(ctx, event.UpdateEvent{
 		ObjectOld: &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -108,7 +111,7 @@ func TestWatchPodsUpdate(t *testing.T) {
 		}
 
 		// Newly pending; one reconcile by label.
-		update(event.UpdateEvent{
+		update(ctx, event.UpdateEvent{
 			ObjectOld: base.DeepCopy(),
 			ObjectNew: pending.DeepCopy(),
 		}, queue)
@@ -119,7 +122,7 @@ func TestWatchPodsUpdate(t *testing.T) {
 		queue.Done(item)
 
 		// Still pending; one reconcile by label.
-		update(event.UpdateEvent{
+		update(ctx, event.UpdateEvent{
 			ObjectOld: pending.DeepCopy(),
 			ObjectNew: pending.DeepCopy(),
 		}, queue)
@@ -130,7 +133,7 @@ func TestWatchPodsUpdate(t *testing.T) {
 		queue.Done(item)
 
 		// No longer pending; one reconcile by label.
-		update(event.UpdateEvent{
+		update(ctx, event.UpdateEvent{
 			ObjectOld: pending.DeepCopy(),
 			ObjectNew: base.DeepCopy(),
 		}, queue)

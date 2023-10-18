@@ -21,8 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -44,13 +46,21 @@ func CreateRuntimeManager(namespace string, config *rest.Config,
 	}
 
 	options := manager.Options{
-		Namespace:  namespace, // if empty then watching all namespaces
-		SyncPeriod: &refreshInterval,
-		Scheme:     pgoScheme,
+		Cache: cache.Options{
+			SyncPeriod: &refreshInterval,
+		},
+		Scheme: pgoScheme,
+	}
+	if len(namespace) > 0 {
+		options.Cache.DefaultNamespaces = map[string]cache.Config{
+			namespace: {},
+		}
 	}
 	if disableMetrics {
 		options.HealthProbeBindAddress = "0"
-		options.MetricsBindAddress = "0"
+		options.Metrics = metricsServer.Options{
+			BindAddress: "0",
+		}
 	}
 
 	// create controller runtime manager

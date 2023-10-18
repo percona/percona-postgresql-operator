@@ -54,25 +54,25 @@ type PGClusterReconciler struct {
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
-	if err := r.CrunchyController.Watch(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()); err != nil {
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), r.watchSecrets()); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
-	if err := r.CrunchyController.Watch(&source.Kind{Type: &batchv1.Job{}}, r.watchBackupJobs()); err != nil {
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), r.watchBackupJobs()); err != nil {
 		return errors.Wrap(err, "unable to watch jobs")
 	}
 
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
-		Watches(&source.Kind{Type: &corev1.Service{}}, r.watchServices()).
-		Watches(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()).
-		Watches(&source.Kind{Type: &batchv1.Job{}}, r.watchBackupJobs()).
+		Watches(&corev1.Service{}, r.watchServices()).
+		Watches(&corev1.Secret{}, r.watchSecrets()).
+		Watches(&batchv1.Job{}, r.watchBackupJobs()).
 		Complete(r)
 }
 
 func (r *PGClusterReconciler) watchServices() handler.Funcs {
 	return handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 
@@ -88,7 +88,7 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 
 func (r *PGClusterReconciler) watchBackupJobs() handler.Funcs {
 	return handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 			repoName := labels[naming.LabelPGBackRestRepo]
@@ -106,7 +106,7 @@ func (r *PGClusterReconciler) watchBackupJobs() handler.Funcs {
 
 func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 	return handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 
