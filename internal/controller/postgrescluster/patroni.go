@@ -161,10 +161,10 @@ func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
 	dcsService.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelPatroni: naming.PatroniScope(cluster),
-		})
+		}, cluster.Name, ""))
 
 	// Allocate no IP address (headless) and create no Endpoints.
 	// - https://docs.k8s.io/concepts/services-networking/service/#headless-services
@@ -248,10 +248,10 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 
 	// add our labels last so they aren't overwritten
 	service.Labels = naming.Merge(service.Labels,
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelPatroni: naming.PatroniScope(cluster),
-		})
+		}, cluster.Name, ""))
 
 	// Allocate an IP address and/or node port and let Patroni manage the Endpoints.
 	// Patroni will ensure that they always route to the elected leader.

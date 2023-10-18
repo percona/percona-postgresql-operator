@@ -81,10 +81,10 @@ func (r *Reconciler) generatePGAdminConfigMap(
 	configmap.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.UserInterface.PGAdmin.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGAdmin,
-		})
+		}, cluster.Name, ""))
 
 	err := errors.WithStack(pgadmin.ConfigMap(cluster, configmap))
 	if err == nil {
@@ -148,10 +148,10 @@ func (r *Reconciler) generatePGAdminService(
 
 	// add our labels last so they aren't overwritten
 	service.Labels = naming.Merge(service.Labels,
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGAdmin,
-		})
+		}, cluster.Name, ""))
 
 	// Allocate an IP address and/or node port and let Kubernetes manage the
 	// Endpoints by selecting Pods with the pgAdmin role.
@@ -255,11 +255,11 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 	sts.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.UserInterface.PGAdmin.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGAdmin,
 			naming.LabelData:    naming.DataPGAdmin,
-		})
+		}, cluster.Name, ""))
 	sts.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster: cluster.Name,
@@ -272,11 +272,11 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.UserInterface.PGAdmin.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGAdmin,
 			naming.LabelData:    naming.DataPGAdmin,
-		})
+		}, cluster.Name, ""))
 
 	// if the shutdown flag is set, set pgAdmin replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {
