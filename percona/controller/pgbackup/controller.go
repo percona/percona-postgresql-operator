@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"go.opentelemetry.io/otel/trace"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -32,10 +30,7 @@ var ErrBackupJobNotFound = errors.New("backup Job not found")
 
 // Reconciler holds resources for the PerconaPGBackup reconciler
 type PGBackupReconciler struct {
-	Client   client.Client
-	Owner    client.FieldOwner
-	Recorder record.EventRecorder
-	Tracer   trace.Tracer
+	Client client.Client
 }
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
@@ -72,14 +67,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
-	if pgBackup.Labels == nil {
-		pgBackup.Labels = make(map[string]string)
-	}
-	pgBackup.Labels[naming.LabelCluster] = pgCluster.Name
-	if err := r.Client.Update(ctx, pgBackup); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
-	}
-
 	switch pgBackup.Status.State {
 	case v2.BackupNew:
 		// start backup only if backup job doesn't exist

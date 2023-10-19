@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +38,7 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 	}
 
 	if pb == nil {
-		canCreate, err := canCreatePGBackup(ctx, cl, cr)
+		canCreate, err := canCreatePGBackupForNonManualBackup(ctx, cl, cr)
 		if err != nil {
 			return errors.Wrap(err, "failed to check if we can create PerconaPGBackup")
 		}
@@ -95,7 +94,7 @@ func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster
 		return nil, errors.Wrap(err, "failed to list backup jobs")
 	}
 
-	for _, pb := range pbList.Items {
+	for _, pb := range pbList {
 		pb := pb
 		if pb.GetAnnotations()[v2.AnnotationPGBackrestBackupJobName] == job.Name || pb.Status.JobName == job.Name {
 			return &pb, nil
@@ -104,33 +103,48 @@ func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster
 	return nil, nil
 }
 
-func canCreatePGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
+// canCreatePGBackupForNonManualBackup checks if we can create a PerconaPGBackup
+// resource for backup jobs created without this resource like the scheduled ones.
+//
+// When we create a manual backup, we wait until the backup job is created, and
+// only after that, we assign a job name to the PerconaPGBackup. While waiting,
+// we can't find any PerconaPGBackup for the job and will create an additional
+// pg-backup for it, which is not needed.
+//
+// We can prevent the issue by checking for any pg-backup without a job name and
+// waiting until it receives one.
+func canCreatePGBackupForNonManualBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
 	pbList, err := listPGBackups(ctx, cl, cr)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to list backup jobs")
 	}
-	for _, pb := range pbList.Items {
-		// We can't create resource if there is at least one in new or starting state.
-		// These states are the only ones in which the resource doesn't have `.status.jobName`.
-		if pb.Status.State == v2.BackupNew || pb.Status.State == v2.BackupStarting {
+	for _, pb := range pbList {
+		if pb.GetAnnotations()[v2.AnnotationPGBackrestBackupJobName] == "" && pb.Status.JobName == "" {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func listPGBackups(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (*v2.PerconaPGBackupList, error) {
+func listPGBackups(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) ([]v2.PerconaPGBackup, error) {
 	pbList := new(v2.PerconaPGBackupList)
 	err := cl.List(ctx, pbList, &client.ListOptions{
 		Namespace: cr.Namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			naming.LabelCluster: cr.Name,
-		})})
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list backup jobs")
 	}
 
-	return pbList, nil
+	// we should not filter by label, because the user can create the resource without the label
+	list := []v2.PerconaPGBackup{}
+	for _, pgBackup := range pbList.Items {
+		if pgBackup.Spec.PGCluster != cr.Name {
+			continue
+		}
+		list = append(list, pgBackup)
+	}
+
+	return list, nil
 }
 
 func listBackupJobs(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster, repoName string) (*batchv1.JobList, error) {
