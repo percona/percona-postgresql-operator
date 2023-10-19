@@ -37,15 +37,8 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 		return errors.Wrapf(err, "failed to find PerconaPGBackup for job %s", job.Name)
 	}
 
-	if pb == nil {
-		canCreate, err := canCreatePGBackupForNonManualBackup(ctx, cl, cr)
-		if err != nil {
-			return errors.Wrap(err, "failed to check if we can create PerconaPGBackup")
-		}
-		if !canCreate {
-			return nil
-		}
-
+	// we shouldn't create pg backups for manual backup jobs
+	if pb == nil && job.Labels[naming.LabelPGBackRestBackup] != string(naming.BackupManual) {
 		// Create PerconaPGBackup resource for backup job,
 		// which was created without this resource.
 		pb = &v2.PerconaPGBackup{
@@ -101,29 +94,6 @@ func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster
 		}
 	}
 	return nil, nil
-}
-
-// canCreatePGBackupForNonManualBackup checks if we can create a PerconaPGBackup
-// resource for backup jobs created without this resource like the scheduled ones.
-//
-// When we create a manual backup, we wait until the backup job is created, and
-// only after that, we assign a job name to the PerconaPGBackup. While waiting,
-// we can't find any PerconaPGBackup for the job and will create an additional
-// pg-backup for it, which is not needed.
-//
-// We can prevent the issue by checking for any pg-backup without a job name and
-// waiting until it receives one.
-func canCreatePGBackupForNonManualBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
-	pbList, err := listPGBackups(ctx, cl, cr)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to list backup jobs")
-	}
-	for _, pb := range pbList {
-		if pb.GetAnnotations()[v2.AnnotationPGBackrestBackupJobName] == "" && pb.Status.JobName == "" {
-			return false, nil
-		}
-	}
-	return true, nil
 }
 
 func listPGBackups(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) ([]v2.PerconaPGBackup, error) {
