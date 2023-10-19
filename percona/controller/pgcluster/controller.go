@@ -176,96 +176,19 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile backup jobs")
 	}
 
-	if err := controllerutil.SetControllerReference(cr, postgresCluster, r.Client.Scheme()); err != nil {
-		return ctrl.Result{}, err
+	if err := r.addPMMSidecar(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
+	}
+
+	if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
-		postgresCluster.Default()
+		var err error
+		postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
 
-		annotations := make(map[string]string)
-		for k, v := range cr.Annotations {
-			switch k {
-			case v2.AnnotationPGBackrestBackup:
-				annotations[naming.PGBackRestBackup] = v
-			case v2.AnnotationPGBackRestRestore:
-				annotations[naming.PGBackRestRestore] = v
-			case corev1.LastAppliedConfigAnnotation:
-				continue
-			default:
-				annotations[k] = v
-			}
-		}
-		postgresCluster.Annotations = annotations
-		postgresCluster.Labels = cr.Labels
-
-		postgresCluster.Spec.Image = cr.Spec.Image
-		postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
-		postgresCluster.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
-
-		postgresCluster.Spec.PostgresVersion = cr.Spec.PostgresVersion
-		postgresCluster.Spec.Port = cr.Spec.Port
-		postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
-		postgresCluster.Spec.Paused = cr.Spec.Unmanaged
-		postgresCluster.Spec.Shutdown = cr.Spec.Pause
-		postgresCluster.Spec.Standby = cr.Spec.Standby
-		postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
-
-		postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
-		postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
-
-		postgresCluster.Spec.Backups = cr.Spec.Backups
-		postgresCluster.Spec.DataSource = cr.Spec.DataSource
-		postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
-		postgresCluster.Spec.Patroni = cr.Spec.Patroni
-
-		users := make([]v1beta1.PostgresUserSpec, 0)
-
-		for _, user := range cr.Spec.Users {
-			if user.Name == pmm.MonitoringUser {
-				log.Info(pmm.MonitoringUser + " user is reserved, it'll be ignored.")
-				continue
-			}
-			users = append(users, user)
-		}
-
-		if cr.PMMEnabled() {
-			users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
-				Name:    pmm.MonitoringUser,
-				Options: "SUPERUSER",
-				Password: &v1beta1.PostgresPasswordSpec{
-					Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
-				},
-			})
-
-			if cr.Spec.Users == nil || len(cr.Spec.Users) == 0 {
-				// Add default user: <cluster-name>-pguser-<cluster-name>
-				users = append(users, v1beta1.PostgresUserSpec{
-					Name: v1beta1.PostgresIdentifier(cr.Name),
-					Databases: []v1beta1.PostgresIdentifier{
-						v1beta1.PostgresIdentifier(cr.Name),
-					},
-					Password: &v1beta1.PostgresPasswordSpec{
-						Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
-					},
-				})
-			}
-		}
-
-		postgresCluster.Spec.Users = users
-
-		if err := r.addPMMSidecar(ctx, cr); err != nil {
-			return errors.Wrap(err, "failed to add pmm sidecar")
-		}
-
-		if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
-			return err
-		}
-
-		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
-		postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
-
-		return nil
+		return err
 	})
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update/create PostgresCluster")
@@ -354,7 +277,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	log := logging.FromContext(ctx)
 
 	secret := new(corev1.Secret)
-	n := cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser
+	n := cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring
 
 	if err := r.Client.Get(ctx, types.NamespacedName{
 		Name:      n,

@@ -26,7 +26,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -301,7 +300,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 		})
 
 		It("Instance sets should have monitor user secret hash annotation", func() {
-			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser}
+			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
 			secretString := fmt.Sprintln(monitorUserSecret.Data)
@@ -340,7 +339,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 		})
 
 		It("Instance sets should have updated user secret hash annotation", func() {
-			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser}
+			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
 			secretString := fmt.Sprintln(monitorUserSecret.Data)
@@ -648,7 +647,7 @@ var _ = Describe("Users", Ordered, func() {
 				Expect(secList.Items).Should(ContainElements(
 					gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 						"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
-							"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser),
+							"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring),
 						}),
 					}),
 					gs.MatchFields(gs.IgnoreExtras, gs.Fields{
@@ -693,7 +692,7 @@ var _ = Describe("Users", Ordered, func() {
 			Expect(secList.Items).Should(ContainElements(
 				gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 					"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
-						"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser),
+						"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring),
 					}),
 				}),
 				gs.MatchFields(gs.IgnoreExtras, gs.Fields{
