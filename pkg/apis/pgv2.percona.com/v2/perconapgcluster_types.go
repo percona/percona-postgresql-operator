@@ -170,6 +170,10 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
+	if cr.Spec.Proxy.PGBouncer == nil {
+		cr.Spec.Proxy.PGBouncer = new(PGBouncerSpec)
+	}
+
 	if cr.Spec.Proxy.PGBouncer.Metadata == nil {
 		cr.Spec.Proxy.PGBouncer.Metadata = new(crunchyv1beta1.Metadata)
 	}
@@ -650,6 +654,10 @@ type PGBouncerSpec struct {
 }
 
 func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
+	if p == nil {
+		return nil
+	}
+
 	spec := &crunchyv1beta1.PGBouncerPodSpec{
 		Metadata:                  p.Metadata,
 		Affinity:                  p.Affinity,

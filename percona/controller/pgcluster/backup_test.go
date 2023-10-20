@@ -76,6 +76,7 @@ func TestBackupOwnerReference(t *testing.T) {
 	}
 
 	for _, job := range jobList.Items {
+		job := job
 		if job.Labels[naming.LabelPGBackRestBackup] == string(naming.BackupReplicaCreate) {
 			job.Status.Conditions = []batchv1.JobCondition{
 				{
@@ -99,6 +100,7 @@ func TestBackupOwnerReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, cj := range cronjobList.Items {
+		cj := cj
 		if err := createFakeJobForCron(ctx, fakeClient, &cj); err != nil {
 			t.Fatal(err)
 		}
@@ -159,6 +161,7 @@ func createFakeJobForCron(ctx context.Context, cl client.Client, cronJob *batchv
 
 func createFakePodsForStatefulsets(ctx context.Context, cl client.Client, stsList *appsv1.StatefulSetList) error {
 	for _, sts := range stsList.Items {
+		sts := sts
 		for i := 0; i < int(*sts.Spec.Replicas); i++ {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

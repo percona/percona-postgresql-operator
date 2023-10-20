@@ -43,8 +43,6 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   generation: 1
-  labels:
-    postgres-operator.crunchydata.com/cluster: scheduled-backup
 spec:
   pgCluster: scheduled-backup
   repoName: repo2
@@ -56,8 +54,6 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   generation: 1
-  labels:
-    postgres-operator.crunchydata.com/cluster: scheduled-backup
 spec:
   pgCluster: scheduled-backup
   repoName: repo1
@@ -69,8 +65,6 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   generation: 1
-  labels:
-    postgres-operator.crunchydata.com/cluster: scheduled-backup
 spec:
   pgCluster: scheduled-backup
   repoName: repo1
