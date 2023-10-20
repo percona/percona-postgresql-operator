@@ -23,10 +23,6 @@ Whether you need to get a simple PostgreSQL cluster up and running, need to depl
 - Scheduled and manual backups
 - Integrated monitoring with [Percona Monitoring and Management](https://www.percona.com/software/database-tools/percona-monitoring-and-management)
 
-## Status
-
-**This project is in the tech preview state right now. Don't use it on production.**
-
 # Architecture
 
 Percona Operators are based on the [Operator SDK](https://github.com/operator-framework/operator-sdk) and leverage Kubernetes primitives to follow best CNCF practices.
