@@ -53,21 +53,21 @@ type PGClusterReconciler struct {
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
-	if err := r.CrunchyController.Watch(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()); err != nil {
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), r.watchSecrets()); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
 
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
-		Watches(&source.Kind{Type: &corev1.Service{}}, r.watchServices()).
-		Watches(&source.Kind{Type: &corev1.Secret{}}, r.watchSecrets()).
+		Watches(&corev1.Service{}, r.watchServices()).
+		Watches(&corev1.Secret{}, r.watchSecrets()).
 		Complete(r)
 }
 
 func (r *PGClusterReconciler) watchServices() handler.Funcs {
 	return handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 
@@ -83,7 +83,7 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 
 func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 	return handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 
@@ -201,7 +201,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			users = append(users, user)
 		}
 
-		if cr.Spec.PMM.Enabled {
+		if cr.PMMEnabled() {
 			users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
 				Name:    pmm.MonitoringUser,
 				Options: "SUPERUSER",
@@ -253,7 +253,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 }
 
 func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
+	if !cr.PMMEnabled() {
 		return nil
 	}
 
@@ -319,7 +319,7 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaP
 }
 
 func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Spec.PMM == nil || !cr.Spec.PMM.Enabled {
+	if !cr.PMMEnabled() {
 		return nil
 	}
 

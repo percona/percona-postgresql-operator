@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -60,7 +59,7 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v1beta1.PGUpgrade{}).
 		Owns(&batchv1.Job{}).
 		Watches(
-			&source.Kind{Type: v1beta1.NewPostgresCluster()},
+			v1beta1.NewPostgresCluster(),
 			r.watchPostgresClusters(),
 		).
 		Complete(r)
@@ -105,13 +104,13 @@ func (r *PGUpgradeReconciler) watchPostgresClusters() handler.Funcs {
 	}
 
 	return handler.Funcs{
-		CreateFunc: func(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+		CreateFunc: func(_ context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 			handle(e.Object, q)
 		},
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(_ context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			handle(e.ObjectNew, q)
 		},
-		DeleteFunc: func(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+		DeleteFunc: func(_ context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
 			handle(e.Object, q)
 		},
 	}
@@ -192,6 +191,19 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			Message: fmt.Sprintf(
 				"Cannot upgrade from postgres version %d to %d",
 				upgrade.Spec.FromPostgresVersion, upgrade.Spec.ToPostgresVersion),
+		})
+
+		return ctrl.Result{}, nil
+	}
+
+	if err = verifyUpgradeImageValue(upgrade); err != nil {
+
+		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
+			ObservedGeneration: upgrade.GetGeneration(),
+			Type:               ConditionPGUpgradeProgressing,
+			Status:             metav1.ConditionFalse,
+			Reason:             "PGUpgradeInvalid",
+			Message:            fmt.Sprintf("Error: %s", err),
 		})
 
 		return ctrl.Result{}, nil
@@ -317,7 +329,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	//
 	// Requiring the cluster be shutdown also provides some assurance that the
 	// user understands downtime requirement of upgrading
-	if !world.ClusterShutdown || world.ClusterPrimary == nil {
+	if !world.ClusterShutdown {
 		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
 			ObservedGeneration: upgrade.Generation,
 			Type:               ConditionPGUpgradeProgressing,
@@ -330,6 +342,22 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	setStatusToProgressingIfReasonWas("PGClusterNotShutdown", upgrade)
+
+	// A separate check for primary identification allows for cases where the
+	// PostgresCluster may not have been initialized properly.
+	if world.ClusterPrimary == nil {
+		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
+			ObservedGeneration: upgrade.Generation,
+			Type:               ConditionPGUpgradeProgressing,
+			Status:             metav1.ConditionFalse,
+			Reason:             "PGClusterPrimaryNotIdentified",
+			Message:            "PostgresCluster primary instance not identified",
+		})
+
+		return ctrl.Result{}, nil
+	}
+
+	setStatusToProgressingIfReasonWas("PGClusterPrimaryNotIdentified", upgrade)
 
 	if version != int64(upgrade.Spec.FromPostgresVersion) &&
 		statusVersion != int64(upgrade.Spec.ToPostgresVersion) {

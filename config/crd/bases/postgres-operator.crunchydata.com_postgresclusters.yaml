@@ -6,7 +6,7 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/name: pgo
-    app.kubernetes.io/version: 5.2.0
+    app.kubernetes.io/version: 5.4.2
   name: postgresclusters.postgres-operator.crunchydata.com
 spec:
   group: postgres-operator.crunchydata.com
@@ -13783,6 +13783,13 @@ spec:
                       service:
                         description: Specification of the service that exposes PgBouncer.
                         properties:
+                          loadBalancerSourceRanges:
+                            description: LoadBalancerSourceRanges is a list of IP
+                              CIDRs allowed access to load. This field will be ignored
+                              if the cloud-provider does not support the feature.
+                            items:
+                              type: string
+                            type: array
                           metadata:
                             description: Metadata contains metadata for custom resources
                             properties:
@@ -14109,6 +14116,13 @@ spec:
                 description: Specification of the service that exposes the PostgreSQL
                   primary instance.
                 properties:
+                  loadBalancerSourceRanges:
+                    description: LoadBalancerSourceRanges is a list of IP CIDRs allowed
+                      access to load. This field will be ignored if the cloud-provider
+                      does not support the feature.
+                    items:
+                      type: string
+                    type: array
                   metadata:
                     description: Metadata contains metadata for custom resources
                     properties:
@@ -15663,6 +15677,13 @@ spec:
                       service:
                         description: Specification of the service that exposes pgAdmin.
                         properties:
+                          loadBalancerSourceRanges:
+                            description: LoadBalancerSourceRanges is a list of IP
+                              CIDRs allowed access to load. This field will be ignored
+                              if the cloud-provider does not support the feature.
+                            items:
+                              type: string
+                            type: array
                           metadata:
                             description: Metadata contains metadata for custom resources
                             properties:

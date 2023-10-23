@@ -40,8 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
@@ -147,6 +147,20 @@ func (r *Reconciler) Reconcile(
 	// Perform initial validation on a cluster
 	// TODO: Move this to a defaulting (mutating admission) webhook
 	// to leverage regular validation.
+
+	// verify all needed image values are defined
+	if err := config.VerifyImageValues(cluster); err != nil {
+		// warning event with missing image information
+		r.Recorder.Event(cluster, corev1.EventTypeWarning, "MissingRequiredImage",
+			err.Error())
+		// specifically allow reconciliation if the cluster is shutdown to
+		// facilitate upgrades, otherwise return
+		if cluster.Spec.Shutdown == nil ||
+			(cluster.Spec.Shutdown != nil && !*cluster.Spec.Shutdown) {
+			return result, err
+		}
+	}
+
 	if cluster.Spec.Standby != nil &&
 		cluster.Spec.Standby.Enabled &&
 		cluster.Spec.Standby.Host == "" &&
@@ -171,8 +185,10 @@ func (r *Reconciler) Reconcile(
 		patroniLeaderService     *corev1.Service
 		primaryCertificate       *corev1.SecretProjection
 		primaryService           *corev1.Service
+		replicaService           *corev1.Service
 		rootCA                   *pki.RootCertificateAuthority
 		monitoringSecret         *corev1.Secret
+		exporterQueriesConfig    *corev1.ConfigMap
 		exporterWebConfig        *corev1.ConfigMap
 		err                      error
 	)
@@ -298,10 +314,10 @@ func (r *Reconciler) Reconcile(
 		primaryService, err = r.reconcileClusterPrimaryService(ctx, cluster, patroniLeaderService)
 	}
 	if err == nil {
-		err = r.reconcileClusterReplicaService(ctx, cluster)
+		replicaService, err = r.reconcileClusterReplicaService(ctx, cluster)
 	}
 	if err == nil {
-		primaryCertificate, err = r.reconcileClusterCertificate(ctx, rootCA, cluster, primaryService)
+		primaryCertificate, err = r.reconcileClusterCertificate(ctx, rootCA, cluster, primaryService, replicaService)
 	}
 	if err == nil {
 		err = r.reconcilePatroniDistributedConfiguration(ctx, cluster)
@@ -313,13 +329,16 @@ func (r *Reconciler) Reconcile(
 		monitoringSecret, err = r.reconcileMonitoringSecret(ctx, cluster)
 	}
 	if err == nil {
+		exporterQueriesConfig, err = r.reconcileExporterQueriesConfig(ctx, cluster)
+	}
+	if err == nil {
 		exporterWebConfig, err = r.reconcileExporterWebConfig(ctx, cluster)
 	}
 	if err == nil {
 		err = r.reconcileInstanceSets(
-			ctx, cluster, clusterConfigMap, clusterReplicationSecret,
-			rootCA, clusterPodService, instanceServiceAccount, instances,
-			patroniLeaderService, primaryCertificate, clusterVolumes, exporterWebConfig)
+			ctx, cluster, clusterConfigMap, clusterReplicationSecret, rootCA,
+			clusterPodService, instanceServiceAccount, instances, patroniLeaderService,
+			primaryCertificate, clusterVolumes, exporterQueriesConfig, exporterWebConfig)
 	}
 
 	if err == nil {
@@ -465,8 +484,8 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, r.watchPods()).
-		Watches(&source.Kind{Type: &appsv1.StatefulSet{}},
+		Watches(&corev1.Pod{}, r.watchPods()).
+		Watches(&appsv1.StatefulSet{},
 			r.controllerRefHandlerFuncs()). // watch all StatefulSets
 		Complete(r)
 }

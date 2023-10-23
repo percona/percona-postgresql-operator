@@ -1165,9 +1165,13 @@ func TestDeleteInstance(t *testing.T) {
 	assert.NilError(t, reconciler.deleteInstance(ctx, cluster, instanceName))
 
 	gvks := []schema.GroupVersionKind{
-		corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"),
+		// K8SPG-328: Keep this commented in case of conflicts.
+		// We don't want to delete PVCs if custom resource is deleted.
+		//corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"),
 		corev1.SchemeGroupVersion.WithKind("ConfigMap"),
-		corev1.SchemeGroupVersion.WithKind("Secret"),
+		// K8SPG-328: Keep this commented in case of conflicts.
+		// We don't want to delete secrets if custom resource is deleted.
+		//corev1.SchemeGroupVersion.WithKind("Secret"),
 		appsv1.SchemeGroupVersion.WithKind("StatefulSet"),
 	}
 
@@ -1496,6 +1500,7 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 `))
 		},
 	}} {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 
 			cluster := test.ip.cluster
