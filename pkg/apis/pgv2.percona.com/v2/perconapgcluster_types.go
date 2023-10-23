@@ -78,7 +78,7 @@ type PerconaPGClusterSpec struct {
 
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Minimum=12
 	// +kubebuilder:validation:Maximum=16
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	PostgresVersion int `json:"postgresVersion"`
