@@ -14,17 +14,7 @@ status:
   replicas: 1
   updatedReplicas: 1
 ---
+kind: Service
 apiVersion: v1
-count: 1
-involvedObject:
-  apiVersion: v1
-  kind: Service
+metadata:
   name: monitoring-service
-kind: Event
-message: Ensured load balancer
-reason: EnsuredLoadBalancer
-reportingComponent: ""
-reportingInstance: ""
-source:
-  component: service-controller
-type: Normal
