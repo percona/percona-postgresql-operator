@@ -386,7 +386,7 @@ func TestDynamicConfiguration(t *testing.T) {
 				"ttl":       int32(30),
 				"postgresql": map[string]interface{}{
 					"parameters": map[string]interface{}{
-						"shared_preload_libraries": "mandatory,given",
+						"shared_preload_libraries": "given,mandatory",
 					},
 					"pg_hba":        []string{},
 					"use_pg_rewind": true,
