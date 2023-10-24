@@ -84,6 +84,21 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			}
 		}
 
+		pgBackup.Status.Destination = getDestination(pgCluster, pgBackup)
+		pgBackup.Status.Image = pgCluster.Spec.Backups.PGBackRest.Image
+		repo := getRepo(pgCluster, pgBackup)
+		pgBackup.Status.Repo = repo
+		switch {
+		case repo.S3 != nil:
+			pgBackup.Status.StorageType = v2.PGBackupStorageTypeS3
+		case repo.Azure != nil:
+			pgBackup.Status.StorageType = v2.PGBackupStorageTypeAzure
+		case repo.GCS != nil:
+			pgBackup.Status.StorageType = v2.PGBackupStorageTypeGCS
+		default:
+			pgBackup.Status.StorageType = v2.PGBackupStorageTypeFilesystem
+		}
+
 		pgBackup.Status.State = v2.BackupStarting
 		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
@@ -104,7 +119,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		pgBackup.Status.State = v2.BackupRunning
 		pgBackup.Status.JobName = job.Name
-		pgBackup.Status.Destination = getDestination(pgCluster, pgBackup)
 		pgBackup.Status.BackupType = getBackupType(job)
 
 		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
@@ -142,8 +156,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	}
 }
 
-func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
-	destination := ""
+func getRepo(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) *v1beta1.PGBackRestRepo {
 	repoName := pb.Spec.RepoName
 	var repo *v1beta1.PGBackRestRepo
 	for i, r := range pg.Spec.Backups.PGBackRest.Repos {
@@ -152,6 +165,12 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 			break
 		}
 	}
+	return repo
+}
+
+func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
+	destination := ""
+	repo := getRepo(pg, pb)
 	if repo == nil {
 		return ""
 	}

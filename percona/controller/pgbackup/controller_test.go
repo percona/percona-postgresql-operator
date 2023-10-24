@@ -23,7 +23,7 @@ func TestGetBackupTypeFromOpts(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(t.Name()+strconv.Itoa(i), func(t *testing.T) {
 			actual := getBackupTypeFromOpts(tt.Opts)
-			if string(actual) != tt.Expected {
+			if actual != tt.Expected {
 				t.Errorf("expected %s, got %s", tt.Expected, actual)
 			}
 		})

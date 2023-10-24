@@ -142,14 +142,512 @@ PerconaPGBackup is the CRD that defines a Percona PostgreSQL Backup
         <td></td>
         <td>false</td>
       </tr><tr>
+        <td><b>image</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
         <td><b>jobName</b></td>
         <td>string</td>
         <td></td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepo">repo</a></b></td>
+        <td>object</td>
+        <td>PGBackRestRepo represents a pgBackRest repository.  Only one of its members may be specified.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b>state</b></td>
         <td>string</td>
         <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>storageType</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepo">
+  PerconaPGBackup.status.repo
+  <sup><sup><a href="#perconapgbackupstatus">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+PGBackRestRepo represents a pgBackRest repository.  Only one of its members may be specified.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>The name of the the repository</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepoazure">azure</a></b></td>
+        <td>object</td>
+        <td>Represents a pgBackRest repository that is created using Azure storage</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepogcs">gcs</a></b></td>
+        <td>object</td>
+        <td>Represents a pgBackRest repository that is created using Google Cloud Storage</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepos3">s3</a></b></td>
+        <td>object</td>
+        <td>RepoS3 represents a pgBackRest repository that is created using AWS S3 (or S3-compatible) storage</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusreposchedules">schedules</a></b></td>
+        <td>object</td>
+        <td>Defines the schedules for the pgBackRest backups Full, Differential and Incremental backup types are supported: https://pgbackrest.org/user-guide.html#concept/backup</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepovolume">volume</a></b></td>
+        <td>object</td>
+        <td>Represents a pgBackRest repository that is created using a PersistentVolumeClaim</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepoazure">
+  PerconaPGBackup.status.repo.azure
+  <sup><sup><a href="#perconapgbackupstatusrepo">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Represents a pgBackRest repository that is created using Azure storage
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>container</b></td>
+        <td>string</td>
+        <td>The Azure container utilized for the repository</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepogcs">
+  PerconaPGBackup.status.repo.gcs
+  <sup><sup><a href="#perconapgbackupstatusrepo">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Represents a pgBackRest repository that is created using Google Cloud Storage
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>bucket</b></td>
+        <td>string</td>
+        <td>The GCS bucket utilized for the repository</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepos3">
+  PerconaPGBackup.status.repo.s3
+  <sup><sup><a href="#perconapgbackupstatusrepo">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+RepoS3 represents a pgBackRest repository that is created using AWS S3 (or S3-compatible) storage
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>bucket</b></td>
+        <td>string</td>
+        <td>The S3 bucket utilized for the repository</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>endpoint</b></td>
+        <td>string</td>
+        <td>A valid endpoint corresponding to the specified region</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>region</b></td>
+        <td>string</td>
+        <td>The region corresponding to the S3 bucket</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusreposchedules">
+  PerconaPGBackup.status.repo.schedules
+  <sup><sup><a href="#perconapgbackupstatusrepo">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Defines the schedules for the pgBackRest backups Full, Differential and Incremental backup types are supported: https://pgbackrest.org/user-guide.html#concept/backup
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>differential</b></td>
+        <td>string</td>
+        <td>Defines the Cron schedule for a differential pgBackRest backup. Follows the standard Cron schedule syntax: https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>full</b></td>
+        <td>string</td>
+        <td>Defines the Cron schedule for a full pgBackRest backup. Follows the standard Cron schedule syntax: https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>incremental</b></td>
+        <td>string</td>
+        <td>Defines the Cron schedule for an incremental pgBackRest backup. Follows the standard Cron schedule syntax: https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepovolume">
+  PerconaPGBackup.status.repo.volume
+  <sup><sup><a href="#perconapgbackupstatusrepo">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Represents a pgBackRest repository that is created using a PersistentVolumeClaim
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgbackupstatusrepovolumevolumeclaimspec">volumeClaimSpec</a></b></td>
+        <td>object</td>
+        <td>Defines a PersistentVolumeClaim spec used to create and/or bind a volume</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepovolumevolumeclaimspec">
+  PerconaPGBackup.status.repo.volume.volumeClaimSpec
+  <sup><sup><a href="#perconapgbackupstatusrepovolume">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Defines a PersistentVolumeClaim spec used to create and/or bind a volume
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>accessModes</b></td>
+        <td>[]string</td>
+        <td>accessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepovolumevolumeclaimspecdatasource">dataSource</a></b></td>
+        <td>object</td>
+        <td>dataSource field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source. When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified. If the namespace is specified, then dataSourceRef will not be copied to dataSource.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepovolumevolumeclaimspecdatasourceref">dataSourceRef</a></b></td>
+        <td>object</td>
+        <td>dataSourceRef specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner. This field will replace the functionality of the dataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, when namespace isn't specified in dataSourceRef, both fields (dataSource and dataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty. When namespace is specified in dataSourceRef, dataSource isn't set to the same value and must be empty. There are three important differences between dataSource and dataSourceRef: * While dataSource only allows two specific types of objects, dataSourceRef allows any non-core object, as well as PersistentVolumeClaim objects. * While dataSource ignores disallowed values (dropping them), dataSourceRef preserves all values, and generates an error if a disallowed value is specified. * While dataSource only allows local objects, dataSourceRef allows objects in any namespaces. (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled. (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepovolumevolumeclaimspecresources">resources</a></b></td>
+        <td>object</td>
+        <td>resources represents the minimum resources the volume should have. If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements that are lower than previous value but must still be higher than capacity recorded in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgbackupstatusrepovolumevolumeclaimspecselector">selector</a></b></td>
+        <td>object</td>
+        <td>selector is a label query over volumes to consider for binding.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>storageClassName</b></td>
+        <td>string</td>
+        <td>storageClassName is the name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>volumeMode</b></td>
+        <td>string</td>
+        <td>volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>volumeName</b></td>
+        <td>string</td>
+        <td>volumeName is the binding reference to the PersistentVolume backing this claim.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepovolumevolumeclaimspecdatasource">
+  PerconaPGBackup.status.repo.volume.volumeClaimSpec.dataSource
+  <sup><sup><a href="#perconapgbackupstatusrepovolumevolumeclaimspec">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+dataSource field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source. When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified. If the namespace is specified, then dataSourceRef will not be copied to dataSource.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>kind</b></td>
+        <td>string</td>
+        <td>Kind is the type of resource being referenced</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name is the name of resource being referenced</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>apiGroup</b></td>
+        <td>string</td>
+        <td>APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepovolumevolumeclaimspecdatasourceref">
+  PerconaPGBackup.status.repo.volume.volumeClaimSpec.dataSourceRef
+  <sup><sup><a href="#perconapgbackupstatusrepovolumevolumeclaimspec">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+dataSourceRef specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner. This field will replace the functionality of the dataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, when namespace isn't specified in dataSourceRef, both fields (dataSource and dataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty. When namespace is specified in dataSourceRef, dataSource isn't set to the same value and must be empty. There are three important differences between dataSource and dataSourceRef: * While dataSource only allows two specific types of objects, dataSourceRef allows any non-core object, as well as PersistentVolumeClaim objects. * While dataSource ignores disallowed values (dropping them), dataSourceRef preserves all values, and generates an error if a disallowed value is specified. * While dataSource only allows local objects, dataSourceRef allows objects in any namespaces. (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled. (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>kind</b></td>
+        <td>string</td>
+        <td>Kind is the type of resource being referenced</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name is the name of resource being referenced</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>apiGroup</b></td>
+        <td>string</td>
+        <td>APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>namespace</b></td>
+        <td>string</td>
+        <td>Namespace is the namespace of resource being referenced Note that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details. (Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepovolumevolumeclaimspecresources">
+  PerconaPGBackup.status.repo.volume.volumeClaimSpec.resources
+  <sup><sup><a href="#perconapgbackupstatusrepovolumevolumeclaimspec">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+resources represents the minimum resources the volume should have. If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements that are lower than previous value but must still be higher than capacity recorded in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgbackupstatusrepovolumevolumeclaimspecresourcesclaimsindex">claims</a></b></td>
+        <td>[]object</td>
+        <td>Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container. 
+ This is an alpha field and requires enabling the DynamicResourceAllocation feature gate. 
+ This field is immutable. It can only be set for containers.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>limits</b></td>
+        <td>map[string]int or string</td>
+        <td>Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>requests</b></td>
+        <td>map[string]int or string</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepovolumevolumeclaimspecresourcesclaimsindex">
+  PerconaPGBackup.status.repo.volume.volumeClaimSpec.resources.claims[index]
+  <sup><sup><a href="#perconapgbackupstatusrepovolumevolumeclaimspecresources">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ResourceClaim references one entry in PodSpec.ResourceClaims.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepovolumevolumeclaimspecselector">
+  PerconaPGBackup.status.repo.volume.volumeClaimSpec.selector
+  <sup><sup><a href="#perconapgbackupstatusrepovolumevolumeclaimspec">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+selector is a label query over volumes to consider for binding.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgbackupstatusrepovolumevolumeclaimspecselectormatchexpressionsindex">matchExpressions</a></b></td>
+        <td>[]object</td>
+        <td>matchExpressions is a list of label selector requirements. The requirements are ANDed.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>matchLabels</b></td>
+        <td>map[string]string</td>
+        <td>matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgbackupstatusrepovolumevolumeclaimspecselectormatchexpressionsindex">
+  PerconaPGBackup.status.repo.volume.volumeClaimSpec.selector.matchExpressions[index]
+  <sup><sup><a href="#perconapgbackupstatusrepovolumevolumeclaimspecselector">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>key is the label key that the selector applies to.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>operator</b></td>
+        <td>string</td>
+        <td>operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>values</b></td>
+        <td>[]string</td>
+        <td>values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -805,7 +1303,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -2540,7 +3038,7 @@ Resource limits for backup jobs. Includes manual, scheduled and replica create b
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -3962,7 +4460,7 @@ Resource requirements for a pgBackRest repository host
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -4231,7 +4729,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -5613,7 +6112,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -5785,7 +6284,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -5878,7 +6377,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -6167,7 +6666,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -7522,7 +8021,7 @@ Compute resources of a PostgreSQL container.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -7629,9 +8128,19 @@ A single application container that you want to run within a pod.
         <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexsecuritycontext">securityContext</a></b></td>
@@ -8174,7 +8683,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -8349,7 +8858,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -8423,7 +8932,7 @@ Periodic probe of container liveness. Container will be restarted if the probe f
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexlivenessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexlivenessprobehttpget">httpGet</a></b></td>
@@ -8498,7 +9007,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -8592,7 +9101,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -8713,7 +9222,7 @@ Periodic probe of container service readiness. Container will be removed from se
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexreadinessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexreadinessprobehttpget">httpGet</a></b></td>
@@ -8788,7 +9297,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -8882,7 +9391,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -8925,6 +9434,38 @@ TCPSocket specifies an action involving a TCP port.
 </table>
 
 
+<h3 id="perconapgclusterspecinstancesindexsidecarsindexresizepolicyindex">
+  PerconaPGCluster.spec.instances[index].sidecars[index].resizePolicy[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexsidecarsindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="perconapgclusterspecinstancesindexsidecarsindexresources">
   PerconaPGCluster.spec.instances[index].sidecars[index].resources
   <sup><sup><a href="#perconapgclusterspecinstancesindexsidecarsindex">↩ Parent</a></sup></sup>
@@ -8958,7 +9499,7 @@ Compute Resources required by this container. Cannot be updated. More info: http
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -9169,7 +9710,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -9206,7 +9747,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -9248,7 +9789,7 @@ StartupProbe indicates that the Pod has successfully initialized. If specified, 
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexstartupprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindexstartupprobehttpget">httpGet</a></b></td>
@@ -9323,7 +9864,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -9417,7 +9958,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -9632,7 +10173,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -9900,7 +10442,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -10487,7 +11029,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -12175,7 +12717,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -13538,7 +14080,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -14181,7 +14723,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -14218,7 +14760,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -14262,7 +14804,7 @@ Compute resources of a PMM container.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -16200,7 +16742,7 @@ Compute resources of a PgBouncer container. Changing this value causes PgBouncer
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -16307,9 +16849,19 @@ A single application container that you want to run within a pod.
         <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexsecuritycontext">securityContext</a></b></td>
@@ -16852,7 +17404,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -17027,7 +17579,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -17101,7 +17653,7 @@ Periodic probe of container liveness. Container will be restarted if the probe f
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexlivenessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexlivenessprobehttpget">httpGet</a></b></td>
@@ -17176,7 +17728,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -17270,7 +17822,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -17391,7 +17943,7 @@ Periodic probe of container service readiness. Container will be removed from se
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexreadinessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexreadinessprobehttpget">httpGet</a></b></td>
@@ -17466,7 +18018,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -17560,7 +18112,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -17603,6 +18155,38 @@ TCPSocket specifies an action involving a TCP port.
 </table>
 
 
+<h3 id="perconapgclusterspecproxypgbouncersidecarsindexresizepolicyindex">
+  PerconaPGCluster.spec.proxy.pgBouncer.sidecars[index].resizePolicy[index]
+  <sup><sup><a href="#perconapgclusterspecproxypgbouncersidecarsindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="perconapgclusterspecproxypgbouncersidecarsindexresources">
   PerconaPGCluster.spec.proxy.pgBouncer.sidecars[index].resources
   <sup><sup><a href="#perconapgclusterspecproxypgbouncersidecarsindex">↩ Parent</a></sup></sup>
@@ -17636,7 +18220,7 @@ Compute Resources required by this container. Cannot be updated. More info: http
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -17847,7 +18431,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -17884,7 +18468,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -17926,7 +18510,7 @@ StartupProbe indicates that the Pod has successfully initialized. If specified, 
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexstartupprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindexstartupprobehttpget">httpGet</a></b></td>
@@ -18001,7 +18585,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -18095,7 +18679,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -18310,7 +18894,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -20391,7 +20976,7 @@ Resource requirements for the PGUpgrade container.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -21146,7 +21731,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
     <tbody><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecbackupspgbackrestreposindexvolumevolumeclaimspecresourcesclaimsindex">claims</a></b></td>
@@ -22972,7 +23557,7 @@ Resource limits for backup jobs. Includes manual, scheduled and replica create b
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -24394,7 +24979,7 @@ Resource requirements for a pgBackRest repository host
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -24663,7 +25248,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -26045,7 +26631,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -26217,7 +26803,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -26310,7 +26896,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -26518,7 +27104,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
     <tbody><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexdatavolumeclaimspecresourcesclaimsindex">claims</a></b></td>
@@ -27973,9 +28559,19 @@ A single application container that you want to run within a pod.
         <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexcontainersindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexsecuritycontext">securityContext</a></b></td>
@@ -28518,7 +29114,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -28693,7 +29289,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -28767,7 +29363,7 @@ Periodic probe of container liveness. Container will be restarted if the probe f
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexlivenessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexlivenessprobehttpget">httpGet</a></b></td>
@@ -28842,7 +29438,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -28936,7 +29532,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -29057,7 +29653,7 @@ Periodic probe of container service readiness. Container will be removed from se
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexreadinessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexreadinessprobehttpget">httpGet</a></b></td>
@@ -29132,7 +29728,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -29226,7 +29822,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -29269,6 +29865,38 @@ TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported
 </table>
 
 
+<h3 id="postgresclusterspecinstancesindexcontainersindexresizepolicyindex">
+  PostgresCluster.spec.instances[index].containers[index].resizePolicy[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexcontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="postgresclusterspecinstancesindexcontainersindexresources">
   PostgresCluster.spec.instances[index].containers[index].resources
   <sup><sup><a href="#postgresclusterspecinstancesindexcontainersindex">↩ Parent</a></sup></sup>
@@ -29302,7 +29930,7 @@ Compute Resources required by this container. Cannot be updated. More info: http
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -29512,7 +30140,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -29549,7 +30177,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -29591,7 +30219,7 @@ StartupProbe indicates that the Pod has successfully initialized. If specified, 
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexstartupprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexcontainersindexstartupprobehttpget">httpGet</a></b></td>
@@ -29666,7 +30294,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -29760,7 +30388,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -29952,7 +30580,7 @@ Compute resources of a PostgreSQL container.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -30072,7 +30700,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -30311,7 +30939,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -30501,7 +31129,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -30678,7 +31307,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
     <tbody><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexwalvolumeclaimspecresourcesclaimsindex">claims</a></b></td>
@@ -31896,7 +32525,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -33584,7 +34213,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -34947,7 +35576,7 @@ Resource requirements for the pgBackRest restore Job.
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -35819,7 +36448,7 @@ Changing this value causes PostgreSQL and the exporter to restart. More info: ht
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -37734,9 +38363,19 @@ A single application container that you want to run within a pod.
         <td>Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexresizepolicyindex">resizePolicy</a></b></td>
+        <td>[]object</td>
+        <td>Resources resize policy for the container.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is "Always". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as "Always" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy "Always" will be shut down. This lifecycle differs from normal init containers and is often referred to as a "sidecar" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexsecuritycontext">securityContext</a></b></td>
@@ -38279,7 +38918,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -38454,7 +39093,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -38528,7 +39167,7 @@ Periodic probe of container liveness. Container will be restarted if the probe f
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexlivenessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexlivenessprobehttpget">httpGet</a></b></td>
@@ -38603,7 +39242,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -38697,7 +39336,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -38818,7 +39457,7 @@ Periodic probe of container service readiness. Container will be removed from se
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexreadinessprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexreadinessprobehttpget">httpGet</a></b></td>
@@ -38893,7 +39532,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -38987,7 +39626,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -39030,6 +39669,38 @@ TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported
 </table>
 
 
+<h3 id="postgresclusterspecproxypgbouncercontainersindexresizepolicyindex">
+  PostgresCluster.spec.proxy.pgBouncer.containers[index].resizePolicy[index]
+  <sup><sup><a href="#postgresclusterspecproxypgbouncercontainersindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+ContainerResizePolicy represents resource resize policy for the container.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>resourceName</b></td>
+        <td>string</td>
+        <td>Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>restartPolicy</b></td>
+        <td>string</td>
+        <td>Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="postgresclusterspecproxypgbouncercontainersindexresources">
   PostgresCluster.spec.proxy.pgBouncer.containers[index].resources
   <sup><sup><a href="#postgresclusterspecproxypgbouncercontainersindex">↩ Parent</a></sup></sup>
@@ -39063,7 +39734,7 @@ Compute Resources required by this container. Cannot be updated. More info: http
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -39273,7 +39944,7 @@ The seccomp options to use by this container. If seccomp options are provided at
       </tr><tr>
         <td><b>localhostProfile</b></td>
         <td>string</td>
-        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is "Localhost".</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -39310,7 +39981,7 @@ The Windows specific settings applied to all containers. If unspecified, the opt
       </tr><tr>
         <td><b>hostProcess</b></td>
         <td>boolean</td>
-        <td>HostProcess determines if a container should be run as a 'Host Process' container. This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag. Setting this field without the feature flag will result in errors when validating the Pod. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).  In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
         <td>false</td>
       </tr><tr>
         <td><b>runAsUserName</b></td>
@@ -39352,7 +40023,7 @@ StartupProbe indicates that the Pod has successfully initialized. If specified, 
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexstartupprobegrpc">grpc</a></b></td>
         <td>object</td>
-        <td>GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.</td>
+        <td>GRPC specifies an action involving a GRPC port.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncercontainersindexstartupprobehttpget">httpGet</a></b></td>
@@ -39427,7 +40098,7 @@ Exec specifies the action to take.
 
 
 
-GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate.
+GRPC specifies an action involving a GRPC port.
 
 <table>
     <thead>
@@ -39521,7 +40192,7 @@ HTTPHeader describes a custom header to be used in HTTP probes
     <tbody><tr>
         <td><b>name</b></td>
         <td>string</td>
-        <td>The header field name</td>
+        <td>The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.</td>
         <td>true</td>
       </tr><tr>
         <td><b>value</b></td>
@@ -39787,7 +40458,7 @@ Compute resources of a PgBouncer container. Changing this value causes PgBouncer
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -39981,7 +40652,7 @@ Resource requirements for a sidecar container
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -40102,7 +40773,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>
@@ -40590,7 +41262,7 @@ resources represents the minimum resources the volume should have. If RecoverVol
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -42384,7 +43056,7 @@ Compute resources of a pgAdmin container. Changing this value causes pgAdmin to 
       </tr><tr>
         <td><b>requests</b></td>
         <td>map[string]int or string</td>
-        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
+        <td>Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -42579,7 +43251,8 @@ TopologySpreadConstraint specifies how to spread matching pods among the given t
       </tr><tr>
         <td><b>matchLabelKeys</b></td>
         <td>[]string</td>
-        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.</td>
+        <td>MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector. 
+ This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).</td>
         <td>false</td>
       </tr><tr>
         <td><b>minDomains</b></td>

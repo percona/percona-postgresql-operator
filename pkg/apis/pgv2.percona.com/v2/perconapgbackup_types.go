@@ -2,6 +2,8 @@ package v2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func init() {
@@ -64,12 +66,24 @@ const (
 )
 
 type PerconaPGBackupStatus struct {
-	JobName     string        `json:"jobName,omitempty"`
-	State       PGBackupState `json:"state,omitempty"`
-	CompletedAt *metav1.Time  `json:"completed,omitempty"`
-	Destination string        `json:"destination,omitempty"`
-	BackupType  PGBackupType  `json:"backupType,omitempty"`
+	JobName     string                         `json:"jobName,omitempty"`
+	State       PGBackupState                  `json:"state,omitempty"`
+	CompletedAt *metav1.Time                   `json:"completed,omitempty"`
+	Destination string                         `json:"destination,omitempty"`
+	BackupType  PGBackupType                   `json:"backupType,omitempty"`
+	StorageType PGBackupStorageType            `json:"storageType,omitempty"`
+	Repo        *crunchyv1beta1.PGBackRestRepo `json:"repo,omitempty"`
+	Image       string                         `json:"image,omitempty"`
 }
+
+type PGBackupStorageType string
+
+const (
+	PGBackupStorageTypeFilesystem PGBackupStorageType = "filesystem"
+	PGBackupStorageTypeAzure      PGBackupStorageType = "azure"
+	PGBackupStorageTypeGCS        PGBackupStorageType = "gcs"
+	PGBackupStorageTypeS3         PGBackupStorageType = "s3"
+)
 
 type PGBackupType string
 
