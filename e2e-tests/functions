@@ -546,6 +546,12 @@ check_jobs_and_pgbackups() {
 			job_backup_type=$(kubectl get job "$job_name" -n "$NAMESPACE" -o yaml \
 				| yq '.spec.template.metadata.labels."postgres-operator.crunchydata.com/pgbackrest-cronjob"')
 		fi
+		if [[ $job_backup_type == "replica-create" ]]; then
+			job_backup_type="incremental"
+		fi
+		if [[ $job_backup_type == "manual" ]]; then
+			job_backup_type="full"
+		fi
 		pg_backup_type=$(kubectl get pg-backup -n "$NAMESPACE" "$backup_name" -o yaml \
 			| yq '.status.backupType')
 

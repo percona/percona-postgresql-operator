@@ -2,11 +2,15 @@ package pgbackup
 
 import (
 	"context"
+	"flag"
+	"io"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -169,11 +173,22 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 }
 
 func getBackupType(job *batchv1.Job) v2.PGBackupType {
-	v := job.GetLabels()[naming.LabelPGBackRestCronJob]
-	if v == "" {
-		v = job.GetLabels()[naming.LabelPGBackRestBackup]
+	var backupContainer corev1.Container
+	for _, container := range job.Spec.Template.Spec.Containers {
+		if len(container.Command) > 0 && container.Command[0] == "/opt/crunchy/bin/pgbackrest" {
+			backupContainer = container
+			break
+		}
 	}
-	switch v {
+	cmdOpts := ""
+	for _, env := range backupContainer.Env {
+		if env.Name == "COMMAND_OPTS" {
+			cmdOpts = env.Value
+			break
+		}
+	}
+	backupType := getBackupTypeFromOpts(cmdOpts)
+	switch backupType {
 	case postgrescluster.Differential:
 		return v2.PGBackupTypeDifferential
 	case postgrescluster.Incremental:
@@ -181,8 +196,18 @@ func getBackupType(job *batchv1.Job) v2.PGBackupType {
 	case postgrescluster.Full:
 		return v2.PGBackupTypeFull
 	default:
-		return v2.PGBackupType(v)
+		// Incremental is default: https://pgbackrest.org/command.html#command-backup/category-command/option-type
+		return v2.PGBackupTypeIncremental
 	}
+}
+
+func getBackupTypeFromOpts(opts string) string {
+	flagSet := flag.NewFlagSet("", flag.ErrorHandling(-1))
+	flagSet.SetOutput(io.Discard)
+
+	backupType := flagSet.String("type", "", "")
+	_ = flagSet.Parse(strings.Split(opts, " "))
+	return *backupType
 }
 
 func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) error {

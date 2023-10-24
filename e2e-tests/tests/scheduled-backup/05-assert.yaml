@@ -58,7 +58,7 @@ spec:
   pgCluster: scheduled-backup
   repoName: repo1
 status:
-  backupType: replica-create
+  backupType: incremental
   state: Succeeded
 ---
 apiVersion: pgv2.percona.com/v2
