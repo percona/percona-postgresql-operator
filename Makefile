@@ -226,8 +226,8 @@ check-kuttl: ## example command: make check-kuttl KUTTL_TEST='
 
 .PHONY: generate-kuttl
 generate-kuttl: export KUTTL_PG_UPGRADE_FROM_VERSION ?= 14
-generate-kuttl: export KUTTL_PG_UPGRADE_TO_VERSION ?= 15
-generate-kuttl: export KUTTL_PG_VERSION ?= 15
+generate-kuttl: export KUTTL_PG_UPGRADE_TO_VERSION ?= 16
+generate-kuttl: export KUTTL_PG_VERSION ?= 16
 generate-kuttl: export KUTTL_POSTGIS_VERSION ?= 3.3
 generate-kuttl: export KUTTL_PSQL_IMAGE ?= registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-15.4-0
 generate-kuttl: export KUTTL_TEST_DELETE_NAMESPACE ?= kuttl-test-delete-namespace
