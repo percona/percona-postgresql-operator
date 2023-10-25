@@ -179,10 +179,10 @@ kind: Service
 		assert.Assert(t, marshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:
-  app.kubernetes.io/instance: my-cluster,
-  app.kubernetes.io/managed-by: percona-postgresql-operator,
-  app.kubernetes.io/name: percona-postgresql,
-  app.kubernetes.io/part-of: percona-postgresql,
+  app.kubernetes.io/instance: my-cluster
+  app.kubernetes.io/managed-by: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql
+  app.kubernetes.io/part-of: percona-postgresql
   postgres-operator.crunchydata.com/cluster: my-cluster
   postgres-operator.crunchydata.com/role: pgadmin
 name: my-cluster-pgadmin
