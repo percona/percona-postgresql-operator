@@ -193,6 +193,8 @@ void runTest(Integer TEST_ID) {
                     fi
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
+                    export BAHUR=$BAHUR
+                    export HAHOR=$HAHOR
                     set -o pipefail
                     kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
@@ -535,9 +537,8 @@ pipeline {
             }
             deleteOldClusters("$CLUSTER_NAME")
             sh """
-                sudo docker system prune -fa
-                sudo rm -rf ./*
-                sudo rm -rf $HOME/google-cloud-sdk
+                sudo docker system prune --volumes -af
+                sudo rm -rf *
             """
             deleteDir()
         }
