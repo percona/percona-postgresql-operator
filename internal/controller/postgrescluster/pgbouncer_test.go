@@ -107,7 +107,7 @@ ownerReferences:
 		assert.DeepEqual(t, service.Spec.Selector, naming.WithPerconaLabels(map[string]string{
 			"postgres-operator.crunchydata.com/cluster": "pg7",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		}, "pg1", "pgbouncer")
+		}, "pg1", "pgbouncer"))
 	}
 
 	t.Run("AnnotationsLabels", func(t *testing.T) {
@@ -130,7 +130,7 @@ ownerReferences:
 		assert.DeepEqual(t, service.ObjectMeta.Labels, naming.WithPerconaLabels(map[string]string{
 			"postgres-operator.crunchydata.com/cluster": "pg7",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		}, "pg1", "pgbouncer")
+		}, "pg1", "pgbouncer"))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -163,7 +163,7 @@ ownerReferences:
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg7",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		}, "pg7", "pgbouncer")
+		}, "pg7", "pgbouncer"))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{

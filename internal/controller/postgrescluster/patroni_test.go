@@ -124,7 +124,7 @@ ownerReferences:
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
-		}, "pg1", "")
+		}, "pg1", ""))
 
 		// Labels not in the selector.
 		assert.Assert(t, service.Spec.Selector == nil,
@@ -154,7 +154,7 @@ ownerReferences:
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
-		}, "pg1", "")
+		}, "pg1", ""))
 
 		// Labels not in the selector.
 		assert.Assert(t, service.Spec.Selector == nil,
