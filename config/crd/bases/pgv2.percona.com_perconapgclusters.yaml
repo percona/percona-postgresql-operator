@@ -14140,7 +14140,23 @@ spec:
     singular: perconapgrestore
   scope: Namespaced
   versions:
-  - name: v2
+  - additionalPrinterColumns:
+    - description: Cluster name
+      jsonPath: .spec.pgCluster
+      name: Cluster
+      type: string
+    - description: Job status
+      jsonPath: .status.state
+      name: Status
+      type: string
+    - description: Completed time
+      jsonPath: .status.completed
+      name: Completed
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v2
     schema:
       openAPIV3Schema:
         description: PerconaPGRestore is the CRD that defines a Percona PostgreSQL
