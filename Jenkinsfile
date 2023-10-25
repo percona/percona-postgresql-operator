@@ -225,40 +225,37 @@ void runTest(Integer TEST_ID) {
 }
 
 void prepareNode() {
-    sh '''
-        if [ ! -d $HOME/google-cloud-sdk/bin ]; then
-            rm -rf $HOME/google-cloud-sdk
-            curl https://sdk.cloud.google.com | bash
-        fi
-        source $HOME/google-cloud-sdk/path.bash.inc
-        gcloud components install alpha
-        gcloud components install kubectl
-        curl -fsSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-        curl -s -L https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz \
-            | sudo tar -C /usr/local/bin --strip-components 1 --wildcards -zxvpf - '*/oc'
-        curl -s -L https://github.com/mitchellh/golicense/releases/latest/download/golicense_0.2.0_linux_x86_64.tar.gz \
-            | sudo tar -C /usr/local/bin --wildcards -zxvpf -
+    sh """
+        sudo curl -s -L -o /usr/local/bin/kubectl https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl && sudo chmod +x /usr/local/bin/kubectl
+        kubectl version --client --output=yaml
 
-        sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 > /usr/local/bin/yq"
+        curl -fsSL https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz | sudo tar -C /usr/local/bin --strip-components 1 -xzf - linux-amd64/helm
+
+        sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 > /usr/local/bin/yq"
         sudo chmod +x /usr/local/bin/yq
-        sudo sh -c "curl -s -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /usr/local/bin/jq"
+
+        sudo sh -c "curl -s -L https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64 > /usr/local/bin/jq"
         sudo chmod +x /usr/local/bin/jq
 
-        cd "$(mktemp -d)"
-        OS="$(uname | tr '[:upper:]' '[:lower:]')"
-        ARCH="$(uname -m | sed -e 's/x86_64/amd64/')"
-        KREW="krew-${OS}_${ARCH}"
-        curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/download/v0.4.3/${KREW}.tar.gz"
-        tar zxvf "${KREW}.tar.gz"
-        ./"${KREW}" install krew
-        rm -f "${KREW}.tar.gz"
-        export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
-
+        curl -fsSL https://github.com/kubernetes-sigs/krew/releases/latest/download/krew-linux_amd64.tar.gz | tar -xzf -
+        ./krew-linux_amd64 install krew
+        export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
         # v0.15.0 kuttl version
         kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/a67f31ecb2e62f15149ca66d096357050f07b77d/plugins/kuttl.yaml
         printf "%s is installed" "$(kubectl kuttl --version)"
         kubectl krew install assert
-    '''
+
+        sudo tee /etc/yum.repos.d/google-cloud-sdk.repo << EOF
+[google-cloud-cli]
+name=Google Cloud CLI
+baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+        sudo yum install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
+    """
 }
 
 def skipBranchBuilds = true
