@@ -198,10 +198,10 @@ ownerReferences:
 
 		// Always gets a ClusterIP (never None).
 		assert.Equal(t, service.Spec.ClusterIP, "")
-		assert.DeepEqual(t, service.Spec.Selector, naming.WithPerconaLabels(map[string]string{
+		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
 			"postgres-operator.crunchydata.com/cluster": "my-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		}, "my-cluster", ""))
+		})
 	}
 
 	t.Run("AnnotationsLabels", func(t *testing.T) {
