@@ -342,33 +342,33 @@ pipeline {
                 deleteOldClusters("jen-pg-$CHANGE_ID")
             }
         }
-        // stage('Build docker image') {
-        //     when {
-        //         expression {
-        //             !skipBranchBuilds
-        //         }
-        //     }
-        //     steps {
-        //         withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
-        //             sh '''
-        //                 DOCKER_TAG=perconalab/percona-postgresql-operator:$VERSION
-        //                 docker_tag_file='./results/docker/TAG'
-        //                 mkdir -p $(dirname ${docker_tag_file})
-        //                 echo ${DOCKER_TAG} > "${docker_tag_file}"
-        //                     sg docker -c "
-        //                         docker login -u '${USER}' -p '${PASS}'
-        //                         export RELEASE=0
-        //                         export IMAGE=\$DOCKER_TAG
-        //                         ./e2e-tests/build
-        //                         docker logout
-        //                     "
-        //                 sudo rm -rf ./build
-        //             '''
-        //         }
-        //         stash includes: 'results/docker/TAG', name: 'IMAGE'
-        //         archiveArtifacts 'results/docker/TAG'
-        //     }
-        // }
+        stage('Build docker image') {
+            when {
+                expression {
+                    !skipBranchBuilds
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    sh '''
+                        DOCKER_TAG=perconalab/percona-postgresql-operator:$VERSION
+                        docker_tag_file='./results/docker/TAG'
+                        mkdir -p $(dirname ${docker_tag_file})
+                        echo ${DOCKER_TAG} > "${docker_tag_file}"
+                            sg docker -c "
+                                docker login -u '${USER}' -p '${PASS}'
+                                export RELEASE=0
+                                export IMAGE=\$DOCKER_TAG
+                                ./e2e-tests/build
+                                docker logout
+                            "
+                        sudo rm -rf ./build
+                    '''
+                }
+                stash includes: 'results/docker/TAG', name: 'IMAGE'
+                archiveArtifacts 'results/docker/TAG'
+            }
+        }
         stage('Check licenses') {
              when {
                  expression {
