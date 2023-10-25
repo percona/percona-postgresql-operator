@@ -415,51 +415,6 @@ pipeline {
                         clusterRunner('cluster1')
                     }
                 }
-                stage('cluster2') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
-                    agent {
-                        label 'docker'
-                    }
-                    steps {
-                        prepareNode()
-                        unstash "sourceFILES"
-                        clusterRunner('cluster2')
-                    }
-                }
-                stage('cluster3') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
-                    agent {
-                        label 'docker'
-                    }
-                    steps {
-                        prepareNode()
-                        unstash "sourceFILES"
-                        clusterRunner('cluster3')
-                    }
-                }
-                stage('cluster4') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
-                    agent {
-                        label 'docker'
-                    }
-                    steps {
-                        prepareNode()
-                        unstash "sourceFILES"
-                        clusterRunner('cluster4')
-                    }
-                }
             }
         }
     }
