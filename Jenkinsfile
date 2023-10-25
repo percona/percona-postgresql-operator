@@ -234,6 +234,13 @@ void prepareNode() {
         sudo sh -c "curl -s -L https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64 > /usr/local/bin/jq"
         sudo chmod +x /usr/local/bin/jq
 
+        curl -fsSL https://github.com/kubernetes-sigs/krew/releases/latest/download/krew-linux_amd64.tar.gz | tar -xzf -
+        ./krew-linux_amd64 install krew
+        export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
+        # v0.15.0 kuttl version
+        kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/a67f31ecb2e62f15149ca66d096357050f07b77d/plugins/kuttl.yaml
+        printf "%s is installed" "$(kubectl kuttl --version)"
+        kubectl krew install assert
 
     """
 }
