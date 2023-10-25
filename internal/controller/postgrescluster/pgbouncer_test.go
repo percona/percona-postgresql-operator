@@ -440,7 +440,7 @@ namespace: ns3
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, deploy.ObjectMeta.Labels, naming.WithPerconalabels(map[string]string{
+		assert.DeepEqual(t, deploy.ObjectMeta.Labels, naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "test-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
