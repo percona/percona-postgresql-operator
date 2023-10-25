@@ -52,7 +52,6 @@ void deleteOldClusters(String FILTER) {
         sh """
             if [ -f $HOME/google-cloud-sdk/path.bash.inc ]; then
                 export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-                source $HOME/google-cloud-sdk/path.bash.inc
                 gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                 gcloud config set project $GCP_PROJECT
                 for GKE_CLUSTER in \$(gcloud container clusters list --format='csv[no-heading](name)' --filter="$FILTER"); do
@@ -493,8 +492,8 @@ pipeline {
             }
             deleteOldClusters("$CLUSTER_NAME")
             sh """
-                sudo docker system prune -fa
-                sudo rm -rf ./*
+                sudo docker system prune --volumes -af
+                sudo rm -rf *
             """
             deleteDir()
         }
