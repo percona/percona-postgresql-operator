@@ -181,7 +181,7 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 	case repo.S3 != nil:
 		destination = "s3://" + path.Join(repo.S3.Bucket, repoPath)
 	case repo.GCS != nil:
-		destination = "s3://" + path.Join(repo.GCS.Bucket, repoPath)
+		destination = "gs://" + path.Join(repo.GCS.Bucket, repoPath)
 	case repo.Azure != nil:
 		destination = "azure://" + path.Join(repo.Azure.Container, repoPath)
 	default:

@@ -503,7 +503,7 @@ calculate_backup_destination() {
 		| yq ".spec.backups.pgbackrest.repos[] | select(.name==\"$repo\").$storage_type.bucket")
 
 	if [[ $storage_type == "gcs" ]]; then
-		storage_type="s3"
+		storage_type="gs"
 	fi
 
 	echo -n "$storage_type://$bucket$repo_path"
