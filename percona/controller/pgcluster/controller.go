@@ -10,9 +10,11 @@ import (
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -29,6 +31,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -152,17 +155,18 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, err
 	}
 
-	backupRunning, err := isBackupRunning(ctx, r.Client, cr)
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "is backup running")
+	if cr.Spec.Pause != nil && *cr.Spec.Pause {
+		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "is backup running")
+		}
+		if backupRunning {
+			*cr.Spec.Pause = false
+			log.Info("Backup is running. Can't pause cluster", "cluster", cr.Name)
+		}
 	}
 
-	if backupRunning && cr.Spec.Pause != nil && *cr.Spec.Pause {
-		*cr.Spec.Pause = false
-		log.Info("Backup is running. Can't pause cluster", "cluster", cr.Name)
-	}
-
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		postgresCluster.Default()
 
 		annotations := make(map[string]string)
@@ -371,6 +375,22 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 }
 
 func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
+	jobList := &batchv1.JobList{}
+	selector := labels.SelectorFromSet(map[string]string{
+		naming.LabelCluster: cr.Name,
+	})
+	err := cl.List(ctx, jobList, client.InNamespace(cr.Namespace), client.MatchingLabelsSelector{Selector: selector}, client.HasLabels{naming.LabelPGBackRestBackup})
+	if err != nil {
+		return false, errors.Wrap(err, "get backup jobs")
+	}
+
+	for _, job := range jobList.Items {
+		if perconaController.JobFailed(&job) || perconaController.JobCompleted(&job) {
+			continue
+		}
+		return true, nil
+	}
+
 	backupList := &v2.PerconaPGBackupList{}
 	if err := cl.List(ctx, backupList, &client.ListOptions{
 		Namespace: cr.Namespace}); err != nil {
