@@ -7,7 +7,6 @@ void createCluster(String CLUSTER_SUFFIX) {
         sh """
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
             export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-            source $HOME/google-cloud-sdk/path.bash.inc
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
                 ret_val=0
@@ -32,7 +31,6 @@ void shutdownCluster(String CLUSTER_SUFFIX) {
         sh """
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
             export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-            source $HOME/google-cloud-sdk/path.bash.inc
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
             for namespace in \$(kubectl get namespaces --no-headers | awk '{print \$1}' | grep -vE "^kube-|^openshift" | sed '/-operator/ s/^/1-/' | sort | sed 's/^1-//'); do
@@ -196,7 +194,6 @@ void runTest(Integer TEST_ID) {
                     fi
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="$HOME/.krew/bin:$PATH"
-                    source $HOME/google-cloud-sdk/path.bash.inc
                     set -o pipefail
                     kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
@@ -226,35 +223,8 @@ void runTest(Integer TEST_ID) {
 
 void prepareNode() {
     sh """
-        sudo curl -s -L -o /usr/local/bin/kubectl https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl && sudo chmod +x /usr/local/bin/kubectl
-        kubectl version --client --output=yaml
+        echo bahur
 
-        curl -fsSL https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz | sudo tar -C /usr/local/bin --strip-components 1 -xzf - linux-amd64/helm
-
-        sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 > /usr/local/bin/yq"
-        sudo chmod +x /usr/local/bin/yq
-
-        sudo sh -c "curl -s -L https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64 > /usr/local/bin/jq"
-        sudo chmod +x /usr/local/bin/jq
-
-        curl -fsSL https://github.com/kubernetes-sigs/krew/releases/latest/download/krew-linux_amd64.tar.gz | tar -xzf -
-        ./krew-linux_amd64 install krew
-        export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
-        # v0.15.0 kuttl version
-        kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/a67f31ecb2e62f15149ca66d096357050f07b77d/plugins/kuttl.yaml
-        printf "%s is installed" "$(kubectl kuttl --version)"
-        kubectl krew install assert
-
-        sudo tee /etc/yum.repos.d/google-cloud-sdk.repo << EOF
-[google-cloud-cli]
-name=Google Cloud CLI
-baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el7-x86_64
-enabled=1
-gpgcheck=1
-repo_gpgcheck=0
-gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-EOF
-        sudo yum install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
     """
 }
 
@@ -506,7 +476,6 @@ pipeline {
             sh """
                 sudo docker system prune -fa
                 sudo rm -rf ./*
-                sudo rm -rf $HOME/google-cloud-sdk
             """
             deleteDir()
         }
