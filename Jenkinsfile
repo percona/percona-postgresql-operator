@@ -1,4 +1,4 @@
-GKERegion='us-central1-a'
+region="us-central1-a"
 testUrlPrefix="https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator"
 tests=[]
 
@@ -11,14 +11,14 @@ void createCluster(String CLUSTER_SUFFIX) {
                 ret_val=0
                 gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                 gcloud config set project $GCP_PROJECT
-                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $GKERegion --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
-                gcloud container clusters create --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.25 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=3 --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 --enable-ip-alias --workload-pool=cloud-dev-112233.svc.id.goog && \
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $region --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $region --quiet || true
+                gcloud container clusters create --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.25 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=3 --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 --enable-ip-alias --workload-pool=cloud-dev-112233.svc.id.goog && \
                 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
                 if [ \${ret_val} -eq 0 ]; then break; fi
                 ret_num=\$((ret_num + 1))
             done
             if [ \${ret_num} -eq 15 ]; then
-                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $GKERegion --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $GKERegion --quiet || true
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $region --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $region --quiet || true
                 exit 1
             fi
         """
@@ -40,7 +40,7 @@ void shutdownCluster(String CLUSTER_SUFFIX) {
                 kubectl delete pods --all -n \$namespace --force --grace-period=0 || true
             done
             kubectl get svc --all-namespaces || true
-            gcloud container clusters delete --zone $GKERegion $CLUSTER_NAME-${CLUSTER_SUFFIX}
+            gcloud container clusters delete --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX}
         """
    }
 }
@@ -48,25 +48,23 @@ void shutdownCluster(String CLUSTER_SUFFIX) {
 void deleteOldClusters(String FILTER) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
-            if [ -f $HOME/google-cloud-sdk/path.bash.inc ]; then
-                gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
-                gcloud config set project $GCP_PROJECT
-                for GKE_CLUSTER in \$(gcloud container clusters list --format='csv[no-heading](name)' --filter="$FILTER"); do
+            gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+            gcloud config set project $GCP_PROJECT
+            for GKE_CLUSTER in \$(gcloud container clusters list --format='csv[no-heading](name)' --filter="$FILTER"); do
+                GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
+                retry=0
+                while [ "\$GKE_CLUSTER_STATUS" == "PROVISIONING" ]; do
+                    echo "Cluster \$GKE_CLUSTER is being provisioned, waiting before delete."
+                    sleep 10
                     GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
-                    retry=0
-                    while [ "\$GKE_CLUSTER_STATUS" == "PROVISIONING" ]; do
-                        echo "Cluster \$GKE_CLUSTER is being provisioned, waiting before delete."
-                        sleep 10
-                        GKE_CLUSTER_STATUS=\$(gcloud container clusters list --format='csv[no-heading](status)' --filter="\$GKE_CLUSTER")
-                        let retry+=1
-                        if [ \$retry -ge 60 ]; then
-                            echo "Cluster \$GKE_CLUSTER to delete is being provisioned for too long. Skipping..."
-                            break
-                        fi
-                    done
-                    gcloud container clusters delete --async --zone $GKERegion --quiet \$GKE_CLUSTER || true
+                    let retry+=1
+                    if [ \$retry -ge 60 ]; then
+                        echo "Cluster \$GKE_CLUSTER to delete is being provisioned for too long. Skipping..."
+                        break
+                    fi
                 done
-            fi
+                gcloud container clusters delete --async --zone $region --quiet \$GKE_CLUSTER || true
+            done
         """
    }
 }
@@ -177,9 +175,6 @@ void runTest(Integer TEST_ID) {
     def testName = tests[TEST_ID]["name"]
     def clusterSuffix = tests[TEST_ID]["cluster"]
 
-    def BAHUR = "bahur"
-    HAHOR = "hahor"
-
     waitUntil {
         def timeStart = new Date().getTime()
         try {
@@ -193,8 +188,6 @@ void runTest(Integer TEST_ID) {
                     fi
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
-                    export BAHUR=$BAHUR
-                    export HAHOR=$HAHOR
                     set -o pipefail
                     kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
@@ -221,42 +214,6 @@ void runTest(Integer TEST_ID) {
         }
     }
 }
-
-// void prepareNode() {
-//     sh '''
-//         if [ ! -d $HOME/google-cloud-sdk/bin ]; then
-//             rm -rf $HOME/google-cloud-sdk
-//             curl https://sdk.cloud.google.com | bash
-//         fi
-//         gcloud components install alpha
-//         gcloud components install kubectl
-//         curl -fsSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-//         curl -s -L https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz \
-//             | sudo tar -C /usr/local/bin --strip-components 1 --wildcards -zxvpf - '*/oc'
-//         curl -s -L https://github.com/mitchellh/golicense/releases/latest/download/golicense_0.2.0_linux_x86_64.tar.gz \
-//             | sudo tar -C /usr/local/bin --wildcards -zxvpf -
-
-//         sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 > /usr/local/bin/yq"
-//         sudo chmod +x /usr/local/bin/yq
-//         sudo sh -c "curl -s -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /usr/local/bin/jq"
-//         sudo chmod +x /usr/local/bin/jq
-
-//         cd "$(mktemp -d)"
-//         OS="$(uname | tr '[:upper:]' '[:lower:]')"
-//         ARCH="$(uname -m | sed -e 's/x86_64/amd64/')"
-//         KREW="krew-${OS}_${ARCH}"
-//         curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/download/v0.4.3/${KREW}.tar.gz"
-//         tar zxvf "${KREW}.tar.gz"
-//         ./"${KREW}" install krew
-//         rm -f "${KREW}.tar.gz"
-//         export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
-
-//         # v0.15.0 kuttl version
-//         kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/a67f31ecb2e62f15149ca66d096357050f07b77d/plugins/kuttl.yaml
-//         printf "%s is installed" "$(kubectl kuttl --version)"
-//         kubectl krew install assert
-//     '''
-// }
 
 void prepareNode() {
     sh """
