@@ -7,6 +7,7 @@ void createCluster(String CLUSTER_SUFFIX) {
         sh """
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
             export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+            source $HOME/google-cloud-sdk/path.bash.inc
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
                 ret_val=0
@@ -31,6 +32,7 @@ void shutdownCluster(String CLUSTER_SUFFIX) {
         sh """
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
             export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+            source $HOME/google-cloud-sdk/path.bash.inc
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
             for namespace in \$(kubectl get namespaces --no-headers | awk '{print \$1}' | grep -vE "^kube-|^openshift" | sed '/-operator/ s/^/1-/' | sort | sed 's/^1-//'); do
@@ -52,6 +54,7 @@ void deleteOldClusters(String FILTER) {
         sh """
             if [ -f $HOME/google-cloud-sdk/path.bash.inc ]; then
                 export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+                source $HOME/google-cloud-sdk/path.bash.inc
                 gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                 gcloud config set project $GCP_PROJECT
                 for GKE_CLUSTER in \$(gcloud container clusters list --format='csv[no-heading](name)' --filter="$FILTER"); do
@@ -180,9 +183,6 @@ void runTest(Integer TEST_ID) {
     def testName = tests[TEST_ID]["name"]
     def clusterSuffix = tests[TEST_ID]["cluster"]
 
-    def BAHUR = "bahur"
-    HAHOR = "hahor"
-
     waitUntil {
         def timeStart = new Date().getTime()
         try {
@@ -195,8 +195,9 @@ void runTest(Integer TEST_ID) {
                         mkdir "e2e-tests/logs"
                     fi
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
-                    export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
-                    # set -o pipefail
+                    export PATH="$HOME/.krew/bin:$PATH"
+                    source $HOME/google-cloud-sdk/path.bash.inc
+                    set -o pipefail
                     kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
             }
@@ -222,6 +223,43 @@ void runTest(Integer TEST_ID) {
         }
     }
 }
+
+// void prepareNode() {
+//     sh '''
+//         if [ ! -d $HOME/google-cloud-sdk/bin ]; then
+//             rm -rf $HOME/google-cloud-sdk
+//             curl https://sdk.cloud.google.com | bash
+//         fi
+//         source $HOME/google-cloud-sdk/path.bash.inc
+//         gcloud components install alpha
+//         gcloud components install kubectl
+//         curl -fsSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+//         curl -s -L https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz \
+//             | sudo tar -C /usr/local/bin --strip-components 1 --wildcards -zxvpf - '*/oc'
+//         curl -s -L https://github.com/mitchellh/golicense/releases/latest/download/golicense_0.2.0_linux_x86_64.tar.gz \
+//             | sudo tar -C /usr/local/bin --wildcards -zxvpf -
+
+//         sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 > /usr/local/bin/yq"
+//         sudo chmod +x /usr/local/bin/yq
+//         sudo sh -c "curl -s -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /usr/local/bin/jq"
+//         sudo chmod +x /usr/local/bin/jq
+
+//         cd "$(mktemp -d)"
+//         OS="$(uname | tr '[:upper:]' '[:lower:]')"
+//         ARCH="$(uname -m | sed -e 's/x86_64/amd64/')"
+//         KREW="krew-${OS}_${ARCH}"
+//         curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/download/v0.4.3/${KREW}.tar.gz"
+//         tar zxvf "${KREW}.tar.gz"
+//         ./"${KREW}" install krew
+//         rm -f "${KREW}.tar.gz"
+//         export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+
+//         # v0.15.0 kuttl version
+//         kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/a67f31ecb2e62f15149ca66d096357050f07b77d/plugins/kuttl.yaml
+//         printf "%s is installed" "$(kubectl kuttl --version)"
+//         kubectl krew install assert
+//     '''
+// }
 
 void prepareNode() {
     sh """
@@ -415,6 +453,51 @@ pipeline {
                         clusterRunner('cluster1')
                     }
                 }
+                stage('cluster2') {
+                    when {
+                        expression {
+                            !skipBranchBuilds
+                        }
+                    }
+                    agent {
+                        label 'docker'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster2')
+                    }
+                }
+                stage('cluster3') {
+                    when {
+                        expression {
+                            !skipBranchBuilds
+                        }
+                    }
+                    agent {
+                        label 'docker'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster3')
+                    }
+                }
+                stage('cluster4') {
+                    when {
+                        expression {
+                            !skipBranchBuilds
+                        }
+                    }
+                    agent {
+                        label 'docker'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster4')
+                    }
+                }
             }
         }
     }
@@ -424,7 +507,12 @@ pipeline {
                 echo "CLUSTER ASSIGNMENTS\n" + tests.toString().replace("], ","]\n").replace("]]","]").replaceFirst("\\[","")
 
                 if (currentBuild.result != null && currentBuild.result != 'SUCCESS' && currentBuild.nextBuild == null) {
-                    slackSend channel: '#cloud-dev-ci', color: '#FF0000', message: "[$JOB_NAME]: build $currentBuild.result, $BUILD_URL"
+                    try {
+                        slackSend channel: "@${AUTHOR_NAME}", color: '#FF0000', message: "[${JOB_NAME}]: build ${currentBuild.result}, ${BUILD_URL} owner: @${AUTHOR_NAME}"
+                    }
+                    catch (exc) {
+                        slackSend channel: '#cloud-dev-ci', color: '#FF0000', message: "[${JOB_NAME}]: build ${currentBuild.result}, ${BUILD_URL} owner: @${AUTHOR_NAME}"
+                    }
                 }
 
                 if (env.CHANGE_URL && currentBuild.nextBuild == null) {
@@ -450,8 +538,9 @@ pipeline {
             }
             deleteOldClusters("$CLUSTER_NAME")
             sh """
-                sudo docker system prune --volumes -af
-                sudo rm -rf *
+                sudo docker system prune -fa
+                sudo rm -rf ./*
+                sudo rm -rf $HOME/google-cloud-sdk
             """
             deleteDir()
         }
