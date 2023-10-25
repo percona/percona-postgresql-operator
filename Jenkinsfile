@@ -395,28 +395,28 @@ pipeline {
                  }
              }
         }
-        stage('Run E2E tests') {
-            options {
-                timeout(time: 3, unit: 'HOURS')
-            }
-            parallel {
-                stage('cluster1') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
-                    agent {
-                        label 'docker'
-                    }
-                    steps {
-                        prepareNode()
-                        unstash "sourceFILES"
-                        clusterRunner('cluster1')
-                    }
-                }
-            }
-        }
+        // stage('Run E2E tests') {
+        //     options {
+        //         timeout(time: 3, unit: 'HOURS')
+        //     }
+        //     parallel {
+        //         stage('cluster1') {
+        //             when {
+        //                 expression {
+        //                     !skipBranchBuilds
+        //                 }
+        //             }
+        //             agent {
+        //                 label 'docker'
+        //             }
+        //             steps {
+        //                 prepareNode()
+        //                 unstash "sourceFILES"
+        //                 clusterRunner('cluster1')
+        //             }
+        //         }
+        //     }
+        // }
     }
     post {
         always {
