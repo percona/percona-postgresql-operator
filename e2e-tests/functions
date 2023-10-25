@@ -527,7 +527,10 @@ get_backup_name_by_job() {
 check_jobs_and_pgbackups() {
 	local cluster=$1
 
-	readarray -t job_names <<<"$(kubectl get job -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')"
+	job_names=()
+	while IFS= read -r line; do
+		job_names+=("$line")
+	done < <(kubectl get job -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
 	for ((i = 0; i < ${#job_names[@]}; i++)); do
 		job_name=${job_names[$i]}
