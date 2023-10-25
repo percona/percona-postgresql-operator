@@ -69,6 +69,10 @@ creationTimestamp: null
 labels:
   postgres-operator.crunchydata.com/cluster: pg2
   postgres-operator.crunchydata.com/patroni: pg2-ha
+  app.kubernetes.io/instance: pg2
+  app.kubernetes.io/managed-by: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql
+  app.kubernetes.io/part-of: percona-postgresql
 name: pg2-ha
 namespace: ns1
 ownerReferences:
@@ -116,11 +120,11 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string{
+		assert.DeepEqual(t, service.ObjectMeta.Labels, naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
-		})
+		}, "pg1", "")
 
 		// Labels not in the selector.
 		assert.Assert(t, service.Spec.Selector == nil,
@@ -145,12 +149,12 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string{
+		assert.DeepEqual(t, service.ObjectMeta.Labels, naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
-		})
+		}, "pg1", "")
 
 		// Labels not in the selector.
 		assert.Assert(t, service.Spec.Selector == nil,

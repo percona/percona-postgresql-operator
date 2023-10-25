@@ -621,6 +621,11 @@ kind: Service
 		assert.Assert(t, marshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:
+  app.kubernetes.io/component: pg
+  app.kubernetes.io/instance: pg5
+  app.kubernetes.io/managed-by: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql
+  app.kubernetes.io/part-of: percona-postgresql
   postgres-operator.crunchydata.com/cluster: pg5
   postgres-operator.crunchydata.com/role: primary
 name: pg5-primary
@@ -783,6 +788,11 @@ some: note
 happy: label
 postgres-operator.crunchydata.com/cluster: pg2
 postgres-operator.crunchydata.com/role: replica
+app.kubernetes.io/component: pg
+app.kubernetes.io/instance: pg2
+app.kubernetes.io/managed-by: percona-postgresql-operator
+app.kubernetes.io/name: percona-postgresql
+app.kubernetes.io/part-of: percona-postgresql
 		`))
 
 		// Labels not in the selector.
