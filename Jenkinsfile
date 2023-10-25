@@ -430,73 +430,73 @@ pipeline {
                  }
              }
         }
-        // stage('Run E2E tests') {
-        //     options {
-        //         timeout(time: 3, unit: 'HOURS')
-        //     }
-        //     parallel {
-        //         stage('cluster1') {
-        //             when {
-        //                 expression {
-        //                     !skipBranchBuilds
-        //                 }
-        //             }
-        //             agent {
-        //                 label 'docker'
-        //             }
-        //             steps {
-        //                 prepareNode()
-        //                 unstash "sourceFILES"
-        //                 clusterRunner('cluster1')
-        //             }
-        //         }
-        //         stage('cluster2') {
-        //             when {
-        //                 expression {
-        //                     !skipBranchBuilds
-        //                 }
-        //             }
-        //             agent {
-        //                 label 'docker'
-        //             }
-        //             steps {
-        //                 prepareNode()
-        //                 unstash "sourceFILES"
-        //                 clusterRunner('cluster2')
-        //             }
-        //         }
-        //         stage('cluster3') {
-        //             when {
-        //                 expression {
-        //                     !skipBranchBuilds
-        //                 }
-        //             }
-        //             agent {
-        //                 label 'docker'
-        //             }
-        //             steps {
-        //                 prepareNode()
-        //                 unstash "sourceFILES"
-        //                 clusterRunner('cluster3')
-        //             }
-        //         }
-        //         stage('cluster4') {
-        //             when {
-        //                 expression {
-        //                     !skipBranchBuilds
-        //                 }
-        //             }
-        //             agent {
-        //                 label 'docker'
-        //             }
-        //             steps {
-        //                 prepareNode()
-        //                 unstash "sourceFILES"
-        //                 clusterRunner('cluster4')
-        //             }
-        //         }
-        //     }
-        // }
+        stage('Run E2E tests') {
+            options {
+                timeout(time: 3, unit: 'HOURS')
+            }
+            parallel {
+                stage('cluster1') {
+                    when {
+                        expression {
+                            !skipBranchBuilds
+                        }
+                    }
+                    agent {
+                        label 'docker'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster1')
+                    }
+                }
+                stage('cluster2') {
+                    when {
+                        expression {
+                            !skipBranchBuilds
+                        }
+                    }
+                    agent {
+                        label 'docker'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster2')
+                    }
+                }
+                stage('cluster3') {
+                    when {
+                        expression {
+                            !skipBranchBuilds
+                        }
+                    }
+                    agent {
+                        label 'docker'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster3')
+                    }
+                }
+                stage('cluster4') {
+                    when {
+                        expression {
+                            !skipBranchBuilds
+                        }
+                    }
+                    agent {
+                        label 'docker'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster4')
+                    }
+                }
+            }
+        }
     }
     post {
         always {
