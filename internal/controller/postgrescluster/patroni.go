@@ -272,6 +272,7 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 	} else {
 		service.Spec.Type = corev1.ServiceType(spec.Type)
+		service.Spec.LoadBalancerSourceRanges = spec.LoadBalancerSourceRanges
 		if spec.NodePort != nil {
 			if service.Spec.Type == corev1.ServiceTypeClusterIP {
 				// The NodePort can only be set when the Service type is NodePort or

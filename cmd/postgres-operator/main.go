@@ -40,6 +40,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
+	perconaRuntime "github.com/percona/percona-postgresql-operator/percona/runtime"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -112,7 +114,9 @@ func main() {
 	// deprecation warnings when using an older version of a resource for backwards compatibility).
 	rest.SetDefaultWarningHandler(rest.NoWarnings{})
 
-	mgr, err := runtime.CreateRuntimeManager(os.Getenv("PGO_TARGET_NAMESPACE"), cfg, false)
+	namespaces, err := k8s.GetWatchNamespace()
+	assertNoError(err)
+	mgr, err := perconaRuntime.CreateRuntimeManager(namespaces, cfg, false)
 	assertNoError(err)
 
 	// Add Percona custom resource types to scheme

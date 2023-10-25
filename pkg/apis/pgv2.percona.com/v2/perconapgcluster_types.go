@@ -423,6 +423,11 @@ type ServiceExpose struct {
 	// +kubebuilder:default=ClusterIP
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	Type string `json:"type,omitempty"`
+
+	// LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
+	// This field will be ignored if the cloud-provider does not support the feature.
+	// +optional
+	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
 }
 
 func (s *ServiceExpose) ToCrunchy() *crunchyv1beta1.ServiceSpec {
@@ -435,8 +440,9 @@ func (s *ServiceExpose) ToCrunchy() *crunchyv1beta1.ServiceSpec {
 			Annotations: s.Annotations,
 			Labels:      s.Labels,
 		},
-		NodePort: s.NodePort,
-		Type:     s.Type,
+		NodePort:                 s.NodePort,
+		Type:                     s.Type,
+		LoadBalancerSourceRanges: s.LoadBalancerSourceRanges,
 	}
 }
 

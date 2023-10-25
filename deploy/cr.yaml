@@ -69,6 +69,8 @@ spec:
 #    labels:
 #      my-label: value2
 #    type: LoadBalancer
+#    loadBalancerSourceRanges:
+#      - 10.0.0.0/8
 
   instances:
   - name: instance1
@@ -130,6 +132,8 @@ spec:
 #        labels:
 #          my-label: value2
 #        type: LoadBalancer
+#        loadBalancerSourceRanges:
+#          - 10.0.0.0/8
 #
 #      affinity:
 #        podAntiAffinity:
