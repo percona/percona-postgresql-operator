@@ -183,6 +183,9 @@ void runTest(Integer TEST_ID) {
     def testName = tests[TEST_ID]["name"]
     def clusterSuffix = tests[TEST_ID]["cluster"]
 
+    def BAHUR = "bahur"
+    HAHOR = "hahor"
+
     waitUntil {
         def timeStart = new Date().getTime()
         try {
