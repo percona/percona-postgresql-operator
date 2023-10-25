@@ -37,8 +37,11 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 		return errors.Wrapf(err, "failed to find PerconaPGBackup for job %s", job.Name)
 	}
 
-	// we shouldn't create pg backups for manual backup jobs
-	if pb == nil && job.Labels[naming.LabelPGBackRestBackup] != string(naming.BackupManual) {
+	if pb == nil {
+		if job.Labels[naming.LabelPGBackRestBackup] == string(naming.BackupManual) {
+			// we shouldn't create pg-backup for manual backup jobs and should wait until it's pg-backup will have `.status.jobName`
+			return nil
+		}
 		// Create PerconaPGBackup resource for backup job,
 		// which was created without this resource.
 		pb = &v2.PerconaPGBackup{
