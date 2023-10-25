@@ -193,7 +193,7 @@ void runTest(Integer TEST_ID) {
                         mkdir "e2e-tests/logs"
                     fi
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
-                    export PATH="$HOME/.krew/bin:$PATH"
+                    export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
                     set -o pipefail
                     kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
