@@ -67,12 +67,12 @@ kind: Service
 		assert.Assert(t, marshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:
-  postgres-operator.crunchydata.com/cluster: pg2
-  postgres-operator.crunchydata.com/patroni: pg2-ha
   app.kubernetes.io/instance: pg2
   app.kubernetes.io/managed-by: percona-postgresql-operator
   app.kubernetes.io/name: percona-postgresql
   app.kubernetes.io/part-of: percona-postgresql
+  postgres-operator.crunchydata.com/cluster: pg2
+  postgres-operator.crunchydata.com/patroni: pg2-ha
 name: pg2-ha
 namespace: ns1
 ownerReferences:

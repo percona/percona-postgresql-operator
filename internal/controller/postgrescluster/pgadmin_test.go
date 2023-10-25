@@ -86,12 +86,12 @@ kind: ConfigMap
 		assert.Assert(t, cmp.MarshalMatches(configmap.ObjectMeta, `
 creationTimestamp: null
 labels:
-  postgres-operator.crunchydata.com/cluster: pg1
-  postgres-operator.crunchydata.com/role: pgadmin
   app.kubernetes.io/instance: pg1
   app.kubernetes.io/managed-by: percona-postgresql-operator
   app.kubernetes.io/name: percona-postgresql
   app.kubernetes.io/part-of: percona-postgresql
+  postgres-operator.crunchydata.com/cluster: pg1
+  postgres-operator.crunchydata.com/role: pgadmin
 name: pg1-pgadmin
 namespace: some-ns
 ownerReferences:
@@ -179,12 +179,12 @@ kind: Service
 		assert.Assert(t, marshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:
+  app.kubernetes.io/instance: my-cluster,
+  app.kubernetes.io/managed-by: percona-postgresql-operator,
+  app.kubernetes.io/name: percona-postgresql,
+  app.kubernetes.io/part-of: percona-postgresql,
   postgres-operator.crunchydata.com/cluster: my-cluster
   postgres-operator.crunchydata.com/role: pgadmin
-  "app.kubernetes.io/instance":                "my-cluster",
-  "app.kubernetes.io/managed-by":              "percona-postgresql-operator",
-  "app.kubernetes.io/name":                    "percona-postgresql",
-  "app.kubernetes.io/part-of":                 "percona-postgresql",
 name: my-cluster-pgadmin
 namespace: my-ns
 ownerReferences:
@@ -524,13 +524,13 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 		assert.Assert(t, cmp.MarshalMatches(template.ObjectMeta, `
 creationTimestamp: null
 labels:
-  postgres-operator.crunchydata.com/cluster: test-cluster
-  postgres-operator.crunchydata.com/data: pgadmin
-  postgres-operator.crunchydata.com/role: pgadmin
   app.kubernetes.io/instance: test-cluster
   app.kubernetes.io/managed-by: percona-postgresql-operator
   app.kubernetes.io/name: percona-postgresql
   app.kubernetes.io/part-of: percona-postgresql
+  postgres-operator.crunchydata.com/cluster: test-cluster
+  postgres-operator.crunchydata.com/data: pgadmin
+  postgres-operator.crunchydata.com/role: pgadmin
 		`))
 
 		compare := `
@@ -641,14 +641,14 @@ annotations:
   annotation1: annotationvalue
 creationTimestamp: null
 labels:
-  label1: labelvalue
-  postgres-operator.crunchydata.com/cluster: custom-cluster
-  postgres-operator.crunchydata.com/data: pgadmin
-  postgres-operator.crunchydata.com/role: pgadmin
   app.kubernetes.io/instance: custom-cluster
   app.kubernetes.io/managed-by: percona-postgresql-operator
   app.kubernetes.io/name: percona-postgresql
   app.kubernetes.io/part-of: percona-postgresql
+  label1: labelvalue
+  postgres-operator.crunchydata.com/cluster: custom-cluster
+  postgres-operator.crunchydata.com/data: pgadmin
+  postgres-operator.crunchydata.com/role: pgadmin
 		`))
 
 		compare := `

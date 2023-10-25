@@ -786,13 +786,13 @@ some: note
 		// Labels present in the metadata.
 		assert.Assert(t, marshalMatches(service.ObjectMeta.Labels, `
 happy: label
-postgres-operator.crunchydata.com/cluster: pg2
-postgres-operator.crunchydata.com/role: replica
 app.kubernetes.io/component: pg
 app.kubernetes.io/instance: pg2
 app.kubernetes.io/managed-by: percona-postgresql-operator
 app.kubernetes.io/name: percona-postgresql
 app.kubernetes.io/part-of: percona-postgresql
+postgres-operator.crunchydata.com/cluster: pg2
+postgres-operator.crunchydata.com/role: replica
 		`))
 
 		// Labels not in the selector.
