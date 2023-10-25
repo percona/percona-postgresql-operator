@@ -6,8 +6,6 @@ void createCluster(String CLUSTER_SUFFIX) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
-            export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-            source $HOME/google-cloud-sdk/path.bash.inc
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
                 ret_val=0
@@ -31,8 +29,6 @@ void shutdownCluster(String CLUSTER_SUFFIX) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
-            export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-            source $HOME/google-cloud-sdk/path.bash.inc
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
             for namespace in \$(kubectl get namespaces --no-headers | awk '{print \$1}' | grep -vE "^kube-|^openshift" | sed '/-operator/ s/^/1-/' | sort | sed 's/^1-//'); do
@@ -53,8 +49,6 @@ void deleteOldClusters(String FILTER) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
             if [ -f $HOME/google-cloud-sdk/path.bash.inc ]; then
-                export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-                source $HOME/google-cloud-sdk/path.bash.inc
                 gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                 gcloud config set project $GCP_PROJECT
                 for GKE_CLUSTER in \$(gcloud container clusters list --format='csv[no-heading](name)' --filter="$FILTER"); do
@@ -198,8 +192,7 @@ void runTest(Integer TEST_ID) {
                         mkdir "e2e-tests/logs"
                     fi
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
-                    export PATH="$HOME/.krew/bin:$PATH"
-                    source $HOME/google-cloud-sdk/path.bash.inc
+                    export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
                     set -o pipefail
                     kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
@@ -233,7 +226,6 @@ void runTest(Integer TEST_ID) {
 //             rm -rf $HOME/google-cloud-sdk
 //             curl https://sdk.cloud.google.com | bash
 //         fi
-//         source $HOME/google-cloud-sdk/path.bash.inc
 //         gcloud components install alpha
 //         gcloud components install kubectl
 //         curl -fsSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
