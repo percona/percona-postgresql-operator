@@ -8,5 +8,11 @@ commands:
 
       source ../../functions
 
+      echo ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      echo BAHUR=$BAHUR
+      echo HAHOR=$HAHOR
+      echo KUBECONFIG=$KUBECONFIG
+      echo ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
       deploy_operator
       deploy_client

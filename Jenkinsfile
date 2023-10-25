@@ -180,6 +180,9 @@ void runTest(Integer TEST_ID) {
     def testName = tests[TEST_ID]["name"]
     def clusterSuffix = tests[TEST_ID]["cluster"]
 
+    def BAHUR = "bahur"
+    HAHOR = "hahor"
+
     waitUntil {
         def timeStart = new Date().getTime()
         try {
@@ -462,40 +465,40 @@ pipeline {
     }
     post {
         always {
-            // script {
-            //     echo "CLUSTER ASSIGNMENTS\n" + tests.toString().replace("], ","]\n").replace("]]","]").replaceFirst("\\[","")
+            script {
+                echo "CLUSTER ASSIGNMENTS\n" + tests.toString().replace("], ","]\n").replace("]]","]").replaceFirst("\\[","")
 
-            //     if (currentBuild.result != null && currentBuild.result != 'SUCCESS' && currentBuild.nextBuild == null) {
-            //         slackSend channel: '#cloud-dev-ci', color: '#FF0000', message: "[$JOB_NAME]: build $currentBuild.result, $BUILD_URL"
-            //     }
+                if (currentBuild.result != null && currentBuild.result != 'SUCCESS' && currentBuild.nextBuild == null) {
+                    slackSend channel: '#cloud-dev-ci', color: '#FF0000', message: "[$JOB_NAME]: build $currentBuild.result, $BUILD_URL"
+                }
 
-            //     if (env.CHANGE_URL && currentBuild.nextBuild == null) {
-            //         for (comment in pullRequest.comments) {
-            //             println("Author: ${comment.user}, Comment: ${comment.body}")
-            //             if (comment.user.equals('JNKPercona')) {
-            //                 println("delete comment")
-            //                 comment.delete()
-            //             }
-            //         }
-            //         makeReport()
-            //         sh """
-            //             echo "${TestsReportXML}" > TestsReport.xml
-            //         """
-            //         step([$class: 'JUnitResultArchiver', testResults: '*.xml', healthScaleFactor: 1.0])
-            //         archiveArtifacts '*.xml'
+                if (env.CHANGE_URL && currentBuild.nextBuild == null) {
+                    for (comment in pullRequest.comments) {
+                        println("Author: ${comment.user}, Comment: ${comment.body}")
+                        if (comment.user.equals('JNKPercona')) {
+                            println("delete comment")
+                            comment.delete()
+                        }
+                    }
+                    makeReport()
+                    sh """
+                        echo "${TestsReportXML}" > TestsReport.xml
+                    """
+                    step([$class: 'JUnitResultArchiver', testResults: '*.xml', healthScaleFactor: 1.0])
+                    archiveArtifacts '*.xml'
 
-            //         unstash 'IMAGE'
-            //         def IMAGE = sh(returnStdout: true, script: "cat results/docker/TAG").trim()
-            //         TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${IMAGE}`\r\n"
-            //         pullRequest.comment(TestsReport)
-            //     }
-            // }
-            deleteOldClusters("$CLUSTER_NAME")
-            sh """
-                sudo docker system prune --volumes -af
-                sudo rm -rf *
-            """
-            deleteDir()
+                    unstash 'IMAGE'
+                    def IMAGE = sh(returnStdout: true, script: "cat results/docker/TAG").trim()
+                    TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${IMAGE}`\r\n"
+                    pullRequest.comment(TestsReport)
+                }
+            }
+            // deleteOldClusters("$CLUSTER_NAME")
+            // sh """
+            //     sudo docker system prune --volumes -af
+            //     sudo rm -rf *
+            // """
+            // deleteDir()
         }
     }
 }
