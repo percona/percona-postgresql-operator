@@ -497,11 +497,6 @@ shareProcessNamespace: true
 topologySpreadConstraints:
 - labelSelector:
     matchLabels:
-      app.kubernetes.io/component: pgbouncer
-      app.kubernetes.io/instance: test-cluster
-      app.kubernetes.io/managed-by: percona-postgresql-operator
-      app.kubernetes.io/name: percona-postgresql
-      app.kubernetes.io/part-of: percona-postgresql
       postgres-operator.crunchydata.com/cluster: test-cluster
       postgres-operator.crunchydata.com/role: pgbouncer
   maxSkew: 1
