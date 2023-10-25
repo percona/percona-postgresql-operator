@@ -120,11 +120,11 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, naming.WithPerconaLabels(map[string]string{
+		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
-		}, "pg1", ""))
+		}, "pg1", "")))
 
 		// Labels not in the selector.
 		assert.Assert(t, service.Spec.Selector == nil,
@@ -149,12 +149,12 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, naming.WithPerconaLabels(map[string]string{
+		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
-		}, "pg1", ""))
+		}, "pg1", "")))
 
 		// Labels not in the selector.
 		assert.Assert(t, service.Spec.Selector == nil,
