@@ -196,7 +196,7 @@ void runTest(Integer TEST_ID) {
                     fi
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
-                    set -o pipefail
+                    # set -o pipefail
                     kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
             }
@@ -493,12 +493,12 @@ pipeline {
                     pullRequest.comment(TestsReport)
                 }
             }
-            // deleteOldClusters("$CLUSTER_NAME")
-            // sh """
-            //     sudo docker system prune --volumes -af
-            //     sudo rm -rf *
-            // """
-            // deleteDir()
+            deleteOldClusters("$CLUSTER_NAME")
+            sh """
+                sudo docker system prune --volumes -af
+                sudo rm -rf *
+            """
+            deleteDir()
         }
     }
 }
