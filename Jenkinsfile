@@ -311,37 +311,37 @@ pipeline {
         disableConcurrentBuilds(abortPrevious: true)
     }
     stages {
-        // stage('Prepare') {
-        //     when {
-        //         expression {
-        //             !skipBranchBuilds
-        //         }
-        //     }
-        //     steps {
-        //         initTests()
-        //         prepareNode()
-        //         script {
-        //             if (AUTHOR_NAME == 'null') {
-        //                 AUTHOR_NAME = sh(script: "git show -s --pretty=%ae | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
-        //             }
-        //             for (comment in pullRequest.comments) {
-        //                 println("Author: ${comment.user}, Comment: ${comment.body}")
-        //                 if (comment.user.equals('JNKPercona')) {
-        //                     println("delete comment")
-        //                     comment.delete()
-        //                 }
-        //             }
-        //         }
-        //         withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
-        //             sh '''
-        //                 cp $CLOUD_SECRET_FILE ./e2e-tests/conf/cloud-secret.yml
-        //                 cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
-        //             '''
-        //         }
-        //         stash includes: "**", name: "sourceFILES"
-        //         deleteOldClusters("jen-pg-$CHANGE_ID")
-        //     }
-        // }
+        stage('Prepare') {
+            when {
+                expression {
+                    !skipBranchBuilds
+                }
+            }
+            steps {
+                initTests()
+                prepareNode()
+                script {
+                    if (AUTHOR_NAME == 'null') {
+                        AUTHOR_NAME = sh(script: "git show -s --pretty=%ae | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
+                    }
+                    for (comment in pullRequest.comments) {
+                        println("Author: ${comment.user}, Comment: ${comment.body}")
+                        if (comment.user.equals('JNKPercona')) {
+                            println("delete comment")
+                            comment.delete()
+                        }
+                    }
+                }
+                withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
+                    sh '''
+                        cp $CLOUD_SECRET_FILE ./e2e-tests/conf/cloud-secret.yml
+                        cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
+                    '''
+                }
+                stash includes: "**", name: "sourceFILES"
+                deleteOldClusters("jen-pg-$CHANGE_ID")
+            }
+        }
         // stage('Build docker image') {
         //     when {
         //         expression {
