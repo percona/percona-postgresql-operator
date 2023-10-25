@@ -385,6 +385,7 @@ func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGClus
 	}
 
 	for _, job := range jobList.Items {
+		job := job
 		if perconaController.JobFailed(&job) || perconaController.JobCompleted(&job) {
 			continue
 		}
