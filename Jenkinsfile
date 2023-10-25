@@ -284,6 +284,8 @@ repo_gpgcheck=0
 gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 EOF
         sudo yum install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
+
+        curl -sL https://github.com/mitchellh/golicense/releases/latest/download/golicense_0.2.0_linux_x86_64.tar.gz | sudo tar -C /usr/local/bin -xzf - golicense
     """
 }
 
@@ -309,192 +311,192 @@ pipeline {
         disableConcurrentBuilds(abortPrevious: true)
     }
     stages {
-        stage('Prepare') {
-            when {
-                expression {
-                    !skipBranchBuilds
-                }
-            }
-            steps {
-                initTests()
-                prepareNode()
-                script {
-                    if (AUTHOR_NAME == 'null') {
-                        AUTHOR_NAME = sh(script: "git show -s --pretty=%ae | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
-                    }
-                    for (comment in pullRequest.comments) {
-                        println("Author: ${comment.user}, Comment: ${comment.body}")
-                        if (comment.user.equals('JNKPercona')) {
-                            println("delete comment")
-                            comment.delete()
-                        }
-                    }
-                }
-                withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
-                    sh '''
-                        cp $CLOUD_SECRET_FILE ./e2e-tests/conf/cloud-secret.yml
-                        cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
-                    '''
-                }
-                stash includes: "**", name: "sourceFILES"
-                deleteOldClusters("jen-pg-$CHANGE_ID")
-            }
-        }
-        stage('Build docker image') {
-            when {
-                expression {
-                    !skipBranchBuilds
-                }
-            }
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
-                    sh '''
-                        DOCKER_TAG=perconalab/percona-postgresql-operator:$VERSION
-                        docker_tag_file='./results/docker/TAG'
-                        mkdir -p $(dirname ${docker_tag_file})
-                        echo ${DOCKER_TAG} > "${docker_tag_file}"
-                            sg docker -c "
-                                docker login -u '${USER}' -p '${PASS}'
-                                export RELEASE=0
-                                export IMAGE=\$DOCKER_TAG
-                                ./e2e-tests/build
-                                docker logout
-                            "
-                        sudo rm -rf ./build
-                    '''
-                }
-                stash includes: 'results/docker/TAG', name: 'IMAGE'
-                archiveArtifacts 'results/docker/TAG'
-            }
-        }
-        // stage('Check licenses') {
-        //      when {
-        //          expression {
-        //              !skipBranchBuilds
-        //          }
-        //      }
-        //      parallel {
-        //          stage('GoLicenseDetector test') {
-        //              steps {
-        //                  sh """
-        //                      mkdir -p $WORKSPACE/src/github.com/percona
-        //                      ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
-        //                      sg docker -c "
-        //                          docker run \
-        //                              --rm \
-        //                              -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
-        //                              -w /go/src/github.com/percona/percona-postgresql-operator \
-        //                              -e GO111MODULE=on \
-        //                              golang:1.20 sh -c '
-        //                                  go install github.com/google/go-licenses@latest;
-        //                                  /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
-        //                                      | cut -d , -f 3 \
-        //                                      | sort -u \
-        //                                      > go-licenses-new || :
-        //                              '
-        //                      "
-        //                      diff -u ./e2e-tests/license/compare/go-licenses go-licenses-new
-        //                  """
-        //              }
-        //          }
-        //          stage('GoLicense test') {
-        //              steps {
-        //                  sh '''
-        //                      mkdir -p $WORKSPACE/src/github.com/percona
-        //                      ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
-        //                      sg docker -c "
-        //                          docker run \
-        //                              --rm \
-        //                              -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
-        //                              -w /go/src/github.com/percona/percona-postgresql-operator \
-        //                              -e GO111MODULE=on \
-        //                              -e GOFLAGS='-buildvcs=false' \
-        //                              golang:1.20 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
-        //                      "
-        //                  '''
-
-        //                  withCredentials([string(credentialsId: 'GITHUB_API_TOKEN', variable: 'GITHUB_TOKEN')]) {
-        //                      sh """
-        //                          golicense -plain ./percona-postgresql-operator \
-        //                              | grep -v 'license not found' \
-        //                              | sed -r 's/^[^ ]+[ ]+//' \
-        //                              | sort \
-        //                              | uniq \
-        //                              > golicense-new || true
-        //                          diff -u ./e2e-tests/license/compare/golicense golicense-new
-        //                      """
-        //                  }
-        //              }
-        //          }
-        //      }
+        // stage('Prepare') {
+        //     when {
+        //         expression {
+        //             !skipBranchBuilds
+        //         }
+        //     }
+        //     steps {
+        //         initTests()
+        //         prepareNode()
+        //         script {
+        //             if (AUTHOR_NAME == 'null') {
+        //                 AUTHOR_NAME = sh(script: "git show -s --pretty=%ae | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
+        //             }
+        //             for (comment in pullRequest.comments) {
+        //                 println("Author: ${comment.user}, Comment: ${comment.body}")
+        //                 if (comment.user.equals('JNKPercona')) {
+        //                     println("delete comment")
+        //                     comment.delete()
+        //                 }
+        //             }
+        //         }
+        //         withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
+        //             sh '''
+        //                 cp $CLOUD_SECRET_FILE ./e2e-tests/conf/cloud-secret.yml
+        //                 cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
+        //             '''
+        //         }
+        //         stash includes: "**", name: "sourceFILES"
+        //         deleteOldClusters("jen-pg-$CHANGE_ID")
+        //     }
         // }
-        stage('Run E2E tests') {
-            options {
-                timeout(time: 3, unit: 'HOURS')
-            }
-            parallel {
-                stage('cluster1') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
-                    agent {
-                        label 'docker'
-                    }
-                    steps {
-                        prepareNode()
-                        unstash "sourceFILES"
-                        clusterRunner('cluster1')
-                    }
-                }
-                stage('cluster2') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
-                    agent {
-                        label 'docker'
-                    }
-                    steps {
-                        prepareNode()
-                        unstash "sourceFILES"
-                        clusterRunner('cluster2')
-                    }
-                }
-                stage('cluster3') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
-                    agent {
-                        label 'docker'
-                    }
-                    steps {
-                        prepareNode()
-                        unstash "sourceFILES"
-                        clusterRunner('cluster3')
-                    }
-                }
-                stage('cluster4') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
-                    agent {
-                        label 'docker'
-                    }
-                    steps {
-                        prepareNode()
-                        unstash "sourceFILES"
-                        clusterRunner('cluster4')
-                    }
-                }
-            }
+        // stage('Build docker image') {
+        //     when {
+        //         expression {
+        //             !skipBranchBuilds
+        //         }
+        //     }
+        //     steps {
+        //         withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+        //             sh '''
+        //                 DOCKER_TAG=perconalab/percona-postgresql-operator:$VERSION
+        //                 docker_tag_file='./results/docker/TAG'
+        //                 mkdir -p $(dirname ${docker_tag_file})
+        //                 echo ${DOCKER_TAG} > "${docker_tag_file}"
+        //                     sg docker -c "
+        //                         docker login -u '${USER}' -p '${PASS}'
+        //                         export RELEASE=0
+        //                         export IMAGE=\$DOCKER_TAG
+        //                         ./e2e-tests/build
+        //                         docker logout
+        //                     "
+        //                 sudo rm -rf ./build
+        //             '''
+        //         }
+        //         stash includes: 'results/docker/TAG', name: 'IMAGE'
+        //         archiveArtifacts 'results/docker/TAG'
+        //     }
+        // }
+        stage('Check licenses') {
+             when {
+                 expression {
+                     !skipBranchBuilds
+                 }
+             }
+             parallel {
+                 stage('GoLicenseDetector test') {
+                     steps {
+                         sh """
+                             mkdir -p $WORKSPACE/src/github.com/percona
+                             ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
+                             sg docker -c "
+                                 docker run \
+                                     --rm \
+                                     -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
+                                     -w /go/src/github.com/percona/percona-postgresql-operator \
+                                     -e GO111MODULE=on \
+                                     golang:1.20 sh -c '
+                                         go install github.com/google/go-licenses@latest;
+                                         /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
+                                             | cut -d , -f 3 \
+                                             | sort -u \
+                                             > go-licenses-new || :
+                                     '
+                             "
+                             diff -u ./e2e-tests/license/compare/go-licenses go-licenses-new
+                         """
+                     }
+                 }
+                 stage('GoLicense test') {
+                     steps {
+                         sh '''
+                             mkdir -p $WORKSPACE/src/github.com/percona
+                             ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
+                             sg docker -c "
+                                 docker run \
+                                     --rm \
+                                     -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
+                                     -w /go/src/github.com/percona/percona-postgresql-operator \
+                                     -e GO111MODULE=on \
+                                     -e GOFLAGS='-buildvcs=false' \
+                                     golang:1.20 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
+                             "
+                         '''
+
+                         withCredentials([string(credentialsId: 'GITHUB_API_TOKEN', variable: 'GITHUB_TOKEN')]) {
+                             sh """
+                                 golicense -plain ./percona-postgresql-operator \
+                                     | grep -v 'license not found' \
+                                     | sed -r 's/^[^ ]+[ ]+//' \
+                                     | sort \
+                                     | uniq \
+                                     > golicense-new || true
+                                 diff -u ./e2e-tests/license/compare/golicense golicense-new
+                             """
+                         }
+                     }
+                 }
+             }
         }
+        // stage('Run E2E tests') {
+        //     options {
+        //         timeout(time: 3, unit: 'HOURS')
+        //     }
+        //     parallel {
+        //         stage('cluster1') {
+        //             when {
+        //                 expression {
+        //                     !skipBranchBuilds
+        //                 }
+        //             }
+        //             agent {
+        //                 label 'docker'
+        //             }
+        //             steps {
+        //                 prepareNode()
+        //                 unstash "sourceFILES"
+        //                 clusterRunner('cluster1')
+        //             }
+        //         }
+        //         stage('cluster2') {
+        //             when {
+        //                 expression {
+        //                     !skipBranchBuilds
+        //                 }
+        //             }
+        //             agent {
+        //                 label 'docker'
+        //             }
+        //             steps {
+        //                 prepareNode()
+        //                 unstash "sourceFILES"
+        //                 clusterRunner('cluster2')
+        //             }
+        //         }
+        //         stage('cluster3') {
+        //             when {
+        //                 expression {
+        //                     !skipBranchBuilds
+        //                 }
+        //             }
+        //             agent {
+        //                 label 'docker'
+        //             }
+        //             steps {
+        //                 prepareNode()
+        //                 unstash "sourceFILES"
+        //                 clusterRunner('cluster3')
+        //             }
+        //         }
+        //         stage('cluster4') {
+        //             when {
+        //                 expression {
+        //                     !skipBranchBuilds
+        //                 }
+        //             }
+        //             agent {
+        //                 label 'docker'
+        //             }
+        //             steps {
+        //                 prepareNode()
+        //                 unstash "sourceFILES"
+        //                 clusterRunner('cluster4')
+        //             }
+        //         }
+        //     }
+        // }
     }
     post {
         always {
