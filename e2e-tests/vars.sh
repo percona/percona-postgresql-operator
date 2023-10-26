@@ -12,7 +12,7 @@ export VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' 
 
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
-export PG_VER="${PG_VER:-15}"
+export PG_VER="${PG_VER:-16}"
 export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbouncer"}
 export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
 export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest"}
