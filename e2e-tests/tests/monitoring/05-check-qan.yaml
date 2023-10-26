@@ -12,4 +12,4 @@ commands:
 
       get_metric_values node_boot_time_seconds ${NAMESPACE}-${instance} ${api_key}
       get_qan20_values ${NAMESPACE}-${instance} ${api_key}
-    timeout: 120
+    timeout: 360
