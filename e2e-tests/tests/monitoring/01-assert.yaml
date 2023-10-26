@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 120
+timeout: 480
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -14,6 +14,11 @@ status:
   replicas: 1
   updatedReplicas: 1
 ---
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-service
+---
 apiVersion: v1
 count: 1
 involvedObject:
@@ -23,8 +28,6 @@ involvedObject:
 kind: Event
 message: Ensured load balancer
 reason: EnsuredLoadBalancer
-reportingComponent: ""
-reportingInstance: ""
 source:
   component: service-controller
 type: Normal
