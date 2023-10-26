@@ -2,6 +2,8 @@ package v2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func init() {
@@ -11,6 +13,13 @@ func init() {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=pg-backup
+// +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.pgCluster",description="Cluster name"
+// +kubebuilder:printcolumn:name="Repo",type=string,JSONPath=".spec.repoName",description="Repo name"
+// +kubebuilder:printcolumn:name="Destination",type=string,JSONPath=".status.destination",description="Backup destination"
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=".status.state",description="Job status"
+// +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".status.backupType",description="Backup type"
+// +kubebuilder:printcolumn:name="Completed",type=date,JSONPath=".status.completed",description="Completed time"
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp",description="Created time"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +operator-sdk:csv:customresourcedefinitions:order=2
 // +operator-sdk:csv:customresourcedefinitions:resources={{CronJob,v1beta1},{Job,v1}}
@@ -57,7 +66,29 @@ const (
 )
 
 type PerconaPGBackupStatus struct {
-	JobName     string        `json:"jobName,omitempty"`
-	State       PGBackupState `json:"state,omitempty"`
-	CompletedAt *metav1.Time  `json:"completed,omitempty"`
+	JobName     string                         `json:"jobName,omitempty"`
+	State       PGBackupState                  `json:"state,omitempty"`
+	CompletedAt *metav1.Time                   `json:"completed,omitempty"`
+	Destination string                         `json:"destination,omitempty"`
+	BackupType  PGBackupType                   `json:"backupType,omitempty"`
+	StorageType PGBackupStorageType            `json:"storageType,omitempty"`
+	Repo        *crunchyv1beta1.PGBackRestRepo `json:"repo,omitempty"`
+	Image       string                         `json:"image,omitempty"`
 }
+
+type PGBackupStorageType string
+
+const (
+	PGBackupStorageTypeFilesystem PGBackupStorageType = "filesystem"
+	PGBackupStorageTypeAzure      PGBackupStorageType = "azure"
+	PGBackupStorageTypeGCS        PGBackupStorageType = "gcs"
+	PGBackupStorageTypeS3         PGBackupStorageType = "s3"
+)
+
+type PGBackupType string
+
+const (
+	PGBackupTypeFull         PGBackupType = "full"
+	PGBackupTypeDifferential PGBackupType = "differential"
+	PGBackupTypeIncremental  PGBackupType = "incremental"
+)

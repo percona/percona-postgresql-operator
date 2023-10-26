@@ -78,9 +78,8 @@ metadata:
   annotations:
     postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: operator-self-healing
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
 status:

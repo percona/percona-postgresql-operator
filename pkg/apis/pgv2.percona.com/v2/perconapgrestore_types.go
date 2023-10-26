@@ -14,6 +14,10 @@ func init() {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +operator-sdk:csv:customresourcedefinitions:order=3
 // +operator-sdk:csv:customresourcedefinitions:resources={{CronJob,v1beta1},{Job,v1}}
+// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.pgCluster",description="Cluster name"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.state",description="Job status"
+// +kubebuilder:printcolumn:name="Completed",type="date",JSONPath=".status.completed",description="Completed time"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 //
 // PerconaPGRestore is the CRD that defines a Percona PostgreSQL Restore
 type PerconaPGRestore struct {
