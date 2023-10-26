@@ -173,10 +173,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	}
 
 	pb := &pgbackup.PGBackupReconciler{
-		Client:   mgr.GetClient(),
-		Owner:    pgbackup.PGBackupControllerName,
-		Recorder: mgr.GetEventRecorderFor(pgbackup.PGBackupControllerName),
-		Tracer:   otel.Tracer(pgbackup.PGBackupControllerName),
+		Client: mgr.GetClient(),
 	}
 	if err := pb.SetupWithManager(mgr); err != nil {
 		return err
