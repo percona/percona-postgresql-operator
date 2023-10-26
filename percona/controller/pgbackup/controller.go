@@ -194,7 +194,7 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 func getBackupType(job *batchv1.Job) v2.PGBackupType {
 	var backupContainer corev1.Container
 	for _, container := range job.Spec.Template.Spec.Containers {
-		if len(container.Command) > 0 && container.Command[0] == "/opt/crunchy/bin/pgbackrest" {
+		if len(container.Command) > 0 && container.Name == naming.PGBackRestRepoContainerName {
 			backupContainer = container
 			break
 		}

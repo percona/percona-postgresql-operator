@@ -470,7 +470,7 @@ check_passwords_leak() {
 	fi
 }
 
-calculate_backup_destination() {
+get_backup_destination() {
 	local cluster=$1
 	local backup_name=$2
 
@@ -538,8 +538,8 @@ check_jobs_and_pgbackups() {
 		backup_name=$(get_backup_name_by_job "$job_name")
 
 		dest=$(kubectl get pg-backup -n "$NAMESPACE" "$backup_name" -o yaml | yq ".status.destination")
-		if [[ $dest != "$(calculate_backup_destination "$cluster" "$backup_name")" ]]; then
-			echo "ERROR: $dest != $(calculate_backup_destination "$cluster" "$backup_name")"
+		if [[ $dest != "$(get_backup_destination "$cluster" "$backup_name")" ]]; then
+			echo "ERROR: $dest != $(get_backup_destination "$cluster" "$backup_name")"
 			exit 1
 		fi
 
