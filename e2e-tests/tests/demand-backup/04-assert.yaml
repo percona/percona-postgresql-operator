@@ -13,9 +13,8 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: demand-backup
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
 status:

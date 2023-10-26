@@ -10,8 +10,6 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
-const MonitoringUser = "monitor"
-
 // #nosec G101
 
 const (
@@ -193,14 +191,14 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name:  "DB_USER",
-				Value: MonitoringUser,
+				Value: v2.UserMonitoring,
 			},
 			{
 				Name: "DB_PASS",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: pgc.Name + "-pguser-" + MonitoringUser,
+							Name: pgc.Name + "-pguser-" + v2.UserMonitoring,
 						},
 						Key: "password",
 					},

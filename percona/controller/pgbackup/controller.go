@@ -2,17 +2,22 @@ package pgbackup
 
 import (
 	"context"
+	"flag"
+	"io"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
@@ -37,8 +42,8 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGBackup{}).Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=get;list;watch
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
@@ -66,15 +71,36 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
-
 	switch pgBackup.Status.State {
 	case v2.BackupNew:
 		if pgCluster.Spec.Pause != nil && *pgCluster.Spec.Pause {
 			log.Info("Can't start backup. PostgresCluster is paused", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
-		if err := startBackup(ctx, r.Client, pgCluster, pgBackup); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "start backup")
+		// start backup only if backup job doesn't exist
+		_, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
+		if err != nil {
+			if !errors.Is(err, ErrBackupJobNotFound) {
+				return reconcile.Result{}, errors.Wrap(err, "find backup job")
+			}
+			if err := startBackup(ctx, r.Client, pgCluster, pgBackup); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "start backup")
+			}
+		}
+
+		pgBackup.Status.Destination = getDestination(pgCluster, pgBackup)
+		pgBackup.Status.Image = pgCluster.Spec.Backups.PGBackRest.Image
+		repo := getRepo(pgCluster, pgBackup)
+		pgBackup.Status.Repo = repo
+		switch {
+		case repo.S3 != nil:
+			pgBackup.Status.StorageType = v2.PGBackupStorageTypeS3
+		case repo.Azure != nil:
+			pgBackup.Status.StorageType = v2.PGBackupStorageTypeAzure
+		case repo.GCS != nil:
+			pgBackup.Status.StorageType = v2.PGBackupStorageTypeGCS
+		default:
+			pgBackup.Status.StorageType = v2.PGBackupStorageTypeFilesystem
 		}
 
 		pgBackup.Status.State = v2.BackupStarting
@@ -97,6 +123,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		pgBackup.Status.State = v2.BackupRunning
 		pgBackup.Status.JobName = job.Name
+		pgBackup.Status.BackupType = getBackupType(job)
 
 		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
@@ -121,6 +148,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
+		pgBackup.Status.CompletedAt = job.Status.CompletionTime
 		pgBackup.Status.State = status
 		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
@@ -130,6 +158,79 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	default:
 		return reconcile.Result{}, nil
 	}
+}
+
+func getRepo(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) *v1beta1.PGBackRestRepo {
+	repoName := pb.Spec.RepoName
+	var repo *v1beta1.PGBackRestRepo
+	for i, r := range pg.Spec.Backups.PGBackRest.Repos {
+		if repoName == r.Name {
+			repo = &pg.Spec.Backups.PGBackRest.Repos[i]
+			break
+		}
+	}
+	return repo
+}
+
+func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
+	destination := ""
+	repo := getRepo(pg, pb)
+	if repo == nil {
+		return ""
+	}
+
+	repoPath := pg.Spec.Backups.PGBackRest.Global[repo.Name+"-path"]
+
+	switch {
+	case repo.S3 != nil:
+		destination = "s3://" + path.Join(repo.S3.Bucket, repoPath)
+	case repo.GCS != nil:
+		destination = "gs://" + path.Join(repo.GCS.Bucket, repoPath)
+	case repo.Azure != nil:
+		destination = "azure://" + path.Join(repo.Azure.Container, repoPath)
+	default:
+		return ""
+	}
+
+	return destination
+}
+
+func getBackupType(job *batchv1.Job) v2.PGBackupType {
+	var backupContainer corev1.Container
+	for _, container := range job.Spec.Template.Spec.Containers {
+		if len(container.Command) > 0 && container.Name == naming.PGBackRestRepoContainerName {
+			backupContainer = container
+			break
+		}
+	}
+	cmdOpts := ""
+	for _, env := range backupContainer.Env {
+		if env.Name == "COMMAND_OPTS" {
+			cmdOpts = env.Value
+			break
+		}
+	}
+	backupType := getBackupTypeFromOpts(cmdOpts)
+	switch backupType {
+	case postgrescluster.Differential:
+		return v2.PGBackupTypeDifferential
+	case postgrescluster.Incremental:
+		return v2.PGBackupTypeIncremental
+	case postgrescluster.Full:
+		return v2.PGBackupTypeFull
+	default:
+		// Incremental is default: https://pgbackrest.org/command.html#command-backup/category-command/option-type
+		return v2.PGBackupTypeIncremental
+	}
+}
+
+func getBackupTypeFromOpts(opts string) string {
+	flagSet := flag.NewFlagSet("", flag.ErrorHandling(-1))
+	flagSet.SetOutput(io.Discard)
+
+	backupType := flagSet.String("type", "", "")
+	_ = flagSet.Parse(strings.Split(opts, " "))
+	return *backupType
 }
 
 func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) error {
@@ -155,13 +256,21 @@ func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, 
 }
 
 func findBackupJob(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) (*batchv1.Job, error) {
+	if jobName := pb.GetAnnotations()[v2.AnnotationPGBackrestBackupJobName]; jobName != "" {
+		job := new(batchv1.Job)
+		err := c.Get(ctx, types.NamespacedName{Name: jobName, Namespace: pb.Namespace}, job)
+		if err != nil {
+			return nil, errors.Wrap(err, "get backup job by .status.jobName")
+		}
+		return job, nil
+	}
+
 	jobList := &batchv1.JobList{}
-	selector := labels.SelectorFromSet(map[string]string{
-		naming.LabelCluster:          pg.Name,
-		naming.LabelPGBackRestBackup: "manual",
-		naming.LabelPGBackRestRepo:   pb.Spec.RepoName,
-	})
-	err := c.List(ctx, jobList, client.InNamespace(pg.Namespace), client.MatchingLabelsSelector{Selector: selector})
+	err := c.List(ctx, jobList,
+		client.InNamespace(pg.Namespace),
+		client.MatchingLabelsSelector{
+			Selector: naming.PGBackRestBackupJobSelector(pg.Name, pb.Spec.RepoName, naming.BackupManual),
+		})
 	if err != nil {
 		return nil, errors.Wrap(err, "get backup jobs")
 	}

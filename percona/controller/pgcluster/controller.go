@@ -59,12 +59,16 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), r.watchSecrets()); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), r.watchBackupJobs()); err != nil {
+		return errors.Wrap(err, "unable to watch jobs")
+	}
 
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
 		Watches(&corev1.Service{}, r.watchServices()).
 		Watches(&corev1.Secret{}, r.watchSecrets()).
+		Watches(&batchv1.Job{}, r.watchBackupJobs()).
 		Complete(r)
 }
 
@@ -75,6 +79,24 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 			crName := labels[naming.LabelCluster]
 
 			if e.ObjectNew.GetName() == crName+"-pgbouncer" {
+				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+					Namespace: e.ObjectNew.GetNamespace(),
+					Name:      crName,
+				}})
+			}
+		},
+	}
+}
+
+func (r *PGClusterReconciler) watchBackupJobs() handler.Funcs {
+	return handler.Funcs{
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			labels := e.ObjectNew.GetLabels()
+			crName := labels[naming.LabelCluster]
+			repoName := labels[naming.LabelPGBackRestRepo]
+
+			if len(crName) != 0 && len(repoName) != 0 &&
+				!reflect.DeepEqual(e.ObjectNew.(*batchv1.Job).Status, e.ObjectOld.(*batchv1.Job).Status) {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      crName,
@@ -105,6 +127,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/status,verbs=patch;update
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx)
@@ -151,8 +174,16 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile version")
 	}
 
-	if err := controllerutil.SetControllerReference(cr, postgresCluster, r.Client.Scheme()); err != nil {
-		return ctrl.Result{}, err
+	if err := r.reconcileBackupJobs(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile backup jobs")
+	}
+
+	if err := r.addPMMSidecar(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
+	}
+
+	if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
@@ -167,91 +198,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
-		postgresCluster.Default()
+		var err error
+		postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
 
-		annotations := make(map[string]string)
-		for k, v := range cr.Annotations {
-			switch k {
-			case v2.AnnotationPGBackrestBackup:
-				annotations[naming.PGBackRestBackup] = v
-			case v2.AnnotationPGBackRestRestore:
-				annotations[naming.PGBackRestRestore] = v
-			case corev1.LastAppliedConfigAnnotation:
-				continue
-			default:
-				annotations[k] = v
-			}
-		}
-		postgresCluster.Annotations = annotations
-		postgresCluster.Labels = cr.Labels
-
-		postgresCluster.Spec.Image = cr.Spec.Image
-		postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
-		postgresCluster.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
-
-		postgresCluster.Spec.PostgresVersion = cr.Spec.PostgresVersion
-		postgresCluster.Spec.Port = cr.Spec.Port
-		postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
-		postgresCluster.Spec.Paused = cr.Spec.Unmanaged
-		postgresCluster.Spec.Shutdown = cr.Spec.Pause
-		postgresCluster.Spec.Standby = cr.Spec.Standby
-		postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
-
-		postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
-		postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
-
-		postgresCluster.Spec.Backups = cr.Spec.Backups
-		postgresCluster.Spec.DataSource = cr.Spec.DataSource
-		postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
-		postgresCluster.Spec.Patroni = cr.Spec.Patroni
-
-		users := make([]v1beta1.PostgresUserSpec, 0)
-
-		for _, user := range cr.Spec.Users {
-			if user.Name == pmm.MonitoringUser {
-				log.Info(pmm.MonitoringUser + " user is reserved, it'll be ignored.")
-				continue
-			}
-			users = append(users, user)
-		}
-
-		if cr.PMMEnabled() {
-			users = append(cr.Spec.Users, v1beta1.PostgresUserSpec{
-				Name:    pmm.MonitoringUser,
-				Options: "SUPERUSER",
-				Password: &v1beta1.PostgresPasswordSpec{
-					Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
-				},
-			})
-
-			if cr.Spec.Users == nil || len(cr.Spec.Users) == 0 {
-				// Add default user: <cluster-name>-pguser-<cluster-name>
-				users = append(users, v1beta1.PostgresUserSpec{
-					Name: v1beta1.PostgresIdentifier(cr.Name),
-					Databases: []v1beta1.PostgresIdentifier{
-						v1beta1.PostgresIdentifier(cr.Name),
-					},
-					Password: &v1beta1.PostgresPasswordSpec{
-						Type: v1beta1.PostgresPasswordTypeAlphaNumeric,
-					},
-				})
-			}
-		}
-
-		postgresCluster.Spec.Users = users
-
-		if err := r.addPMMSidecar(ctx, cr); err != nil {
-			return errors.Wrap(err, "failed to add pmm sidecar")
-		}
-
-		if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
-			return err
-		}
-
-		postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
-		postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
-
-		return nil
+		return err
 	})
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update/create PostgresCluster")
@@ -340,7 +290,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	log := logging.FromContext(ctx)
 
 	secret := new(corev1.Secret)
-	n := cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser
+	n := cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring
 
 	if err := r.Client.Get(ctx, types.NamespacedName{
 		Name:      n,
