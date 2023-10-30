@@ -153,6 +153,7 @@ rules:
   - pgv2.percona.com
   resources:
   - perconapgclusters/finalizers
+  - perconapgbackups/finalizers
   verbs:
   - update
 - apiGroups:

@@ -45,7 +45,7 @@ spec:
           value: INFO
         - name: DISABLE_TELEMETRY
           value: "false"
-        image: perconalab/percona-postgresql-operator:main
+        image: tishina/percona-postgresql-operator:K8SPG-391_openshift_certification
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
