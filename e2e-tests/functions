@@ -259,7 +259,7 @@ wait_for_delete() {
 deploy_pmm_server() {
 	local platform=kubernetes
 	helm uninstall -n "${NAMESPACE}" pmm || :
-	if [[ -n $OPENSHIFT ]]; then
+	if [[ $OPENSHIFT ]]; then
 		platform=openshift
 		oc create sa pmm-server -n "$NAMESPACE"
 		oc adm policy add-scc-to-user privileged -z pmm-server -n "$NAMESPACE"
