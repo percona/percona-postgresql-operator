@@ -47,9 +47,9 @@ func (r *Reconciler) reconcileClusterConfigMap(
 
 	clusterConfigMap.Annotations = naming.Merge(cluster.Spec.Metadata.GetAnnotationsOrNil())
 	clusterConfigMap.Labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
-		})
+		}, cluster.Name, ""))
 
 	if err == nil {
 		err = patroni.ClusterConfigMap(ctx, cluster, pgHBAs, pgParameters,
@@ -76,9 +76,9 @@ func (r *Reconciler) reconcileClusterPodService(
 
 	clusterPodService.Annotations = naming.Merge(cluster.Spec.Metadata.GetAnnotationsOrNil())
 	clusterPodService.Labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
-		})
+		}, cluster.Name, "pg"))
 
 	// Allocate no IP address (headless) and match any Pod with the cluster
 	// label, regardless of its readiness. Not particularly useful by itself, but
@@ -118,10 +118,10 @@ func (r *Reconciler) generateClusterPrimaryService(
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
 	service.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePrimary,
-		})
+		}, cluster.Name, "pg"))
 
 	err := errors.WithStack(r.setControllerReference(cluster, service))
 
@@ -203,10 +203,10 @@ func (r *Reconciler) generateClusterReplicaService(
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
 	service.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RoleReplica,
-		})
+		}, cluster.Name, "pg"))
 
 	// Allocate an IP address and let Kubernetes manage the Endpoints by
 	// selecting Pods with the Patroni replica role.
