@@ -243,10 +243,10 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		})
+		}, cluster.Name, "pgbouncer"))
 
 	if err == nil {
 		err = pgbouncer.Secret(ctx, cluster, root, existing, service, intent)

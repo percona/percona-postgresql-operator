@@ -383,7 +383,7 @@ func (r *Reconciler) reconcilePGAdminDataVolume(
 	)
 	pvc.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		labelMap,
+		naming.WithPerconaLabels(labelMap, cluster.Name, ""),
 	)
 	pvc.Spec = cluster.Spec.UserInterface.PGAdmin.DataVolumeClaimSpec
 

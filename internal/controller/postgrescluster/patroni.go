@@ -404,10 +404,10 @@ func (r *Reconciler) reconcileReplicationSecret(
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "replication-client-tls",
-		})
+		}, cluster.Name, ""))
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.
