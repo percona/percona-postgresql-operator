@@ -58,9 +58,9 @@ spec:
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
 
-  image: perconalab/percona-postgresql-operator:k8spg-375-postgres
+  image: perconalab/percona-postgresql-operator:main-ppg16-postgres
   imagePullPolicy: Always
-  postgresVersion: 15
+  postgresVersion: 16
 #  port: 5432
 
 #  expose:
@@ -119,7 +119,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-ppg15-pgbouncer
+      image: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -175,7 +175,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-ppg15-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
 #      configuration:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets

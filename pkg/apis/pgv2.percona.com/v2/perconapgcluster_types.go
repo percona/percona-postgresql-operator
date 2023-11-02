@@ -1,12 +1,17 @@
 package v2
 
 import (
+	"context"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -78,8 +83,8 @@ type PerconaPGClusterSpec struct {
 
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=10
-	// +kubebuilder:validation:Maximum=15
+	// +kubebuilder:validation:Minimum=12
+	// +kubebuilder:validation:Maximum=16
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -170,6 +175,10 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
+	if cr.Spec.Proxy.PGBouncer == nil {
+		cr.Spec.Proxy.PGBouncer = new(PGBouncerSpec)
+	}
+
 	if cr.Spec.Proxy.PGBouncer.Metadata == nil {
 		cr.Spec.Proxy.PGBouncer.Metadata = new(crunchyv1beta1.Metadata)
 	}
@@ -185,6 +194,101 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.Backups.PGBackRest.Metadata.Labels = make(map[string]string)
 	}
 	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
+}
+
+func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crunchyv1beta1.PostgresCluster, scheme *runtime.Scheme) (*crunchyv1beta1.PostgresCluster, error) {
+	log := logging.FromContext(ctx)
+
+	if postgresCluster == nil {
+		postgresCluster = &crunchyv1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cr.Name,
+				Namespace: cr.Namespace,
+			},
+		}
+	}
+
+	if err := controllerutil.SetControllerReference(cr, postgresCluster, scheme); err != nil {
+		return nil, err
+	}
+
+	postgresCluster.Default()
+
+	annotations := make(map[string]string)
+	for k, v := range cr.Annotations {
+		switch k {
+		case AnnotationPGBackrestBackup:
+			annotations[naming.PGBackRestBackup] = v
+		case AnnotationPGBackRestRestore:
+			annotations[naming.PGBackRestRestore] = v
+		case corev1.LastAppliedConfigAnnotation:
+			continue
+		default:
+			annotations[k] = v
+		}
+	}
+	postgresCluster.Annotations = annotations
+	postgresCluster.Labels = cr.Labels
+
+	postgresCluster.Spec.Image = cr.Spec.Image
+	postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
+	postgresCluster.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
+
+	postgresCluster.Spec.PostgresVersion = cr.Spec.PostgresVersion
+	postgresCluster.Spec.Port = cr.Spec.Port
+	postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
+	postgresCluster.Spec.Paused = cr.Spec.Unmanaged
+	postgresCluster.Spec.Shutdown = cr.Spec.Pause
+	postgresCluster.Spec.Standby = cr.Spec.Standby
+	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
+
+	postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
+	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
+
+	postgresCluster.Spec.Backups = cr.Spec.Backups
+	postgresCluster.Spec.DataSource = cr.Spec.DataSource
+	postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
+	postgresCluster.Spec.Patroni = cr.Spec.Patroni
+
+	users := make([]crunchyv1beta1.PostgresUserSpec, 0)
+
+	for _, user := range cr.Spec.Users {
+		if user.Name == UserMonitoring {
+			log.Info(UserMonitoring + " user is reserved, it'll be ignored.")
+			continue
+		}
+		users = append(users, user)
+	}
+
+	if cr.PMMEnabled() {
+		users = append(cr.Spec.Users, crunchyv1beta1.PostgresUserSpec{
+			Name:    UserMonitoring,
+			Options: "SUPERUSER",
+			Password: &crunchyv1beta1.PostgresPasswordSpec{
+				Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
+			},
+		})
+
+		if cr.Spec.Users == nil || len(cr.Spec.Users) == 0 {
+			// Add default user: <cluster-name>-pguser-<cluster-name>
+			users = append(users, crunchyv1beta1.PostgresUserSpec{
+				Name: crunchyv1beta1.PostgresIdentifier(cr.Name),
+				Databases: []crunchyv1beta1.PostgresIdentifier{
+					crunchyv1beta1.PostgresIdentifier(cr.Name),
+				},
+				Password: &crunchyv1beta1.PostgresPasswordSpec{
+					Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
+				},
+			})
+		}
+	}
+
+	postgresCluster.Spec.Users = users
+
+	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
+	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
+
+	return postgresCluster, nil
 }
 
 type AppState string
@@ -588,6 +692,10 @@ type PGBouncerSpec struct {
 }
 
 func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
+	if p == nil {
+		return nil
+	}
+
 	spec := &crunchyv1beta1.PGBouncerPodSpec{
 		Metadata:                  p.Metadata,
 		Affinity:                  p.Affinity,
@@ -629,24 +737,28 @@ const (
 const annotationPrefix = "pgv2.percona.com/"
 
 const (
-	// PGBackRestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
+	// AnnotationPGBackrestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
 	// backup.  The value of the annotation will be a unique identifier for a backup Job (e.g. a
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.  Also used to annotate the backup Job itself as needed to identify the backup
 	// ID associated with a specific manual backup Job.
 	AnnotationPGBackrestBackup = annotationPrefix + "pgbackrest-backup"
 
-	// PGBackRestRestore is the annotation that is added to a PerconaPGCluster to initiate an in-place
+	// AnnotationPGBackrestBackupJobName is the annotation that is added to a PerconaPGClusterBackup.
+	// The value of the annotation will be a name of an existing backup job
+	AnnotationPGBackrestBackupJobName = AnnotationPGBackrestBackup + "-job-name"
+
+	// AnnotationPGBackRestRestore is the annotation that is added to a PerconaPGCluster to initiate an in-place
 	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.
 	AnnotationPGBackRestRestore = annotationPrefix + "pgbackrest-restore"
 
-	// PMMSecretHash is the annotation that is added to instance annotations to
+	// AnnotationPMMSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case PMM credentials are rotated.
 	AnnotationPMMSecretHash = annotationPrefix + "pmm-secret-hash"
 
-	// MonitorUserSecretHash is the annotation that is added to instance annotations to
+	// AnnotationMonitorUserSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case monitor user password is changed.
 	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-secret-hash"
 )
@@ -666,4 +778,8 @@ func GetDefaultVersionServiceEndpoint() string {
 const (
 	FinalizerDeletePVC = "percona.com/delete-pvc"
 	FinalizerDeleteSSL = "percona.com/delete-ssl"
+)
+
+const (
+	UserMonitoring = "monitor"
 )
