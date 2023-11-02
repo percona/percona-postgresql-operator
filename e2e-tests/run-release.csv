@@ -5,6 +5,7 @@ operator-self-healing
 scaling
 scheduled-backup
 self-healing
+standby
 start-from-backup
 telemetry-transfer
 users

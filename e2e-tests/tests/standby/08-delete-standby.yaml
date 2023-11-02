@@ -1,0 +1,14 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl delete -n "${NAMESPACE}" pg standby-standby
+      kubectl delete -n "${NAMESPACE}" pvc -l 'postgres-operator.crunchydata.com/cluster=standby-standby'
+
+      sleep 30
+

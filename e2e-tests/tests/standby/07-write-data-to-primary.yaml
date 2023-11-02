@@ -1,0 +1,18 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      run_psql_local \
+        'CREATE DATABASE myapp2; \c myapp2 \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
+        "postgres:$(get_psql_user_pass standby-primary-pguser-postgres)@$(get_psql_user_host standby-primary-pguser-postgres)"
+      
+      run_psql_local \
+        '\c myapp2 \\\ INSERT INTO myApp (id) VALUES (100500)' \
+        "postgres:$(get_psql_user_pass standby-primary-pguser-postgres)@$(get_psql_user_host standby-primary-pguser-postgres)"
+      
+      sleep 60
