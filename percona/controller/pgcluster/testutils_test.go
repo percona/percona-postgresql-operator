@@ -20,6 +20,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/util"
+	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -41,6 +42,12 @@ func crunchyReconciler() *postgrescluster.Reconciler {
 		Recorder: new(record.FakeRecorder),
 		Tracer:   otel.Tracer("test"),
 		PodExec:  func(string, string, string, io.Reader, io.Writer, io.Writer, ...string) error { return nil },
+	}
+}
+
+func backupReconciler() *pgbackup.PGBackupReconciler {
+	return &pgbackup.PGBackupReconciler{
+		Client: k8sClient,
 	}
 }
 
