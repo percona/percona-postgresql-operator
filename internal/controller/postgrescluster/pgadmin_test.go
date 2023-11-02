@@ -86,6 +86,10 @@ kind: ConfigMap
 		assert.Assert(t, cmp.MarshalMatches(configmap.ObjectMeta, `
 creationTimestamp: null
 labels:
+  app.kubernetes.io/instance: pg1
+  app.kubernetes.io/managed-by: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql
+  app.kubernetes.io/part-of: percona-postgresql
   postgres-operator.crunchydata.com/cluster: pg1
   postgres-operator.crunchydata.com/role: pgadmin
 name: pg1-pgadmin
@@ -123,11 +127,11 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, configmap.ObjectMeta.Labels, map[string]string{
+		assert.DeepEqual(t, configmap.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"c": "v7", "d": "v4", "f": "v8",
 			"postgres-operator.crunchydata.com/cluster": "pg1",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		})
+		}, "pg1", "")))
 	})
 }
 
@@ -175,6 +179,10 @@ kind: Service
 		assert.Assert(t, marshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:
+  app.kubernetes.io/instance: my-cluster
+  app.kubernetes.io/managed-by: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql
+  app.kubernetes.io/part-of: percona-postgresql
   postgres-operator.crunchydata.com/cluster: my-cluster
   postgres-operator.crunchydata.com/role: pgadmin
 name: my-cluster-pgadmin
@@ -213,11 +221,11 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string{
+		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "my-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		})
+		}, "my-cluster", "")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -245,12 +253,12 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string{
+		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "my-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		})
+		}, "my-cluster", "")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -516,6 +524,10 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 		assert.Assert(t, cmp.MarshalMatches(template.ObjectMeta, `
 creationTimestamp: null
 labels:
+  app.kubernetes.io/instance: test-cluster
+  app.kubernetes.io/managed-by: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql
+  app.kubernetes.io/part-of: percona-postgresql
   postgres-operator.crunchydata.com/cluster: test-cluster
   postgres-operator.crunchydata.com/data: pgadmin
   postgres-operator.crunchydata.com/role: pgadmin
@@ -629,6 +641,10 @@ annotations:
   annotation1: annotationvalue
 creationTimestamp: null
 labels:
+  app.kubernetes.io/instance: custom-cluster
+  app.kubernetes.io/managed-by: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql
+  app.kubernetes.io/part-of: percona-postgresql
   label1: labelvalue
   postgres-operator.crunchydata.com/cluster: custom-cluster
   postgres-operator.crunchydata.com/data: pgadmin

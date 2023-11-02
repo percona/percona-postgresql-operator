@@ -1942,7 +1942,7 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestConfigLabels(cluster.Name),
+		naming.WithPerconaLabels(naming.PGBackRestConfigLabels(cluster.Name), cluster.Name, ""),
 	)
 
 	existing := &corev1.Secret{}

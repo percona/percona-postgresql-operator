@@ -1157,12 +1157,12 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	sts.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    sts.Name,
 			naming.LabelData:        naming.DataPostgres,
-		})
+		}, cluster.Name, "pg"))
 	sts.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster:     cluster.Name,
@@ -1177,12 +1177,12 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    sts.Name,
 			naming.LabelData:        naming.DataPostgres,
-		})
+		}, cluster.Name, "pg"))
 
 	// Don't clutter the namespace with extra ControllerRevisions.
 	// The "controller-revision-hash" label still exists on the Pod.
@@ -1305,11 +1305,11 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 	instanceConfigMap.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    instance.Name,
-		})
+		}, cluster.Name, "pg"))
 
 	if err == nil {
 		err = patroni.InstanceConfigMap(ctx, cluster, spec, instanceConfigMap)
@@ -1351,11 +1351,11 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	instanceCerts.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    instance.Name,
-		})
+		}, cluster.Name, ""))
 
 	// This secret is holding certificates, but the "kubernetes.io/tls" type
 	// expects an *unencrypted* private key. We're also adding other values and
