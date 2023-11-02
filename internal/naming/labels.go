@@ -22,8 +22,15 @@ import (
 const (
 	labelPrefix        = "postgres-operator.crunchydata.com/"
 	perconaLabelPrefix = "pgv2.percona.com/"
+	appK8sPrefix       = "app.kubernetes.io/"
 
 	LabelVersion = perconaLabelPrefix + "version"
+
+	LabelPerconaComponent = appK8sPrefix + "component"
+	LabelPerconaManagedBy = appK8sPrefix + "managed-by"
+	LabelPerconaPartOf    = appK8sPrefix + "part-of"
+	LabelPerconaName      = appK8sPrefix + "name"
+	LabelPerconaInstance  = appK8sPrefix + "instance"
 
 	// LabelCluster et al. provides the fundamental labels for Postgres instances
 	LabelCluster     = labelPrefix + "cluster"
@@ -286,4 +293,24 @@ func PGBackRestRepoVolumeLabels(clusterName, repoName string) labels.Set {
 		LabelData:                 DataPGBackRest,
 	}
 	return labels.Merge(repoLabels, repoVolLabels)
+}
+
+// WithPerconaLabels takes a map of labels and merges them with the Percona specific
+// set of labels.
+func WithPerconaLabels(set map[string]string, clusterName, component string) labels.Set {
+	ls := labels.Set{
+		LabelPerconaManagedBy: "percona-postgresql-operator",
+		LabelPerconaName:      "percona-postgresql",
+		LabelPerconaPartOf:    "percona-postgresql",
+	}
+
+	if clusterName != "" {
+		ls[LabelPerconaInstance] = clusterName
+	}
+
+	if component != "" {
+		ls[LabelPerconaComponent] = component
+	}
+
+	return labels.Merge(set, ls)
 }
