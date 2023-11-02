@@ -13,7 +13,7 @@ create_namespace() {
 	local namespace=$1
 
 	if [[ "$OPENSHIFT" ]]; then
-	  set -o pipefail
+		set -o pipefail
 		if [[ $OPERATOR_NS ]] && (oc get project "$OPERATOR_NS" -o json >/dev/null 2>&1 | jq -r '.metadata.name' >/dev/null 2>&1); then
 			oc delete --grace-period=0 --force=true project "$namespace" && sleep 120 || :
 		else
