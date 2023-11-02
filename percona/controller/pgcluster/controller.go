@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -184,6 +186,17 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	if cr.Spec.Pause != nil && *cr.Spec.Pause {
+		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "is backup running")
+		}
+		if backupRunning {
+			*cr.Spec.Pause = false
+			log.Info("Backup is running. Can't pause cluster", "cluster", cr.Name)
+		}
+	}
+
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		var err error
 		postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
@@ -309,4 +322,40 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	}
 
 	return nil
+}
+
+func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
+	jobList := &batchv1.JobList{}
+	selector := labels.SelectorFromSet(map[string]string{
+		naming.LabelCluster: cr.Name,
+	})
+	err := cl.List(ctx, jobList, client.InNamespace(cr.Namespace), client.MatchingLabelsSelector{Selector: selector}, client.HasLabels{naming.LabelPGBackRestBackup})
+	if err != nil {
+		return false, errors.Wrap(err, "get backup jobs")
+	}
+
+	for _, job := range jobList.Items {
+		job := job
+		if perconaController.JobFailed(&job) || perconaController.JobCompleted(&job) {
+			continue
+		}
+		return true, nil
+	}
+
+	backupList := &v2.PerconaPGBackupList{}
+	if err := cl.List(ctx, backupList, &client.ListOptions{
+		Namespace: cr.Namespace}); err != nil {
+		return false, errors.Wrap(err, "list backups")
+	}
+
+	for _, backup := range backupList.Items {
+		if backup.Spec.PGCluster != cr.Name {
+			continue
+		}
+		if backup.Status.State == v2.BackupStarting || backup.Status.State == v2.BackupRunning {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
