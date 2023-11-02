@@ -118,6 +118,7 @@ func (r *Reconciler) reconcileRootCertificate(
 func (r *Reconciler) reconcileClusterCertificate(
 	ctx context.Context, root *pki.RootCertificateAuthority,
 	cluster *v1beta1.PostgresCluster, primaryService *corev1.Service,
+	replicaService *corev1.Service,
 ) (
 	*corev1.SecretProjection, error,
 ) {
@@ -133,7 +134,7 @@ func (r *Reconciler) reconcileClusterCertificate(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
 
 	leaf := &pki.LeafCertificate{}
-	dnsNames := naming.ServiceDNSNames(ctx, primaryService)
+	dnsNames := append(naming.ServiceDNSNames(ctx, primaryService), naming.ServiceDNSNames(ctx, replicaService)...)
 	dnsFQDN := dnsNames[0]
 
 	if err == nil {
@@ -155,10 +156,10 @@ func (r *Reconciler) reconcileClusterCertificate(
 	intent.Annotations = naming.Merge(cluster.Spec.Metadata.GetAnnotationsOrNil())
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "postgres-tls",
-		})
+		}, cluster.Name, ""))
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.

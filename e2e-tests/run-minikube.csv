@@ -1,7 +1,9 @@
 demand-backup
 init-deploy
+operator-self-healing
 scaling
 scheduled-backup
+self-healing
 start-from-backup
 telemetry-transfer
 users

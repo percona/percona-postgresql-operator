@@ -1,3 +1,6 @@
+//go:build envtest
+// +build envtest
+
 package pgcluster
 
 import (
@@ -9,20 +12,15 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.opentelemetry.io/otel"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/featuregate"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -33,9 +31,8 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg       *rest.Config
-	k8sClient client.Client
-	testEnv   *envtest.Environment
+	cfg     *rest.Config
+	testEnv *envtest.Environment
 )
 
 func TestAPIs(t *testing.T) {
@@ -85,40 +82,6 @@ var _ = AfterSuite(func() {
 	Expect(os.Unsetenv("DISABLE_TELEMETRY")).To(Succeed())
 })
 
-func reconciler() *PGClusterReconciler {
-	return (&PGClusterReconciler{
-		Client:      k8sClient,
-		Platform:    "unknown",
-		KubeVersion: "1.25",
-	})
-}
-
-func crunchyReconciler() *postgrescluster.Reconciler {
-	return &postgrescluster.Reconciler{
-		Client:   k8sClient,
-		Owner:    postgrescluster.ControllerName,
-		Recorder: new(record.FakeRecorder),
-		Tracer:   otel.Tracer("test"),
-	}
-}
-
-func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	cr := &v2.PerconaPGCluster{}
-
-	if err := yaml.Unmarshal(data, cr); err != nil {
-		return nil, err
-	}
-
-	cr.Name = name
-	cr.Namespace = namespace
-	return cr, nil
-}
-
 func updateCrunchyPGClusterStatus(ctx context.Context, nn types.NamespacedName, update func(*v1beta1.PostgresCluster)) {
 	pgc := &v1beta1.PostgresCluster{}
 	Eventually(func() bool {
@@ -141,21 +104,4 @@ func updatePerconaPGClusterCR(ctx context.Context, nn types.NamespacedName, upda
 	update(cr)
 
 	Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
-}
-
-func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	cr := &appsv1.Deployment{}
-
-	if err := yaml.Unmarshal(data, cr); err != nil {
-		return nil, err
-	}
-
-	cr.Name = name
-	cr.Namespace = namespace
-	return cr, nil
 }

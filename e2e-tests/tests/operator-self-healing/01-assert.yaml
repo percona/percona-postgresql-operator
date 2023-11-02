@@ -1,0 +1,27 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chaos-controller-manager
+spec:
+  replicas: 3
+status:
+  availableReplicas: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: chaos-daemon
+status:
+  currentNumberScheduled: 3
+  desiredNumberScheduled: 3
+  numberAvailable: 3
+  numberMisscheduled: 0
+  numberReady: 3
+  updatedNumberScheduled: 3

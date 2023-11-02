@@ -6,7 +6,7 @@ metadata:
 #  - percona.com/delete-pvc
 #  - percona.com/delete-ssl
 spec:
-  crVersion: 2.2.0
+  crVersion: 2.3.0
 #  secrets:
 #    customTLSSecret:
 #      name: cluster1-cert
@@ -58,9 +58,9 @@ spec:
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
 
-  image: perconalab/percona-postgresql-operator:main-ppg15-postgres
+  image: perconalab/percona-postgresql-operator:main-ppg16-postgres
   imagePullPolicy: Always
-  postgresVersion: 15
+  postgresVersion: 16
 #  port: 5432
 
 #  expose:
@@ -69,6 +69,8 @@ spec:
 #    labels:
 #      my-label: value2
 #    type: LoadBalancer
+#    loadBalancerSourceRanges:
+#      - 10.0.0.0/8
 
   instances:
   - name: instance1
@@ -117,7 +119,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-ppg15-pgbouncer
+      image: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -130,6 +132,8 @@ spec:
 #        labels:
 #          my-label: value2
 #        type: LoadBalancer
+#        loadBalancerSourceRanges:
+#          - 10.0.0.0/8
 #
 #      affinity:
 #        podAntiAffinity:
@@ -171,7 +175,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-ppg15-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
 #      configuration:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets

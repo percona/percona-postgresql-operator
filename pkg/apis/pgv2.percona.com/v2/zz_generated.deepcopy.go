@@ -23,7 +23,7 @@ package v2
 import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	"k8s.io/api/core/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -340,6 +340,11 @@ func (in *PerconaPGBackupStatus) DeepCopyInto(out *PerconaPGBackupStatus) {
 	if in.CompletedAt != nil {
 		in, out := &in.CompletedAt, &out.CompletedAt
 		*out = (*in).DeepCopy()
+	}
+	if in.Repo != nil {
+		in, out := &in.Repo, &out.Repo
+		*out = new(v1beta1.PGBackRestRepo)
+		(*in).DeepCopyInto(*out)
 	}
 }
 
@@ -686,6 +691,11 @@ func (in *ServiceExpose) DeepCopyInto(out *ServiceExpose) {
 		in, out := &in.NodePort, &out.NodePort
 		*out = new(int32)
 		**out = **in
+	}
+	if in.LoadBalancerSourceRanges != nil {
+		in, out := &in.LoadBalancerSourceRanges, &out.LoadBalancerSourceRanges
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 }
 

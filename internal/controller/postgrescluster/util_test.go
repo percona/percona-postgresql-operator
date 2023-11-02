@@ -529,3 +529,45 @@ func TestJobFailed(t *testing.T) {
 		})
 	}
 }
+
+func TestGetTMPSizeLimit(t *testing.T) {
+	// Test case 1: version is empty string
+	version := ""
+	resources := corev1.ResourceRequirements{}
+	expected := tmpDirSizeLimitLT230
+	result := getTMPSizeLimit(version, resources)
+	if result != expected {
+		t.Errorf("result: %+v, expected: %+v", result, expected)
+	}
+
+	// Test case 2: version < 2.3.0
+	version = "2.2.0"
+	resources = corev1.ResourceRequirements{}
+	expected = tmpDirSizeLimitLT230
+	result = getTMPSizeLimit(version, resources)
+	if result != expected {
+		t.Errorf("result: %+v, expected: %+v", result, expected)
+	}
+
+	// Test case 3: version >= 2.3.0, ephemeral storage limit set
+	version = "2.3.0"
+	resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+		},
+	}
+	expected = resource.MustParse("2Gi")
+	result = getTMPSizeLimit(version, resources)
+	if result != expected {
+		t.Errorf("result: %+v, expected: %+v", result, expected)
+	}
+
+	// Test case 4: version >= 2.3.0, ephemeral storage limit not set
+	version = "2.3.0"
+	resources = corev1.ResourceRequirements{}
+	expected = tmpDirSizeLimitGTE230
+	result = getTMPSizeLimit(version, resources)
+	if result != expected {
+		t.Errorf("result: %+v, expected: %+v", result, expected)
+	}
+}

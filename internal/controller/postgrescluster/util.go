@@ -20,6 +20,7 @@ import (
 	"hash/fnv"
 	"io"
 
+	gover "github.com/hashicorp/go-version"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,8 +30,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 )
-
-var tmpDirSizeLimit = resource.MustParse("16Mi")
 
 const (
 	// devSHMDir is the directory used for allocating shared memory segments,
@@ -117,6 +116,35 @@ echo "nss_wrapper: environment configured"
 `
 )
 
+var (
+	// OperatorVersion230 is the version 2.3.0 of the Operator
+	operatorVersion230 = gover.Must(gover.NewVersion("2.3.0"))
+
+	// TMPDirSizeLimitLT230 is the size limit for the /tmp directory for Operator versions < 2.3.0
+	tmpDirSizeLimitLT230 = resource.MustParse("16Mi")
+
+	// TMPDirSizeLimitGTE230 is the size limit for the /tmp directory for Operator versions >= 2.3.0
+	tmpDirSizeLimitGTE230 = resource.MustParse("1.5Gi")
+)
+
+func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) resource.Quantity {
+	currVersion, err := gover.NewVersion(version)
+	if err != nil {
+		return tmpDirSizeLimitLT230
+	}
+
+	if currVersion.LessThan(operatorVersion230) {
+		return tmpDirSizeLimitLT230
+	}
+
+	ephemeralLimit, ok := resources.Limits[corev1.ResourceEphemeralStorage]
+	if ok {
+		return ephemeralLimit
+	}
+
+	return tmpDirSizeLimitGTE230
+}
+
 // addDevSHM adds the shared memory "directory" to a Pod, which is needed by
 // Postgres to allocate shared memory segments. This is a special directory
 // called "/dev/shm", and is mounted as an emptyDir over a "memory" medium. This
@@ -152,13 +180,13 @@ func addDevSHM(template *corev1.PodTemplateSpec) {
 //   - As the pgBackRest lock directory (this is the default lock location for pgBackRest)
 //   - The location where the replication client certificates can be loaded with the proper
 //     permissions set
-func addTMPEmptyDir(template *corev1.PodTemplateSpec) {
+func addTMPEmptyDir(template *corev1.PodTemplateSpec, sizeLimit resource.Quantity) {
 
 	template.Spec.Volumes = append(template.Spec.Volumes, corev1.Volume{
 		Name: "tmp",
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{
-				SizeLimit: &tmpDirSizeLimit,
+				SizeLimit: &sizeLimit,
 			},
 		},
 	})

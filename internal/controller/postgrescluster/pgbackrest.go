@@ -106,9 +106,13 @@ const (
 
 // backup types
 const (
-	full         = "full"
-	differential = "diff"
-	incremental  = "incr"
+	Full         = "full"
+	Differential = "diff"
+	Incremental  = "incr"
+	// K8SPG-422: we need to keep these constants exported
+	//full         = "full"
+	//differential = "diff"
+	//incremental  = "incr"
 )
 
 // regexRepoIndex is the regex used to obtain the repo index from a pgBackRest repo name
@@ -154,7 +158,7 @@ func (r *Reconciler) applyRepoHostIntent(ctx context.Context, postgresCluster *v
 // applying the PostgresCluster controller's fully specified intent for the PersistentVolumeClaim
 // representing a repository.
 func (r *Reconciler) applyRepoVolumeIntent(ctx context.Context,
-	postgresCluster *v1beta1.PostgresCluster, spec *corev1.PersistentVolumeClaimSpec,
+	postgresCluster *v1beta1.PostgresCluster, spec corev1.PersistentVolumeClaimSpec,
 	repoName string, repoResources *RepoResources) (*corev1.PersistentVolumeClaim, error) {
 
 	repo, err := r.generateRepoVolumeIntent(postgresCluster, spec, repoName, repoResources)
@@ -307,7 +311,10 @@ func (r *Reconciler) cleanupRepoResources(ctx context.Context,
 			for _, repo := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 				if repo.Name == owned.GetLabels()[naming.LabelPGBackRestRepo] {
 					if backupScheduleFound(repo,
-						owned.GetLabels()[naming.LabelPGBackRestCronJob]) {
+						owned.GetLabels()[naming.LabelPGBackRestCronJob]) ||
+						// K8SPG-410: we shouldn't delete jobs created by the cronjob,
+						// because we assign it to be owned by the PerconaPGBackup
+						owned.GetKind() == "Job" {
 						delete = false
 						ownedNoDelete = append(ownedNoDelete, owned)
 					}
@@ -344,11 +351,11 @@ func (r *Reconciler) cleanupRepoResources(ctx context.Context,
 func backupScheduleFound(repo v1beta1.PGBackRestRepo, backupType string) bool {
 	if repo.BackupSchedules != nil {
 		switch backupType {
-		case full:
+		case Full:
 			return repo.BackupSchedules.Full != nil
-		case differential:
+		case Differential:
 			return repo.BackupSchedules.Differential != nil
-		case incremental:
+		case Incremental:
 			return repo.BackupSchedules.Incremental != nil
 		default:
 			return false
@@ -604,7 +611,13 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 		postgresCluster.Spec.ImagePullPolicy,
 		&repo.Spec.Template)
 
-	addTMPEmptyDir(&repo.Spec.Template)
+	resources := corev1.ResourceRequirements{}
+	if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
+		resources = postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources
+	}
+	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
+
+	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
 
 	// set ownership references
 	if err := controllerutil.SetControllerReference(postgresCluster, repo,
@@ -616,7 +629,7 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 }
 
 func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresCluster,
-	spec *corev1.PersistentVolumeClaimSpec, repoName string,
+	spec corev1.PersistentVolumeClaimSpec, repoName string,
 	repoResources *RepoResources) (*corev1.PersistentVolumeClaim, error) {
 
 	annotations := naming.Merge(
@@ -649,7 +662,7 @@ func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresC
 			Kind:       "PersistentVolumeClaim",
 		},
 		ObjectMeta: meta,
-		Spec:       *spec,
+		Spec:       spec,
 	}
 
 	// K8SPG-328: Keep this commented in case of conflicts.
@@ -1087,9 +1100,16 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		}
 	}
 
+	// Check to see if huge pages have been requested in the spec. If they have, include 'huge_pages = try'
+	// in the restore command. If they haven't, include 'huge_pages = off'.
+	hugePagesSetting := "off"
+	if postgres.HugePagesRequested(cluster) {
+		hugePagesSetting = "try"
+	}
+
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
-	cmd := pgbackrest.RestoreCommand(pgdata, pgtablespaceVolumes, strings.Join(opts, " "))
+	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, pgtablespaceVolumes, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
 	dataVolumeMount := postgres.DataVolumeMount()
@@ -1149,7 +1169,13 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		cluster.Spec.ImagePullPolicy,
 		&restoreJob.Spec.Template)
 
-	addTMPEmptyDir(&restoreJob.Spec.Template)
+	resources := corev1.ResourceRequirements{}
+	if cluster.Spec.Backups.PGBackRest.Restore != nil {
+		resources = cluster.Spec.Backups.PGBackRest.Restore.Resources
+	}
+	sizeLimit := getTMPSizeLimit(restoreJob.Labels[naming.LabelVersion], resources)
+
+	addTMPEmptyDir(&restoreJob.Spec.Template, sizeLimit)
 
 	return errors.WithStack(r.apply(ctx, restoreJob))
 }
@@ -1916,7 +1942,7 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestConfigLabels(cluster.Name),
+		naming.WithPerconaLabels(naming.PGBackRestConfigLabels(cluster.Name), cluster.Name, ""),
 	)
 
 	existing := &corev1.Secret{}
@@ -2280,10 +2306,11 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 
 	// set gvk and ownership refs
 	backupJob.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
-	if err := controllerutil.SetControllerReference(postgresCluster, backupJob,
-		r.Client.Scheme()); err != nil {
-		return errors.WithStack(err)
-	}
+	// K8SPG-432: we should set controller reference to PerconaPGBackup
+	//if err := controllerutil.SetControllerReference(postgresCluster, backupJob,
+	//	r.Client.Scheme()); err != nil {
+	//	return errors.WithStack(err)
+	//}
 
 	// server-side apply the backup Job intent
 	if err := r.apply(ctx, backupJob); err != nil {
@@ -2456,10 +2483,11 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 
 	// set gvk and ownership refs
 	backupJob.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
-	if err := controllerutil.SetControllerReference(postgresCluster, backupJob,
-		r.Client.Scheme()); err != nil {
-		return errors.WithStack(err)
-	}
+	// K8SPG-432: we should set controller reference to PerconaPGBackup
+	//if err := controllerutil.SetControllerReference(postgresCluster, backupJob,
+	//	r.Client.Scheme()); err != nil {
+	//	return errors.WithStack(err)
+	//}
 
 	if err := r.apply(ctx, backupJob); err != nil {
 		return errors.WithStack(err)
@@ -2489,7 +2517,7 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 		if repo.Volume == nil {
 			continue
 		}
-		repo, err := r.applyRepoVolumeIntent(ctx, postgresCluster, &repo.Volume.VolumeClaimSpec,
+		repo, err := r.applyRepoVolumeIntent(ctx, postgresCluster, repo.Volume.VolumeClaimSpec,
 			repo.Name, repoResources)
 		if err != nil {
 			log.Error(err, errMsg)
@@ -2792,21 +2820,21 @@ func (r *Reconciler) reconcileScheduledBackups(
 			// next if the repo level schedule is not nil, create the CronJob.
 			if repo.BackupSchedules.Full != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
-					full, repo.BackupSchedules.Full, sa, cronjobs); err != nil {
+					Full, repo.BackupSchedules.Full, sa, cronjobs); err != nil {
 					log.Error(err, "unable to reconcile Full backup for "+repo.Name)
 					requeue = true
 				}
 			}
 			if repo.BackupSchedules.Differential != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
-					differential, repo.BackupSchedules.Differential, sa, cronjobs); err != nil {
+					Differential, repo.BackupSchedules.Differential, sa, cronjobs); err != nil {
 					log.Error(err, "unable to reconcile Differential backup for "+repo.Name)
 					requeue = true
 				}
 			}
 			if repo.BackupSchedules.Incremental != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
-					incremental, repo.BackupSchedules.Incremental, sa, cronjobs); err != nil {
+					Incremental, repo.BackupSchedules.Incremental, sa, cronjobs); err != nil {
 					log.Error(err, "unable to reconcile Incremental backup for "+repo.Name)
 					requeue = true
 				}

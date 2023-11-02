@@ -1,3 +1,6 @@
+//go:build envtest
+// +build envtest
+
 package pgcluster
 
 import (
@@ -23,7 +26,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -298,7 +300,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 		})
 
 		It("Instance sets should have monitor user secret hash annotation", func() {
-			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser}
+			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
 			secretString := fmt.Sprintln(monitorUserSecret.Data)
@@ -337,7 +339,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 		})
 
 		It("Instance sets should have updated user secret hash annotation", func() {
-			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser}
+			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
 			secretString := fmt.Sprintln(monitorUserSecret.Data)
@@ -645,7 +647,7 @@ var _ = Describe("Users", Ordered, func() {
 				Expect(secList.Items).Should(ContainElements(
 					gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 						"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
-							"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser),
+							"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring),
 						}),
 					}),
 					gs.MatchFields(gs.IgnoreExtras, gs.Fields{
@@ -690,7 +692,7 @@ var _ = Describe("Users", Ordered, func() {
 			Expect(secList.Items).Should(ContainElements(
 				gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 					"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
-						"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + pmm.MonitoringUser),
+						"Name": Equal(cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring),
 					}),
 				}),
 				gs.MatchFields(gs.IgnoreExtras, gs.Fields{
@@ -794,5 +796,202 @@ var _ = Describe("Version labels", Ordered, func() {
 				"Labels": HaveKeyWithValue(v2.LabelOperatorVersion, cr.Spec.CRVersion),
 			}),
 		})))
+	})
+})
+
+var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "lb-source-ranges"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster with service exposed with loadBalancerSourceRanges", func() {
+		cr.Spec.Expose = &v2.ServiceExpose{
+			Type:                     "LoadBalancer",
+			LoadBalancerSourceRanges: []string{"10.10.10.10/16"},
+		}
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create services with loadBalancerSourceRanges ", func() {
+		haService := &corev1.Service{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Name + "-ha"}, haService)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(haService.Spec.LoadBalancerSourceRanges).To(Equal(cr.Spec.Expose.LoadBalancerSourceRanges))
+	})
+})
+
+var _ = Describe("Pause with backup", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "backup-pause"
+	const backupName = crName + "-backup"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+	backupNamespacedName := types.NamespacedName{Name: backupName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	cr.Spec.Backups.PGBackRest.Manual = nil
+
+	It("should create PerconaPGCluster", func() {
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+	pgBackup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: ns,
+		},
+		Spec: v2.PerconaPGBackupSpec{
+			PGCluster: crName,
+			RepoName:  "repo1",
+		},
+	}
+
+	It("should create PerconaPGBackup", func() {
+		Expect(k8sClient.Create(ctx, pgBackup)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	When("cluster is paused", func() {
+		Context("pause cluster", func() {
+			It("should pause cluster", func() {
+				Expect(k8sClient.Get(ctx, crNamespacedName, cr)).To(Succeed())
+				t := true
+				cr.Spec.Pause = &t
+				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
+			})
+			It("should reconcile", func() {
+				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("should be paused crunchy cluster", func() {
+				postgresCluster := &v1beta1.PostgresCluster{}
+				Expect(k8sClient.Get(ctx, crNamespacedName, postgresCluster)).To(Succeed())
+				Expect(*postgresCluster.Spec.Shutdown).To(BeTrue())
+			})
+		})
+
+		It("should reconcile backup", func() {
+			_, err := backupReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: backupNamespacedName})
+			Expect(err).To(Succeed())
+		})
+
+		It("should have new backup state", func() {
+			Expect(k8sClient.Get(ctx, backupNamespacedName, pgBackup)).To(Succeed())
+			Expect(pgBackup.Status.State).To(Equal(v2.BackupNew))
+		})
+	})
+
+	When("backup is running", func() {
+		Context("unpause cluster", func() {
+			It("should unpause cluster", func() {
+				Expect(k8sClient.Get(ctx, crNamespacedName, cr)).To(Succeed())
+				t := false
+				cr.Spec.Pause = &t
+				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
+			})
+			It("should reconcile", func() {
+				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("should be running crunchy cluster", func() {
+				postgresCluster := &v1beta1.PostgresCluster{}
+				Expect(k8sClient.Get(ctx, crNamespacedName, postgresCluster)).To(Succeed())
+				Expect(*postgresCluster.Spec.Shutdown).To(BeFalse())
+			})
+		})
+
+		It("should reconcile backup", func() {
+			_, err := backupReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: backupNamespacedName})
+			Expect(err).To(Succeed())
+		})
+		It("should have starting backup state", func() {
+			Expect(k8sClient.Get(ctx, backupNamespacedName, pgBackup)).To(Succeed())
+			Expect(pgBackup.Status.State).To(Equal(v2.BackupStarting))
+		})
+
+		Context("try to pause cluster", func() {
+			It("should pause cluster", func() {
+				Expect(k8sClient.Get(ctx, crNamespacedName, cr)).To(Succeed())
+				t := true
+				cr.Spec.Pause = &t
+				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
+			})
+			It("should reconcile", func() {
+				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("should be running crunchy cluster", func() {
+				postgresCluster := &v1beta1.PostgresCluster{}
+				Expect(k8sClient.Get(ctx, crNamespacedName, postgresCluster)).To(Succeed())
+				Expect(*postgresCluster.Spec.Shutdown).To(BeFalse())
+			})
+		})
 	})
 })

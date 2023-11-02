@@ -502,7 +502,7 @@ func (r *Reconciler) reconcileInstanceSets(
 	patroniLeaderService *corev1.Service,
 	primaryCertificate *corev1.SecretProjection,
 	clusterVolumes []corev1.PersistentVolumeClaim,
-	exporterWebConfig *corev1.ConfigMap,
+	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
 ) error {
 
 	// Go through the observed instances and check if a primary has been determined.
@@ -539,7 +539,7 @@ func (r *Reconciler) reconcileInstanceSets(
 			rootCA, clusterPodService, instanceServiceAccount,
 			patroniLeaderService, primaryCertificate,
 			findAvailableInstanceNames(*set, instances, clusterVolumes),
-			numInstancePods, clusterVolumes, exporterWebConfig)
+			numInstancePods, clusterVolumes, exporterQueriesConfig, exporterWebConfig)
 
 		if err == nil {
 			err = r.reconcileInstanceSetPodDisruptionBudget(ctx, cluster, set)
@@ -977,7 +977,7 @@ func (r *Reconciler) scaleUpInstances(
 	availableInstanceNames []string,
 	numInstancePods int,
 	clusterVolumes []corev1.PersistentVolumeClaim,
-	exporterWebConfig *corev1.ConfigMap,
+	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
 ) ([]*appsv1.StatefulSet, error) {
 	log := logging.FromContext(ctx)
 
@@ -1021,7 +1021,7 @@ func (r *Reconciler) scaleUpInstances(
 			clusterConfigMap, clusterReplicationSecret,
 			rootCA, clusterPodService, instanceServiceAccount,
 			patroniLeaderService, primaryCertificate, instances[i],
-			numInstancePods, clusterVolumes, exporterWebConfig,
+			numInstancePods, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
 		)
 	}
 	if err == nil {
@@ -1050,7 +1050,7 @@ func (r *Reconciler) reconcileInstance(
 	instance *appsv1.StatefulSet,
 	numInstancePods int,
 	clusterVolumes []corev1.PersistentVolumeClaim,
-	exporterWebConfig *corev1.ConfigMap,
+	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
 ) error {
 	log := logging.FromContext(ctx).WithValues("instance", instance.Name)
 	ctx = logging.NewContext(ctx, log)
@@ -1107,7 +1107,7 @@ func (r *Reconciler) reconcileInstance(
 
 	// Add pgMonitor resources to the instance Pod spec
 	if err == nil {
-		err = addPGMonitorToInstancePodSpec(cluster, &instance.Spec.Template, exporterWebConfig)
+		err = addPGMonitorToInstancePodSpec(cluster, &instance.Spec.Template, exporterQueriesConfig, exporterWebConfig)
 	}
 
 	// add nss_wrapper init container and add nss_wrapper env vars to the database and pgbackrest
@@ -1119,10 +1119,13 @@ func (r *Reconciler) reconcileInstance(
 			&instance.Spec.Template)
 
 	}
+
+	sizeLimit := getTMPSizeLimit(instance.Labels[naming.LabelVersion], spec.Resources)
+
 	// add an emptyDir volume to the PodTemplateSpec and an associated '/tmp' volume mount to
 	// all containers included within that spec
 	if err == nil {
-		addTMPEmptyDir(&instance.Spec.Template)
+		addTMPEmptyDir(&instance.Spec.Template, sizeLimit)
 	}
 
 	// mount shared memory to the Postgres instance
@@ -1154,12 +1157,12 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	sts.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    sts.Name,
 			naming.LabelData:        naming.DataPostgres,
-		})
+		}, cluster.Name, "pg"))
 	sts.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster:     cluster.Name,
@@ -1174,12 +1177,12 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    sts.Name,
 			naming.LabelData:        naming.DataPostgres,
-		})
+		}, cluster.Name, "pg"))
 
 	// Don't clutter the namespace with extra ControllerRevisions.
 	// The "controller-revision-hash" label still exists on the Pod.
@@ -1302,11 +1305,11 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 	instanceConfigMap.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    instance.Name,
-		})
+		}, cluster.Name, "pg"))
 
 	if err == nil {
 		err = patroni.InstanceConfigMap(ctx, cluster, spec, instanceConfigMap)
@@ -1348,11 +1351,11 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	instanceCerts.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    instance.Name,
-		})
+		}, cluster.Name, ""))
 
 	// This secret is holding certificates, but the "kubernetes.io/tls" type
 	// expects an *unencrypted* private key. We're also adding other values and

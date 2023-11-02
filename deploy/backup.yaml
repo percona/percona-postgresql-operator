@@ -1,4 +1,4 @@
-apiVersion: pg.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   name: backup1

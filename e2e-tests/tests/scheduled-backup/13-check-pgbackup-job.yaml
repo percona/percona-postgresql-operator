@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      check_jobs_and_pgbackups "scheduled-backup"
+
+      if [[ $(kubectl get -n "$NAMESPACE" pg-backup -o yaml | yq '.items | length') != 3 ]]; then
+        echo "ERROR: pg-backup count != 3"
+        exit 1
+      fi
+
+      if [[ $(kubectl get -n "$NAMESPACE" job -o yaml | yq '.items | length') != 3 ]]; then
+        echo "ERROR: job count != 3"
+        exit 1
+      fi

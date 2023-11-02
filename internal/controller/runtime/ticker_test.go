@@ -41,7 +41,7 @@ func TestTicker(t *testing.T) {
 	expected := event.GenericEvent{Object: new(corev1.ConfigMap)}
 
 	tq := workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())
-	th := handler.Funcs{GenericFunc: func(e event.GenericEvent, q workqueue.RateLimitingInterface) {
+	th := handler.Funcs{GenericFunc: func(ctx context.Context, e event.GenericEvent, q workqueue.RateLimitingInterface) {
 		called = append(called, e)
 
 		assert.Equal(t, q, tq, "should be called with the queue passed in Start")

@@ -97,10 +97,10 @@ func (r *Reconciler) reconcilePGBouncerConfigMap(
 	configmap.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		})
+		}, cluster.Name, "pgbouncer"))
 
 	if err == nil {
 		pgbouncer.ConfigMap(cluster, configmap)
@@ -243,10 +243,10 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		})
+		}, cluster.Name, "pgbouncer"))
 
 	if err == nil {
 		err = pgbouncer.Secret(ctx, cluster, root, existing, service, intent)
@@ -286,10 +286,10 @@ func (r *Reconciler) generatePGBouncerService(
 
 	// add our labels last so they aren't overwritten
 	service.Labels = naming.Merge(service.Labels,
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		})
+		}, cluster.Name, "pgbouncer"))
 
 	// Allocate an IP address and/or node port and let Kubernetes manage the
 	// Endpoints by selecting Pods with the PgBouncer role.
@@ -313,6 +313,7 @@ func (r *Reconciler) generatePGBouncerService(
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 	} else {
 		service.Spec.Type = corev1.ServiceType(spec.Type)
+		service.Spec.LoadBalancerSourceRanges = spec.LoadBalancerSourceRanges
 		if spec.NodePort != nil {
 			if service.Spec.Type == corev1.ServiceTypeClusterIP {
 				// The NodePort can only be set when the Service type is NodePort or
@@ -380,10 +381,10 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	deploy.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		})
+		}, cluster.Name, "pgbouncer"))
 	deploy.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster: cluster.Name,
@@ -396,10 +397,10 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	deploy.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		})
+		}, cluster.Name, "pgbouncer"))
 
 	// if the shutdown flag is set, set pgBouncer replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {

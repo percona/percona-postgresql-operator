@@ -386,7 +386,7 @@ func TestDynamicConfiguration(t *testing.T) {
 				"ttl":       int32(30),
 				"postgresql": map[string]interface{}{
 					"parameters": map[string]interface{}{
-						"shared_preload_libraries": "mandatory,given",
+						"shared_preload_libraries": "given,mandatory",
 					},
 					"pg_hba":        []string{},
 					"use_pg_rewind": true,
@@ -1019,6 +1019,7 @@ func TestProbeTiming(t *testing.T) {
 			FailureThreshold: 1,
 		}},
 	} {
+		tt := tt
 		actual := probeTiming(&v1beta1.PatroniSpec{
 			LeaderLeaseDurationSeconds: &tt.lease,
 			SyncPeriodSeconds:          &tt.sync,
