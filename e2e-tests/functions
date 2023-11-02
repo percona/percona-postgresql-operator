@@ -431,7 +431,10 @@ check_passwords_leak() {
 		kubectl -n "${NAMESPACE}" get secrets -o json | jq -r '.items[] | select(.data."pgbouncer-password"? != null) | .data."pgbouncer-password"'
 	)
 
-	passwords="$(for i in $secrets; do base64 -d <<< $i; echo; done) $secrets"
+	passwords="$(for i in $secrets; do
+		base64 -d <<<$i
+		echo
+	done) $secrets"
 	pods=$(kubectl -n "${NAMESPACE}" get pods -o name | awk -F "/" '{print $2}')
 
 	collect_logs() {
@@ -446,7 +449,7 @@ check_passwords_leak() {
 				if [[ $c =~ "pmm" ]]; then
 					continue
 				fi
-				kubectl -n "$NS" logs $p -c $c > ${TEMP_DIR}/logs_output-$p-$c.txt
+				kubectl -n "$NS" logs $p -c $c >${TEMP_DIR}/logs_output-$p-$c.txt
 				echo logs saved in: ${TEMP_DIR}/logs_output-$p-$c.txt
 				for pass in $passwords; do
 					count=$(grep -c --fixed-strings -- "$pass" ${TEMP_DIR}/logs_output-$p-$c.txt || :)
@@ -465,4 +468,99 @@ check_passwords_leak() {
 		pods=$(kubectl -n "${OPERATOR_NS}" get pods -o name | awk -F "/" '{print $2}')
 		collect_logs $OPERATOR_NS
 	fi
+}
+
+get_backup_destination() {
+	local cluster=$1
+	local backup_name=$2
+
+	local repo
+	local storage_type
+
+	repo=$(kubectl get pg-backup -n "$NAMESPACE" "$backup_name" -o yaml \
+		| yq ".spec.repoName")
+
+	if [[ $(kubectl get pg -n "$NAMESPACE" "$cluster" -o yaml \
+		| yq ".spec.backups.pgbackrest.repos[] | select(.name==\"$repo\") | has(\"s3\")") == "true" ]]; then
+		storage_type="s3"
+	elif [[ $(kubectl get pg -n "$NAMESPACE" "$cluster" -o yaml \
+		| yq ".spec.backups.pgbackrest.repos[] | select(.name==\"$repo\") | has(\"gcs\")") == "true" ]]; then
+		storage_type="gcs"
+	elif [[ $(kubectl get pg -n "$NAMESPACE" "$cluster" -o yaml \
+		| yq ".spec.backups.pgbackrest.repos[] | select(.name==\"$repo\") | has(\"azure\")") == "true" ]]; then
+		storage_type="azure"
+	else
+		echo "ERROR: unknown storage type"
+		exit 1
+	fi
+
+	local repo_path
+	local bucket
+
+	repo_path=$(kubectl get pg -n "$NAMESPACE" "$cluster" -o yaml \
+		| yq ".spec.backups.pgbackrest.global.$repo-path")
+	bucket=$(kubectl get pg -n "$NAMESPACE" "$cluster" -o yaml \
+		| yq ".spec.backups.pgbackrest.repos[] | select(.name==\"$repo\").$storage_type.bucket")
+
+	if [[ $storage_type == "gcs" ]]; then
+		storage_type="gs"
+	fi
+
+	echo -n "$storage_type://$bucket$repo_path"
+}
+
+get_backup_name_by_job() {
+	local job_name=$1
+
+	pgbackup_per_job=$(kubectl get pg-backup -n "$NAMESPACE" -o yaml \
+		| yq "[.items[] | select(.status.jobName==\"$job_name\")]" \
+		| yq '. | length')
+	if [[ $pgbackup_per_job != 1 ]]; then
+		echo "ERROR: pgbackup_per_job != 1"
+		exit 1
+	fi
+
+	kubectl get pg-backup -n "$NAMESPACE" -o yaml \
+		| yq ".items[] | select(.status.jobName==\"$job_name\").metadata.name"
+}
+
+check_jobs_and_pgbackups() {
+	local cluster=$1
+
+	job_names=()
+	kubectl get job -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | while IFS= read -r line; do
+		job_names+=("$line")
+	done
+
+	for ((i = 0; i < ${#job_names[@]}; i++)); do
+		job_name=${job_names[$i]}
+
+		backup_name=$(get_backup_name_by_job "$job_name")
+
+		dest=$(kubectl get pg-backup -n "$NAMESPACE" "$backup_name" -o yaml | yq ".status.destination")
+		if [[ $dest != "$(get_backup_destination "$cluster" "$backup_name")" ]]; then
+			echo "ERROR: $dest != $(get_backup_destination "$cluster" "$backup_name")"
+			exit 1
+		fi
+
+		job_backup_type=$(kubectl get job "$job_name" -n "$NAMESPACE" -o yaml \
+			| yq '.spec.template.metadata.labels."postgres-operator.crunchydata.com/pgbackrest-backup"')
+		if [[ $job_backup_type == "null" ]]; then
+			job_backup_type=$(kubectl get job "$job_name" -n "$NAMESPACE" -o yaml \
+				| yq '.spec.template.metadata.labels."postgres-operator.crunchydata.com/pgbackrest-cronjob"')
+		fi
+		if [[ $job_backup_type == "replica-create" ]]; then
+			job_backup_type="incremental"
+		fi
+		if [[ $job_backup_type == "manual" ]]; then
+			job_backup_type="full"
+		fi
+		pg_backup_type=$(kubectl get pg-backup -n "$NAMESPACE" "$backup_name" -o yaml \
+			| yq '.status.backupType')
+
+		if [[ $job_backup_type != "$pg_backup_type" ]]; then
+			echo "ERROR: backup type $job_backup_type != $pg_backup_type"
+			exit 1
+		fi
+	done
 }

@@ -118,6 +118,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 			log.Info("Restore failed")
 		case v2.RestoreSucceeded:
 			log.Info("Restore succeeded")
+			pgRestore.Status.CompletedAt = job.Status.CompletionTime
 		default:
 			log.Info("Waiting for restore to complete")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil

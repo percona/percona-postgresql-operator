@@ -84,6 +84,11 @@ kind: Service
 		assert.Assert(t, marshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:
+  app.kubernetes.io/component: pgbouncer
+  app.kubernetes.io/instance: pg7
+  app.kubernetes.io/managed-by: percona-postgresql-operator
+  app.kubernetes.io/name: percona-postgresql
+  app.kubernetes.io/part-of: percona-postgresql
   postgres-operator.crunchydata.com/cluster: pg7
   postgres-operator.crunchydata.com/role: pgbouncer
 name: pg7-pgbouncer
@@ -122,11 +127,11 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string{
+		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "pg7",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		})
+		}, "pg7", "pgbouncer")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -154,12 +159,12 @@ ownerReferences:
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string{
+		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg7",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		})
+		}, "pg7", "pgbouncer")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -436,11 +441,11 @@ namespace: ns3
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, deploy.ObjectMeta.Labels, map[string]string{
+		assert.DeepEqual(t, deploy.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "test-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		})
+		}, "test-cluster", "pgbouncer")))
 
 		// Labels not in the pod selector.
 		assert.DeepEqual(t, deploy.Spec.Selector,
@@ -457,11 +462,11 @@ namespace: ns3
 		})
 
 		// Labels present in the pod template.
-		assert.DeepEqual(t, deploy.Spec.Template.Labels, map[string]string{
+		assert.DeepEqual(t, deploy.Spec.Template.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "test-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		})
+		}, "test-cluster", "pgbouncer")))
 	})
 
 	t.Run("PodSpec", func(t *testing.T) {
