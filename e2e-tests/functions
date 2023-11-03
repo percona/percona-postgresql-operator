@@ -345,7 +345,7 @@ deploy_chaos_mesh() {
 
 	helm repo add chaos-mesh https://charts.chaos-mesh.org
 	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version 2.5.1
-	if [ ! -z "$OPENSHIFT" ]; then
+	if [[ $OPENSHIFT ]]; then
 		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace=${NAMESPACE}
 	fi
 	sleep 10
