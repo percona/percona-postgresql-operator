@@ -20,6 +20,7 @@ export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
 export IMAGE_PMM_CLIENT=${IMAGE_PMM_CLIENT:-"perconalab/pmm-client:dev-latest"}
 export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:dev-latest"}
+export IMAGE_EXT_INSTALLER=${IMAGE_EXT_INSTALLER:-"perconalab/percona-postgresql-operator:main-ext-installer"}
 
 date=$(which gdate || which date)
 sed=$(which gsed || which sed)

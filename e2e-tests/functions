@@ -60,6 +60,9 @@ deploy_s3_secrets() {
 			yq eval '.stringData["credentials.json"]' ${TESTS_CONFIG_DIR}/cloud-secret-minio-gw.yml >${TEMP_DIR}/gcs-key.json
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini" --from-file=gcs-key.json=${TEMP_DIR}/gcs-key.json
 			;;
+		custom-extensions)
+			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
+			;;
 		*)
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini"
 			;;
@@ -123,6 +126,17 @@ get_cr() {
 				' "${TEMP_DIR}/cr.yaml" \
 				>"${TEMP_DIR}/backup.cr.yaml"
 			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
+			;;
+		custom-extensions)
+			yq eval '
+				.spec.postgresVersion = 15
+				| .spec.image = "'${IMAGE_BASE}:k8spg-375-ppg15-postgres'"
+				| .spec.customExtensions.image = "'${IMAGE_EXT_INSTALLER}'"
+				| .spec.customExtensions.imagePullPolicy = "Always"
+				| .spec.customExtensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
+			' "${TEMP_DIR}/cr.yaml" \
+				>"${TEMP_DIR}/custom-extensions.cr.yaml"
+			mv "${TEMP_DIR}/custom-extensions.cr.yaml" "${TEMP_DIR}/cr.yaml"
 			;;
 		*) ;;
 	esac
