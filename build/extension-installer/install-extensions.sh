@@ -23,6 +23,10 @@ done
 for installed in ${PGDATA_EXTENSIONS}/*.installed; do
 	filename=$(basename -- ${installed})
 	key=${filename%.*}
+	if [[ "${key}" == "*" ]]; then
+		continue
+	fi
+
 	if [[ ! ${extensions[*]} =~ ${key} ]]; then
 		echo "Uninstalling extension: ${key}"
 		/usr/local/bin/extension-installer \
