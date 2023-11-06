@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -32,6 +33,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -127,6 +129,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/status,verbs=patch;update
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -188,6 +191,17 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcileCustomExtensions(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
+	}
+
+	if cr.Spec.Pause != nil && *cr.Spec.Pause {
+		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "is backup running")
+		}
+		if backupRunning {
+			*cr.Spec.Pause = false
+			log.Info("Backup is running. Can't pause cluster", "cluster", cr.Name)
+		}
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
@@ -337,4 +351,40 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	}
 
 	return nil
+}
+
+func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
+	jobList := &batchv1.JobList{}
+	selector := labels.SelectorFromSet(map[string]string{
+		naming.LabelCluster: cr.Name,
+	})
+	err := cl.List(ctx, jobList, client.InNamespace(cr.Namespace), client.MatchingLabelsSelector{Selector: selector}, client.HasLabels{naming.LabelPGBackRestBackup})
+	if err != nil {
+		return false, errors.Wrap(err, "get backup jobs")
+	}
+
+	for _, job := range jobList.Items {
+		job := job
+		if perconaController.JobFailed(&job) || perconaController.JobCompleted(&job) {
+			continue
+		}
+		return true, nil
+	}
+
+	backupList := &v2.PerconaPGBackupList{}
+	if err := cl.List(ctx, backupList, &client.ListOptions{
+		Namespace: cr.Namespace}); err != nil {
+		return false, errors.Wrap(err, "list backups")
+	}
+
+	for _, backup := range backupList.Items {
+		if backup.Spec.PGCluster != cr.Name {
+			continue
+		}
+		if backup.Status.State == v2.BackupStarting || backup.Status.State == v2.BackupRunning {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

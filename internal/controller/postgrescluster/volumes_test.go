@@ -492,14 +492,14 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 
 		// validate the expected labels are in place
 		// expected volume labels, plus the original label
-		expected := map[string]string{
+		expected := map[string]string(naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: cluster.Spec.InstanceSets[0].Name,
 			naming.LabelInstance:    cluster.Status.StartupInstance,
 			naming.LabelRole:        naming.RolePostgresData,
 			naming.LabelData:        naming.DataPostgres,
 			"somelabel":             "labelvalue-pgdata",
-		}
+		}, cluster.Name, ""))
 
 		// ensure volume is found and labeled correctly
 		var found bool
@@ -558,14 +558,14 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 
 		// validate the expected labels are in place
 		// expected volume labels, plus the original label
-		expected := map[string]string{
+		expected := map[string]string(naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: cluster.Spec.InstanceSets[0].Name,
 			naming.LabelInstance:    cluster.Status.StartupInstance,
 			naming.LabelRole:        naming.RolePostgresWAL,
 			naming.LabelData:        naming.DataPostgres,
 			"somelabel":             "labelvalue-pgwal",
-		}
+		}, cluster.Name, ""))
 
 		// ensure volume is found and labeled correctly
 		var found bool

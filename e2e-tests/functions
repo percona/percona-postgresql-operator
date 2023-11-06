@@ -5,14 +5,31 @@ ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 test_name=$(basename "$(pwd)")
 
+if oc get projects 2>/dev/null; then
+	OPENSHIFT=4
+fi
+
 create_namespace() {
 	local namespace=$1
-	if [[ ${CLEAN_NAMESPACE} == 1 ]]; then
+
+	if [[ "$OPENSHIFT" ]]; then
+		set -o pipefail
+		if [[ $OPERATOR_NS ]] && (oc get project "$OPERATOR_NS" -o json >/dev/null 2>&1 | jq -r '.metadata.name' >/dev/null 2>&1); then
+			oc delete --grace-period=0 --force=true project "$namespace" && sleep 120 || :
+		else
+			oc delete project "$namespace" && sleep 40 || :
+		fi
+		wait_for_delete "project/$namespace"
+
+		desc "create namespace $namespace"
+		oc new-project "$namespace"
+		oc project "$namespace"
+		oc adm policy add-scc-to-user hostaccess -z default || :
+	else
 		kubectl delete namespace $namespace --ignore-not-found || :
 		kubectl wait --for=delete namespace "$namespace" || :
+		kubectl create namespace $namespace
 	fi
-
-	kubectl create namespace $namespace
 }
 
 deploy_operator() {
@@ -252,10 +269,26 @@ wait_for_delete() {
 }
 
 deploy_pmm_server() {
-	local platform=kubernetes
 	helm uninstall -n "${NAMESPACE}" pmm || :
-	helm install monitoring -n "${NAMESPACE}" --set imageTag=${IMAGE_PMM_SERVER#*:} --set service.type="LoadBalancer" \
-		--set imageRepo=${IMAGE_PMM_SERVER%:*} --set platform="${platform}" "https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz"
+	if [[ $OPENSHIFT ]]; then
+		platform=openshift
+		oc create sa pmm-server -n "$NAMESPACE"
+		oc adm policy add-scc-to-user privileged -z pmm-server -n "$NAMESPACE"
+
+		if [[ $OPERATOR_NS ]]; then
+			timeout 30 oc delete clusterrolebinding $(kubectl get clusterrolebinding | grep 'pmm-pg-operator-' | awk '{print $1}') || :
+			oc create clusterrolebinding pmm-pg-operator-cluster-wide --clusterrole=percona-postgresql-operator --serviceaccount=$NAMESPACE:pmm-server -n "$NAMESPACE"
+			oc patch clusterrole/percona-postgresql-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' ${OPERATOR_NS:+-n $OPERATOR_NS}
+		else
+			oc create rolebinding pmm-pg-operator-namespace-only --role percona-postgresql-operator --serviceaccount=$NAMESPACE:pmm-server -n "${NAMESPACE}"
+			oc patch role/percona-postgresql-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' -n "$NAMESPACE"
+		fi
+		helm install monitoring --set imageTag=${IMAGE_PMM_SERVER#*:} --set imageRepo=${IMAGE_PMM_SERVER%:*} --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz -n "$NAMESPACE"
+	else
+		platform=kubernetes
+		helm install monitoring -n "$NAMESPACE" --set imageTag=${IMAGE_PMM_SERVER#*:} --set service.type="LoadBalancer" \
+			--set imageRepo=${IMAGE_PMM_SERVER%:*} --set platform="$platform" "https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz"
+	fi
 }
 
 generate_pmm_api_key() {
@@ -326,6 +359,9 @@ deploy_chaos_mesh() {
 
 	helm repo add chaos-mesh https://charts.chaos-mesh.org
 	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version 2.5.1
+	if [[ $OPENSHIFT ]]; then
+		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace=${NAMESPACE}
+	fi
 	sleep 10
 }
 

@@ -45,6 +45,7 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/finalizers,verbs=update
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 
@@ -73,6 +74,10 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	}
 	switch pgBackup.Status.State {
 	case v2.BackupNew:
+		if pgCluster.Spec.Pause != nil && *pgCluster.Spec.Pause {
+			log.Info("Can't start backup. PostgresCluster is paused", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
+			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		}
 		// start backup only if backup job doesn't exist
 		_, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
 		if err != nil {
@@ -236,6 +241,10 @@ func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, 
 		pg.Annotations = make(map[string]string)
 	}
 	pg.Annotations[naming.PGBackRestBackup] = pb.Name
+
+	if pg.Spec.Backups.PGBackRest.Manual == nil {
+		pg.Spec.Backups.PGBackRest.Manual = new(v1beta1.PGBackRestManualBackup)
+	}
 
 	pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
 	pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options

@@ -176,11 +176,11 @@ func (r *Reconciler) generatePostgresUserSecret(
 	intent.Annotations = cluster.Spec.Metadata.GetAnnotationsOrNil()
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:      cluster.Name,
 			naming.LabelRole:         naming.RolePostgresUser,
 			naming.LabelPostgresUser: username,
-		})
+		}, cluster.Name, ""))
 
 	// K8SPG-328: Keep this commented in case of conflicts.
 	// We don't want to delete secrets if custom resource is deleted.
@@ -566,7 +566,7 @@ func (r *Reconciler) reconcilePostgresDataVolume(
 	pvc.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		instanceSpec.Metadata.GetLabelsOrNil(),
-		labelMap,
+		naming.WithPerconaLabels(labelMap, cluster.Name, ""),
 	)
 
 	pvc.Spec = instanceSpec.DataVolumeClaimSpec
@@ -633,7 +633,7 @@ func (r *Reconciler) reconcileTablespaceVolumes(
 		pvc.Labels = naming.Merge(
 			cluster.Spec.Metadata.GetLabelsOrNil(),
 			instanceSpec.Metadata.GetLabelsOrNil(),
-			labelMap,
+			naming.WithPerconaLabels(labelMap, cluster.Name, ""),
 		)
 
 		pvc.Spec = vol.DataVolumeClaimSpec
@@ -745,7 +745,7 @@ func (r *Reconciler) reconcilePostgresWALVolume(
 	pvc.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		instanceSpec.Metadata.GetLabelsOrNil(),
-		labelMap,
+		naming.WithPerconaLabels(labelMap, cluster.Name, ""),
 	)
 
 	pvc.Spec = *instanceSpec.WALVolumeClaimSpec
