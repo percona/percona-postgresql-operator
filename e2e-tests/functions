@@ -105,12 +105,12 @@ get_cr() {
 		' "${DEPLOY_DIR}/cr.yaml" \
 		>"${TEMP_DIR}/cr.yaml"
 
-	if [[ $OPENSHIFT ]];then
-    yq eval '
+	if [[ $OPENSHIFT ]]; then
+		yq eval '
 				.spec.openshift = true
 				' "${TEMP_DIR}/cr.yaml" \
-				>"${TEMP_DIR}/openshift.cr.yaml"
-			mv "${TEMP_DIR}/openshift.cr.yaml" "${TEMP_DIR}/cr.yaml"
+			>"${TEMP_DIR}/openshift.cr.yaml"
+		mv "${TEMP_DIR}/openshift.cr.yaml" "${TEMP_DIR}/cr.yaml"
 
 	fi
 
