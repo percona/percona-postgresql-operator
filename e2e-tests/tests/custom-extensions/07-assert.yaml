@@ -42,7 +42,7 @@ spec:
         - name: STORAGE_BUCKET
           value: pg-extensions
         - name: INSTALL_EXTENSIONS
-          value: pg_cron-pg15-1.6.1,timescaledb-pg15-2.11.2
+          value: pg_cron-pg15-1.6.1
         - name: PG_VERSION
           value: "15"
         - name: PGDATA_EXTENSIONS
@@ -65,7 +65,7 @@ spec:
           name: tmp
       - name: nss-wrapper-init
 status:
-  observedGeneration: 3
+  observedGeneration: 4
   replicas: 1
   updatedReplicas: 1
   readyReplicas: 1
