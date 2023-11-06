@@ -8,11 +8,10 @@ ARG GIT_COMMIT
 ARG GIT_BRANCH
 ARG GO_LDFLAGS
 ARG GOOS=linux
-ARG GOARCH=amd64
 ARG CGO_ENABLED=0
 
 RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
        go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/postgres-operator \
                ./cmd/postgres-operator \
