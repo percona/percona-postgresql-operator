@@ -13,6 +13,8 @@ func GetExtensionKey(pgMajor int, name, version string) string {
 	return fmt.Sprintf("%s-pg%d-%s", name, pgMajor, version)
 }
 
+// ExtensionRelocatorContainer returns a container that will relocate extensions from the base image (i.e. pg_stat_monitor, pg_audit)
+// to the data directory so we don't lose them when user adds a custom extension.
 func ExtensionRelocatorContainer(image string, imagePullPolicy corev1.PullPolicy, postgresVersion int) corev1.Container {
 	return corev1.Container{
 		Name:            "extension-relocator",
