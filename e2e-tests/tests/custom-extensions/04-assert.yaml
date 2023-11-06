@@ -66,6 +66,9 @@ spec:
       - name: nss-wrapper-init
 status:
   observedGeneration: 3
+  replicas: 1
+  updatedReplicas: 1
+  readyReplicas: 1
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
