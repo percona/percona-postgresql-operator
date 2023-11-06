@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -65,6 +66,13 @@ func (r *PGClusterReconciler) getVersionMeta(cr *v2.PerconaPGCluster, operatorDe
 			vm.HelmDeployOperator = true
 		}
 	}
+
+	extensions := make([]string, 0)
+	for _, extension := range cr.Spec.CustomExtensions.Extensions {
+		key := GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
+		extensions = append(extensions, key)
+	}
+	vm.Extensions = strings.Join(extensions, ",")
 
 	return vm
 }
