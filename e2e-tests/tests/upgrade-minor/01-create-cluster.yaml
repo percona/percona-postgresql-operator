@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      git_tag="v$(curl -s https://check.percona.com/versions/v1/pg-operator | jq -r '.versions[].operator' | sort -V | tail -n1)"
+      curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/cr.yaml" >"${TEMP_DIR}/cr_${git_tag}.yaml"
+
+      yq -i eval '
+          .metadata.name = "'${test_name}'" |
+          .metadata.labels = {"e2e":"'${test_name}'"} |
+          .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
+          .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' "${TEMP_DIR}/cr_${git_tag}.yaml"
+      kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_${git_tag}.yaml"
