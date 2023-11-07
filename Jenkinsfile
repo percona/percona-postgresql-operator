@@ -166,6 +166,10 @@ void clusterRunner(String cluster) {
             runTest(i)
         }
     }
+
+    if (clusterCreated >= 1) {
+        shutdownCluster(cluster)
+    }
 }
 
 void runTest(Integer TEST_ID) {
@@ -187,7 +191,7 @@ void runTest(Integer TEST_ID) {
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
                     set -o pipefail
-                    kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" --skip-delete |& tee e2e-tests/logs/${testName}.log
+                    kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
             }
             pushArtifactFile("${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$testName")
