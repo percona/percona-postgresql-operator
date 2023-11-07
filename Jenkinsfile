@@ -169,7 +169,7 @@ void clusterRunner(String cluster) {
 }
 
 void runTest(Integer TEST_ID) {
-    def retryCount = 1
+    def retryCount = 0
     def testName = tests[TEST_ID]["name"]
     def clusterSuffix = tests[TEST_ID]["cluster"]
 
