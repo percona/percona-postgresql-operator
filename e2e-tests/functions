@@ -614,3 +614,14 @@ check_jobs_and_pgbackups() {
 		fi
 	done
 }
+
+restart_pg_pods() {
+	local cluster=$1
+	local instance=$2
+
+	pods=$(kubectl get pods -n "${NAMESPACE}" --selector=postgres-operator.crunchydata.com/cluster="${cluster}",postgres-operator.crunchydata.com/instance-set="${instance}" -o jsonpath='{.items[*].metadata.name}')
+	for pod in $pods; do
+		kubectl delete pod -n "${NAMESPACE}" "${pod}"
+		wait_pod "${pod}"
+	done
+}
