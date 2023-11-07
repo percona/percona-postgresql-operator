@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 360
 commands:
   - script: |-
       set -o errexit
@@ -13,3 +12,4 @@ commands:
       wait_cluster_consistency custom-extensions
 
       run_psql_local '\c postgres \\\ CREATE EXTENSION pg_cron' "postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres)"
+    timeout: 360
