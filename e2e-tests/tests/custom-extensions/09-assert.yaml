@@ -24,7 +24,7 @@ spec:
       - name: extension-installer
       - name: nss-wrapper-init
 status:
-  observedGeneration: 6
+  observedGeneration: 5
   replicas: 1
   updatedReplicas: 1
   readyReplicas: 1
