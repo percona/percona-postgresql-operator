@@ -65,7 +65,7 @@ spec:
           name: tmp
       - name: nss-wrapper-init
 status:
-  observedGeneration: 5
+  observedGeneration: 4
   replicas: 1
   updatedReplicas: 1
   readyReplicas: 1

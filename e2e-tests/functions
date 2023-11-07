@@ -625,3 +625,21 @@ restart_pg_pods() {
 		wait_pod "${pod}"
 	done
 }
+
+wait_cluster_consistency() {
+	local cluster_name=$1
+	local wait_time=${2:-32}
+
+	retry=0
+	sleep 7 # wait for two reconcile loops ;)  3 sec x 2 times + 1 sec = 7 seconds
+	echo -n 'waiting for cluster readyness'
+	until [[ "$(kubectl -n "${NAMESPACE}" get pg "${cluster_name}" -o jsonpath='{.status.state}')" == "ready" ]]; do
+		let retry+=1
+		if [ $retry -ge $wait_time ]; then
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+		echo -n .
+		sleep 10
+	done
+}
