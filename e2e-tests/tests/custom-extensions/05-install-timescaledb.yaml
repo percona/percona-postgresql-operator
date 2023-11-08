@@ -3,8 +3,8 @@ kind: PerconaPGCluster
 metadata:
   name: custom-extensions
 spec:
-  customExtensions:
-    extensions:
+  extensions:
+    custom:
     - name: pg_cron
       version: 1.6.1
     - name: timescaledb

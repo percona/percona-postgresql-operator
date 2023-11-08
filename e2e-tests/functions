@@ -156,9 +156,9 @@ get_cr() {
 			yq eval '
 				.spec.postgresVersion = 15
 				| .spec.image = "'${IMAGE_BASE}:k8spg-375-ppg15-postgres'"
-				| .spec.customExtensions.image = "'${IMAGE_EXT_INSTALLER}'"
-				| .spec.customExtensions.imagePullPolicy = "Always"
-				| .spec.customExtensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
+				| .spec.extensions.image = "'${IMAGE_EXT_INSTALLER}'"
+				| .spec.extensions.imagePullPolicy = "Always"
+				| .spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
 			' "${TEMP_DIR}/cr.yaml" \
 				>"${TEMP_DIR}/custom-extensions.cr.yaml"
 			mv "${TEMP_DIR}/custom-extensions.cr.yaml" "${TEMP_DIR}/cr.yaml"
@@ -646,6 +646,8 @@ get_desired_replicas() {
 
 wait_sts_rollout() {
 	local sts=$1
+	local updated_replicas=$(get_updated_replicas $sts)
+	local desired_replicas=$(get_desired_replicas $sts)
 
 	until [[ "$updated_replicas" -eq "$desired_replicas" ]]; do
 		updated_replicas=$(get_updated_replicas $sts)
