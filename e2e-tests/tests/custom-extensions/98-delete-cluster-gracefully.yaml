@@ -5,3 +5,7 @@ delete:
   kind: PerconaPGCluster
   metadata:
     name: custom-extensions
+- apiVersion: postgres-operator.crunchydata.com/v1beta1
+  kind: PostgresCluster
+  metadata:
+    name: custom-extensions
