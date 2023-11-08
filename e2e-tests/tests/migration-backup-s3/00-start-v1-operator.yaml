@@ -14,12 +14,10 @@ commands:
 
       if [[ $OPERATOR_NS ]]; then
         OPNS=$OPERATOR_NS
+        create_namespace $OPERATOR_NS
       else
         OPNS=$NAMESPACE
       fi
-
-      kubectl delete namespace $OPNS || true
-      create_namespace $OPNS
 
       curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v$PGOV1_TAG/deploy/operator.yaml |
       $sed -r 's/^(    namespace:).*pgo.*$/\1 \"'$NAMESPACE'\"/g' |

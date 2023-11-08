@@ -21,8 +21,8 @@ commands:
         .spec.parameters.backrest-opts="--type=full" |
         .spec.parameters.pg-cluster="'$POSTGRES_V1_CLUSTER_NAME'" |
         .spec.parameters.podname="'$(kubectl -n $NAMESPACE get pods --selector=name=$POSTGRES_V1_CLUSTER_NAME-backrest-shared-repo,pg-cluster=$POSTGRES_V1_CLUSTER_NAME -o 'jsonpath={.items[].metadata.name}')'"
-        ' - > ~/tmp/backup.yaml
-      kubectl -n $NAMESPACE apply -f ~/tmp/backup.yaml
+        ' - |
+      kubectl -n $NAMESPACE apply -f -
 
       sleep 5
       kubectl -n $NAMESPACE wait --for=condition=Complete job/data-$POSTGRES_V1_CLUSTER_NAME --timeout=300s
