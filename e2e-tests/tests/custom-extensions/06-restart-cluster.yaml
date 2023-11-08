@@ -7,5 +7,7 @@ commands:
 
       source ../../functions
       
+      wait_cluster_consistency custom-extensions
+
       restart_pg_pods custom-extensions instance1
     timeout: 360
