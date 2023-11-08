@@ -126,7 +126,7 @@ get_cr() {
 					.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
 					' $TEMP_DIR/cr.yaml
 			fi
-		;;
+			;;
 		"scheduled-backup")
 			yq eval -i '
 				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'$test_name'-pgbackrest-secrets"}}] |
