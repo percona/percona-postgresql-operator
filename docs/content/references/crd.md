@@ -740,11 +740,6 @@ PerconaPGCluster is the CRD that defines a Percona PG Cluster
         <td>Version of the operator. Update this to new version after operator upgrade to apply changes to Kubernetes objects. Default is the latest version.</td>
         <td>false</td>
       </tr><tr>
-        <td><b><a href="#perconapgclusterspeccustomextensions">customExtensions</a></b></td>
-        <td>object</td>
-        <td>The specification of custom extensions.</td>
-        <td>false</td>
-      </tr><tr>
         <td><b><a href="#perconapgclusterspecdatasource">dataSource</a></b></td>
         <td>object</td>
         <td>Specifies a data source for bootstrapping the PostgreSQL cluster.</td>
@@ -758,6 +753,11 @@ PerconaPGCluster is the CRD that defines a Percona PG Cluster
         <td><b><a href="#perconapgclusterspecexpose">expose</a></b></td>
         <td>object</td>
         <td>Specification of the service that exposes the PostgreSQL primary instance.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecextensions">extensions</a></b></td>
+        <td>object</td>
+        <td>The specification of extensions.</td>
         <td>false</td>
       </tr><tr>
         <td><b>image</b></td>
@@ -12642,203 +12642,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 </table>
 
 
-<h3 id="perconapgclusterspeccustomextensions">
-  PerconaPGCluster.spec.customExtensions
-  <sup><sup><a href="#perconapgclusterspec">↩ Parent</a></sup></sup>
-</h3>
-
-
-
-The specification of custom extensions.
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b><a href="#perconapgclusterspeccustomextensionsextensionsindex">extensions</a></b></td>
-        <td>[]object</td>
-        <td></td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>image</b></td>
-        <td>string</td>
-        <td></td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>imagePullPolicy</b></td>
-        <td>string</td>
-        <td>PullPolicy describes a policy for if/when to pull a container image</td>
-        <td>false</td>
-      </tr><tr>
-        <td><b><a href="#perconapgclusterspeccustomextensionsstorage">storage</a></b></td>
-        <td>object</td>
-        <td></td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
-<h3 id="perconapgclusterspeccustomextensionsextensionsindex">
-  PerconaPGCluster.spec.customExtensions.extensions[index]
-  <sup><sup><a href="#perconapgclusterspeccustomextensions">↩ Parent</a></sup></sup>
-</h3>
-
-
-
-
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b>checksum</b></td>
-        <td>string</td>
-        <td></td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>name</b></td>
-        <td>string</td>
-        <td></td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>version</b></td>
-        <td>string</td>
-        <td></td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
-<h3 id="perconapgclusterspeccustomextensionsstorage">
-  PerconaPGCluster.spec.customExtensions.storage
-  <sup><sup><a href="#perconapgclusterspeccustomextensions">↩ Parent</a></sup></sup>
-</h3>
-
-
-
-
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b>bucket</b></td>
-        <td>string</td>
-        <td></td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>region</b></td>
-        <td>string</td>
-        <td></td>
-        <td>false</td>
-      </tr><tr>
-        <td><b><a href="#perconapgclusterspeccustomextensionsstoragesecret">secret</a></b></td>
-        <td>object</td>
-        <td>Adapts a secret into a projected volume. 
- The contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.</td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>type</b></td>
-        <td>enum</td>
-        <td></td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
-<h3 id="perconapgclusterspeccustomextensionsstoragesecret">
-  PerconaPGCluster.spec.customExtensions.storage.secret
-  <sup><sup><a href="#perconapgclusterspeccustomextensionsstorage">↩ Parent</a></sup></sup>
-</h3>
-
-
-
-Adapts a secret into a projected volume. 
- The contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b><a href="#perconapgclusterspeccustomextensionsstoragesecretitemsindex">items</a></b></td>
-        <td>[]object</td>
-        <td>items if unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.</td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>name</b></td>
-        <td>string</td>
-        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>optional</b></td>
-        <td>boolean</td>
-        <td>optional field specify whether the Secret or its key must be defined</td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
-<h3 id="perconapgclusterspeccustomextensionsstoragesecretitemsindex">
-  PerconaPGCluster.spec.customExtensions.storage.secret.items[index]
-  <sup><sup><a href="#perconapgclusterspeccustomextensionsstoragesecret">↩ Parent</a></sup></sup>
-</h3>
-
-
-
-Maps a string key to a path within a volume.
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b>key</b></td>
-        <td>string</td>
-        <td>key is the key to project.</td>
-        <td>true</td>
-      </tr><tr>
-        <td><b>path</b></td>
-        <td>string</td>
-        <td>path is the relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.</td>
-        <td>true</td>
-      </tr><tr>
-        <td><b>mode</b></td>
-        <td>integer</td>
-        <td>mode is Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
 <h3 id="perconapgclusterspecdatasource">
   PerconaPGCluster.spec.dataSource
   <sup><sup><a href="#perconapgclusterspec">↩ Parent</a></sup></sup>
@@ -16662,6 +16465,240 @@ Specification of the service that exposes the PostgreSQL primary instance.
         <td><b>type</b></td>
         <td>enum</td>
         <td>More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecextensions">
+  PerconaPGCluster.spec.extensions
+  <sup><sup><a href="#perconapgclusterspec">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The specification of extensions.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecextensionsbuiltin">builtin</a></b></td>
+        <td>object</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecextensionscustomindex">custom</a></b></td>
+        <td>[]object</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>image</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>imagePullPolicy</b></td>
+        <td>string</td>
+        <td>PullPolicy describes a policy for if/when to pull a container image</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecextensionsstorage">storage</a></b></td>
+        <td>object</td>
+        <td></td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecextensionsbuiltin">
+  PerconaPGCluster.spec.extensions.builtin
+  <sup><sup><a href="#perconapgclusterspecextensions">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>pg_audit</b></td>
+        <td>boolean</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>pg_stat_monitor</b></td>
+        <td>boolean</td>
+        <td></td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecextensionscustomindex">
+  PerconaPGCluster.spec.extensions.custom[index]
+  <sup><sup><a href="#perconapgclusterspecextensions">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>checksum</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>version</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecextensionsstorage">
+  PerconaPGCluster.spec.extensions.storage
+  <sup><sup><a href="#perconapgclusterspecextensions">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>bucket</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>region</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecextensionsstoragesecret">secret</a></b></td>
+        <td>object</td>
+        <td>Adapts a secret into a projected volume. 
+ The contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>enum</td>
+        <td></td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecextensionsstoragesecret">
+  PerconaPGCluster.spec.extensions.storage.secret
+  <sup><sup><a href="#perconapgclusterspecextensionsstorage">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Adapts a secret into a projected volume. 
+ The contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#perconapgclusterspecextensionsstoragesecretitemsindex">items</a></b></td>
+        <td>[]object</td>
+        <td>items if unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>optional</b></td>
+        <td>boolean</td>
+        <td>optional field specify whether the Secret or its key must be defined</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecextensionsstoragesecretitemsindex">
+  PerconaPGCluster.spec.extensions.storage.secret.items[index]
+  <sup><sup><a href="#perconapgclusterspecextensionsstoragesecret">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Maps a string key to a path within a volume.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>key is the key to project.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>path</b></td>
+        <td>string</td>
+        <td>path is the relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>mode</b></td>
+        <td>integer</td>
+        <td>mode is Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</td>
         <td>false</td>
       </tr></tbody>
 </table>
@@ -23547,6 +23584,11 @@ PostgresClusterSpec defines the desired state of PostgresCluster
         <td><b>disableDefaultPodScheduling</b></td>
         <td>boolean</td>
         <td>Whether or not the PostgreSQL cluster should use the defined default scheduling constraints. If the field is unset or false, the default scheduling constraints will be used in addition to any custom constraints provided.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecextensions">extensions</a></b></td>
+        <td>object</td>
+        <td></td>
         <td>false</td>
       </tr><tr>
         <td><b>image</b></td>
@@ -40205,6 +40247,38 @@ DatabaseInitSQL defines a ConfigMap containing custom SQL that will be run after
         <td>string</td>
         <td>Name is the name of a ConfigMap</td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecextensions">
+  PostgresCluster.spec.extensions
+  <sup><sup><a href="#postgresclusterspec">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>pgAudit</b></td>
+        <td>boolean</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>pgStatMonitor</b></td>
+        <td>boolean</td>
+        <td></td>
+        <td>false</td>
       </tr></tbody>
 </table>
 

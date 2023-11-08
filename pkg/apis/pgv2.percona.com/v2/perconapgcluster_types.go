@@ -154,10 +154,10 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	PMM *PMMSpec `json:"pmm,omitempty"`
 
-	// The specification of custom extensions.
+	// The specification of extensions.
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
-	CustomExtensions CustomExtensionsSpec `json:"customExtensions,omitempty"`
+	Extensions ExtensionsSpec `json:"extensions,omitempty"`
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -194,6 +194,14 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.Backups.PGBackRest.Metadata.Labels = make(map[string]string)
 	}
 	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
+
+	t := true
+	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
+	}
+	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
+		cr.Spec.Extensions.BuiltIn.PGAudit = &t
+	}
 }
 
 func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crunchyv1beta1.PostgresCluster, scheme *runtime.Scheme) (*crunchyv1beta1.PostgresCluster, error) {
@@ -288,6 +296,9 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
 
+	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
+	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
+
 	return postgresCluster, nil
 }
 
@@ -380,7 +391,7 @@ func (cr *PerconaPGCluster) PMMEnabled() bool {
 	return cr.Spec.PMM != nil && cr.Spec.PMM.Enabled
 }
 
-type ExtensionSpec struct {
+type CustomExtensionSpec struct {
 	Name     string `json:"name,omitempty"`
 	Version  string `json:"version,omitempty"`
 	Checksum string `json:"checksum,omitempty"`
@@ -394,11 +405,17 @@ type CustomExtensionsStorageSpec struct {
 	Secret *corev1.SecretProjection `json:"secret,omitempty"`
 }
 
-type CustomExtensionsSpec struct {
+type BuiltInExtensionsSpec struct {
+	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
+	PGAudit       *bool `json:"pg_audit,omitempty"`
+}
+
+type ExtensionsSpec struct {
 	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
 	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
-	Extensions      []ExtensionSpec             `json:"extensions,omitempty"`
+	BuiltIn         BuiltInExtensionsSpec       `json:"builtin,omitempty"`
+	Custom          []CustomExtensionSpec       `json:"custom,omitempty"`
 }
 
 type SecretsSpec struct {

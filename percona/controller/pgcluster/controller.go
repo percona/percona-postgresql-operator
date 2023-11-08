@@ -332,16 +332,16 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 }
 
 func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Spec.CustomExtensions.Storage.Secret == nil {
+	if cr.Spec.Extensions.Storage.Secret == nil {
 		return nil
 	}
 
 	extensions := make([]string, 0)
-	for _, extension := range cr.Spec.CustomExtensions.Extensions {
+	for _, extension := range cr.Spec.Extensions.Custom {
 		key := GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
 		extensions = append(extensions, key)
 	}
-	container := ExtensionInstallerContainer(cr.Spec.PostgresVersion, &cr.Spec.CustomExtensions, strings.Join(extensions, ","))
+	container := ExtensionInstallerContainer(cr.Spec.PostgresVersion, &cr.Spec.Extensions, strings.Join(extensions, ","))
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]

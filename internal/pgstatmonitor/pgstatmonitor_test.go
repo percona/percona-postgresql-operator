@@ -1,19 +1,4 @@
-/*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
-
-package pgaudit
+package pgstatmonitor
 
 import (
 	"context"
@@ -42,7 +27,7 @@ func TestEnableInPostgreSQL(t *testing.T) {
 		b, err := io.ReadAll(stdin)
 		assert.NilError(t, err)
 		assert.Equal(t, string(b), strings.Trim(`
-SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS pgaudit;
+SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS pg_stat_monitor;
 		`, "\t\n"))
 
 		return expected
@@ -67,7 +52,7 @@ func TestDisableInPostgreSQL(t *testing.T) {
 		b, err := io.ReadAll(stdin)
 		assert.NilError(t, err)
 		assert.Equal(t, string(b), strings.Trim(`
-SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS pgaudit;
+SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS pg_stat_monitor;
 		`, "\t\n"))
 
 		return expected
@@ -87,7 +72,8 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
-		"shared_preload_libraries": "pgaudit",
+		"pg_stat_monitor.pgsm_query_max_len": "2048",
+		"shared_preload_libraries":           "pg_stat_monitor",
 	})
 
 	// Appended when not empty.
@@ -96,6 +82,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
-		"shared_preload_libraries": "some,existing,pgaudit",
+		"pg_stat_monitor.pgsm_query_max_len": "2048",
+		"shared_preload_libraries":           "some,existing,pg_stat_monitor",
 	})
 }

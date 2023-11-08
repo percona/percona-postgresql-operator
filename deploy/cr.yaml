@@ -274,7 +274,7 @@ spec:
 #          shared_buffers: 1GB
 #          work_mem: 2MB
 
-#  customExtensions:
+#  extensions:
 #    image: perconalab/percona-postgresql-operator:main-ext-installer
 #    imagePullPolicy: Always
 #    storage:
@@ -283,6 +283,9 @@ spec:
 #      region: eu-central-1
 #      secret:
 #        name: cluster1-extensions-secret
-#    extensions:
+#    builtin:
+#      pg_stat_monitor: true
+#      pg_audit: true
+#    custom:
 #    - name: pg_cron
 #      version: 1.6.1

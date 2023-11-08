@@ -68,7 +68,7 @@ func (r *PGClusterReconciler) getVersionMeta(cr *v2.PerconaPGCluster, operatorDe
 	}
 
 	extensions := make([]string, 0)
-	for _, extension := range cr.Spec.CustomExtensions.Extensions {
+	for _, extension := range cr.Spec.Extensions.Custom {
 		key := GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
 		extensions = append(extensions, key)
 	}

@@ -7396,6 +7396,13 @@ spec:
                   false, the default scheduling constraints will be used in addition
                   to any custom constraints provided.
                 type: boolean
+              extensions:
+                properties:
+                  pgAudit:
+                    type: boolean
+                  pgStatMonitor:
+                    type: boolean
+                type: object
               image:
                 description: The image name to use for PostgreSQL containers. When
                   omitted, the value comes from an operator environment variable.

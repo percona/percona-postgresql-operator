@@ -36,7 +36,7 @@ func ExtensionRelocatorContainer(image string, imagePullPolicy corev1.PullPolicy
 	}
 }
 
-func ExtensionInstallerContainer(postgresVersion int, spec *v2.CustomExtensionsSpec, extensions string) corev1.Container {
+func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, extensions string) corev1.Container {
 	mounts := []corev1.VolumeMount{
 		{
 			Name:      "postgres-data",

@@ -175,6 +175,13 @@ type PostgresClusterSpec struct {
 	Users []PostgresUserSpec `json:"users,omitempty"`
 
 	Config PostgresAdditionalConfig `json:"config,omitempty"`
+
+	Extensions ExtensionsSpec `json:"extensions,omitempty"`
+}
+
+type ExtensionsSpec struct {
+	PGStatMonitor bool `json:"pgStatMonitor,omitempty"`
+	PGAudit       bool `json:"pgAudit,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.
