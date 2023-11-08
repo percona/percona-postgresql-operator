@@ -137,7 +137,7 @@ get_cr() {
 				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
 				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
-		;;
+			;;
 	esac
 	cat $TEMP_DIR/cr.yaml
 }
