@@ -36,5 +36,6 @@ for installed in ${PGDATA_EXTENSIONS}/*.installed; do
 			-extension-path ${PGDATA_EXTENSIONS} \
 			-key ${key} \
 			-uninstall
+		rm -f ${installed}
 	fi
 done
