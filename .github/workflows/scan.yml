@@ -4,6 +4,7 @@ on: [pull_request]
 env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: docker.io
+
   # github.repository as <account>/<repo>
   IMAGE_NAME: perconalab/percona-postgresql-operator
 
@@ -23,7 +24,7 @@ jobs:
 
       - name: Build an image from Dockerfile (linux/arm64)
         run: |
-          export IMAGE=perconalab/percona-postgresql-operator:${{ github.sha }}-arm64
+          export IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
           export DOCKER_PUSH=0
           export DOCKER_SQUASH=0
           export DOCKER_DEFAULT_PLATFORM='linux/arm64'
@@ -32,7 +33,7 @@ jobs:
       - name: Run Trivy vulnerability scanner image (linux/arm64)
         uses: aquasecurity/trivy-action@0.13.1
         with:
-          image-ref: 'perconalab/percona-postgresql-operator:${{ github.sha }}-arm64'
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
@@ -41,7 +42,7 @@ jobs:
 
       - name: Build an image from Dockerfile (linux/amd64)
         run: |
-          export IMAGE=perconalab/percona-postgresql-operator:${{ github.sha }}-amd64
+          export IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
           export DOCKER_PUSH=0
           export DOCKER_SQUASH=0
           export DOCKER_DEFAULT_PLATFORM='linux/amd64'
@@ -50,7 +51,7 @@ jobs:
       - name: Run Trivy vulnerability scanner image (linux/amd64)
         uses: aquasecurity/trivy-action@0.13.1
         with:
-          image-ref: 'perconalab/percona-postgresql-operator:${{ github.sha }}-amd64'
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
