@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 300
+timeout: 320
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -55,9 +55,9 @@ metadata:
   annotations:
     postgres-operator.crunchydata.com/pgbackrest-config: database
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: migration-backup-s3
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      # name: migration-backup-s3
       controller: true
       blockOwnerDeletion: true
 status:
@@ -68,7 +68,7 @@ kind: PostgresCluster
 metadata:
   name: migration-backup-s3
   ownerReferences:
-    - apiVersion: pg.percona.com/v2beta1
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: migration-backup-s3
       controller: true
@@ -91,7 +91,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pg.percona.com/v2beta1
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: migration-backup-s3

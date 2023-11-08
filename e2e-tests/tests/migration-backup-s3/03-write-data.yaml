@@ -6,13 +6,13 @@ commands:
       set -o xtrace
 
       source ../../functions
-      POSTGRES_V1_CLUSTER_NAME=$(kubectl -n ${NAMESPACE} get configmap/v1-cluster-name --template='{{index .data "v1-cluster-name"}}')
-      POSTGRES_V1_PASS=$(kubectl -n ${NAMESPACE} get secret/${POSTGRES_V1_CLUSTER_NAME}-postgres-secret --template='{{.data.password | base64decode}}')
+      POSTGRES_V1_CLUSTER_NAME=$(kubectl -n $NAMESPACE get configmap/v1-cluster-name --template='{{index .data "v1-cluster-name"}}')
+      POSTGRES_V1_PASS=$(kubectl -n $NAMESPACE get secret/$POSTGRES_V1_CLUSTER_NAME-postgres-secret --template='{{.data.password | base64decode}}')
 
       run_psql \
         'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
-        "postgres:${POSTGRES_V1_PASS}@${POSTGRES_V1_CLUSTER_NAME}"
+        "postgres://postgres:$POSTGRES_V1_PASS@$POSTGRES_V1_CLUSTER_NAME"
 
       run_psql \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
-        "postgres:${POSTGRES_V1_PASS}@${POSTGRES_V1_CLUSTER_NAME}"
+        "postgres://postgres:$POSTGRES_V1_PASS@$POSTGRES_V1_CLUSTER_NAME"

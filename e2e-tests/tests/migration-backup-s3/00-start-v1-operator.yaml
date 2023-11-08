@@ -9,10 +9,19 @@ commands:
       source ../../functions
 
       deploy_client
-      [[ ${PG_VER} -ge 15 ]] && echo "PostgeSQL Major version is not supported" && exit 1 || true
-      kubectl -n ${NAMESPACE} delete -f ${DEPLOY_DIR}/crd.yaml || true
+      (( PGOV1_VER > 14 )) && echo "PostgeSQL Major version is not supported" && exit 1 || true
+      kubectl -n $NAMESPACE delete -f $DEPLOY_DIR/crd.yaml || true
 
-      curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v${PGV1_TAG}/deploy/operator.yaml \
-        | $sed -r 's/^(    namespace:).*pgo.*$/\1 \"'${NAMESPACE}'\"/g' \
-        | $sed -r 's/^(    pgo_operator_namespace:).*pgo.*$/\1 \"'${NAMESPACE}'\"/g' \
-        | kubectl -n ${NAMESPACE} apply -f -
+      if [[ $OPERATOR_NS ]]; then
+        OPNS=$OPERATOR_NS
+      else
+        OPNS=$NAMESPACE
+      fi
+
+      kubectl delete namespace $OPNS || true
+      create_namespace $OPNS
+
+      curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v$PGOV1_TAG/deploy/operator.yaml |
+      $sed -r 's/^(    namespace:).*pgo.*$/\1 \"'$NAMESPACE'\"/g' |
+      $sed -r 's/^(    pgo_operator_namespace:).*pgo.*$/\1 \"'$OPNS'\"/g' |
+      kubectl -n $NAMESPACE apply -f -

@@ -8,31 +8,30 @@ commands:
 
       source ../../functions
 
-      [[ ${PG_VER} -ge 15 ]] && echo "PostgeSQL Major version is not supported" && exit 1 || true
+      (( PGOV1_VER > 14 )) && echo "PostgeSQL Major version is not supported" && exit 1 || true
 
-      V1_CLUSTER_NAME="v1-data-source-${RANDOM}"
-      kubectl create configmap -n ${NAMESPACE} v1-cluster-name --from-literal=v1-cluster-name="${V1_CLUSTER_NAME}"
+      V1_CLUSTER_NAME="v1-data-source-$RANDOM"
+      kubectl create configmap -n $NAMESPACE v1-cluster-name --from-literal=v1-cluster-name="$V1_CLUSTER_NAME"
 
-      curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v${PGV1_TAG}/e2e-tests/demand-backup/conf/backrest-repo-secret.yml \
-        | yq eval '
-            .metadata.name="'${V1_CLUSTER_NAME}'-backrest-repo-config"
-            | .data.aws-s3-key="'$(yq eval 'select(documentIndex == 0).data.AWS_ACCESS_KEY_ID' ${TESTS_CONFIG_DIR}/cloud-secret.yml)'"
-            | .data.aws-s3-key-secret="'$(yq eval 'select(documentIndex == 0).data.AWS_SECRET_ACCESS_KEY' ${TESTS_CONFIG_DIR}/cloud-secret.yml)'"
-            ' - \
-        | kubectl -n ${NAMESPACE} apply -f -
+      curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v$PGOV1_TAG/e2e-tests/demand-backup/conf/backrest-repo-secret.yml |
+      yq eval '
+        .metadata.name="'$V1_CLUSTER_NAME'-backrest-repo-config" |
+        .data.aws-s3-key="'$(yq eval 'select(documentIndex == 0).data.AWS_ACCESS_KEY_ID' $TESTS_CONFIG_DIR/cloud-secret.yml)'" |
+        .data.aws-s3-key-secret="'$(yq eval 'select(documentIndex == 0).data.AWS_SECRET_ACCESS_KEY' $TESTS_CONFIG_DIR/cloud-secret.yml)'"
+        ' - |
+      kubectl -n $NAMESPACE apply -f -
 
-
-      curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v${PGV1_TAG}/deploy/cr.yaml \
-        | yq eval '
-            .spec.pgPrimary.image="percona/percona-postgresql-operator:'${PGV1_TAG}'-ppg'${PG_VER}'-postgres-ha"
-            | .spec.backup.image="percona/percona-postgresql-operator:'${PGV1_TAG}'-ppg'${PG_VER}'-pgbackrest"
-            | .spec.backup.backrestRepoImage="percona/percona-postgresql-operator:'${PGV1_TAG}'-ppg'${PG_VER}'-pgbackrest-repo"
-            | .spec.pgBouncer.image="percona/percona-postgresql-operator:'${PGV1_TAG}'-ppg'${PG_VER}'-pgbouncer"
-            | .spec.backup.storages.my-s3.type="s3"
-            | .spec.backup.storages.my-s3.endpointUrl="s3.amazonaws.com"
-            | .spec.backup.storages.my-s3.region="us-east-1"
-            | .spec.backup.storages.my-s3.uriStyle="path"
-            | .spec.backup.storages.my-s3.bucket="'${BUCKET}'"
-            ' - \
-        | $sed -r 's/cluster1/'${V1_CLUSTER_NAME}'/g' \
-        | kubectl -n ${NAMESPACE} apply -f -
+      curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v$PGOV1_TAG/deploy/cr.yaml |
+      yq eval '
+        .spec.pgPrimary.image="percona/percona-postgresql-operator:'$PGOV1_TAG'-ppg'$PGOV1_VER'-postgres-ha" |
+        .spec.backup.image="percona/percona-postgresql-operator:'$PGOV1_TAG'-ppg'$PGOV1_VER'-pgbackrest" |
+        .spec.backup.backrestRepoImage="percona/percona-postgresql-operator:'$PGOV1_TAG'-ppg'$PGOV1_VER'-pgbackrest-repo" |
+        .spec.pgBouncer.image="percona/percona-postgresql-operator:'$PGOV1_TAG'-ppg'$PGOV1_VER'-pgbouncer" |
+        .spec.backup.storages.my-s3.type="s3" |
+        .spec.backup.storages.my-s3.endpointUrl="s3.amazonaws.com" |
+        .spec.backup.storages.my-s3.region="us-east-1" |
+        .spec.backup.storages.my-s3.uriStyle="path" |
+        .spec.backup.storages.my-s3.bucket="'$BUCKET'"
+        ' - |
+      $sed -r 's/cluster1/'$V1_CLUSTER_NAME'/g' |
+      kubectl -n $NAMESPACE apply -f -
