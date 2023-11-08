@@ -21,7 +21,6 @@ create_namespace() {
 		fi
 		wait_for_delete "project/$namespace"
 
-		desc "create namespace $namespace"
 		oc new-project "$namespace"
 		oc project "$namespace"
 		oc adm policy add-scc-to-user hostaccess -z default || :
@@ -108,6 +107,15 @@ get_cr() {
 		| '$(printf .spec.pmm.secret="%s" \"${test_name}-pmm-secret\")'
 		' "${DEPLOY_DIR}/cr.yaml" \
 		>"${TEMP_DIR}/cr.yaml"
+
+	if [[ $OPENSHIFT ]]; then
+		yq eval '
+				.spec.openshift = true
+				' "${TEMP_DIR}/cr.yaml" \
+			>"${TEMP_DIR}/openshift.cr.yaml"
+		mv "${TEMP_DIR}/openshift.cr.yaml" "${TEMP_DIR}/cr.yaml"
+
+	fi
 
 	case ${test_name} in
 		"demand-backup" | "start-from-backup")
