@@ -88,6 +88,10 @@ get_cr() {
 		.spec.pmm.secret = "'$test_name'-pmm-secret"
 		' $DEPLOY_DIR/cr.yaml > $TEMP_DIR/cr.yaml
 
+	if [[ $OPENSHIFT ]]; then
+		yq eval -i '.spec.openshift = true' $TEMP_DIR/cr.yaml
+	fi
+
 	case $test_name in
 		"demand-backup" | "start-from-backup")
 			yq eval -i '
