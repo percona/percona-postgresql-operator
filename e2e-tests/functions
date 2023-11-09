@@ -643,20 +643,20 @@ get_desired_replicas() {
 	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}'
 }
 
-kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.status.updatedReplicas}'
 wait_sts_rollout() {
 	local sts=$1
 	local updated_replicas=$(get_updated_replicas $sts)
 	local desired_replicas=$(get_desired_replicas $sts)
 
-	until [[ $updated_replicas -eq $desired_replicas ]]; do
-		kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}'
+	until [[ "$updated_replicas" -eq "$desired_replicas" ]]; do
+		updated_replicas=$(get_updated_replicas $sts)
 		desired_replicas=$(get_desired_replicas $sts)
 
+		echo "Waiting for sts/$sts to update... $updated_replicas/$desired_replicas pods updated."
 		sleep 10
 	done
 }
-	until [[ $updated_replicas -eq $desired_replicas ]]; do
+
 wait_cluster_consistency() {
 	local cluster_name=$1
 	local wait_time=${2:-32}
@@ -673,8 +673,9 @@ wait_cluster_consistency() {
 		echo -n .
 		sleep 10
 	done
+⋮
 	sts=$(kubectl -n "${NAMESPACE}" get sts --selector=postgres-operator.crunchydata.com/cluster="${cluster_name}" -o jsonpath='{.items[*].metadata.name}' | grep "${cluster_name}")
 	for st in $sts; do
 		wait_sts_rollout "$st"
-	done
+	 done
 }
