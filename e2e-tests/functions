@@ -673,7 +673,7 @@ wait_cluster_consistency() {
 		echo -n .
 		sleep 10
 	done
-⋮
+
 	sts=$(kubectl -n "${NAMESPACE}" get sts --selector=postgres-operator.crunchydata.com/cluster="${cluster_name}" -o jsonpath='{.items[*].metadata.name}' | grep "${cluster_name}")
 	for st in $sts; do
 		wait_sts_rollout "$st"
