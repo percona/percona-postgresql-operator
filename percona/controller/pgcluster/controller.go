@@ -189,9 +189,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	if err := r.reconcileCustomExtensions(cr); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
-	}
+	r.reconcileCustomExtensions(cr)
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
@@ -331,9 +329,9 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
-func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster) {
 	if cr.Spec.Extensions.Storage.Secret == nil {
-		return nil
+		return
 	}
 
 	extensions := make([]string, 0)
@@ -349,8 +347,6 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster)
 		set.InitContainers = append(set.InitContainers, container)
 		set.VolumeMounts = append(set.VolumeMounts, ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
 	}
-
-	return nil
 }
 
 func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
