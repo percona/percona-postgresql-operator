@@ -74,6 +74,68 @@ var _ = Describe("PG Cluster", Ordered, func() {
 	})
 })
 
+var _ = Describe("Annotations", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "annotations-test"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster with annotations", func() {
+		cr.Annotations = make(map[string]string)
+		cr.Annotations["pgv2.percona.com/trigger-switchover"] = "true"
+		cr.Annotations["egedemo.com/test"] = "true"
+
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+	Context("Reconcile controller", func() {
+		It("Controller should reconcile", func() {
+			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	crunchyCr := v1beta1.PostgresCluster{}
+
+	It("should get PostgresCluster", func() {
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), &crunchyCr)).Should(Succeed())
+	})
+
+	It("should have annotations", func() {
+		_, ok := crunchyCr.Annotations["postgres-operator.crunchydata.com/trigger-switchover"]
+		Expect(ok).To(BeTrue())
+
+		_, ok = crunchyCr.Annotations["egedemo.com/test"]
+		Expect(ok).To(BeTrue())
+	})
+})
+
 var _ = Describe("PMM sidecar", Ordered, func() {
 	ctx := context.Background()
 
