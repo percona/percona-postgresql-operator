@@ -635,7 +635,7 @@ restart_pg_pods() {
 }
 
 get_updated_replicas() {
-  kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.status.updatedReplicas}'
+	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.status.updatedReplicas}'
 }
 
 # Function to get the desired number of replicas
