@@ -640,7 +640,7 @@ get_updated_replicas() {
 
 # Function to get the desired number of replicas
 get_desired_replicas() {
-  kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}'
+	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}'
 }
 
 	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.status.updatedReplicas}'
