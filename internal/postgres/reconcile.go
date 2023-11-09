@@ -162,6 +162,13 @@ func InstancePod(ctx context.Context,
 		},
 	}
 
+	dbContainerMounts := []corev1.VolumeMount{
+		certVolumeMount,
+		dataVolumeMount,
+		downwardAPIVolumeMount,
+	}
+	dbContainerMounts = append(dbContainerMounts, inInstanceSpec.VolumeMounts...)
+
 	container := corev1.Container{
 		Name: naming.ContainerDatabase,
 
@@ -179,11 +186,7 @@ func InstancePod(ctx context.Context,
 		}},
 
 		SecurityContext: initialize.RestrictedSecurityContext(),
-		VolumeMounts: []corev1.VolumeMount{
-			certVolumeMount,
-			dataVolumeMount,
-			downwardAPIVolumeMount,
-		},
+		VolumeMounts:    dbContainerMounts,
 	}
 
 	reloader := corev1.Container{
@@ -282,6 +285,7 @@ func InstancePod(ctx context.Context,
 	}
 
 	outInstancePod.InitContainers = []corev1.Container{startup}
+	outInstancePod.InitContainers = append(outInstancePod.InitContainers, inInstanceSpec.InitContainers...)
 }
 
 // PodSecurityContext returns a v1.PodSecurityContext for cluster that can write

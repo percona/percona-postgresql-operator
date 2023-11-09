@@ -175,6 +175,13 @@ type PostgresClusterSpec struct {
 	Users []PostgresUserSpec `json:"users,omitempty"`
 
 	Config PostgresAdditionalConfig `json:"config,omitempty"`
+
+	Extensions ExtensionsSpec `json:"extensions,omitempty"`
+}
+
+type ExtensionsSpec struct {
+	PGStatMonitor bool `json:"pgStatMonitor,omitempty"`
+	PGAudit       bool `json:"pgAudit,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.
@@ -433,6 +440,11 @@ type PostgresInstanceSetSpec struct {
 	// +optional
 	Containers []corev1.Container `json:"containers,omitempty"`
 
+	// Additional init containers for PostgreSQL instance pods. Changing this value causes
+	// PostgreSQL to restart.
+	// +optional
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
+
 	// Defines a PersistentVolumeClaim for PostgreSQL data.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 	// +kubebuilder:validation:Required
@@ -485,6 +497,11 @@ type PostgresInstanceSetSpec struct {
 	// +listMapKey=name
 	// +optional
 	TablespaceVolumes []TablespaceVolume `json:"tablespaceVolumes,omitempty"`
+
+	// The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes
+	// PostgreSQL to restart.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 type TablespaceVolume struct {
