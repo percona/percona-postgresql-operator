@@ -657,7 +657,7 @@ wait_sts_rollout() {
 		sleep 10
 	done
 }
-
+	until [[ $updated_replicas -eq $desired_replicas ]]; do
 wait_cluster_consistency() {
 	local cluster_name=$1
 	local wait_time=${2:-32}
