@@ -89,6 +89,9 @@ type VersionServiceApplyParams struct {
 	// DatabaseVersion.
 	DatabaseVersion *string
 
+	// Extensions.
+	Extensions *string
+
 	// HaproxyVersion.
 	HaproxyVersion *string
 
@@ -284,6 +287,17 @@ func (o *VersionServiceApplyParams) WithDatabaseVersion(databaseVersion *string)
 // SetDatabaseVersion adds the databaseVersion to the version service apply params
 func (o *VersionServiceApplyParams) SetDatabaseVersion(databaseVersion *string) {
 	o.DatabaseVersion = databaseVersion
+}
+
+// WithExtensions adds the extensions to the version service apply params
+func (o *VersionServiceApplyParams) WithExtensions(extensions *string) *VersionServiceApplyParams {
+	o.SetExtensions(extensions)
+	return o
+}
+
+// SetExtensions adds the extensions to the version service apply params
+func (o *VersionServiceApplyParams) SetExtensions(extensions *string) {
+	o.Extensions = extensions
 }
 
 // WithHaproxyVersion adds the haproxyVersion to the version service apply params
@@ -583,6 +597,23 @@ func (o *VersionServiceApplyParams) WriteToRequest(r runtime.ClientRequest, reg 
 		if qDatabaseVersion != "" {
 
 			if err := r.SetQueryParam("databaseVersion", qDatabaseVersion); err != nil {
+				return err
+			}
+		}
+	}
+
+	if o.Extensions != nil {
+
+		// query param extensions
+		var qrExtensions string
+
+		if o.Extensions != nil {
+			qrExtensions = *o.Extensions
+		}
+		qExtensions := qrExtensions
+		if qExtensions != "" {
+
+			if err := r.SetQueryParam("extensions", qExtensions); err != nil {
 				return err
 			}
 		}

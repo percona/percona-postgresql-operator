@@ -231,8 +231,12 @@ func (r *Reconciler) Reconcile(
 	pgbouncer.PostgreSQL(cluster, &pgHBAs)
 
 	pgParameters := postgres.NewParameters()
-	pgstatmonitor.PostgreSQLParameters(&pgParameters)
-	pgaudit.PostgreSQLParameters(&pgParameters)
+	if cluster.Spec.Extensions.PGStatMonitor {
+		pgstatmonitor.PostgreSQLParameters(&pgParameters)
+	}
+	if cluster.Spec.Extensions.PGAudit {
+		pgaudit.PostgreSQLParameters(&pgParameters)
+	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
 

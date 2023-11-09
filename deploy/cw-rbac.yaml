@@ -117,6 +117,13 @@ rules:
 - apiGroups:
   - pgv2.percona.com
   resources:
+  - perconapgbackups/finalizers
+  - perconapgclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - pgv2.percona.com
+  resources:
   - perconapgbackups/status
   verbs:
   - create
@@ -149,13 +156,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - pgv2.percona.com
-  resources:
-  - perconapgclusters/finalizers
-  - perconapgbackups/finalizers
-  verbs:
-  - update
 - apiGroups:
   - policy
   resources:
