@@ -189,7 +189,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	if err := r.reconcileCustomExtensions(ctx, cr); err != nil {
+	if err := r.reconcileCustomExtensions(cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
 	}
 
@@ -331,7 +331,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
-func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster) error {
 	if cr.Spec.Extensions.Storage.Secret == nil {
 		return nil
 	}
