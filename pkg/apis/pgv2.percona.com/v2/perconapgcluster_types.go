@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"os"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -212,14 +212,15 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	annotations := make(map[string]string)
 	for k, v := range cr.Annotations {
 		switch k {
-		case AnnotationPGBackrestBackup:
-			annotations[naming.PGBackRestBackup] = v
-		case AnnotationPGBackRestRestore:
-			annotations[naming.PGBackRestRestore] = v
 		case corev1.LastAppliedConfigAnnotation:
 			continue
 		default:
-			annotations[k] = v
+			if strings.HasPrefix(k, annotationPrefix) {
+				a := strings.Split(k, "/")
+				annotations[crunchyAnnotationPrefix+a[1]] = v
+			} else {
+				annotations[k] = v
+			}
 		}
 	}
 	postgresCluster.Annotations = annotations
@@ -697,6 +698,7 @@ const (
 )
 
 const annotationPrefix = "pgv2.percona.com/"
+const crunchyAnnotationPrefix = "postgres-operator.crunchydata.com/"
 
 const (
 	// AnnotationPGBackrestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
