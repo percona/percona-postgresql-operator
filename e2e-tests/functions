@@ -649,7 +649,7 @@ wait_sts_rollout() {
 	local updated_replicas=$(get_updated_replicas $sts)
 	local desired_replicas=$(get_desired_replicas $sts)
 
-	until [[ "$updated_replicas" -eq "$desired_replicas" ]]; do
+	until [[ $updated_replicas -eq $desired_replicas ]]; do
 		updated_replicas=$(get_updated_replicas $sts)
 		desired_replicas=$(get_desired_replicas $sts)
 
