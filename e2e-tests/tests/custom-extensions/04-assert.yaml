@@ -43,6 +43,7 @@ data:
      pg_cron
      pg_freespacemap
      pg_prewarm
+     pg_repack
      pg_stat_monitor
      pg_stat_statements
      pg_surgery
