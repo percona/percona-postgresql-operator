@@ -50,6 +50,13 @@ func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, e
 		Image:           spec.Image,
 		ImagePullPolicy: spec.ImagePullPolicy,
 		Command:         []string{"/usr/local/bin/install-extensions.sh"},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: func() *int64 {
+				// postgres user
+				var uid int64 = 26
+				return &uid
+			}(),
+		},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "STORAGE_TYPE",

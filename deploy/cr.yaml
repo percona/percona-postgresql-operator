@@ -283,7 +283,7 @@ spec:
 #          work_mem: 2MB
 
 #  extensions:
-#    image: perconalab/percona-postgresql-operator:main-ext-installer
+#    image: perconalab/percona-postgresql-operator:main
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
