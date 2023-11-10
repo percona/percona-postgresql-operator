@@ -2,6 +2,8 @@ package pgcluster
 
 import (
 	"context"
+	"strings"
+
 	// #nosec G501
 	"crypto/md5"
 	"fmt"
@@ -187,6 +189,8 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	r.reconcileCustomExtensions(cr)
+
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
 		if err != nil {
@@ -323,6 +327,26 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	}
 
 	return nil
+}
+
+func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster) {
+	if cr.Spec.Extensions.Storage.Secret == nil {
+		return
+	}
+
+	extensions := make([]string, 0)
+	for _, extension := range cr.Spec.Extensions.Custom {
+		key := GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
+		extensions = append(extensions, key)
+	}
+	container := ExtensionInstallerContainer(cr.Spec.PostgresVersion, &cr.Spec.Extensions, strings.Join(extensions, ","))
+
+	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+		set := &cr.Spec.InstanceSets[i]
+		set.InitContainers = append(set.InitContainers, ExtensionRelocatorContainer(cr.Spec.Image, cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion))
+		set.InitContainers = append(set.InitContainers, container)
+		set.VolumeMounts = append(set.VolumeMounts, ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
+	}
 }
 
 func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {

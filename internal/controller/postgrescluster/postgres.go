@@ -241,21 +241,38 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	var pgAuditOK, pgStatMonitorOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
-		if pgStatMonitorOK = pgstatmonitor.EnableInPostgreSQL(ctx, exec) == nil; !pgStatMonitorOK {
-			// pg_stat_monitor can only be enabled after its shared library is loaded,
-			// but early versions of PGO do not load it automatically. Assume
-			// that an error here is because the cluster started during one of
-			// those versions and has not been restarted.
-			r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgStatMonitorDisabled",
-				"Unable to install pgStatMonitor")
+		if cluster.Spec.Extensions.PGStatMonitor {
+			if pgStatMonitorOK = pgstatmonitor.EnableInPostgreSQL(ctx, exec) == nil; !pgStatMonitorOK {
+				// pg_stat_monitor can only be enabled after its shared library is loaded,
+				// but early versions of PGO do not load it automatically. Assume
+				// that an error here is because the cluster started during one of
+				// those versions and has not been restarted.
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgStatMonitorDisabled",
+					"Unable to install pgStatMonitor")
+			}
+		} else {
+			err := pgstatmonitor.DisableInPostgreSQL(ctx, exec)
+			if err != nil {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgStatMonitorEnabled",
+					"Unable to disable pgStatMonitor")
+			}
 		}
-		if pgAuditOK = pgaudit.EnableInPostgreSQL(ctx, exec) == nil; !pgAuditOK {
-			// pgAudit can only be enabled after its shared library is loaded,
-			// but early versions of PGO do not load it automatically. Assume
-			// that an error here is because the cluster started during one of
-			// those versions and has not been restarted.
-			r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgAuditDisabled",
-				"Unable to install pgAudit")
+
+		if cluster.Spec.Extensions.PGAudit {
+			if pgAuditOK = pgaudit.EnableInPostgreSQL(ctx, exec) == nil; !pgAuditOK {
+				// pgAudit can only be enabled after its shared library is loaded,
+				// but early versions of PGO do not load it automatically. Assume
+				// that an error here is because the cluster started during one of
+				// those versions and has not been restarted.
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgAuditDisabled",
+					"Unable to install pgAudit")
+			}
+		} else {
+			err := pgaudit.DisableInPostgreSQL(ctx, exec)
+			if err != nil {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgAuditEnabled",
+					"Unable to disable pgAudit")
+			}
 		}
 
 		// Enabling PostGIS extensions is a one-way operation

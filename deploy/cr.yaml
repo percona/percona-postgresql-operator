@@ -281,3 +281,19 @@ spec:
 #          max_worker_processes: 2
 #          shared_buffers: 1GB
 #          work_mem: 2MB
+
+#  extensions:
+#    image: perconalab/percona-postgresql-operator:main-ext-installer
+#    imagePullPolicy: Always
+#    storage:
+#      type: s3
+#      bucket: pg-extensions
+#      region: eu-central-1
+#      secret:
+#        name: cluster1-extensions-secret
+#    builtin:
+#      pg_stat_monitor: true
+#      pg_audit: true
+#    custom:
+#    - name: pg_cron
+#      version: 1.6.1

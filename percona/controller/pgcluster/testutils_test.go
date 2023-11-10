@@ -122,6 +122,7 @@ func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...clien
 	}
 
 	objs = append(objs, cr)
+	cr.Default()
 	postgresCluster, err := cr.ToCrunchy(ctx, nil, s)
 	if err != nil {
 		return nil, err
