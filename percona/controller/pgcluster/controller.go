@@ -54,6 +54,7 @@ type PGClusterReconciler struct {
 	Platform          string
 	KubeVersion       string
 	CrunchyController controller.Controller
+	IsOpenShift       bool
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
@@ -147,6 +148,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	cr.Default()
+
+	if cr.Spec.OpenShift == nil {
+		cr.Spec.OpenShift = &r.IsOpenShift
+	}
 
 	postgresCluster := &v1beta1.PostgresCluster{
 		ObjectMeta: metav1.ObjectMeta{
