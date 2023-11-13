@@ -339,7 +339,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster)
 		key := GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
 		extensions = append(extensions, key)
 	}
-	container := ExtensionInstallerContainer(cr.Spec.PostgresVersion, &cr.Spec.Extensions, strings.Join(extensions, ","))
+	container := ExtensionInstallerContainer(cr.Spec.PostgresVersion, &cr.Spec.Extensions, strings.Join(extensions, ","), cr.Spec.OpenShift)
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]

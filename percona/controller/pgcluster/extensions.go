@@ -36,7 +36,7 @@ func ExtensionRelocatorContainer(image string, imagePullPolicy corev1.PullPolicy
 	}
 }
 
-func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, extensions string) corev1.Container {
+func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, extensions string, openshift *bool) corev1.Container {
 	mounts := []corev1.VolumeMount{
 		{
 			Name:      "postgres-data",
@@ -45,18 +45,11 @@ func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, e
 	}
 	mounts = append(mounts, ExtensionVolumeMounts(postgresVersion)...)
 
-	return corev1.Container{
+	container := corev1.Container{
 		Name:            "extension-installer",
 		Image:           spec.Image,
 		ImagePullPolicy: spec.ImagePullPolicy,
 		Command:         []string{"/usr/local/bin/install-extensions.sh"},
-		SecurityContext: &corev1.SecurityContext{
-			RunAsUser: func() *int64 {
-				// postgres user
-				var uid int64 = 26
-				return &uid
-			}(),
-		},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "STORAGE_TYPE",
@@ -92,6 +85,17 @@ func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, e
 		},
 		VolumeMounts: mounts,
 	}
+
+	if openshift == nil || !*openshift {
+		container.SecurityContext = &corev1.SecurityContext{
+			RunAsUser: func() *int64 {
+				uid := int64(26)
+				return &uid
+			}(),
+		}
+	}
+
+	return container
 }
 
 func ExtensionVolumeMounts(postgresVersion int) []corev1.VolumeMount {
