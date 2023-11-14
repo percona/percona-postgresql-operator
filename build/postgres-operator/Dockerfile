@@ -15,7 +15,12 @@ RUN mkdir -p build/_output/bin \
        go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/postgres-operator \
                ./cmd/postgres-operator \
-    && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
+       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
+           -o build/_output/bin/extension-installer \
+               ./cmd/extension-installer \
+    && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator \
+    && cp -r build/_output/bin/extension-installer /usr/local/bin/extension-installer
 
 
 RUN ./bin/license_aggregator.sh ./cmd/...; \
@@ -34,7 +39,9 @@ RUN microdnf update -y && microdnf clean all -y
 COPY licenses /licenses
 
 COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
+COPY --from=go_builder /usr/local/bin/extension-installer /usr/local/bin
 COPY --from=go_builder /licenses /licenses
+COPY build/postgres-operator/install-extensions.sh /usr/local/bin
 
 USER 2
 

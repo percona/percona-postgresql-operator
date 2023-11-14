@@ -154,9 +154,7 @@ get_cr() {
 			;;
 		custom-extensions)
 			yq eval '
-				.spec.postgresVersion = 15
-				| .spec.image = "'${IMAGE_BASE}:k8spg-375-ppg15-postgres'"
-				| .spec.extensions.image = "'${IMAGE_EXT_INSTALLER}'"
+				.spec.extensions.image = "'${IMAGE}'"
 				| .spec.extensions.imagePullPolicy = "Always"
 				| .spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
 			' "${TEMP_DIR}/cr.yaml" \

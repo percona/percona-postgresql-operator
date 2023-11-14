@@ -4,12 +4,9 @@ metadata:
   name: custom-extensions
 spec:
   extensions:
-    custom:
-    - name: pg_cron
-      version: 1.6.1
-    - name: timescaledb
-      version: 2.11.2
+    custom: []
   patroni:
     dynamicConfiguration:
       postgresql:
-        shared_preload_libraries: pg_cron,timescaledb
+        parameters:
+          shared_preload_libraries: ""
