@@ -209,14 +209,8 @@ pipeline {
                     }
                 }
                 sh '''
-                    if [ ! -d $HOME/google-cloud-sdk/bin ]; then
-                        rm -rf $HOME/google-cloud-sdk
-                        curl https://sdk.cloud.google.com | bash
-                    fi
-
-                    source $HOME/google-cloud-sdk/path.bash.inc
-                    gcloud components install alpha
-                    gcloud components install kubectl
+                    sudo curl -s -L -o /usr/local/bin/kubectl https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl && sudo chmod +x /usr/local/bin/kubectl
+                    kubectl version --client --output=yaml
 
                     curl -fsSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
                     curl -s -L https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz \
