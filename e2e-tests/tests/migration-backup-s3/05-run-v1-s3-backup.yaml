@@ -1,0 +1,29 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      POSTGRES_V1_CLUSTER_NAME=$(kubectl -n $NAMESPACE get configmap/v1-cluster-name --template='{{index .data "v1-cluster-name"}}')
+      POSTGRES_V1_PASS=$(kubectl -n $NAMESPACE get secret/$POSTGRES_V1_CLUSTER_NAME-postgres-secret --template='{{.data.password | base64decode}}')
+
+      curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v$PGOV1_TAG/e2e-tests/conf/backup.yml |
+      yq eval '
+        .metadata.labels.pg-cluster="'$POSTGRES_V1_CLUSTER_NAME'" |
+        .metadata.name="data-'$POSTGRES_V1_CLUSTER_NAME'" |
+        .spec.name="data-'$POSTGRES_V1_CLUSTER_NAME'" |
+        .spec.namespace="'$NAMESPACE'" |
+        .spec.parameters.job-name="data-'$POSTGRES_V1_CLUSTER_NAME'" |
+        .spec.parameters.backrest-opts="--type=full" |
+        .spec.parameters.pg-cluster="'$POSTGRES_V1_CLUSTER_NAME'" |
+        .spec.parameters.podname="'$(kubectl -n $NAMESPACE get pods --selector=name=$POSTGRES_V1_CLUSTER_NAME-backrest-shared-repo,pg-cluster=$POSTGRES_V1_CLUSTER_NAME -o 'jsonpath={.items[].metadata.name}')'"
+        ' - |
+      kubectl -n $NAMESPACE apply -f -
+
+      sleep 5
+      kubectl -n $NAMESPACE wait --for=condition=Complete job/data-$POSTGRES_V1_CLUSTER_NAME --timeout=300s
+      exit

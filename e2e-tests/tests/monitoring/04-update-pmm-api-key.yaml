@@ -13,4 +13,4 @@ commands:
         &&  kubectl -n ${NAMESPACE} patch secret monitoring-pmm-secret --type merge --patch '{"stringData": {"PMM_SERVER_KEY": "'${api_key}'"}}' \
         || true
 
-      sleep 5
+      sleep 10
