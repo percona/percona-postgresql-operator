@@ -29,6 +29,7 @@ type Meta struct {
 	HelmDeployCR       bool
 	HelmDeployOperator bool
 	SidecarsUsed       bool
+	Extensions         string
 }
 
 func EnsureVersion(ctx context.Context, meta Meta) error {
@@ -53,6 +54,9 @@ func fetchVersions(ctx context.Context, endpoint string, vm Meta) (DepVersion, e
 	})
 
 	applyParams := &version_service.VersionServiceApplyParams{
+		Context:            ctx,
+		HTTPClient:         &http.Client{Timeout: 10 * time.Second},
+		Product:            v2.ProductName,
 		Apply:              vm.Apply,
 		BackupVersion:      &vm.BackupVersion,
 		CustomResourceUID:  &vm.CRUID,
@@ -66,9 +70,7 @@ func fetchVersions(ctx context.Context, endpoint string, vm Meta) (DepVersion, e
 		HelmDeployCr:       &vm.HelmDeployCR,
 		HelmDeployOperator: &vm.HelmDeployOperator,
 		SidecarsUsed:       &vm.SidecarsUsed,
-		Product:            v2.ProductName,
-		Context:            ctx,
-		HTTPClient:         &http.Client{Timeout: 10 * time.Second},
+		Extensions:         &vm.Extensions,
 	}
 	applyParams = applyParams.WithTimeout(10 * time.Second)
 

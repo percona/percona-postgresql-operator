@@ -75,6 +75,16 @@ spec:
   instances:
   - name: instance1
     replicas: 3
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                postgres-operator.crunchydata.com/data: postgres
+            topologyKey: kubernetes.io/hostname
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -135,16 +145,15 @@ spec:
 #        loadBalancerSourceRanges:
 #          - 10.0.0.0/8
 #
-#      affinity:
-#        podAntiAffinity:
-#          preferredDuringSchedulingIgnoredDuringExecution:
-#          - weight: 1
-#            podAffinityTerm:
-#              labelSelector:
-#                matchLabels:
-#                  postgres-operator.crunchydata.com/cluster: keycloakdb
-#                  postgres-operator.crunchydata.com/role: pgbouncer
-#              topologyKey: kubernetes.io/hostname
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  postgres-operator.crunchydata.com/role: pgbouncer
+              topologyKey: kubernetes.io/hostname
 #
 #      tolerations:
 #      - effect: NoSchedule
@@ -200,7 +209,16 @@ spec:
 #        repo2-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo2
 #        repo3-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo3
 #        repo4-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo4
-#      repoHost:
+      repoHost:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+             - weight: 1
+               podAffinityTerm:
+                 labelSelector:
+                   matchLabels:
+                     postgres-operator.crunchydata.com/data: pgbackrest
+                 topologyKey: kubernetes.io/hostname
 #        priorityClassName: high-priority
 #
 #        topologySpreadConstraints:
@@ -210,16 +228,6 @@ spec:
 #          labelSelector:
 #            matchLabels:
 #              postgres-operator.crunchydata.com/pgbackrest: ""
-#        affinity:
-#          podAntiAffinity:
-#            preferredDuringSchedulingIgnoredDuringExecution:
-#             - weight: 1
-#             podAffinityTerm:
-#               labelSelector:
-#               matchLabels:
-#                 postgres-operator.crunchydata.com/cluster: keycloakdb
-#                 postgres-operator.crunchydata.com/role: pgbouncer
-#               topologyKey: kubernetes.io/hostname
 #
       manual:
         repoName: repo1
@@ -273,3 +281,19 @@ spec:
 #          max_worker_processes: 2
 #          shared_buffers: 1GB
 #          work_mem: 2MB
+
+#  extensions:
+#    image: perconalab/percona-postgresql-operator:main
+#    imagePullPolicy: Always
+#    storage:
+#      type: s3
+#      bucket: pg-extensions
+#      region: eu-central-1
+#      secret:
+#        name: cluster1-extensions-secret
+#    builtin:
+#      pg_stat_monitor: true
+#      pg_audit: true
+#    custom:
+#    - name: pg_cron
+#      version: 1.6.1

@@ -26,7 +26,6 @@ create_namespace() {
 		fi
 		wait_for_delete "project/$namespace"
 
-		desc "create namespace $namespace"
 		oc new-project "$namespace"
 		oc project "$namespace"
 		oc adm policy add-scc-to-user hostaccess -z default || :
@@ -98,6 +97,9 @@ deploy_s3_secrets() {
 			yq eval '.stringData["credentials.json"]' ${TESTS_CONFIG_DIR}/cloud-secret-minio-gw.yml >${TEMP_DIR}/gcs-key.json
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini" --from-file=gcs-key.json=${TEMP_DIR}/gcs-key.json
 			;;
+		custom-extensions)
+			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
+			;;
 		*)
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini"
 			;;
@@ -126,6 +128,15 @@ get_cr() {
 		| '$(printf .spec.pmm.secret="%s" \"${test_name}-pmm-secret\")'
 		' "${DEPLOY_DIR}/cr.yaml" \
 		>"${TEMP_DIR}/cr.yaml"
+
+	if [[ $OPENSHIFT ]]; then
+		yq eval '
+				.spec.openshift = true
+				' "${TEMP_DIR}/cr.yaml" \
+			>"${TEMP_DIR}/openshift.cr.yaml"
+		mv "${TEMP_DIR}/openshift.cr.yaml" "${TEMP_DIR}/cr.yaml"
+
+	fi
 
 	case ${test_name} in
 		"demand-backup" | "start-from-backup")
@@ -161,6 +172,15 @@ get_cr() {
 				' "${TEMP_DIR}/cr.yaml" \
 				>"${TEMP_DIR}/backup.cr.yaml"
 			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
+			;;
+		custom-extensions)
+			yq eval '
+				.spec.extensions.image = "'${IMAGE}'"
+				| .spec.extensions.imagePullPolicy = "Always"
+				| .spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
+			' "${TEMP_DIR}/cr.yaml" \
+				>"${TEMP_DIR}/custom-extensions.cr.yaml"
+			mv "${TEMP_DIR}/custom-extensions.cr.yaml" "${TEMP_DIR}/cr.yaml"
 			;;
 		*) ;;
 	esac
@@ -620,4 +640,61 @@ check_jobs_and_pgbackups() {
 			exit 1
 		fi
 	done
+}
+
+restart_pg_pods() {
+	local cluster=$1
+	local instance=$2
+
+	pods=$(kubectl get pods -n "${NAMESPACE}" --selector=postgres-operator.crunchydata.com/cluster="${cluster}",postgres-operator.crunchydata.com/instance-set="${instance}" -o jsonpath='{.items[*].metadata.name}')
+	for pod in $pods; do
+		kubectl delete pod -n "${NAMESPACE}" "${pod}"
+		wait_pod "${pod}"
+	done
+}
+
+get_updated_replicas() {
+	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.status.updatedReplicas}'
+}
+
+# Function to get the desired number of replicas
+get_desired_replicas() {
+	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}'
+}
+
+wait_sts_rollout() {
+	local sts=$1
+	local updated_replicas=$(get_updated_replicas $sts)
+	local desired_replicas=$(get_desired_replicas $sts)
+
+	until [[ "$updated_replicas" -eq "$desired_replicas" ]]; do
+		updated_replicas=$(get_updated_replicas $sts)
+		desired_replicas=$(get_desired_replicas $sts)
+
+		echo "Waiting for sts/$sts to update... $updated_replicas/$desired_replicas pods updated."
+		sleep 10
+	done
+}
+
+wait_cluster_consistency() {
+	local cluster_name=$1
+	local wait_time=${2:-32}
+
+	retry=0
+	sleep 7 # wait for two reconcile loops ;)  3 sec x 2 times + 1 sec = 7 seconds
+	echo -n 'waiting for cluster readyness'
+	until [[ "$(kubectl -n "${NAMESPACE}" get pg "${cluster_name}" -o jsonpath='{.status.state}')" == "ready" ]]; do
+		let retry+=1
+		if [ $retry -ge $wait_time ]; then
+			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
+			exit 1
+		fi
+		echo -n .
+		sleep 10
+	done
+
+	sts=$(kubectl -n "${NAMESPACE}" get sts --selector=postgres-operator.crunchydata.com/cluster="${cluster_name}" -o jsonpath='{.items[*].metadata.name}' | grep "${cluster_name}")
+	for st in $sts; do
+		wait_sts_rollout "$st"
+	 done
 }

@@ -167,6 +167,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Platform:          detectPlatform(ctx, mgr.GetConfig()),
 		KubeVersion:       getServerVersion(ctx, mgr.GetConfig()),
 		CrunchyController: cm.Controller(),
+		IsOpenShift:       isOpenshift(ctx, mgr.GetConfig()),
 	}
 	if err := pc.SetupWithManager(mgr); err != nil {
 		return err

@@ -251,7 +251,7 @@ gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 EOF
         sudo yum install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
 
-        curl -sL https://github.com/mitchellh/golicense/releases/latest/download/golicense_0.2.0_linux_x86_64.tar.gz | sudo tar -C /usr/local/bin -xzf - golicense
+        curl -sL https://github.com/mitchellh/golicense/releases/download/v0.2.0/golicense_0.2.0_linux_x86_64.tar.gz | sudo tar -C /usr/local/bin -xzf - golicense
     """
 }
 
@@ -325,6 +325,7 @@ pipeline {
                                 docker login -u '${USER}' -p '${PASS}'
                                 export RELEASE=0
                                 export IMAGE=\$DOCKER_TAG
+                                docker buildx create --use
                                 ./e2e-tests/build
                                 docker logout
                             "

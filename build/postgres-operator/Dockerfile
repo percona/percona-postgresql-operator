@@ -1,4 +1,4 @@
-FROM golang:1.20 AS go_builder
+FROM golang:1.21 AS go_builder
 WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
 COPY . .
@@ -8,15 +8,19 @@ ARG GIT_COMMIT
 ARG GIT_BRANCH
 ARG GO_LDFLAGS
 ARG GOOS=linux
-ARG GOARCH=amd64
 ARG CGO_ENABLED=0
 
 RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH GO_LDFLAGS=$GO_LDFLAGS \
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
        go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/postgres-operator \
                ./cmd/postgres-operator \
-    && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator
+    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
+       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
+           -o build/_output/bin/extension-installer \
+               ./cmd/extension-installer \
+    && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator \
+    && cp -r build/_output/bin/extension-installer /usr/local/bin/extension-installer
 
 
 RUN ./bin/license_aggregator.sh ./cmd/...; \
@@ -35,7 +39,9 @@ RUN microdnf update -y && microdnf clean all -y
 COPY licenses /licenses
 
 COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
+COPY --from=go_builder /usr/local/bin/extension-installer /usr/local/bin
 COPY --from=go_builder /licenses /licenses
+COPY build/postgres-operator/install-extensions.sh /usr/local/bin
 
 USER 2
 
