@@ -28,6 +28,7 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
+  generation: 2
   labels:
     app.kubernetes.io/component: pg
     app.kubernetes.io/instance: upgrade-minor
@@ -43,12 +44,122 @@ metadata:
       name: upgrade-minor
       controller: true
       blockOwnerDeletion: true
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: pg
+        app.kubernetes.io/instance: upgrade-minor
+        app.kubernetes.io/managed-by: percona-postgresql-operator
+        app.kubernetes.io/name: percona-postgresql
+        app.kubernetes.io/part-of: percona-postgresql
+        postgres-operator.crunchydata.com/cluster: upgrade-minor
+        postgres-operator.crunchydata.com/data: postgres
+        postgres-operator.crunchydata.com/instance-set: instance1
+        postgres-operator.crunchydata.com/patroni: upgrade-minor-ha
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  observedGeneration: 2
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: upgrade-minor-pgbouncer
+  labels:
+    app.kubernetes.io/component: pgbouncer
+    app.kubernetes.io/instance: upgrade-minor
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    postgres-operator.crunchydata.com/cluster: upgrade-minor
+    postgres-operator.crunchydata.com/role: pgbouncer
+  annotations:
+    deployment.kubernetes.io/revision: '2'
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: upgrade-minor
+      controller: true
+      blockOwnerDeletion: true
 status:
   observedGeneration: 2
-  replicas: 1
-  readyReplicas: 1
-  updatedReplicas: 1
-  collisionCount: 0
+  replicas: 3
+  updatedReplicas: 3
+  readyReplicas: 3
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: upgrade-minor
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: upgrade-minor
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: upgrade-minor
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  observedGeneration: 1
+  pgbackrest:
+    repoHost:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      ready: true
+    repos:
+      - bound: true
+        name: repo1
+        replicaCreateBackupComplete: true
+        stanzaCreated: true
+  proxy:
+    pgBouncer:
+      readyReplicas: 3
+      replicas: 3
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  generation: 2
+  name: upgrade-minor
+status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+      - name: instance1
+        ready: 3
+        size: 3
+    ready: 3
+    size: 3
+  state: ready
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
