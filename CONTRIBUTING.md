@@ -52,6 +52,16 @@ Contributions to the source tree should follow the workflow described below:
 The workflow for documentation is similar, but we store source code for the Percona Operator for PostgreSQL documentation in a [separate repository](https://github.com/percona/k8spg-docs).
 See the [Documentation Contribution Guide](https://github.com/percona/k8spg-docs/blob/main/CONTRIBUTING.md) for more information.
 
+### 4. Container images
+
+Find Operator Dockerfile in [build folder](build).
+
+Our Operator uses various container images - databases, proxies, other. You can find the Dockerfiles in [percona-docker](https://github.com/percona/percona-docker) repository.
+
+* [PostgreSQL (different versions)](https://github.com/percona/percona-docker/tree/main/postgresql-containers/build/postgres)
+* [PGBouncer](https://github.com/percona/percona-docker/tree/main/postgresql-containers/build/pgbouncer)
+* [pgBackrest](https://github.com/percona/percona-docker/tree/main/postgresql-containers/build/pgbackrest)
+
 ## Code review
 
 Your contribution will be reviewed by other developers contributing to the project. The more complex your changes are, the more experts will be involved. You will receive feedback and recommendations directly on your pull request on GitHub, so keep an eye on your submission and be prepared to make further amendments. The developers might even provide some concrete suggestions on modifying your code to match the project’s expectations better.
