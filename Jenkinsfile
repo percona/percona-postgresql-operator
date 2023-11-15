@@ -397,6 +397,7 @@ EOF
                             -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                             -w /go/src/github.com/percona/percona-postgresql-operator \
                             -e GO111MODULE=on \
+                            -e GOFLAGS='-buildvcs=false' \
                             golang:1.20 sh -c 'go build -v -o apiserver github.com/percona/percona-postgresql-operator/cmd/apiserver;
                                                go build -v -o pgo-rmdata github.com/percona/percona-postgresql-operator/cmd/pgo-rmdata;
                                                go build -v -o pgo-scheduler github.com/percona/percona-postgresql-operator/cmd/pgo-scheduler;
