@@ -8,7 +8,7 @@ commands:
       set -o xtrace
 
       source ../../functions
-      init_temp_dir
+      init_temp_dir # do this only in the first TestStep
 
       kubectl -n ${NAMESPACE} create configmap versions \
           --from-file "${TESTS_CONFIG_DIR}/operator.9.9.9.pg-operator.dep.json" \
