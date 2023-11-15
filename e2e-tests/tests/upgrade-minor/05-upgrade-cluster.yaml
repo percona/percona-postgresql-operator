@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 15
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      pg_ver_lower="$(cat ${TEMP_DIR}/pg_ver.txt)"
+      pg_ver_upper=$(echo "$IMAGE_POSTGRESQL" | cut -d':' -f2 | grep -oE '\-ppg[0-9]+-' | grep -oE '[0-9]+' | tr -d '-')
+      TARGET_IMAGE_POSTGRESQL=$IMAGE_POSTGRESQL
+
+      if [ "${pg_ver_lower}" != "${pg_ver_upper}" ]; then
+          TARGET_IMAGE_POSTGRESQL="percona/percona-postgresql-operator:main-ppg${pg_ver}-postgres"
+      fi
+
+      yq -i eval '
+          .metadata.name = "'${test_name}'" |
+          .metadata.labels = {"e2e":"'${test_name}'"} |
+          .spec.image = "${TARGET_IMAGE_POSTGRESQL}" |
+          .spec.proxy.pgBouncer.image = "${IMAGE_PGBOUNCER}" |
+          .spec.backups.pgbackrest.image = "${IMAGE_BACKREST}"' "${TEMP_DIR}/cr_lower.yaml"
+      kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"
+      sleep 7 # wait for reconcile loop

@@ -1,14 +1,11 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
+timeout: 30
 commands:
   - script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
-      init_temp_dir
 
       deploy_operator
-      deploy_client
-      deploy_s3_secrets

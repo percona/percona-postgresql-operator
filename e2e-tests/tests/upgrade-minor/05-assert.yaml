@@ -1,0 +1,59 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 180
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: upgrade-minor-repo-host
+  labels:
+    postgres-operator.crunchydata.com/cluster: upgrade-minor
+    postgres-operator.crunchydata.com/data: pgbackrest
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-dedicated: ''
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: upgrade-minor
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    app.kubernetes.io/component: pg
+    app.kubernetes.io/instance: upgrade-minor
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    postgres-operator.crunchydata.com/cluster: upgrade-minor
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: upgrade-minor
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 2
+  replicas: 1
+  readyReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: check-cluster-images
+timeout: 120
+commands:
+  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1,"spec.template.spec.containers[0].image=$IMAGE"

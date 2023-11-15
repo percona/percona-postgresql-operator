@@ -2,12 +2,17 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-source "${ROOT_REPO}/e2e-tests/vars.sh"
 test_name=$(basename "$(pwd)")
+source "${ROOT_REPO}/e2e-tests/vars.sh"
 
 if oc get projects 2>/dev/null; then
 	OPENSHIFT=4
 fi
+
+init_temp_dir() {
+	rm -rf "$TEMP_DIR"
+	mkdir -p "$TEMP_DIR"
+}
 
 create_namespace() {
 	local namespace=$1
@@ -44,9 +49,9 @@ deploy_operator() {
 	kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
 	kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
 
-	yq eval '.spec.template.spec.containers[0].image = "percona/percona-postgresql-operator:'${git_tag#v}'"' \
+	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' \
 		"${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
-		| kubectl -n "${OPERATOR_NS}" apply -f -
+		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
 deploy_operator_gh() {
