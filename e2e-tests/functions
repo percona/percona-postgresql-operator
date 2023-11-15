@@ -34,21 +34,21 @@ create_namespace() {
 deploy_operator() {
 	destroy_operator
 
-	if [ -n "$OPERATOR_NS" ]; then
+	if [[ $OPERATOR_NS ]]; then
 		create_namespace $OPERATOR_NS
-		kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
-		kubectl -n "${OPERATOR_NS}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/cw-rbac.yaml"
+		kubectl -n $OPERATOR_NS apply --server-side --force-conflicts -f "$DEPLOY_DIR/crd.yaml"
+		kubectl -n $OPERATOR_NS apply --server-side --force-conflicts -f "$DEPLOY_DIR/cw-rbac.yaml"
 		yq eval \
-			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
-			"${DEPLOY_DIR}/cw-operator.yaml" \
-			| kubectl -n "${OPERATOR_NS}" apply -f -
+			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "$IMAGE")" \
+			"$DEPLOY_DIR/cw-operator.yaml" \
+			| kubectl -n $OPERATOR_NS apply -f -
 	else
-		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
-		kubectl -n "${NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/rbac.yaml"
+		kubectl -n $NAMESPACE apply --server-side --force-conflicts -f "$DEPLOY_DIR/crd.yaml"
+		kubectl -n $NAMESPACE apply --server-side --force-conflicts -f "$DEPLOY_DIR/rbac.yaml"
 		yq eval \
-			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "${IMAGE}")" \
-			"${DEPLOY_DIR}/operator.yaml" \
-			| kubectl -n "${NAMESPACE}" apply -f -
+			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "$IMAGE")" \
+			"$DEPLOY_DIR/operator.yaml" \
+			| kubectl -n $NAMESPACE apply -f -
 	fi
 }
 
@@ -95,75 +95,61 @@ get_cr() {
 	local name_suffix=$1
 
 	yq eval '
-		'$(printf .metadata.name="%s" \"${test_name}\")'
-		| .metadata.labels={"e2e":"'${test_name}'"}
-		| .spec.postgresVersion='${PG_VER}'
-		| .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}]
-		| .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]
-		| '$(printf .spec.image="%s" \"${IMAGE_POSTGRESQL}\")'
-		| '$(printf .spec.backups.pgbackrest.image="%s" \"${IMAGE_BACKREST}\")'
-		| '$(printf .spec.proxy.pgBouncer.image="%s" \"${IMAGE_PGBOUNCER}\")'
-		| '$(printf .spec.pmm.image="%s" \"${IMAGE_PMM_CLIENT}\")'
-		| '$(printf .spec.pmm.secret="%s" \"${test_name}-pmm-secret\")'
-		' "${DEPLOY_DIR}/cr.yaml" \
-		>"${TEMP_DIR}/cr.yaml"
+		.metadata.name = "'$test_name'" |
+		.metadata.labels = {"e2e":"'$test_name'"} |
+		.spec.postgresVersion = '$PG_VER' |
+		.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
+		.spec.users += [{"name":"'$test_name'","password":{"type":"AlphaNumeric"}}] |
+		.spec.image = "'$IMAGE_POSTGRESQL'" |
+		.spec.backups.pgbackrest.image = "'$IMAGE_BACKREST'" |
+		.spec.proxy.pgBouncer.image = "'$IMAGE_PGBOUNCER'" |
+		.spec.pmm.image = "'$IMAGE_PMM_CLIENT'" |
+		.spec.pmm.secret = "'$test_name'-pmm-secret"
+		' $DEPLOY_DIR/cr.yaml > $TEMP_DIR/cr.yaml
 
 	if [[ $OPENSHIFT ]]; then
-		yq eval '
-				.spec.openshift = true
-				' "${TEMP_DIR}/cr.yaml" \
-			>"${TEMP_DIR}/openshift.cr.yaml"
-		mv "${TEMP_DIR}/openshift.cr.yaml" "${TEMP_DIR}/cr.yaml"
-
+		yq eval -i '.spec.openshift = true' $TEMP_DIR/cr.yaml
 	fi
 
-	case ${test_name} in
+	case $test_name in
 		"demand-backup" | "start-from-backup")
-			yq eval '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]
-				| .spec.backups.pgbackrest.manual.repoName = "repo1"
-				| .spec.backups.pgbackrest.manual.options = ["--type=full"]
-				| .spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo1"
-				| .spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
-				' "${TEMP_DIR}/cr.yaml" \
-				>"${TEMP_DIR}/backup.cr.yaml"
-			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
-			if [[ ${test_name} == "start-from-backup" ]]; then
-				yq eval '
-					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]
-					| .spec.dataSource.pgbackrest.stanza = "db"
-					| .spec.dataSource.pgbackrest.global.repo1-path = "/cluster-source/demand-backup-ppg'${PG_VER}'/repo1"
-					| .spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
-					' "${TEMP_DIR}/cr.yaml" \
-					>"${TEMP_DIR}/start-from-backup.cr.yaml"
-				mv "${TEMP_DIR}/start-from-backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
+			yq eval -i '
+				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'$test_name'-pgbackrest-secrets"}}] |
+				.spec.backups.pgbackrest.manual.repoName = "repo1" |
+				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
+				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'$test_name${name_suffix:+-$name_suffix}'/repo1" |
+				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
+				' $TEMP_DIR/cr.yaml
+
+			if [[ $test_name == "start-from-backup" ]]; then
+				yq eval -i '
+					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'$test_name'-pgbackrest-secrets"}}] |
+					.spec.dataSource.pgbackrest.stanza = "db" |
+					.spec.dataSource.pgbackrest.global.repo1-path = "/cluster-source/demand-backup-ppg'$PG_VER'/repo1" |
+					.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
+					' $TEMP_DIR/cr.yaml
 			fi
-			;;
-		scheduled-backup)
-			yq eval '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}]
-				| .spec.backups.pgbackrest.manual.repoName = "repo1"
-				| .spec.backups.pgbackrest.manual.options = ["--type=full"]
-				| .spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo1"
-				| .spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'${test_name}${name_suffix:+-$name_suffix}'/repo2"
-				| .spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'${BUCKET}'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
-				| .spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'${BUCKET}'"}}]
-				' "${TEMP_DIR}/cr.yaml" \
-				>"${TEMP_DIR}/backup.cr.yaml"
-			mv "${TEMP_DIR}/backup.cr.yaml" "${TEMP_DIR}/cr.yaml"
-			;;
-		custom-extensions)
-			yq eval '
-				.spec.extensions.image = "'${IMAGE}'"
-				| .spec.extensions.imagePullPolicy = "Always"
-				| .spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
-			' "${TEMP_DIR}/cr.yaml" \
-				>"${TEMP_DIR}/custom-extensions.cr.yaml"
-			mv "${TEMP_DIR}/custom-extensions.cr.yaml" "${TEMP_DIR}/cr.yaml"
-			;;
-		*) ;;
+		;;
+		"scheduled-backup")
+			yq eval -i '
+				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'$test_name'-pgbackrest-secrets"}}] |
+				.spec.backups.pgbackrest.manual.repoName = "repo1" |
+				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
+				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'$test_name${name_suffix:+-$name_suffix}'/repo1" |
+				.spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'$test_name${name_suffix:+-$name_suffix}'/repo2" |
+				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
+				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}]
+				' $TEMP_DIR/cr.yaml
+		;;
+		"custom-extensions")
+			yq eval -i '
+				.spec.extensions.image = "'$IMAGE'" |
+				.spec.extensions.imagePullPolicy = "Always" |
+				.spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
+			    ' $TEMP_DIR/cr.yaml
+		;;
 	esac
-	cat "${TEMP_DIR}/cr.yaml"
+	cat $TEMP_DIR/cr.yaml
 }
 
 run_psql_local() {

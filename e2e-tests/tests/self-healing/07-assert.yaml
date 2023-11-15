@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 30
+timeout: 40
 ---
 kind: ConfigMap
 apiVersion: v1

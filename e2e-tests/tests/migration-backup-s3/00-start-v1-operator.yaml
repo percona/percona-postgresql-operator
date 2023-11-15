@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      deploy_client
+      (( PGOV1_VER > 14 )) && echo "PostgeSQL Major version is not supported" && exit 1 || true
+      kubectl -n $NAMESPACE delete -f $DEPLOY_DIR/crd.yaml || true
+
+      if [[ $OPERATOR_NS ]]; then
+        OPNS=$OPERATOR_NS
+        create_namespace $OPERATOR_NS
+      else
+        OPNS=$NAMESPACE
+      fi
+
+      curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v$PGOV1_TAG/deploy/operator.yaml |
+      $sed -r 's/^(    namespace:).*pgo.*$/\1 \"'$NAMESPACE'\"/g' |
+      $sed -r 's/^(    pgo_operator_namespace:).*pgo.*$/\1 \"'$OPNS'\"/g' |
+      kubectl -n $NAMESPACE apply -f -
