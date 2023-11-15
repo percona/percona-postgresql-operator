@@ -1,6 +1,6 @@
 module github.com/percona/percona-postgresql-operator
 
-go 1.18
+go 1.20
 
 require (
 	github.com/fatih/color v1.12.0
