@@ -22,9 +22,6 @@ spec:
       - name: postgres-startup
       - command:
         - /usr/local/bin/relocate-extensions.sh
-        env:
-        - name: PG_VERSION
-          value: "15"
         name: extension-relocator
         resources: {}
         volumeMounts:
@@ -42,11 +39,8 @@ spec:
         - name: STORAGE_BUCKET
           value: pg-extensions
         - name: INSTALL_EXTENSIONS
-          value: pg_cron-pg15-1.6.1
         - name: PG_VERSION
-          value: "15"
         - name: PGDATA_EXTENSIONS
-          value: /pgdata/extension/15
         envFrom:
         - secretRef:
             name: aws-s3-secret
@@ -55,12 +49,8 @@ spec:
         volumeMounts:
         - mountPath: /pgdata
           name: postgres-data
-        - mountPath: /usr/pgsql-15/share/extension
-          name: postgres-data
-          subPath: extension/15/usr/pgsql-15/share/extension
-        - mountPath: /usr/pgsql-15/lib
-          name: postgres-data
-          subPath: extension/15/usr/pgsql-15/lib
+        - name: postgres-data
+        - name: postgres-data
         - mountPath: /tmp
           name: tmp
       - name: nss-wrapper-init
