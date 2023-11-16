@@ -1,3 +1,4 @@
+custom-extensions
 demand-backup
 init-deploy
 operator-self-healing
@@ -6,5 +7,5 @@ scheduled-backup
 self-healing
 start-from-backup
 telemetry-transfer
+upgrade-minor
 users
-custom-extensions
