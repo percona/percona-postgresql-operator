@@ -28,8 +28,8 @@ commands:
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |
           .spec.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-postgres" |
-          .spec.proxy.pgBouncer.image = "perconalab/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-pgbouncer" |
-          .spec.backups.pgbackrest.image = "perconalab/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-pgbackrest" |
+          .spec.proxy.pgBouncer.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-pgbouncer" |
+          .spec.backups.pgbackrest.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-pgbackrest" |
           .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
           .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' "${TEMP_DIR}/cr_lower.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"

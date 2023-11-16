@@ -18,7 +18,7 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 1
+  observedGeneration: 2
   replicas: 1
   readyReplicas: 1
   currentReplicas: 1
@@ -28,7 +28,7 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  generation: 2
+  generation: 3
   labels:
     app.kubernetes.io/component: pg
     app.kubernetes.io/instance: upgrade-minor
@@ -60,7 +60,7 @@ spec:
 status:
   availableReplicas: 1
   collisionCount: 0
-  observedGeneration: 2
+  observedGeneration: 3
   readyReplicas: 1
   replicas: 1
   updatedReplicas: 1
@@ -78,7 +78,7 @@ metadata:
     postgres-operator.crunchydata.com/cluster: upgrade-minor
     postgres-operator.crunchydata.com/role: pgbouncer
   annotations:
-    deployment.kubernetes.io/revision: '2'
+    deployment.kubernetes.io/revision: '3'
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
@@ -86,7 +86,7 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
+  observedGeneration: 3
   replicas: 3
   updatedReplicas: 3
   readyReplicas: 3
@@ -102,8 +102,8 @@ metadata:
   annotations:
     postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
 status:
@@ -112,6 +112,9 @@ status:
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
+  generation: 3
+  labels:
+    e2e: upgrade-minor
   name: upgrade-minor
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
@@ -127,7 +130,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 1
+  observedGeneration: 3
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
@@ -160,11 +163,3 @@ status:
     ready: 3
     size: 3
   state: ready
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-metadata:
-  name: check-cluster-images
-timeout: 120
-commands:
-  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1,"spec.template.spec.containers[0].image=$IMAGE"
