@@ -185,7 +185,7 @@ func PGBackRestLabels(clusterName string) labels.Set {
 // PGBackRestBackupJobLabels provides labels for pgBackRest backup Jobs.
 func PGBackRestBackupJobLabels(clusterName, repoName string,
 	backupType BackupJobType) labels.Set {
-	repoLabels := PGBackRestLabels(clusterName)
+	repoLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
 	jobLabels := map[string]string{
 		LabelPGBackRestRepo:   repoName,
 		LabelPGBackRestBackup: string(backupType),
@@ -206,7 +206,7 @@ func PGBackRestBackupJobSelector(clusterName, repoName string,
 // Deprecated: Store restore data in the pgBackRest ConfigMap and Secret,
 // [PGBackRestConfig] and [PGBackRestSecret].
 func PGBackRestRestoreConfigLabels(clusterName string) labels.Set {
-	commonLabels := PGBackRestLabels(clusterName)
+	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
 	jobLabels := map[string]string{
 		LabelPGBackRestRestoreConfig: "",
 	}
@@ -222,7 +222,7 @@ func PGBackRestRestoreConfigSelector(clusterName string) labels.Selector {
 // PGBackRestRestoreJobLabels provides labels for pgBackRest restore Jobs and
 // associated configuration ConfigMaps and Secrets.
 func PGBackRestRestoreJobLabels(clusterName string) labels.Set {
-	commonLabels := PGBackRestLabels(clusterName)
+	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
 	jobLabels := map[string]string{
 		LabelPGBackRestRestore: "",
 	}
@@ -237,7 +237,7 @@ func PGBackRestRestoreJobSelector(clusterName string) labels.Selector {
 // PGBackRestRepoLabels provides common labels for pgBackRest repository
 // resources.
 func PGBackRestRepoLabels(clusterName, repoName string) labels.Set {
-	commonLabels := PGBackRestLabels(clusterName)
+	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
 	repoLabels := map[string]string{
 		LabelPGBackRestRepo: repoName,
 	}
@@ -253,7 +253,7 @@ func PGBackRestSelector(clusterName string) labels.Selector {
 // PGBackRestConfigLabels provides labels for the pgBackRest configuration created and used by
 // the PostgreSQL Operator
 func PGBackRestConfigLabels(clusterName string) labels.Set {
-	repoLabels := PGBackRestLabels(clusterName)
+	repoLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
 	operatorConfigLabels := map[string]string{
 		LabelPGBackRestConfig: "",
 	}
@@ -262,7 +262,7 @@ func PGBackRestConfigLabels(clusterName string) labels.Set {
 
 // PGBackRestCronJobLabels provides common labels for pgBackRest CronJobs
 func PGBackRestCronJobLabels(clusterName, repoName, backupType string) labels.Set {
-	commonLabels := PGBackRestLabels(clusterName)
+	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
 	cronJobLabels := map[string]string{
 		LabelPGBackRestRepo:    repoName,
 		LabelPGBackRestCronJob: backupType,
@@ -272,7 +272,7 @@ func PGBackRestCronJobLabels(clusterName, repoName, backupType string) labels.Se
 
 // PGBackRestDedicatedLabels provides labels for a pgBackRest dedicated repository host
 func PGBackRestDedicatedLabels(clusterName string) labels.Set {
-	commonLabels := PGBackRestLabels(clusterName)
+	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
 	operatorConfigLabels := map[string]string{
 		LabelPGBackRestDedicated: "",
 	}
