@@ -626,14 +626,14 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 
 		// validate the expected labels are in place
 		// expected volume labels, plus the original label
-		expected := map[string]string{
+		expected := map[string]string(naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:              cluster.Name,
 			naming.LabelData:                 naming.DataPGBackRest,
 			naming.LabelPGBackRest:           "",
 			naming.LabelPGBackRestRepo:       "repo1",
 			naming.LabelPGBackRestRepoVolume: "",
 			"somelabel":                      "labelvalue-repo",
-		}
+		}, cluster.Name, ""))
 
 		// ensure volume is found and labeled correctly
 		var found bool
