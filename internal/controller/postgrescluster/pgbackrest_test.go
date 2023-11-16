@@ -818,7 +818,11 @@ func TestGetPGBackRestExecSelector(t *testing.T) {
 			Name:   "repo1",
 			Volume: &v1beta1.RepoPVC{},
 		},
-		expectedSelector: "postgres-operator.crunchydata.com/cluster=hippo," +
+		expectedSelector: "app.kubernetes.io/instance=hippo," +
+			"app.kubernetes.io/managed-by=percona-postgresql-operator," +
+			"app.kubernetes.io/name=percona-postgresql," +
+			"app.kubernetes.io/part-of=percona-postgresql," +
+			"postgres-operator.crunchydata.com/cluster=hippo," +
 			"postgres-operator.crunchydata.com/pgbackrest=," +
 			"postgres-operator.crunchydata.com/pgbackrest-dedicated=",
 		expectedContainer: "pgbackrest",
@@ -963,7 +967,11 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 		case "NAMESPACE":
 			assert.Assert(t, env.Value == ns.Name)
 		case "SELECTOR":
-			assert.Assert(t, env.Value == "postgres-operator.crunchydata.com/cluster=hippocluster,"+
+			assert.Assert(t, env.Value == "app.kubernetes.io/instance=hippocluster,"+
+				"app.kubernetes.io/managed-by=percona-postgresql-operator,"+
+				"app.kubernetes.io/name=percona-postgresql,"+
+				"app.kubernetes.io/part-of=percona-postgresql,"+
+				"postgres-operator.crunchydata.com/cluster=hippocluster,"+
 				"postgres-operator.crunchydata.com/pgbackrest=,"+
 				"postgres-operator.crunchydata.com/pgbackrest-dedicated=")
 		}
