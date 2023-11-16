@@ -9,3 +9,11 @@ delete:
   kind: PostgresCluster
   metadata:
     name: migration-backup-s3
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      destroy_operator
