@@ -88,11 +88,11 @@ func TestCreatePGBackRestConfigMapIntent(t *testing.T) {
 			[]string{"some-instance"})
 
 		assert.DeepEqual(t, configmap.Annotations, map[string]string{})
-		assert.DeepEqual(t, configmap.Labels, map[string]string{
+		assert.DeepEqual(t, configmap.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"postgres-operator.crunchydata.com/cluster":           "hippo-dance",
 			"postgres-operator.crunchydata.com/pgbackrest":        "",
 			"postgres-operator.crunchydata.com/pgbackrest-config": "",
-		})
+		}, "hippo-dance", "")))
 
 		assert.Equal(t, configmap.Data["config-hash"], "abcde12345")
 		assert.Equal(t, configmap.Data["pgbackrest_repo.conf"], strings.Trim(`
@@ -194,7 +194,7 @@ pg1-socket-path = /tmp/postgres
 			"ak2": "backups-av2",
 			"ak3": "backups-av3",
 		})
-		assert.DeepEqual(t, configmap.Labels, map[string]string{
+		assert.DeepEqual(t, configmap.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"lk1": "cluster-lv1",
 			"lk2": "backups-lv2",
 			"lk3": "backups-lv3",
@@ -202,7 +202,7 @@ pg1-socket-path = /tmp/postgres
 			"postgres-operator.crunchydata.com/cluster":           "hippo-dance",
 			"postgres-operator.crunchydata.com/pgbackrest":        "",
 			"postgres-operator.crunchydata.com/pgbackrest-config": "",
-		})
+		}, "hippo-dance", "")))
 	})
 }
 
