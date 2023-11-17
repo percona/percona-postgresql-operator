@@ -21,4 +21,4 @@ metadata:
   name: check-operator-deploy-status
 timeout: 120
 commands:
-  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1,"spec.template.spec.containers[0].image=$IMAGE"
+  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1,"spec.template.spec.containers[0].image"=$IMAGE
