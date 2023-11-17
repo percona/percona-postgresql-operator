@@ -10,27 +10,29 @@ commands:
 
       pg_ver_lower="$(cat ${TEMP_DIR}/pg_ver.txt)"
       pg_ver_upper=$(echo "$IMAGE_POSTGRESQL" | cut -d':' -f2 | grep -oE '\-ppg[0-9]+-' | grep -oE '[0-9]+' | tr -d '-')
-      TARGET_IMAGE_POSTGRESQL=$IMAGE_POSTGRESQL
-      TARGET_IMAGE_PGBOUNCER=$IMAGE_PGBOUNCER
-      TARGET_IMAGE_BACKREST=$IMAGE_BACKREST
+      target_image_postgresql=$IMAGE_POSTGRESQL
+      target_image_pgbouncer=$IMAGE_PGBOUNCER
+      target_image_backrest=$IMAGE_BACKREST
 
       if [ "${pg_ver_lower}" != "${pg_ver_upper}" ]; then
-          TARGET_IMAGE_POSTGRESQL="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-postgres"
-          TARGET_IMAGE_PGBOUNCER="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-pgbouncer"
-          TARGET_IMAGE_BACKREST="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-pgbackrest"
+          target_image_postgresql="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-postgres"
+          target_image_pgbouncer="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-pgbouncer"
+          target_image_backrest="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-pgbackrest"
       fi
+      cr_ver=$(yq '.spec.crVersion' $DEPLOY_DIR/cr.yaml)
 
       yq -i eval '
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |
-          .spec.image = "'${TARGET_IMAGE_POSTGRESQL}'" |
-          .spec.proxy.pgBouncer.image = "'${TARGET_IMAGE_PGBOUNCER}'" |
-          .spec.backups.pgbackrest.image = "'${TARGET_IMAGE_BACKREST}'"' "${TEMP_DIR}/cr_lower.yaml"
+          .spec.crVersion = "'${cr_ver}'" |
+          .spec.image = "'${target_image_postgresql}'" |
+          .spec.proxy.pgBouncer.image = "'${target_image_pgbouncer}'" |
+          .spec.backups.pgbackrest.image = "'${target_image_backrest}'"' "${TEMP_DIR}/cr_lower.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"
       sleep 7 # wait for reconcile loop
 
-      kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$TARGET_IMAGE_BACKREST sts/upgrade-minor-repo-host
-      kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$TARGET_IMAGE_PGBOUNCER deployment/upgrade-minor-pgbouncer
+      kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$target_image_backrest sts/upgrade-minor-repo-host
+      kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$target_image_pgbouncer deployment/upgrade-minor-pgbouncer
       for s in $(kubectl get sts --no-headers -l postgres-operator.crunchydata.com/instance-set=instance1 --output=custom-columns='NAME:.metadata.name'); do
-          kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$TARGET_IMAGE_POSTGRESQL sts/${s}
+          kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$target_image_postgresql sts/${s}
       done
