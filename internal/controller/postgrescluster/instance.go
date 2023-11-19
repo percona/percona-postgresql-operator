@@ -1162,7 +1162,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    sts.Name,
 			naming.LabelData:        naming.DataPostgres,
-		}, cluster.Name, "pg"))
+		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
 	sts.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster:     cluster.Name,
@@ -1182,7 +1182,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    sts.Name,
 			naming.LabelData:        naming.DataPostgres,
-		}, cluster.Name, "pg"))
+		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
 
 	// Don't clutter the namespace with extra ControllerRevisions.
 	// The "controller-revision-hash" label still exists on the Pod.
@@ -1309,7 +1309,7 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    instance.Name,
-		}, cluster.Name, "pg"))
+		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
 
 	if err == nil {
 		err = patroni.InstanceConfigMap(ctx, cluster, spec, instanceConfigMap)
@@ -1355,7 +1355,7 @@ func (r *Reconciler) reconcileInstanceCertificates(
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    instance.Name,
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
 	// This secret is holding certificates, but the "kubernetes.io/tls" type
 	// expects an *unencrypted* private key. We're also adding other values and

@@ -92,7 +92,7 @@ func TestCreatePGBackRestConfigMapIntent(t *testing.T) {
 			"postgres-operator.crunchydata.com/cluster":           "hippo-dance",
 			"postgres-operator.crunchydata.com/pgbackrest":        "",
 			"postgres-operator.crunchydata.com/pgbackrest-config": "",
-		}, "hippo-dance", "")))
+		}, "hippo-dance", "", "2.3.0")))
 
 		assert.Equal(t, configmap.Data["config-hash"], "abcde12345")
 		assert.Equal(t, configmap.Data["pgbackrest_repo.conf"], strings.Trim(`
@@ -202,7 +202,7 @@ pg1-socket-path = /tmp/postgres
 			"postgres-operator.crunchydata.com/cluster":           "hippo-dance",
 			"postgres-operator.crunchydata.com/pgbackrest":        "",
 			"postgres-operator.crunchydata.com/pgbackrest-config": "",
-		}, "hippo-dance", "")))
+		}, "hippo-dance", "", "2.3.0")))
 	})
 }
 

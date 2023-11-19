@@ -228,7 +228,7 @@ func (r *Reconciler) configureExistingPGVolumes(
 				naming.LabelInstance:    instanceName,
 				naming.LabelRole:        naming.RolePostgresData,
 				naming.LabelData:        naming.DataPostgres,
-			}, cluster.Name, "")
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion])
 			volume.SetGroupVersionKind(corev1.SchemeGroupVersion.
 				WithKind("PersistentVolumeClaim"))
 			// K8SPG-328: Keep this commented in case of conflicts.
@@ -283,7 +283,7 @@ func (r *Reconciler) configureExistingPGWALVolume(
 			naming.LabelInstance:    instanceName,
 			naming.LabelRole:        naming.RolePostgresWAL,
 			naming.LabelData:        naming.DataPostgres,
-		}, cluster.Name, "")
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion])
 		volume.SetGroupVersionKind(corev1.SchemeGroupVersion.
 			WithKind("PersistentVolumeClaim"))
 		// K8SPG-328: Keep this commented in case of conflicts.
@@ -327,8 +327,9 @@ func (r *Reconciler) configureExistingRepoVolumes(
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      volName,
 					Namespace: cluster.Namespace,
-					Labels: naming.PGBackRestRepoVolumeLabels(cluster.Name,
-						cluster.Spec.Backups.PGBackRest.Repos[0].Name),
+					Labels: naming.WithPerconaLabels(
+						naming.PGBackRestRepoVolumeLabels(cluster.Name, cluster.Spec.Backups.PGBackRest.Repos[0].Name),
+						cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 				},
 				Spec: cluster.Spec.Backups.PGBackRest.Repos[0].Volume.
 					VolumeClaimSpec,

@@ -131,7 +131,7 @@ ownerReferences:
 			"c": "v7", "d": "v4", "f": "v8",
 			"postgres-operator.crunchydata.com/cluster": "pg1",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		}, "pg1", "")))
+		}, "pg1", "", "2.3.0")))
 	})
 }
 
@@ -225,7 +225,7 @@ ownerReferences:
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "my-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		}, "my-cluster", "")))
+		}, "my-cluster", "", "2.3.0")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -258,7 +258,7 @@ ownerReferences:
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "my-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		}, "my-cluster", "")))
+		}, "my-cluster", "", "2.3.0")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{

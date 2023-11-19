@@ -67,7 +67,7 @@ func TestGeneratePostgresUserSecret(t *testing.T) {
 				"postgres-operator.crunchydata.com/cluster": "hippo2",
 				"postgres-operator.crunchydata.com/role":    "pguser",
 				"postgres-operator.crunchydata.com/pguser":  "some-user-name",
-			}, cluster.Name, "")))
+			}, cluster.Name, "", "2.3.0")))
 		}
 	})
 
