@@ -86,7 +86,8 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 	meta.Labels = naming.Merge(
 		postgresCluster.Spec.Metadata.GetLabelsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestConfigLabels(postgresCluster.GetName()),
+		naming.WithPerconaLabels(naming.PGBackRestConfigLabels(postgresCluster.GetName()),
+			postgresCluster.GetName(), "", postgresCluster.Labels[naming.LabelVersion]),
 	)
 
 	cm := &corev1.ConfigMap{

@@ -164,7 +164,7 @@ func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelPatroni: naming.PatroniScope(cluster),
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
 	// Allocate no IP address (headless) and create no Endpoints.
 	// - https://docs.k8s.io/concepts/services-networking/service/#headless-services
@@ -251,7 +251,7 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelPatroni: naming.PatroniScope(cluster),
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
 	// Allocate an IP address and/or node port and let Patroni manage the Endpoints.
 	// Patroni will ensure that they always route to the elected leader.
@@ -407,7 +407,7 @@ func (r *Reconciler) reconcileReplicationSecret(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "replication-client-tls",
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.

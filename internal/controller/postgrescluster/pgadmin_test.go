@@ -52,6 +52,10 @@ func TestGeneratePGAdminConfigMap(t *testing.T) {
 	cluster.Namespace = "some-ns"
 	cluster.Name = "pg1"
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	t.Run("Unspecified", func(t *testing.T) {
 		for _, spec := range []*v1beta1.UserInterfaceSpec{
 			nil, new(v1beta1.UserInterfaceSpec),
@@ -131,7 +135,7 @@ ownerReferences:
 			"c": "v7", "d": "v4", "f": "v8",
 			"postgres-operator.crunchydata.com/cluster": "pg1",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		}, "pg1", "")))
+		}, "pg1", "", "2.3.0")))
 	})
 }
 
@@ -147,6 +151,10 @@ func TestGeneratePGAdminService(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "my-ns"
 	cluster.Name = "my-cluster"
+
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
 
 	t.Run("Unspecified", func(t *testing.T) {
 		for _, spec := range []*v1beta1.UserInterfaceSpec{
@@ -225,7 +233,7 @@ ownerReferences:
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "my-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		}, "my-cluster", "")))
+		}, "my-cluster", "", "2.3.0")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -258,7 +266,7 @@ ownerReferences:
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "my-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgadmin",
-		}, "my-cluster", "")))
+		}, "my-cluster", "", "2.3.0")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -483,6 +491,10 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 	ns := setupNamespace(t, cc)
 	cluster := pgAdminTestCluster(*ns)
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	assert.NilError(t, cc.Create(ctx, cluster))
 	t.Cleanup(func() { assert.Check(t, cc.Delete(ctx, cluster)) })
 
@@ -552,6 +564,9 @@ terminationGracePeriodSeconds: 30
 	t.Run("verify customized deployment", func(t *testing.T) {
 
 		customcluster := pgAdminTestCluster(*ns)
+		customcluster.Labels = map[string]string{
+			naming.LabelVersion: "2.3.0",
+		}
 
 		// add pod level customizations
 		customcluster.Name = "custom-cluster"

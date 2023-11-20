@@ -59,6 +59,10 @@ func TestGeneratePatroniLeaderLeaseService(t *testing.T) {
 	cluster.Name = "pg2"
 	cluster.Spec.Port = initialize.Int32(9876)
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	alwaysExpect := func(t testing.TB, service *corev1.Service) {
 		assert.Assert(t, marshalMatches(service.TypeMeta, `
 apiVersion: v1
@@ -110,6 +114,9 @@ ownerReferences:
 			Annotations: map[string]string{"a": "v1"},
 			Labels:      map[string]string{"b": "v2"},
 		}
+		cluster.Labels = map[string]string{
+			naming.LabelVersion: "2.3.0",
+		}
 
 		service, err := reconciler.generatePatroniLeaderLeaseService(cluster)
 		assert.NilError(t, err)
@@ -124,7 +131,7 @@ ownerReferences:
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
-		}, "pg2", "")))
+		}, "pg2", "", "2.3.0")))
 
 		// Labels not in the selector.
 		assert.Assert(t, service.Spec.Selector == nil,
@@ -154,7 +161,7 @@ ownerReferences:
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
-		}, "pg2", "")))
+		}, "pg2", "", "2.3.0")))
 
 		// Labels not in the selector.
 		assert.Assert(t, service.Spec.Selector == nil,

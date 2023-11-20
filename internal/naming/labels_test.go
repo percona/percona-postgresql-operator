@@ -149,7 +149,7 @@ func TestPGBackRestLabelFuncs(t *testing.T) {
 	repoName := "hippo-repo"
 
 	// verify the labels that identify pgBackRest resources
-	pgBackRestLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
+	pgBackRestLabels := PGBackRestLabels(clusterName)
 	assert.Equal(t, pgBackRestLabels.Get(LabelCluster), clusterName)
 	assert.Check(t, pgBackRestLabels.Has(LabelPGBackRest))
 

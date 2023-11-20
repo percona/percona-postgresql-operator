@@ -493,7 +493,8 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 	labels := naming.Merge(
 		postgresCluster.Spec.Metadata.GetLabelsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestDedicatedLabels(postgresCluster.GetName()),
+		naming.WithPerconaLabels(naming.PGBackRestDedicatedLabels(postgresCluster.GetName()),
+			postgresCluster.GetName(), "", postgresCluster.Labels[naming.LabelVersion]),
 		map[string]string{
 			naming.LabelData: naming.DataPGBackRest,
 		})
@@ -638,7 +639,9 @@ func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresC
 	labels := naming.Merge(
 		postgresCluster.Spec.Metadata.GetLabelsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestRepoVolumeLabels(postgresCluster.GetName(), repoName),
+		naming.WithPerconaLabels(
+			naming.PGBackRestRepoVolumeLabels(postgresCluster.GetName(), repoName),
+			postgresCluster.GetName(), "", postgresCluster.Labels[naming.LabelVersion]),
 	)
 
 	// generate the default metadata
@@ -1194,7 +1197,9 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	labels := naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestRestoreJobLabels(cluster.Name),
+		naming.WithPerconaLabels(
+			naming.PGBackRestRestoreJobLabels(cluster.Name),
+			cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		map[string]string{naming.LabelStartupInstance: instanceName},
 	)
 	meta.Annotations = annotations
@@ -1727,7 +1732,9 @@ func (r *Reconciler) copyRestoreConfiguration(ctx context.Context,
 	config.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestConfigLabels(cluster.GetName()),
+		naming.WithPerconaLabels(
+			naming.PGBackRestConfigLabels(cluster.GetName()),
+			cluster.GetName(), "", cluster.Labels[naming.LabelVersion]),
 	)
 	if err == nil {
 		err = r.setControllerReference(cluster, config)
@@ -1745,7 +1752,9 @@ func (r *Reconciler) copyRestoreConfiguration(ctx context.Context,
 	secret.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestConfigLabels(cluster.Name),
+		naming.WithPerconaLabels(
+			naming.PGBackRestConfigLabels(cluster.Name),
+			cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 	)
 	if err == nil {
 		err = r.setControllerReference(cluster, secret)
@@ -1827,7 +1836,9 @@ func (r *Reconciler) copyConfigurationResources(ctx context.Context, cluster,
 				cluster.Spec.Metadata.GetLabelsOrNil(),
 				cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
 				// this label allows for cleanup when the restore completes
-				naming.PGBackRestRestoreJobLabels(cluster.Name),
+				naming.WithPerconaLabels(
+					naming.PGBackRestRestoreJobLabels(cluster.Name),
+					cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 			)
 			if err := r.setControllerReference(cluster, secretCopy); err != nil {
 				return err
@@ -1881,7 +1892,9 @@ func (r *Reconciler) copyConfigurationResources(ctx context.Context, cluster,
 				cluster.Spec.Metadata.GetLabelsOrNil(),
 				cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
 				// this label allows for cleanup when the restore completes
-				naming.PGBackRestRestoreJobLabels(cluster.Name),
+				naming.WithPerconaLabels(
+					naming.PGBackRestRestoreJobLabels(cluster.Name),
+					cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 			)
 			if err := r.setControllerReference(cluster, configMapCopy); err != nil {
 				return err
@@ -1942,7 +1955,7 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(naming.PGBackRestConfigLabels(cluster.Name), cluster.Name, ""),
+		naming.WithPerconaLabels(naming.PGBackRestConfigLabels(cluster.Name), cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 	)
 
 	existing := &corev1.Secret{}
@@ -2287,8 +2300,9 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	var labels, annotations map[string]string
 	labels = naming.Merge(postgresCluster.Spec.Metadata.GetLabelsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestBackupJobLabels(postgresCluster.GetName(), repoName,
-			naming.BackupManual))
+		naming.WithPerconaLabels(
+			naming.PGBackRestBackupJobLabels(postgresCluster.GetName(), repoName, naming.BackupManual),
+			postgresCluster.GetName(), "", postgresCluster.Labels[naming.LabelVersion]))
 	annotations = naming.Merge(postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
 		map[string]string{
@@ -2463,8 +2477,9 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	var labels, annotations map[string]string
 	labels = naming.Merge(postgresCluster.Spec.Metadata.GetLabelsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestBackupJobLabels(postgresCluster.GetName(),
-			postgresCluster.Spec.Backups.PGBackRest.Repos[0].Name, naming.BackupReplicaCreate))
+		naming.WithPerconaLabels(
+			naming.PGBackRestBackupJobLabels(postgresCluster.GetName(), postgresCluster.Spec.Backups.PGBackRest.Repos[0].Name, naming.BackupReplicaCreate),
+			postgresCluster.GetName(), "", postgresCluster.Labels[naming.LabelVersion]))
 	annotations = naming.Merge(postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
 		map[string]string{
@@ -2862,7 +2877,8 @@ func (r *Reconciler) reconcilePGBackRestCronJob(
 	labels := naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
-		naming.PGBackRestCronJobLabels(cluster.Name, repo.Name, backupType),
+		naming.WithPerconaLabels(naming.PGBackRestCronJobLabels(cluster.Name, repo.Name, backupType),
+			cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 	)
 	objectmeta := naming.PGBackRestCronJob(cluster, backupType, repo.Name)
 

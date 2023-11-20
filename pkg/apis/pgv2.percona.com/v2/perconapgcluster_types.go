@@ -238,6 +238,10 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	}
 	postgresCluster.Annotations = annotations
 	postgresCluster.Labels = cr.Labels
+	if postgresCluster.Labels == nil {
+		postgresCluster.Labels = make(map[string]string)
+	}
+	postgresCluster.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
 	postgresCluster.Spec.Image = cr.Spec.Image
 	postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
