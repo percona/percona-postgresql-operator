@@ -16,6 +16,7 @@
 package naming
 
 import (
+	gover "github.com/hashicorp/go-version"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -185,7 +186,7 @@ func PGBackRestLabels(clusterName string) labels.Set {
 // PGBackRestBackupJobLabels provides labels for pgBackRest backup Jobs.
 func PGBackRestBackupJobLabels(clusterName, repoName string,
 	backupType BackupJobType) labels.Set {
-	repoLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
+	repoLabels := PGBackRestLabels(clusterName)
 	jobLabels := map[string]string{
 		LabelPGBackRestRepo:   repoName,
 		LabelPGBackRestBackup: string(backupType),
@@ -206,7 +207,7 @@ func PGBackRestBackupJobSelector(clusterName, repoName string,
 // Deprecated: Store restore data in the pgBackRest ConfigMap and Secret,
 // [PGBackRestConfig] and [PGBackRestSecret].
 func PGBackRestRestoreConfigLabels(clusterName string) labels.Set {
-	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
+	commonLabels := PGBackRestLabels(clusterName)
 	jobLabels := map[string]string{
 		LabelPGBackRestRestoreConfig: "",
 	}
@@ -222,7 +223,7 @@ func PGBackRestRestoreConfigSelector(clusterName string) labels.Selector {
 // PGBackRestRestoreJobLabels provides labels for pgBackRest restore Jobs and
 // associated configuration ConfigMaps and Secrets.
 func PGBackRestRestoreJobLabels(clusterName string) labels.Set {
-	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
+	commonLabels := PGBackRestLabels(clusterName)
 	jobLabels := map[string]string{
 		LabelPGBackRestRestore: "",
 	}
@@ -237,7 +238,7 @@ func PGBackRestRestoreJobSelector(clusterName string) labels.Selector {
 // PGBackRestRepoLabels provides common labels for pgBackRest repository
 // resources.
 func PGBackRestRepoLabels(clusterName, repoName string) labels.Set {
-	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
+	commonLabels := PGBackRestLabels(clusterName)
 	repoLabels := map[string]string{
 		LabelPGBackRestRepo: repoName,
 	}
@@ -253,7 +254,7 @@ func PGBackRestSelector(clusterName string) labels.Selector {
 // PGBackRestConfigLabels provides labels for the pgBackRest configuration created and used by
 // the PostgreSQL Operator
 func PGBackRestConfigLabels(clusterName string) labels.Set {
-	repoLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
+	repoLabels := PGBackRestLabels(clusterName)
 	operatorConfigLabels := map[string]string{
 		LabelPGBackRestConfig: "",
 	}
@@ -262,7 +263,7 @@ func PGBackRestConfigLabels(clusterName string) labels.Set {
 
 // PGBackRestCronJobLabels provides common labels for pgBackRest CronJobs
 func PGBackRestCronJobLabels(clusterName, repoName, backupType string) labels.Set {
-	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
+	commonLabels := PGBackRestLabels(clusterName)
 	cronJobLabels := map[string]string{
 		LabelPGBackRestRepo:    repoName,
 		LabelPGBackRestCronJob: backupType,
@@ -272,7 +273,7 @@ func PGBackRestCronJobLabels(clusterName, repoName, backupType string) labels.Se
 
 // PGBackRestDedicatedLabels provides labels for a pgBackRest dedicated repository host
 func PGBackRestDedicatedLabels(clusterName string) labels.Set {
-	commonLabels := WithPerconaLabels(PGBackRestLabels(clusterName), clusterName, "")
+	commonLabels := PGBackRestLabels(clusterName)
 	operatorConfigLabels := map[string]string{
 		LabelPGBackRestDedicated: "",
 	}
@@ -297,7 +298,12 @@ func PGBackRestRepoVolumeLabels(clusterName, repoName string) labels.Set {
 
 // WithPerconaLabels takes a map of labels and merges them with the Percona specific
 // set of labels.
-func WithPerconaLabels(set map[string]string, clusterName, component string) labels.Set {
+func WithPerconaLabels(set map[string]string, clusterName, component, crVersion string) labels.Set {
+	currVersion, err := gover.NewVersion(crVersion)
+	if err != nil || currVersion.LessThan(gover.Must(gover.NewVersion("2.3.0"))) {
+		return set
+	}
+
 	ls := labels.Set{
 		LabelPerconaManagedBy: "percona-postgresql-operator",
 		LabelPerconaName:      "percona-postgresql",

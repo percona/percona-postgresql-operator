@@ -43,6 +43,10 @@ func TestCreatePGBackRestConfigMapIntent(t *testing.T) {
 	cluster.Spec.Port = initialize.Int32(2345)
 	cluster.Spec.PostgresVersion = 12
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	domain := naming.KubernetesClusterDomain(context.Background())
 
 	t.Run("NoVolumeRepo", func(t *testing.T) {
@@ -92,7 +96,7 @@ func TestCreatePGBackRestConfigMapIntent(t *testing.T) {
 			"postgres-operator.crunchydata.com/cluster":           "hippo-dance",
 			"postgres-operator.crunchydata.com/pgbackrest":        "",
 			"postgres-operator.crunchydata.com/pgbackrest-config": "",
-		}, "hippo-dance", "")))
+		}, "hippo-dance", "", "2.3.0")))
 
 		assert.Equal(t, configmap.Data["config-hash"], "abcde12345")
 		assert.Equal(t, configmap.Data["pgbackrest_repo.conf"], strings.Trim(`
@@ -202,7 +206,7 @@ pg1-socket-path = /tmp/postgres
 			"postgres-operator.crunchydata.com/cluster":           "hippo-dance",
 			"postgres-operator.crunchydata.com/pgbackrest":        "",
 			"postgres-operator.crunchydata.com/pgbackrest-config": "",
-		}, "hippo-dance", "")))
+		}, "hippo-dance", "", "2.3.0")))
 	})
 }
 

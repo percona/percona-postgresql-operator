@@ -400,6 +400,9 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testcluster",
 			Namespace: ns.GetName(),
+			Labels: map[string]string{
+				naming.LabelVersion: "2.3.0",
+			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
 			PostgresVersion: 13,
@@ -499,7 +502,7 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 			naming.LabelRole:        naming.RolePostgresData,
 			naming.LabelData:        naming.DataPostgres,
 			"somelabel":             "labelvalue-pgdata",
-		}, cluster.Name, ""))
+		}, cluster.Name, "", "2.3.0"))
 
 		// ensure volume is found and labeled correctly
 		var found bool
@@ -565,7 +568,7 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 			naming.LabelRole:        naming.RolePostgresWAL,
 			naming.LabelData:        naming.DataPostgres,
 			"somelabel":             "labelvalue-pgwal",
-		}, cluster.Name, ""))
+		}, cluster.Name, "", "2.3.0"))
 
 		// ensure volume is found and labeled correctly
 		var found bool
@@ -633,7 +636,7 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 			naming.LabelPGBackRestRepo:       "repo1",
 			naming.LabelPGBackRestRepoVolume: "",
 			"somelabel":                      "labelvalue-repo",
-		}, cluster.Name, ""))
+		}, cluster.Name, "", "2.3.0"))
 
 		// ensure volume is found and labeled correctly
 		var found bool

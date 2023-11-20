@@ -51,6 +51,10 @@ func TestGeneratePGBouncerService(t *testing.T) {
 	cluster.Namespace = "ns5"
 	cluster.Name = "pg7"
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	t.Run("Unspecified", func(t *testing.T) {
 		for _, spec := range []*v1beta1.PostgresProxySpec{
 			nil, new(v1beta1.PostgresProxySpec),
@@ -131,7 +135,7 @@ ownerReferences:
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "pg7",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		}, "pg7", "pgbouncer")))
+		}, "pg7", "pgbouncer", "2.3.0")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -164,7 +168,7 @@ ownerReferences:
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg7",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		}, "pg7", "pgbouncer")))
+		}, "pg7", "pgbouncer", "2.3.0")))
 
 		// Labels not in the selector.
 		assert.DeepEqual(t, service.Spec.Selector, map[string]string{
@@ -390,6 +394,9 @@ func TestGeneratePGBouncerDeployment(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns3"
 	cluster.Name = "test-cluster"
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
 
 	t.Run("Unspecified", func(t *testing.T) {
 		for _, spec := range []*v1beta1.PostgresProxySpec{
@@ -445,7 +452,7 @@ namespace: ns3
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "test-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		}, "test-cluster", "pgbouncer")))
+		}, "test-cluster", "pgbouncer", "2.3.0")))
 
 		// Labels not in the pod selector.
 		assert.DeepEqual(t, deploy.Spec.Selector,
@@ -466,7 +473,7 @@ namespace: ns3
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "test-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
-		}, "test-cluster", "pgbouncer")))
+		}, "test-cluster", "pgbouncer", "2.3.0")))
 	})
 
 	t.Run("PodSpec", func(t *testing.T) {

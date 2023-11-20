@@ -84,7 +84,7 @@ func (r *Reconciler) generatePGAdminConfigMap(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGAdmin,
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
 	err := errors.WithStack(pgadmin.ConfigMap(cluster, configmap))
 	if err == nil {
@@ -151,7 +151,7 @@ func (r *Reconciler) generatePGAdminService(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGAdmin,
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
 	// Allocate an IP address and/or node port and let Kubernetes manage the
 	// Endpoints by selecting Pods with the pgAdmin role.
@@ -259,7 +259,7 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGAdmin,
 			naming.LabelData:    naming.DataPGAdmin,
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 	sts.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster: cluster.Name,
@@ -276,7 +276,7 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGAdmin,
 			naming.LabelData:    naming.DataPGAdmin,
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
 	// if the shutdown flag is set, set pgAdmin replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {
@@ -383,7 +383,7 @@ func (r *Reconciler) reconcilePGAdminDataVolume(
 	)
 	pvc.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(labelMap, cluster.Name, ""),
+		naming.WithPerconaLabels(labelMap, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 	)
 	pvc.Spec = cluster.Spec.UserInterface.PGAdmin.DataVolumeClaimSpec
 

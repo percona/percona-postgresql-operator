@@ -100,7 +100,7 @@ func (r *Reconciler) reconcilePGBouncerConfigMap(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer"))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 
 	if err == nil {
 		pgbouncer.ConfigMap(cluster, configmap)
@@ -246,7 +246,7 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer"))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 
 	if err == nil {
 		err = pgbouncer.Secret(ctx, cluster, root, existing, service, intent)
@@ -289,7 +289,7 @@ func (r *Reconciler) generatePGBouncerService(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer"))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 
 	// Allocate an IP address and/or node port and let Kubernetes manage the
 	// Endpoints by selecting Pods with the PgBouncer role.
@@ -384,7 +384,7 @@ func (r *Reconciler) generatePGBouncerDeployment(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer"))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 	deploy.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster: cluster.Name,
@@ -400,7 +400,7 @@ func (r *Reconciler) generatePGBouncerDeployment(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer"))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 
 	// if the shutdown flag is set, set pgBouncer replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {

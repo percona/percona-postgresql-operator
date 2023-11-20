@@ -159,7 +159,7 @@ func (r *Reconciler) reconcileClusterCertificate(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "postgres-tls",
-		}, cluster.Name, ""))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.
