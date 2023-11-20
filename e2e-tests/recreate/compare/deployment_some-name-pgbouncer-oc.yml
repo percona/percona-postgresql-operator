@@ -57,6 +57,8 @@ spec:
                       operator: In
                       values:
                         - some-name
+                    - key: crunchy-pgbouncer
+                      operator: Exists
                 topologyKey: kubernetes.io/hostname
               weight: 1
       containers:
