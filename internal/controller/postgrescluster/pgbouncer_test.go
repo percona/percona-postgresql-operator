@@ -394,7 +394,6 @@ func TestGeneratePGBouncerDeployment(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns3"
 	cluster.Name = "test-cluster"
-	
 	cluster.Labels = map[string]string{
 		naming.LabelVersion: "2.3.0",
 	}
