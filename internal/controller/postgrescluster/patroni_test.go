@@ -59,6 +59,10 @@ func TestGeneratePatroniLeaderLeaseService(t *testing.T) {
 	cluster.Name = "pg2"
 	cluster.Spec.Port = initialize.Int32(9876)
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	alwaysExpect := func(t testing.TB, service *corev1.Service) {
 		assert.Assert(t, marshalMatches(service.TypeMeta, `
 apiVersion: v1
@@ -109,6 +113,9 @@ ownerReferences:
 		cluster.Spec.Metadata = &v1beta1.Metadata{
 			Annotations: map[string]string{"a": "v1"},
 			Labels:      map[string]string{"b": "v2"},
+		}
+		cluster.Labels = map[string]string{
+			naming.LabelVersion: "2.3.0",
 		}
 
 		service, err := reconciler.generatePatroniLeaderLeaseService(cluster)

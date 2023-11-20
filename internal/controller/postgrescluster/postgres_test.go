@@ -52,6 +52,10 @@ func TestGeneratePostgresUserSecret(t *testing.T) {
 	cluster.Name = "hippo2"
 	cluster.Spec.Port = initialize.Int32(9999)
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	spec := &v1beta1.PostgresUserSpec{Name: "some-user-name"}
 
 	t.Run("ObjectMeta", func(t *testing.T) {

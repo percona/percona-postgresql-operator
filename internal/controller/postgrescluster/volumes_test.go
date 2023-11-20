@@ -400,6 +400,9 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testcluster",
 			Namespace: ns.GetName(),
+			Labels: map[string]string{
+				naming.LabelVersion: "2.3.0",
+			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
 			PostgresVersion: 13,

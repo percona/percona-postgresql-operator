@@ -43,6 +43,10 @@ func TestCreatePGBackRestConfigMapIntent(t *testing.T) {
 	cluster.Spec.Port = initialize.Int32(2345)
 	cluster.Spec.PostgresVersion = 12
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	domain := naming.KubernetesClusterDomain(context.Background())
 
 	t.Run("NoVolumeRepo", func(t *testing.T) {

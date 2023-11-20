@@ -51,6 +51,10 @@ func TestGeneratePGBouncerService(t *testing.T) {
 	cluster.Namespace = "ns5"
 	cluster.Name = "pg7"
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	t.Run("Unspecified", func(t *testing.T) {
 		for _, spec := range []*v1beta1.PostgresProxySpec{
 			nil, new(v1beta1.PostgresProxySpec),
@@ -390,6 +394,10 @@ func TestGeneratePGBouncerDeployment(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns3"
 	cluster.Name = "test-cluster"
+	
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
 
 	t.Run("Unspecified", func(t *testing.T) {
 		for _, spec := range []*v1beta1.PostgresProxySpec{

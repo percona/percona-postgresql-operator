@@ -607,6 +607,10 @@ func TestGenerateClusterPrimaryService(t *testing.T) {
 	cluster.Name = "pg5"
 	cluster.Spec.Port = initialize.Int32(2600)
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	leader := &corev1.Service{}
 	leader.Spec.ClusterIP = "1.9.8.3"
 
@@ -738,6 +742,10 @@ func TestGenerateClusterReplicaServiceIntent(t *testing.T) {
 	cluster.Namespace = "ns1"
 	cluster.Name = "pg2"
 	cluster.Spec.Port = initialize.Int32(9876)
+
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
 
 	service, err := reconciler.generateClusterReplicaService(cluster)
 	assert.NilError(t, err)

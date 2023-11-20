@@ -52,6 +52,10 @@ func TestGeneratePGAdminConfigMap(t *testing.T) {
 	cluster.Namespace = "some-ns"
 	cluster.Name = "pg1"
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	t.Run("Unspecified", func(t *testing.T) {
 		for _, spec := range []*v1beta1.UserInterfaceSpec{
 			nil, new(v1beta1.UserInterfaceSpec),
@@ -147,6 +151,10 @@ func TestGeneratePGAdminService(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "my-ns"
 	cluster.Name = "my-cluster"
+
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
 
 	t.Run("Unspecified", func(t *testing.T) {
 		for _, spec := range []*v1beta1.UserInterfaceSpec{
@@ -483,6 +491,10 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 	ns := setupNamespace(t, cc)
 	cluster := pgAdminTestCluster(*ns)
 
+	cluster.Labels = map[string]string{
+		naming.LabelVersion: "2.3.0",
+	}
+
 	assert.NilError(t, cc.Create(ctx, cluster))
 	t.Cleanup(func() { assert.Check(t, cc.Delete(ctx, cluster)) })
 
@@ -552,6 +564,9 @@ terminationGracePeriodSeconds: 30
 	t.Run("verify customized deployment", func(t *testing.T) {
 
 		customcluster := pgAdminTestCluster(*ns)
+		customcluster.Labels = map[string]string{
+			naming.LabelVersion: "2.3.0",
+		}
 
 		// add pod level customizations
 		customcluster.Name = "custom-cluster"
