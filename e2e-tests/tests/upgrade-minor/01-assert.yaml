@@ -94,6 +94,22 @@ metadata:
 status:
   succeeded: 1
 ---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  generation: 1
+  labels:
+    postgres-operator.crunchydata.com/cluster: upgrade-minor
+    postgres-operator.crunchydata.com/pgbackrest: ""
+    postgres-operator.crunchydata.com/pgbackrest-cronjob: full
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  ownerReferences:
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: upgrade-minor
+---
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
