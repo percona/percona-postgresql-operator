@@ -71,6 +71,7 @@ const (
 
 type podAntiAffinityTemplateFields struct {
 	AffinityType            affinityType
+	DeploymentType          string
 	ClusterName             string
 	PodAntiAffinityLabelKey string
 	VendorLabelKey          string
@@ -745,6 +746,7 @@ func GetPodAntiAffinity(cluster *crv1.Pgcluster, deploymentType crv1.PodAntiAffi
 
 	podAntiAffinityTemplateFields := podAntiAffinityTemplateFields{
 		AffinityType:            templateAffinityType,
+		DeploymentType:          strconv.Itoa(int(deploymentType)),
 		ClusterName:             cluster.Spec.Name,
 		VendorLabelKey:          config.LABEL_VENDOR,
 		VendorLabelValue:        config.LABEL_CRUNCHY,
@@ -773,11 +775,11 @@ func GetPodAntiAffinity(cluster *crv1.Pgcluster, deploymentType crv1.PodAntiAffi
 // In other words, the pod anti-affinity is determined by this heuristic, in
 // priority order:
 //
-// 1. If it's pgBackRest/pgBouncer the value set by the user (available in the
-//    cluster spec)
-// 2. If it's pgBackRest/pgBouncer the value set in pgo.yaml
-// 3. The value set in "Default" in the cluster spec
-// 4. The value set for PodAntiAffinity in pgo.yaml
+//  1. If it's pgBackRest/pgBouncer the value set by the user (available in the
+//     cluster spec)
+//  2. If it's pgBackRest/pgBouncer the value set in pgo.yaml
+//  3. The value set in "Default" in the cluster spec
+//  4. The value set for PodAntiAffinity in pgo.yaml
 func GetPodAntiAffinityType(cluster *crv1.Pgcluster, deploymentType crv1.PodAntiAffinityDeployment, podAntiAffinityType crv1.PodAntiAffinityType) crv1.PodAntiAffinityType {
 	// early exit: if podAntiAffinityType is already set, return
 	if podAntiAffinityType != "" {
