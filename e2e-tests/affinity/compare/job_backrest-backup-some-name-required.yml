@@ -45,6 +45,8 @@ spec:
                     operator: In
                     values:
                       - some-name-required
+                  - key: pgo-pg-database
+                    operator: Exists
               topologyKey: kubernetes.io/hostname
       containers:
         - env:
