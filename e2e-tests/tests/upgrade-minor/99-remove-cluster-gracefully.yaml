@@ -4,19 +4,11 @@ delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
-    name: self-healing
+    name: upgrade-minor
 - apiVersion: postgres-operator.crunchydata.com/v1beta1
   kind: PostgresCluster
   metadata:
-    name: self-healing
-commands:
-  - script: |-
-      set -o errexit
-      set -o xtrace
-
-      source ../../functions
-
-      destroy_operator
+    name: upgrade-minor
 commands:
   - script: |-
       set -o errexit

@@ -4,11 +4,11 @@ delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
-    name: migration-backup-s3
+    name: custom-extensions
 - apiVersion: postgres-operator.crunchydata.com/v1beta1
   kind: PostgresCluster
   metadata:
-    name: migration-backup-s3
+    name: custom-extensions
 commands:
   - script: |-
       set -o errexit

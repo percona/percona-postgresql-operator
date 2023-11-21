@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      deploy_operator
+      kubectl wait -n ${OPERATOR_NS:-$NAMESPACE} --timeout 30s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$IMAGE deployment/percona-postgresql-operator

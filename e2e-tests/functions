@@ -2,17 +2,22 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-source "${ROOT_REPO}/e2e-tests/vars.sh"
 test_name=$(basename "$(pwd)")
+source "${ROOT_REPO}/e2e-tests/vars.sh"
 
 if oc get projects 2>/dev/null; then
 	OPENSHIFT=4
 fi
 
+init_temp_dir() {
+	rm -rf "$TEMP_DIR"
+	mkdir -p "$TEMP_DIR"
+}
+
 create_namespace() {
 	local namespace=$1
 
-	if [[ "$OPENSHIFT" ]]; then
+	if [[ $OPENSHIFT ]]; then
 		set -o pipefail
 		if [[ $OPERATOR_NS ]] && (oc get project "$OPERATOR_NS" -o json >/dev/null 2>&1 | jq -r '.metadata.name' >/dev/null 2>&1); then
 			oc delete --grace-period=0 --force=true project "$namespace" && sleep 120 || :
@@ -32,29 +37,45 @@ create_namespace() {
 }
 
 deploy_operator() {
+	local cw_prefix=""
+
 	destroy_operator
 
 	if [[ $OPERATOR_NS ]]; then
 		create_namespace $OPERATOR_NS
-		kubectl -n $OPERATOR_NS apply --server-side --force-conflicts -f "$DEPLOY_DIR/crd.yaml"
-		kubectl -n $OPERATOR_NS apply --server-side --force-conflicts -f "$DEPLOY_DIR/cw-rbac.yaml"
-		yq eval \
-			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "$IMAGE")" \
-			"$DEPLOY_DIR/cw-operator.yaml" \
-			| kubectl -n $OPERATOR_NS apply -f -
-	else
-		kubectl -n $NAMESPACE apply --server-side --force-conflicts -f "$DEPLOY_DIR/crd.yaml"
-		kubectl -n $NAMESPACE apply --server-side --force-conflicts -f "$DEPLOY_DIR/rbac.yaml"
-		yq eval \
-			"$(printf 'select(documentIndex==0).spec.template.spec.containers[0].image="%s"' "$IMAGE")" \
-			"$DEPLOY_DIR/operator.yaml" \
-			| kubectl -n $NAMESPACE apply -f -
+		cw_prefix="cw-"
 	fi
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
+
+	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' \
+		"${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
+		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
+}
+
+deploy_operator_gh() {
+	local git_tag="$1"
+	local cw_prefix=""
+
+	destroy_operator
+
+	if [[ $OPERATOR_NS ]]; then
+		create_namespace $OPERATOR_NS
+		cw_prefix="cw-"
+	fi
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/crd.yaml"
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/${cw_prefix}rbac.yaml"
+
+	curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/${cw_prefix}operator.yaml" >"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml"
+
+	yq eval '.spec.template.spec.containers[0].image = "percona/percona-postgresql-operator:'${git_tag#v}'"' \
+		"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml" \
+		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
 destroy_operator() {
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" delete deployment percona-postgresql-operator --force --grace-period=0 || true
-	if [ -n "$OPERATOR_NS" ]; then
+	if [[ $OPERATOR_NS ]]; then
 		kubectl delete namespace $OPERATOR_NS --force --grace-period=0 || true
 	fi
 }

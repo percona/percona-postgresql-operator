@@ -9,4 +9,5 @@ scheduled-backup
 self-healing
 start-from-backup
 telemetry-transfer
+upgrade-minor
 users
