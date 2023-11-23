@@ -85,7 +85,7 @@ spec:
 #    customconfig: ""
   pmm:
     enabled: false
-    image: percona/pmm-client:2.36.0
+    image: percona/pmm-client:2.40.1
 #    imagePullPolicy: Always
     serverHost: monitoring-service
     serverUser: admin
