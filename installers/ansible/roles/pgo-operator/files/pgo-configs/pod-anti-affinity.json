@@ -32,7 +32,28 @@
                                             "values": [
                                                 "{{.ClusterName}}"
                                             ]
+                                        },
+                                        {{ if eq .DeploymentType "0" }}
+                                        {
+                                            "key": "pgo-pg-database",
+                                            "operator": "Exists"
                                         }
+                                        {{ else if eq .DeploymentType "1" }}
+                                        {
+                                            "key": "pgo-backrest",
+                                            "operator": "Exists"
+                                        }
+                                        {{ else if eq .DeploymentType "2" }}
+                                        {
+                                            "key": "crunchy-pgbouncer",
+                                            "operator": "Exists"
+                                        }
+                                        {{ else if eq .DeploymentType "3" }}
+                                        {
+                                            "key": "pgo-backrest-job",
+                                            "operator": "Exists"
+                                        }
+                                        {{ end }}
                                     ]
                                 },
                                 "topologyKey": "kubernetes.io/hostname"

@@ -59,6 +59,8 @@ spec:
                     operator: In
                     values:
                       - some-name-required
+                  - key: pgo-backrest
+                    operator: Exists
               topologyKey: kubernetes.io/hostname
       containers:
         - env:

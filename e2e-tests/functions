@@ -752,6 +752,8 @@ compare_kubectl() {
 		| yq d - 'metadata.annotations."kubernetes.io/psp"' \
 		| yq d - 'metadata.annotations."cloud.google.com/neg"' \
 		| yq d - 'metadata.annotations."batch.kubernetes.io/job-tracking"' \
+		| yq d - '**."batch.kubernetes.io/controller-uid"' \
+		| yq d - 'spec.template.metadata.labels."batch.kubernetes.io/job-name"' \
 		| yq d - '**.creationTimestamp' \
 		| yq d - '**.image' \
 		| yq d - '**.clusterIP' \
