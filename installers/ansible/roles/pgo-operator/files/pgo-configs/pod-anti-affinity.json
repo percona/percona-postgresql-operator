@@ -48,6 +48,11 @@
                                             "key": "crunchy-pgbouncer",
                                             "operator": "Exists"
                                         }
+                                        {{ else if eq .DeploymentType "3" }}
+                                        {
+                                            "key": "pgo-backrest-job",
+                                            "operator": "Exists"
+                                        }
                                         {{ end }}
                                     ]
                                 },
