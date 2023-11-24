@@ -466,6 +466,7 @@ EOF
                         runTest('tls-check', 'sandbox')
                         runTest('users', 'sandbox')
                         runTest('ns-mode', 'sandbox')
+                        runTest('data-migration-gcs', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }
