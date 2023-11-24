@@ -123,7 +123,7 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 
 	var customAffinity string
 	nodeSelector := operator.GetNodeAffinity(cluster.Spec.NodeAffinity.Default)
-	podAntiAffinity := operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentDefault, cluster.Spec.PodAntiAffinity.Default)
+	podAntiAffinity := operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentPgBackRestJob, cluster.Spec.PodAntiAffinity.Default)
 	podAntiAffinityLabelValue := string(cluster.Spec.PodAntiAffinity.Default)
 
 	affinityJSON, ok := task.Spec.Parameters[config.LABEL_AFFINITY_JSON]
@@ -146,7 +146,7 @@ func Backrest(namespace string, clientset kubeapi.Interface, task *crv1.Pgtask) 
 			}
 
 			nodeSelector = operator.GetNodeAffinity(nodeAffinity)
-			podAntiAffinity = operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentDefault, affinity.AntiAffinityType)
+			podAntiAffinity = operator.GetPodAntiAffinity(cluster, crv1.PodAntiAffinityDeploymentPgBackRestJob, affinity.AntiAffinityType)
 			podAntiAffinityLabelValue = string(affinity.AntiAffinityType)
 
 			if affinity.Advanced != nil {
