@@ -251,8 +251,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 					"Unable to install pgStatMonitor")
 			}
 		} else {
-			err := pgstatmonitor.DisableInPostgreSQL(ctx, exec)
-			if err != nil {
+			if pgStatMonitorOK = pgstatmonitor.DisableInPostgreSQL(ctx, exec) == nil; !pgStatMonitorOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgStatMonitorEnabled",
 					"Unable to disable pgStatMonitor")
 			}
@@ -268,8 +267,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 					"Unable to install pgAudit")
 			}
 		} else {
-			err := pgaudit.DisableInPostgreSQL(ctx, exec)
-			if err != nil {
+			if pgAuditOK = pgaudit.DisableInPostgreSQL(ctx, exec) == nil; !pgAuditOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgAuditEnabled",
 					"Unable to disable pgAudit")
 			}
@@ -318,7 +316,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		log := logging.FromContext(ctx).WithValues("revision", revision)
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
 	}
-	if err == nil && pgAuditOK && postgisInstallOK {
+
+	if err == nil && pgStatMonitorOK && pgAuditOK && postgisInstallOK {
 		cluster.Status.DatabaseRevision = revision
 	}
 
