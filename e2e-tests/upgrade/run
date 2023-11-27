@@ -48,10 +48,12 @@ function create_or_upgrade_to_version() {
 				{"op":"replace","path":"/spec/pgBadger/image","value":"'${IMAGE_PGBADGER}'"},
 				{"op":"replace","path":"/spec/pgBouncer/image","value":"'${IMAGE_PGBOUNCER}'"},
 				{"op":"replace","path":"/spec/pgPrimary/image","value":"'${IMAGE_PG_HA}'"},
-				{"op":"replace","path":"/spec/userLabels/pgo-version","value":"'${pgo_tag}'"},
-				{"op":"replace","path":"/metadata/labels/pgo-version","value":"'${pgo_tag}'"},
-				{"op":"replace","path":"/spec/pause","value":false}
+				{"op":"replace","path":"/metadata/labels/pgo-version","value":"'${pgo_tag}'"}
 			]'
+	fi
+
+	if [[ "x$operator_action" == 'xupdate' ]]; then
+		compare_generation "2" "deployment" "${cluster}-pgbouncer"
 	fi
 
 	wait_cluster_consistency "${cluster}"
@@ -64,17 +66,6 @@ function create_or_upgrade_to_version() {
 		]'
 	wait_cluster_consistency "${cluster}"
 	wait_deployment "${cluster}-pgbouncer"
-
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-		'[
-			{"op":"replace","path":"/spec/pgBouncer/size","value":0},
-		]'
-	sleep 10
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-		'[
-			{"op":"replace","path":"/spec/pause","value":true},
-		]'
-	wait_cluster_status "${cluster}" "pgcluster Shutdown"
 }
 
 main() {
@@ -106,13 +97,12 @@ main() {
 			{"op":"replace","path":"/spec/pgBadger/image","value":'${IMAGE_PGBADGER}'},
 			{"op":"replace","path":"/spec/pgBouncer/image","value":'${IMAGE_PGBOUNCER}'},
 			{"op":"replace","path":"/spec/pgPrimary/image","value":'${IMAGE_PG_HA}'},
-			{"op":"replace","path":"/spec/userLabels/pgo-version","value":'${LATEST_TAG}'},
-			{"op":"replace","path":"/metadata/labels/pgo-version","value":'${LATEST_TAG}'},
-			{"op":"replace","path":"/spec/pause","value":false}
+			{"op":"replace","path":"/metadata/labels/pgo-version","value":'${LATEST_TAG}'}
 		]'
 
 	wait_cluster_consistency "${cluster}"
 	wait_deployment "${cluster}"
+	compare_generation '3' "deployment" "${cluster}-pgbouncer"
 
 	if [[ $(kubectl_bin get deployment/${cluster} -o jsonpath='{.metadata.labels.pgo-version}') != ${LATEST_TAG} ]] \
 		|| [[ $(kubectl_bin get deployment/${cluster} -o jsonpath='{.spec.template.metadata.labels.pgo-version}') != ${LATEST_TAG} ]]; then
@@ -120,14 +110,6 @@ main() {
 		exit 1
 	fi
 	#wait for some significant time period. Pgbouncer pod may not be started otherwise
-
-	sleep 10
-	kubectl_bin patch "perconapgcluster/${cluster}" --type json -p \
-		'[
-			{"op":"replace","path":"/spec/pgBouncer/size","value":1}
-		]'
-	wait_cluster_consistency "${cluster}"
-	wait_deployment "${cluster}-pgbouncer"
 
 	sleep 10
 	compare_psql_cmd "select-1" '\c myapp \\\ SELECT * from myApp;' "${cluster}:${cluster}_pass@${cluster}-pgbouncer.${namespace}"
@@ -160,10 +142,10 @@ main() {
 	disable_pgBouncer ${cluster}
 	enable_pgBouncer ${cluster}
 
-	#	wait_cluster_consistency "${cluster}"
-	#	wait_deployment "${cluster}"
-	#	wait_deployment "${cluster}-pgbouncer"
-	sleep 200
+	wait_cluster_consistency "${cluster}"
+	wait_deployment "${cluster}"
+	wait_deployment "${cluster}-pgbouncer"
+	sleep 10
 	compare_psql "select-1" '\c myapp \\\ SELECT * from myApp;' "${cluster}:${cluster}_pass@${cluster}-pgbouncer.${namespace}" "verify-ca"
 
 	destroy "${namespace}"
