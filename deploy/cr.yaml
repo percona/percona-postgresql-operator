@@ -58,7 +58,7 @@ spec:
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
 
-  image: percona/percona-postgresql-operator:2.2.0-ppg15-postgres
+  image: perconalab/percona-postgresql-operator:2.2.0-ppg15-postgres-custom-162
   imagePullPolicy: Always
   postgresVersion: 15
 #  port: 5432
