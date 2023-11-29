@@ -356,7 +356,7 @@ wait_job_completion() {
 	local ns=${3:-"$namespace"}
 
 	retry=0
-	set +o xtrace
+	# set +o xtrace
 	until KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl -n $ns get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
 		sleep 1
 		echo -n .
@@ -389,7 +389,7 @@ wait_job_completion() {
 		fi
 	done
 	echo
-	set -o xtrace
+	# set -o xtrace
 }
 
 apply_cluster() {
