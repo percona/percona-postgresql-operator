@@ -373,7 +373,7 @@ wait_job_completion() {
 
 	retry=0
 	until [[ $(kubectl_bin -n $ns get job/$job -o jsonpath='{.metadata.name}' 2>&1 | grep -io 'not found') == "not found" ]] \
-		|| ! kubectl_bin -n $ns get job/$job -o jsonpath='{.status.succeeded}' 2>/dev/null; do
+		|| [[ $(kubectl_bin -n $ns get job/$job -o jsonpath='{.status.succeeded}' 2>/dev/null) == '1' ]]; do
 		sleep 1
 		echo -n .
 		let retry+=1
