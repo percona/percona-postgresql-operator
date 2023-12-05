@@ -365,10 +365,10 @@ wait_job_completion() {
 		sleep 1
 		echo -n .
 		let retry+=1
-		if [[ $retry -ge 90 && ${mandatory} == "true" ]]; then
+		if [[ $retry -ge 120 && ${mandatory} == "true" ]]; then
 			echo max retry count $retry reached. No target object found.
 			exit 1
-		elif [[ $retry -ge 90 && ${mandatory} != "true" ]]; then
+		elif [[ $retry -ge 120 && ${mandatory} != "true" ]]; then
 			echo Can not detect job. Passing by.
 			set -o xtrace
 			return 0
@@ -952,13 +952,25 @@ run_psql_ssl() {
 	local command="$1"
 	local uri="$2"
 	local driver=${3:-postgres}
-	local suffix=${4:-.svc.cluster.local}
-	local client_container=$(kubectl_bin -n $namespace get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+
+	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 	local sslmode="$5"
 
-	kubectl_bin exec ${client_container} -n $namespace -- \
-		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix" || true
+	kubectl_bin exec ${client_container} -- \
+		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri" || true
 }
+
+# run_psql_ssl() {
+# 	local command="$1"
+# 	local uri="$2"
+# 	local driver=${3:-postgres}
+# 	local suffix=${4:-.svc.cluster.local}
+# 	local client_container=$(kubectl_bin -n $namespace get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+# 	local sslmode="$5"
+
+# 	kubectl_bin exec ${client_container} -n $namespace -- \
+# 		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix" || true
+# }
 
 run_psql() {
 	local command="$1"
@@ -1198,36 +1210,6 @@ network_loss() {
 		| yq w - "metadata.namespace" "$namespace" \
 		| yq w - "spec.selector.pods.$namespace[0]" "$pod" \
 		| kubectl_bin apply -f -
-}
-
-compare_psql() {
-	local command_id="$1"
-	local command="$2"
-	local uri="$3"
-	local sslmode="$4"
-
-	local expected_result=${test_dir}/compare/${command_id}.sql
-
-	run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
-		>$tmp_dir/${command_id}.sql
-	if [ ! -s "$tmp_dir/${command_id}.sql" ]; then
-		sleep 20
-		run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
-			>$tmp_dir/${command_id}.sql
-	fi
-	diff -u $expected_result $tmp_dir/${command_id}.sql
-}
-
-run_psql_ssl() {
-	local command="$1"
-	local uri="$2"
-	local driver=${3:-postgres}
-
-	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
-	local sslmode="$5"
-
-	kubectl_bin exec ${client_container} -- \
-		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri" || true
 }
 
 patch_secret() {
