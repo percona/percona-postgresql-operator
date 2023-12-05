@@ -208,6 +208,10 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 				Name:  "PMM_AGENT_PRERUN_SCRIPT",
 				Value: agentPrerunScript(),
 			},
+			{
+				Name:  "PMM_AGENT_PATHS_TEMPDIR",
+				Value: "/tmp",
+			},
 		},
 	}
 }
