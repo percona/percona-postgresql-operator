@@ -309,6 +309,8 @@ spec:
                 secretKeyRef:
                   key: password
                   name: some-name-postgres-secret
+            - name: PMM_AGENT_PATHS_TEMPDIR
+              value: /tmp
             - name: PMM_AGENT_PRERUN_SCRIPT
               value: |-
                 pmm-admin status --wait=10s;
