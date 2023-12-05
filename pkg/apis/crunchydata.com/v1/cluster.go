@@ -307,11 +307,12 @@ type PodAntiAffinityType string
 
 // PodAntiAffinitySpec provides multiple configurations for how pod
 // anti-affinity can be set.
-// - "Default" is the default rule that applies to all Pods that are a part of
-//		the PostgreSQL cluster
-// - "PgBackrest" applies just to the pgBackRest repository Pods in said
-//		Deployment
-// - "PgBouncer" applies to just pgBouncer Pods in said Deployment
+//   - "Default" is the default rule that applies to all Pods that are a part of
+//     the PostgreSQL cluster
+//   - "PgBackrest" applies just to the pgBackRest repository Pods in said
+//     Deployment
+//   - "PgBouncer" applies to just pgBouncer Pods in said Deployment
+//
 // swaggier:ignore
 type PodAntiAffinitySpec struct {
 	Default    PodAntiAffinityType `json:"default"`
@@ -419,6 +420,7 @@ const (
 	PodAntiAffinityDeploymentDefault PodAntiAffinityDeployment = iota
 	PodAntiAffinityDeploymentPgBackRest
 	PodAntiAffinityDeploymentPgBouncer
+	PodAntiAffinityDeploymentPgBackRestJob
 )
 
 // ValidatePodAntiAffinityType is responsible for validating whether or not the type of pod
