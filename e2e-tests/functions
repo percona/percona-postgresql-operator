@@ -245,7 +245,7 @@ deploy_minio() {
 		--set "users[0].secretKey=some-secret-key" \
 		--set "users[0].policy=consoleAdmin" \
 		--set service.type=ClusterIP \
-		--set configPathmc=/tmp/.minio/ \
+		--set configPathmc=/tmp/ \
 		--set persistence.size=2G \
 		--set securityContext.enabled=false \
 		--set tls.enabled=true \
