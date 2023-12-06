@@ -1113,7 +1113,10 @@ get_service_endpoint() {
 }
 
 deploy_helm() {
+	helm repo remove hashicorp || :
 	helm repo add hashicorp https://helm.releases.hashicorp.com
+
+	helm repo remove percona || :
 	helm repo add percona https://percona-charts.storage.googleapis.com/
 	helm repo update
 }
@@ -1126,6 +1129,7 @@ deploy_chaos_mesh() {
 	if [ "${old_cm_namespace}" != "NAMESPACE" ]; then
 		helm del chaos-mesh --namespace ${old_cm_namespace} || :
 	fi
+	helm repo remove chaos-mesh || :
 	helm repo add chaos-mesh https://charts.chaos-mesh.org
 	case ${PLATFORM} in
 		"OPENSHIFT")
