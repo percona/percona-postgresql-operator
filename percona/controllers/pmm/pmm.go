@@ -233,6 +233,10 @@ func GetPMMContainer(pgc *crv1.PerconaPGCluster, clusterName, nodeName string) v
 					},
 				},
 			},
+			{
+				Name:  "PMM_AGENT_PATHS_TEMPDIR",
+				Value: "/tmp",
+			},
 			getPMMAgentPrerunScript(pgc),
 		},
 	}
