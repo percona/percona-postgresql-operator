@@ -24,7 +24,7 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 
 	pmmSpec := pgc.Spec.PMM
 
-	return corev1.Container{
+	container := corev1.Container{
 		Name:            "pmm-client",
 		Image:           pmmSpec.Image,
 		ImagePullPolicy: pmmSpec.ImagePullPolicy,
@@ -210,6 +210,15 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 		},
 	}
+
+	if pgc.CompareVersion("2.3.0") >= 0 {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "PMM_AGENT_PATHS_TEMPDIR",
+			Value: "/tmp",
+		})
+	}
+
+	return container
 }
 
 func agentPrerunScript() string {
