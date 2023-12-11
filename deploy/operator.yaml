@@ -133,7 +133,7 @@ data:
     disable_telemetry: "false"
     namespace: "pgo"
     namespace_mode: "disabled"
-    pgo_image_prefix: "perconalab/percona-postgresql-operator"
+    pgo_image_prefix: "percona/percona-postgresql-operator"
     pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
@@ -167,7 +167,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: perconalab/percona-postgresql-operator:1.5.0-pgo-deployer
+          image: percona/percona-postgresql-operator:1.5.0-pgo-deployer
           imagePullPolicy: Always
           env:
             - name: DEPLOY_ACTION
