@@ -269,7 +269,7 @@ spec:
 
   pmm:
     enabled: false
-    image: percona/pmm-client:2.37.0
+    image: percona/pmm-client:2.41.0
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
