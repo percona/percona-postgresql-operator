@@ -17,7 +17,7 @@ IMAGE_PG_HA=${IMAGE_PG_HA:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres-ha"}
 IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest"}
 IMAGE_BACKREST_REPO=${IMAGE_BACKREST_REPO:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest-repo"}
 IMAGE_PGBADGER=${IMAGE_PGBADGER:-"${IMAGE_BASE}:main-ppg$PG_VER-pgbadger"}
-IMAGE_PMM=${IMAGE_PMM:-"perconalab/pmm-client:2.36.0"}
+IMAGE_PMM=${IMAGE_PMM:-"perconalab/pmm-client:2.40.1"}
 PMM_SERVER_VER=${PMM_SERVER_VER:-"9.9.9"}
 IMAGE_PMM_SERVER_REPO=${IMAGE_PMM_SERVER_REPO:-"perconalab/pmm-server"}
 IMAGE_PMM_SERVER_TAG=${IMAGE_PMM_SERVER_TAG:-"dev-latest"}
@@ -232,19 +232,23 @@ deploy_minio() {
 	kubectl_bin apply -f $src_dir/deploy/backup/minio-gw-tls.yaml
 	helm uninstall minio-service || :
 	helm repo remove minio || :
-	helm repo add minio https://helm.min.io/
+	helm repo add minio https://charts.min.io/
 	# kubectl_bin delete pvc minio-service --force
 	retry 10 60 helm install minio-service \
-		--version 8.0.5 \
-		--set tls.enabled=true \
-		--set accessKey=some-access-key \
-		--set secretKey=some-secret-key \
+		--version 5.0.14 \
+		--set replicas=1 \
+		--set mode=standalone \
+		--set resources.requests.memory=256Mi \
+		--set rootUser=rootuser \
+		--set rootPassword=rootpass123 \
+		--set "users[0].accessKey=some-access-key" \
+		--set "users[0].secretKey=some-secret-key" \
+		--set "users[0].policy=consoleAdmin" \
 		--set service.type=ClusterIP \
-		--set configPathmc=/tmp/.minio/ \
+		--set configPathmc=/tmp/ \
 		--set persistence.size=2G \
-		--set environment.MINIO_REGION=us-east-1 \
-		--set environment.MINIO_HTTP_TRACE=/tmp/trace.log \
 		--set securityContext.enabled=false \
+		--set tls.enabled=true \
 		--set tls.certSecret=minio-gw-tls \
 		--set tls.publicCrt=tls.crt \
 		--set tls.privateKey=tls.key \
@@ -356,15 +360,14 @@ wait_job_completion() {
 	local ns=${3:-"$namespace"}
 
 	retry=0
-	set +o xtrace
 	until KUBECONFIG=${TARGET_CONFIG:-"${KUBECONFIG}"} kubectl -n $ns get job/${job} -o jsonpath='{.metadata.name}' 2>/dev/null; do
 		sleep 1
 		echo -n .
 		let retry+=1
-		if [[ $retry -ge 90 && ${mandatory} == "true" ]]; then
+		if [[ $retry -ge 120 && ${mandatory} == "true" ]]; then
 			echo max retry count $retry reached. No target object found.
 			exit 1
-		elif [[ $retry -ge 90 && ${mandatory} != "true" ]]; then
+		elif [[ $retry -ge 120 && ${mandatory} != "true" ]]; then
 			echo Can not detect job. Passing by.
 			set -o xtrace
 			return 0
@@ -389,7 +392,6 @@ wait_job_completion() {
 		fi
 	done
 	echo
-	set -o xtrace
 }
 
 apply_cluster() {
@@ -971,12 +973,12 @@ run_psql_ssl() {
 	local command="$1"
 	local uri="$2"
 	local driver=${3:-postgres}
-	local suffix=${4:-.svc.cluster.local}
-	local client_container=$(kubectl_bin -n $namespace get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
+
+	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 	local sslmode="$5"
 
-	kubectl_bin exec ${client_container} -n $namespace -- \
-		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri$suffix" || true
+	kubectl_bin exec ${client_container} -- \
+		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri" || true
 }
 
 run_psql() {
@@ -1120,7 +1122,10 @@ get_service_endpoint() {
 }
 
 deploy_helm() {
+	helm repo remove hashicorp || :
 	helm repo add hashicorp https://helm.releases.hashicorp.com
+
+	helm repo remove percona || :
 	helm repo add percona https://percona-charts.storage.googleapis.com/
 	helm repo update
 }
@@ -1133,6 +1138,7 @@ deploy_chaos_mesh() {
 	if [ "${old_cm_namespace}" != "NAMESPACE" ]; then
 		helm del chaos-mesh --namespace ${old_cm_namespace} || :
 	fi
+	helm repo remove chaos-mesh || :
 	helm repo add chaos-mesh https://charts.chaos-mesh.org
 	case ${PLATFORM} in
 		"OPENSHIFT")
@@ -1217,36 +1223,6 @@ network_loss() {
 		| yq w - "metadata.namespace" "$namespace" \
 		| yq w - "spec.selector.pods.$namespace[0]" "$pod" \
 		| kubectl_bin apply -f -
-}
-
-compare_psql() {
-	local command_id="$1"
-	local command="$2"
-	local uri="$3"
-	local sslmode="$4"
-
-	local expected_result=${test_dir}/compare/${command_id}.sql
-
-	run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
-		>$tmp_dir/${command_id}.sql
-	if [ ! -s "$tmp_dir/${command_id}.sql" ]; then
-		sleep 20
-		run_psql_ssl "$command" "$uri" "postgres" "" "$sslmode" \
-			>$tmp_dir/${command_id}.sql
-	fi
-	diff -u $expected_result $tmp_dir/${command_id}.sql
-}
-
-run_psql_ssl() {
-	local command="$1"
-	local uri="$2"
-	local driver=${3:-postgres}
-
-	local client_container=$(kubectl_bin get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
-	local sslmode="$5"
-
-	kubectl_bin exec ${client_container} -- \
-		bash -c "printf '$command\n' | PGSSLMODE=$sslmode PGSSLROOTCERT=/tmp/tls/ca.crt psql -v ON_ERROR_STOP=1 -t -q $driver://$uri" || true
 }
 
 patch_secret() {

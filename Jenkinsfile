@@ -101,7 +101,7 @@ testsReportMap  = [:]
 testsResultsMap = [:]
 
 void makeReport() {
-    def wholeTestAmount=sh(script: "ls -l e2e-tests/| grep ^d| egrep -v 'conf|data-migration-gcs|license|logs' | wc -l", , returnStdout: true).trim()
+    def wholeTestAmount=sh(script: "ls -l e2e-tests/| grep ^d| egrep -v 'conf|license|logs' | wc -l", , returnStdout: true).trim()
     def startedTestAmount = testsReportMap.size()
     for ( test in testsReportMap ) {
         TestsReport = TestsReport + "\r\n| ${test.key} | ${test.value} |"
@@ -466,6 +466,7 @@ EOF
                         runTest('tls-check', 'sandbox')
                         runTest('users', 'sandbox')
                         runTest('ns-mode', 'sandbox')
+                        runTest('data-migration-gcs', 'sandbox')
                         ShutdownCluster('sandbox')
                     }
                 }

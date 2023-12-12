@@ -62,7 +62,7 @@ spec:
                       operator: In
                       values:
                         - some-name
-                    - key: crunchy-pgbouncer
+                    - key: pgo-pg-database
                       operator: Exists
                 topologyKey: kubernetes.io/hostname
               weight: 1
