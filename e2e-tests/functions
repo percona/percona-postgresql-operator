@@ -48,8 +48,8 @@ deploy_operator() {
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
 
-	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' \
-		"${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
+	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' "${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
+		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "true"' - \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
