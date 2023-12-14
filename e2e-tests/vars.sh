@@ -22,7 +22,6 @@ export IMAGE_PMM_CLIENT=${IMAGE_PMM_CLIENT:-"perconalab/pmm-client:dev-latest"}
 export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:dev-latest"}
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
-export IMAGE_EXT_INSTALLER=${IMAGE_EXT_INSTALLER:-"perconalab/percona-postgresql-operator"}
 
 date=$(which gdate || which date)
 sed=$(which gsed || which sed)
