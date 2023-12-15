@@ -1,7 +1,7 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: 03-verify-tramsferred-keys
+  name: 03-verify-transferred-keys
 data:
   keys: |-
     [
