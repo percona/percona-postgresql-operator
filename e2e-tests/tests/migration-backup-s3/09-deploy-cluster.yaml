@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 300
 commands:
   - script: |-
       set -o errexit
@@ -25,3 +24,4 @@ commands:
 
       sleep 5
       kubectl -n $NAMESPACE wait --for=condition=Complete job/migration-backup-s3-pgbackrest-restore --timeout=360s
+    timeout: 300
