@@ -8,6 +8,5 @@ metadata:
   name: 10-check-extensions
 data:
   data: |2-
-     pg_cron
      pg_stat_monitor
      pgaudit

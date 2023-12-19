@@ -8,6 +8,6 @@ commands:
 
       source ../../functions
 
-      data=$(run_psql_local "\c postgres \\\\\ select name from pg_available_extensions where name in ('pg_cron','pg_stat_monitor','pgaudit') order by name" "postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres)")
+      data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres) -c "\c postgres" -c "select name from pg_available_extensions where name in ('pg_cron','pg_stat_monitor','pgaudit') order by name")
 
       kubectl create configmap -n "${NAMESPACE}" 10-check-extensions --from-literal=data="${data}"
