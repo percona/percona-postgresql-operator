@@ -388,7 +388,7 @@ destroy_chaos_mesh() {
 	local chaos_mesh_ns=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}' | sed 's/NAMESPACE//')
 
 	if [ -n "${chaos_mesh_ns}" ]; then
-		helm uninstall --wait --timeout 60 chaos-mesh --namespace ${chaos_mesh_ns} || :
+		helm uninstall --wait --timeout 60s chaos-mesh --namespace ${chaos_mesh_ns} || :
 	fi
 	timeout 30 kubectl delete MutatingWebhookConfiguration $(kubectl get MutatingWebhookConfiguration | grep 'chaos-mesh' | awk '{print $1}') || :
 	timeout 30 kubectl delete ValidatingWebhookConfiguration $(kubectl get ValidatingWebhookConfiguration | grep 'chaos-mesh' | awk '{print $1}') || :
