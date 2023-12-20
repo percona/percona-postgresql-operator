@@ -28,6 +28,7 @@ commands:
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |
           .spec.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-postgres" |
+          .spec.postgresVersion = '${pg_ver}' |
           .spec.proxy.pgBouncer.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-pgbouncer" |
           .spec.backups.pgbackrest.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-pgbackrest" |
           .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
