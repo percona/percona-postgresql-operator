@@ -48,8 +48,12 @@ deploy_operator() {
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
 
-	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' \
-		"${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
+	local disable_telemetry=true
+	if [ "${test_name}" == "telemetry-transfer" ]; then
+		disable_telemetry=false
+	fi
+	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' "${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
+		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "'${disable_telemetry}'"' - \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
@@ -112,6 +116,10 @@ deploy_client() {
 	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/client.yaml"
 }
 
+get_client_pod() {
+	kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}'
+}
+
 get_cr() {
 	local name_suffix=$1
 
@@ -126,7 +134,7 @@ get_cr() {
 		.spec.proxy.pgBouncer.image = "'$IMAGE_PGBOUNCER'" |
 		.spec.pmm.image = "'$IMAGE_PMM_CLIENT'" |
 		.spec.pmm.secret = "'$test_name'-pmm-secret"
-		' $DEPLOY_DIR/cr.yaml > $TEMP_DIR/cr.yaml
+		' $DEPLOY_DIR/cr.yaml >$TEMP_DIR/cr.yaml
 
 	if [[ $OPENSHIFT ]]; then
 		yq eval -i '.spec.openshift = true' $TEMP_DIR/cr.yaml
@@ -150,7 +158,7 @@ get_cr() {
 					.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
 					' $TEMP_DIR/cr.yaml
 			fi
-		;;
+			;;
 		"scheduled-backup")
 			yq eval -i '
 				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'$test_name'-pgbackrest-secrets"}}] |
@@ -161,14 +169,14 @@ get_cr() {
 				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
 				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
-		;;
+			;;
 		"custom-extensions")
 			yq eval -i '
 				.spec.extensions.image = "'$IMAGE'" |
 				.spec.extensions.imagePullPolicy = "Always" |
 				.spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
 			    ' $TEMP_DIR/cr.yaml
-		;;
+			;;
 	esac
 	cat $TEMP_DIR/cr.yaml
 }
@@ -177,9 +185,8 @@ run_psql_local() {
 	local command=${1}
 	local uri=${2}
 	local driver=${3:-postgres}
-	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 
-	kubectl -n ${NAMESPACE} exec ${client_container} -- \
+	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
 		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://'$uri'"
 }
 
@@ -187,9 +194,8 @@ run_psql() {
 	local command=${1}
 	local uri=${2}
 	local password=${3}
-	local client_container=$(kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}')
 
-	kubectl -n ${NAMESPACE} exec ${client_container} -- \
+	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
 		bash -c "printf '$command\n' | PGPASSWORD="\'$password\'" psql -v ON_ERROR_STOP=1 -t -q $uri"
 }
 
@@ -381,16 +387,25 @@ deploy_chaos_mesh() {
 destroy_chaos_mesh() {
 	local chaos_mesh_ns=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}' | sed 's/NAMESPACE//')
 
-	for i in $(kubectl api-resources | grep chaos-mesh | awk '{print $1}'); do timeout 30 kubectl delete ${i} --all --all-namespaces || :; done
 	if [ -n "${chaos_mesh_ns}" ]; then
-		helm uninstall chaos-mesh --namespace ${chaos_mesh_ns} || :
+		helm uninstall --wait --timeout 60s chaos-mesh --namespace ${chaos_mesh_ns} || :
 	fi
-	timeout 30 kubectl delete crd $(kubectl get crd | grep 'chaos-mesh.org' | awk '{print $1}') || :
-	timeout 30 kubectl delete clusterrolebinding $(kubectl get clusterrolebinding | grep 'chaos-mesh' | awk '{print $1}') || :
-	timeout 30 kubectl delete clusterrole $(kubectl get clusterrole | grep 'chaos-mesh' | awk '{print $1}') || :
 	timeout 30 kubectl delete MutatingWebhookConfiguration $(kubectl get MutatingWebhookConfiguration | grep 'chaos-mesh' | awk '{print $1}') || :
 	timeout 30 kubectl delete ValidatingWebhookConfiguration $(kubectl get ValidatingWebhookConfiguration | grep 'chaos-mesh' | awk '{print $1}') || :
 	timeout 30 kubectl delete ValidatingWebhookConfiguration $(kubectl get ValidatingWebhookConfiguration | grep 'validate-auth' | awk '{print $1}') || :
+	for i in $(kubectl api-resources | grep chaos-mesh | awk '{print $1}'); do
+		kubectl get ${i} --all-namespaces --no-headers -o custom-columns=Kind:.kind,Name:.metadata.name,NAMESPACE:.metadata.namespace \
+			| while read -r line; do
+				local kind=$(echo "$line" | awk '{print $1}')
+				local name=$(echo "$line" | awk '{print $2}')
+				local namespace=$(echo "$line" | awk '{print $3}')
+				kubectl patch $kind $name -n $namespace --type=merge -p '{"metadata":{"finalizers":[]}}' || :
+			done
+		timeout 30 kubectl delete ${i} --all --all-namespaces || :
+	done
+	timeout 30 kubectl delete crd $(kubectl get crd | grep 'chaos-mesh.org' | awk '{print $1}') || :
+	timeout 30 kubectl delete clusterrolebinding $(kubectl get clusterrolebinding | grep 'chaos-mesh' | awk '{print $1}') || :
+	timeout 30 kubectl delete clusterrole $(kubectl get clusterrole | grep 'chaos-mesh' | awk '{print $1}') || :
 }
 
 kill_pods() {
@@ -653,7 +668,7 @@ wait_sts_rollout() {
 	local updated_replicas=$(get_updated_replicas $sts)
 	local desired_replicas=$(get_desired_replicas $sts)
 
-	until [[ "$updated_replicas" -eq "$desired_replicas" ]]; do
+	until [[ $updated_replicas -eq $desired_replicas ]]; do
 		updated_replicas=$(get_updated_replicas $sts)
 		desired_replicas=$(get_desired_replicas $sts)
 
@@ -682,5 +697,5 @@ wait_cluster_consistency() {
 	sts=$(kubectl -n "${NAMESPACE}" get sts --selector=postgres-operator.crunchydata.com/cluster="${cluster_name}" -o jsonpath='{.items[*].metadata.name}' | grep "${cluster_name}")
 	for st in $sts; do
 		wait_sts_rollout "$st"
-	 done
+	done
 }
