@@ -142,7 +142,7 @@ yq --yaml-roundtrip < bundle.csv.yaml > "${bundle_directory}/manifests/${file_na
 	--argjson rules "$(yq <<< "${operator_roles}" 'first | .rules')" \
 	--argjson crds "${crd_descriptions}" \
 	--arg examples "${crd_examples}" \
-	--arg version "${PGO_VERSION}" \
+	--arg version "${VERSION}" \
 	--arg minKubeVer "${MIN_KUBE_VERSION}" \
 	--arg description "$(< description.md)" \
 	--arg icon "$(base64 -i ../icon.png | tr -d '\n')" \
