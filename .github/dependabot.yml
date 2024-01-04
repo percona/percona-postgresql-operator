@@ -38,7 +38,7 @@ updates:
     labels:
       - "dependencies"
     schedule:
-      interval: monthly
+      interval: weekly
       day: "tuesday"
       time: "01:00"
   
