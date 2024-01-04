@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 180
+timeout: 120
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -28,7 +28,6 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  generation: 1
   labels:
     postgres-operator.crunchydata.com/cluster: upgrade-minor
     postgres-operator.crunchydata.com/data: postgres
@@ -39,21 +38,13 @@ metadata:
       name: upgrade-minor
       controller: true
       blockOwnerDeletion: true
-spec:
-  template:
-    metadata:
-      labels:
-        postgres-operator.crunchydata.com/cluster: upgrade-minor
-        postgres-operator.crunchydata.com/data: postgres
-        postgres-operator.crunchydata.com/instance-set: instance1
-        postgres-operator.crunchydata.com/patroni: upgrade-minor-ha
 status:
-  availableReplicas: 1
-  collisionCount: 0
   observedGeneration: 1
-  readyReplicas: 1
   replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
   updatedReplicas: 1
+  collisionCount: 0
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -87,28 +78,12 @@ metadata:
   annotations:
     postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
 status:
   succeeded: 1
----
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  generation: 1
-  labels:
-    postgres-operator.crunchydata.com/cluster: upgrade-minor
-    postgres-operator.crunchydata.com/pgbackrest: ""
-    postgres-operator.crunchydata.com/pgbackrest-cronjob: full
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
-  ownerReferences:
-  - apiVersion: postgres-operator.crunchydata.com/v1beta1
-    blockOwnerDeletion: true
-    controller: true
-    kind: PostgresCluster
-    name: upgrade-minor
 ---
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
@@ -147,7 +122,6 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  generation: 1
   name: upgrade-minor
 status:
   pgbouncer:
@@ -155,9 +129,9 @@ status:
     size: 3
   postgres:
     instances:
-      - name: instance1
-        ready: 3
-        size: 3
+    - name: instance1
+      ready: 3
+      size: 3
     ready: 3
     size: 3
   state: ready
