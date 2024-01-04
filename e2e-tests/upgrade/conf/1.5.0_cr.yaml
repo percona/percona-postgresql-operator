@@ -2,13 +2,13 @@ apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   labels:
-    pgo-version: 1.6.0
-  name: some-name
+    pgo-version: 1.5.0
+  name: cluster1
 spec:
-#  secretsName: some-name-users
-  sslCA: some-name-ssl-ca
-  sslSecretName: some-name-ssl-keypair
-  sslReplicationSecretName: some-name-replication-ssl-keypair
+#  secretsName: cluster1-users
+#  sslCA: cluster1-ssl-ca
+#  sslSecretName: cluster1-ssl-keypair
+#  sslReplicationSecretName: cluster1-ssl-keypair
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
     apply: disabled
@@ -40,16 +40,20 @@ spec:
 #      storagetype: dynamic
 #      storageclass: ""
 #      matchLabels: ""
-#  userLabels:
-#    pgo-version: "1.6.0"
+  userLabels:
+    pgo-version: "1.5.0"
   pgPrimary:
-    affinity:
-     antiAffinityType: preferred
-    image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
-    imagePullPolicy: Always
+    image: percona/percona-postgresql-operator:1.5.0-ppg14-postgres-ha
+#    imagePullPolicy: Always
     resources:
       requests:
-        memory: "128Mi"
+        cpu: 500m
+        memory: "256Mi"
+#      limits:
+#        cpu: 500m
+#        memory: "256Mi"
+#    affinity:
+#      antiAffinityType: preferred
     tolerations: []
     volumeSpec:
       size: 1G
@@ -61,17 +65,17 @@ spec:
       serviceType: ClusterIP
 #      loadBalancerSourceRanges:
 #      annotations:
-#        pg-cluster-annot: some-name
+#        pg-cluster-annot: cluster1
 #      labels:
-#        pg-cluster-label: some-name
+#        pg-cluster-label: cluster1
 #    customconfig: ""
   pmm:
-    enabled: true
-    image: percona/pmm-client:2.24.0
-    imagePullPolicy: Always
+    enabled: false
+    image: percona/pmm-client:2.26.0
+#    imagePullPolicy: Always
     serverHost: monitoring-service
     serverUser: admin
-    pmmSecret: some-name-pmm-secret
+    pmmSecret: cluster1-pmm-secret
     resources:
       requests:
         memory: 200M
@@ -80,17 +84,18 @@ spec:
 #        cpu: "1"
 #        memory: "400M"
   backup:
-    image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
-    imagePullPolicy: Always
-    backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest-repo
-    affinity:
-     antiAffinityType: preferred
+    image: percona/percona-postgresql-operator:1.5.0-ppg14-pgbackrest
+#    imagePullPolicy: Always
+    backrestRepoImage: percona/percona-postgresql-operator:1.5.0-ppg14-pgbackrest-repo
     resources:
       requests:
+        cpu: "200m"
         memory: "48Mi"
 #      limits:
 #        cpu: "1"
 #        memory: "64Mi"
+#    affinity:
+#      antiAffinityType: preferred
     volumeSpec:
       size: 1G
       accessmode: ReadWriteOnce
@@ -109,59 +114,57 @@ spec:
         type: full
         storage: local
   pgBouncer:
-    image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
-    imagePullPolicy: Always
-    affinity:
-     antiAffinityType: preferred
-    size: 3
+    image: percona/percona-postgresql-operator:1.5.0-ppg14-pgbouncer
+#    imagePullPolicy: Always
+    size: 0
     resources:
       requests:
         cpu: "1"
         memory: "128Mi"
-      limits:
-        cpu: "2"
-        memory: "512Mi"
+#      limits:
+#        cpu: "2"
+#        memory: "512Mi"
+#    affinity:
+#      antiAffinityType: preferred
     expose:
       serviceType: ClusterIP
 #      loadBalancerSourceRanges:
 #      annotations:
-#        pg-cluster-annot: some-name
+#        pg-cluster-annot: cluster1
 #      labels:
-#        pg-cluster-label: some-name
+#        pg-cluster-label: cluster1
   pgReplicas:
     hotStandby:
       size: 2
       resources:
         requests:
-#          cpu: "1"
-          memory: "128Mi"
+          cpu: "500m"
+          memory: "256Mi"
 #        limits:
-#          cpu: "1"
-#          memory: "128Mi"
+#          cpu: "500m"
+#          memory: "256Mi"
       volumeSpec:
         accessmode: ReadWriteOnce
         size: 1G
         storagetype: dynamic
         storageclass: ""
 #        matchLabels: ""
-#      affinity:
-#        default: null
 #      labels:
-#        pg-cluster-label: some-name
+#        pg-cluster-label: cluster1
 #      annotations:
-#        pg-cluster-annot: some-name-1
+#        pg-cluster-annot: cluster1-1
       enableSyncStandby: false
       expose:
         serviceType: ClusterIP
 #        loadBalancerSourceRanges:
 #        annotations:
-#          pg-cluster-annot: some-name
+#          pg-cluster-annot: cluster1
 #        labels:
-#          pg-cluster-label: some-name
+#          pg-cluster-label: cluster1
   pgBadger:
-    enabled: true
-    image: perconalab/percona-postgresql-operator:main-ppg14-pgbadger
-    imagePullPolicy: Always
+    enabled: false
+    image: percona/percona-postgresql-operator:1.5.0-ppg14-pgbadger
+#    imagePullPolicy: Always
     port: 10000
 #  securityContext:
 #    fsGroup: 1001
