@@ -55,6 +55,7 @@ type PGClusterReconciler struct {
 	KubeVersion       string
 	CrunchyController controller.Controller
 	IsOpenShift       bool
+	Cron              CronRegistry
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
@@ -195,6 +196,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	r.reconcileCustomExtensions(cr)
+
+	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
+	}
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
@@ -374,7 +379,8 @@ func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGClus
 
 	backupList := &v2.PerconaPGBackupList{}
 	if err := cl.List(ctx, backupList, &client.ListOptions{
-		Namespace: cr.Namespace}); err != nil {
+		Namespace: cr.Namespace,
+	}); err != nil {
 		return false, errors.Wrap(err, "list backups")
 	}
 
