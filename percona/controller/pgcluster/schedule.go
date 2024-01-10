@@ -36,6 +36,12 @@ func (r *PGClusterReconciler) reconcileScheduledBackup(ctx context.Context, cr *
 			Namespace: cr.Namespace,
 		},
 	}, backupType, repo.Name)
+
+	if repo.BackupSchedules == nil {
+		r.Cron.DeleteBackupJob(name.Name)
+		return nil
+	}
+
 	schedule := ""
 	switch backupType {
 	case postgrescluster.Full:
