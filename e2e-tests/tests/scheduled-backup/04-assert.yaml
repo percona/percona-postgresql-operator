@@ -6,8 +6,6 @@ kind: Job
 apiVersion: batch/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: scheduled-backup
-    postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
