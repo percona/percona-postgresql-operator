@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -227,12 +226,6 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	annotations := make(map[string]string)
 	for k, v := range cr.Annotations {
 		switch k {
-		// pg-backup reconciler will manage this annotation
-		case naming.PGBackRestBackup:
-			v, ok := postgresCluster.Annotations[k]
-			if ok {
-				annotations[k] = v
-			}
 		case corev1.LastAppliedConfigAnnotation:
 			continue
 		default:
@@ -812,6 +805,10 @@ const (
 	// AnnotationMonitorUserSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case monitor user password is changed.
 	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-secret-hash"
+
+	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
+	// indicate that backup is in progress.
+	AnnotationBackupInProgress = annotationPrefix + "backup-in-progress"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"
