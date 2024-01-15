@@ -58,7 +58,7 @@ func (r *CronRegistry) ApplyBackupJob(name string, schedule string, cmd func()) 
 }
 
 func (r *CronRegistry) DeleteBackupJob(name string) {
-	if sch, ok := r.backupJobs.Load(name); ok {
+	if sch, ok := r.backupJobs.LoadAndDelete(name); ok {
 		r.crons.Remove(sch.(BackupScheduleJob).id)
 	}
 }
