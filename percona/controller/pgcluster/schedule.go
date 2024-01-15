@@ -4,19 +4,21 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
-	"github.com/pkg/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func (r *PGClusterReconciler) reconcileScheduledBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
+	for i := range cr.Spec.Backups.PGBackRest.Repos {
+		repo := cr.Spec.Backups.PGBackRest.Repos[i]
 		for _, t := range []string{postgrescluster.Full, postgrescluster.Differential, postgrescluster.Incremental} {
 			err := r.reconcileScheduledBackup(ctx, cr, &repo, t)
 			if err != nil {
