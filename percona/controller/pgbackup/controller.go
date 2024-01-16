@@ -154,9 +154,13 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			log.Info("Waiting for backup to complete")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
-		err = finishBackup(ctx, r.Client, pgBackup, job)
+		rr, err := finishBackup(ctx, r.Client, pgBackup, job)
 		if err != nil {
 			return reconcile.Result{}, err
+		}
+		if rr != nil {
+			log.Info("Waiting for crunchy reconciler to finish")
+			return *rr, nil
 		}
 
 		pgBackup.Status.CompletedAt = job.Status.CompletionTime
@@ -244,9 +248,10 @@ func getBackupTypeFromOpts(opts string) string {
 	return *backupType
 }
 
-func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup, job *batchv1.Job) error {
-	deleteAnnotation := func(annotation string) error {
-		return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup, job *batchv1.Job) (*reconcile.Result, error) {
+	deleteAnnotation := func(annotation string) (bool, error) {
+		deleted := true
+		return deleted, retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			pgCluster := new(v2.PerconaPGCluster)
 			err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pgCluster)
 			if err != nil {
@@ -254,6 +259,7 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 			}
 			_, ok := pgCluster.Annotations[annotation]
 			if !ok {
+				deleted = false
 				return nil
 			}
 			delete(pgCluster.Annotations, annotation)
@@ -265,8 +271,16 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 	}
 
 	if job.Labels[naming.LabelPGBackRestBackup] == string(naming.BackupManual) {
-		if err := deleteAnnotation(naming.PGBackRestBackup); err != nil {
-			return errors.Wrapf(err, "delete %s annotation", naming.PGBackRestBackup)
+		deleted, err := deleteAnnotation(naming.PGBackRestBackup)
+		if err != nil {
+			return nil, errors.Wrapf(err, "delete %s annotation", naming.PGBackRestBackup)
+		}
+		if deleted {
+			// We should wait until the crunchy reconciler is finished.
+			// If we delete the job labels without waiting for the reconcile to finish, the Crunchy reconciler will
+			// receive the pgcluster with the "naming.PGBackRestBackup" annotation, but will not find the manual backup job.
+			// It will attempt to create a new job with the same name, failing and resulting in a scary error in the logs.
+			return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
 		// Remove PGBackRest labels to prevent the job from being included in
@@ -277,15 +291,15 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		}
 
 		if err := c.Update(ctx, job); err != nil {
-			return errors.Wrap(err, "update backup job annotation")
+			return nil, errors.Wrap(err, "update backup job annotation")
 		}
 
-		if err := deleteAnnotation(v2.AnnotationBackupInProgress); err != nil {
-			return errors.Wrapf(err, "delete %s annotation", v2.AnnotationBackupInProgress)
+		if _, err := deleteAnnotation(v2.AnnotationBackupInProgress); err != nil {
+			return nil, errors.Wrapf(err, "delete %s annotation", v2.AnnotationBackupInProgress)
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) error {
