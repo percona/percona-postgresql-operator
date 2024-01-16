@@ -1,48 +1,17 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 180
+timeout: 30
 ---
-apiVersion: postgres-operator.crunchydata.com/v1beta1
-kind: PostgresCluster
+kind: ConfigMap
+apiVersion: v1
 metadata:
-  name: scheduled-backup
-  generation: 7
-  annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: s3-restore
-  ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
-      kind: PerconaPGCluster
-      name: scheduled-backup
-      controller: true
-      blockOwnerDeletion: true
-  finalizers:
-    - postgres-operator.crunchydata.com/finalizer
-status:
-  instances:
-    - name: instance1
-      readyReplicas: 3
-      replicas: 3
-      updatedReplicas: 3
-  observedGeneration: 7
-  pgbackrest:
-    repos:
-      - name: repo1
-        replicaCreateBackupComplete: true
-        stanzaCreated: true
-      - name: repo2
-        stanzaCreated: true
-    restore:
-      finished: true
-      id: s3-restore
-      succeeded: 1
-  proxy:
-    pgBouncer:
-      readyReplicas: 3
-      replicas: 3
+  name: pitr-target
 ---
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGRestore
+kind: ConfigMap
+apiVersion: v1
 metadata:
-  name: s3-restore
-status:
-  state: Succeeded
+  name: 07-add-more-data
+data:
+  data: |2-
+     100500
+     100501
