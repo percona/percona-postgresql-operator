@@ -73,6 +73,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		Watches(&corev1.Service{}, r.watchServices()).
 		Watches(&corev1.Secret{}, r.watchSecrets()).
 		Watches(&batchv1.Job{}, r.watchBackupJobs()).
+		Watches(&v2.PerconaPGBackup{}, r.watchPGBackups()).
 		Complete(r)
 }
 
@@ -106,6 +107,21 @@ func (r *PGClusterReconciler) watchBackupJobs() handler.Funcs {
 					Name:      crName,
 				}})
 			}
+		},
+	}
+}
+
+func (r *PGClusterReconciler) watchPGBackups() handler.Funcs {
+	return handler.Funcs{
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			pgBackup, ok := e.ObjectNew.(*v2.PerconaPGBackup)
+			if !ok {
+				return
+			}
+			q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+				Namespace: pgBackup.GetNamespace(),
+				Name:      pgBackup.Spec.PGCluster,
+			}})
 		},
 	}
 }
