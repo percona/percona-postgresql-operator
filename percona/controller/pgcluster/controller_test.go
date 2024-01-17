@@ -383,7 +383,6 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 					"Annotations": HaveKeyWithValue(v2.AnnotationMonitorUserSecretHash, currentHash),
 				}),
 			})))
-
 		})
 	})
 
@@ -498,6 +497,9 @@ var _ = Describe("Watching secrets", Ordered, func() {
 	It("should read default cr.yaml", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
+	for i := range cr.Spec.Backups.PGBackRest.Repos {
+		cr.Spec.Backups.PGBackRest.Repos[i].BackupSchedules = nil
+	}
 
 	reconcileCount := 0
 	Context("Create cluster and wait until Reconcile stops", func() {

@@ -55,6 +55,7 @@ type PGClusterReconciler struct {
 	KubeVersion       string
 	CrunchyController controller.Controller
 	IsOpenShift       bool
+	Cron              CronRegistry
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
@@ -160,7 +161,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		if err = client.IgnoreNotFound(err); err != nil {
 			log.Error(err, "unable to fetch PerconaPGCluster")
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 	}
 
 	cr.Default()
@@ -188,7 +189,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		if err := r.runFinalizers(ctx, cr); err != nil {
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, err
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run finalizers")
 		}
 
 		return reconcile.Result{}, nil
@@ -207,10 +208,14 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
-		return reconcile.Result{}, err
+		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
 	r.reconcileCustomExtensions(cr)
+
+	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
+	}
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
@@ -238,8 +243,11 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	err = r.updateStatus(ctx, cr, &postgresCluster.Status)
+	if err != nil {
+		return ctrl.Result{}, errors.Wrap(err, "update status")
+	}
 
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
 
 func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaPGCluster) error {

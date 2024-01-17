@@ -32,6 +32,7 @@ func reconciler() *PGClusterReconciler {
 		Client:      k8sClient,
 		Platform:    "unknown",
 		KubeVersion: "1.25",
+		Cron:        NewCronRegistry(),
 	})
 }
 
