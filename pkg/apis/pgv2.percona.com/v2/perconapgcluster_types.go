@@ -260,6 +260,16 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 
 	postgresCluster.Spec.Backups = cr.Spec.Backups
+	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
+		repo := postgresCluster.Spec.Backups.PGBackRest.Repos[i]
+
+		if repo.BackupSchedules == nil {
+			continue
+		}
+		repo.BackupSchedules.Differential = nil
+		repo.BackupSchedules.Full = nil
+		repo.BackupSchedules.Incremental = nil
+	}
 	postgresCluster.Spec.DataSource = cr.Spec.DataSource
 	postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
 	postgresCluster.Spec.Patroni = cr.Spec.Patroni
@@ -765,8 +775,10 @@ const (
 	LabelPMMSecret       = labelPrefix + "pmm-secret"
 )
 
-const annotationPrefix = "pgv2.percona.com/"
-const crunchyAnnotationPrefix = "postgres-operator.crunchydata.com/"
+const (
+	annotationPrefix        = "pgv2.percona.com/"
+	crunchyAnnotationPrefix = "postgres-operator.crunchydata.com/"
+)
 
 const (
 	// AnnotationPGBackrestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
@@ -793,6 +805,10 @@ const (
 	// AnnotationMonitorUserSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case monitor user password is changed.
 	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-secret-hash"
+
+	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
+	// indicate that backup is in progress.
+	AnnotationBackupInProgress = annotationPrefix + "backup-in-progress"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"

@@ -12,6 +12,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -78,14 +79,19 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			log.Info("Can't start backup. PostgresCluster is paused", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
+
 		// start backup only if backup job doesn't exist
 		_, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
 		if err != nil {
 			if !errors.Is(err, ErrBackupJobNotFound) {
 				return reconcile.Result{}, errors.Wrap(err, "find backup job")
 			}
-			if err := startBackup(ctx, r.Client, pgCluster, pgBackup); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "start backup")
+			if a := pgCluster.Annotations[v2.AnnotationBackupInProgress]; a != "" && a != pgBackup.Name {
+				log.Info("Can't start backup. Previous backup is still in progress", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
+				return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+			}
+			if err := startBackup(ctx, r.Client, pgBackup); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "failed to start backup")
 			}
 		}
 
@@ -109,7 +115,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 
-		log.Info("Backup is starting")
+		log.Info("Backup is starting", "backup", pgBackup.Name, "cluster", pgCluster.Name)
 		return reconcile.Result{}, nil
 	case v2.BackupStarting:
 		job, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
@@ -147,6 +153,14 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		default:
 			log.Info("Waiting for backup to complete")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		}
+		rr, err := finishBackup(ctx, r.Client, pgBackup, job)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if rr != nil {
+			log.Info("Waiting for crunchy reconciler to finish")
+			return *rr, nil
 		}
 
 		pgBackup.Status.CompletedAt = job.Status.CompletionTime
@@ -234,23 +248,86 @@ func getBackupTypeFromOpts(opts string) string {
 	return *backupType
 }
 
-func startBackup(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) error {
-	orig := pg.DeepCopy()
-
-	if pg.Annotations == nil {
-		pg.Annotations = make(map[string]string)
+func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup, job *batchv1.Job) (*reconcile.Result, error) {
+	deleteAnnotation := func(annotation string) (bool, error) {
+		deleted := true
+		return deleted, retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			pgCluster := new(v2.PerconaPGCluster)
+			err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pgCluster)
+			if err != nil {
+				return errors.Wrap(err, "get PostgresCluster")
+			}
+			_, ok := pgCluster.Annotations[annotation]
+			if !ok {
+				deleted = false
+				return nil
+			}
+			delete(pgCluster.Annotations, annotation)
+			if err := c.Update(ctx, pgCluster); err != nil {
+				return err
+			}
+			return nil
+		})
 	}
-	pg.Annotations[naming.PGBackRestBackup] = pb.Name
 
-	if pg.Spec.Backups.PGBackRest.Manual == nil {
-		pg.Spec.Backups.PGBackRest.Manual = new(v1beta1.PGBackRestManualBackup)
+	if job.Labels[naming.LabelPGBackRestBackup] == string(naming.BackupManual) {
+		deleted, err := deleteAnnotation(naming.PGBackRestBackup)
+		if err != nil {
+			return nil, errors.Wrapf(err, "delete %s annotation", naming.PGBackRestBackup)
+		}
+		if deleted {
+			// We should wait until the crunchy reconciler is finished.
+			// If we delete the job labels without waiting for the reconcile to finish, the Crunchy reconciler will
+			// receive the pgcluster with the "naming.PGBackRestBackup" annotation, but will not find the manual backup job.
+			// It will attempt to create a new job with the same name, failing and resulting in a scary error in the logs.
+			return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		}
+
+		// Remove PGBackRest labels to prevent the job from being included in
+		// repoResources.manualBackupJobs and deleted by the cleanupRepoResources
+		// or reconcileManualBackup methods.
+		for k := range naming.PGBackRestLabels(pgBackup.Spec.PGCluster) {
+			delete(job.Labels, k)
+		}
+
+		if err := c.Update(ctx, job); err != nil {
+			return nil, errors.Wrap(err, "update backup job annotation")
+		}
+
+		if _, err := deleteAnnotation(v2.AnnotationBackupInProgress); err != nil {
+			return nil, errors.Wrapf(err, "delete %s annotation", v2.AnnotationBackupInProgress)
+		}
 	}
 
-	pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
-	pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options
+	return nil, nil
+}
 
-	if err := c.Patch(ctx, pg, client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "annotate PostgresCluster")
+func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) error {
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		pg := &v2.PerconaPGCluster{}
+		err := c.Get(ctx, types.NamespacedName{Name: pb.Spec.PGCluster, Namespace: pb.Namespace}, pg)
+		if err != nil {
+			return err
+		}
+		if a := pg.Annotations[v2.AnnotationBackupInProgress]; a != "" && a != pb.Name {
+			return errors.Errorf("backup %s already in progress", a)
+		}
+		if pg.Annotations == nil {
+			pg.Annotations = make(map[string]string)
+		}
+		pg.Annotations[naming.PGBackRestBackup] = pb.Name
+		pg.Annotations[v2.AnnotationBackupInProgress] = pb.Name
+
+		if pg.Spec.Backups.PGBackRest.Manual == nil {
+			pg.Spec.Backups.PGBackRest.Manual = new(v1beta1.PGBackRestManualBackup)
+		}
+
+		pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
+		pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options
+
+		return c.Update(ctx, pg)
+	}); err != nil {
+		return errors.Wrap(err, "update PostgresCluster")
 	}
 
 	return nil

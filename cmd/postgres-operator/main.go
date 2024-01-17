@@ -168,6 +168,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		KubeVersion:       getServerVersion(ctx, mgr.GetConfig()),
 		CrunchyController: cm.Controller(),
 		IsOpenShift:       isOpenshift(ctx, mgr.GetConfig()),
+		Cron:              pgcluster.NewCronRegistry(),
 	}
 	if err := pc.SetupWithManager(mgr); err != nil {
 		return err

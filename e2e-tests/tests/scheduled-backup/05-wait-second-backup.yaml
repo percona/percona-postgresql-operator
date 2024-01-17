@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 600
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      while true; do
+        succeeded_backups=$(kubectl get -n "$NAMESPACE" pg-backup -o yaml | yq '.items | map(select(.status.state == "Succeeded")) | length')
+
+        if [[ $succeeded_backups -ge 3 ]]; then
+          break
+        else
+          echo "waiting for 3 succeeded pg-backups"
+          sleep 1
+        fi
+      done
