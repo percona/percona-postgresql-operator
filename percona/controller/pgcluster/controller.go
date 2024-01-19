@@ -66,6 +66,9 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), r.watchBackupJobs()); err != nil {
 		return errors.Wrap(err, "unable to watch jobs")
 	}
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}), r.watchPGBackups()); err != nil {
+		return errors.Wrap(err, "unable to watch pg-backups")
+	}
 
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
