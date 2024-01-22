@@ -101,6 +101,10 @@ func (r *PGClusterReconciler) createScheduledBackup(log logr.Logger, backupName,
 		}
 		return err
 	}
+	if cr.Status.State != v2.AppStateReady {
+		log.Info("Cluster is not ready. Can't start scheduled backup")
+		return nil
+	}
 
 	pb := &v2.PerconaPGBackup{
 		ObjectMeta: metav1.ObjectMeta{
