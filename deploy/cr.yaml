@@ -283,7 +283,7 @@ spec:
 #          work_mem: 2MB
 
 #  extensions:
-#    image: percona/percona-postgresql-operator:2.3.0
+#    image: percona/percona-postgresql-operator:2.4.0
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3

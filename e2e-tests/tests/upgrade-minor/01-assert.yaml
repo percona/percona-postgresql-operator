@@ -7,6 +7,10 @@ apiVersion: apps/v1
 metadata:
   name: upgrade-minor-repo-host
   labels:
+    app.kubernetes.io/instance: upgrade-minor
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
     postgres-operator.crunchydata.com/cluster: upgrade-minor
     postgres-operator.crunchydata.com/data: pgbackrest
     postgres-operator.crunchydata.com/pgbackrest: ''
@@ -29,6 +33,11 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   labels:
+    app.kubernetes.io/component: pg
+    app.kubernetes.io/instance: upgrade-minor
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
     postgres-operator.crunchydata.com/cluster: upgrade-minor
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
@@ -51,6 +60,11 @@ apiVersion: apps/v1
 metadata:
   name: upgrade-minor-pgbouncer
   labels:
+    app.kubernetes.io/component: pgbouncer
+    app.kubernetes.io/instance: upgrade-minor
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
     postgres-operator.crunchydata.com/cluster: upgrade-minor
     postgres-operator.crunchydata.com/role: pgbouncer
   annotations:
@@ -88,6 +102,9 @@ status:
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
+  generation: 1
+  labels:
+    e2e: upgrade-minor
   name: upgrade-minor
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
