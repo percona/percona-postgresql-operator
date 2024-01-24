@@ -10,7 +10,7 @@ metadata:
     name: some-name-disabled
     pg-cluster: some-name-disabled
     pgo-pg-database: "true"
-    pgo-version: 1.6.0
+    pgo-version: 1.5.1
     pgouser: admin
     service-name: some-name-disabled
     vendor: crunchydata
@@ -42,7 +42,7 @@ spec:
         pg-cluster: some-name-disabled
         pg-pod-anti-affinity: disabled
         pgo-pg-database: "true"
-        pgo-version: 1.6.0
+        pgo-version: 1.5.1
         pgouser: admin
         vendor: crunchydata
     spec:
