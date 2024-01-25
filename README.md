@@ -63,7 +63,7 @@ See the [Contribution Guide](CONTRIBUTING.md) on how you can contribute.
 
 ## Communication
 
-We would love to hear from you! Reach out to us on [Forum]() with your questions, feedback and ideas
+We would love to hear from you! Reach out to us on [Forum](https://forums.percona.com/c/postgresql/percona-kubernetes-operator-for-postgresql/68) with your questions, feedback and ideas
 
 ## Join Percona Kubernetes Squad!                                                                             
 ```                                                                                     
