@@ -1,0 +1,5 @@
+percona/percona-postgresql-operator:1.5.1-ppg14-pgbackrest
+percona/percona-postgresql-operator:1.5.1-ppg14-pgbackrest-repo
+percona/percona-postgresql-operator:1.5.1-ppg14-pgbadger
+percona/percona-postgresql-operator:1.5.1-ppg14-pgbouncer
+percona/percona-postgresql-operator:1.5.1-ppg14-postgres-ha

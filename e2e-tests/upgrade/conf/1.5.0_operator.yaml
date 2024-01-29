@@ -137,7 +137,7 @@ data:
     pgo_image_pull_policy: "Always"
     pgo_image_pull_secret: ""
     pgo_image_pull_secret_manifest: ""
-    pgo_image_tag: "1.5.1"
+    pgo_image_tag: "1.5.0"
     pgo_operator_namespace: "pgo"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -167,7 +167,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: pgo-deploy
-          image: percona/percona-postgresql-operator:1.5.1-pgo-deployer
+          image: percona/percona-postgresql-operator:1.5.0-pgo-deployer
           imagePullPolicy: Always
           env:
             - name: DEPLOY_ACTION
