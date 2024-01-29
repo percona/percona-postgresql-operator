@@ -8,8 +8,6 @@ metadata:
   annotations:
     postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full
   labels:
-    postgres-operator.crunchydata.com/cluster: demand-backup
-    postgres-operator.crunchydata.com/pgbackrest: ""
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:

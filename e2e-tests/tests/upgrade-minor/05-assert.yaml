@@ -113,30 +113,10 @@ metadata:
 status:
   succeeded: 1
 ---
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  generation: 2
-  labels:
-    app.kubernetes.io/instance: upgrade-minor
-    app.kubernetes.io/managed-by: percona-postgresql-operator
-    app.kubernetes.io/name: percona-postgresql
-    app.kubernetes.io/part-of: percona-postgresql
-    postgres-operator.crunchydata.com/cluster: upgrade-minor
-    postgres-operator.crunchydata.com/pgbackrest: ""
-    postgres-operator.crunchydata.com/pgbackrest-cronjob: full
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
-  ownerReferences:
-  - apiVersion: postgres-operator.crunchydata.com/v1beta1
-    blockOwnerDeletion: true
-    controller: true
-    kind: PostgresCluster
-    name: upgrade-minor
----
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  generation: 3
+  generation: 2
   labels:
     e2e: upgrade-minor
   name: upgrade-minor
@@ -154,7 +134,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 3
+  observedGeneration: 2
   pgbackrest:
     repoHost:
       apiVersion: apps/v1

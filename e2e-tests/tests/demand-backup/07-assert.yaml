@@ -8,7 +8,6 @@ metadata:
   name: demand-backup
   generation: 3
   annotations:
-    postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full
     postgres-operator.crunchydata.com/pgbackrest-restore: demand-backup-restore
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
@@ -26,9 +25,6 @@ status:
       updatedReplicas: 3
   observedGeneration: 3
   pgbackrest:
-    manualBackup:
-      finished: true
-      succeeded: 1
     repos:
       - name: repo1
         replicaCreateBackupComplete: true

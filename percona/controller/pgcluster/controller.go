@@ -55,6 +55,7 @@ type PGClusterReconciler struct {
 	KubeVersion       string
 	CrunchyController controller.Controller
 	IsOpenShift       bool
+	Cron              CronRegistry
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
@@ -65,6 +66,9 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), r.watchBackupJobs()); err != nil {
 		return errors.Wrap(err, "unable to watch jobs")
 	}
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}), r.watchPGBackups()); err != nil {
+		return errors.Wrap(err, "unable to watch pg-backups")
+	}
 
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
@@ -72,6 +76,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		Watches(&corev1.Service{}, r.watchServices()).
 		Watches(&corev1.Secret{}, r.watchSecrets()).
 		Watches(&batchv1.Job{}, r.watchBackupJobs()).
+		Watches(&v2.PerconaPGBackup{}, r.watchPGBackups()).
 		Complete(r)
 }
 
@@ -105,6 +110,21 @@ func (r *PGClusterReconciler) watchBackupJobs() handler.Funcs {
 					Name:      crName,
 				}})
 			}
+		},
+	}
+}
+
+func (r *PGClusterReconciler) watchPGBackups() handler.Funcs {
+	return handler.Funcs{
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			pgBackup, ok := e.ObjectNew.(*v2.PerconaPGBackup)
+			if !ok {
+				return
+			}
+			q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+				Namespace: pgBackup.GetNamespace(),
+				Name:      pgBackup.Spec.PGCluster,
+			}})
 		},
 	}
 }
@@ -144,7 +164,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		if err = client.IgnoreNotFound(err); err != nil {
 			log.Error(err, "unable to fetch PerconaPGCluster")
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 	}
 
 	cr.Default()
@@ -172,7 +192,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		if err := r.runFinalizers(ctx, cr); err != nil {
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, err
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run finalizers")
 		}
 
 		return reconcile.Result{}, nil
@@ -191,10 +211,14 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
-		return reconcile.Result{}, err
+		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
 	r.reconcileCustomExtensions(cr)
+
+	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
+	}
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
@@ -222,8 +246,11 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	err = r.updateStatus(ctx, cr, &postgresCluster.Status)
+	if err != nil {
+		return ctrl.Result{}, errors.Wrap(err, "update status")
+	}
 
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
 
 func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaPGCluster) error {
@@ -374,7 +401,8 @@ func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGClus
 
 	backupList := &v2.PerconaPGBackupList{}
 	if err := cl.List(ctx, backupList, &client.ListOptions{
-		Namespace: cr.Namespace}); err != nil {
+		Namespace: cr.Namespace,
+	}); err != nil {
 		return false, errors.Wrap(err, "list backups")
 	}
 

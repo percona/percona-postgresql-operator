@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -98,15 +99,29 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		}
 	}
 
-	cr.Status = v2.PerconaPGClusterStatus{
-		Postgres: pgStatusFromCruncy(),
-		PGBouncer: v2.PGBouncerStatus{
-			Size:  status.Proxy.PGBouncer.Replicas,
-			Ready: status.Proxy.PGBouncer.ReadyReplicas,
-		},
-		State: r.getState(cr, status),
-		Host:  host,
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cluster := &v2.PerconaPGCluster{}
+		if err := r.Client.Get(ctx, types.NamespacedName{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+		}, cluster); err != nil {
+			return errors.Wrap(err, "get PerconaPGCluster")
+		}
+
+		cluster.Status = v2.PerconaPGClusterStatus{
+			Postgres: pgStatusFromCruncy(),
+			PGBouncer: v2.PGBouncerStatus{
+				Size:  status.Proxy.PGBouncer.Replicas,
+				Ready: status.Proxy.PGBouncer.ReadyReplicas,
+			},
+			State: r.getState(cr, status),
+			Host:  host,
+		}
+
+		return r.Client.Status().Update(ctx, cluster)
+	}); err != nil {
+		return errors.Wrap(err, "update PerconaPGCluster status")
 	}
 
-	return r.Client.Status().Update(ctx, cr)
+	return nil
 }
