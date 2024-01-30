@@ -10,7 +10,7 @@ metadata:
     name: some-name
     pg-cluster: some-name
     pgo-pg-database: "true"
-    pgo-version: 1.5.1
+    pgo-version: 1.6.0
     pgouser: admin
     service-name: some-name
     vendor: crunchydata
@@ -42,7 +42,7 @@ spec:
         pg-cluster: some-name
         pg-pod-anti-affinity: preferred
         pgo-pg-database: "true"
-        pgo-version: 1.5.1
+        pgo-version: 1.6.0
         pgouser: admin
         vendor: crunchydata
     spec:
