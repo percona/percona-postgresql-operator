@@ -62,9 +62,14 @@
 - name: PerconaPGCluster CRD
   tags:
     - install
-    - update
   block:
-  - name: Create PerconaPGClusters CRD
-    kubernetes.core.k8s:
-      state: present
-      src: "{{ role_path }}/files/crds/perconapgclusters-crd.yaml"
+  - name: Check if PerconaPGCluster CRD Is Installed
+    shell: "{{ kubectl_or_oc }} get crd perconapgclusters.pg.percona.com"
+    register: crds_result
+    failed_when: false
+
+  - name: Create PerconaPGCluster CRD
+    command: "{{ kubectl_or_oc }} create -f {{ role_path }}/files/crds/perconapgclusters-crd.yaml"
+    when: crds_result.rc == 1
+    ignore_errors: no
+    no_log: false
