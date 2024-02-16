@@ -174,7 +174,7 @@ with a timestamp, so you know when you initiated the change.
 For example, for our `hippo` cluster, we can run the following command to trigger the switchover:
 
 ```shell
-kubectl annotate -n postgres-operator postgrescluster hippo \
+kubectl annotate -n postgres-operator pg hippo \
   postgres-operator.crunchydata.com/trigger-switchover="$(date)"
 ```
 
@@ -182,7 +182,7 @@ kubectl annotate -n postgres-operator postgrescluster hippo \
 If you want to perform another switchover you can re-run the annotation command and add the `--overwrite` flag:
 
 ```shell
-kubectl annotate -n postgres-operator postgrescluster hippo --overwrite \
+kubectl annotate -n postgres-operator pg hippo --overwrite \
   postgres-operator.crunchydata.com/trigger-switchover="$(date)"
 ```
 {{% /notice %}}
