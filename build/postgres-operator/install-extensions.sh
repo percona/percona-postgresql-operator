@@ -13,6 +13,7 @@ for key in "${extensions[@]}"; do
 	echo "Installing extension: ${key}"
 	/usr/local/bin/extension-installer \
 		-type ${STORAGE_TYPE} \
+		${STORAGE_ENDPOINT:+-endpoint "$STORAGE_ENDPOINT"} \
 		-region ${STORAGE_REGION} \
 		-bucket ${STORAGE_BUCKET} \
 		-extension-path ${PGDATA_EXTENSIONS} \

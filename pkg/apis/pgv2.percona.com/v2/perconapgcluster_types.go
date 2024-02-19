@@ -436,10 +436,11 @@ type CustomExtensionSpec struct {
 
 type CustomExtensionsStorageSpec struct {
 	// +kubebuilder:validation:Enum={s3,gcs,azure}
-	Type   string                   `json:"type,omitempty"`
-	Bucket string                   `json:"bucket,omitempty"`
-	Region string                   `json:"region,omitempty"`
-	Secret *corev1.SecretProjection `json:"secret,omitempty"`
+	Type     string                   `json:"type,omitempty"`
+	Bucket   string                   `json:"bucket,omitempty"`
+	Region   string                   `json:"region,omitempty"`
+	Endpoint string                   `json:"endpoint,omitempty"`
+	Secret   *corev1.SecretProjection `json:"secret,omitempty"`
 }
 
 type BuiltInExtensionsSpec struct {
