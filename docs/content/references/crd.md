@@ -16610,6 +16610,11 @@ The specification of extensions.
         <td></td>
         <td>false</td>
       </tr><tr>
+        <td><b>endpoint</b></td>
+        <td>string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
         <td><b>region</b></td>
         <td>string</td>
         <td></td>

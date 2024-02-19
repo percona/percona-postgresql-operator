@@ -56,6 +56,10 @@ func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, e
 				Value: spec.Storage.Type,
 			},
 			{
+				Name:  "STORAGE_ENDPOINT",
+				Value: spec.Storage.Endpoint,
+			},
+			{
 				Name:  "STORAGE_REGION",
 				Value: spec.Storage.Region,
 			},

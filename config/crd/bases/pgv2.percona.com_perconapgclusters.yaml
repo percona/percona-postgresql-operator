@@ -7548,6 +7548,8 @@ spec:
                     properties:
                       bucket:
                         type: string
+                      endpoint:
+                        type: string
                       region:
                         type: string
                       secret:
