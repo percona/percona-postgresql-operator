@@ -147,6 +147,10 @@ type PGBackRestArchive struct {
 	// Configuration for pgBackRest sidecar containers
 	// +optional
 	Sidecars *PGBackRestSidecars `json:"sidecars,omitempty"`
+
+	// SecurityContext defines the security settings for PGBackRest pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 // PGBackRestSidecars defines the configuration for pgBackRest sidecar containers

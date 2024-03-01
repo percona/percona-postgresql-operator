@@ -485,6 +485,10 @@ type PostgresInstanceSetSpec struct {
 	// +listMapKey=name
 	// +optional
 	TablespaceVolumes []TablespaceVolume `json:"tablespaceVolumes,omitempty"`
+
+	// SecurityContext defines the security settings for a PostgreSQL pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 type TablespaceVolume struct {

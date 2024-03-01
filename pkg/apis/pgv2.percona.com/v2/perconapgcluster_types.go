@@ -384,6 +384,10 @@ type PGInstanceSetSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 	// +kubebuilder:validation:Required
 	DataVolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"dataVolumeClaimSpec"`
+
+	// SecurityContext defines the security settings for a PostgreSQL pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -400,6 +404,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
 		WALVolumeClaimSpec:        p.WALVolumeClaimSpec,
 		DataVolumeClaimSpec:       p.DataVolumeClaimSpec,
+		SecurityContext:           p.SecurityContext,
 	}
 }
 
@@ -537,6 +542,10 @@ type PGBouncerSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
 	// +optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+
+	// SecurityContext defines the security settings for PGBouncer pods.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
@@ -556,6 +565,7 @@ func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
 		Service:                   p.ServiceExpose.ToCrunchy(),
 		Tolerations:               p.Tolerations,
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
+		SecurityContext:           p.SecurityContext,
 	}
 
 	spec.Default()
