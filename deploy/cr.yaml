@@ -100,6 +100,24 @@ spec:
 #
 #    priorityClassName: high-priority
 #
+#    securityContext:
+#      fsGroup: 1001
+#      runAsUser: 1001
+#      runAsNonRoot: true
+#      fsGroupChangePolicy: "OnRootMismatch"
+#      runAsGroup: 1001
+#      seLinuxOptions:
+#        type: spc_t
+#        level: s0:c123,c456
+#      seccompProfile:
+#        type: Localhost
+#        localhostProfile: localhost/profile.json
+#      supplementalGroups:
+#      - 1001
+#      sysctls:
+#      - net.ipv4.tcp_keepalive_time=600
+#      - net.ipv4.tcp_keepalive_intvl=60
+#
 #    walVolumeClaimSpec:
 #       accessModes:
 #       - "ReadWriteOnce"
@@ -148,6 +166,24 @@ spec:
 #        operator: Equal
 #        value: connection-poolers
 #
+#      securityContext:
+#        fsGroup: 1001
+#        runAsUser: 1001
+#        runAsNonRoot: true
+#        fsGroupChangePolicy: "OnRootMismatch"
+#        runAsGroup: 1001
+#        seLinuxOptions:
+#          type: spc_t
+#          level: s0:c123,c456
+#        seccompProfile:
+#          type: Localhost
+#          localhostProfile: localhost/profile.json
+#        supplementalGroups:
+#        - 1001
+#        sysctls:
+#        - net.ipv4.tcp_keepalive_time=600
+#        - net.ipv4.tcp_keepalive_intvl=60
+#
 #      topologySpreadConstraints:
 #        - maxSkew: 1
 #          topologyKey: my-node-label
@@ -186,6 +222,23 @@ spec:
 #          key: role
 #          operator: Equal
 #          value: connection-poolers
+#        securityContext:
+#          fsGroup: 1001
+#          runAsUser: 1001
+#          runAsNonRoot: true
+#          fsGroupChangePolicy: "OnRootMismatch"
+#          runAsGroup: 1001
+#          seLinuxOptions:
+#            type: spc_t
+#            level: s0:c123,c456
+#          seccompProfile:
+#            type: Localhost
+#            localhostProfile: localhost/profile.json
+#          supplementalGroups:
+#          - 1001
+#          sysctls:
+#          - net.ipv4.tcp_keepalive_time=600
+#          - net.ipv4.tcp_keepalive_intvl=60
 #
 #      global:
 #        repo1-retention-full: "14"
@@ -216,7 +269,24 @@ spec:
 #                 postgres-operator.crunchydata.com/cluster: keycloakdb
 #                 postgres-operator.crunchydata.com/role: pgbouncer
 #               topologyKey: kubernetes.io/hostname
-#
+#        securityContext:
+#          fsGroup: 1001
+#          runAsUser: 1001
+#          runAsNonRoot: true
+#          fsGroupChangePolicy: "OnRootMismatch"
+#          runAsGroup: 1001
+#          seLinuxOptions:
+#            type: spc_t
+#            level: s0:c123,c456
+#          seccompProfile:
+#            type: Localhost
+#            localhostProfile: localhost/profile.json
+#          supplementalGroups:
+#          - 1001
+#          sysctls:
+#          - net.ipv4.tcp_keepalive_time=600
+#          - net.ipv4.tcp_keepalive_intvl=60
+
       manual:
         repoName: repo1
         options:

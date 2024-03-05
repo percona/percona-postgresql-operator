@@ -802,9 +802,7 @@ var _ = Describe("Security context", Ordered, func() {
 
 	const crName = "security-context"
 	const ns = crName
-	const backupName = crName + "-backup"
 	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
-	backupNamespacedName := types.NamespacedName{Name: backupName, Namespace: ns}
 
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -841,7 +839,9 @@ var _ = Describe("Security context", Ordered, func() {
 			i.SecurityContext = podSecContext
 		}
 		cr.Spec.Proxy.PGBouncer.SecurityContext = podSecContext
-		cr.Spec.Backups.PGBackRest.SecurityContext = podSecContext
+		cr.Spec.Backups.PGBackRest.RepoHost = &v1beta1.PGBackRestRepoHost{
+			SecurityContext: podSecContext,
+		}
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 	})
 
@@ -889,34 +889,5 @@ var _ = Describe("Security context", Ordered, func() {
 		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(sts.Spec.Template.Spec.SecurityContext).To(Equal(podSecContext))
-	})
-
-	pgBackup := &v2.PerconaPGBackup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      backupName,
-			Namespace: ns,
-		},
-		Spec: v2.PerconaPGBackupSpec{
-			PGCluster: crName,
-			RepoName:  "repo1",
-		},
-	}
-
-	It("should create PerconaPGBackup", func() {
-		Expect(k8sClient.Create(ctx, pgBackup)).Should(Succeed())
-	})
-
-	It("should reconcile backup", func() {
-		_, err := backupReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: backupNamespacedName})
-		Expect(err).NotTo(HaveOccurred())
-		_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-		Expect(err).NotTo(HaveOccurred())
-		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("should have starting backup state", func() {
-		Expect(k8sClient.Get(ctx, backupNamespacedName, pgBackup)).To(Succeed())
-		Expect(pgBackup.Status.State).To(Equal(v2.BackupStarting))
 	})
 })
