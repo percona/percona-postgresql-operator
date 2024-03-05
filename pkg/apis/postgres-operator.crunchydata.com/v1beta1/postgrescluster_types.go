@@ -502,6 +502,10 @@ type PostgresInstanceSetSpec struct {
 	// PostgreSQL to restart.
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// SecurityContext defines the security settings for a PostgreSQL pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 type TablespaceVolume struct {

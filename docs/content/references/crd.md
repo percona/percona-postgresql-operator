@@ -1809,6 +1809,11 @@ Jobs field allows configuration for all backup jobs
         <td>Resource limits for backup jobs. Includes manual, scheduled and replica create backups</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security settings for PGBackRest pod.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#perconapgclusterspecbackupspgbackrestjobstolerationsindex">tolerations</a></b></td>
         <td>[]object</td>
         <td>Tolerations of pgBackRest backup Job pods. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration</td>
@@ -3076,6 +3081,229 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
 </table>
 
 
+<h3 id="perconapgclusterspecbackupspgbackrestjobssecuritycontext">
+  PerconaPGCluster.spec.backups.pgbackrest.jobs.securityContext
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestjobs">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security settings for PGBackRest pod.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fsGroup</b></td>
+        <td>integer</td>
+        <td>A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>fsGroupChangePolicy</b></td>
+        <td>string</td>
+        <td>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>supplementalGroups</b></td>
+        <td>[]integer</td>
+        <td>A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontextsysctlsindex">sysctls</a></b></td>
+        <td>[]object</td>
+        <td>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestjobssecuritycontextselinuxoptions">
+  PerconaPGCluster.spec.backups.pgbackrest.jobs.securityContext.seLinuxOptions
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestjobssecuritycontextseccompprofile">
+  PerconaPGCluster.spec.backups.pgbackrest.jobs.securityContext.seccompProfile
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestjobssecuritycontextsysctlsindex">
+  PerconaPGCluster.spec.backups.pgbackrest.jobs.securityContext.sysctls[index]
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Sysctl defines a kernel parameter to be set
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of a property to set</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Value of a property to set</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestjobssecuritycontextwindowsoptions">
+  PerconaPGCluster.spec.backups.pgbackrest.jobs.securityContext.windowsOptions
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestjobssecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="perconapgclusterspecbackupspgbackrestjobstolerationsindex">
   PerconaPGCluster.spec.backups.pgbackrest.jobs.tolerations[index]
   <sup><sup><a href="#perconapgclusterspecbackupspgbackrestjobs">↩ Parent</a></sup></sup>
@@ -3219,6 +3447,11 @@ Defines configuration for a pgBackRest dedicated repository host.  This section 
         <td><b><a href="#perconapgclusterspecbackupspgbackrestrepohostresources">resources</a></b></td>
         <td>object</td>
         <td>Resource requirements for a pgBackRest repository host</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security settings for PGBackRest pod.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecbackupspgbackrestrepohostsshconfigmap">sshConfigMap</a></b></td>
@@ -4494,6 +4727,229 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td>string</td>
         <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestrepohostsecuritycontext">
+  PerconaPGCluster.spec.backups.pgbackrest.repoHost.securityContext
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestrepohost">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security settings for PGBackRest pod.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fsGroup</b></td>
+        <td>integer</td>
+        <td>A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>fsGroupChangePolicy</b></td>
+        <td>string</td>
+        <td>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>supplementalGroups</b></td>
+        <td>[]integer</td>
+        <td>A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontextsysctlsindex">sysctls</a></b></td>
+        <td>[]object</td>
+        <td>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestrepohostsecuritycontextselinuxoptions">
+  PerconaPGCluster.spec.backups.pgbackrest.repoHost.securityContext.seLinuxOptions
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestrepohostsecuritycontextseccompprofile">
+  PerconaPGCluster.spec.backups.pgbackrest.repoHost.securityContext.seccompProfile
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestrepohostsecuritycontextsysctlsindex">
+  PerconaPGCluster.spec.backups.pgbackrest.repoHost.securityContext.sysctls[index]
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Sysctl defines a kernel parameter to be set
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of a property to set</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Value of a property to set</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecbackupspgbackrestrepohostsecuritycontextwindowsoptions">
+  PerconaPGCluster.spec.backups.pgbackrest.repoHost.securityContext.windowsOptions
+  <sup><sup><a href="#perconapgclusterspecbackupspgbackrestrepohostsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -6477,6 +6933,11 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td><b><a href="#perconapgclusterspecinstancesindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute resources of a PostgreSQL container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexsecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security settings for a PostgreSQL pod.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#perconapgclusterspecinstancesindexsidecarsindex">sidecars</a></b></td>
@@ -10096,6 +10557,229 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td>string</td>
         <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexsecuritycontext">
+  PerconaPGCluster.spec.instances[index].securityContext
+  <sup><sup><a href="#perconapgclusterspecinstancesindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security settings for a PostgreSQL pod.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fsGroup</b></td>
+        <td>integer</td>
+        <td>A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>fsGroupChangePolicy</b></td>
+        <td>string</td>
+        <td>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexsecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexsecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>supplementalGroups</b></td>
+        <td>[]integer</td>
+        <td>A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexsecuritycontextsysctlsindex">sysctls</a></b></td>
+        <td>[]object</td>
+        <td>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecinstancesindexsecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexsecuritycontextselinuxoptions">
+  PerconaPGCluster.spec.instances[index].securityContext.seLinuxOptions
+  <sup><sup><a href="#perconapgclusterspecinstancesindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexsecuritycontextseccompprofile">
+  PerconaPGCluster.spec.instances[index].securityContext.seccompProfile
+  <sup><sup><a href="#perconapgclusterspecinstancesindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexsecuritycontextsysctlsindex">
+  PerconaPGCluster.spec.instances[index].securityContext.sysctls[index]
+  <sup><sup><a href="#perconapgclusterspecinstancesindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Sysctl defines a kernel parameter to be set
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of a property to set</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Value of a property to set</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecinstancesindexsecuritycontextwindowsoptions">
+  PerconaPGCluster.spec.instances[index].securityContext.windowsOptions
+  <sup><sup><a href="#perconapgclusterspecinstancesindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -17275,6 +17959,11 @@ Defines a PgBouncer proxy and connection pooler.
         <td>Compute resources of a PgBouncer container. Changing this value causes PgBouncer to restart. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspecproxypgbouncersecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security settings for PGBouncer pods.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#perconapgclusterspecproxypgbouncersidecarsindex">sidecars</a></b></td>
         <td>[]object</td>
         <td>Custom sidecars for a PgBouncer pod. Changing this value causes PgBouncer to restart.</td>
@@ -19103,6 +19792,229 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td>string</td>
         <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecproxypgbouncersecuritycontext">
+  PerconaPGCluster.spec.proxy.pgBouncer.securityContext
+  <sup><sup><a href="#perconapgclusterspecproxypgbouncer">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security settings for PGBouncer pods.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fsGroup</b></td>
+        <td>integer</td>
+        <td>A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>fsGroupChangePolicy</b></td>
+        <td>string</td>
+        <td>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecproxypgbouncersecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecproxypgbouncersecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>supplementalGroups</b></td>
+        <td>[]integer</td>
+        <td>A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecproxypgbouncersecuritycontextsysctlsindex">sysctls</a></b></td>
+        <td>[]object</td>
+        <td>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#perconapgclusterspecproxypgbouncersecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecproxypgbouncersecuritycontextselinuxoptions">
+  PerconaPGCluster.spec.proxy.pgBouncer.securityContext.seLinuxOptions
+  <sup><sup><a href="#perconapgclusterspecproxypgbouncersecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecproxypgbouncersecuritycontextseccompprofile">
+  PerconaPGCluster.spec.proxy.pgBouncer.securityContext.seccompProfile
+  <sup><sup><a href="#perconapgclusterspecproxypgbouncersecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecproxypgbouncersecuritycontextsysctlsindex">
+  PerconaPGCluster.spec.proxy.pgBouncer.securityContext.sysctls[index]
+  <sup><sup><a href="#perconapgclusterspecproxypgbouncersecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Sysctl defines a kernel parameter to be set
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of a property to set</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Value of a property to set</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecproxypgbouncersecuritycontextwindowsoptions">
+  PerconaPGCluster.spec.proxy.pgBouncer.securityContext.windowsOptions
+  <sup><sup><a href="#perconapgclusterspecproxypgbouncersecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -24660,6 +25572,11 @@ Jobs field allows configuration for all backup jobs
         <td>Resource limits for backup jobs. Includes manual, scheduled and replica create backups</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security settings for PGBackRest pod.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecbackupspgbackrestjobstolerationsindex">tolerations</a></b></td>
         <td>[]object</td>
         <td>Tolerations of pgBackRest backup Job pods. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration</td>
@@ -25927,6 +26844,229 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
 </table>
 
 
+<h3 id="postgresclusterspecbackupspgbackrestjobssecuritycontext">
+  PostgresCluster.spec.backups.pgbackrest.jobs.securityContext
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestjobs">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security settings for PGBackRest pod.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fsGroup</b></td>
+        <td>integer</td>
+        <td>A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>fsGroupChangePolicy</b></td>
+        <td>string</td>
+        <td>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>supplementalGroups</b></td>
+        <td>[]integer</td>
+        <td>A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontextsysctlsindex">sysctls</a></b></td>
+        <td>[]object</td>
+        <td>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestjobssecuritycontextselinuxoptions">
+  PostgresCluster.spec.backups.pgbackrest.jobs.securityContext.seLinuxOptions
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestjobssecuritycontextseccompprofile">
+  PostgresCluster.spec.backups.pgbackrest.jobs.securityContext.seccompProfile
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestjobssecuritycontextsysctlsindex">
+  PostgresCluster.spec.backups.pgbackrest.jobs.securityContext.sysctls[index]
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Sysctl defines a kernel parameter to be set
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of a property to set</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Value of a property to set</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestjobssecuritycontextwindowsoptions">
+  PostgresCluster.spec.backups.pgbackrest.jobs.securityContext.windowsOptions
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestjobssecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
 <h3 id="postgresclusterspecbackupspgbackrestjobstolerationsindex">
   PostgresCluster.spec.backups.pgbackrest.jobs.tolerations[index]
   <sup><sup><a href="#postgresclusterspecbackupspgbackrestjobs">↩ Parent</a></sup></sup>
@@ -26070,6 +27210,11 @@ Defines configuration for a pgBackRest dedicated repository host.  This section 
         <td><b><a href="#postgresclusterspecbackupspgbackrestrepohostresources">resources</a></b></td>
         <td>object</td>
         <td>Resource requirements for a pgBackRest repository host</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security settings for PGBackRest pod.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecbackupspgbackrestrepohostsshconfigmap">sshConfigMap</a></b></td>
@@ -27345,6 +28490,229 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td>string</td>
         <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestrepohostsecuritycontext">
+  PostgresCluster.spec.backups.pgbackrest.repoHost.securityContext
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestrepohost">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security settings for PGBackRest pod.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fsGroup</b></td>
+        <td>integer</td>
+        <td>A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>fsGroupChangePolicy</b></td>
+        <td>string</td>
+        <td>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>supplementalGroups</b></td>
+        <td>[]integer</td>
+        <td>A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontextsysctlsindex">sysctls</a></b></td>
+        <td>[]object</td>
+        <td>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestrepohostsecuritycontextselinuxoptions">
+  PostgresCluster.spec.backups.pgbackrest.repoHost.securityContext.seLinuxOptions
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestrepohostsecuritycontextseccompprofile">
+  PostgresCluster.spec.backups.pgbackrest.repoHost.securityContext.seccompProfile
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestrepohostsecuritycontextsysctlsindex">
+  PostgresCluster.spec.backups.pgbackrest.repoHost.securityContext.sysctls[index]
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Sysctl defines a kernel parameter to be set
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of a property to set</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Value of a property to set</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecbackupspgbackrestrepohostsecuritycontextwindowsoptions">
+  PostgresCluster.spec.backups.pgbackrest.repoHost.securityContext.windowsOptions
+  <sup><sup><a href="#postgresclusterspecbackupspgbackrestrepohostsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -29333,6 +30701,11 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td><b><a href="#postgresclusterspecinstancesindexresources">resources</a></b></td>
         <td>object</td>
         <td>Compute resources of a PostgreSQL container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexsecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security settings for a PostgreSQL pod.</td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#postgresclusterspecinstancesindexsidecars">sidecars</a></b></td>
@@ -34987,6 +36360,229 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td>string</td>
         <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexsecuritycontext">
+  PostgresCluster.spec.instances[index].securityContext
+  <sup><sup><a href="#postgresclusterspecinstancesindex">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security settings for a PostgreSQL pod.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fsGroup</b></td>
+        <td>integer</td>
+        <td>A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>fsGroupChangePolicy</b></td>
+        <td>string</td>
+        <td>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexsecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexsecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>supplementalGroups</b></td>
+        <td>[]integer</td>
+        <td>A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexsecuritycontextsysctlsindex">sysctls</a></b></td>
+        <td>[]object</td>
+        <td>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecinstancesindexsecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexsecuritycontextselinuxoptions">
+  PostgresCluster.spec.instances[index].securityContext.seLinuxOptions
+  <sup><sup><a href="#postgresclusterspecinstancesindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexsecuritycontextseccompprofile">
+  PostgresCluster.spec.instances[index].securityContext.seccompProfile
+  <sup><sup><a href="#postgresclusterspecinstancesindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexsecuritycontextsysctlsindex">
+  PostgresCluster.spec.instances[index].securityContext.sysctls[index]
+  <sup><sup><a href="#postgresclusterspecinstancesindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Sysctl defines a kernel parameter to be set
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of a property to set</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Value of a property to set</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecinstancesindexsecuritycontextwindowsoptions">
+  PostgresCluster.spec.instances[index].securityContext.windowsOptions
+  <sup><sup><a href="#postgresclusterspecinstancesindexsecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -41133,6 +42729,11 @@ Defines a PgBouncer proxy and connection pooler.
         <td>Compute resources of a PgBouncer container. Changing this value causes PgBouncer to restart. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#postgresclusterspecproxypgbouncersecuritycontext">securityContext</a></b></td>
+        <td>object</td>
+        <td>SecurityContext defines the security settings for PGBouncer pods.</td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#postgresclusterspecproxypgbouncerservice">service</a></b></td>
         <td>object</td>
         <td>Specification of the service that exposes PgBouncer.</td>
@@ -44949,6 +46550,229 @@ ResourceClaim references one entry in PodSpec.ResourceClaims.
         <td>string</td>
         <td>Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.</td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecproxypgbouncersecuritycontext">
+  PostgresCluster.spec.proxy.pgBouncer.securityContext
+  <sup><sup><a href="#postgresclusterspecproxypgbouncer">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+SecurityContext defines the security settings for PGBouncer pods.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>fsGroup</b></td>
+        <td>integer</td>
+        <td>A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>fsGroupChangePolicy</b></td>
+        <td>string</td>
+        <td>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsGroup</b></td>
+        <td>integer</td>
+        <td>The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsNonRoot</b></td>
+        <td>boolean</td>
+        <td>Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUser</b></td>
+        <td>integer</td>
+        <td>The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecproxypgbouncersecuritycontextselinuxoptions">seLinuxOptions</a></b></td>
+        <td>object</td>
+        <td>The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecproxypgbouncersecuritycontextseccompprofile">seccompProfile</a></b></td>
+        <td>object</td>
+        <td>The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>supplementalGroups</b></td>
+        <td>[]integer</td>
+        <td>A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecproxypgbouncersecuritycontextsysctlsindex">sysctls</a></b></td>
+        <td>[]object</td>
+        <td>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#postgresclusterspecproxypgbouncersecuritycontextwindowsoptions">windowsOptions</a></b></td>
+        <td>object</td>
+        <td>The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecproxypgbouncersecuritycontextselinuxoptions">
+  PostgresCluster.spec.proxy.pgBouncer.securityContext.seLinuxOptions
+  <sup><sup><a href="#postgresclusterspecproxypgbouncersecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>level</b></td>
+        <td>string</td>
+        <td>Level is SELinux level label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>role</b></td>
+        <td>string</td>
+        <td>Role is a SELinux role label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>Type is a SELinux type label that applies to the container.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>user</b></td>
+        <td>string</td>
+        <td>User is a SELinux user label that applies to the container.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecproxypgbouncersecuritycontextseccompprofile">
+  PostgresCluster.spec.proxy.pgBouncer.securityContext.seccompProfile
+  <sup><sup><a href="#postgresclusterspecproxypgbouncersecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>type</b></td>
+        <td>string</td>
+        <td>type indicates which kind of seccomp profile will be applied. Valid options are: 
+ Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>localhostProfile</b></td>
+        <td>string</td>
+        <td>localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is "Localhost". Must NOT be set for any other type.</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecproxypgbouncersecuritycontextsysctlsindex">
+  PostgresCluster.spec.proxy.pgBouncer.securityContext.sysctls[index]
+  <sup><sup><a href="#postgresclusterspecproxypgbouncersecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Sysctl defines a kernel parameter to be set
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>Name of a property to set</td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>Value of a property to set</td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="postgresclusterspecproxypgbouncersecuritycontextwindowsoptions">
+  PostgresCluster.spec.proxy.pgBouncer.securityContext.windowsOptions
+  <sup><sup><a href="#postgresclusterspecproxypgbouncersecuritycontext">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>gmsaCredentialSpec</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>gmsaCredentialSpecName</b></td>
+        <td>string</td>
+        <td>GMSACredentialSpecName is the name of the GMSA credential spec to use.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hostProcess</b></td>
+        <td>boolean</td>
+        <td>HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.</td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>runAsUserName</b></td>
+        <td>string</td>
+        <td>The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
