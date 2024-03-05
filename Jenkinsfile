@@ -188,6 +188,9 @@ void runTest(Integer TEST_ID) {
                     if [ ! -d "e2e-tests/logs" ]; then
                         mkdir "e2e-tests/logs"
                     fi
+                    export IMAGE_BACKREST=percona/percona-postgresql-operator:2.2.0-ppg15-pgbackrest
+                    export IMAGE_POSTGRESQL=percona/percona-postgresql-operator:2.2.0-ppg15-postgres
+                    export IMAGE_PGBOUNCER=percona/percona-postgresql-operator:2.2.0-ppg15-pgbouncer
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
                     set -o pipefail
