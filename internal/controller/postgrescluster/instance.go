@@ -1263,7 +1263,11 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
 	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	sts.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	if spec.SecurityContext != nil {
+		sts.Spec.Template.Spec.SecurityContext = spec.SecurityContext
+	} else {
+		sts.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	}
 
 	// Set the image pull secrets, if any exist.
 	// This is set here rather than using the service account due to the lack
