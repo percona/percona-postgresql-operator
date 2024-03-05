@@ -1104,7 +1104,9 @@ var _ = Describe("Security context", Ordered, func() {
 			i.SecurityContext = podSecContext
 		}
 		cr.Spec.Proxy.PGBouncer.SecurityContext = podSecContext
-		cr.Spec.Backups.PGBackRest.SecurityContext = podSecContext
+		cr.Spec.Backups.PGBackRest.RepoHost = &v1beta1.PGBackRestRepoHost{
+			SecurityContext: podSecContext,
+		}
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 	})
 

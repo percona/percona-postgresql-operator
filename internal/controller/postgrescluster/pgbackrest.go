@@ -589,8 +589,8 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 	// Do not add environment variables describing services in this namespace.
 	repo.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	if postgresCluster.Spec.Backups.PGBackRest.SecurityContext != nil {
-		repo.Spec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.SecurityContext
+	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.RepoHost != nil && pgbackrest.RepoHost.SecurityContext != nil {
+		repo.Spec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.RepoHost.SecurityContext
 	} else {
 		repo.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(postgresCluster)
 	}
@@ -741,8 +741,8 @@ func generateBackupJobSpecIntent(postgresCluster *v1beta1.PostgresCluster,
 		},
 	}
 
-	if postgresCluster.Spec.Backups.PGBackRest.SecurityContext != nil {
-		jobSpec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.SecurityContext
+	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
+		jobSpec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.Jobs.SecurityContext
 	}
 
 	if jobs := postgresCluster.Spec.Backups.PGBackRest.Jobs; jobs != nil {
@@ -1256,8 +1256,8 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	// Do not add environment variables describing services in this namespace.
 	job.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	if cluster.Spec.Backups.PGBackRest.SecurityContext != nil {
-		job.Spec.Template.Spec.SecurityContext = cluster.Spec.Backups.PGBackRest.SecurityContext
+	if pgbackrest := cluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
+		job.Spec.Template.Spec.SecurityContext = cluster.Spec.Backups.PGBackRest.Jobs.SecurityContext
 	} else {
 		job.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
 	}
