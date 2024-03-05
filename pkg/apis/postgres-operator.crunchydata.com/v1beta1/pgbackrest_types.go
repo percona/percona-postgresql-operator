@@ -186,6 +186,10 @@ type BackupJobs struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=60
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+
+	// SecurityContext defines the security settings for a PostgreSQL pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 // PGBackRestManualBackup contains information that is used for creating a
@@ -241,6 +245,10 @@ type PGBackRestRepoHost struct {
 	// Deprecated: Repository hosts use mTLS for encryption, authentication, and authorization.
 	// +optional
 	SSHSecret *corev1.SecretProjection `json:"sshSecret,omitempty"`
+
+	// SecurityContext defines the security settings for a PostgreSQL pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.

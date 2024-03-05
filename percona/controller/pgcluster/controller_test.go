@@ -796,3 +796,98 @@ var _ = Describe("Version labels", Ordered, func() {
 		})))
 	})
 })
+
+var _ = Describe("Security context", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "security-context"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	el := int64(11)
+	podSecContext := &corev1.PodSecurityContext{
+		RunAsUser:  &el,
+		RunAsGroup: &el,
+	}
+
+	It("should create PerconaPGCluster", func() {
+		for i := range cr.Spec.InstanceSets {
+			i := &cr.Spec.InstanceSets[i]
+			i.SecurityContext = podSecContext
+		}
+		cr.Spec.Proxy.PGBouncer.SecurityContext = podSecContext
+		cr.Spec.Backups.PGBackRest.RepoHost = &v1beta1.PGBackRestRepoHost{
+			SecurityContext: podSecContext,
+		}
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Instances should have security context", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":    "postgres",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			Expect(sts.Spec.Template.Spec.SecurityContext).To(Equal(podSecContext))
+		}
+	})
+
+	It("PgBouncer should have security context", func() {
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-pgbouncer",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(deployment.Spec.Template.Spec.SecurityContext).To(Equal(podSecContext))
+	})
+
+	It("PgBackrest Repo should have security context", func() {
+		sts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-repo-host",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sts.Spec.Template.Spec.SecurityContext).To(Equal(podSecContext))
+	})
+})

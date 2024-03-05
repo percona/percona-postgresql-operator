@@ -581,7 +581,11 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 	// Do not add environment variables describing services in this namespace.
 	repo.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	repo.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(postgresCluster)
+	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.RepoHost != nil && pgbackrest.RepoHost.SecurityContext != nil {
+		repo.Spec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.RepoHost.SecurityContext
+	} else {
+		repo.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(postgresCluster)
+	}
 
 	pgbackrest.AddServerToRepoPod(postgresCluster, &repo.Spec.Template.Spec)
 
@@ -719,6 +723,10 @@ func generateBackupJobSpecIntent(postgresCluster *v1beta1.PostgresCluster,
 				ServiceAccountName: serviceAccountName,
 			},
 		},
+	}
+
+	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
+		jobSpec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.Jobs.SecurityContext
 	}
 
 	if jobs := postgresCluster.Spec.Backups.PGBackRest.Jobs; jobs != nil {
@@ -1217,7 +1225,11 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	// Do not add environment variables describing services in this namespace.
 	job.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	job.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	if pgbackrest := cluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
+		job.Spec.Template.Spec.SecurityContext = cluster.Spec.Backups.PGBackRest.Jobs.SecurityContext
+	} else {
+		job.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	}
 
 	// set the priority class name, if it exists
 	if dataSource.PriorityClassName != nil {
