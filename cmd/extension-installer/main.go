@@ -11,10 +11,11 @@ import (
 )
 
 func main() {
-	var storageType, region, bucket, key, extensionPath string
+	var storageType, endpoint, region, bucket, key, extensionPath string
 	var install, uninstall bool
 
 	flag.StringVar(&storageType, "type", "", "Storage type")
+	flag.StringVar(&endpoint, "endpoint", "", "Storage endpoint")
 	flag.StringVar(&region, "region", "", "Storage region")
 	flag.StringVar(&bucket, "bucket", "", "Storage bucket")
 	flag.StringVar(&extensionPath, "extension-path", "", "Extension installation path")
@@ -30,7 +31,7 @@ func main() {
 
 	log.Printf("starting extension installer for %s/%s (%s) in %s", bucket, key, storageType, region)
 
-	storage := initStorage(extensions.StorageType(storageType), bucket, region)
+	storage := initStorage(extensions.StorageType(storageType), endpoint, bucket, region)
 
 	packageName := key + ".tar.gz"
 
@@ -69,10 +70,10 @@ func main() {
 	}
 }
 
-func initStorage(storageType extensions.StorageType, bucket, region string) extensions.ObjectGetter {
+func initStorage(storageType extensions.StorageType, endpoint, bucket, region string) extensions.ObjectGetter {
 	switch storageType {
 	case extensions.StorageTypeS3:
-		return extensions.NewS3(region, bucket)
+		return extensions.NewS3(endpoint, region, bucket)
 	default:
 		log.Fatalf("unknown storage type: %s", os.Getenv("STORAGE_TYPE"))
 	}
