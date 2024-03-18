@@ -1,0 +1,33 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 500
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-backup: standby-primary-backup-full
+  labels:
+    postgres-operator.crunchydata.com/cluster: standby-primary
+    postgres-operator.crunchydata.com/pgbackrest: ""
+    postgres-operator.crunchydata.com/pgbackrest-backup: manual
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  name: standby-primary-backup-full
+spec:
+  pgCluster: standby-primary
+  repoName: repo1
+  options:
+    - --type=full
+status:
+  state: Succeeded
