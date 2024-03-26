@@ -49,7 +49,7 @@ type PerconaPGCluster struct {
 type PerconaPGClusterSpec struct {
 
 	// +optional
-	Metadata *Metadata `json:"metadata,omitempty"`
+	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
 
 	// Version of the operator. Update this to new version after operator
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
@@ -248,6 +248,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	}
 	postgresCluster.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	postgresCluster.Spec.Metadata = cr.Spec.Metadata
 	postgresCluster.Spec.Image = cr.Spec.Image
 	postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
 	postgresCluster.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
@@ -780,15 +781,6 @@ type PerconaPGClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PerconaPGCluster `json:"items"`
-}
-
-// Metadata contains metadata for custom resources
-type Metadata struct {
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 const labelPrefix = "pgv2.percona.com/"

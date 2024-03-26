@@ -6,5 +6,5 @@ resources:
 - ../manager/namespace
 images:
 - name: postgres-operator
-  newName: tishina/percona-postgresql-operator
-  newTag: K8SPG-138
+  newName: perconalab/percona-postgresql-operator
+  newTag: main
