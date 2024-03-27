@@ -528,6 +528,7 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 		repo.Spec.Template.Spec.Affinity = repoHost.Affinity
 		repo.Spec.Template.Spec.Tolerations = repoHost.Tolerations
 		repo.Spec.Template.Spec.TopologySpreadConstraints = repoHost.TopologySpreadConstraints
+		repo.Spec.Template.Spec.ServiceAccountName = naming.PGBackRestRBAC(postgresCluster).Name
 		if repoHost.PriorityClassName != nil {
 			repo.Spec.Template.Spec.PriorityClassName = *repoHost.PriorityClassName
 		}
