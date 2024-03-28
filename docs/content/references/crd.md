@@ -775,6 +775,11 @@ PerconaPGCluster is the CRD that defines a Percona PG Cluster
         <td>The image pull secrets used to pull from a private registry Changing this value causes all running pods to restart. https://k8s.io/docs/tasks/configure-pod-container/pull-image-private-registry/</td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#perconapgclusterspecmetadata">metadata</a></b></td>
+        <td>object</td>
+        <td>Metadata contains metadata for custom resources</td>
+        <td>false</td>
+      </tr><tr>
         <td><b>openshift</b></td>
         <td>boolean</td>
         <td>Whether or not the PostgreSQL cluster is being deployed to an OpenShift environment. If the field is unset, the operator will automatically detect the environment.</td>
@@ -17410,6 +17415,38 @@ LocalObjectReference contains enough information to let you locate the reference
         <td><b>name</b></td>
         <td>string</td>
         <td>Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?</td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+<h3 id="perconapgclusterspecmetadata">
+  PerconaPGCluster.spec.metadata
+  <sup><sup><a href="#perconapgclusterspec">↩ Parent</a></sup></sup>
+</h3>
+
+
+
+Metadata contains metadata for custom resources
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>annotations</b></td>
+        <td>map[string]string</td>
+        <td></td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>labels</b></td>
+        <td>map[string]string</td>
+        <td></td>
         <td>false</td>
       </tr></tbody>
 </table>

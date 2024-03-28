@@ -47,6 +47,10 @@ type PerconaPGCluster struct {
 }
 
 type PerconaPGClusterSpec struct {
+
+	// +optional
+	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
+
 	// Version of the operator. Update this to new version after operator
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
@@ -244,6 +248,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	}
 	postgresCluster.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	postgresCluster.Spec.Metadata = cr.Spec.Metadata
 	postgresCluster.Spec.Image = cr.Spec.Image
 	postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
 	postgresCluster.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets

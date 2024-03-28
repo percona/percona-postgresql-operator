@@ -582,9 +582,13 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
 	repo.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
 
-	// pgBackRest does not make any Kubernetes API calls. Use the default
-	// ServiceAccount and do not mount its credentials.
+	// pgBackRest does not make any Kubernetes API calls, but it may interact
+	// with a cloud storage provider. Use the pgBackRest ServiceAccount for its
+	// possible cloud identity without mounting its Kubernetes API credentials.
+	// - https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity
+	// - https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
 	repo.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	repo.Spec.Template.Spec.ServiceAccountName = naming.PGBackRestRBAC(postgresCluster).Name
 
 	// Do not add environment variables describing services in this namespace.
 	repo.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)

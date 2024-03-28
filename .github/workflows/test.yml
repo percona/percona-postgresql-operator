@@ -15,4 +15,4 @@ jobs:
       - name: Basic tests
         run: make check
       - name: envtest
-        run: ENVTEST_K8S_VERSION=1.24 make check-envtest
+        run: ENVTEST_K8S_VERSION=1.26 make check-envtest
