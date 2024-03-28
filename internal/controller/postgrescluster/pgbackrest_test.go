@@ -344,6 +344,8 @@ schedulerName: default-scheduler
 securityContext:
   fsGroup: 26
   fsGroupChangePolicy: OnRootMismatch
+serviceAccount: hippocluster-pgbackrest
+serviceAccountName: hippocluster-pgbackrest
 shareProcessNamespace: true
 terminationGracePeriodSeconds: 30
 tolerations:
