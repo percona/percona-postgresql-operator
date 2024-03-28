@@ -2738,7 +2738,7 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 	assert.NilError(t, err)
 
 	t.Run("ServiceAccount", func(t *testing.T) {
-		assert.Equal(t, sts.Spec.Template.Spec.ServiceAccountName, "hippocluster-pgbackrest")
+		assert.Equal(t, sts.Spec.Template.Spec.ServiceAccountName, "-pgbackrest")
 		if assert.Check(t, sts.Spec.Template.Spec.AutomountServiceAccountToken != nil) {
 			assert.Equal(t, *sts.Spec.Template.Spec.AutomountServiceAccountToken, false)
 		}
