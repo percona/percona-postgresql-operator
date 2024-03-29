@@ -12019,6 +12019,18 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              metadata:
+                description: Metadata contains metadata for custom resources
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                type: object
               openshift:
                 description: Whether or not the PostgreSQL cluster is being deployed
                   to an OpenShift environment. If the field is unset, the operator
