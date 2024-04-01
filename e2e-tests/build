@@ -20,7 +20,6 @@ if [[ ${DOCKER_SQUASH:-1} == 1 ]]; then
 	squash="--squash"
 fi
 
-
 if [[ ${DOCKER_PUSH:-1} == 1 ]]; then
 	imgresult="--push=true"
 else
@@ -34,8 +33,16 @@ build_operator() {
 		GO_LDFLAGS="-race"
 	fi
 
-	export DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-"linux/amd64,linux/arm64"}
+	export DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-"linux/amd64"}
 	export GO_LDFLAGS="-w -s -trimpath ${GO_LDFLAGS}"
+
+	if echo "$DOCKER_DEFAULT_PLATFORM" | grep -q ','; then
+		if [ "${DOCKER_PUSH:-1}" = 0 ]; then
+			echo "'docker $build_command' doesn't support DOCKER_PUSH=0 option in case of multi-arch builds, please use DOCKER_PUSH=1"
+			exit 1
+		fi
+	fi
+
 	pushd "${ROOT_REPO}" || exit
 	docker buildx build \
 		--platform $DOCKER_DEFAULT_PLATFORM \
@@ -43,6 +50,7 @@ build_operator() {
 		--build-arg GIT_BRANCH="${GIT_BRANCH}" \
 		--build-arg BUILD_TIME="${BUILD_TIME}" \
 		--build-arg GO_LDFLAGS="${GO_LDFLAGS}" \
+		--progress plain \
 		$imgresult \
 		$squash \
 		$no_cache \
