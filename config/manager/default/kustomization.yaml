@@ -8,7 +8,3 @@ commonLabels:
   app.kubernetes.io/name: percona-postgresql-operator
   app.kubernetes.io/part-of: percona-postgresql-operator
   pgv2.percona.com/control-plane: postgres-operator
-images:
-- name: postgres-operator
-  newName: perconalab/percona-postgresql-operator
-  newTag: main

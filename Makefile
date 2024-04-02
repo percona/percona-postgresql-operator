@@ -418,3 +418,26 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
+# Prepare release
+PG_VER ?= $(shell grep -o "postgresVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+")
+release: generate
+	sed -i \
+		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
+		-e "/^spec:/,/^  image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-postgres#}" \
+		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbouncer#}" \
+		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbackrest#}" \
+		-e "/extensions:/,/image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)#}" \
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: percona/pmm-client:@@SET_TAG@@#}" deploy/cr.yaml
+
+# Prepare main branch after release
+MAJOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f1)
+MINOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f2)
+NEXT_VER ?= $(MAJOR_VER).$$(($(MINOR_VER) + 1)).0
+after-release: generate
+	sed -i \
+		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
+		-e "/^spec:/,/^  image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
+		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbouncer#}" \
+		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbackrest#}" \
+		-e "/extensions:/,/image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main#}" \
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: perconalab/pmm-client:dev-latest#}" deploy/cr.yaml
