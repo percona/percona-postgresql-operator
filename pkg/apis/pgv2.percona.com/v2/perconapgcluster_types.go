@@ -47,6 +47,10 @@ type PerconaPGCluster struct {
 }
 
 type PerconaPGClusterSpec struct {
+
+	// +optional
+	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
+
 	// Version of the operator. Update this to new version after operator
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
@@ -244,6 +248,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	}
 	postgresCluster.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	postgresCluster.Spec.Metadata = cr.Spec.Metadata
 	postgresCluster.Spec.Image = cr.Spec.Image
 	postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
 	postgresCluster.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
@@ -260,6 +265,16 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 
 	postgresCluster.Spec.Backups = cr.Spec.Backups
+	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
+		repo := postgresCluster.Spec.Backups.PGBackRest.Repos[i]
+
+		if repo.BackupSchedules == nil {
+			continue
+		}
+		repo.BackupSchedules.Differential = nil
+		repo.BackupSchedules.Full = nil
+		repo.BackupSchedules.Incremental = nil
+	}
 	postgresCluster.Spec.DataSource = cr.Spec.DataSource
 	postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
 	postgresCluster.Spec.Patroni = cr.Spec.Patroni
@@ -559,6 +574,10 @@ type PGInstanceSetSpec struct {
 	// PostgreSQL to restart.
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// SecurityContext defines the security settings for a PostgreSQL pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -577,6 +596,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		WALVolumeClaimSpec:        p.WALVolumeClaimSpec,
 		DataVolumeClaimSpec:       p.DataVolumeClaimSpec,
 		VolumeMounts:              p.VolumeMounts,
+		SecurityContext:           p.SecurityContext,
 	}
 }
 
@@ -720,6 +740,10 @@ type PGBouncerSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
 	// +optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+
+	// SecurityContext defines the security settings for PGBouncer pods.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
@@ -743,6 +767,7 @@ func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
 		Service:                   p.ServiceExpose.ToCrunchy(),
 		Tolerations:               p.Tolerations,
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
+		SecurityContext:           p.SecurityContext,
 	}
 
 	spec.Default()
@@ -765,8 +790,10 @@ const (
 	LabelPMMSecret       = labelPrefix + "pmm-secret"
 )
 
-const annotationPrefix = "pgv2.percona.com/"
-const crunchyAnnotationPrefix = "postgres-operator.crunchydata.com/"
+const (
+	annotationPrefix        = "pgv2.percona.com/"
+	crunchyAnnotationPrefix = "postgres-operator.crunchydata.com/"
+)
 
 const (
 	// AnnotationPGBackrestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
@@ -793,6 +820,10 @@ const (
 	// AnnotationMonitorUserSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case monitor user password is changed.
 	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-secret-hash"
+
+	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
+	// indicate that backup is in progress.
+	AnnotationBackupInProgress = annotationPrefix + "backup-in-progress"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"
