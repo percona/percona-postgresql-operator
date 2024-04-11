@@ -180,6 +180,10 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
+	if cr.Spec.Proxy == nil {
+		cr.Spec.Proxy = new(PGProxySpec)
+	}
+
 	if cr.Spec.Proxy.PGBouncer == nil {
 		cr.Spec.Proxy.PGBouncer = new(PGBouncerSpec)
 	}
