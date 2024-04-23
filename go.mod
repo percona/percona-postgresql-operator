@@ -12,7 +12,7 @@ require (
 	github.com/go-openapi/swag v0.22.5
 	github.com/go-openapi/validate v0.22.4
 	github.com/google/go-cmp v0.6.0
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.29.0
