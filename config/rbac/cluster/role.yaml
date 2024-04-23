@@ -81,7 +81,6 @@ rules:
   - batch
   resources:
   - cronjobs
-  - jobs
   verbs:
   - create
   - delete
@@ -167,6 +166,25 @@ rules:
 - apiGroups:
   - postgres-operator.crunchydata.com
   resources:
+  - crunchybridgeclusters
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgres-operator.crunchydata.com
+  resources:
+  - crunchybridgeclusters/finalizers
+  - crunchybridgeclusters/status
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - postgres-operator.crunchydata.com
+  resources:
+  - pgadmins
   - pgupgrades
   verbs:
   - get
