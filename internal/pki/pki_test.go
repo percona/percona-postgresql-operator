@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -479,7 +479,7 @@ func basicOpenSSLVerify(t *testing.T, openssl string, root, leaf Certificate) {
 	// - https://mail.python.org/pipermail/cryptography-dev/2016-August/000676.html
 
 	// TODO(cbandy): When we generate intermediate certificates, verify them
-	// idependently then bundle them with the root to verify the leaf.
+	// independently then bundle them with the root to verify the leaf.
 
 	verify(t, "-CAfile", rootFile, leafFile)
 	verify(t, "-CAfile", rootFile, "-purpose", "sslclient", leafFile)
@@ -525,7 +525,7 @@ func strictOpenSSLVerify(t *testing.T, openssl string, root, leaf Certificate) {
 	assert.NilError(t, os.WriteFile(leafFile, leafBytes, 0o600))
 
 	// TODO(cbandy): When we generate intermediate certificates, verify them
-	// idependently then pass them via "-untrusted" to verify the leaf.
+	// independently then pass them via "-untrusted" to verify the leaf.
 
 	verify(t, "-trusted", rootFile, leafFile)
 	verify(t, "-trusted", rootFile, "-purpose", "sslclient", leafFile)

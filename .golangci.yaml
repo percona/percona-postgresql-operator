@@ -79,4 +79,3 @@ run:
     - envtest
   skip-dirs:
     - pkg/generated
-    - hack

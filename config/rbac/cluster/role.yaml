@@ -81,6 +81,7 @@ rules:
   - batch
   resources:
   - cronjobs
+  - jobs
   verbs:
   - create
   - delete
@@ -174,6 +175,7 @@ rules:
 - apiGroups:
   - postgres-operator.crunchydata.com
   resources:
+  - pgadmins/finalizers
   - pgupgrades/finalizers
   - postgresclusters/finalizers
   verbs:
@@ -181,6 +183,7 @@ rules:
 - apiGroups:
   - postgres-operator.crunchydata.com
   resources:
+  - pgadmins/status
   - pgupgrades/status
   - postgresclusters/status
   verbs:

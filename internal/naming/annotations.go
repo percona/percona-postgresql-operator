@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -46,7 +46,7 @@ const (
 	PGBackRestCurrentConfig = annotationPrefix + "pgbackrest-config"
 
 	// PGBackRestRestore is the annotation that is added to a PostgresCluster to initiate an in-place
-	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a
+	// restore.  The value of the annotation will be a unique identifier for a restore Job (e.g. a
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.
 	PGBackRestRestore = annotationPrefix + "pgbackrest-restore"
@@ -58,4 +58,16 @@ const (
 	// for this annotation is due to an issue in pgBackRest (#1841) where using a wildcard address to
 	// bind all addresses does not work in certain IPv6 environments.
 	PGBackRestIPVersion = annotationPrefix + "pgbackrest-ip-version"
+
+	// PostgresExporterCollectorsAnnotation is an annotation used to allow users to control whether or
+	// not postgres_exporter default metrics, settings, and collectors are enabled. The value "None"
+	// disables all postgres_exporter defaults. Disabling the defaults may cause errors in dashboards.
+	PostgresExporterCollectorsAnnotation = annotationPrefix + "postgres-exporter-collectors"
+
+	// CrunchyBridgeClusterAdoptionAnnotation is an annotation used to allow users to "adopt" or take
+	// control over an existing Bridge Cluster with a CrunchyBridgeCluster CR. Essentially, if a
+	// CrunchyBridgeCluster CR does not have a status.ID, but the name matches the name of an existing
+	// bridge cluster, the user must add this annotation to the CR to allow the CR to take control of
+	// the Bridge Cluster. The Value assigned to the annotation must be the ID of existing cluster.
+	CrunchyBridgeClusterAdoptionAnnotation = annotationPrefix + "adopt-bridge-cluster"
 )

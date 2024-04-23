@@ -1,7 +1,7 @@
 package postgrescluster
 
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -329,7 +329,7 @@ func safeHash32(content func(w io.Writer) error) (string, error) {
 // updateReconcileResult creates a new Result based on the new and existing results provided to it.
 // This includes setting "Requeue" to true in the Result if set to true in the new Result but not
 // in the existing Result, while also updating RequeueAfter if the RequeueAfter value for the new
-// result is less the the RequeueAfter value for the existing Result.
+// result is less than the RequeueAfter value for the existing Result.
 func updateReconcileResult(currResult, newResult reconcile.Result) reconcile.Result {
 
 	if newResult.Requeue {
