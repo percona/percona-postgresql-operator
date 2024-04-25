@@ -545,6 +545,11 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 		*out = new(ServiceExpose)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ExposeReplicas != nil {
+		in, out := &in.ExposeReplicas, &out.ExposeReplicas
+		*out = new(ServiceExpose)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Secrets.DeepCopyInto(&out.Secrets)
 	if in.Standby != nil {
 		in, out := &in.Standby, &out.Standby

@@ -71,6 +71,14 @@ spec:
 #    type: LoadBalancer
 #    loadBalancerSourceRanges:
 #      - 10.0.0.0/8
+#  exposeReplicas:
+#    annotations:
+#      my-annotation: value1
+#    labels:
+#      my-label: value2
+#    type: LoadBalancer
+#    loadBalancerSourceRanges:
+#      - 10.0.0.0/8
 
   instances:
   - name: instance1
