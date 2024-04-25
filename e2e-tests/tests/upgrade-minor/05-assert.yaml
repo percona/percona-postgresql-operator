@@ -22,7 +22,7 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
+  observedGeneration: 1
   replicas: 1
   readyReplicas: 1
   currentReplicas: 1
@@ -32,7 +32,7 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  generation: 2
+  generation: 3
   labels:
     app.kubernetes.io/component: pg
     app.kubernetes.io/instance: upgrade-minor
@@ -64,7 +64,7 @@ spec:
 status:
   availableReplicas: 1
   collisionCount: 0
-  observedGeneration: 2
+  observedGeneration: 3
   readyReplicas: 1
   replicas: 1
   updatedReplicas: 1

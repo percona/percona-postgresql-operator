@@ -365,6 +365,10 @@ generate-crd: generate-crunchy-crd generate-percona-crd
 	cat ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml > ./deploy/crd.yaml
 	echo --- >> ./deploy/crd.yaml
 	cat ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml >> ./deploy/crd.yaml
+	echo --- >> ./deploy/crd.yaml
+	cat ./config/crd/bases/postgres-operator.crunchydata.com_pgadmins.yaml >> ./deploy/crd.yaml
+	echo --- >> ./deploy/crd.yaml
+	cat ./config/crd/bases/postgres-operator.crunchydata.com_crunchybridgeclusters.yaml >> ./deploy/crd.yaml
 
 generate-percona-crd:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \

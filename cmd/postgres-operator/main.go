@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	//"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/internal/bridge"
 	"github.com/percona/percona-postgresql-operator/internal/bridge/crunchybridgecluster"
-	"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/controller/standalone_pgadmin"
@@ -199,15 +199,15 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return err
 	}
 
-	upgradeReconciler := &pgupgrade.PGUpgradeReconciler{
-		Client: mgr.GetClient(),
-		Owner:  "pgupgrade-controller",
-		Scheme: mgr.GetScheme(),
-	}
+	//upgradeReconciler := &pgupgrade.PGUpgradeReconciler{
+	//	Client: mgr.GetClient(),
+	//	Owner:  "pgupgrade-controller",
+	//	Scheme: mgr.GetScheme(),
+	//}
 
-	if err := upgradeReconciler.SetupWithManager(mgr); err != nil {
-		return errors.Wrap(err, "unable to create PGUpgrade controller")
-	}
+	//if err := upgradeReconciler.SetupWithManager(mgr); err != nil {
+	//	return errors.Wrap(err, "unable to create PGUpgrade controller")
+	//}
 
 	pgAdminReconciler := &standalone_pgadmin.PGAdminReconciler{
 		Client:      mgr.GetClient(),
