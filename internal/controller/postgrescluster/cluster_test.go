@@ -253,7 +253,6 @@ func TestCustomLabels(t *testing.T) {
 				}
 			})
 		}
-
 	})
 
 	t.Run("PGBackRest", func(t *testing.T) {
@@ -275,9 +274,11 @@ func TestCustomLabels(t *testing.T) {
 			MatchLabels: map[string]string{
 				naming.LabelCluster: cluster.Name,
 			},
-			MatchExpressions: []metav1.LabelSelectorRequirement{{
-				Key:      naming.LabelPGBackRest,
-				Operator: metav1.LabelSelectorOpExists},
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      naming.LabelPGBackRest,
+					Operator: metav1.LabelSelectorOpExists,
+				},
 			},
 		})
 		assert.NilError(t, err)
@@ -507,7 +508,6 @@ func TestCustomAnnotations(t *testing.T) {
 				}
 			})
 		}
-
 	})
 
 	t.Run("PGBackRest", func(t *testing.T) {
@@ -529,9 +529,11 @@ func TestCustomAnnotations(t *testing.T) {
 			MatchLabels: map[string]string{
 				naming.LabelCluster: cluster.Name,
 			},
-			MatchExpressions: []metav1.LabelSelectorRequirement{{
-				Key:      naming.LabelPGBackRest,
-				Operator: metav1.LabelSelectorOpExists},
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      naming.LabelPGBackRest,
+					Operator: metav1.LabelSelectorOpExists,
+				},
 			},
 		})
 		assert.NilError(t, err)
@@ -755,10 +757,6 @@ func TestGenerateClusterReplicaServiceIntent(t *testing.T) {
 apiVersion: v1
 kind: Service
 		`))
-		assert.Assert(t, marshalMatches(service.ObjectMeta, `
-apiVersion: v1
-kind: Service
-	`))
 		assert.Assert(t, marshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:

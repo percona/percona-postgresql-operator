@@ -213,10 +213,10 @@ func (r *Reconciler) generateClusterReplicaService(
 	// add our labels last so they aren't overwritten
 	service.Labels = naming.Merge(
 		service.Labels,
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RoleReplica,
-		})
+		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
 
 	// The TargetPort must be the name (not the number) of the PostgreSQL
 	// ContainerPort. This name allows the port number to differ between Pods,
@@ -290,8 +290,8 @@ func (r *Reconciler) reconcileClusterReplicaService(
 func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, observed *observedInstances,
 	clusterVolumes []corev1.PersistentVolumeClaim,
-	rootCA *pki.RootCertificateAuthority) (bool, error) {
-
+	rootCA *pki.RootCertificateAuthority,
+) (bool, error) {
 	// a hash func to hash the pgBackRest restore options
 	hashFunc := func(jobConfigs []string) (string, error) {
 		return safeHash32(func(w io.Writer) (err error) {
@@ -384,8 +384,7 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	}
 	var configChanged bool
 	if restoreJob != nil {
-		configChanged =
-			(configHash != restoreJob.GetAnnotations()[naming.PGBackRestConfigHash])
+		configChanged = (configHash != restoreJob.GetAnnotations()[naming.PGBackRestConfigHash])
 	}
 
 	// Proceed with preparing the cluster for restore (e.g. tearing down runners, the DCS,

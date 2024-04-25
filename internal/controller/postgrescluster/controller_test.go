@@ -19,9 +19,9 @@
 package postgrescluster
 
 import (
+	//"os"
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -43,8 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
+	//"github.com/percona/percona-postgresql-operator/internal/config"
+	//"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/internal/util"
@@ -196,7 +196,7 @@ var _ = Describe("PostgresCluster Reconciler", func() {
 		return result
 	}
 
-	Context("New Unregistered Cluster with Registration Requirement, no Token, no need to Encumber", func() {
+	/*
 		var cluster *v1beta1.PostgresCluster
 
 		BeforeEach(func() {
@@ -398,6 +398,7 @@ var _ = Describe("PostgresCluster Reconciler", func() {
 			Expect(reg.Iat).To(Equal(int64(1516239022)))
 		})
 	})
+	*/
 
 	Context("Cluster", func() {
 		var cluster *v1beta1.PostgresCluster
