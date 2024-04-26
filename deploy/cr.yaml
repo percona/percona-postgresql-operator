@@ -310,6 +310,7 @@ spec:
         schedules:
           full: "0 0 * * 6"
 #          differential: "0 1 * * 1-6"
+#          incremental: "0 1 * * 1-6"
         volume:
           volumeClaimSpec:
             accessModes:
