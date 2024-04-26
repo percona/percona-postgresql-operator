@@ -47,7 +47,6 @@ type PerconaPGCluster struct {
 }
 
 type PerconaPGClusterSpec struct {
-
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
 
@@ -806,6 +805,10 @@ const (
 	// AnnotationPGBackrestBackupJobName is the annotation that is added to a PerconaPGClusterBackup.
 	// The value of the annotation will be a name of an existing backup job
 	AnnotationPGBackrestBackupJobName = AnnotationPGBackrestBackup + "-job-name"
+
+	// AnnotationPGBackrestBackupJobType is the annotation that is added to a PerconaPGClusterBackup.
+	// The value of the annotation will be a type of a backup (e.g. "manual" or "replica-create).
+	AnnotationPGBackrestBackupJobType = AnnotationPGBackrestBackup + "-job-type"
 
 	// AnnotationPGBackRestRestore is the annotation that is added to a PerconaPGCluster to initiate an in-place
 	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a

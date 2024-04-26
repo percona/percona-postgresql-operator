@@ -16,6 +16,7 @@ import (
 const (
 	AnnotationBackupName = "percona.com/backup-name"
 	AnnotationJobName    = "percona.com/backup-job-name"
+	AnnotationJobType    = "percona.com/backup-job-type"
 )
 
 type InfoOutput []InfoStanza

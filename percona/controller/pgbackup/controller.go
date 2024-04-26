@@ -131,11 +131,39 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "find backup job")
 		}
 
-		pgBackup.Status.State = v2.BackupRunning
-		pgBackup.Status.JobName = job.Name
-		pgBackup.Status.BackupType = getBackupType(job)
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			bcp := new(v2.PerconaPGBackup)
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
+				return errors.Wrap(err, "get PGBackup")
+			}
 
-		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
+			switch job.Labels[naming.LabelPGBackRestBackup] {
+			case string(naming.BackupReplicaCreate), string(naming.BackupManual):
+				if bcp.Annotations == nil {
+					bcp.Annotations = make(map[string]string)
+				}
+				bcp.Annotations[v2.AnnotationPGBackrestBackupJobType] = job.Labels[naming.LabelPGBackRestBackup]
+			default:
+				return errors.Errorf("unknown value for %s label: %s", naming.LabelPGBackRestBackup, job.Labels[naming.LabelPGBackRestBackup])
+			}
+
+			return r.Client.Update(ctx, bcp)
+		}); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "update PGBackup")
+		}
+
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			bcp := new(v2.PerconaPGBackup)
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
+				return errors.Wrap(err, "get PGBackup")
+			}
+
+			bcp.Status.State = v2.BackupRunning
+			bcp.Status.JobName = job.Name
+			bcp.Status.BackupType = getBackupType(job)
+
+			return r.Client.Status().Update(ctx, bcp)
+		}); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 
@@ -289,7 +317,9 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 			if v := backup.Annotation[pgbackrest.AnnotationJobName]; v != "" && v != pgBackup.Status.JobName {
 				continue
 			}
-			if backup.Annotation[pgbackrest.AnnotationBackupName] == pgBackup.Name {
+			backupType := backup.Annotation[pgbackrest.AnnotationJobType]
+			if backupType == pgBackup.Annotations[v2.AnnotationPGBackrestBackupJobType] &&
+				backupType == string(naming.BackupReplicaCreate) || backup.Annotation[pgbackrest.AnnotationBackupName] == pgBackup.Name {
 				stanzaName = info.Name
 
 				if pgBackup.Status.BackupName == "" {
