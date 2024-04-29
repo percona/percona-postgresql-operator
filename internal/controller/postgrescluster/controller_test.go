@@ -105,6 +105,7 @@ func TestDeleteControlled(t *testing.T) {
 	})
 }
 
+/*
 var olmClusterYAML = `
 metadata:
   name: olm
@@ -132,6 +133,7 @@ spec:
               requests:
                 storage: 1Gi
 `
+*/
 
 var _ = Describe("PostgresCluster Reconciler", func() {
 	var test struct {

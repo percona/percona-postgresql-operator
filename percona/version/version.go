@@ -14,8 +14,6 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
-type DepVersion struct{}
-
 type Meta struct {
 	Apply              string
 	OperatorVersion    string
@@ -33,7 +31,7 @@ type Meta struct {
 }
 
 func EnsureVersion(ctx context.Context, meta Meta) error {
-	_, err := fetchVersions(ctx, v2.GetDefaultVersionServiceEndpoint(), meta)
+	err := fetchVersions(ctx, v2.GetDefaultVersionServiceEndpoint(), meta)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to send telemetry to %s", v2.GetDefaultVersionServiceEndpoint()))
 	}
@@ -41,10 +39,10 @@ func EnsureVersion(ctx context.Context, meta Meta) error {
 	return nil
 }
 
-func fetchVersions(ctx context.Context, endpoint string, vm Meta) (DepVersion, error) {
+func fetchVersions(ctx context.Context, endpoint string, vm Meta) error {
 	requestURL, err := url.Parse(endpoint)
 	if err != nil {
-		return DepVersion{}, errors.Wrap(err, "parse endpoint")
+		return errors.Wrap(err, "parse endpoint")
 	}
 
 	srvCl := client.NewHTTPClientWithConfig(nil, &client.TransportConfig{
@@ -76,8 +74,8 @@ func fetchVersions(ctx context.Context, endpoint string, vm Meta) (DepVersion, e
 
 	_, err = srvCl.VersionService.VersionServiceApply(applyParams)
 	if err != nil {
-		return DepVersion{}, errors.Wrap(err, "version service apply")
+		return errors.Wrap(err, "version service apply")
 	}
 
-	return DepVersion{}, nil
+	return nil
 }

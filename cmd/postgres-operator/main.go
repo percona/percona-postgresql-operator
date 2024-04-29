@@ -60,14 +60,14 @@ func assertNoError(err error) {
 	}
 }
 
-func initLogging() {
-	// Configure a singleton that treats logr.Logger.V(1) as logrus.DebugLevel.
-	var verbosity int
-	if strings.EqualFold(os.Getenv("CRUNCHY_DEBUG"), "true") {
-		verbosity = 1
-	}
-	logging.SetLogSink(logging.Logrus(os.Stdout, versionString, 1, verbosity))
-}
+//func initLogging() {
+//	// Configure a singleton that treats logr.Logger.V(1) as logrus.DebugLevel.
+//	var verbosity int
+//	if strings.EqualFold(os.Getenv("CRUNCHY_DEBUG"), "true") {
+//		verbosity = 1
+//	}
+//	logging.SetLogSink(logging.Logrus(os.Stdout, versionString, 1, verbosity))
+//}
 
 func main() {
 	// Set any supplied feature gates; panic on any unrecognized feature gate
