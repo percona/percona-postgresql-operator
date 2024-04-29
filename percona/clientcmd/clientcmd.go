@@ -76,40 +76,6 @@ func (c *Client) Exec(ctx context.Context, pod *corev1.Pod, containerName string
 	})
 }
 
-//func NewPodExecutor(config *)
-
-//func newPodExecutor(config *rest.Config) (podExecutor, error) {
-//	client, err := newPodClient(config)
-//
-//	return func(
-//		namespace, pod, container string,
-//		stdin io.Reader, stdout, stderr io.Writer, command ...string,
-//	) error {
-//		request := client.Post().
-//			Resource("pods").SubResource("exec").
-//			Namespace(namespace).Name(pod).
-//			VersionedParams(&corev1.PodExecOptions{
-//				Container: container,
-//				Command:   command,
-//				Stdin:     stdin != nil,
-//				Stdout:    stdout != nil,
-//				Stderr:    stderr != nil,
-//			}, scheme.ParameterCodec)
-//
-//		exec, err := remotecommand.NewSPDYExecutor(config, "POST", request.URL())
-//
-//		if err == nil {
-//			err = exec.Stream(remotecommand.StreamOptions{
-//				Stdin:  stdin,
-//				Stdout: stdout,
-//				Stderr: stderr,
-//			})
-//		}
-//
-//		return err
-//	}, err
-//}
-
 func (c *Client) REST() restclient.Interface {
 	return c.client.RESTClient()
 }
