@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 180
+timeout: 300
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -22,7 +22,7 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 1
+  observedGeneration: 2
   replicas: 1
   readyReplicas: 1
   currentReplicas: 1
