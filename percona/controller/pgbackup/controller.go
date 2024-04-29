@@ -294,6 +294,16 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 			return nil, errors.Wrap(err, "update backup job annotation")
 		}
 
+		pgCluster := new(v1beta1.PostgresCluster)
+		if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pgCluster); err != nil {
+			return nil, errors.Wrap(err, "get PostgresCluster")
+		}
+		origPGCluster := pgCluster.DeepCopy()
+		pgCluster.Status.PGBackRest.ManualBackup = nil
+		if err := c.Status().Patch(ctx, pgCluster, client.MergeFrom(origPGCluster)); err != nil {
+			return nil, errors.Wrap(err, "failed to patch PostgresCluster")
+		}
+
 		if _, err := deleteAnnotation(v2.AnnotationBackupInProgress); err != nil {
 			return nil, errors.Wrapf(err, "delete %s annotation", v2.AnnotationBackupInProgress)
 		}
