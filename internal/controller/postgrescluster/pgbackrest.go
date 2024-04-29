@@ -18,7 +18,6 @@ package postgrescluster
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io"
 	"regexp"
 	"sort"
@@ -590,8 +589,6 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 	// - https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
 	repo.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
 	currVersion := postgresCluster.Labels[naming.LabelVersion]
-	log := logrus.New()
-	log.Info("currVersion '%s' ", currVersion)
 	if currVersion >= "2.4.0" {
 		repo.Spec.Template.Spec.ServiceAccountName = naming.PGBackRestRBAC(postgresCluster).Name
 	}
