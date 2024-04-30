@@ -59,7 +59,7 @@ func GetInfo(ctx context.Context, pod *corev1.Pod) (InfoOutput, error) {
 	}
 
 	for _, elem := range out {
-		if elem.Status.Code != 0 {
+		if elem.Status.Code != 0 && elem.Status.Code != 4 {
 			return InfoOutput{}, errors.Errorf("pgBackRest info command failed with code %d: %s", int(elem.Status.Code), elem.Status.Message)
 		}
 	}
