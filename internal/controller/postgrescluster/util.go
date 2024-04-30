@@ -119,12 +119,16 @@ echo "nss_wrapper: environment configured"
 var (
 	// OperatorVersion230 is the version 2.3.0 of the Operator
 	operatorVersion230 = gover.Must(gover.NewVersion("2.3.0"))
+	operatorVersion240 = gover.Must(gover.NewVersion("2.4.0"))
 
 	// TMPDirSizeLimitLT230 is the size limit for the /tmp directory for Operator versions < 2.3.0
 	tmpDirSizeLimitLT230 = resource.MustParse("16Mi")
 
-	// TMPDirSizeLimitGTE230 is the size limit for the /tmp directory for Operator versions >= 2.3.0
-	tmpDirSizeLimitGTE230 = resource.MustParse("2Gi")
+	// TMPDirSizeLimitGTE230 is the size limit for the /tmp directory for Operator versions >= 2.3.0 and less 2.4.0 (2.3.0 and 2.3.1)
+	tmpDirSizeLimitGTE230 = resource.MustParse("1.5Gi")
+
+	// TMPDirSizeLimitGTE240 is the size limit for the /tmp directory for Operator versions >= 2.4.0
+	tmpDirSizeLimitGTE240 = resource.MustParse("2Gi")
 )
 
 func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) resource.Quantity {
@@ -137,12 +141,16 @@ func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) reso
 		return tmpDirSizeLimitLT230
 	}
 
+	if currVersion.LessThan(operatorVersion240) {
+		return tmpDirSizeLimitGTE230
+	}
+
 	ephemeralLimit, ok := resources.Limits[corev1.ResourceEphemeralStorage]
 	if ok {
 		return ephemeralLimit
 	}
 
-	return tmpDirSizeLimitGTE230
+	return tmpDirSizeLimitGTE240
 }
 
 // addDevSHM adds the shared memory "directory" to a Pod, which is needed by
