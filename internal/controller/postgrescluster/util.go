@@ -124,7 +124,7 @@ var (
 	tmpDirSizeLimitLT230 = resource.MustParse("16Mi")
 
 	// TMPDirSizeLimitGTE230 is the size limit for the /tmp directory for Operator versions >= 2.3.0
-	tmpDirSizeLimitGTE230 = resource.MustParse("1.5Gi")
+	tmpDirSizeLimitGTE230 = resource.MustParse("2Gi")
 )
 
 func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) resource.Quantity {
