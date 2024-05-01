@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
+
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -618,8 +620,11 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 	// - https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity
 	// - https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
 	repo.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
-	repo.Spec.Template.Spec.ServiceAccountName = naming.PGBackRestRBAC(postgresCluster).Name
 
+	currVersion, err := gover.NewVersion(postgresCluster.Labels[naming.LabelVersion])
+	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.4.0"))) {
+		repo.Spec.Template.Spec.ServiceAccountName = naming.PGBackRestRBAC(postgresCluster).Name
+	}
 	// Do not add environment variables describing services in this namespace.
 	repo.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
