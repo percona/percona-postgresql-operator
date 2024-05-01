@@ -18,12 +18,13 @@ package postgrescluster
 import (
 	"context"
 	"fmt"
-	gover "github.com/hashicorp/go-version"
 	"io"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	gover "github.com/hashicorp/go-version"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
