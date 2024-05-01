@@ -194,9 +194,17 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return *rr, nil
 		}
 
-		pgBackup.Status.CompletedAt = job.Status.CompletionTime
-		pgBackup.Status.State = status
-		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			bcp := new(v2.PerconaPGBackup)
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
+				return errors.Wrap(err, "get PGBackup")
+			}
+
+			bcp.Status.CompletedAt = job.Status.CompletionTime
+			bcp.Status.State = status
+
+			return r.Client.Status().Update(ctx, bcp)
+		}); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 

@@ -12,7 +12,7 @@ spec:
             endpoint: s3.amazonaws.com
             region: us-east-1
           schedules:
-            full: "*/4 * * * *"
+            full: "*/5 * * * *"
         - gcs:
             bucket: pg-operator-testing
           name: repo2

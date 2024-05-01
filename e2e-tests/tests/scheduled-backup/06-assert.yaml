@@ -50,3 +50,11 @@ spec:
 status:
   backupType: full
   state: Succeeded
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: scheduled-backup
+  generation: 6
+status:
+  observedGeneration: 6
