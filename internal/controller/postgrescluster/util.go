@@ -141,13 +141,13 @@ func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) reso
 		return tmpDirSizeLimitLT230
 	}
 
-	if currVersion.LessThan(operatorVersion240) {
-		return tmpDirSizeLimitGTE230
-	}
-
 	ephemeralLimit, ok := resources.Limits[corev1.ResourceEphemeralStorage]
 	if ok {
 		return ephemeralLimit
+	}
+
+	if currVersion.LessThan(operatorVersion240) {
+		return tmpDirSizeLimitGTE230
 	}
 
 	return tmpDirSizeLimitGTE240
