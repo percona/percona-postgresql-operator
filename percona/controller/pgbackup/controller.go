@@ -306,7 +306,7 @@ func getReadyInstancePod(ctx context.Context, c client.Client, pgBackup *v2.Perc
 }
 
 func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod, pgBackup *v2.PerconaPGBackup) error {
-	info, err := pgbackrest.GetInfo(ctx, pod)
+	info, err := pgbackrest.GetInfo(ctx, pod, pgBackup.Spec.RepoName)
 	if err != nil {
 		return errors.Wrap(err, "get pgBackRest info")
 	}
@@ -345,7 +345,7 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 					}
 				}
 
-				if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, map[string]string{
+				if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, pgBackup.Spec.RepoName, map[string]string{
 					pgbackrest.AnnotationJobName: pgBackup.Status.JobName,
 				}); err != nil {
 					return errors.Wrap(err, "set annotations to backup")

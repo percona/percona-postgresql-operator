@@ -6,7 +6,7 @@ apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: scheduled-backup
-  generation: 10
+  generation: 11
   annotations:
     postgres-operator.crunchydata.com/pgbackrest-restore: gcs-restore
   ownerReferences:
@@ -23,7 +23,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 10
+  observedGeneration: 11
   pgbackrest:
     repos:
       - name: repo1

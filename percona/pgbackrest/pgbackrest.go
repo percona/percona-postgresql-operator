@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -30,17 +31,17 @@ type InfoStanza struct {
 	Name   string       `json:"name,omitempty"`
 	Backup []InfoBackup `json:"backup,omitempty"`
 	Status struct {
-		Code float64 `json:"code,omitempty"`
-		Lock struct {
+		Message string  `json:"message,omitempty"`
+		Code    float64 `json:"code,omitempty"`
+		Lock    struct {
 			Backup struct {
 				Held bool `json:"held,omitempty"`
 			} `json:"backup,omitempty"`
 		} `json:"lock,omitempty"`
-		Message string `json:"message,omitempty"`
 	} `json:"status,omitempty"`
 }
 
-func GetInfo(ctx context.Context, pod *corev1.Pod) (InfoOutput, error) {
+func GetInfo(ctx context.Context, pod *corev1.Pod, repoName string) (InfoOutput, error) {
 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
 
 	c, err := clientcmd.NewClient()
@@ -48,7 +49,7 @@ func GetInfo(ctx context.Context, pod *corev1.Pod) (InfoOutput, error) {
 		return InfoOutput{}, errors.Wrap(err, "failed to create client")
 	}
 
-	if err := c.Exec(ctx, pod, naming.ContainerDatabase, nil, stdout, stderr, "pgbackrest", "info", "--output=json"); err != nil {
+	if err := c.Exec(ctx, pod, naming.ContainerDatabase, nil, stdout, stderr, "pgbackrest", "info", "--output=json", "--repo="+strings.TrimPrefix(repoName, "repo")); err != nil {
 		return InfoOutput{}, errors.Wrapf(err, "exec: %s", stderr.String())
 	}
 
@@ -59,7 +60,7 @@ func GetInfo(ctx context.Context, pod *corev1.Pod) (InfoOutput, error) {
 	}
 
 	for _, elem := range out {
-		if elem.Status.Code != 0 && elem.Status.Code != 4 {
+		if elem.Status.Code != 0 {
 			return InfoOutput{}, errors.Errorf("pgBackRest info command failed with code %d: %s", int(elem.Status.Code), elem.Status.Message)
 		}
 	}
@@ -67,7 +68,7 @@ func GetInfo(ctx context.Context, pod *corev1.Pod) (InfoOutput, error) {
 	return out, nil
 }
 
-func SetAnnotationsToBackup(ctx context.Context, pod *corev1.Pod, stanza string, backupSet string, annotations map[string]string) error {
+func SetAnnotationsToBackup(ctx context.Context, pod *corev1.Pod, stanza string, backupSet string, repoName string, annotations map[string]string) error {
 	stderr := new(bytes.Buffer)
 
 	c, err := clientcmd.NewClient()
@@ -80,7 +81,7 @@ func SetAnnotationsToBackup(ctx context.Context, pod *corev1.Pod, stanza string,
 		annotationsOpts = append(annotationsOpts, fmt.Sprintf(`--annotation=%s=%s`, k, v))
 	}
 
-	cmd := []string{"pgbackrest", fmt.Sprintf(`--stanza=%s`, stanza), "--set=" + backupSet}
+	cmd := []string{"pgbackrest", fmt.Sprintf(`--stanza=%s`, stanza), "--set=" + backupSet, "--repo=" + strings.TrimPrefix(repoName, "repo")}
 	cmd = append(cmd, annotationsOpts...)
 	cmd = append(cmd, "annotate")
 

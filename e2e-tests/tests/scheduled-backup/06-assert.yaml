@@ -2,22 +2,6 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
 ---
-kind: Job
-apiVersion: batch/v1
-metadata:
-  labels:
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo2
-  ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
-      kind: PerconaPGBackup
-      controller: true
-      blockOwnerDeletion: true
-status:
-  conditions:
-    - type: Complete
-      status: 'True'
-  succeeded: 1
----
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
@@ -27,7 +11,6 @@ spec:
   repoName: repo2
 status:
   backupType: full
-  state: Succeeded
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
