@@ -347,6 +347,7 @@ spec:
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
 #  patroni:
+#    syncPeriodSeconds: 10
 #    dynamicConfiguration:
 #      postgresql:
 #        parameters:
