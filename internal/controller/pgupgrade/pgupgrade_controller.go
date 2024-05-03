@@ -1,4 +1,4 @@
-// Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
+	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -92,8 +93,7 @@ func (r *PGUpgradeReconciler) findUpgradesForPostgresCluster(
 
 // watchPostgresClusters returns a [handler.EventHandler] for PostgresClusters.
 func (r *PGUpgradeReconciler) watchPostgresClusters() handler.Funcs {
-	handle := func(cluster client.Object, q workqueue.RateLimitingInterface) {
-		ctx := context.Background()
+	handle := func(ctx context.Context, cluster client.Object, q workqueue.RateLimitingInterface) {
 		key := client.ObjectKeyFromObject(cluster)
 
 		for _, upgrade := range r.findUpgradesForPostgresCluster(ctx, key) {
@@ -104,14 +104,14 @@ func (r *PGUpgradeReconciler) watchPostgresClusters() handler.Funcs {
 	}
 
 	return handler.Funcs{
-		CreateFunc: func(_ context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
-			handle(e.Object, q)
+		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+			handle(ctx, e.Object, q)
 		},
-		UpdateFunc: func(_ context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
-			handle(e.ObjectNew, q)
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			handle(ctx, e.ObjectNew, q)
 		},
-		DeleteFunc: func(_ context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
-			handle(e.Object, q)
+		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+			handle(ctx, e.Object, q)
 		},
 	}
 }
@@ -459,7 +459,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// TODO: error from apply could mean that the job exists with a different spec.
 	if err == nil && !upgradeJobComplete {
 		err = errors.WithStack(r.apply(ctx,
-			r.generateUpgradeJob(ctx, upgrade, world.ClusterPrimary)))
+			r.generateUpgradeJob(ctx, upgrade, world.ClusterPrimary, config.FetchKeyCommand(&world.Cluster.Spec))))
 	}
 
 	// Create the jobs to remove the data from the replicas, as long as

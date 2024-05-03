@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -216,7 +216,7 @@ func (r *Reconciler) reconcilePatroniDynamicConfiguration(
 		return r.PodExec(pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 	}
 
-	var configuration map[string]interface{}
+	var configuration map[string]any
 	if cluster.Spec.Patroni != nil {
 		configuration = cluster.Spec.Patroni.DynamicConfiguration
 	}
@@ -544,7 +544,7 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 
 	// To ensure idempotency, the operator verifies that the timeline reported by Patroni
 	// matches the timeline that was present when the switchover was first requested.
-	// TODO(benjb): consider pulling the timeline from the pod annotation; manual experiments
+	// TODO(benjaminjb): consider pulling the timeline from the pod annotation; manual experiments
 	// have shown that the annotation on the Leader pod is up to date during a switchover, but
 	// missing from the Replica pods.
 	timeline, err := patroni.Executor(exec).GetTimeline(ctx)

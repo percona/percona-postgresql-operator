@@ -1,4 +1,4 @@
-// Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -42,9 +42,15 @@ func pgUpgradeJob(upgrade *v1beta1.PGUpgrade) metav1.ObjectMeta {
 
 // upgradeCommand returns an entrypoint that prepares the filesystem for
 // and performs a PostgreSQL major version upgrade using pg_upgrade.
-func upgradeCommand(upgrade *v1beta1.PGUpgrade) []string {
+func upgradeCommand(upgrade *v1beta1.PGUpgrade, fetchKeyCommand string) []string {
 	oldVersion := fmt.Sprint(upgrade.Spec.FromPostgresVersion)
 	newVersion := fmt.Sprint(upgrade.Spec.ToPostgresVersion)
+
+	// if the fetch key command is set for TDE, provide the value during initialization
+	initdb := `/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}"`
+	if fetchKeyCommand != "" {
+		initdb += ` --encryption-key-command "` + fetchKeyCommand + `"`
+	}
 
 	args := []string{oldVersion, newVersion}
 	script := strings.Join([]string{
@@ -63,7 +69,7 @@ func upgradeCommand(upgrade *v1beta1.PGUpgrade) []string {
 		`echo "postgres:x:${gid%% *}:") > "${NSS_WRAPPER_GROUP}"`,
 
 		// Create a copy of the system user definitions, but remove the "postgres"
-		// user or any user with the currrent UID. Replace them with our own that
+		// user or any user with the current UID. Replace them with our own that
 		// has the current UID and GID.
 		`uid=$(id -u); NSS_WRAPPER_PASSWD=$(mktemp)`,
 		`(sed "/^postgres:x:/ d; /^[^:]*:x:${uid}:/ d" /etc/passwd`,
@@ -74,7 +80,7 @@ func upgradeCommand(upgrade *v1beta1.PGUpgrade) []string {
 		`export LD_PRELOAD='libnss_wrapper.so' NSS_WRAPPER_GROUP NSS_WRAPPER_PASSWD`,
 
 		// Below is the pg_upgrade script used to upgrade a PostgresCluster from
-		// one major verson to another. Additional information concerning the
+		// one major version to another. Additional information concerning the
 		// steps used and command flag specifics can be found in the documentation:
 		// - https://www.postgresql.org/docs/current/pgupgrade.html
 
@@ -84,7 +90,7 @@ func upgradeCommand(upgrade *v1beta1.PGUpgrade) []string {
 		`echo -e "Step 1: Making new pgdata directory...\n"`,
 		`mkdir /pgdata/pg"${new_version}"`,
 		`echo -e "Step 2: Initializing new pgdata directory...\n"`,
-		`/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}"`,
+		initdb,
 
 		// Before running the upgrade check, which ensures the clusters are compatible,
 		// proper permissions have to be set on the old pgdata directory and the
@@ -124,7 +130,8 @@ func upgradeCommand(upgrade *v1beta1.PGUpgrade) []string {
 // generateUpgradeJob returns a Job that can upgrade the PostgreSQL data
 // directory of the startup instance.
 func (r *PGUpgradeReconciler) generateUpgradeJob(
-	_ context.Context, upgrade *v1beta1.PGUpgrade, startup *appsv1.StatefulSet,
+	_ context.Context, upgrade *v1beta1.PGUpgrade,
+	startup *appsv1.StatefulSet, fetchKeyCommand string,
 ) *batchv1.Job {
 	job := &batchv1.Job{}
 	job.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
@@ -177,7 +184,7 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 		VolumeMounts:    database.VolumeMounts,
 
 		// Use our upgrade command and the specified image and resources.
-		Command:         upgradeCommand(upgrade),
+		Command:         upgradeCommand(upgrade, fetchKeyCommand),
 		Image:           pgUpgradeContainerImage(upgrade),
 		ImagePullPolicy: upgrade.Spec.ImagePullPolicy,
 		Resources:       upgrade.Spec.Resources,

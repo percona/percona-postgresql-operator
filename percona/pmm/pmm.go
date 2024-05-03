@@ -10,10 +10,8 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
-// #nosec G101
-
 const (
-	SecretKey = "PMM_SERVER_KEY"
+	SecretKey = "PMM_SERVER_KEY" // nolint:gosec
 )
 
 func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
@@ -242,5 +240,4 @@ func agentPrerunScript() string {
 	addService := fmt.Sprintf("pmm-admin add postgresql %s", strings.Join(addServiceArgs, " "))
 
 	return wait + "; " + addService + "; " + annotate
-
 }

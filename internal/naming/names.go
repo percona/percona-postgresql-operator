@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -574,6 +574,25 @@ func MovePGBackRestRepoDirJob(cluster *v1beta1.PostgresCluster) metav1.ObjectMet
 	return metav1.ObjectMeta{
 		Namespace: cluster.GetNamespace(),
 		Name:      cluster.Name + "-move-pgbackrest-repo-dir",
+	}
+}
+
+// StandalonePGAdminCommonLabels returns the ObjectMeta used for the standalone
+// pgAdmin StatefulSet and Pod.
+func StandalonePGAdminCommonLabels(pgadmin *v1beta1.PGAdmin) map[string]string {
+	return map[string]string{
+		LabelStandalonePGAdmin: pgadmin.Name,
+		LabelData:              DataPGAdmin,
+		LabelRole:              RolePGAdmin,
+	}
+}
+
+// StandalonePGAdmin returns the ObjectMeta necessary to lookup the ConfigMap,
+// Service, StatefulSet, or Volume for the cluster's pgAdmin user interface.
+func StandalonePGAdmin(pgadmin *v1beta1.PGAdmin) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: pgadmin.Namespace,
+		Name:      fmt.Sprintf("pgadmin-%s", pgadmin.UID),
 	}
 }
 

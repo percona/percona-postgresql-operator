@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -50,14 +50,7 @@ func PostgreSQLParameters(inCluster *v1beta1.PostgresCluster, outParameters *pos
 		// Exporter expects that shared_preload_libraries are installed
 		// pg_stat_statements: https://access.crunchydata.com/documentation/pgmonitor/latest/exporter/
 		// pgnodemx: https://github.com/CrunchyData/pgnodemx
-		libraries := []string{"pg_stat_statements", "pgnodemx"}
-
-		defined, found := outParameters.Mandatory.Get("shared_preload_libraries")
-		if found {
-			libraries = append(libraries, defined)
-		}
-
-		outParameters.Mandatory.Add("shared_preload_libraries", strings.Join(libraries, ","))
+		outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_stat_statements", "pgnodemx")
 		outParameters.Mandatory.Add("pgnodemx.kdapi_path",
 			postgres.DownwardAPIVolumeMount().MountPath)
 	}
