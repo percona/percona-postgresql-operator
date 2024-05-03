@@ -346,9 +346,12 @@ chmod +x /tmp/pg_rewind_tde.sh
 			naming.ReplicationCACert),
 
 		// Add the pg_rewind wrapper script, if TDE is enabled.
-		pg_rewind_override,
-
-		tablespaceCmd,
+		func() string {
+			if pg_rewind_override == "" || tablespaceCmd == "" {
+				return pg_rewind_override + tablespaceCmd
+			}
+			return strings.Join([]string{pg_rewind_override, tablespaceCmd}, "\n")
+		}(),
 		// When the data directory is empty, there's nothing more to do.
 		`[ -f "${postgres_data_directory}/PG_VERSION" ] || exit 0`,
 
