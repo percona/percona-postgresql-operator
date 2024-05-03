@@ -9,7 +9,7 @@ require (
 	github.com/go-openapi/errors v0.21.0
 	github.com/go-openapi/runtime v0.27.1
 	github.com/go-openapi/strfmt v0.21.10
-	github.com/go-openapi/swag v0.22.5
+	github.com/go-openapi/swag v0.23.0
 	github.com/go-openapi/validate v0.22.4
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
@@ -94,7 +94,7 @@ require (
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/swaggest/assertjson v1.9.0 // indirect
 	github.com/yudai/gojsondiff v1.0.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
