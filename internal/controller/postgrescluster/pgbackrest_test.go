@@ -345,8 +345,6 @@ schedulerName: default-scheduler
 securityContext:
   fsGroup: 26
   fsGroupChangePolicy: OnRootMismatch
-serviceAccount: hippocluster-pgbackrest
-serviceAccountName: hippocluster-pgbackrest
 shareProcessNamespace: true
 terminationGracePeriodSeconds: 30
 tolerations:
@@ -2743,7 +2741,7 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 	assert.NilError(t, err)
 
 	t.Run("ServiceAccount", func(t *testing.T) {
-		assert.Equal(t, sts.Spec.Template.Spec.ServiceAccountName, "-pgbackrest")
+		assert.Equal(t, sts.Spec.Template.Spec.ServiceAccountName, "")
 		if assert.Check(t, sts.Spec.Template.Spec.AutomountServiceAccountToken != nil) {
 			assert.Equal(t, *sts.Spec.Template.Spec.AutomountServiceAccountToken, false)
 		}
