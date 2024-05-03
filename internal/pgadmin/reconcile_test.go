@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -268,7 +268,7 @@ initContainers:
     import glob, json, re, os
     DEFAULT_BINARY_PATHS = {'pg': sorted([''] + glob.glob('/usr/pgsql-*/bin')).pop()}
     with open('/etc/pgadmin/conf.d/~postgres-operator/pgadmin.json') as _f:
-        _conf, _data = re.compile(r'[A-Z_]+'), json.load(_f)
+        _conf, _data = re.compile(r'[A-Z_0-9]+'), json.load(_f)
         if type(_data) is dict:
             globals().update({k: v for k, v in _data.items() if _conf.fullmatch(k)})
     if os.path.isfile('/etc/pgadmin/conf.d/~postgres-operator/ldap-bind-password'):
@@ -506,7 +506,7 @@ initContainers:
     import glob, json, re, os
     DEFAULT_BINARY_PATHS = {'pg': sorted([''] + glob.glob('/usr/pgsql-*/bin')).pop()}
     with open('/etc/pgadmin/conf.d/~postgres-operator/pgadmin.json') as _f:
-        _conf, _data = re.compile(r'[A-Z_]+'), json.load(_f)
+        _conf, _data = re.compile(r'[A-Z_0-9]+'), json.load(_f)
         if type(_data) is dict:
             globals().update({k: v for k, v in _data.items() if _conf.fullmatch(k)})
     if os.path.isfile('/etc/pgadmin/conf.d/~postgres-operator/ldap-bind-password'):

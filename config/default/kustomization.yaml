@@ -1,3 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 namespace: postgres-operator
 
 commonLabels:
@@ -6,7 +9,16 @@ commonLabels:
   app.kubernetes.io/version: 5.4.2
   postgres-operator.crunchydata.com/control-plane: postgres-operator
 
-bases:
+labels:
+- includeSelectors: true
+  pairs:
+    # Note: this label differs from the label set in postgres-operator-examples
+    postgres-operator.crunchydata.com/control-plane: postgres-operator
+    # The version below should match the version on the PostgresCluster CRD
+    app.kubernetes.io/version: 5.5.1
+    postgres-operator.crunchydata.com/control-plane: postgres-operator
+
+resources:
 - ../crd
 - ../rbac/cluster
 - ../manager

@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -133,6 +133,14 @@ const (
 )
 
 const (
+	// LabelCrunchyBridgeClusterPostgresRole identifies the PostgreSQL user an object is for or about.
+	LabelCrunchyBridgeClusterPostgresRole = labelPrefix + "cbc-pgrole"
+
+	// RoleCrunchyBridgeClusterPostgresRole is the LabelRole applied to CBC PostgreSQL role secrets.
+	RoleCrunchyBridgeClusterPostgresRole = "cbc-pgrole"
+)
+
+const (
 	// DataPGAdmin is a LabelData value that indicates the object has pgAdmin data.
 	DataPGAdmin = "pgadmin"
 
@@ -154,6 +162,12 @@ const (
 	// BackupReplicaCreate is the backup type for the backup taken to enable pgBackRest replica
 	// creation
 	BackupReplicaCreate BackupJobType = "replica-create"
+)
+
+const (
+
+	// LabelStandalonePGAdmin is used to indicate a resource for a standalone-pgadmin instance.
+	LabelStandalonePGAdmin = labelPrefix + "pgadmin"
 )
 
 // Merge takes sets of labels and merges them. The last set
