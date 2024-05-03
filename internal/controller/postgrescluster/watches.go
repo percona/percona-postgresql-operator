@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -53,6 +53,18 @@ func (*Reconciler) watchPods() handler.Funcs {
 			if len(cluster) != 0 &&
 				(patroni.PodRequiresRestart(e.ObjectOld) ||
 					patroni.PodRequiresRestart(e.ObjectNew)) {
+				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+					Namespace: e.ObjectNew.GetNamespace(),
+					Name:      cluster,
+				}})
+				return
+			}
+
+			// Queue an event to start applying changes if the PostgreSQL instance
+			// now has the "master" role.
+			if len(cluster) != 0 &&
+				!patroni.PodIsPrimary(e.ObjectOld) &&
+				patroni.PodIsPrimary(e.ObjectNew) {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      cluster,

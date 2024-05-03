@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -246,6 +247,18 @@ func startupCommand(
 		}
 	}
 
+	pg_rewind_override := ""
+	if config.FetchKeyCommand(&cluster.Spec) != "" {
+		// Quoting "EOF" disables parameter substitution during write.
+		// - https://tldp.org/LDP/abs/html/here-docs.html#EX71C
+		pg_rewind_override = `cat << "EOF" > /tmp/pg_rewind_tde.sh
+#!/bin/sh
+pg_rewind -K "$(postgres -C encryption_key_command)" "$@"
+EOF
+chmod +x /tmp/pg_rewind_tde.sh
+`
+	}
+
 	args := []string{version, walDir, naming.PGBackRestPGDataLogPath}
 	script := strings.Join([]string{
 		`declare -r expected_major_version="$1" pgwal_directory="$2" pgbrLog_directory="$3"`,
@@ -332,7 +345,13 @@ func startupCommand(
 			naming.ReplicationCert, naming.ReplicationPrivateKey,
 			naming.ReplicationCACert),
 
-		tablespaceCmd,
+		// Add the pg_rewind wrapper script, if TDE is enabled.
+		func() string {
+			if pg_rewind_override == "" || tablespaceCmd == "" {
+				return pg_rewind_override + tablespaceCmd
+			}
+			return strings.Join([]string{pg_rewind_override, tablespaceCmd}, "\n")
+		}(),
 		// When the data directory is empty, there's nothing more to do.
 		`[ -f "${postgres_data_directory}/PG_VERSION" ] || exit 0`,
 

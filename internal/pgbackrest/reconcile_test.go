@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -485,6 +485,51 @@ func TestAddConfigToRestorePod(t *testing.T) {
     sources:
     - secret:
         name: custom-secret
+    - configMap:
+        items:
+        - key: pgbackrest_instance.conf
+          path: pgbackrest_instance.conf
+        name: source-pgbackrest-config
+    - secret:
+        items:
+        - key: pgbackrest.ca-roots
+          path: ~postgres-operator/tls-ca.crt
+        - key: pgbackrest-client.crt
+          path: ~postgres-operator/client-tls.crt
+        - key: pgbackrest-client.key
+          mode: 384
+          path: ~postgres-operator/client-tls.key
+        name: source-pgbackrest
+        optional: true
+		`))
+	})
+
+	t.Run("CustomFiles", func(t *testing.T) {
+		custom := corev1.ConfigMapProjection{}
+		custom.Name = "custom-configmap-files"
+
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Config.Files = []corev1.VolumeProjection{
+			{ConfigMap: &custom},
+		}
+
+		sourceCluster := cluster.DeepCopy()
+
+		out := pod.DeepCopy()
+		AddConfigToRestorePod(cluster, sourceCluster, out)
+		alwaysExpect(t, out)
+
+		// Instance configuration files and optional configuration files
+		// after custom projections.
+		assert.Assert(t, marshalMatches(out.Volumes, `
+- name: postgres-config
+  projected:
+    sources:
+    - configMap:
+        name: custom-configmap-files
+- name: pgbackrest-config
+  projected:
+    sources:
     - configMap:
         items:
         - key: pgbackrest_instance.conf

@@ -1,5 +1,5 @@
 /*
- Copyright 2017 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -32,7 +32,13 @@ const (
 	// Feature gates should be listed in alphabetical, case-sensitive
 	// (upper before any lower case character) order.
 	//
+	// Enables support of appending custom queries to default PGMonitor queries
+	AppendCustomQueries featuregate.Feature = "AppendCustomQueries"
+	//
 	BridgeIdentifiers featuregate.Feature = "BridgeIdentifiers"
+	//
+	// Enables Kubernetes-native way to manage Crunchy Bridge managed Postgresclusters
+	CrunchyBridgeClusters featuregate.Feature = "CrunchyBridgeClusters"
 	//
 	// Enables support of custom sidecars for PostgreSQL instance Pods
 	InstanceSidecars featuregate.Feature = "InstanceSidecars"
@@ -52,10 +58,12 @@ const (
 //
 // - https://releases.k8s.io/v1.20.0/pkg/features/kube_features.go#L729-732
 var pgoFeatures = map[featuregate.Feature]featuregate.FeatureSpec{
-	BridgeIdentifiers: {Default: false, PreRelease: featuregate.Alpha},
-	InstanceSidecars:  {Default: false, PreRelease: featuregate.Alpha},
-	PGBouncerSidecars: {Default: false, PreRelease: featuregate.Alpha},
-	TablespaceVolumes: {Default: false, PreRelease: featuregate.Alpha},
+	AppendCustomQueries:   {Default: false, PreRelease: featuregate.Alpha},
+	BridgeIdentifiers:     {Default: false, PreRelease: featuregate.Alpha},
+	CrunchyBridgeClusters: {Default: false, PreRelease: featuregate.Alpha},
+	InstanceSidecars:      {Default: false, PreRelease: featuregate.Alpha},
+	PGBouncerSidecars:     {Default: false, PreRelease: featuregate.Alpha},
+	TablespaceVolumes:     {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // DefaultMutableFeatureGate is a mutable, shared global FeatureGate.
