@@ -2780,7 +2780,7 @@ spec:
                               - bucket
                               type: object
                             name:
-                              description: The name of the the repository
+                              description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
                             s3:
@@ -4459,7 +4459,7 @@ spec:
                   pgbackrest:
                     description: |-
                       Defines a pgBackRest cloud-based data source that can be used to pre-populate the
-                      the PostgreSQL data directory for a new PostgreSQL cluster using a pgBackRest restore.
+                      PostgreSQL data directory for a new PostgreSQL cluster using a pgBackRest restore.
                       The PGBackRest field is incompatible with the PostgresCluster field: only one
                       data source can be used for pre-populating a new PostgreSQL cluster
                     properties:
@@ -5512,7 +5512,7 @@ spec:
                             - bucket
                             type: object
                           name:
-                            description: The name of the the repository
+                            description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
                           s3:
@@ -15142,6 +15142,46 @@ spec:
                 required:
                 - pgBouncer
                 type: object
+              replicaService:
+                description: Specification of the service that exposes PostgreSQL
+                  replica instances
+                properties:
+                  loadBalancerSourceRanges:
+                    description: |-
+                      LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
+                      This field will be ignored if the cloud-provider does not support the feature.
+                    items:
+                      type: string
+                    type: array
+                  metadata:
+                    description: Metadata contains metadata for custom resources
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
+                  nodePort:
+                    description: |-
+                      The port on which this service is exposed when type is NodePort or
+                      LoadBalancer. Value must be in-range and not in use or the operation will
+                      fail. If unspecified, a port will be allocated if this Service requires one.
+                      - https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+                    format: int32
+                    type: integer
+                  type:
+                    default: ClusterIP
+                    description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
+                    enum:
+                    - ClusterIP
+                    - NodePort
+                    - LoadBalancer
+                    type: string
+                type: object
               service:
                 description: Specification of the service that exposes the PostgreSQL
                   primary instance.
@@ -17142,7 +17182,7 @@ spec:
                         repoOptionsHash:
                           description: |-
                             A hash of the required fields in the spec for defining an Azure, GCS or S3 repository,
-                            Utilizd to detect changes to these fields and then execute pgBackRest stanza-create
+                            Utilized to detect changes to these fields and then execute pgBackRest stanza-create
                             commands accordingly.
                           type: string
                         stanzaCreated:
@@ -17275,6 +17315,13 @@ spec:
                         type: integer
                     type: object
                 type: object
+              registrationRequired:
+                description: Version information for installations with a registration
+                  requirement.
+                properties:
+                  pgoVersion:
+                    type: string
+                type: object
               startupInstance:
                 description: |-
                   The instance that should be started first when bootstrapping and/or starting a
@@ -17282,6 +17329,10 @@ spec:
                 type: string
               startupInstanceSet:
                 description: The instance set associated with the startupInstance
+                type: string
+              tokenRequired:
+                description: Signals the need for a token to be applied when registration
+                  is required.
                 type: string
               userInterface:
                 description: Current state of the PostgreSQL user interface.

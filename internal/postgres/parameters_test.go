@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -67,4 +67,27 @@ func TestParameterSet(t *testing.T) {
 
 	ps2.Add("x", "n")
 	assert.Assert(t, ps2.Value("x") != ps.Value("x"))
+}
+
+func TestParameterSetAppendToList(t *testing.T) {
+	ps := NewParameterSet()
+
+	ps.AppendToList("empty")
+	assert.Assert(t, ps.Has("empty"))
+	assert.Equal(t, ps.Value("empty"), "")
+
+	ps.AppendToList("empty")
+	assert.Equal(t, ps.Value("empty"), "", "expected no change")
+
+	ps.AppendToList("full", "a")
+	assert.Equal(t, ps.Value("full"), "a")
+
+	ps.AppendToList("full", "b")
+	assert.Equal(t, ps.Value("full"), "a,b")
+
+	ps.AppendToList("full")
+	assert.Equal(t, ps.Value("full"), "a,b", "expected no change")
+
+	ps.AppendToList("full", "a", "cd", `"e"`)
+	assert.Equal(t, ps.Value("full"), `a,b,a,cd,"e"`)
 }

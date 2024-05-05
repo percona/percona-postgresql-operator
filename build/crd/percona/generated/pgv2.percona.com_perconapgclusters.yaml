@@ -2797,7 +2797,7 @@ spec:
                               - bucket
                               type: object
                             name:
-                              description: The name of the the repository
+                              description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
                             s3:
@@ -4143,7 +4143,7 @@ spec:
                   pgbackrest:
                     description: |-
                       Defines a pgBackRest cloud-based data source that can be used to pre-populate the
-                      the PostgreSQL data directory for a new PostgreSQL cluster using a pgBackRest restore.
+                      PostgreSQL data directory for a new PostgreSQL cluster using a pgBackRest restore.
                       The PGBackRest field is incompatible with the PostgresCluster field: only one
                       data source can be used for pre-populating a new PostgreSQL cluster
                     properties:
@@ -5196,7 +5196,7 @@ spec:
                             - bucket
                             type: object
                           name:
-                            description: The name of the the repository
+                            description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
                           s3:
@@ -6564,6 +6564,42 @@ spec:
               expose:
                 description: Specification of the service that exposes the PostgreSQL
                   primary instance.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  loadBalancerSourceRanges:
+                    description: |-
+                      LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
+                      This field will be ignored if the cloud-provider does not support the feature.
+                    items:
+                      type: string
+                    type: array
+                  nodePort:
+                    description: |-
+                      The port on which this service is exposed when type is NodePort or
+                      LoadBalancer. Value must be in-range and not in use or the operation will
+                      fail. If unspecified, a port will be allocated if this Service requires one.
+                      - https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+                    format: int32
+                    type: integer
+                  type:
+                    default: ClusterIP
+                    description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
+                    enum:
+                    - ClusterIP
+                    - NodePort
+                    - LoadBalancer
+                    type: string
+                type: object
+              exposeReplicas:
+                description: Specification of the service that exposes PostgreSQL
+                  replica instances
                 properties:
                   annotations:
                     additionalProperties:

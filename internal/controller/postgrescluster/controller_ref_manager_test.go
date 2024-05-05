@@ -4,7 +4,7 @@
 package postgrescluster
 
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -67,7 +67,7 @@ func TestManageControllerRefs(t *testing.T) {
 	t.Run("adopt Object", func(t *testing.T) {
 
 		obj := objBase.DeepCopy()
-		obj.Name = "adpot"
+		obj.Name = "adopt"
 		obj.Labels = map[string]string{naming.LabelCluster: clusterName}
 
 		if err := r.Client.Create(ctx, obj); err != nil {
@@ -155,7 +155,7 @@ func TestManageControllerRefs(t *testing.T) {
 
 		obj := objBase.DeepCopy()
 		obj.Name = "ignore-no-postgrescluster"
-		obj.Labels = map[string]string{naming.LabelCluster: "noexist"}
+		obj.Labels = map[string]string{naming.LabelCluster: "nonexistent"}
 
 		if err := r.Client.Create(ctx, obj); err != nil {
 			t.Error(err)

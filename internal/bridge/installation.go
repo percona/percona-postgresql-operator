@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -62,7 +61,7 @@ type Installation struct {
 type InstallationReconciler struct {
 	Owner  client.FieldOwner
 	Reader interface {
-		Get(context.Context, types.NamespacedName, client.Object, ...client.GetOption) error
+		Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error
 	}
 	Writer interface {
 		Patch(context.Context, client.Object, client.Patch, ...client.PatchOption) error

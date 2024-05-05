@@ -1,7 +1,7 @@
 package postgrescluster
 
 /*
-Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
@@ -51,6 +52,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -62,15 +64,17 @@ const (
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
 	Client      client.Client
-	Owner       client.FieldOwner
-	Recorder    record.EventRecorder
-	Tracer      trace.Tracer
 	IsOpenShift bool
-
-	PodExec func(
+	Owner       client.FieldOwner
+	PGOVersion  string
+	PodExec     func(
 		namespace, pod, container string,
 		stdin io.Reader, stdout, stderr io.Writer, command ...string,
 	) error
+	Recorder        record.EventRecorder
+	Registration    util.Registration
+	RegistrationURL string
+	Tracer          trace.Tracer
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
@@ -193,7 +197,7 @@ func (r *Reconciler) Reconcile(
 		err                      error
 	)
 
-	// Define the function for the updating the PostgresCluster status. Returns any error that
+	// Define a function for updating PostgresCluster status. Returns any error that
 	// occurs while attempting to patch the status, while otherwise simply returning the
 	// Result and error variables that are populated while reconciling the PostgresCluster.
 	patchClusterStatus := func() (reconcile.Result, error) {
@@ -208,6 +212,36 @@ func (r *Reconciler) Reconcile(
 			log.V(1).Info("patched cluster status")
 		}
 		return result, err
+	}
+
+	if config.RegistrationRequired() && !r.registrationValid() {
+		if !registrationRequiredStatusFound(cluster) {
+			addRegistrationRequiredStatus(cluster, r.PGOVersion)
+			return patchClusterStatus()
+		}
+
+		if r.tokenAuthenticationFailed() {
+			r.Recorder.Event(cluster, corev1.EventTypeWarning, "Token Authentication Failed", "See "+r.RegistrationURL+" for details.")
+		}
+
+		if shouldEncumberReconciliation(r.Registration.Authenticated, cluster, r.PGOVersion) {
+			emitEncumbranceWarning(cluster, r)
+			// Encumbrance is just an early return from the reconciliation loop.
+			return patchClusterStatus()
+		} else {
+			emitAdvanceWarning(cluster, r)
+		}
+	}
+
+	if config.RegistrationRequired() && r.registrationValid() {
+		if tokenRequiredConditionFound(cluster) {
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.TokenRequired)
+		}
+
+		if registrationRequiredStatusFound(cluster) {
+			cluster.Status.RegistrationRequired = nil
+			r.Recorder.Event(cluster, corev1.EventTypeNormal, "Token Verified", "Thank you for registering your installation of Crunchy Postgres for Kubernetes.")
+		}
 	}
 
 	// if the cluster is paused, set a condition and return
@@ -380,6 +414,20 @@ func (r *Reconciler) Reconcile(
 	log.V(1).Info("reconciled cluster")
 
 	return patchClusterStatus()
+}
+
+func (r *Reconciler) tokenAuthenticationFailed() bool {
+	return r.Registration.TokenFileFound && r.Registration.Authenticated
+}
+
+func (r *Reconciler) registrationValid() bool {
+	expiry := r.Registration.Exp
+	authenticated := r.Registration.Authenticated
+	// Use epoch time in seconds, consistent with RFC 7519.
+	now := time.Now().Unix()
+	expired := expiry < now
+
+	return authenticated && !expired
 }
 
 // deleteControlled safely deletes object when it is controlled by cluster.

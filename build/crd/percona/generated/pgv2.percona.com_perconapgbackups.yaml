@@ -128,7 +128,7 @@ spec:
                     - bucket
                     type: object
                   name:
-                    description: The name of the the repository
+                    description: The name of the repository
                     pattern: ^repo[1-4]
                     type: string
                   s3:

@@ -85,6 +85,10 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	Expose *ServiceExpose `json:"expose,omitempty"`
 
+	// Specification of the service that exposes PostgreSQL replica instances
+	// +optional
+	ExposeReplicas *ServiceExpose `json:"exposeReplicas,omitempty"`
+
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
@@ -259,6 +263,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Shutdown = cr.Spec.Pause
 	postgresCluster.Spec.Standby = cr.Spec.Standby
 	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
+	postgresCluster.Spec.ReplicaService = cr.Spec.ExposeReplicas.ToCrunchy()
 
 	postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret

@@ -1,0 +1,19 @@
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PGAdmin
+metadata:
+  name: rhino
+spec:
+  dataVolumeClaimSpec:
+    accessModes:
+    - "ReadWriteOnce"
+    resources:
+      requests:
+        storage: 1Gi
+  serverGroups:
+    - name: supply
+      # An empty selector selects all postgresclusters in the Namespace
+      postgresClusterSelector: {}
+    - name: demand
+      postgresClusterSelector:
+        matchLabels:
+          postgres-operator.crunchydata.com/cluster: hippo

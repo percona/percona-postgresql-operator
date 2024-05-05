@@ -5,7 +5,7 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app.kubernetes.io/name: pgo
-    app.kubernetes.io/version: 5.4.2
+    app.kubernetes.io/version: 5.5.1
   name: pgupgrades.postgres-operator.crunchydata.com
 spec:
   group: postgres-operator.crunchydata.com
@@ -807,7 +807,7 @@ spec:
                 type: object
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
-                maximum: 15
+                maximum: 16
                 minimum: 10
                 type: integer
               image:
@@ -923,7 +923,7 @@ spec:
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
-                maximum: 15
+                maximum: 16
                 minimum: 10
                 type: integer
               tolerations:
