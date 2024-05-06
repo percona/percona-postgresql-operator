@@ -1,4 +1,4 @@
-// Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ type PGUpgradeSpec struct {
 	// The major version of PostgreSQL before the upgrade.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=10
-	// +kubebuilder:validation:Maximum=15
+	// +kubebuilder:validation:Maximum=16
 	FromPostgresVersion int `json:"fromPostgresVersion"`
 
 	// TODO(benjaminjb): define webhook validation to make sure
@@ -70,7 +70,7 @@ type PGUpgradeSpec struct {
 	// The major version of PostgreSQL to be upgraded to.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=10
-	// +kubebuilder:validation:Maximum=15
+	// +kubebuilder:validation:Maximum=16
 	ToPostgresVersion int `json:"toPostgresVersion"`
 
 	// The image name to use for PostgreSQL containers after upgrade.

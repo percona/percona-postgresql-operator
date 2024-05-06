@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
+	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -55,7 +56,7 @@ func clusterYAML(
 	cluster *v1beta1.PostgresCluster,
 	pgHBAs postgres.HBAs, pgParameters postgres.Parameters,
 ) (string, error) {
-	root := map[string]interface{}{
+	root := map[string]any{
 		// The cluster identifier. This value cannot change during the cluster's
 		// lifetime.
 		"scope": naming.PatroniScope(cluster),
@@ -65,7 +66,7 @@ func clusterYAML(
 		//
 		// NOTE(cbandy): It *might* be possible to *carefully* change the role and
 		// scope labels, but there is no way to reconfigure all instances at once.
-		"kubernetes": map[string]interface{}{
+		"kubernetes": map[string]any{
 			"namespace":     cluster.Namespace,
 			"role_label":    naming.LabelRole,
 			"scope_label":   naming.LabelPatroni,
@@ -79,7 +80,7 @@ func clusterYAML(
 			},
 		},
 
-		"postgresql": map[string]interface{}{
+		"postgresql": map[string]any{
 			// TODO(cbandy): "callbacks"
 
 			// Custom configuration "must exist on all cluster nodes".
@@ -95,15 +96,15 @@ func clusterYAML(
 			// PostgreSQL Auth settings used by Patroni to
 			// create replication, and pg_rewind accounts
 			// TODO(tjmoore4): add "superuser" account
-			"authentication": map[string]interface{}{
-				"replication": map[string]interface{}{
+			"authentication": map[string]any{
+				"replication": map[string]any{
 					"sslcert":     "/tmp/replication/tls.crt",
 					"sslkey":      "/tmp/replication/tls.key",
 					"sslmode":     "verify-ca",
 					"sslrootcert": "/tmp/replication/ca.crt",
 					"username":    postgres.ReplicationUser,
 				},
-				"rewind": map[string]interface{}{
+				"rewind": map[string]any{
 					"sslcert":     "/tmp/replication/tls.crt",
 					"sslkey":      "/tmp/replication/tls.key",
 					"sslmode":     "verify-ca",
@@ -117,7 +118,7 @@ func clusterYAML(
 		// instance. TLS and/or authentication settings need to be applied consistently
 		// across the entire cluster.
 
-		"restapi": map[string]interface{}{
+		"restapi": map[string]any{
 			// Use TLS to encrypt traffic and verify clients.
 			// NOTE(cbandy): The path package always uses slash separators.
 			"cafile":   path.Join(configDirectory, certAuthorityConfigPath),
@@ -142,7 +143,7 @@ func clusterYAML(
 			// - https://github.com/zalando/patroni/commit/ba4ab58d4069ee30
 		},
 
-		"ctl": map[string]interface{}{
+		"ctl": map[string]any{
 			// Use TLS to verify the server and present a client certificate.
 			// NOTE(cbandy): The path package always uses slash separators.
 			"cacert":   path.Join(configDirectory, certAuthorityConfigPath),
@@ -155,7 +156,7 @@ func clusterYAML(
 			"insecure": false,
 		},
 
-		"watchdog": map[string]interface{}{
+		"watchdog": map[string]any{
 			// Disable leader watchdog device. Kubernetes' liveness probe is a less
 			// flexible approximation.
 			"mode": "off",
@@ -166,12 +167,12 @@ func clusterYAML(
 		// Patroni has not yet bootstrapped. Populate the "bootstrap.dcs" field to
 		// facilitate it. When Patroni is already bootstrapped, this field is ignored.
 
-		var configuration map[string]interface{}
+		var configuration map[string]any
 		if cluster.Spec.Patroni != nil {
 			configuration = cluster.Spec.Patroni.DynamicConfiguration
 		}
 
-		root["bootstrap"] = map[string]interface{}{
+		root["bootstrap"] = map[string]any{
 			"dcs": DynamicConfiguration(cluster, configuration, pgHBAs, pgParameters),
 
 			// Missing here is "users" which runs *after* "post_bootstrap". It is
@@ -188,11 +189,11 @@ func clusterYAML(
 // and returns a value that can be marshaled to JSON.
 func DynamicConfiguration(
 	cluster *v1beta1.PostgresCluster,
-	configuration map[string]interface{},
+	configuration map[string]any,
 	pgHBAs postgres.HBAs, pgParameters postgres.Parameters,
-) map[string]interface{} {
+) map[string]any {
 	// Copy the entire configuration before making any changes.
-	root := make(map[string]interface{}, len(configuration))
+	root := make(map[string]any, len(configuration))
 	for k, v := range configuration {
 		root[k] = v
 	}
@@ -201,11 +202,20 @@ func DynamicConfiguration(
 	root["loop_wait"] = *cluster.Spec.Patroni.SyncPeriodSeconds
 
 	// Copy the "postgresql" section before making any changes.
-	postgresql := map[string]interface{}{
+	postgresql := map[string]any{
 		// TODO(cbandy): explain this. requires an archive, perhaps.
 		"use_slots": false,
 	}
-	if section, ok := root["postgresql"].(map[string]interface{}); ok {
+
+	// When TDE is configured, override the pg_rewind binary name to point
+	// to the wrapper script.
+	if config.FetchKeyCommand(&cluster.Spec) != "" {
+		postgresql["bin_name"] = map[string]any{
+			"pg_rewind": "/tmp/pg_rewind_tde.sh",
+		}
+	}
+
+	if section, ok := root["postgresql"].(map[string]any); ok {
 		for k, v := range section {
 			postgresql[k] = v
 		}
@@ -213,13 +223,13 @@ func DynamicConfiguration(
 	root["postgresql"] = postgresql
 
 	// Copy the "postgresql.parameters" section over any defaults.
-	parameters := make(map[string]interface{})
+	parameters := make(map[string]any)
 	if pgParameters.Default != nil {
 		for k, v := range pgParameters.Default.AsMap() {
 			parameters[k] = v
 		}
 	}
-	if section, ok := postgresql["parameters"].(map[string]interface{}); ok {
+	if section, ok := postgresql["parameters"].(map[string]any); ok {
 		for k, v := range section {
 			parameters[k] = v
 		}
@@ -227,17 +237,24 @@ func DynamicConfiguration(
 	// Override the above with mandatory parameters.
 	if pgParameters.Mandatory != nil {
 		for k, v := range pgParameters.Mandatory.AsMap() {
-			// Unlike other PostgreSQL parameters that have mandatory values,
-			// shared_preload_libraries is a comma separated list that can have
-			// other values appended in addition to the mandatory values. Below,
-			// any values provided in the CRD are prepended before the mandatory
-			// values.
-			s, ok := parameters[k].(string)
-			if k == "shared_preload_libraries" && ok {
-				parameters[k] = s + "," + v
-			} else {
-				parameters[k] = v
+
+			// This parameter is a comma-separated list. Rather than overwrite the
+			// user-defined value, we want to combine it with the mandatory one.
+			// Some libraries belong at specific positions in the list, so figure
+			// that out as well.
+			if k == "shared_preload_libraries" {
+				// Load mandatory libraries ahead of user-defined libraries.
+				if s, ok := parameters[k].(string); ok && len(s) > 0 {
+					v = s + "," + v
+				}
+				// Load "citus" ahead of any other libraries.
+				// - https://github.com/citusdata/citus/blob/v12.0.0/src/backend/distributed/shared_library_init.c#L417-L419
+				if strings.Contains(v, "citus") {
+					v = "citus," + v
+				}
 			}
+
+			parameters[k] = v
 		}
 	}
 	postgresql["parameters"] = parameters
@@ -247,7 +264,7 @@ func DynamicConfiguration(
 	for i := range pgHBAs.Mandatory {
 		hba = append(hba, pgHBAs.Mandatory[i].String())
 	}
-	if section, ok := postgresql["pg_hba"].([]interface{}); ok {
+	if section, ok := postgresql["pg_hba"].([]any); ok {
 		for i := range section {
 			// any pg_hba values that are not strings will be skipped
 			if value, ok := section[i].(string); ok {
@@ -265,7 +282,8 @@ func DynamicConfiguration(
 
 	// Enabling `pg_rewind` allows a former primary to automatically rejoin the
 	// cluster even if it has commits that were not sent to a replica. In other
-	// words, this favors availability over consistency.
+	// words, this favors availability over consistency. Without it, the former
+	// primary needs patronictl reinit to rejoin.
 	//
 	// Recent versions of `pg_rewind` can run with limited permissions granted
 	// by Patroni to the user defined in "postgresql.authentication.rewind".
@@ -274,8 +292,8 @@ func DynamicConfiguration(
 
 	if cluster.Spec.Standby != nil && cluster.Spec.Standby.Enabled {
 		// Copy the "standby_cluster" section before making any changes.
-		standby := make(map[string]interface{})
-		if section, ok := root["standby_cluster"].(map[string]interface{}); ok {
+		standby := make(map[string]any)
+		if section, ok := root["standby_cluster"].(map[string]any); ok {
 			for k, v := range section {
 				standby[k] = v
 			}
@@ -471,12 +489,12 @@ func instanceYAML(
 	cluster *v1beta1.PostgresCluster, instance *v1beta1.PostgresInstanceSetSpec,
 	pgbackrestReplicaCreateCommand []string,
 ) (string, error) {
-	root := map[string]interface{}{
+	root := map[string]any{
 		// Missing here is "name" which cannot be known until the instance Pod is
 		// created. That value should be injected using the downward API and the
 		// PATRONI_NAME environment variable.
 
-		"kubernetes": map[string]interface{}{
+		"kubernetes": map[string]any{
 			// Missing here is "pod_ip" which cannot be known until the instance Pod is
 			// created. That value should be injected using the downward API and the
 			// PATRONI_KUBERNETES_POD_IP environment variable.
@@ -485,7 +503,7 @@ func instanceYAML(
 			// See the PATRONI_KUBERNETES_PORTS env variable.
 		},
 
-		"restapi": map[string]interface{}{
+		"restapi": map[string]any{
 			// Missing here is "connect_address" which cannot be known until the
 			// instance Pod is created. That value should be injected using the downward
 			// API and the PATRONI_RESTAPI_CONNECT_ADDRESS environment variable.
@@ -494,13 +512,13 @@ func instanceYAML(
 			// See the PATRONI_RESTAPI_LISTEN environment variable.
 		},
 
-		"tags": map[string]interface{}{
+		"tags": map[string]any{
 			// TODO(cbandy): "nofailover"
 			// TODO(cbandy): "nosync"
 		},
 	}
 
-	postgresql := map[string]interface{}{
+	postgresql := map[string]any{
 		// TODO(cbandy): "bin_dir"
 
 		// Missing here is "connect_address" which cannot be known until the
@@ -555,7 +573,7 @@ func instanceYAML(
 		for i := range command {
 			quoted[i] = quoteShellWord(command[i])
 		}
-		postgresql[pgBackRestCreateReplicaMethod] = map[string]interface{}{
+		postgresql[pgBackRestCreateReplicaMethod] = map[string]any{
 			"command":   strings.Join(quoted, " "),
 			"keep_data": true,
 			"no_master": true,
@@ -578,44 +596,51 @@ func instanceYAML(
 		// bootstrap method.  Otherwise use "initdb".
 		if isRestore || isDataSource {
 			data_dir := postgres.DataDirectory(cluster)
-			root["bootstrap"] = map[string]interface{}{
+			root["bootstrap"] = map[string]any{
 				"method": "existing",
-				"existing": map[string]interface{}{
+				"existing": map[string]any{
 					"command":   fmt.Sprintf(`mv %q %q`, data_dir+"_bootstrap", data_dir),
 					"no_params": "true",
 				},
 			}
 		} else {
+			initdb := []string{
+				// Enable checksums on data pages to help detect corruption of
+				// storage that would otherwise be silent. This also enables
+				// "wal_log_hints" which is a prerequisite for using `pg_rewind`.
+				// - https://www.postgresql.org/docs/current/app-initdb.html
+				// - https://www.postgresql.org/docs/current/app-pgrewind.html
+				// - https://www.postgresql.org/docs/current/runtime-config-wal.html
+				//
+				// The benefits of checksums in the Kubernetes storage landscape
+				// outweigh their negligible overhead, and enabling them later
+				// is costly. (Every file of the cluster must be rewritten.)
+				// PostgreSQL v12 introduced the `pg_checksums` utility which
+				// can cheaply disable them while PostgreSQL is stopped.
+				// - https://www.postgresql.org/docs/current/app-pgchecksums.html
+				"data-checksums",
+				"encoding=UTF8",
+
+				// NOTE(cbandy): The "--waldir" option was introduced in PostgreSQL v10.
+				"waldir=" + postgres.WALDirectory(cluster, instance),
+			}
+
+			// Append the encryption key command, if provided.
+			if ekc := config.FetchKeyCommand(&cluster.Spec); ekc != "" {
+				initdb = append(initdb, fmt.Sprintf("encryption-key-command=%s", ekc))
+			}
+
 			// Populate some "bootstrap" fields to initialize the cluster.
 			// When Patroni is already bootstrapped, this section is ignored.
 			// - https://github.com/zalando/patroni/blob/v2.0.2/docs/SETTINGS.rst#bootstrap-configuration
 			// - https://github.com/zalando/patroni/blob/v2.0.2/docs/replica_bootstrap.rst#bootstrap
-			root["bootstrap"] = map[string]interface{}{
+			root["bootstrap"] = map[string]any{
 				"method": "initdb",
 
 				// The "initdb" bootstrap method is configured differently from others.
 				// Patroni prepends "--" before it calls `initdb`.
 				// - https://github.com/zalando/patroni/blob/v2.0.2/patroni/postgresql/bootstrap.py#L45
-				"initdb": []string{
-					// Enable checksums on data pages to help detect corruption of
-					// storage that would otherwise be silent. This also enables
-					// "wal_log_hints" which is a prerequisite for using `pg_rewind`.
-					// - https://www.postgresql.org/docs/current/app-initdb.html
-					// - https://www.postgresql.org/docs/current/app-pgrewind.html
-					// - https://www.postgresql.org/docs/current/runtime-config-wal.html
-					//
-					// The benefits of checksums in the Kubernetes storage landscape
-					// outweigh their negligible overhead, and enabling them later
-					// is costly. (Every file of the cluster must be rewritten.)
-					// PostgreSQL v12 introduced the `pg_checksums` utility which
-					// can cheaply disable them while PostgreSQL is stopped.
-					// - https://www.postgresql.org/docs/current/app-pgchecksums.html
-					"data-checksums",
-					"encoding=UTF8",
-
-					// NOTE(cbandy): The "--waldir" option was introduced in PostgreSQL v10.
-					"waldir=" + postgres.WALDirectory(cluster, instance),
-				},
+				"initdb": initdb,
 			}
 		}
 	}

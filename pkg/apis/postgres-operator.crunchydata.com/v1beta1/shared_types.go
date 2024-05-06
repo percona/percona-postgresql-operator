@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -26,7 +26,7 @@ import (
 // - kubebuilder:pruning:PreserveUnknownFields
 // - kubebuilder:validation:Schemaless
 // - kubebuilder:validation:Type=object
-type SchemalessObject map[string]interface{}
+type SchemalessObject map[string]any
 
 // DeepCopy creates a new SchemalessObject by copying the receiver.
 func (in *SchemalessObject) DeepCopy() *SchemalessObject {

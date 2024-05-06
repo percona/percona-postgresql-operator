@@ -1,5 +1,5 @@
 <!--
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -69,7 +69,7 @@ instance name or set to blank ("")
 ### Logic Map
 
 With this, the grid below shows the expected replica count value, depending on
-the the values. Below, the letters represent the following:
+the values. Below, the letters represent the following:
 
 M = StartupInstance matches the instance name
 
