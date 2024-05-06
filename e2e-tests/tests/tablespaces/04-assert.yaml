@@ -1,0 +1,24 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 04-check-tablespace
+data:
+  data: '/tablespaces/myts/data'
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 04-check-table-in-tablespace
+data:
+  data: 'myts'
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 04-read-from-primary
+data:
+  data: ' 100500'
