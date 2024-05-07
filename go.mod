@@ -6,7 +6,7 @@ require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
 	github.com/evanphx/json-patch/v5 v5.7.0
 	github.com/go-logr/logr v1.4.1
-	github.com/go-openapi/errors v0.21.0
+	github.com/go-openapi/errors v0.22.0
 	github.com/go-openapi/runtime v0.27.1
 	github.com/go-openapi/strfmt v0.21.10
 	github.com/go-openapi/swag v0.23.0
