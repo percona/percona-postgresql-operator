@@ -31,7 +31,7 @@ Percona Operators are based on the [Operator SDK](https://github.com/operator-fr
 
 Learn more about [architecture and design decisions](https://docs.percona.com/percona-operator-for-postgresql/2.0/architecture.html).
 
-## Documentation
+# Documentation
 
 To learn more about the Operator, check the [Percona Operator for PostgreSQL documentation](https://docs.percona.com/percona-operator-for-postgresql/2.0/index.html). 
 

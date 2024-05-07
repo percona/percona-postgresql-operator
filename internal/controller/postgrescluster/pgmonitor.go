@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -37,30 +37,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-const (
-	exporterPort = int32(9187)
-
-	// TODO: With the current implementation of the crunchy-postgres-exporter
-	// it makes sense to hard-code the database. When moving away from the
-	// crunchy-postgres-exporter start.sh script we should re-evaluate always
-	// setting the exporter database to `postgres`.
-	exporterDB = "postgres"
-
-	// The exporter connects to all databases over loopback using a password.
-	// Kubernetes guarantees localhost resolves to loopback:
-	// https://kubernetes.io/docs/concepts/cluster-administration/networking/
-	// https://releases.k8s.io/v1.21.0/pkg/kubelet/kubelet_pods.go#L343
-	exporterHost = "localhost"
-)
-
-// Defaults for certain values used in queries.yml
-// TODO(dsessler7): make these values configurable via spec
-var defaultValuesForQueries = map[string]string{
-	"PGBACKREST_INFO_THROTTLE_MINUTES":    "10",
-	"PG_STAT_STATEMENTS_LIMIT":            "20",
-	"PG_STAT_STATEMENTS_THROTTLE_MINUTES": "-1",
-}
-
 // If pgMonitor is enabled the pgMonitor sidecar(s) have been added to the
 // instance pod. reconcilePGMonitor will update the database to
 // create the necessary objects for the tool to run
@@ -78,7 +54,7 @@ func (r *Reconciler) reconcilePGMonitor(ctx context.Context,
 // Status.Monitoring.ExporterConfiguration is used to determine when the
 // pgMonitor postgres_exporter configuration should be added/changed to
 // limit how often PodExec is used
-// - TODO jmckulk: kube perms comment?
+// - TODO (jmckulk): kube perms comment?
 func (r *Reconciler) reconcilePGMonitorExporter(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, instances *observedInstances,
 	monitoringSecret *corev1.Secret) error {
@@ -133,7 +109,7 @@ func (r *Reconciler) reconcilePGMonitorExporter(ctx context.Context,
 	// pgMonitor objects.
 
 	action := func(ctx context.Context, exec postgres.Executor) error {
-		return pgmonitor.EnableExporterInPostgreSQL(ctx, exec, monitoringSecret, exporterDB, setup)
+		return pgmonitor.EnableExporterInPostgreSQL(ctx, exec, monitoringSecret, pgmonitor.ExporterDB, setup)
 	}
 
 	if !pgmonitor.ExporterEnabled(cluster) {
@@ -221,25 +197,33 @@ func (r *Reconciler) reconcileMonitoringSecret(
 
 	intent.Data = make(map[string][]byte)
 
-	if len(existing.Data["password"]) == 0 || len(existing.Data["verifier"]) == 0 {
+	// Copy existing password and verifier into the intent
+	if existing.Data != nil {
+		intent.Data["password"] = existing.Data["password"]
+		intent.Data["verifier"] = existing.Data["verifier"]
+	}
+
+	// When password is unset, generate a new one
+	if len(intent.Data["password"]) == 0 {
 		password, err := util.GenerateASCIIPassword(util.DefaultGeneratedPasswordLength)
 		if err != nil {
 			return nil, err
 		}
-
-		// Generate the SCRAM verifier now and store alongside the plaintext
-		// password so that later reconciles don't generate it repeatedly.
-		// NOTE(cbandy): We don't have a function to compare a plaintext password
-		// to a SCRAM verifier.
-		verifier, err := pgpassword.NewSCRAMPassword(password).Build()
-		if err != nil {
-			return nil, err
-		}
 		intent.Data["password"] = []byte(password)
+		// We generated a new password, unset the verifier so that it is regenerated
+		intent.Data["verifier"] = nil
+	}
+
+	// When a password has been generated or the verifier is empty,
+	// generate a verifier based on the current password.
+	// NOTE(cbandy): We don't have a function to compare a plaintext
+	// password to a SCRAM verifier.
+	if len(intent.Data["verifier"]) == 0 {
+		verifier, err := pgpassword.NewSCRAMPassword(string(intent.Data["password"])).Build()
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
 		intent.Data["verifier"] = []byte(verifier)
-	} else {
-		intent.Data["password"] = existing.Data["password"]
-		intent.Data["verifier"] = existing.Data["verifier"]
 	}
 
 	err = errors.WithStack(r.setControllerReference(cluster, intent))
@@ -267,7 +251,7 @@ func addPGMonitorToInstancePodSpec(
 
 // addPGMonitorExporterToInstancePodSpec performs the necessary setup to
 // add pgMonitor exporter resources to a PodTemplateSpec
-// TODO jmckulk: refactor to pass around monitoring secret; Without the secret
+// TODO (jmckulk): refactor to pass around monitoring secret; Without the secret
 // the exporter container cannot be created; Testing relies on ensuring the
 // monitoring secret is available
 func addPGMonitorExporterToInstancePodSpec(
@@ -279,10 +263,9 @@ func addPGMonitorExporterToInstancePodSpec(
 		return nil
 	}
 
-	var (
-		exporterExtendQueryPathFlag  = "--extend.query-path=/opt/crunchy/conf/queries.yml"
-		exporterWebListenAddressFlag = fmt.Sprintf("--web.listen-address=:%d", exporterPort)
-	)
+	certSecret := cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret
+	withBuiltInCollectors :=
+		!strings.EqualFold(cluster.Annotations[naming.PostgresExporterCollectorsAnnotation], "None")
 
 	securityContext := initialize.RestrictedSecurityContext()
 	exporterContainer := corev1.Container{
@@ -290,46 +273,38 @@ func addPGMonitorExporterToInstancePodSpec(
 		Image:           config.PGExporterContainerImage(cluster),
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Resources:       cluster.Spec.Monitoring.PGMonitor.Exporter.Resources,
-		Command: []string{
-			"postgres_exporter", exporterExtendQueryPathFlag, exporterWebListenAddressFlag,
-		},
+		Command:         pgmonitor.ExporterStartCommand(withBuiltInCollectors),
 		Env: []corev1.EnvVar{
-			{Name: "DATA_SOURCE_URI", Value: fmt.Sprintf("%s:%d/%s", exporterHost, *cluster.Spec.Port, exporterDB)},
+			{Name: "DATA_SOURCE_URI", Value: fmt.Sprintf("%s:%d/%s", pgmonitor.ExporterHost, *cluster.Spec.Port, pgmonitor.ExporterDB)},
 			{Name: "DATA_SOURCE_USER", Value: pgmonitor.MonitoringUser},
-			{Name: "DATA_SOURCE_PASS", ValueFrom: &corev1.EnvVarSource{
-				// Environment variables are not updated after a secret update.
-				// This could lead to a state where the exporter does not have
-				// the correct password and the container needs to restart.
-				// https://kubernetes.io/docs/concepts/configuration/secret/#environment-variables-are-not-updated-after-a-secret-update
-				// https://github.com/kubernetes/kubernetes/issues/29761
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: naming.MonitoringUserSecret(cluster).Name,
-					},
-					Key: "password",
-				},
-			}},
+			{Name: "DATA_SOURCE_PASS_FILE", Value: "/opt/crunchy/password"},
 		},
 		SecurityContext: securityContext,
 		// ContainerPort is needed to support proper target discovery by Prometheus for pgMonitor
 		// integration
 		Ports: []corev1.ContainerPort{{
-			ContainerPort: exporterPort,
+			ContainerPort: pgmonitor.ExporterPort,
 			Name:          naming.PortExporter,
 			Protocol:      corev1.ProtocolTCP,
 		}},
 		VolumeMounts: []corev1.VolumeMount{{
 			Name: "exporter-config",
-			// this is the path for custom config as defined in the start.sh script for the exporter container
+			// this is the path for both custom and default queries files
 			MountPath: "/conf",
 		}, {
-			Name: "exporter-queries",
-			// this is the path for the default config, which we generate and then mount via ConfigMap
-			MountPath: "/opt/crunchy/conf",
+			Name:      "monitoring-secret",
+			MountPath: "/opt/crunchy/",
 		}},
 	}
 
-	template.Spec.Containers = append(template.Spec.Containers, exporterContainer)
+	passwordVolume := corev1.Volume{
+		Name: "monitoring-secret",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: naming.MonitoringUserSecret(cluster).Name,
+			},
+		},
+	}
 
 	// add custom exporter config volume
 	configVolume := corev1.Volume{
@@ -340,59 +315,35 @@ func addPGMonitorExporterToInstancePodSpec(
 			},
 		},
 	}
-	template.Spec.Volumes = append(template.Spec.Volumes, configVolume)
+	template.Spec.Volumes = append(template.Spec.Volumes, configVolume, passwordVolume)
 
-	// add default exporter queries config volume
-	queriesVolume := corev1.Volume{Name: "exporter-queries"}
-	queriesVolume.ConfigMap = &corev1.ConfigMapVolumeSource{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: exporterQueriesConfig.Name,
-		},
-	}
-	template.Spec.Volumes = append(template.Spec.Volumes, queriesVolume)
+	// The original "custom queries" ability allowed users to provide a file with custom queries;
+	// however, it would turn off the default queries. The new "custom queries" ability allows
+	// users to append custom queries to the default queries. This new behavior is feature gated.
+	// Therefore, we only want to add the default queries ConfigMap as a source for the
+	// "exporter-config" volume if the AppendCustomQueries feature gate is turned on OR if the
+	// user has not provided any custom configuration.
+	if util.DefaultMutableFeatureGate.Enabled(util.AppendCustomQueries) ||
+		cluster.Spec.Monitoring.PGMonitor.Exporter.Configuration == nil {
 
-	if cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret != nil {
-		configureExporterTLS(cluster, template, exporterWebConfig)
-	}
-
-	// add the proper label to support Pod discovery by Prometheus per pgMonitor configuration
-	initialize.Labels(template)
-	template.Labels[naming.LabelPGMonitorDiscovery] = "true"
-
-	return nil
-}
-
-// getExporterCertSecret retrieves the custom tls cert secret projection from the exporter spec
-// TODO (jmckulk): One day we might want to generate certs here
-func getExporterCertSecret(cluster *v1beta1.PostgresCluster) *corev1.SecretProjection {
-	if cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret != nil {
-		return cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret
-	}
-
-	return nil
-}
-
-// configureExporterTLS takes a cluster and pod template spec. If enabled, the pod template spec
-// will be updated with exporter tls configuration
-func configureExporterTLS(cluster *v1beta1.PostgresCluster, template *corev1.PodTemplateSpec, exporterWebConfig *corev1.ConfigMap) {
-	var found bool
-	var exporterContainer *corev1.Container
-	for i, container := range template.Spec.Containers {
-		if container.Name == naming.ContainerPGMonitorExporter {
-			exporterContainer = &template.Spec.Containers[i]
-			found = true
+		defaultConfigVolumeProjection := corev1.VolumeProjection{
+			ConfigMap: &corev1.ConfigMapProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: exporterQueriesConfig.Name,
+				},
+			},
 		}
+		configVolume.VolumeSource.Projected.Sources = append(configVolume.VolumeSource.Projected.Sources,
+			defaultConfigVolumeProjection)
 	}
 
-	if found &&
-		pgmonitor.ExporterEnabled(cluster) &&
-		(cluster.Spec.Monitoring.PGMonitor.Exporter.CustomTLSSecret != nil) {
+	if certSecret != nil {
 		// TODO (jmckulk): params for paths and such
 		certVolume := corev1.Volume{Name: "exporter-certs"}
 		certVolume.Projected = &corev1.ProjectedVolumeSource{
 			Sources: append([]corev1.VolumeProjection{},
 				corev1.VolumeProjection{
-					Secret: getExporterCertSecret(cluster),
+					Secret: certSecret,
 				},
 			),
 		}
@@ -414,8 +365,17 @@ func configureExporterTLS(cluster *v1beta1.PostgresCluster, template *corev1.Pod
 		}}
 
 		exporterContainer.VolumeMounts = append(exporterContainer.VolumeMounts, mounts...)
-		exporterContainer.Command = append(exporterContainer.Command, "--web.config.file=/web-config/web-config.yml")
+		exporterContainer.Command = pgmonitor.ExporterStartCommand(
+			withBuiltInCollectors, pgmonitor.ExporterWebConfigFileFlag)
 	}
+
+	template.Spec.Containers = append(template.Spec.Containers, exporterContainer)
+
+	// add the proper label to support Pod discovery by Prometheus per pgMonitor configuration
+	initialize.Labels(template)
+	template.Labels[naming.LabelPGMonitorDiscovery] = "true"
+
+	return nil
 }
 
 // reconcileExporterWebConfig reconciles the configmap containing the webconfig for exporter tls
@@ -475,6 +435,7 @@ tls_server_config:
 	return nil, err
 }
 
+// reconcileExporterQueriesConfig reconciles the configmap containing the default queries for exporter
 func (r *Reconciler) reconcileExporterQueriesConfig(ctx context.Context,
 	cluster *v1beta1.PostgresCluster) (*corev1.ConfigMap, error) {
 
@@ -495,7 +456,7 @@ func (r *Reconciler) reconcileExporterQueriesConfig(ctx context.Context,
 
 	intent := &corev1.ConfigMap{
 		ObjectMeta: naming.ExporterQueriesConfigMap(cluster),
-		Data:       map[string]string{"queries.yml": generateQueries(ctx, cluster)},
+		Data:       map[string]string{"defaultQueries.yml": pgmonitor.GenerateDefaultExporterQueries(ctx, cluster)},
 	}
 
 	intent.Annotations = naming.Merge(
@@ -519,63 +480,4 @@ func (r *Reconciler) reconcileExporterQueriesConfig(ctx context.Context,
 	}
 
 	return nil, err
-}
-
-func generateQueries(ctx context.Context, cluster *v1beta1.PostgresCluster) string {
-	log := logging.FromContext(ctx)
-	var queries string
-	baseQueries := []string{"backrest", "global", "per_db", "nodemx"}
-
-	// TODO: When we add pgbouncer support we will do something like the following:
-	// if pgbouncerEnabled() {
-	// 	baseQueries = append(baseQueries, "pgbouncer")
-	// }
-
-	for _, queryType := range baseQueries {
-		queriesContents, err := os.ReadFile(fmt.Sprintf("%s/queries_%s.yml", pgmonitor.GetQueriesConfigDir(ctx), queryType))
-		if err != nil {
-			// log an error, but continue to next iteration
-			log.Error(err, fmt.Sprintf("Query file queries_%s.yml does not exist (it should)...", queryType))
-			continue
-		}
-		queries += string(queriesContents) + "\n"
-	}
-
-	// Add general queries for specific postgres version
-	queriesGeneral, err := os.ReadFile(fmt.Sprintf("%s/pg%d/queries_general.yml", pgmonitor.GetQueriesConfigDir(ctx), cluster.Spec.PostgresVersion))
-	if err != nil {
-		// log an error, but continue
-		log.Error(err, fmt.Sprintf("Query file %s/pg%d/queries_general.yml does not exist (it should)...", pgmonitor.GetQueriesConfigDir(ctx), cluster.Spec.PostgresVersion))
-	} else {
-		queries += string(queriesGeneral) + "\n"
-	}
-
-	// Add pg_stat_statement queries for specific postgres version
-	queriesPgStatStatements, err := os.ReadFile(fmt.Sprintf("%s/pg%d/queries_pg_stat_statements.yml", pgmonitor.GetQueriesConfigDir(ctx), cluster.Spec.PostgresVersion))
-	if err != nil {
-		// log an error, but continue
-		log.Error(err, fmt.Sprintf("Query file %s/pg%d/queries_pg_stat_statements.yml not loaded.", pgmonitor.GetQueriesConfigDir(ctx), cluster.Spec.PostgresVersion))
-	} else {
-		queries += string(queriesPgStatStatements) + "\n"
-	}
-
-	// If postgres version >= 12, add pg_stat_statements_reset queries
-	if cluster.Spec.PostgresVersion >= 12 {
-		queriesPgStatStatementsReset, err := os.ReadFile(fmt.Sprintf("%s/pg%d/queries_pg_stat_statements_reset_info.yml", pgmonitor.GetQueriesConfigDir(ctx), cluster.Spec.PostgresVersion))
-		if err != nil {
-			// log an error, but continue
-			log.Error(err, fmt.Sprintf("Query file %s/pg%d/queries_pg_stat_statements_reset_info.yml not loaded.", pgmonitor.GetQueriesConfigDir(ctx), cluster.Spec.PostgresVersion))
-		} else {
-			queries += string(queriesPgStatStatementsReset) + "\n"
-		}
-	}
-
-	// Find and replace default values in queries
-	for k, v := range defaultValuesForQueries {
-		queries = strings.ReplaceAll(queries, fmt.Sprintf("#%s#", k), v)
-	}
-
-	// TODO: Add ability to exclude certain user-specified queries
-
-	return queries
 }

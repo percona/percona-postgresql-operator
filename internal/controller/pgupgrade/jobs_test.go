@@ -1,4 +1,4 @@
-// Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ func TestGenerateUpgradeJob(t *testing.T) {
 		},
 	}
 
-	job := reconciler.generateUpgradeJob(ctx, upgrade, startup)
+	job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "")
 	assert.Assert(t, marshalMatches(job, `
 apiVersion: batch/v1
 kind: Job
@@ -163,6 +163,11 @@ spec:
         name: vol2
 status: {}
 	`))
+
+	tdeJob := reconciler.generateUpgradeJob(ctx, upgrade, startup, "echo testKey")
+	b, _ := yaml.Marshal(tdeJob)
+	assert.Assert(t, strings.Contains(string(b),
+		`/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}" --encryption-key-command "echo testKey"`))
 }
 
 func TestGenerateRemoveDataJob(t *testing.T) {

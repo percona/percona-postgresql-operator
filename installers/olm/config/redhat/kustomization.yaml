@@ -4,3 +4,7 @@ kind: Kustomization
 resources:
 - ../operator
 - ../examples
+
+#patches:
+#  - path: related-images.yaml
+#  - path: registration.yaml

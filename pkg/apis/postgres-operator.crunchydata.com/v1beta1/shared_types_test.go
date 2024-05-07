@@ -1,5 +1,5 @@
 /*
- Copyright 2022 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2022 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -57,13 +57,13 @@ func TestSchemalessObjectDeepCopy(t *testing.T) {
 	}
 	{
 		change := *one.DeepCopy()
-		change["arr"].([]interface{})[0] = "rock"
+		change["arr"].([]any)[0] = "rock"
 		assert.Assert(t, reflect.DeepEqual(one, same))
 		assert.Assert(t, !reflect.DeepEqual(one, change))
 	}
 	{
 		change := *one.DeepCopy()
-		change["arr"] = append(change["arr"].([]interface{}), "more")
+		change["arr"] = append(change["arr"].([]any), "more")
 		assert.Assert(t, reflect.DeepEqual(one, same))
 		assert.Assert(t, !reflect.DeepEqual(one, change))
 	}

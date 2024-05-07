@@ -4,7 +4,7 @@
 package postgrescluster
 
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -344,8 +344,6 @@ schedulerName: default-scheduler
 securityContext:
   fsGroup: 26
   fsGroupChangePolicy: OnRootMismatch
-serviceAccount: hippocluster-pgbackrest
-serviceAccountName: hippocluster-pgbackrest
 shareProcessNamespace: true
 terminationGracePeriodSeconds: 30
 tolerations:
@@ -731,9 +729,9 @@ func TestReconcileStanzaCreate(t *testing.T) {
 		Message:            "pgBackRest dedicated repository host is ready",
 	})
 
-	configHashMistmatch, err := r.reconcileStanzaCreate(ctx, postgresCluster, instances, "abcde12345")
+	configHashMismatch, err := r.reconcileStanzaCreate(ctx, postgresCluster, instances, "abcde12345")
 	assert.NilError(t, err)
-	assert.Assert(t, !configHashMistmatch)
+	assert.Assert(t, !configHashMismatch)
 
 	events := &corev1.EventList{}
 	err = wait.Poll(time.Second/2, Scale(time.Second*2), func() (bool, error) {
@@ -775,7 +773,7 @@ func TestReconcileStanzaCreate(t *testing.T) {
 		SystemIdentifier: "6952526174828511264",
 	}
 
-	configHashMismatch, err := r.reconcileStanzaCreate(ctx, postgresCluster, instances, "abcde12345")
+	configHashMismatch, err = r.reconcileStanzaCreate(ctx, postgresCluster, instances, "abcde12345")
 	assert.Error(t, err, "fake stanza create failed: ")
 	assert.Assert(t, !configHashMismatch)
 
@@ -2738,7 +2736,7 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 	assert.NilError(t, err)
 
 	t.Run("ServiceAccount", func(t *testing.T) {
-		assert.Equal(t, sts.Spec.Template.Spec.ServiceAccountName, "-pgbackrest")
+		assert.Equal(t, sts.Spec.Template.Spec.ServiceAccountName, "")
 		if assert.Check(t, sts.Spec.Template.Spec.AutomountServiceAccountToken != nil) {
 			assert.Equal(t, *sts.Spec.Template.Spec.AutomountServiceAccountToken, false)
 		}

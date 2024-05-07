@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -210,14 +210,14 @@ func testCluster() *v1beta1.PostgresCluster {
 
 // setupManager creates the runtime manager used during controller testing
 func setupManager(t *testing.T, cfg *rest.Config,
-	contollerSetup func(mgr manager.Manager)) (context.Context, context.CancelFunc) {
+	controllerSetup func(mgr manager.Manager)) (context.Context, context.CancelFunc) {
 
 	mgr, err := runtime.CreateRuntimeManager("", cfg, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	contollerSetup(mgr)
+	controllerSetup(mgr)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
