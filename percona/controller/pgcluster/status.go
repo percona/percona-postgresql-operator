@@ -2,14 +2,12 @@ package pgcluster
 
 import (
 	"context"
-
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
@@ -44,7 +42,7 @@ func (r *PGClusterReconciler) getState(cr *v2.PerconaPGCluster, status *v1beta1.
 	}
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
-		if ready > size {
+		if ready > 0 {
 			return v2.AppStateStopping
 		}
 
