@@ -562,10 +562,19 @@ func TestGetTMPSizeLimit(t *testing.T) {
 		t.Errorf("result: %+v, expected: %+v", result, expected)
 	}
 
-	// Test case 4: version >= 2.3.0, ephemeral storage limit not set
+	// Test case 4: version >= 2.3.0 and < 2.4.0, ephemeral storage limit not set
 	version = "2.3.0"
 	resources = corev1.ResourceRequirements{}
 	expected = tmpDirSizeLimitGTE230
+	result = getTMPSizeLimit(version, resources)
+	if result != expected {
+		t.Errorf("result: %+v, expected: %+v", result, expected)
+	}
+
+	// Test case 4: version >= 2.3.0 and < 2.4.0, ephemeral storage limit not set
+	version = "2.4.0"
+	resources = corev1.ResourceRequirements{}
+	expected = tmpDirSizeLimitGTE240
 	result = getTMPSizeLimit(version, resources)
 	if result != expected {
 		t.Errorf("result: %+v, expected: %+v", result, expected)
