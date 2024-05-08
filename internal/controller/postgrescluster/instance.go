@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -1263,7 +1263,11 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
 	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	sts.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	if spec.SecurityContext != nil {
+		sts.Spec.Template.Spec.SecurityContext = spec.SecurityContext
+	} else {
+		sts.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	}
 
 	// Set the image pull secrets, if any exist.
 	// This is set here rather than using the service account due to the lack

@@ -1,7 +1,7 @@
 package postgrescluster
 
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -119,12 +119,16 @@ echo "nss_wrapper: environment configured"
 var (
 	// OperatorVersion230 is the version 2.3.0 of the Operator
 	operatorVersion230 = gover.Must(gover.NewVersion("2.3.0"))
+	operatorVersion240 = gover.Must(gover.NewVersion("2.4.0"))
 
 	// TMPDirSizeLimitLT230 is the size limit for the /tmp directory for Operator versions < 2.3.0
 	tmpDirSizeLimitLT230 = resource.MustParse("16Mi")
 
-	// TMPDirSizeLimitGTE230 is the size limit for the /tmp directory for Operator versions >= 2.3.0
+	// TMPDirSizeLimitGTE230 is the size limit for the /tmp directory for Operator versions >= 2.3.0 and less 2.4.0 (2.3.0 and 2.3.1)
 	tmpDirSizeLimitGTE230 = resource.MustParse("1.5Gi")
+
+	// TMPDirSizeLimitGTE240 is the size limit for the /tmp directory for Operator versions >= 2.4.0
+	tmpDirSizeLimitGTE240 = resource.MustParse("2Gi")
 )
 
 func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) resource.Quantity {
@@ -142,7 +146,11 @@ func getTMPSizeLimit(version string, resources corev1.ResourceRequirements) reso
 		return ephemeralLimit
 	}
 
-	return tmpDirSizeLimitGTE230
+	if currVersion.LessThan(operatorVersion240) {
+		return tmpDirSizeLimitGTE230
+	}
+
+	return tmpDirSizeLimitGTE240
 }
 
 // addDevSHM adds the shared memory "directory" to a Pod, which is needed by
@@ -329,7 +337,7 @@ func safeHash32(content func(w io.Writer) error) (string, error) {
 // updateReconcileResult creates a new Result based on the new and existing results provided to it.
 // This includes setting "Requeue" to true in the Result if set to true in the new Result but not
 // in the existing Result, while also updating RequeueAfter if the RequeueAfter value for the new
-// result is less the the RequeueAfter value for the existing Result.
+// result is less than the RequeueAfter value for the existing Result.
 func updateReconcileResult(currResult, newResult reconcile.Result) reconcile.Result {
 
 	if newResult.Requeue {

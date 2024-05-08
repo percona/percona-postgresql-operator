@@ -1,4 +1,6 @@
 /generated/
+/crunchybridgeclusters/generated/
 /postgresclusters/generated/
 /pgupgrades/generated/
+/pgadmins/generated/
 /crunchy/generated/

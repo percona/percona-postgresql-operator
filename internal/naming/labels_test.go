@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -44,6 +44,7 @@ func TestLabelsValid(t *testing.T) {
 	assert.Assert(t, nil == validation.IsQualifiedName(LabelPGBackRestRestoreConfig))
 	assert.Assert(t, nil == validation.IsQualifiedName(LabelPGMonitorDiscovery))
 	assert.Assert(t, nil == validation.IsQualifiedName(LabelPostgresUser))
+	assert.Assert(t, nil == validation.IsQualifiedName(LabelStandalonePGAdmin))
 	assert.Assert(t, nil == validation.IsQualifiedName(LabelStartupInstance))
 }
 

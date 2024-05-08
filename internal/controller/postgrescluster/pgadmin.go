@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -293,15 +294,13 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 	// - https://docs.k8s.io/concepts/services-networking/dns-pod-service/#pods
 	sts.Spec.ServiceName = naming.ClusterPodService(cluster).Name
 
-	// Set the StatefulSet update strategy to "RollingUpdate", and the Partition size for the
-	// update strategy to 0 (note that these are the defaults for a StatefulSet).  This means
-	// every pod of the StatefulSet will be deleted and recreated when the Pod template changes.
-	// - https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#rolling-updates
-	// - https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#forced-rollback
+	// Use StatefulSet's "RollingUpdate" strategy and "Parallel" policy to roll
+	// out changes to pods even when not Running or not Ready.
+	// - https://docs.k8s.io/concepts/workloads/controllers/statefulset/#rolling-updates
+	// - https://docs.k8s.io/concepts/workloads/controllers/statefulset/#forced-rollback
+	// - https://kep.k8s.io/3541
+	sts.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 	sts.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
-	sts.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{
-		Partition: initialize.Int32(0),
-	}
 
 	// Use scheduling constraints from the cluster spec.
 	sts.Spec.Template.Spec.Affinity = cluster.Spec.UserInterface.PGAdmin.Affinity
@@ -329,6 +328,29 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 
 	// set the image pull secrets, if any exist
 	sts.Spec.Template.Spec.ImagePullSecrets = cluster.Spec.ImagePullSecrets
+
+	// Previous versions of PGO used a StatefulSet Pod Management Policy that could leave the Pod
+	// in a failed state. When we see that it has the wrong policy, we will delete the StatefulSet
+	// and then recreate it with the correct policy, as this is not a property that can be patched.
+	// When we delete the StatefulSet, we will leave its Pods in place. They will be claimed by
+	// the StatefulSet that gets created in the next reconcile.
+	existing := &appsv1.StatefulSet{}
+	if err := errors.WithStack(r.Client.Get(ctx, client.ObjectKeyFromObject(sts), existing)); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		if existing.Spec.PodManagementPolicy != sts.Spec.PodManagementPolicy {
+			// We want to delete the STS without affecting the Pods, so we set the PropagationPolicy to Orphan.
+			// The orphaned Pods will be claimed by the StatefulSet that will be created in the next reconcile.
+			uid := existing.GetUID()
+			version := existing.GetResourceVersion()
+			exactly := client.Preconditions{UID: &uid, ResourceVersion: &version}
+			propagate := client.PropagationPolicy(metav1.DeletePropagationOrphan)
+
+			return errors.WithStack(client.IgnoreNotFound(r.Client.Delete(ctx, existing, exactly, propagate)))
+		}
+	}
 
 	if err := errors.WithStack(r.setControllerReference(cluster, sts)); err != nil {
 		return err

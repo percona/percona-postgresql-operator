@@ -4,7 +4,7 @@
 package postgrescluster
 
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -253,7 +253,6 @@ func TestCustomLabels(t *testing.T) {
 				}
 			})
 		}
-
 	})
 
 	t.Run("PGBackRest", func(t *testing.T) {
@@ -275,9 +274,11 @@ func TestCustomLabels(t *testing.T) {
 			MatchLabels: map[string]string{
 				naming.LabelCluster: cluster.Name,
 			},
-			MatchExpressions: []metav1.LabelSelectorRequirement{{
-				Key:      naming.LabelPGBackRest,
-				Operator: metav1.LabelSelectorOpExists},
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      naming.LabelPGBackRest,
+					Operator: metav1.LabelSelectorOpExists,
+				},
 			},
 		})
 		assert.NilError(t, err)
@@ -507,7 +508,6 @@ func TestCustomAnnotations(t *testing.T) {
 				}
 			})
 		}
-
 	})
 
 	t.Run("PGBackRest", func(t *testing.T) {
@@ -529,9 +529,11 @@ func TestCustomAnnotations(t *testing.T) {
 			MatchLabels: map[string]string{
 				naming.LabelCluster: cluster.Name,
 			},
-			MatchExpressions: []metav1.LabelSelectorRequirement{{
-				Key:      naming.LabelPGBackRest,
-				Operator: metav1.LabelSelectorOpExists},
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      naming.LabelPGBackRest,
+					Operator: metav1.LabelSelectorOpExists,
+				},
 			},
 		})
 		assert.NilError(t, err)
@@ -750,11 +752,12 @@ func TestGenerateClusterReplicaServiceIntent(t *testing.T) {
 	service, err := reconciler.generateClusterReplicaService(cluster)
 	assert.NilError(t, err)
 
-	assert.Assert(t, marshalMatches(service.TypeMeta, `
+	alwaysExpect := func(t testing.TB, service *corev1.Service) {
+		assert.Assert(t, marshalMatches(service.TypeMeta, `
 apiVersion: v1
 kind: Service
-	`))
-	assert.Assert(t, marshalMatches(service.ObjectMeta, `
+		`))
+		assert.Assert(t, marshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:
   app.kubernetes.io/component: pg
@@ -773,7 +776,10 @@ ownerReferences:
   kind: PostgresCluster
   name: pg2
   uid: ""
-	`))
+		`))
+	}
+
+	alwaysExpect(t, service)
 	assert.Assert(t, marshalMatches(service.Spec, `
 ports:
 - name: postgres
@@ -785,6 +791,39 @@ selector:
   postgres-operator.crunchydata.com/role: replica
 type: ClusterIP
 	`))
+
+	types := []struct {
+		Type   string
+		Expect func(testing.TB, *corev1.Service)
+	}{
+		{Type: "ClusterIP", Expect: func(t testing.TB, service *corev1.Service) {
+			assert.Equal(t, service.Spec.Type, corev1.ServiceTypeClusterIP)
+		}},
+		{Type: "NodePort", Expect: func(t testing.TB, service *corev1.Service) {
+			assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
+		}},
+		{Type: "LoadBalancer", Expect: func(t testing.TB, service *corev1.Service) {
+			assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
+		}},
+	}
+
+	for _, test := range types {
+		t.Run(test.Type, func(t *testing.T) {
+			cluster := cluster.DeepCopy()
+			cluster.Spec.ReplicaService = &v1beta1.ServiceSpec{Type: test.Type}
+
+			service, err := reconciler.generateClusterReplicaService(cluster)
+			assert.NilError(t, err)
+			alwaysExpect(t, service)
+			test.Expect(t, service)
+			assert.Assert(t, marshalMatches(service.Spec.Ports, `
+- name: postgres
+  port: 9876
+  protocol: TCP
+  targetPort: postgres
+	`))
+		})
+	}
 
 	t.Run("AnnotationsLabels", func(t *testing.T) {
 		cluster := cluster.DeepCopy()

@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -494,5 +494,25 @@ func TestStartupCommand(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Assert(t, strings.HasPrefix(string(b), `|`),
 			"expected literal block scalar, got:\n%s", b)
+	})
+
+	t.Run("EnableTDE", func(t *testing.T) {
+
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			DynamicConfiguration: map[string]any{
+				"postgresql": map[string]any{
+					"parameters": map[string]any{
+						"encryption_key_command": "echo test",
+					},
+				},
+			},
+		}
+		command := startupCommand(cluster, instance)
+		assert.Assert(t, len(command) > 3)
+		assert.Assert(t, strings.Contains(command[3], `cat << "EOF" > /tmp/pg_rewind_tde.sh
+#!/bin/sh
+pg_rewind -K "$(postgres -C encryption_key_command)" "$@"
+EOF
+chmod +x /tmp/pg_rewind_tde.sh`))
 	})
 }

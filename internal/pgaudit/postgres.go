@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -17,7 +17,6 @@ package pgaudit
 
 import (
 	"context"
-	"strings"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
@@ -85,7 +84,5 @@ func PostgreSQLParameters(outParameters *postgres.Parameters) {
 	// PostgreSQL must be restarted when changing this value.
 	// - https://github.com/pgaudit/pgaudit#settings
 	// - https://www.postgresql.org/docs/current/runtime-config-client.html
-	shared := outParameters.Mandatory.Value("shared_preload_libraries")
-	outParameters.Mandatory.Add("shared_preload_libraries",
-		strings.TrimPrefix(shared+",pgaudit", ","))
+	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pgaudit")
 }
