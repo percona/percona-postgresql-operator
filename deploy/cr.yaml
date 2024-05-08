@@ -139,13 +139,15 @@ spec:
 #      - net.ipv4.tcp_keepalive_intvl=60
 #
 #    walVolumeClaimSpec:
+#       storageClassName: standard
 #       accessModes:
-#       - "ReadWriteOnce"
+#       - ReadWriteOnce
 #       resources:
 #         requests:
 #           storage: 1Gi
 #
     dataVolumeClaimSpec:
+#      storageClassName: standard
       accessModes:
       - ReadWriteOnce
       resources:
@@ -321,6 +323,7 @@ spec:
 #          incremental: "0 1 * * 1-6"
         volume:
           volumeClaimSpec:
+#            storageClassName: standard
             accessModes:
             - ReadWriteOnce
             resources:
