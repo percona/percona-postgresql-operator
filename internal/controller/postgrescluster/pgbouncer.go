@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -460,7 +460,11 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	// Do not add environment variables describing services in this namespace.
 	deploy.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	deploy.Spec.Template.Spec.SecurityContext = initialize.PodSecurityContext()
+	if cluster.Spec.Proxy.PGBouncer.SecurityContext != nil {
+		deploy.Spec.Template.Spec.SecurityContext = cluster.Spec.Proxy.PGBouncer.SecurityContext
+	} else {
+		deploy.Spec.Template.Spec.SecurityContext = initialize.PodSecurityContext()
+	}
 
 	// set the image pull secrets, if any exist
 	deploy.Spec.Template.Spec.ImagePullSecrets = cluster.Spec.ImagePullSecrets

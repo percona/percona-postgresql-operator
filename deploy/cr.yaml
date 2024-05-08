@@ -71,6 +71,14 @@ spec:
 #    type: LoadBalancer
 #    loadBalancerSourceRanges:
 #      - 10.0.0.0/8
+#  exposeReplicas:
+#    annotations:
+#      my-annotation: value1
+#    labels:
+#      my-label: value2
+#    type: LoadBalancer
+#    loadBalancerSourceRanges:
+#      - 10.0.0.0/8
 
   instances:
   - name: instance1
@@ -112,14 +120,34 @@ spec:
 #
 #    priorityClassName: high-priority
 #
+#    securityContext:
+#      fsGroup: 1001
+#      runAsUser: 1001
+#      runAsNonRoot: true
+#      fsGroupChangePolicy: "OnRootMismatch"
+#      runAsGroup: 1001
+#      seLinuxOptions:
+#        type: spc_t
+#        level: s0:c123,c456
+#      seccompProfile:
+#        type: Localhost
+#        localhostProfile: localhost/profile.json
+#      supplementalGroups:
+#      - 1001
+#      sysctls:
+#      - net.ipv4.tcp_keepalive_time=600
+#      - net.ipv4.tcp_keepalive_intvl=60
+#
 #    walVolumeClaimSpec:
+#       storageClassName: standard
 #       accessModes:
-#       - "ReadWriteOnce"
+#       - ReadWriteOnce
 #       resources:
 #         requests:
 #           storage: 1Gi
 #
     dataVolumeClaimSpec:
+#      storageClassName: standard
       accessModes:
       - ReadWriteOnce
       resources:
@@ -161,6 +189,24 @@ spec:
 #        operator: Equal
 #        value: connection-poolers
 #
+#      securityContext:
+#        fsGroup: 1001
+#        runAsUser: 1001
+#        runAsNonRoot: true
+#        fsGroupChangePolicy: "OnRootMismatch"
+#        runAsGroup: 1001
+#        seLinuxOptions:
+#          type: spc_t
+#          level: s0:c123,c456
+#        seccompProfile:
+#          type: Localhost
+#          localhostProfile: localhost/profile.json
+#        supplementalGroups:
+#        - 1001
+#        sysctls:
+#        - net.ipv4.tcp_keepalive_time=600
+#        - net.ipv4.tcp_keepalive_intvl=60
+#
 #      topologySpreadConstraints:
 #        - maxSkew: 1
 #          topologyKey: my-node-label
@@ -200,6 +246,24 @@ spec:
 #          operator: Equal
 #          value: connection-poolers
 #
+#        securityContext:
+#          fsGroup: 1001
+#          runAsUser: 1001
+#          runAsNonRoot: true
+#          fsGroupChangePolicy: "OnRootMismatch"
+#          runAsGroup: 1001
+#          seLinuxOptions:
+#            type: spc_t
+#            level: s0:c123,c456
+#          seccompProfile:
+#            type: Localhost
+#            localhostProfile: localhost/profile.json
+#          supplementalGroups:
+#          - 1001
+#          sysctls:
+#          - net.ipv4.tcp_keepalive_time=600
+#          - net.ipv4.tcp_keepalive_intvl=60
+#
 #      global:
 #        repo1-retention-full: "14"
 #        repo1-retention-full-type: time
@@ -229,6 +293,24 @@ spec:
 #            matchLabels:
 #              postgres-operator.crunchydata.com/pgbackrest: ""
 #
+#        securityContext:
+#          fsGroup: 1001
+#          runAsUser: 1001
+#          runAsNonRoot: true
+#          fsGroupChangePolicy: "OnRootMismatch"
+#          runAsGroup: 1001
+#          seLinuxOptions:
+#            type: spc_t
+#            level: s0:c123,c456
+#          seccompProfile:
+#            type: Localhost
+#            localhostProfile: localhost/profile.json
+#          supplementalGroups:
+#          - 1001
+#          sysctls:
+#          - net.ipv4.tcp_keepalive_time=600
+#          - net.ipv4.tcp_keepalive_intvl=60
+#
       manual:
         repoName: repo1
         options:
@@ -238,8 +320,10 @@ spec:
         schedules:
           full: "0 0 * * 6"
 #          differential: "0 1 * * 1-6"
+#          incremental: "0 1 * * 1-6"
         volume:
           volumeClaimSpec:
+#            storageClassName: standard
             accessModes:
             - ReadWriteOnce
             resources:
@@ -283,7 +367,7 @@ spec:
 #          work_mem: 2MB
 
 #  extensions:
-#    image: percona/percona-postgresql-operator:2.3.0
+#    image: percona/percona-postgresql-operator:2.4.0
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3

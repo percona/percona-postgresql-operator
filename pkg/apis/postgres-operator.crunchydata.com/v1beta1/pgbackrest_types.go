@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -186,6 +186,10 @@ type BackupJobs struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=60
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+
+	// SecurityContext defines the security settings for PGBackRest pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 // PGBackRestManualBackup contains information that is used for creating a
@@ -241,6 +245,10 @@ type PGBackRestRepoHost struct {
 	// Deprecated: Repository hosts use mTLS for encryption, authentication, and authorization.
 	// +optional
 	SSHSecret *corev1.SecretProjection `json:"sshSecret,omitempty"`
+
+	// SecurityContext defines the security settings for PGBackRest pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.
@@ -311,7 +319,7 @@ type PGBackRestRepo struct {
 	// will be applicable once implemented:
 	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/1027-api-unions
 
-	// The name of the the repository
+	// The name of the repository
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
 	Name string `json:"name"`
@@ -414,7 +422,7 @@ type RepoStatus struct {
 	ReplicaCreateBackupComplete bool `json:"replicaCreateBackupComplete,omitempty"`
 
 	// A hash of the required fields in the spec for defining an Azure, GCS or S3 repository,
-	// Utilizd to detect changes to these fields and then execute pgBackRest stanza-create
+	// Utilized to detect changes to these fields and then execute pgBackRest stanza-create
 	// commands accordingly.
 	// +optional
 	RepoOptionsHash string `json:"repoOptionsHash,omitempty"`

@@ -2,12 +2,16 @@
 .SUFFIXES:
 
 CONTAINER ?= docker
-PGO_VERSION ?= 2.1.0
 OPENSHIFT_VERSIONS ?= v4.10-v4.12
 PACKAGE_CHANNEL ?= preview
 MIN_KUBE_VERSION ?= 1.23.0
 DOCKER_DEFAULT_PLATFORM ?= linux/amd64
 SHELL := /bin/bash
+
+IMAGE_TAG_BASE ?= perconalab/percona-postgresql-operator
+BUNDLE_REPO ?= $(IMAGE_TAG_BASE)
+
+IMAGE ?= $(IMAGE_TAG_BASE):$(VERSION)
 
 ifeq ($(shell bash -c 'echo $$BASH_VERSION | cut -d "." -f1'), 5)
 else
@@ -20,22 +24,35 @@ SYSTEM = $(OS_KERNEL)-$(OS_MACHINE)
 
 export PATH := $(CURDIR)/tools/$(SYSTEM):$(PATH)
 
-export PGO_VERSION
+export VERSION
+export BUNDLE_REPO
 export OPENSHIFT_VERSIONS
 export PACKAGE_CHANNEL
 export MIN_KUBE_VERSION
 export DOCKER_DEFAULT_PLATFORM
 
+REPO_ROOT = $(shell git rev-parse --show-toplevel)
+
 distros = community redhat marketplace
+
+check-version:
+ifndef VERSION
+	$(error VERSION is not set)
+endif
+
+KUSTOMIZE = $(REPO_ROOT)/bin/kustomize
+kustomize: ## Download kustomize locally if necessary.
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.3)
 
 .PHONY: bundles
 bundles: ## Build OLM bundles
-bundles: $(distros:%=bundles/%)
+bundles: check-version $(distros:%=bundles/%)
 
 # https://olm.operatorframework.io/docs/tasks/creating-operator-bundle/#validating-your-bundle
 # https://github.com/operator-framework/community-operators/blob/8a36a33/docs/packaging-required-criteria-ocp.md
 .PHONY: bundles/community
 bundles/community:
+	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
 	./generate.sh community
 	env operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
 	env operator-sdk bundle validate $@ --select-optional='name=community' --optional-values='index-path=$@/Dockerfile'
@@ -43,12 +60,14 @@ bundles/community:
 # https://redhat-connect.gitbook.io/certified-operator-guide/ocp-deployment/operator-metadata/reviewing-your-metadata-bundle
 .PHONY: bundles/redhat
 bundles/redhat:
+	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
 	./generate.sh redhat
 	env operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
 
 # The 'marketplace' configuration is currently identical to the 'redhat', so we just copy it here.
 .PHONY: bundles/marketplace
 bundles/marketplace:
+	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
 	cp -r ./config/redhat/ ./config/marketplace
 	./generate.sh marketplace
 	env operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
@@ -99,7 +118,7 @@ tools/$(SYSTEM)/operator-sdk:
 tools: tools/$(SYSTEM)/opm
 tools/$(SYSTEM)/opm:
 	install -d '$(dir $@)'
-	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-registry/releases/download/v1.20.0/$(OS_KERNEL)-$(OS_MACHINE)-opm'
+	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/$(OS_KERNEL)-$(OS_MACHINE)-opm'
 	chmod u+x '$@'
 
 tools/$(SYSTEM)/venv:
@@ -123,7 +142,7 @@ validate-%-image:
 	./validate-image.sh '$(CONTAINER)' 'bundles/$*'
 
 .PHONY: build-bundle-images
-build-bundle-images: $(distros:%=build-%-image)
+build-bundle-images: check-version $(distros:%=build-%-image)
 
 build-%-image:
-	./build-image.sh '$(CONTAINER)' 'bundles/$*' '$*' '$(PGO_VERSION)'
+	./build-image.sh '$(CONTAINER)' 'bundles/$*' '$*' '$(VERSION)'

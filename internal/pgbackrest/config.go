@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -18,6 +18,7 @@ package pgbackrest
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -107,8 +108,10 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 	pgPort := *postgresCluster.Spec.Port
 	cm.Data[CMInstanceKey] = iniGeneratedWarning +
 		populatePGInstanceConfigurationMap(
-			serviceName, serviceNamespace, repoHostName,
-			pgdataDir, pgPort, postgresCluster.Spec.Backups.PGBackRest.Repos,
+			serviceName, serviceNamespace, repoHostName, pgdataDir,
+			config.FetchKeyCommand(&postgresCluster.Spec),
+			strconv.Itoa(postgresCluster.Spec.PostgresVersion),
+			pgPort, postgresCluster.Spec.Backups.PGBackRest.Repos,
 			postgresCluster.Spec.Backups.PGBackRest.Global,
 		).String()
 
@@ -125,7 +128,9 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 		cm.Data[CMRepoKey] = iniGeneratedWarning +
 			populateRepoHostConfigurationMap(
 				serviceName, serviceNamespace,
-				pgdataDir, pgPort, instanceNames,
+				pgdataDir, config.FetchKeyCommand(&postgresCluster.Spec),
+				strconv.Itoa(postgresCluster.Spec.PostgresVersion),
+				pgPort, instanceNames,
 				postgresCluster.Spec.Backups.PGBackRest.Repos,
 				postgresCluster.Spec.Backups.PGBackRest.Global,
 			).String()
@@ -178,7 +183,7 @@ func MakePGBackrestLogDir(template *corev1.PodTemplateSpec,
 //   - Renames the data directory as needed to bootstrap the cluster using the restored database.
 //     This ensures compatibility with the "existing" bootstrap method that is included in the
 //     Patroni config when bootstrapping a cluster using an existing data directory.
-func RestoreCommand(pgdata, hugePagesSetting string, tablespaceVolumes []*corev1.PersistentVolumeClaim, args ...string) []string {
+func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, tablespaceVolumes []*corev1.PersistentVolumeClaim, args ...string) []string {
 
 	// After pgBackRest restores files, PostgreSQL starts in recovery to finish
 	// replaying WAL files. "hot_standby" is "on" (by default) so we can detect
@@ -213,6 +218,14 @@ func RestoreCommand(pgdata, hugePagesSetting string, tablespaceVolumes []*corev1
 			tablespaceVolume.Labels[naming.LabelData])
 	}
 
+	// If the fetch key command is not empty, save the GUC variable and value
+	// to a new string.
+	var ekc string
+	if fetchKeyCommand != "" {
+		ekc = `
+encryption_key_command = '` + fetchKeyCommand + `'`
+	}
+
 	restoreScript := `declare -r pgdata="$1" opts="$2"
 install --directory --mode=0700 "${pgdata}"` + tablespaceCmd + `
 rm -f "${pgdata}/postmaster.pid"
@@ -236,7 +249,9 @@ max_connections = '${max_conn}'
 max_locks_per_transaction = '${max_lock}'
 max_prepared_transactions = '${max_ptxn}'
 max_worker_processes = '${max_work}'
-unix_socket_directories = '/tmp'
+unix_socket_directories = '/tmp'` +
+		// Add the encryption key command setting, if provided.
+		ekc + `
 huge_pages = ` + hugePagesSetting + `
 EOF
 if [ "$(< "${pgdata}/PG_VERSION")" -ge 12 ]; then
@@ -263,7 +278,8 @@ mv "${pgdata}" "${pgdata}_bootstrap"`
 // populatePGInstanceConfigurationMap returns options representing the pgBackRest configuration for
 // a PostgreSQL instance
 func populatePGInstanceConfigurationMap(
-	serviceName, serviceNamespace, repoHostName, pgdataDir string,
+	serviceName, serviceNamespace, repoHostName, pgdataDir,
+	fetchKeyCommand, postgresVersion string,
 	pgPort int32, repos []v1beta1.PGBackRestRepo,
 	globalConfig map[string]string,
 ) iniSectionSet {
@@ -313,6 +329,12 @@ func populatePGInstanceConfigurationMap(
 	stanza.Set("pg1-port", fmt.Sprint(pgPort))
 	stanza.Set("pg1-socket-path", postgres.SocketDirectory)
 
+	if fetchKeyCommand != "" {
+		stanza.Set("archive-header-check", "n")
+		stanza.Set("page-header-check", "n")
+		stanza.Set("pg-version-force", postgresVersion)
+	}
+
 	return iniSectionSet{
 		"global":          global,
 		DefaultStanzaName: stanza,
@@ -322,7 +344,8 @@ func populatePGInstanceConfigurationMap(
 // populateRepoHostConfigurationMap returns options representing the pgBackRest configuration for
 // a pgBackRest dedicated repository host
 func populateRepoHostConfigurationMap(
-	serviceName, serviceNamespace, pgdataDir string,
+	serviceName, serviceNamespace, pgdataDir,
+	fetchKeyCommand, postgresVersion string,
 	pgPort int32, pgHosts []string, repos []v1beta1.PGBackRestRepo,
 	globalConfig map[string]string,
 ) iniSectionSet {
@@ -373,6 +396,12 @@ func populateRepoHostConfigurationMap(
 		stanza.Set(fmt.Sprintf("pg%d-path", i+1), pgdataDir)
 		stanza.Set(fmt.Sprintf("pg%d-port", i+1), fmt.Sprint(pgPort))
 		stanza.Set(fmt.Sprintf("pg%d-socket-path", i+1), postgres.SocketDirectory)
+
+		if fetchKeyCommand != "" {
+			stanza.Set("archive-header-check", "n")
+			stanza.Set("page-header-check", "n")
+			stanza.Set("pg-version-force", postgresVersion)
+		}
 	}
 
 	return iniSectionSet{
@@ -464,7 +493,7 @@ func serverConfig(cluster *v1beta1.PostgresCluster) iniSectionSet {
 	//
 	// NOTE(cbandy): The unspecified IPv6 address, which ends up being the IPv6
 	// wildcard address, did not work in all environments. In some cases, the
-	// the "server-ping" command would not connect.
+	// "server-ping" command would not connect.
 	// - https://tools.ietf.org/html/rfc3493#section-3.8
 	//
 	// TODO(cbandy): When pgBackRest provides a way to bind to all addresses,

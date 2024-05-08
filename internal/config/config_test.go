@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -47,6 +47,71 @@ func unsetEnv(t testing.TB, key string) {
 	t.Helper()
 	saveEnv(t, key)
 	assert.NilError(t, os.Unsetenv(key))
+}
+
+func TestFetchKeyCommand(t *testing.T) {
+
+	spec1 := v1beta1.PostgresClusterSpec{}
+	assert.Assert(t, FetchKeyCommand(&spec1) == "")
+
+	spec2 := v1beta1.PostgresClusterSpec{
+		Patroni: &v1beta1.PatroniSpec{},
+	}
+	assert.Assert(t, FetchKeyCommand(&spec2) == "")
+
+	spec3 := v1beta1.PostgresClusterSpec{
+		Patroni: &v1beta1.PatroniSpec{
+			DynamicConfiguration: map[string]any{},
+		},
+	}
+	assert.Assert(t, FetchKeyCommand(&spec3) == "")
+
+	spec4 := v1beta1.PostgresClusterSpec{
+		Patroni: &v1beta1.PatroniSpec{
+			DynamicConfiguration: map[string]any{
+				"postgresql": map[string]any{},
+			},
+		},
+	}
+	assert.Assert(t, FetchKeyCommand(&spec4) == "")
+
+	spec5 := v1beta1.PostgresClusterSpec{
+		Patroni: &v1beta1.PatroniSpec{
+			DynamicConfiguration: map[string]any{
+				"postgresql": map[string]any{
+					"parameters": map[string]any{},
+				},
+			},
+		},
+	}
+	assert.Assert(t, FetchKeyCommand(&spec5) == "")
+
+	spec6 := v1beta1.PostgresClusterSpec{
+		Patroni: &v1beta1.PatroniSpec{
+			DynamicConfiguration: map[string]any{
+				"postgresql": map[string]any{
+					"parameters": map[string]any{
+						"encryption_key_command": "",
+					},
+				},
+			},
+		},
+	}
+	assert.Assert(t, FetchKeyCommand(&spec6) == "")
+
+	spec7 := v1beta1.PostgresClusterSpec{
+		Patroni: &v1beta1.PatroniSpec{
+			DynamicConfiguration: map[string]any{
+				"postgresql": map[string]any{
+					"parameters": map[string]any{
+						"encryption_key_command": "echo mykey",
+					},
+				},
+			},
+		},
+	}
+	assert.Assert(t, FetchKeyCommand(&spec7) == "echo mykey")
+
 }
 
 func TestPGAdminContainerImage(t *testing.T) {
@@ -119,6 +184,24 @@ func TestPGExporterContainerImage(t *testing.T) {
 		monitoring: { pgMonitor: { exporter: { image: spec-image } } },
 	}`), &cluster.Spec))
 	assert.Equal(t, PGExporterContainerImage(cluster), "spec-image")
+}
+
+func TestStandalonePGAdminContainerImage(t *testing.T) {
+	pgadmin := &v1beta1.PGAdmin{}
+
+	unsetEnv(t, "RELATED_IMAGE_STANDALONE_PGADMIN")
+	assert.Equal(t, StandalonePGAdminContainerImage(pgadmin), "")
+
+	setEnv(t, "RELATED_IMAGE_STANDALONE_PGADMIN", "")
+	assert.Equal(t, StandalonePGAdminContainerImage(pgadmin), "")
+
+	setEnv(t, "RELATED_IMAGE_STANDALONE_PGADMIN", "env-var-pgadmin")
+	assert.Equal(t, StandalonePGAdminContainerImage(pgadmin), "env-var-pgadmin")
+
+	assert.NilError(t, yaml.Unmarshal([]byte(`{
+		image: spec-image
+	}`), &pgadmin.Spec))
+	assert.Equal(t, StandalonePGAdminContainerImage(pgadmin), "spec-image")
 }
 
 func TestPostgresContainerImage(t *testing.T) {

@@ -284,6 +284,16 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 
 		When("PGBouncer expose type is LoadBalancer", func() {
 			It("status host should be LoadBalancer Ingress endpoint", func() {
+				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2.PerconaPGCluster) {
+					cr.Spec.Proxy.PGBouncer.ServiceExpose = &v2.ServiceExpose{
+						Type: string(corev1.ServiceTypeLoadBalancer),
+					}
+				})
+
+				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
 
 				// Update PGBouncer service status so it contains ingress IP
 				Eventually(func() bool {
@@ -296,13 +306,9 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					})
 				Expect(k8sClient.Status().Update(ctx, pgBouncerSVC)).Should(Succeed())
 
-				updatePerconaPGClusterCR(ctx, crNamespacedName, func(cr *v2.PerconaPGCluster) {
-					cr.Spec.Proxy.PGBouncer.ServiceExpose = &v2.ServiceExpose{
-						Type: string(corev1.ServiceTypeLoadBalancer),
-					}
-				})
-
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func() bool {

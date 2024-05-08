@@ -1,7 +1,7 @@
 package postgrescluster
 
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -23,6 +23,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	gover "github.com/hashicorp/go-version"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -138,10 +140,32 @@ func (r *Reconciler) applyRepoHostIntent(ctx context.Context, postgresCluster *v
 	repoHostName string, repoResources *RepoResources,
 	observedInstances *observedInstances) (*appsv1.StatefulSet, error) {
 
-	repo, err := r.generateRepoHostIntent(postgresCluster, repoHostName, repoResources,
-		observedInstances)
+	repo, err := r.generateRepoHostIntent(postgresCluster, repoHostName, repoResources, observedInstances)
 	if err != nil {
 		return nil, err
+	}
+
+	// Previous versions of PGO used a StatefulSet Pod Management Policy that could leave the Pod
+	// in a failed state. When we see that it has the wrong policy, we will delete the StatefulSet
+	// and then recreate it with the correct policy, as this is not a property that can be patched.
+	// When we delete the StatefulSet, we will leave its Pods in place. They will be claimed by
+	// the StatefulSet that gets created in the next reconcile.
+	existing := &appsv1.StatefulSet{}
+	if err := errors.WithStack(r.Client.Get(ctx, client.ObjectKeyFromObject(repo), existing)); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+	} else {
+		if existing.Spec.PodManagementPolicy != repo.Spec.PodManagementPolicy {
+			// We want to delete the STS without affecting the Pods, so we set the PropagationPolicy to Orphan.
+			// The orphaned Pods will be claimed by the new StatefulSet that gets created in the next reconcile.
+			uid := existing.GetUID()
+			version := existing.GetResourceVersion()
+			exactly := client.Preconditions{UID: &uid, ResourceVersion: &version}
+			propagate := client.PropagationPolicy(metav1.DeletePropagationOrphan)
+
+			return repo, errors.WithStack(r.Client.Delete(ctx, existing, exactly, propagate))
+		}
 	}
 
 	if err := r.apply(ctx, repo); err != nil {
@@ -569,6 +593,14 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 		repo.Spec.Replicas = initialize.Int32(1)
 	}
 
+	// Use StatefulSet's "RollingUpdate" strategy and "Parallel" policy to roll
+	// out changes to pods even when not Running or not Ready.
+	// - https://docs.k8s.io/concepts/workloads/controllers/statefulset/#rolling-updates
+	// - https://docs.k8s.io/concepts/workloads/controllers/statefulset/#forced-rollback
+	// - https://kep.k8s.io/3541
+	repo.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+	repo.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
+
 	// Restart containers any time they stop, die, are killed, etc.
 	// - https://docs.k8s.io/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	repo.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyAlways
@@ -582,14 +614,25 @@ func (r *Reconciler) generateRepoHostIntent(postgresCluster *v1beta1.PostgresClu
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
 	repo.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
 
-	// pgBackRest does not make any Kubernetes API calls. Use the default
-	// ServiceAccount and do not mount its credentials.
+	// pgBackRest does not make any Kubernetes API calls, but it may interact
+	// with a cloud storage provider. Use the pgBackRest ServiceAccount for its
+	// possible cloud identity without mounting its Kubernetes API credentials.
+	// - https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity
+	// - https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
 	repo.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
 
+	currVersion, err := gover.NewVersion(postgresCluster.Labels[naming.LabelVersion])
+	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.4.0"))) {
+		repo.Spec.Template.Spec.ServiceAccountName = naming.PGBackRestRBAC(postgresCluster).Name
+	}
 	// Do not add environment variables describing services in this namespace.
 	repo.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	repo.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(postgresCluster)
+	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.RepoHost != nil && pgbackrest.RepoHost.SecurityContext != nil {
+		repo.Spec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.RepoHost.SecurityContext
+	} else {
+		repo.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(postgresCluster)
+	}
 
 	pgbackrest.AddServerToRepoPod(postgresCluster, &repo.Spec.Template.Spec)
 
@@ -737,6 +780,9 @@ func generateBackupJobSpecIntent(postgresCluster *v1beta1.PostgresCluster,
 		},
 	}
 
+	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
+		jobSpec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.Jobs.SecurityContext
+	}
 	if jobs := postgresCluster.Spec.Backups.PGBackRest.Jobs; jobs != nil {
 		jobSpec.TTLSecondsAfterFinished = jobs.TTLSecondsAfterFinished
 	}
@@ -1112,7 +1158,8 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
-	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, pgtablespaceVolumes, strings.Join(opts, " "))
+	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, config.FetchKeyCommand(&cluster.Spec),
+		pgtablespaceVolumes, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
 	dataVolumeMount := postgres.DataVolumeMount()
@@ -1248,7 +1295,11 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	// Do not add environment variables describing services in this namespace.
 	job.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
-	job.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	if pgbackrest := cluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
+		job.Spec.Template.Spec.SecurityContext = cluster.Spec.Backups.PGBackRest.Jobs.SecurityContext
+	} else {
+		job.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	}
 
 	// set the priority class name, if it exists
 	if dataSource.PriorityClassName != nil {
@@ -2194,7 +2245,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	//
 	// TODO (andrewlecuyer): Since reconciliation doesn't currently occur when a leader is elected,
 	// the operator may not get another chance to create the backup if a writable instance is not
-	// detected, and it then returns without requeing.  To ensure this doesn't occur and that the
+	// detected, and it then returns without requeuing.  To ensure this doesn't occur and that the
 	// operator always has a chance to reconcile when an instance becomes writable, we should watch
 	// Pods in the cluster for leader election events, and trigger reconciles accordingly.
 	if !clusterWritable || manualAnnotation == "" ||
@@ -2390,7 +2441,7 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	//
 	// TODO (andrewlecuyer): Since reconciliation doesn't currently occur when a leader is elected,
 	// the operator may not get another chance to create the backup if a writable instance is not
-	// detected, and it then returns without requeing.  To ensure this doesn't occur and that the
+	// detected, and it then returns without requeuing.  To ensure this doesn't occur and that the
 	// operator always has a chance to reconcile when an instance becomes writable, we should watch
 	// Pods in the cluster for leader election events, and trigger reconciles accordingly.
 	if !clusterWritable || replicaCreateRepoStatus == nil || replicaCreateRepoStatus.ReplicaCreateBackupComplete {
@@ -2632,7 +2683,7 @@ func (r *Reconciler) reconcileStanzaCreate(ctx context.Context,
 	//
 	// TODO (andrewlecuyer): Since reconciliation doesn't currently occur when a leader is elected,
 	// the operator may not get another chance to create the stanza if a writable instance is not
-	// detected, and it then returns without requeing.  To ensure this doesn't occur and that the
+	// detected, and it then returns without requeuing.  To ensure this doesn't occur and that the
 	// operator always has a chance to reconcile when an instance becomes writable, we should watch
 	// Pods in the cluster for leader election events, and trigger reconciles accordingly.
 	if !clusterWritable || stanzasCreated {

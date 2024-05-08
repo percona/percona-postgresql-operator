@@ -47,6 +47,9 @@ type PerconaPGCluster struct {
 }
 
 type PerconaPGClusterSpec struct {
+	// +optional
+	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
+
 	// Version of the operator. Update this to new version after operator
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
@@ -81,6 +84,10 @@ type PerconaPGClusterSpec struct {
 	// Specification of the service that exposes the PostgreSQL primary instance.
 	// +optional
 	Expose *ServiceExpose `json:"expose,omitempty"`
+
+	// Specification of the service that exposes PostgreSQL replica instances
+	// +optional
+	ExposeReplicas *ServiceExpose `json:"exposeReplicas,omitempty"`
 
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
@@ -244,6 +251,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	}
 	postgresCluster.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	postgresCluster.Spec.Metadata = cr.Spec.Metadata
 	postgresCluster.Spec.Image = cr.Spec.Image
 	postgresCluster.Spec.ImagePullPolicy = cr.Spec.ImagePullPolicy
 	postgresCluster.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
@@ -255,6 +263,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Shutdown = cr.Spec.Pause
 	postgresCluster.Spec.Standby = cr.Spec.Standby
 	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
+	postgresCluster.Spec.ReplicaService = cr.Spec.ExposeReplicas.ToCrunchy()
 
 	postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
@@ -569,6 +578,10 @@ type PGInstanceSetSpec struct {
 	// PostgreSQL to restart.
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// SecurityContext defines the security settings for a PostgreSQL pod.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -587,6 +600,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		WALVolumeClaimSpec:        p.WALVolumeClaimSpec,
 		DataVolumeClaimSpec:       p.DataVolumeClaimSpec,
 		VolumeMounts:              p.VolumeMounts,
+		SecurityContext:           p.SecurityContext,
 	}
 }
 
@@ -730,6 +744,10 @@ type PGBouncerSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
 	// +optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+
+	// SecurityContext defines the security settings for PGBouncer pods.
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
@@ -753,6 +771,7 @@ func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
 		Service:                   p.ServiceExpose.ToCrunchy(),
 		Tolerations:               p.Tolerations,
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
+		SecurityContext:           p.SecurityContext,
 	}
 
 	spec.Default()

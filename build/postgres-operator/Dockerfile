@@ -1,17 +1,21 @@
-FROM golang:1.21 AS go_builder
+FROM --platform=${BUILDPLATFORM} golang:1.21 AS go_builder
 WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
-COPY . .
+COPY go.mod go.sum ./
 RUN go mod download
 
 ARG GIT_COMMIT
 ARG GIT_BRANCH
+ARG BUILD_TIME
 ARG GO_LDFLAGS
 ARG GOOS=linux
+ARG TARGETARCH
 ARG CGO_ENABLED=0
 
+COPY . .
+
 RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
+    && CGO_ENABLED=$CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
        go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/postgres-operator \
                ./cmd/postgres-operator \
@@ -27,6 +31,7 @@ RUN ./bin/license_aggregator.sh ./cmd/...; \
 	cp -r ./licenses /licenses
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal AS ubi9
+RUN microdnf update -y && microdnf clean all -y
 
 LABEL name="Percona Postgres Operator" \
       vendor="Percona" \
@@ -34,7 +39,6 @@ LABEL name="Percona Postgres Operator" \
       description="Percona Postgres Operator simplifies and automates all essential actions for stable and continuous database operation during the whole database lifecycle" \
       maintainer="Percona Development <info@percona.com>"
 
-RUN microdnf update -y && microdnf clean all -y
 
 COPY licenses /licenses
 
