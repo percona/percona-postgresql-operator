@@ -1,0 +1,49 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 360
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: pitr
+  generation: 3
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-restore: pitr-restore
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: pitr
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  observedGeneration: 3
+  pgbackrest:
+    repos:
+      - name: repo1
+        replicaCreateBackupComplete: true
+        stanzaCreated: true
+    restore:
+      finished: true
+      id: pitr-restore
+      succeeded: 1
+  proxy:
+    pgBouncer:
+      readyReplicas: 3
+      replicas: 3
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
+metadata:
+  name: pitr-restore
+spec:
+  pgCluster: pitr
+  repoName: repo1
+status:
+  state: Succeeded

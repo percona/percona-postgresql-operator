@@ -103,6 +103,8 @@ spec:
                 type: string
               jobName:
                 type: string
+              latestRestorableTime:
+                type: string
               repo:
                 description: PGBackRestRepo represents a pgBackRest repository.  Only
                   one of its members may be specified.

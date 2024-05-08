@@ -1,0 +1,32 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup pitr-full -o json | jq '.status.latestRestorableTime')
+      until [ "${latest_restorable_time}" != "null" ]; do
+        sleep 5
+        latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup pitr-full -o json | jq '.status.latestRestorableTime')
+      done
+
+      run_psql_local \
+        '\c myapp \\\ TRUNCATE TABLE myApp' \
+        "postgres:$(get_psql_user_pass pitr-pguser-postgres)@$(get_psql_user_host pitr-pguser-postgres)"
+      
+      cat <<EOF | kubectl -n ${NAMESPACE} apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: pitr-restore
+      spec:
+        pgCluster: pitr
+        repoName: repo1
+        options:
+        - --type=time
+        - --target=${latest_restorable_time}
+      EOF
+    timeout: 300

@@ -64,7 +64,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should create PVCs", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -87,7 +87,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should delete PostgresCluster", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -107,7 +107,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should run finalizer", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -160,7 +160,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -183,7 +183,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -240,7 +240,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -251,7 +251,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -271,7 +271,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should run finalizer", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -308,7 +308,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -319,7 +319,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -337,6 +337,41 @@ var _ = Describe("Finalizers", Ordered, func() {
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 				Expect(len(secretList.Items)).Should(Equal(8))
+			})
+		})
+	})
+
+	Context(v2.FinalizerStopWatchers, Ordered, func() {
+		When("without finalizer", func() {
+			crName := ns + "-without-stop-watchers"
+			crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+			cr, err := readDefaultCR(crName, ns)
+			It("should read defautl cr.yaml", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			controllerutil.RemoveFinalizer(cr, v2.FinalizerStopWatchers)
+
+			It("should create PerconaPGCluster", func() {
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should reconcile PerconaPGCluster", func() {
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should have add finalizer anyway", func() {
+				cr := &v2.PerconaPGCluster{}
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, crNamespacedName, cr)
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+
+				Expect(cr.Finalizers).Should(ContainElement(v2.FinalizerStopWatchers))
 			})
 		})
 	})

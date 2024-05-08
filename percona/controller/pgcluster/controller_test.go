@@ -14,10 +14,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	gs "github.com/onsi/gomega/gstruct"
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -69,7 +71,7 @@ var _ = Describe("PG Cluster", Ordered, func() {
 
 	Context("Reconcile controller", func() {
 		It("Controller should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -115,7 +117,7 @@ var _ = Describe("Annotations", Ordered, func() {
 
 	Context("Reconcile controller", func() {
 		It("Controller should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -174,7 +176,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 	Context("Reconcile controller", func() {
 		It("Controller should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -216,7 +218,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 					},
 				})).Should(Succeed())
 
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -241,7 +243,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 					},
 				})).Should(Succeed())
 
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -279,7 +281,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				cr.Spec.PMM.Enabled = false
 				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
 
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -340,7 +342,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 	})
 
 	It("controller should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -356,7 +358,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 
 	When("PMM is enabled", Ordered, func() {
 		It("should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -394,7 +396,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 		})
 
 		It("should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -447,7 +449,12 @@ var _ = Describe("Watching secrets", Ordered, func() {
 	const ns = crName
 
 	crunchyR := crunchyReconciler()
-	r := reconciler()
+	r := reconciler(&v2.PerconaPGCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	})
 
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -667,7 +674,7 @@ var _ = Describe("Users", Ordered, func() {
 		})
 
 		It("should add default user", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -696,7 +703,7 @@ var _ = Describe("Users", Ordered, func() {
 			})
 
 			It("should add monitor user along side the default user", func() {
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -728,6 +735,26 @@ var _ = Describe("Users", Ordered, func() {
 		It("should delete cr and all secrets", func() {
 			Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
 			Expect(k8sClient.DeleteAllOf(context.Background(), &corev1.Secret{}, client.InNamespace(ns)))
+
+			Eventually(func() error {
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				if err != nil {
+					return err
+				}
+
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				if err != nil {
+					return err
+				}
+
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v2.PerconaPGCluster))
+				if k8serrors.IsNotFound(err) {
+					return nil
+				}
+
+				return errors.New("cluster not deleted")
+			}, time.Second*15, time.Millisecond*250).Should(BeNil())
+
 		})
 	})
 
@@ -741,7 +768,7 @@ var _ = Describe("Users", Ordered, func() {
 		})
 
 		It("should create defaul and monitor user", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -806,7 +833,7 @@ var _ = Describe("Version labels", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -904,7 +931,7 @@ var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -972,7 +999,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -987,7 +1014,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
 			})
 			It("should reconcile", func() {
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -1019,7 +1046,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
 			})
 			It("should reconcile", func() {
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -1048,7 +1075,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
 			})
 			It("should reconcile", func() {
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -1111,7 +1138,7 @@ var _ = Describe("Security context", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
