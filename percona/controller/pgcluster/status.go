@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,7 +43,7 @@ func (r *PGClusterReconciler) getState(cr *v2.PerconaPGCluster, status *v1beta1.
 	}
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
-		if ready > size {
+		if ready > 0 {
 			return v2.AppStateStopping
 		}
 
