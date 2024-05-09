@@ -50,12 +50,12 @@ func TestTicker(t *testing.T) {
 	t.Run("WithoutPredicates", func(t *testing.T) {
 		called = nil
 
-		ticker := NewTicker(100*time.Millisecond, expected)
+		ticker := NewTicker(100*time.Millisecond, expected, th)
 		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		t.Cleanup(cancel)
 
 		// Start the ticker and wait for the deadline to pass.
-		assert.NilError(t, ticker.Start(ctx, th, tq))
+		assert.NilError(t, ticker.Start(ctx, tq))
 		<-ctx.Done()
 
 		assert.Equal(t, len(called), 2)
@@ -70,12 +70,12 @@ func TestTicker(t *testing.T) {
 		pLength := predicate.Funcs{GenericFunc: func(event.GenericEvent) bool { return len(called) < 3 }}
 		pTrue := predicate.Funcs{GenericFunc: func(event.GenericEvent) bool { return true }}
 
-		ticker := NewTicker(50*time.Millisecond, expected)
+		ticker := NewTicker(50*time.Millisecond, expected, th, pTrue, pLength)
 		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		t.Cleanup(cancel)
 
 		// Start the ticker and wait for the deadline to pass.
-		assert.NilError(t, ticker.Start(ctx, th, tq, pTrue, pLength))
+		assert.NilError(t, ticker.Start(ctx, tq))
 		<-ctx.Done()
 
 		assert.Equal(t, len(called), 3)
@@ -87,12 +87,12 @@ func TestTicker(t *testing.T) {
 	t.Run("Immediate", func(t *testing.T) {
 		called = nil
 
-		ticker := NewTickerImmediate(100*time.Millisecond, expected)
+		ticker := NewTickerImmediate(100*time.Millisecond, expected, th)
 		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		t.Cleanup(cancel)
 
 		// Start the ticker and wait for the deadline to pass.
-		assert.NilError(t, ticker.Start(ctx, th, tq))
+		assert.NilError(t, ticker.Start(ctx, tq))
 		<-ctx.Done()
 
 		assert.Assert(t, len(called) > 2)

@@ -71,8 +71,7 @@ func (r *CrunchyBridgeClusterReconciler) SetupWithManager(
 		// Potentially replace with different requeue times, remove the Watch function
 		// Smarter: retry after a certain time for each cluster: https://gist.github.com/cbandy/a5a604e3026630c5b08cfbcdfffd2a13
 		WatchesRawSource(
-			pgoRuntime.NewTickerImmediate(5*time.Minute, event.GenericEvent{}),
-			r.Watch(),
+			pgoRuntime.NewTickerImmediate(5*time.Minute, event.GenericEvent{}, r.Watch()),
 		).
 		// Watch secrets and filter for secrets mentioned by CrunchyBridgeClusters
 		Watches(
