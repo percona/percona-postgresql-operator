@@ -6,8 +6,8 @@ LABEL name="Percona Postgres Operator Deployer" \
       description="Deployer app is to take care of all Percona Postgres Operator essentials deployment" \
       maintainer="Percona Development <info@percona.com>"
 
-ENV KUBECTL_VERSION=v1.27.13
-ENV KUBECTL_SHA256SUM=e991f163197cbd85bbff22f656a74d48b69db5addfa43cc04cca0cf5328f57f1
+ENV KUBECTL_VERSION=v1.28.9
+ENV KUBECTL_SHA256SUM=b4693d0b22f509250694b10c7727c42b427d570af04f2065fe23a55d6c0051f1
 
 COPY redhat/licenses /licenses
 COPY redhat/atomic/help.1 /help.1
