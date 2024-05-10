@@ -8,13 +8,9 @@ commands:
 
       source ../../functions
 
-      get_cr ${RANDOM}| kubectl -n "${NAMESPACE}" apply -f -
-
       get_cr \
         | yq eval '
             .spec.instances[].tablespaceVolumes[0].name="myts" |
             .spec.instances[].tablespaceVolumes[0].dataVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |
             .spec.instances[].tablespaceVolumes[0].dataVolumeClaimSpec.resources.requests.storage="1Gi"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
-        
-        
