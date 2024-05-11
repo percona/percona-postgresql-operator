@@ -7,19 +7,18 @@ apiVersion: v1
 metadata:
   name: 09-check-tablespace
 data:
-  data: '/tablespaces/myts/data'
+  data: ' /tablespaces/myts/data'
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: 09-check-table-in-tablespace
 data:
-  data: 'mytsp'
+  data: ' myts'
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: 09-verify-restored-data
 data:
-  data: |1-
-    100500
+  data: ' 100500'

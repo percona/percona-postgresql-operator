@@ -1,1 +1,13 @@
+custom-extensions
+demand-backup
+init-deploy
+monitoring
+operator-self-healing
+scaling
+scheduled-backup
+self-healing
+start-from-backup
 tablespaces
+telemetry-transfer
+upgrade-minor
+users

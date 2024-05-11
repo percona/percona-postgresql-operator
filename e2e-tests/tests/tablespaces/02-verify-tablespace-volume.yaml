@@ -8,11 +8,10 @@ commands:
 
       source ../../functions
       
-        pods=$(get_instance_set_pods instance1
-        i=1
-        for pod in $pods; do
-            echo $(k exec -it ${pod} -c database -- ls /tablespaces)
-            path=$(k exec -it ${pod} -c database -- ls /tablespaces)
-            kubectl create configmap -n "${NAMESPACE}" 02-ts-path-${i} --from-literal=path="/tablespaces/${path}"
-            i=$((i+1))
-        done
+      pods=$(get_instance_set_pods instance1)
+      i=1
+      for pod in $pods; do
+          path=$(kubectl -n ${NAMESPACE} exec ${pod} -c database -- ls /tablespaces)
+          kubectl create configmap -n "${NAMESPACE}" 02-ts-path-${i} --from-literal=path="/tablespaces/${path}"
+          i=$((i+1))
+      done

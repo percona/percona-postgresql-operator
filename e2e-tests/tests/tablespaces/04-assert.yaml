@@ -7,14 +7,14 @@ apiVersion: v1
 metadata:
   name: 04-check-tablespace
 data:
-  data: '/tablespaces/myts/data'
+  data: ' /tablespaces/myts/data'
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: 04-check-table-in-tablespace
 data:
-  data: 'myts'
+  data: ' myts'
 ---
 kind: ConfigMap
 apiVersion: v1

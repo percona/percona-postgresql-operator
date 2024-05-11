@@ -7,18 +7,18 @@ apiVersion: v1
 metadata:
   name: 02-ts-path-1
 data:
-  path: '/tablespaces/myts/data'
+  path: '/tablespaces/myts'
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: 02-ts-path-2
 data:
-  path: '/tablespaces/myts/data'
+  path: '/tablespaces/myts'
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: 02-ts-path-3
 data:
-  path: '/tablespaces/myts/data'
+  path: '/tablespaces/myts'
