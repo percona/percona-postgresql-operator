@@ -226,7 +226,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	opRes, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		var err error
 		postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
 
@@ -234,6 +234,12 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	})
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update/create PostgresCluster")
+	}
+
+	// postgresCluster will not be available immediately after creation.
+	// We should wait some time, it's better to continue on the next reconcile
+	if opRes == controllerutil.OperationResultCreated {
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
