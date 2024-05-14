@@ -57,6 +57,20 @@ spec:
 #          bucket: "my-bucket"
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
+#    volumes:
+#      pgDataVolume:
+#        pvcName:
+#        directory:
+#        tolerations:
+#      pgWALVolume:
+#        pvcName:
+#        directory:
+#        tolerations:
+#      pgBackRestVolume:
+#        pvcName:
+#        directory:
+#        tolerations:
+
 
   image: perconalab/percona-postgresql-operator:main-ppg16-postgres
   imagePullPolicy: Always

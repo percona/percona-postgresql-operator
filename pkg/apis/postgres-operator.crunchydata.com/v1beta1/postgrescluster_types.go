@@ -237,6 +237,11 @@ type DataSourceVolume struct {
 	// associated volume.
 	// +optional
 	Directory string `json:"directory,omitempty"`
+
+	// Tolerations of the move dir Job.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // DatabaseInitSQL defines a ConfigMap containing custom SQL that will

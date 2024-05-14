@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      POSTGRES_V1_CLUSTER_NAME=$(kubectl -n $NAMESPACE get configmap/v1-cluster-name --template='{{index .data "v1-cluster-name"}}')
+
+      kubectl -n $NAMESPACE delete perconapgclusters --all

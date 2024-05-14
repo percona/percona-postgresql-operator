@@ -480,6 +480,7 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
+				Tolerations: cluster.Spec.DataSource.Volumes.PGDataVolume.Tolerations,
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
@@ -598,6 +599,7 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
+				Tolerations: cluster.Spec.DataSource.Volumes.PGWALVolume.Tolerations,
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
@@ -721,6 +723,7 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
+				Tolerations: cluster.Spec.DataSource.Volumes.PGBackRestVolume.Tolerations,
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
