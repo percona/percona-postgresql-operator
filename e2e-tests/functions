@@ -770,6 +770,8 @@ compare_kubectl() {
 		| yq d - '**."volume.kubernetes.io/storage-provisioner"' \
 		| yq d - 'spec.volumeMode' \
 		| yq d - 'spec.nodeName' \
+		| yq d - 'spec.podReplacementPolicy' \
+		| yq d - 'spec.manualSelector' \
 		| yq d - '**."volume.kubernetes.io/selected-node"' \
 		| yq d - '**."percona.com/*"' \
 		| yq d - '**.(volumeMode==Filesystem).volumeMode' \
