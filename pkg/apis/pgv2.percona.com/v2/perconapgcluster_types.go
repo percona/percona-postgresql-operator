@@ -183,6 +183,10 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
+	if cr.Spec.Proxy == nil {
+		cr.Spec.Proxy = new(PGProxySpec)
+	}
+
 	if cr.Spec.Proxy.PGBouncer == nil {
 		cr.Spec.Proxy.PGBouncer = new(PGBouncerSpec)
 	}
@@ -574,6 +578,13 @@ type PGInstanceSetSpec struct {
 	// +kubebuilder:validation:Required
 	DataVolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"dataVolumeClaimSpec"`
 
+	// The list of tablespaces volumes to mount for this postgrescluster
+	// This field requires enabling TablespaceVolumes feature gate
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	TablespaceVolumes []crunchyv1beta1.TablespaceVolume `json:"tablespaceVolumes,omitempty"`
+
 	// The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes
 	// PostgreSQL to restart.
 	// +optional
@@ -601,6 +612,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		DataVolumeClaimSpec:       p.DataVolumeClaimSpec,
 		VolumeMounts:              p.VolumeMounts,
 		SecurityContext:           p.SecurityContext,
+		TablespaceVolumes:         p.TablespaceVolumes,
 	}
 }
 

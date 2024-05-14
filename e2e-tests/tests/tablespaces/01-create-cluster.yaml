@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr ${RANDOM} \
+        | yq eval '
+            .spec.instances[].tablespaceVolumes[0].name="myts" |
+            .spec.instances[].tablespaceVolumes[0].dataVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |
+            .spec.instances[].tablespaceVolumes[0].dataVolumeClaimSpec.resources.requests.storage="1Gi"' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
