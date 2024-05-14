@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+	metav1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )

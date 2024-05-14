@@ -24,8 +24,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	certmgrscheme "github.com/jetstack/cert-manager/pkg/client/clientset/versioned/scheme"
-	certmanagerv1 "github.com/jetstack/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1"
+	certmgrscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1"
 	crunchydata "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned"
 	crunchydatascheme "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/scheme"
 	crunchydatav1 "github.com/percona/percona-postgresql-operator/pkg/generated/clientset/versioned/typed/crunchydata.com/v1"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	cm "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
-	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+	cm "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/percona/percona-postgresql-operator/percona/tls"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"

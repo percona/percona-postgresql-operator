@@ -16,6 +16,7 @@ limitations under the License.
 */
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -85,7 +86,7 @@ func main() {
 	}
 
 	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler()
+	stopCtx := signals.SetupSignalHandler()
 
 	// create a new controller manager with controllers for all current namespaces and then run
 	// all of those controllers
@@ -106,7 +107,7 @@ func main() {
 	// consistent manner regardless of the namespace operating mode being utilized.
 	if operator.NamespaceOperatingMode() != ns.NamespaceOperatingModeDisabled {
 		if err := createAndStartNamespaceController(client, controllerManager,
-			stopCh); err != nil {
+			stopCtx); err != nil {
 			log.Fatal(err)
 		}
 	} else {
@@ -115,7 +116,7 @@ func main() {
 			log.Fatal(err)
 		}
 		if err := createAndStartNamespaceController(fakeClient, controllerManager,
-			stopCh); err != nil {
+			stopCtx); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -123,13 +124,14 @@ func main() {
 	defer controllerManager.RemoveAll()
 
 	log.Info("PostgreSQL Operator initialized and running, waiting for signal to exit")
-	<-stopCh
+	stopCtx.Done()
 	log.Infof("Signal received, now exiting")
 }
 
 // createAndStartNamespaceController creates a namespace controller and then starts it
 func createAndStartNamespaceController(kubeClientset kubernetes.Interface,
-	controllerManager controller.Manager, stopCh <-chan struct{}) error {
+	controllerManager controller.Manager, stopCtx context.Context) error {
+
 	nsKubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClientset,
 		time.Duration(*operator.Pgo.Pgo.NamespaceRefreshInterval)*time.Second,
 		kubeinformers.WithTweakListOptions(func(options *metav1.ListOptions) {
@@ -145,15 +147,15 @@ func createAndStartNamespaceController(kubeClientset kubernetes.Interface,
 	}
 
 	// start the namespace controller
-	nsKubeInformerFactory.Start(stopCh)
+	nsKubeInformerFactory.Start(stopCtx.Done())
 
-	if ok := cache.WaitForNamedCacheSync("namespace", stopCh,
+	if ok := cache.WaitForNamedCacheSync("namespace", stopCtx.Done(),
 		nsKubeInformerFactory.Core().V1().Namespaces().Informer().HasSynced); !ok {
 		return fmt.Errorf("failed waiting for namespace cache to sync")
 	}
 
 	for i := 0; i < nsController.WorkerCount(); i++ {
-		go nsController.RunWorker(stopCh)
+		go nsController.RunWorker(stopCtx.Done())
 	}
 
 	log.Debug("namespace controller is now running")
