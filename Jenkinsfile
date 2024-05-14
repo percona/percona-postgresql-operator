@@ -354,7 +354,7 @@ pipeline {
                                      -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                                      -w /go/src/github.com/percona/percona-postgresql-operator \
                                      -e GO111MODULE=on \
-                                     golang:1.20 sh -c '
+                                     golang:1.22 sh -c '
                                          go install github.com/google/go-licenses@latest;
                                          /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
                                              | cut -d , -f 3 \
@@ -378,7 +378,7 @@ pipeline {
                                      -w /go/src/github.com/percona/percona-postgresql-operator \
                                      -e GO111MODULE=on \
                                      -e GOFLAGS='-buildvcs=false' \
-                                     golang:1.20 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
+                                     golang:1.22 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
                              "
                          '''
 
