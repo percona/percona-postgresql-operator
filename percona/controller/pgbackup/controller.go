@@ -320,38 +320,41 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 			if len(backup.Annotation) == 0 {
 				continue
 			}
+
 			// We mark completed backups with the AnnotationJobName.
 			// We should look for a backup without an AnnotationJobName that matches the AnnotationBackupName we're interested in.
 			if v := backup.Annotation[pgbackrest.AnnotationJobName]; v != "" && v != pgBackup.Status.JobName {
 				continue
 			}
+
 			backupType := backup.Annotation[pgbackrest.AnnotationJobType]
-			if backupType == pgBackup.Annotations[v2.AnnotationPGBackrestBackupJobType] &&
-				backupType == string(naming.BackupReplicaCreate) || backup.Annotation[pgbackrest.AnnotationBackupName] == pgBackup.Name {
-				stanzaName = info.Name
-
-				if pgBackup.Status.BackupName == "" {
-					if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-						bcp := new(v2.PerconaPGBackup)
-						if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
-							return errors.Wrap(err, "get PGBackup")
-						}
-
-						bcp.Status.BackupName = backup.Label
-
-						return c.Status().Update(ctx, bcp)
-					}); err != nil {
-						return errors.Wrap(err, "update PGBackup status")
-					}
-				}
-
-				if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, pgBackup.Spec.RepoName, map[string]string{
-					pgbackrest.AnnotationJobName: pgBackup.Status.JobName,
-				}); err != nil {
-					return errors.Wrap(err, "set annotations to backup")
-				}
-				return nil
+			if (backupType != pgBackup.Annotations[v2.AnnotationPGBackrestBackupJobType] ||
+				backupType != string(naming.BackupReplicaCreate)) && backup.Annotation[pgbackrest.AnnotationBackupName] != pgBackup.Name {
+				continue
 			}
+
+			stanzaName = info.Name
+			if pgBackup.Status.BackupName == "" {
+				if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					bcp := new(v2.PerconaPGBackup)
+					if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
+						return errors.Wrap(err, "get PGBackup")
+					}
+
+					bcp.Status.BackupName = backup.Label
+
+					return c.Status().Update(ctx, bcp)
+				}); err != nil {
+					return errors.Wrap(err, "update PGBackup status")
+				}
+			}
+
+			if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, pgBackup.Spec.RepoName, map[string]string{
+				pgbackrest.AnnotationJobName: pgBackup.Status.JobName,
+			}); err != nil {
+				return errors.Wrap(err, "set annotations to backup")
+			}
+			return nil
 		}
 	}
 	return errors.New("backup annotations are not found in pgbackrest")
