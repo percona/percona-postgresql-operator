@@ -211,7 +211,7 @@ main() {
 	IMAGE_PGBADGER="percona/percona-postgresql-operator:$PGO_TAG-ppg$PG_VER-pgbadger"
 	spinup_pgcluster "${cluster}" "${test_dir}/conf/${PGO_TAG}_cr.yaml"
 
-	apply_version ${cluster} '9.9.9' "${PG_VER}.12" ${PG_VER} "${VS_ENDPOINT}" 4
+	apply_version ${cluster} '9.9.9' "${PG_VER}.14" ${PG_VER} "${VS_ENDPOINT}" 4
 
 	kubectl delete perconapgcluster/${cluster}
 	wait_for_delete "deployment/${cluster}"
