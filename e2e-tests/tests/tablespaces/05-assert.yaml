@@ -1,0 +1,31 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 560
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-backup: tablespaces-full
+  labels:
+    postgres-operator.crunchydata.com/pgbackrest-backup: manual
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  name: tablespaces-full
+spec:
+  pgCluster: tablespaces
+  repoName: repo1
+  options:
+    - --type=full
+status:
+  state: Succeeded
