@@ -269,6 +269,13 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.DataVolumeClaimSpec.DeepCopyInto(&out.DataVolumeClaimSpec)
+	if in.TablespaceVolumes != nil {
+		in, out := &in.TablespaceVolumes, &out.TablespaceVolumes
+		*out = make([]v1beta1.TablespaceVolume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.VolumeMounts != nil {
 		in, out := &in.VolumeMounts, &out.VolumeMounts
 		*out = make([]v1.VolumeMount, len(*in))

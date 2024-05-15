@@ -7,6 +7,7 @@ scaling
 scheduled-backup
 self-healing
 start-from-backup
+tablespaces
 telemetry-transfer
 upgrade-minor
 users
