@@ -2,12 +2,10 @@ package pgcluster
 
 import (
 	"context"
-	"strings"
-
-	// #nosec G501
 	"crypto/md5"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -60,13 +58,13 @@ type PGClusterReconciler struct {
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
-	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), r.watchSecrets()); err != nil {
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
-	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), r.watchBackupJobs()); err != nil {
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())); err != nil {
 		return errors.Wrap(err, "unable to watch jobs")
 	}
-	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}), r.watchPGBackups()); err != nil {
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())); err != nil {
 		return errors.Wrap(err, "unable to watch pg-backups")
 	}
 
@@ -74,9 +72,9 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
 		Watches(&corev1.Service{}, r.watchServices()).
-		Watches(&corev1.Secret{}, r.watchSecrets()).
-		Watches(&batchv1.Job{}, r.watchBackupJobs()).
-		Watches(&v2.PerconaPGBackup{}, r.watchPGBackups()).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
 		Complete(r)
 }
 
@@ -96,15 +94,15 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 	}
 }
 
-func (r *PGClusterReconciler) watchBackupJobs() handler.Funcs {
-	return handler.Funcs{
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (r *PGClusterReconciler) watchBackupJobs() handler.TypedFuncs[*batchv1.Job] {
+	return handler.TypedFuncs[*batchv1.Job]{
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*batchv1.Job], q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 			repoName := labels[naming.LabelPGBackRestRepo]
 
 			if len(crName) != 0 && len(repoName) != 0 &&
-				!reflect.DeepEqual(e.ObjectNew.(*batchv1.Job).Status, e.ObjectOld.(*batchv1.Job).Status) {
+				!reflect.DeepEqual(e.ObjectNew.Status, e.ObjectOld.Status) {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      crName,
@@ -114,13 +112,10 @@ func (r *PGClusterReconciler) watchBackupJobs() handler.Funcs {
 	}
 }
 
-func (r *PGClusterReconciler) watchPGBackups() handler.Funcs {
-	return handler.Funcs{
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
-			pgBackup, ok := e.ObjectNew.(*v2.PerconaPGBackup)
-			if !ok {
-				return
-			}
+func (r *PGClusterReconciler) watchPGBackups() handler.TypedFuncs[*v2.PerconaPGBackup] {
+	return handler.TypedFuncs[*v2.PerconaPGBackup]{
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*v2.PerconaPGBackup], q workqueue.RateLimitingInterface) {
+			pgBackup := e.ObjectNew
 			q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 				Namespace: pgBackup.GetNamespace(),
 				Name:      pgBackup.Spec.PGCluster,
@@ -129,14 +124,14 @@ func (r *PGClusterReconciler) watchPGBackups() handler.Funcs {
 	}
 }
 
-func (r *PGClusterReconciler) watchSecrets() handler.Funcs {
-	return handler.Funcs{
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret] {
+	return handler.TypedFuncs[*corev1.Secret]{
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Secret], q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 
 			if len(crName) != 0 &&
-				!reflect.DeepEqual(e.ObjectNew.(*corev1.Secret).Data, e.ObjectOld.(*corev1.Secret).Data) {
+				!reflect.DeepEqual(e.ObjectNew.Data, e.ObjectOld.Data) {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      crName,
@@ -231,7 +226,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	opRes, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 		var err error
 		postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
 
@@ -239,6 +234,12 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	})
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update/create PostgresCluster")
+	}
+
+	// postgresCluster will not be available immediately after creation.
+	// We should wait some time, it's better to continue on the next reconcile
+	if opRes == controllerutil.OperationResultCreated {
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
