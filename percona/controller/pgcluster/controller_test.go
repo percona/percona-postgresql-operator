@@ -5,8 +5,6 @@ package pgcluster
 
 import (
 	"context"
-	"go.opentelemetry.io/otel/trace/noop"
-
 	// #nosec G501
 	"crypto/md5"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 	gs "github.com/onsi/gomega/gstruct"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
