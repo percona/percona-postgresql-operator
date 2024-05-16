@@ -436,9 +436,9 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 
 	// at this point, the Job either wasn't found or it has failed, so the it
 	// should be created
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.Metadata.
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Annotations, cluster.Spec.Metadata.
 		GetAnnotationsOrNil())
-	labels := naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
+	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGDataDir: "",
@@ -559,9 +559,9 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		}
 	}
 
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.Metadata.
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGWALVolume.Annotations, cluster.Spec.Metadata.
 		GetAnnotationsOrNil())
-	labels := naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
+	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGWALVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGWalDir: "",
@@ -678,9 +678,9 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 		}
 	}
 
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGBackRestVolume.Annotations,
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
-	labels := naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
+	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGBackRestVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGBackRestRepoDir: "",

@@ -59,17 +59,41 @@ spec:
 #          region: "ca-central-1"
 #    volumes:
 #      pgDataVolume:
-#        pvcName:
-#        directory:
+#        pvcName: cluster1
+#        directory: cluster1
 #        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
 #      pgWALVolume:
-#        pvcName:
-#        directory:
+#        pvcName: cluster1-pvc-name
+#        directory: some-dir
 #        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
 #      pgBackRestVolume:
-#        pvcName:
-#        directory:
+#        pvcName: cluster1-pgbr-repo
+#        directory: cluster1-backrest-shared-repo
 #        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
 
 
   image: perconalab/percona-postgresql-operator:main-ppg16-postgres

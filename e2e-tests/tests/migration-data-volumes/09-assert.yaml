@@ -67,9 +67,12 @@ kind: Job
 metadata:
   generation: 1
   labels:
+    test-label: value
     postgres-operator.crunchydata.com/cluster: migration-data-volumes
     postgres-operator.crunchydata.com/move-job: ""
     postgres-operator.crunchydata.com/move-pgdata-dir: ""
+  annotations:
+    test-annotation: value2
   name: migration-data-volumes-move-pgdata-dir
   ownerReferences:
   - apiVersion: postgres-operator.crunchydata.com/v1beta1
@@ -87,6 +90,7 @@ spec:
     metadata:
       creationTimestamp: null
       labels:
+        test-label: value
         postgres-operator.crunchydata.com/cluster: migration-data-volumes
         postgres-operator.crunchydata.com/move-job: ""
         postgres-operator.crunchydata.com/move-pgdata-dir: ""
@@ -119,9 +123,12 @@ kind: Job
 metadata:
   generation: 1
   labels:
+    test-label: value3
     postgres-operator.crunchydata.com/cluster: migration-data-volumes
     postgres-operator.crunchydata.com/move-job: ""
     postgres-operator.crunchydata.com/move-pgbackrest-repo-dir: ""
+  annotations:
+    test-annotation: value4
   name: migration-data-volumes-move-pgbackrest-repo-dir
   ownerReferences:
   - apiVersion: postgres-operator.crunchydata.com/v1beta1
@@ -139,6 +146,7 @@ spec:
     metadata:
       creationTimestamp: null
       labels:
+        test-label: value3
         job-name: migration-data-volumes-move-pgbackrest-repo-dir
         postgres-operator.crunchydata.com/cluster: migration-data-volumes
         postgres-operator.crunchydata.com/move-job: ""

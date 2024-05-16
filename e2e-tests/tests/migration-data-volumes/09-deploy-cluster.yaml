@@ -24,6 +24,8 @@ commands:
         yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[1].key=\"node.kubernetes.io/unreachable\"" - |
         yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[1].operator=\"Exists\"" - |
         yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[1].tolerationSeconds=520" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.labels.test-label=\"value\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.annotations.test-annotation=\"value2\"" - |
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.pvcName=\"$POSTGRES_V1_CLUSTER_NAME-pgbr-repo\"" - |
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.directory=\"$POSTGRES_V1_CLUSTER_NAME-backrest-shared-repo\"" - |
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[0].effect=\"NoExecute\"" - |
@@ -34,6 +36,8 @@ commands:
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[1].key=\"node.kubernetes.io/unreachable\"" - |
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[1].operator=\"Exists\"" - |
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[1].tolerationSeconds=420" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.labels.test-label=\"value3\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.annotations.test-annotation=\"value4\"" - |
 
       kubectl -n $NAMESPACE apply -f -
 

@@ -242,6 +242,14 @@ type DataSourceVolume struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Annotations of the move dir Job.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Labels of the move dir Job.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // DatabaseInitSQL defines a ConfigMap containing custom SQL that will

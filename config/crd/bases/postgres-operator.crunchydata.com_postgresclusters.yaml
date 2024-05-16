@@ -7913,11 +7913,21 @@ spec:
                           Defines the existing pgBackRest repo volume and directory to use in the
                           current PostgresCluster.
                         properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: Annotations of the move dir Job.
+                            type: object
                           directory:
                             description: |-
                               The existing directory. When not set, a move Job is not created for the
                               associated volume.
                             type: string
+                          labels:
+                            additionalProperties:
+                              type: string
+                            description: Labels of the move dir Job.
+                            type: object
                           pvcName:
                             description: The existing PVC name.
                             type: string
@@ -7970,11 +7980,21 @@ spec:
                           Defines the existing pgData volume and directory to use in the current
                           PostgresCluster.
                         properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: Annotations of the move dir Job.
+                            type: object
                           directory:
                             description: |-
                               The existing directory. When not set, a move Job is not created for the
                               associated volume.
                             type: string
+                          labels:
+                            additionalProperties:
+                              type: string
+                            description: Labels of the move dir Job.
+                            type: object
                           pvcName:
                             description: The existing PVC name.
                             type: string
@@ -8028,11 +8048,21 @@ spec:
                           PostgresCluster. Note that a defined pg_wal volume MUST be accompanied by
                           a pgData volume.
                         properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: Annotations of the move dir Job.
+                            type: object
                           directory:
                             description: |-
                               The existing directory. When not set, a move Job is not created for the
                               associated volume.
                             type: string
+                          labels:
+                            additionalProperties:
+                              type: string
+                            description: Labels of the move dir Job.
+                            type: object
                           pvcName:
                             description: The existing PVC name.
                             type: string
