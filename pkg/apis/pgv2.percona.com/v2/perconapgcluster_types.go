@@ -531,6 +531,10 @@ type PGInstanceSetSpec struct {
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
 
+	// Configuration for instance default sidecar containers.
+	// +optional
+	Containers *crunchyv1beta1.InstanceSidecars `json:"containers,omitempty"`
+
 	// Additional init containers for PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
 	// +optional
@@ -691,6 +695,10 @@ type PGBouncerSpec struct {
 	// PgBouncer to restart.
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
+
+	// Configuration for pgBouncer default sidecar containers.
+	// +optional
+	Containers *crunchyv1beta1.PGBouncerSidecars `json:"containers,omitempty"`
 
 	// A secret projection containing a certificate and key with which to encrypt
 	// connections to PgBouncer. The "tls.crt", "tls.key", and "ca.crt" paths must
