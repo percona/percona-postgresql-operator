@@ -2,10 +2,7 @@ package pgbackup
 
 import (
 	"context"
-	"flag"
-	"io"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -245,15 +242,6 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 	}
 
 	return destination
-}
-
-func getBackupTypeFromOpts(opts string) string {
-	flagSet := flag.NewFlagSet("", flag.ErrorHandling(-1))
-	flagSet.SetOutput(io.Discard)
-
-	backupType := flagSet.String("type", "", "")
-	_ = flagSet.Parse(strings.Split(opts, " "))
-	return *backupType
 }
 
 func getReadyInstancePod(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (*corev1.Pod, error) {
