@@ -52,6 +52,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	perconaPgbackrest "github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -2541,7 +2542,10 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	backupJob.ObjectMeta.Annotations = annotations
 
 	spec, err := generateBackupJobSpecIntent(postgresCluster, replicaCreateRepo,
-		serviceAccount.GetName(), labels, annotations)
+		serviceAccount.GetName(), labels, annotations,
+		// K8SPG-506: adding label to get info about this backup in `pgbackrest info`
+		fmt.Sprintf(`--annotation="%s"="%s"`, perconaPgbackrest.AnnotationJobType, naming.BackupReplicaCreate),
+	)
 	if err != nil {
 		return errors.WithStack(err)
 	}

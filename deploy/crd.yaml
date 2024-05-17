@@ -394,6 +394,8 @@ spec:
             type: object
           status:
             properties:
+              backupName:
+                type: string
               backupType:
                 type: string
               completed:
