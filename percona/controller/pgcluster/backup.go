@@ -12,8 +12,71 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/percona/controller"
+	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
+
+func (r *PGClusterReconciler) reconcileBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if err := r.reconcileBackupJobs(ctx, cr); err != nil {
+		return errors.Wrap(err, "reconcile backup jobs")
+	}
+
+	if err := r.cleanupOutdatedBackups(ctx, cr); err != nil {
+		return errors.Wrap(err, "cleanup outdated backups")
+	}
+
+	return nil
+}
+
+func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if cr.Status.State != v2.AppStateReady {
+		return nil
+	}
+
+	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
+		var info pgbackrest.InfoOutput
+
+		pbList, err := listPGBackups(ctx, r.Client, cr)
+		if err != nil {
+			return errors.Wrap(err, "list pg-backups")
+		}
+		for _, pgBackup := range pbList {
+			if pgBackup.Status.State != v2.BackupSucceeded {
+				continue
+			}
+
+			if len(info) == 0 {
+				readyPod, err := controller.GetReadyInstancePod(ctx, r.Client, cr.Name, cr.Namespace)
+				if err != nil {
+					return errors.Wrap(err, "get ready instance pod")
+				}
+				info, err = pgbackrest.GetInfo(ctx, readyPod, repo.Name)
+				if err != nil {
+					return errors.Wrap(err, "get pgBackRest info")
+				}
+			}
+
+			backupPresent := false
+			for _, info := range info {
+				for _, backupInfo := range info.Backup {
+					if backupInfo.Annotation[pgbackrest.AnnotationJobName] == pgBackup.Status.JobName {
+						backupPresent = true
+						break
+					}
+				}
+			}
+			if backupPresent {
+				continue
+			}
+
+			if err := r.Client.Delete(ctx, &pgBackup); err != nil {
+				return errors.Wrapf(err, "delete backup %s/%s", pgBackup.Name, pgBackup.Namespace)
+			}
+		}
+	}
+	return nil
+}
 
 func (r *PGClusterReconciler) reconcileBackupJobs(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {

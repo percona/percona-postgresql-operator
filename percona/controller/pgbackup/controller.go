@@ -44,7 +44,7 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGBackup{}).Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/finalizers,verbs=update
@@ -287,24 +287,6 @@ func getBackupTypeFromOpts(opts string) string {
 	return *backupType
 }
 
-func getReadyInstancePod(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (*corev1.Pod, error) {
-	pods := &corev1.PodList{}
-	selector, err := naming.AsSelector(naming.ClusterInstances(pgBackup.Spec.PGCluster))
-	if err != nil {
-		return nil, err
-	}
-	if err := c.List(ctx, pods, client.InNamespace(pgBackup.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
-		return nil, errors.Wrap(err, "list pods")
-	}
-	for _, pod := range pods.Items {
-		if pod.Status.Phase != corev1.PodRunning {
-			continue
-		}
-		return &pod, nil
-	}
-	return nil, errors.New("no running instance found")
-}
-
 func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod, pgBackup *v2.PerconaPGBackup) error {
 	info, err := pgbackrest.GetInfo(ctx, pod, pgBackup.Spec.RepoName)
 	if err != nil {
@@ -361,7 +343,7 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 }
 
 func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup, job *batchv1.Job) (*reconcile.Result, error) {
-	readyPod, err := getReadyInstancePod(ctx, c, pgBackup)
+	readyPod, err := controller.GetReadyInstancePod(ctx, c, pgBackup.Spec.PGCluster, pgBackup.Namespace)
 	if err != nil {
 		return nil, errors.Wrap(err, "get ready instance pod")
 	}
