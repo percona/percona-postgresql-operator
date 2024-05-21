@@ -1,0 +1,45 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      instance=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[].metadata.name}')
+
+      pgbackrest_info_backups=$(kubectl exec -n "${NAMESPACE}" "$instance" -c database -- pgbackrest info --output json | jq '.[0].backup.[]')
+
+      check_backup() {
+          local backup_name=$1
+          local pgbackrest_annotation=$2
+          local pgbackrest_annotation_value=$3
+
+          status_backup_name=$(kubectl get -n "${NAMESPACE}" pg-backup "$backup_name" -o jsonpath='{.status.backupName}')
+          if [[ -z $status_backup_name ]]; then
+              echo ".status.backupName is empty in $backup_name"
+              exit 1
+          fi
+
+          backup_info=$(echo "$pgbackrest_info_backups" | jq "select(.annotation.\"$pgbackrest_annotation\" == \"$pgbackrest_annotation_value\")")
+          if [[ $status_backup_name != $(echo "$backup_info" | jq ".label" --raw-output) ]]; then
+              echo ".status.backupName doesn't equal to label in pgbackrest info"
+              exit 1
+          fi
+
+          backup_job_name=$(kubectl get -n "${NAMESPACE}" pg-backup "$backup_name" -o jsonpath='{.status.jobName}')
+          backup_job_annotation=$(echo "$backup_info" | jq '.annotation."percona.com/backup-job-name"' --raw-output)
+          if [[ $backup_job_name != "$backup_job_annotation" ]]; then
+              echo "Failed to get job name annotation from pgbackrest"
+              exit 1
+          fi
+      }
+
+      manual_backup_name="demand-backup-full"
+      check_backup "$manual_backup_name" "percona.com/backup-name" "$manual_backup_name"
+
+      replica_backup_name=$(kubectl get -n "${NAMESPACE}" pg-backup -o jsonpath='{.items[?(@.metadata.annotations.pgv2\.percona\.com/pgbackrest-backup-job-type=="replica-create")].metadata.name}')
+      check_backup "$replica_backup_name" "percona.com/backup-job-type" "replica-create"
+
+

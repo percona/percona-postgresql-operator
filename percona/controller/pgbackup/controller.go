@@ -22,6 +22,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
+	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -67,6 +68,8 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	if pgBackup.Status.State == v2.BackupSucceeded || pgBackup.Status.State == v2.BackupFailed {
 		return reconcile.Result{}, nil
 	}
+
+	pgBackup.Default()
 
 	pgCluster := &v2.PerconaPGCluster{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
@@ -128,11 +131,39 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "find backup job")
 		}
 
-		pgBackup.Status.State = v2.BackupRunning
-		pgBackup.Status.JobName = job.Name
-		pgBackup.Status.BackupType = getBackupType(job)
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			bcp := new(v2.PerconaPGBackup)
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
+				return errors.Wrap(err, "get PGBackup")
+			}
 
-		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
+			switch job.Labels[naming.LabelPGBackRestBackup] {
+			case string(naming.BackupReplicaCreate), string(naming.BackupManual):
+				if bcp.Annotations == nil {
+					bcp.Annotations = make(map[string]string)
+				}
+				bcp.Annotations[v2.AnnotationPGBackrestBackupJobType] = job.Labels[naming.LabelPGBackRestBackup]
+			default:
+				return errors.Errorf("unknown value for %s label: %s", naming.LabelPGBackRestBackup, job.Labels[naming.LabelPGBackRestBackup])
+			}
+
+			return r.Client.Update(ctx, bcp)
+		}); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "update PGBackup")
+		}
+
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			bcp := new(v2.PerconaPGBackup)
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
+				return errors.Wrap(err, "get PGBackup")
+			}
+
+			bcp.Status.State = v2.BackupRunning
+			bcp.Status.JobName = job.Name
+			bcp.Status.BackupType = getBackupType(job)
+
+			return r.Client.Status().Update(ctx, bcp)
+		}); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 
@@ -163,9 +194,17 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return *rr, nil
 		}
 
-		pgBackup.Status.CompletedAt = job.Status.CompletionTime
-		pgBackup.Status.State = status
-		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			bcp := new(v2.PerconaPGBackup)
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
+				return errors.Wrap(err, "get PGBackup")
+			}
+
+			bcp.Status.CompletedAt = job.Status.CompletionTime
+			bcp.Status.State = status
+
+			return r.Client.Status().Update(ctx, bcp)
+		}); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 
@@ -248,7 +287,89 @@ func getBackupTypeFromOpts(opts string) string {
 	return *backupType
 }
 
+func getReadyInstancePod(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (*corev1.Pod, error) {
+	pods := &corev1.PodList{}
+	selector, err := naming.AsSelector(naming.ClusterInstances(pgBackup.Spec.PGCluster))
+	if err != nil {
+		return nil, err
+	}
+	if err := c.List(ctx, pods, client.InNamespace(pgBackup.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		return nil, errors.Wrap(err, "list pods")
+	}
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+		return &pod, nil
+	}
+	return nil, errors.New("no running instance found")
+}
+
+func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod, pgBackup *v2.PerconaPGBackup) error {
+	info, err := pgbackrest.GetInfo(ctx, pod, pgBackup.Spec.RepoName)
+	if err != nil {
+		return errors.Wrap(err, "get pgBackRest info")
+	}
+
+	stanzaName := ""
+	for _, info := range info {
+		if stanzaName != "" {
+			break
+		}
+		for _, backup := range info.Backup {
+			if len(backup.Annotation) == 0 {
+				continue
+			}
+
+			// We mark completed backups with the AnnotationJobName.
+			// We should look for a backup without an AnnotationJobName that matches the AnnotationBackupName we're interested in.
+			if v := backup.Annotation[pgbackrest.AnnotationJobName]; v != "" && v != pgBackup.Status.JobName {
+				continue
+			}
+
+			backupType := backup.Annotation[pgbackrest.AnnotationJobType]
+			if (backupType != pgBackup.Annotations[v2.AnnotationPGBackrestBackupJobType] ||
+				backupType != string(naming.BackupReplicaCreate)) && backup.Annotation[pgbackrest.AnnotationBackupName] != pgBackup.Name {
+				continue
+			}
+
+			stanzaName = info.Name
+			if pgBackup.Status.BackupName == "" {
+				if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					bcp := new(v2.PerconaPGBackup)
+					if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Name, Namespace: pgBackup.Namespace}, bcp); err != nil {
+						return errors.Wrap(err, "get PGBackup")
+					}
+
+					bcp.Status.BackupName = backup.Label
+
+					return c.Status().Update(ctx, bcp)
+				}); err != nil {
+					return errors.Wrap(err, "update PGBackup status")
+				}
+			}
+
+			if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, pgBackup.Spec.RepoName, map[string]string{
+				pgbackrest.AnnotationJobName: pgBackup.Status.JobName,
+			}); err != nil {
+				return errors.Wrap(err, "set annotations to backup")
+			}
+			return nil
+		}
+	}
+	return errors.New("backup annotations are not found in pgbackrest")
+}
+
 func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup, job *batchv1.Job) (*reconcile.Result, error) {
+	readyPod, err := getReadyInstancePod(ctx, c, pgBackup)
+	if err != nil {
+		return nil, errors.Wrap(err, "get ready instance pod")
+	}
+
+	if err := updatePGBackrestInfo(ctx, c, readyPod, pgBackup); err != nil {
+		return nil, errors.Wrap(err, "update pgbackrest info")
+	}
+
 	deleteAnnotation := func(annotation string) (bool, error) {
 		deleted := true
 		return deleted, retry.RetryOnConflict(retry.DefaultBackoff, func() error {
