@@ -3,7 +3,6 @@ package pgbackup
 import (
 	"context"
 	"flag"
-	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -104,7 +103,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		repo := getRepo(pgCluster, pgBackup)
 		if repo == nil {
-			return reconcile.Result{}, fmt.Errorf("%s repo not found", pgBackup.Spec.RepoName)
+			return reconcile.Result{}, errors.Errorf("%s repo not defined", pgBackup.Spec.RepoName)
 		}
 
 		pgBackup.Status.Repo = repo
