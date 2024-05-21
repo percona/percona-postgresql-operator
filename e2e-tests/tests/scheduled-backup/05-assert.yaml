@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 700
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: scheduled-backup
+  generation: 4
+status:
+  observedGeneration: 4

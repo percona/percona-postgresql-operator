@@ -6,7 +6,7 @@ apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: demand-backup
-  generation: 3
+  generation: 4
   annotations:
     postgres-operator.crunchydata.com/pgbackrest-restore: demand-backup-restore
   ownerReferences:
@@ -23,7 +23,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 3
+  observedGeneration: 4
   pgbackrest:
     repos:
       - name: repo1
