@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+# Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -22,6 +22,6 @@ set -eu
 # Find `controller-gen` on the current PATH or install it to the Go install path.
 tool="$(command -v controller-gen || true)"
 [ -n "$tool" ] || tool="$GOBIN/controller-gen"
-[ -x "$tool" ] || go install 'sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0'
+[ -x "$tool" ] || go install 'sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0'
 
 "$tool" "$@"

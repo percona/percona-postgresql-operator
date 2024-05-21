@@ -2,7 +2,7 @@
 // +build envtest
 
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -894,7 +894,7 @@ func pgAdminTestCluster(ns corev1.Namespace) *v1beta1.PostgresCluster {
 						Volume: &v1beta1.RepoPVC{
 							VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-								Resources: corev1.ResourceRequirements{
+								Resources: corev1.VolumeResourceRequirements{
 									Requests: corev1.ResourceList{
 										corev1.ResourceStorage: resource.MustParse("1Gi"),
 									},
@@ -909,7 +909,7 @@ func pgAdminTestCluster(ns corev1.Namespace) *v1beta1.PostgresCluster {
 					Image: "test-image",
 					DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
 							},

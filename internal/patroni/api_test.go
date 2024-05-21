@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -212,7 +212,7 @@ func TestExecutorReplaceConfiguration(t *testing.T) {
 	}
 
 	actual := Executor(exec).ReplaceConfiguration(
-		context.Background(), map[string]interface{}{"some": "values"})
+		context.Background(), map[string]any{"some": "values"})
 
 	assert.Equal(t, expected, actual, "should call exec")
 }

@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -132,7 +132,7 @@ func TestInstancePod(t *testing.T) {
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 	clusterConfigMap := new(corev1.ConfigMap)
 	clusterPodService := new(corev1.Service)
-	instanceCertficates := new(corev1.Secret)
+	instanceCertificates := new(corev1.Secret)
 	instanceConfigMap := new(corev1.ConfigMap)
 	instanceSpec := new(v1beta1.PostgresInstanceSetSpec)
 	patroniLeaderService := new(corev1.Service)
@@ -142,7 +142,7 @@ func TestInstancePod(t *testing.T) {
 	call := func() error {
 		return InstancePod(context.Background(),
 			cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
-			instanceSpec, instanceCertficates, instanceConfigMap, template)
+			instanceSpec, instanceCertificates, instanceConfigMap, template)
 	}
 
 	assert.NilError(t, call())
@@ -229,6 +229,31 @@ volumes:
         - key: patroni.crt-combined
           path: ~postgres-operator/patroni.crt+key
 	`))
+}
+
+func TestPodIsPrimary(t *testing.T) {
+	// No object
+	assert.Assert(t, !PodIsPrimary(nil))
+
+	// No annotations
+	pod := &corev1.Pod{}
+	assert.Assert(t, !PodIsPrimary(pod))
+
+	// No role
+	pod.Annotations = map[string]string{"status": `{}`}
+	assert.Assert(t, !PodIsPrimary(pod))
+
+	// Replica
+	pod.Annotations["status"] = `{"role":"replica"}`
+	assert.Assert(t, !PodIsPrimary(pod))
+
+	// Standby leader
+	pod.Annotations["status"] = `{"role":"standby_leader"}`
+	assert.Assert(t, !PodIsPrimary(pod))
+
+	// Primary
+	pod.Annotations["status"] = `{"role":"master"}`
+	assert.Assert(t, PodIsPrimary(pod))
 }
 
 func TestPodIsStandbyLeader(t *testing.T) {

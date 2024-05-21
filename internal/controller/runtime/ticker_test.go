@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -50,12 +50,12 @@ func TestTicker(t *testing.T) {
 	t.Run("WithoutPredicates", func(t *testing.T) {
 		called = nil
 
-		ticker := NewTicker(100*time.Millisecond, expected)
+		ticker := NewTicker(100*time.Millisecond, expected, th)
 		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		t.Cleanup(cancel)
 
 		// Start the ticker and wait for the deadline to pass.
-		assert.NilError(t, ticker.Start(ctx, th, tq))
+		assert.NilError(t, ticker.Start(ctx, tq))
 		<-ctx.Done()
 
 		assert.Equal(t, len(called), 2)
@@ -70,12 +70,12 @@ func TestTicker(t *testing.T) {
 		pLength := predicate.Funcs{GenericFunc: func(event.GenericEvent) bool { return len(called) < 3 }}
 		pTrue := predicate.Funcs{GenericFunc: func(event.GenericEvent) bool { return true }}
 
-		ticker := NewTicker(50*time.Millisecond, expected)
+		ticker := NewTicker(50*time.Millisecond, expected, th, pTrue, pLength)
 		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		t.Cleanup(cancel)
 
 		// Start the ticker and wait for the deadline to pass.
-		assert.NilError(t, ticker.Start(ctx, th, tq, pTrue, pLength))
+		assert.NilError(t, ticker.Start(ctx, tq))
 		<-ctx.Done()
 
 		assert.Equal(t, len(called), 3)
@@ -87,15 +87,15 @@ func TestTicker(t *testing.T) {
 	t.Run("Immediate", func(t *testing.T) {
 		called = nil
 
-		ticker := NewTickerImmediate(100*time.Millisecond, expected)
+		ticker := NewTickerImmediate(100*time.Millisecond, expected, th)
 		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		t.Cleanup(cancel)
 
 		// Start the ticker and wait for the deadline to pass.
-		assert.NilError(t, ticker.Start(ctx, th, tq))
+		assert.NilError(t, ticker.Start(ctx, tq))
 		<-ctx.Done()
 
-		assert.Equal(t, len(called), 3)
+		assert.Assert(t, len(called) > 2)
 		assert.Equal(t, called[0], expected, "expected at 0ms")
 		assert.Equal(t, called[1], expected, "expected at 100ms")
 		assert.Equal(t, called[2], expected, "expected at 200ms")

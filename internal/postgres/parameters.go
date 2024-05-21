@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -94,6 +94,22 @@ func (ps *ParameterSet) DeepCopy() (out *ParameterSet) {
 // Add sets parameter name to value.
 func (ps *ParameterSet) Add(name, value string) {
 	ps.values[ps.normalize(name)] = value
+}
+
+// AppendToList adds each value to the right-hand side of parameter name
+// as a comma-separated list without quoting.
+func (ps *ParameterSet) AppendToList(name string, value ...string) {
+	result := ps.Value(name)
+
+	if len(value) > 0 {
+		if len(result) > 0 {
+			result += "," + strings.Join(value, ",")
+		} else {
+			result = strings.Join(value, ",")
+		}
+	}
+
+	ps.Add(name, result)
 }
 
 // Get returns the value of parameter name and whether or not it was present in ps.

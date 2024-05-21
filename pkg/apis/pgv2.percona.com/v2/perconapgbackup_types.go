@@ -1,8 +1,11 @@
 package v2
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -74,6 +77,7 @@ type PerconaPGBackupStatus struct {
 	StorageType PGBackupStorageType            `json:"storageType,omitempty"`
 	Repo        *crunchyv1beta1.PGBackRestRepo `json:"repo,omitempty"`
 	Image       string                         `json:"image,omitempty"`
+	BackupName  string                         `json:"backupName,omitempty"`
 }
 
 type PGBackupStorageType string
@@ -92,3 +96,7 @@ const (
 	PGBackupTypeDifferential PGBackupType = "differential"
 	PGBackupTypeIncremental  PGBackupType = "incremental"
 )
+
+func (b *PerconaPGBackup) Default() {
+	b.Spec.Options = append(b.Spec.Options, fmt.Sprintf(`--annotation="%s"="%s"`, pgbackrest.AnnotationBackupName, b.Name))
+}

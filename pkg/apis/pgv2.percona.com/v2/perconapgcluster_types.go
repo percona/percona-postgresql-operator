@@ -47,7 +47,6 @@ type PerconaPGCluster struct {
 }
 
 type PerconaPGClusterSpec struct {
-
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
 
@@ -85,6 +84,10 @@ type PerconaPGClusterSpec struct {
 	// Specification of the service that exposes the PostgreSQL primary instance.
 	// +optional
 	Expose *ServiceExpose `json:"expose,omitempty"`
+
+	// Specification of the service that exposes PostgreSQL replica instances
+	// +optional
+	ExposeReplicas *ServiceExpose `json:"exposeReplicas,omitempty"`
 
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
@@ -180,6 +183,10 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
+	if cr.Spec.Proxy == nil {
+		cr.Spec.Proxy = new(PGProxySpec)
+	}
+
 	if cr.Spec.Proxy.PGBouncer == nil {
 		cr.Spec.Proxy.PGBouncer = new(PGBouncerSpec)
 	}
@@ -260,6 +267,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Shutdown = cr.Spec.Pause
 	postgresCluster.Spec.Standby = cr.Spec.Standby
 	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
+	postgresCluster.Spec.ReplicaService = cr.Spec.ExposeReplicas.ToCrunchy()
 
 	postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
@@ -570,6 +578,13 @@ type PGInstanceSetSpec struct {
 	// +kubebuilder:validation:Required
 	DataVolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"dataVolumeClaimSpec"`
 
+	// The list of tablespaces volumes to mount for this postgrescluster
+	// This field requires enabling TablespaceVolumes feature gate
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	TablespaceVolumes []crunchyv1beta1.TablespaceVolume `json:"tablespaceVolumes,omitempty"`
+
 	// The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes
 	// PostgreSQL to restart.
 	// +optional
@@ -597,6 +612,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		DataVolumeClaimSpec:       p.DataVolumeClaimSpec,
 		VolumeMounts:              p.VolumeMounts,
 		SecurityContext:           p.SecurityContext,
+		TablespaceVolumes:         p.TablespaceVolumes,
 	}
 }
 
@@ -806,6 +822,10 @@ const (
 	// AnnotationPGBackrestBackupJobName is the annotation that is added to a PerconaPGClusterBackup.
 	// The value of the annotation will be a name of an existing backup job
 	AnnotationPGBackrestBackupJobName = AnnotationPGBackrestBackup + "-job-name"
+
+	// AnnotationPGBackrestBackupJobType is the annotation that is added to a PerconaPGClusterBackup.
+	// The value of the annotation will be a type of a backup (e.g. "manual" or "replica-create).
+	AnnotationPGBackrestBackupJobType = AnnotationPGBackrestBackup + "-job-type"
 
 	// AnnotationPGBackRestRestore is the annotation that is added to a PerconaPGCluster to initiate an in-place
 	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a

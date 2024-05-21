@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -562,10 +562,19 @@ func TestGetTMPSizeLimit(t *testing.T) {
 		t.Errorf("result: %+v, expected: %+v", result, expected)
 	}
 
-	// Test case 4: version >= 2.3.0, ephemeral storage limit not set
+	// Test case 4: version >= 2.3.0 and < 2.4.0, ephemeral storage limit not set
 	version = "2.3.0"
 	resources = corev1.ResourceRequirements{}
 	expected = tmpDirSizeLimitGTE230
+	result = getTMPSizeLimit(version, resources)
+	if result != expected {
+		t.Errorf("result: %+v, expected: %+v", result, expected)
+	}
+
+	// Test case 4: version >= 2.3.0 and < 2.4.0, ephemeral storage limit not set
+	version = "2.4.0"
+	resources = corev1.ResourceRequirements{}
+	expected = tmpDirSizeLimitGTE240
 	result = getTMPSizeLimit(version, resources)
 	if result != expected {
 		t.Errorf("result: %+v, expected: %+v", result, expected)

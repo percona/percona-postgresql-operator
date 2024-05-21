@@ -6,7 +6,7 @@ PGO_IMAGE_URL ?= https://github.com/percona/percona-postgresql-operator
 PGO_IMAGE_PREFIX ?= localhost
 
 PGMONITOR_DIR ?= hack/tools/pgmonitor
-PGMONITOR_VERSION ?= v4.8.1
+PGMONITOR_VERSION ?= v4.11.0
 QUERIES_CONFIG_DIR ?= hack/tools/queries
 
 # Buildah's "build" used to be "bud". Use the alias to be compatible for a while.
@@ -64,12 +64,12 @@ clean: ## Clean resources
 clean: clean-deprecated
 	rm -f bin/postgres-operator
 	rm -f config/rbac/role.yaml
+	rm -rf licenses/*/
 	[ ! -d testing/kuttl/e2e-generated ] || rm -r testing/kuttl/e2e-generated
 	[ ! -d testing/kuttl/e2e-generated-other ] || rm -r testing/kuttl/e2e-generated-other
 	rm -rf build/crd/generated build/crd/*/generated
-	[ ! -f hack/tools/setup-envtest ] || hack/tools/setup-envtest --bin-dir=hack/tools/envtest cleanup
 	[ ! -f hack/tools/setup-envtest ] || rm hack/tools/setup-envtest
-	[ ! -d hack/tools/envtest ] || rm -r hack/tools/envtest
+	[ ! -d hack/tools/envtest ] || { chmod -R u+w hack/tools/envtest && rm -r hack/tools/envtest; }
 	[ ! -d hack/tools/pgmonitor ] || rm -rf hack/tools/pgmonitor
 	[ ! -n "$$(ls hack/tools)" ] || rm -r hack/tools/*
 	[ ! -d hack/.kube ] || rm -r hack/.kube
@@ -124,7 +124,7 @@ undeploy: ## Undeploy the PostgreSQL Operator
 
 .PHONY: deploy-dev
 deploy-dev: ## Deploy the PostgreSQL Operator locally
-deploy-dev: PGO_FEATURE_GATES ?= "TablespaceVolumes=true"
+deploy-dev: PGO_FEATURE_GATES ?= "TablespaceVolumes=true,CrunchyBridgeClusters=true"
 deploy-dev: get-pgmonitor
 deploy-dev: build-postgres-operator
 deploy-dev: createnamespaces
@@ -226,17 +226,18 @@ check-kuttl: ## example command: make check-kuttl KUTTL_TEST='
 		--config testing/kuttl/kuttl-test.yaml
 
 .PHONY: generate-kuttl
-generate-kuttl: export KUTTL_PG_UPGRADE_FROM_VERSION ?= 14
+generate-kuttl: export KUTTL_PG_UPGRADE_FROM_VERSION ?= 15
 generate-kuttl: export KUTTL_PG_UPGRADE_TO_VERSION ?= 16
 generate-kuttl: export KUTTL_PG_VERSION ?= 16
-generate-kuttl: export KUTTL_POSTGIS_VERSION ?= 3.3
-generate-kuttl: export KUTTL_PSQL_IMAGE ?= registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-15.4-0
+generate-kuttl: export KUTTL_POSTGIS_VERSION ?= 3.4
+generate-kuttl: export KUTTL_PSQL_IMAGE ?= registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-16.2-0
 generate-kuttl: export KUTTL_TEST_DELETE_NAMESPACE ?= kuttl-test-delete-namespace
 generate-kuttl: ## Generate kuttl tests
 	[ ! -d testing/kuttl/e2e-generated ] || rm -r testing/kuttl/e2e-generated
 	[ ! -d testing/kuttl/e2e-generated-other ] || rm -r testing/kuttl/e2e-generated-other
 	bash -ceu ' \
 	case $(KUTTL_PG_VERSION) in \
+	16 ) export KUTTL_BITNAMI_IMAGE_TAG=16.0.0-debian-11-r3 ;; \
 	15 ) export KUTTL_BITNAMI_IMAGE_TAG=15.0.0-debian-11-r4 ;; \
 	14 ) export KUTTL_BITNAMI_IMAGE_TAG=14.5.0-debian-11-r37 ;; \
 	13 ) export KUTTL_BITNAMI_IMAGE_TAG=13.8.0-debian-11-r39 ;; \
@@ -251,12 +252,12 @@ generate-kuttl: ## Generate kuttl tests
 		source="$${1}" target="$${1/e2e/e2e-generated}"; \
 		mkdir -p "$${target%/*}"; render < "$${source}" > "$${target}"; \
 		shift; \
-	done' - testing/kuttl/e2e/*/*.yaml testing/kuttl/e2e-other/*/*.yaml
+	done' - testing/kuttl/e2e/*/*.yaml testing/kuttl/e2e-other/*/*.yaml testing/kuttl/e2e/*/*/*.yaml testing/kuttl/e2e-other/*/*/*.yaml
 
 ##@ Generate
 
 .PHONY: check-generate
-check-generate: ## Check crd, crd-docs, deepcopy functions, and rbac generation
+check-generate: ## Check crd, deepcopy functions, and rbac generation
 check-generate: generate-crd
 check-generate: generate-deepcopy
 check-generate: generate-rbac
@@ -265,9 +266,8 @@ check-generate: generate-rbac
 	git diff --exit-code -- pkg/apis
 
 .PHONY: generate
-generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
+generate: ## Generate crd, deepcopy functions, and rbac
 generate: generate-crd
-generate: generate-crd-docs
 generate: generate-deepcopy
 generate: generate-rbac
 
@@ -283,18 +283,23 @@ generate-crunchy-crd: ## Generate crd
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/pgupgrades/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
+	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
+		crd:crdVersions='v1' \
+		paths='./pkg/apis/...' \
+		output:dir='build/crd/pgadmins/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
+	@
+	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
+		crd:crdVersions='v1' \
+		paths='./pkg/apis/...' \
+		output:dir='build/crd/crunchybridgeclusters/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
+	@
 	$(KUSTOMIZE) build ./build/crd/crunchy/ > ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml
 	$(KUSTOMIZE) build ./build/crd/pgupgrades > ./config/crd/bases/postgres-operator.crunchydata.com_pgupgrades.yaml
+	$(KUSTOMIZE) build ./build/crd/pgadmins > ./config/crd/bases/postgres-operator.crunchydata.com_pgadmins.yaml
+	$(KUSTOMIZE) build ./build/crd/crunchybridgeclusters > ./config/crd/bases/postgres-operator.crunchydata.com_crunchybridgeclusters.yaml
 
-.PHONY: generate-crd-docs
-generate-crd-docs: ## Generate crd-docs
-	GOBIN='$(CURDIR)/hack/tools' $(GO) install fybrik.io/crdoc@v0.5.2
-	./hack/tools/crdoc \
-		--resources ./config/crd/bases \
-		--template ./hack/api-template.tmpl \
-		--output ./docs/content/references/crd.md
-
-generate-deepcopy:
+.PHONY: generate-deepcopy
+generate-deepcopy: ## Generate deepcopy functions
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
 		object:headerFile='hack/boilerplate.go.txt' \
 		paths='./pkg/apis/...'
@@ -304,7 +309,6 @@ generate-rbac: ## Generate rbac
 	GOBIN='$(CURDIR)/hack/tools' ./hack/generate-rbac.sh \
 		'./...' 'config/rbac/'
 	$(KUSTOMIZE) build ./config/rbac/namespace/ > ./deploy/rbac.yaml
-
 
 ##@ Release
 
@@ -358,9 +362,7 @@ build-extension-installer-image:
 generate: kustomize generate-crd generate-deepcopy generate-rbac generate-manager generate-bundle generate-cw
 
 generate-crd: generate-crunchy-crd generate-percona-crd
-	cat ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml > ./deploy/crd.yaml
-	echo --- >> ./deploy/crd.yaml
-	cat ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml >> ./deploy/crd.yaml
+	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
 
 generate-percona-crd:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \

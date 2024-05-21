@@ -1,7 +1,7 @@
 package main
 
 /*
-Copyright 2017 - 2023 Crunchy Data Solutions, Inc.
+Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -17,6 +17,7 @@ limitations under the License.
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -31,9 +32,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	//"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
+	"github.com/percona/percona-postgresql-operator/internal/bridge"
+	"github.com/percona/percona-postgresql-operator/internal/bridge/crunchybridgecluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/internal/controller/standalone_pgadmin"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/upgradecheck"
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
@@ -54,14 +60,14 @@ func assertNoError(err error) {
 	}
 }
 
-func initLogging() {
-	// Configure a singleton that treats logr.Logger.V(1) as logrus.DebugLevel.
-	var verbosity int
-	if strings.EqualFold(os.Getenv("CRUNCHY_DEBUG"), "true") {
-		verbosity = 1
-	}
-	logging.SetLogSink(logging.Logrus(os.Stdout, versionString, 1, verbosity))
-}
+//func initLogging() {
+//	// Configure a singleton that treats logr.Logger.V(1) as logrus.DebugLevel.
+//	var verbosity int
+//	if strings.EqualFold(os.Getenv("CRUNCHY_DEBUG"), "true") {
+//		verbosity = 1
+//	}
+//	logging.SetLogSink(logging.Logrus(os.Stdout, versionString, 1, verbosity))
+//}
 
 func main() {
 	// Set any supplied feature gates; panic on any unrecognized feature gate
@@ -69,7 +75,8 @@ func main() {
 	assertNoError(err)
 	// Needed for PMM
 	err = util.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
-		string(util.InstanceSidecars): true,
+		string(util.InstanceSidecars):  true,
+		string(util.TablespaceVolumes): true,
 	})
 	assertNoError(err)
 
@@ -144,6 +151,8 @@ func main() {
 // addControllersToManager adds all PostgreSQL Operator controllers to the provided controller
 // runtime manager.
 func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
+	os.Setenv("REGISTRATION_REQUIRED", "false")
+
 	r := &postgrescluster.Reconciler{
 		Client:      mgr.GetClient(),
 		Owner:       postgrescluster.ControllerName,
@@ -189,6 +198,49 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	}
 	if err := pr.SetupWithManager(mgr); err != nil {
 		return err
+	}
+
+	//upgradeReconciler := &pgupgrade.PGUpgradeReconciler{
+	//	Client: mgr.GetClient(),
+	//	Owner:  "pgupgrade-controller",
+	//	Scheme: mgr.GetScheme(),
+	//}
+
+	//if err := upgradeReconciler.SetupWithManager(mgr); err != nil {
+	//	return errors.Wrap(err, "unable to create PGUpgrade controller")
+	//}
+
+	pgAdminReconciler := &standalone_pgadmin.PGAdminReconciler{
+		Client:      mgr.GetClient(),
+		Owner:       "pgadmin-controller",
+		Recorder:    mgr.GetEventRecorderFor(naming.ControllerPGAdmin),
+		Scheme:      mgr.GetScheme(),
+		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
+	}
+
+	if err := pgAdminReconciler.SetupWithManager(mgr); err != nil {
+		return errors.Wrap(err, "unable to create PGAdmin controller")
+	}
+
+	if util.DefaultMutableFeatureGate.Enabled(util.CrunchyBridgeClusters) {
+		constructor := func() *bridge.Client {
+			client := bridge.NewClient(os.Getenv("PGO_BRIDGE_URL"), versionString)
+			client.Transport = otelTransportWrapper()(http.DefaultTransport)
+			return client
+		}
+
+		crunchyBridgeClusterReconciler := &crunchybridgecluster.CrunchyBridgeClusterReconciler{
+			Client: mgr.GetClient(),
+			Owner:  "crunchybridgecluster-controller",
+			// TODO(crunchybridgecluster): recorder?
+			// Recorder: mgr.GetEventRecorderFor(naming...),
+			Scheme:    mgr.GetScheme(),
+			NewClient: constructor,
+		}
+
+		if err := crunchyBridgeClusterReconciler.SetupWithManager(mgr); err != nil {
+			return errors.Wrap(err, "unable to create CrunchyBridgeCluster controller")
+		}
 	}
 
 	return nil
