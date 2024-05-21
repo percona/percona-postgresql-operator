@@ -40,7 +40,7 @@ func (r *PGClusterReconciler) reconcileScheduledBackup(ctx context.Context, cr *
 	}, backupType, repo.Name)
 
 	if repo.BackupSchedules == nil {
-		r.Cron.DeleteBackupJob(name.Name)
+		r.Cron.DeleteBackupJob(name.Name, name.Namespace)
 		return nil
 	}
 
@@ -63,13 +63,13 @@ func (r *PGClusterReconciler) reconcileScheduledBackup(ctx context.Context, cr *
 	}
 
 	if schedule == "" {
-		r.Cron.DeleteBackupJob(name.Name)
+		r.Cron.DeleteBackupJob(name.Name, name.Namespace)
 		return nil
 	}
 
 	createBackupFunc := r.createScheduledBackupFunc(log, name.Name, backupType, repo.Name, cr.Namespace, cr.Name)
 
-	if err := r.Cron.ApplyBackupJob(name.Name, schedule, createBackupFunc); err != nil {
+	if err := r.Cron.ApplyBackupJob(name.Name, name.Namespace, schedule, createBackupFunc); err != nil {
 		log.Error(err, "failed to create a cron for a scheduled backup job")
 		return nil
 	}
@@ -96,7 +96,7 @@ func (r *PGClusterReconciler) createScheduledBackup(log logr.Logger, backupName,
 		if k8serrors.IsNotFound(err) {
 			log.Info("cluster is not found, deleting the job", "name", backupName, "cluster", cr.Name, "namespace", cr.Namespace)
 
-			r.Cron.DeleteBackupJob(backupName)
+			r.Cron.DeleteBackupJob(backupName, namespace)
 			return nil
 		}
 		return err
