@@ -56,6 +56,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
+	perconaPgbackrest "github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -81,7 +82,7 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 				Name: "instance1",
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -132,7 +133,7 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 			Volume: &v1beta1.RepoPVC{
 				VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -955,7 +956,11 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 		case "COMMAND":
 			assert.Assert(t, env.Value == "backup")
 		case "COMMAND_OPTS":
-			assert.Assert(t, env.Value == "--stanza=db --repo=1")
+			assert.Assert(t, env.Value == "--stanza=db --repo=1"+
+				// K8SPG-506: adding label to get info about this backup in `pgbackrest info`
+				fmt.Sprintf(` --annotation="%s"="%s"`, perconaPgbackrest.AnnotationJobType, naming.BackupReplicaCreate),
+			)
+
 		case "COMPARE_HASH":
 			assert.Assert(t, env.Value == "true")
 		case "CONTAINER":
@@ -1564,7 +1569,7 @@ func TestGetPGBackRestResources(t *testing.T) {
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -1603,7 +1608,7 @@ func TestGetPGBackRestResources(t *testing.T) {
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -2286,7 +2291,7 @@ func TestCopyConfigurationResources(t *testing.T) {
 					Name: "instance1",
 					DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
 							},
@@ -2338,7 +2343,7 @@ func TestCopyConfigurationResources(t *testing.T) {
 					Name: "instance1",
 					DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
 							},

@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} golang:1.21 AS go_builder
+FROM --platform=${BUILDPLATFORM} golang:1.22 AS go_builder
 WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
 COPY go.mod go.sum ./
@@ -15,7 +15,7 @@ ARG CGO_ENABLED=0
 COPY . .
 
 RUN mkdir -p build/_output/bin \
-    && CGO_ENABLED=$CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
+   && CGO_ENABLED=$CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
        go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/postgres-operator \
                ./cmd/postgres-operator \

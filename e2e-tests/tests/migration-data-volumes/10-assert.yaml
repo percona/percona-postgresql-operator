@@ -5,7 +5,6 @@ timeout: 30
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: 07-verify-restored-data
+  name: 10-read-from-primary
 data:
-  data: |1-
-    100500
+  data: ' 100500'

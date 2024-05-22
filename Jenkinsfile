@@ -227,7 +227,7 @@ void prepareNode() {
         sudo sh -c "curl -s -L https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 > /usr/local/bin/yq"
         sudo chmod +x /usr/local/bin/yq
 
-        sudo sh -c "curl -s -L https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64 > /usr/local/bin/jq"
+        sudo sh -c "curl -s -L https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64 > /usr/local/bin/jq"
         sudo chmod +x /usr/local/bin/jq
 
         curl -fsSL https://github.com/kubernetes-sigs/krew/releases/latest/download/krew-linux_amd64.tar.gz | tar -xzf -
@@ -354,7 +354,7 @@ pipeline {
                                      -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                                      -w /go/src/github.com/percona/percona-postgresql-operator \
                                      -e GO111MODULE=on \
-                                     golang:1.20 sh -c '
+                                     golang:1.22 sh -c '
                                          go install github.com/google/go-licenses@latest;
                                          /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
                                              | cut -d , -f 3 \
@@ -378,7 +378,7 @@ pipeline {
                                      -w /go/src/github.com/percona/percona-postgresql-operator \
                                      -e GO111MODULE=on \
                                      -e GOFLAGS='-buildvcs=false' \
-                                     golang:1.20 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
+                                     golang:1.22 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
                              "
                          '''
 

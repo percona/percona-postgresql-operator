@@ -75,7 +75,8 @@ func main() {
 	assertNoError(err)
 	// Needed for PMM
 	err = util.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
-		string(util.InstanceSidecars): true,
+		string(util.InstanceSidecars):  true,
+		string(util.TablespaceVolumes): true,
 	})
 	assertNoError(err)
 

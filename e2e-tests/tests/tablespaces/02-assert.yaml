@@ -1,0 +1,24 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 02-ts-path-1
+data:
+  path: '/tablespaces/myts'
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 02-ts-path-2
+data:
+  path: '/tablespaces/myts'
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 02-ts-path-3
+data:
+  path: '/tablespaces/myts'
