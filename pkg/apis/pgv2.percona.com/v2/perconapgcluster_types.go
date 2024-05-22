@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	gover "github.com/hashicorp/go-version"
 	v "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -272,7 +274,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 
-	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy()
+	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Labels[naming.LabelVersion])
 	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		repo := postgresCluster.Spec.Backups.PGBackRest.Repos[i]
 
@@ -399,7 +401,16 @@ type Backups struct {
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
 }
 
-func (b Backups) ToCrunchy() crunchyv1beta1.Backups {
+func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
+	var sc *crunchyv1beta1.PGBackRestSidecars
+
+	sc = b.PGBackRest.Containers
+
+	currVersion, err := gover.NewVersion(version)
+	if err == nil && currVersion.LessThan(gover.Must(gover.NewVersion("2.4.0"))) {
+		sc = b.PGBackRest.Sidecars
+	}
+
 	return crunchyv1beta1.Backups{
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
 			Metadata:      b.PGBackRest.Metadata,
@@ -411,7 +422,7 @@ func (b Backups) ToCrunchy() crunchyv1beta1.Backups {
 			RepoHost:      b.PGBackRest.RepoHost,
 			Manual:        b.PGBackRest.Manual,
 			Restore:       b.PGBackRest.Restore,
-			Sidecars:      b.PGBackRest.Containers,
+			Sidecars:      sc,
 		},
 	}
 }
@@ -463,6 +474,10 @@ type PGBackRestArchive struct {
 	// Defines details for performing an in-place restore using pgBackRest
 	// +optional
 	Restore *crunchyv1beta1.PGBackRestRestore `json:"restore,omitempty"`
+
+	// Deprecated: Use Containers instead
+	// +optional
+	Sidecars *crunchyv1beta1.PGBackRestSidecars `json:"sidecars,omitempty"`
 
 	// Configuration for pgBackRest sidecar containers
 	// +optional
