@@ -1,0 +1,220 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 320
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: migration-data-volumes
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: migration-data-volumes
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: migration-data-volumes-pgbouncer
+  labels:
+    postgres-operator.crunchydata.com/cluster: migration-data-volumes
+    postgres-operator.crunchydata.com/role: pgbouncer
+  annotations:
+    deployment.kubernetes.io/revision: '1'
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: migration-data-volumes
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 3
+  updatedReplicas: 3
+  readyReplicas: 3
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: migration-data-volumes
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generation: 1
+  labels:
+    test-label: value
+    postgres-operator.crunchydata.com/cluster: migration-data-volumes
+    postgres-operator.crunchydata.com/move-job: ""
+    postgres-operator.crunchydata.com/move-pgdata-dir: ""
+  annotations:
+    test-annotation: value2
+  name: migration-data-volumes-move-pgdata-dir
+  ownerReferences:
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: migration-data-volumes
+spec:
+  backoffLimit: 6
+  completionMode: NonIndexed
+  completions: 1
+  parallelism: 1
+  suspend: false
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        test-label: value
+        postgres-operator.crunchydata.com/cluster: migration-data-volumes
+        postgres-operator.crunchydata.com/move-job: ""
+        postgres-operator.crunchydata.com/move-pgdata-dir: ""
+    spec:
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 530
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 520
+      automountServiceAccountToken: false
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: false
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 26
+        fsGroupChangePolicy: OnRootMismatch
+      terminationGracePeriodSeconds: 30
+status:
+  ready: 0
+  succeeded: 1
+  uncountedTerminatedPods: {}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generation: 1
+  labels:
+    test-label: value3
+    postgres-operator.crunchydata.com/cluster: migration-data-volumes
+    postgres-operator.crunchydata.com/move-job: ""
+    postgres-operator.crunchydata.com/move-pgbackrest-repo-dir: ""
+  annotations:
+    test-annotation: value4
+  name: migration-data-volumes-move-pgbackrest-repo-dir
+  ownerReferences:
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: migration-data-volumes
+spec:
+  backoffLimit: 6
+  completionMode: NonIndexed
+  completions: 1
+  parallelism: 1
+  suspend: false
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        test-label: value3
+        job-name: migration-data-volumes-move-pgbackrest-repo-dir
+        postgres-operator.crunchydata.com/cluster: migration-data-volumes
+        postgres-operator.crunchydata.com/move-job: ""
+        postgres-operator.crunchydata.com/move-pgbackrest-repo-dir: ""
+    spec:
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 430
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 420
+      automountServiceAccountToken: false
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: false
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 26
+        fsGroupChangePolicy: OnRootMismatch
+      terminationGracePeriodSeconds: 30
+status:
+  ready: 0
+  succeeded: 1
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: migration-data-volumes
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: migration-data-volumes
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  observedGeneration: 1
+  pgbackrest:
+    repos:
+      - name: repo1
+        stanzaCreated: true
+  proxy:
+    pgBouncer:
+      readyReplicas: 3
+      replicas: 3
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: migration-data-volumes
+status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready

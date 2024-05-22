@@ -1,0 +1,35 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      POSTGRES_V1_CLUSTER_NAME=$(kubectl -n $NAMESPACE get configmap/v1-cluster-name --template='{{index .data "v1-cluster-name"}}')
+
+      kubectl apply -n $NAMESPACE -f - <<EOF
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: chown-pod
+      spec:
+        restartPolicy: Never
+        volumes:
+          - name: backrestrepo
+            persistentVolumeClaim:
+              claimName: $POSTGRES_V1_CLUSTER_NAME-pgbr-repo
+        containers:
+          - name: task-pv-container
+            image: ubuntu
+            command:
+            - chown
+            args:
+            - -R
+            - 26:26
+            - /backrestrepo/$POSTGRES_V1_CLUSTER_NAME-backrest-shared-repo/
+            volumeMounts:
+              - mountPath: "/backrestrepo"
+                name: backrestrepo
+      EOF
+    timeout: 300

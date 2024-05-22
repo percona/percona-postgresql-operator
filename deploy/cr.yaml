@@ -66,6 +66,44 @@ spec:
 #        key: role
 #        operator: Equal
 #        value: connection-poolers
+#    volumes:
+#      pgDataVolume:
+#        pvcName: cluster1
+#        directory: cluster1
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
+#      pgWALVolume:
+#        pvcName: cluster1-pvc-name
+#        directory: some-dir
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
+#      pgBackRestVolume:
+#        pvcName: cluster1-pgbr-repo
+#        directory: cluster1-backrest-shared-repo
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
+
 
   image: perconalab/percona-postgresql-operator:main-ppg16-postgres
   imagePullPolicy: Always
@@ -380,6 +418,12 @@ spec:
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
 #  patroni:
+#    # Some values of the Liveness/Readiness probes of the patroni container are calulated using syncPeriodSeconds by the following formulas:
+#    # - timeoutSeconds:   syncPeriodSeconds / 2;
+#    # - periodSeconds:    syncPeriodSeconds;
+#    # - failureThreshold: leaderLeaseDurationSeconds / syncPeriodSeconds.
+#    syncPeriodSeconds: 10 # default: 10
+#    leaderLeaseDurationSeconds: 30 # default: 30
 #    dynamicConfiguration:
 #      postgresql:
 #        parameters:
