@@ -1,0 +1,44 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      POSTGRES_V1_CLUSTER_NAME=$(kubectl -n $NAMESPACE get configmap/v1-cluster-name --template='{{index .data "v1-cluster-name"}}')
+
+      IMAGE_POSTGRESQL=$IMAGE_BASE:main-ppg$PGOV1_VER-postgres
+      IMAGE_PGBOUNCER=$IMAGE_BASE:main-ppg$PGOV1_VER-pgbouncer
+      IMAGE_BACKREST=$IMAGE_BASE:main-ppg$PGOV1_VER-pgbackrest
+      PG_VER=14
+
+      get_cr |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.pvcName=\"$POSTGRES_V1_CLUSTER_NAME\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.directory=\"$POSTGRES_V1_CLUSTER_NAME\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[0].effect=\"NoExecute\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[0].key=\"node.kubernetes.io/not-ready\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[0].operator=\"Exists\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[0].tolerationSeconds=530" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[1].effect=\"NoExecute\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[1].key=\"node.kubernetes.io/unreachable\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[1].operator=\"Exists\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.tolerations[1].tolerationSeconds=520" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.labels.test-label=\"value\"" - |
+        yq eval ".spec.dataSource.volumes.pgDataVolume.annotations.test-annotation=\"value2\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.pvcName=\"$POSTGRES_V1_CLUSTER_NAME-pgbr-repo\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.directory=\"$POSTGRES_V1_CLUSTER_NAME-backrest-shared-repo\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[0].effect=\"NoExecute\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[0].key=\"node.kubernetes.io/not-ready\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[0].operator=\"Exists\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[0].tolerationSeconds=430" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[1].effect=\"NoExecute\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[1].key=\"node.kubernetes.io/unreachable\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[1].operator=\"Exists\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[1].tolerationSeconds=420" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.labels.test-label=\"value3\"" - |
+        yq eval ".spec.dataSource.volumes.pgBackRestVolume.annotations.test-annotation=\"value4\"" - |
+
+      kubectl -n $NAMESPACE apply -f -
+
+    timeout: 300
