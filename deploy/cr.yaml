@@ -390,6 +390,12 @@ spec:
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
 #  patroni:
+#    # Some values of the Liveness/Readiness probes of the patroni container are calulated using syncPeriodSeconds by the following formulas:
+#    # - timeoutSeconds:   syncPeriodSeconds / 2;
+#    # - periodSeconds:    syncPeriodSeconds;
+#    # - failureThreshold: leaderLeaseDurationSeconds / syncPeriodSeconds.
+#    syncPeriodSeconds: 10 # default: 10
+#    leaderLeaseDurationSeconds: 30 # default: 30
 #    dynamicConfiguration:
 #      postgresql:
 #        parameters:
