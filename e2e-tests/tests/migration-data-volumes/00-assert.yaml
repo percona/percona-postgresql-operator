@@ -1,0 +1,11 @@
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: pgo-deploy
+  labels:
+    job-name: pgo-deploy
+status:
+  conditions:
+    - type: Complete
+      status: 'True'
+  succeeded: 1
