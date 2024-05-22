@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ $OPERATOR_NS ]]; then
+        OPNS=$OPERATOR_NS
+      else
+        OPNS=$NAMESPACE
+      fi
+
+      kubectl -n $OPNS delete deployment/postgres-operator
+      kubectl delete crd perconapgclusters.pg.percona.com pgclusters.pg.percona.com pgpolicies.pg.percona.com pgreplicas.pg.percona.com pgtasks.pg.percona.com

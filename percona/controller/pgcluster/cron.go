@@ -35,8 +35,12 @@ func NewCronRegistry() CronRegistry {
 	return c
 }
 
-func (r *CronRegistry) ApplyBackupJob(name string, schedule string, cmd func()) error {
-	schRaw, ok := r.backupJobs.Load(name)
+func backupJobKey(name, namespace string) string {
+	return name + "-" + namespace
+}
+
+func (r *CronRegistry) ApplyBackupJob(name, namespace, schedule string, cmd func()) error {
+	schRaw, ok := r.backupJobs.Load(backupJobKey(name, namespace))
 	if ok {
 		sch := schRaw.(BackupScheduleJob)
 		if sch.schedule == schedule {
@@ -44,21 +48,21 @@ func (r *CronRegistry) ApplyBackupJob(name string, schedule string, cmd func()) 
 		}
 	}
 
-	r.DeleteBackupJob(name)
+	r.DeleteBackupJob(name, namespace)
 
 	jobID, err := r.AddFuncWithSeconds(schedule, cmd)
 	if err != nil {
 		return errors.Wrap(err, "failed to add backup job")
 	}
-	r.backupJobs.Store(name, BackupScheduleJob{
+	r.backupJobs.Store(backupJobKey(name, namespace), BackupScheduleJob{
 		schedule: schedule,
 		id:       jobID,
 	})
 	return nil
 }
 
-func (r *CronRegistry) DeleteBackupJob(name string) {
-	if sch, ok := r.backupJobs.LoadAndDelete(name); ok {
+func (r *CronRegistry) DeleteBackupJob(name, namespace string) {
+	if sch, ok := r.backupJobs.LoadAndDelete(backupJobKey(name, namespace)); ok {
 		r.crons.Remove(sch.(BackupScheduleJob).id)
 	}
 }

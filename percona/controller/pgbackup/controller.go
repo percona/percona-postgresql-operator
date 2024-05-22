@@ -100,7 +100,12 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		pgBackup.Status.Destination = getDestination(pgCluster, pgBackup)
 		pgBackup.Status.Image = pgCluster.Spec.Backups.PGBackRest.Image
+
 		repo := getRepo(pgCluster, pgBackup)
+		if repo == nil {
+			return reconcile.Result{}, errors.Errorf("%s repo not defined", pgBackup.Spec.RepoName)
+		}
+
 		pgBackup.Status.Repo = repo
 		switch {
 		case repo.S3 != nil:
@@ -216,14 +221,12 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 func getRepo(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) *v1beta1.PGBackRestRepo {
 	repoName := pb.Spec.RepoName
-	var repo *v1beta1.PGBackRestRepo
 	for i, r := range pg.Spec.Backups.PGBackRest.Repos {
 		if repoName == r.Name {
-			repo = &pg.Spec.Backups.PGBackRest.Repos[i]
-			break
+			return &pg.Spec.Backups.PGBackRest.Repos[i]
 		}
 	}
-	return repo
+	return nil
 }
 
 func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
