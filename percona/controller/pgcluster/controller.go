@@ -35,7 +35,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/percona/exec"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
@@ -71,14 +70,6 @@ type PGClusterReconciler struct {
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
-	if r.PodExec == nil {
-		var err error
-		r.PodExec, err = exec.NewPodExecutor(context.Background(), mgr.GetConfig())
-		if err != nil {
-			return err
-		}
-	}
-
 	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
@@ -220,7 +211,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
-	r.startExternalWatchers(ctx, cr)
+	if err := r.startExternalWatchers(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "start external watchers")
+	}
 
 	if err := r.reconcileVersion(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile version")
@@ -448,21 +441,23 @@ func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGClus
 	return false, nil
 }
 
-func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) []string {
+func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
 	watcherName, watcherFunc := watcher.GetWALWatcher(cr)
-	if !r.Watchers.IsExist(watcherName) {
-		log.Info("Starting WAL watcher", "name", watcherName)
-
-		if err := r.Watchers.Add(watcherName, watcherFunc); err != nil {
-			return nil
-		}
-
-		go watcherFunc(ctx, r.Client, r.ExternalChan, r.StopExternalWatchers, r.PodExec, cr)
+	if r.Watchers.IsExist(watcherName) {
+		return nil
 	}
 
-	return r.Watchers.Names()
+	if err := r.Watchers.Add(watcherName, watcherFunc); err != nil {
+		return errors.Wrap(err, "add WAL watcher")
+	}
+
+	log.Info("Starting WAL watcher", "name", watcherName)
+
+	go watcherFunc(ctx, r.Client, r.ExternalChan, r.StopExternalWatchers, cr)
+
+	return nil
 }
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {

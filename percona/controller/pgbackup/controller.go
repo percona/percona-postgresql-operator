@@ -24,8 +24,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/percona/exec"
 	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -52,14 +52,6 @@ type PGBackupReconciler struct {
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
 func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
-	if r.PodExec == nil {
-		var err error
-		r.PodExec, err = exec.NewPodExecutor(context.Background(), mgr.GetConfig())
-		if err != nil {
-			return err
-		}
-	}
-
 	return (builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGBackup{}).
 		WatchesRawSource(source.Channel(r.ExternalChan, &handler.EnqueueRequestForObject{})).
@@ -233,7 +225,12 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		return reconcile.Result{}, nil
 	case v2.BackupSucceeded:
-		latestRestorableTime, err := watcher.GetLatestCommitTimestamp(ctx, r.Client, r.PodExec, pgCluster)
+		execCli, err := clientcmd.NewClient()
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "failed to create exec client")
+		}
+
+		latestRestorableTime, err := watcher.GetLatestCommitTimestamp(ctx, r.Client, execCli, pgCluster)
 		if err == nil {
 			log.Info("Got latest restorable timestamp", "timestamp", latestRestorableTime)
 			pgBackup.Status.LatestRestorableTime.Time = latestRestorableTime

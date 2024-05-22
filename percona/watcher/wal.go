@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/percona/exec"
+	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
 	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -25,16 +25,22 @@ const (
 
 var LatestTimestampFileNotFound = errors.Errorf("%s not found in container", LatestCommitTimestampFile)
 
-type WALWatcher func(context.Context, client.Client, chan event.GenericEvent, chan event.DeleteEvent, exec.PodExecutor, *pgv2.PerconaPGCluster)
+type WALWatcher func(context.Context, client.Client, chan event.GenericEvent, chan event.DeleteEvent, *pgv2.PerconaPGCluster)
 
 func GetWALWatcher(cr *pgv2.PerconaPGCluster) (string, WALWatcher) {
 	return cr.Namespace + "-" + cr.Name + "-wal-watcher", WatchCommitTimestamps
 }
 
-func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan chan event.GenericEvent, stopChan chan event.DeleteEvent, executor exec.PodExecutor, cr *pgv2.PerconaPGCluster) {
+func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan chan event.GenericEvent, stopChan chan event.DeleteEvent, cr *pgv2.PerconaPGCluster) {
 	log := logging.FromContext(ctx)
 
 	log.Info("Watching commit timestamps")
+
+	execCli, err := clientcmd.NewClient()
+	if err != nil {
+		log.Error(err, "create exec client")
+		return
+	}
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -43,7 +49,7 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 		select {
 		case <-ticker.C:
 			log.V(1).Info("Running WAL watcher")
-			ts, err := GetLatestCommitTimestamp(ctx, cli, executor, cr)
+			ts, err := GetLatestCommitTimestamp(ctx, cli, execCli, cr)
 			if err != nil {
 				if errors.Is(err, LatestTimestampFileNotFound) {
 					log.V(1).Info("Latest commit timestamp file not found", "file", LatestCommitTimestampFile)
@@ -103,7 +109,7 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 	return latest, nil
 }
 
-func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, executor exec.PodExecutor, cr *pgv2.PerconaPGCluster) (*metav1.Time, error) {
+func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *clientcmd.Client, cr *pgv2.PerconaPGCluster) (*metav1.Time, error) {
 	log := logging.FromContext(ctx)
 
 	primary, err := getPrimaryPod(ctx, cli, cr)
@@ -115,7 +121,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, executor e
 
 	stdout := bytes.Buffer{}
 	stderr := bytes.Buffer{}
-	if err := executor(cr.Namespace, primary.Name, "database", nil, &stdout, &stderr, "cat", LatestCommitTimestampFile); err != nil {
+	if err := execCli.Exec(ctx, primary, "database", nil, &stdout, &stderr, "cat", LatestCommitTimestampFile); err != nil {
 		if strings.Contains(stderr.String(), "No such file or directory") {
 			return nil, LatestTimestampFileNotFound
 		}

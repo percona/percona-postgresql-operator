@@ -109,7 +109,7 @@ func (t *PITRestoreDateTime) UnmarshalJSON(b []byte) (err error) {
 		return
 	}
 
-	mt := metav1.NewTime(pt.Local())
+	mt := metav1.NewTime(pt)
 	t.Time = &mt
 
 	return nil
