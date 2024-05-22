@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
@@ -30,6 +31,8 @@ func (r *PGClusterReconciler) reconcileBackups(ctx context.Context, cr *v2.Perco
 }
 
 func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+
 	if cr.Status.State != v2.AppStateReady {
 		return nil
 	}
@@ -37,24 +40,29 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
 		var info pgbackrest.InfoOutput
 
-		pbList, err := listPGBackups(ctx, r.Client, cr)
+		pbList, err := listPGBackups(ctx, r.Client, cr, repo.Name)
 		if err != nil {
 			return errors.Wrap(err, "list pg-backups")
+		}
+		if len(pbList) == 0 {
+			continue
+		}
+
+		readyPod, err := controller.GetReadyInstancePod(ctx, r.Client, cr.Name, cr.Namespace)
+		if err != nil {
+			return errors.Wrap(err, "get ready instance pod")
+		}
+		info, err = pgbackrest.GetInfo(ctx, readyPod, repo.Name)
+		if err != nil {
+			if errors.Is(err, pgbackrest.ErrNoValidBackups) {
+				log.Error(err, "Failed to get pgbackrest info", "repo", repo.Name)
+				continue
+			}
+			return errors.Wrap(err, "get pgBackRest info")
 		}
 		for _, pgBackup := range pbList {
 			if pgBackup.Status.State != v2.BackupSucceeded {
 				continue
-			}
-
-			if len(info) == 0 {
-				readyPod, err := controller.GetReadyInstancePod(ctx, r.Client, cr.Name, cr.Namespace)
-				if err != nil {
-					return errors.Wrap(err, "get ready instance pod")
-				}
-				info, err = pgbackrest.GetInfo(ctx, readyPod, repo.Name)
-				if err != nil {
-					return errors.Wrap(err, "get pgBackRest info")
-				}
 			}
 
 			backupPresent := false
@@ -95,7 +103,7 @@ func (r *PGClusterReconciler) reconcileBackupJobs(ctx context.Context, cr *v2.Pe
 }
 
 func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGCluster, job batchv1.Job, repoName string) error {
-	pb, err := findPGBackup(ctx, cl, cr, job)
+	pb, err := findPGBackup(ctx, cl, cr, job, repoName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find PerconaPGBackup for job %s", job.Name)
 	}
@@ -147,8 +155,8 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 	return nil
 }
 
-func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster, job batchv1.Job) (*v2.PerconaPGBackup, error) {
-	pbList, err := listPGBackups(ctx, cl, cr)
+func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster, job batchv1.Job, repoName string) (*v2.PerconaPGBackup, error) {
+	pbList, err := listPGBackups(ctx, cl, cr, repoName)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list backup jobs")
 	}
@@ -162,7 +170,7 @@ func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster
 	return nil, nil
 }
 
-func listPGBackups(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) ([]v2.PerconaPGBackup, error) {
+func listPGBackups(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster, repoName string) ([]v2.PerconaPGBackup, error) {
 	pbList := new(v2.PerconaPGBackupList)
 	err := cl.List(ctx, pbList, &client.ListOptions{
 		Namespace: cr.Namespace,
@@ -174,7 +182,7 @@ func listPGBackups(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluste
 	// we should not filter by label, because the user can create the resource without the label
 	list := []v2.PerconaPGBackup{}
 	for _, pgBackup := range pbList.Items {
-		if pgBackup.Spec.PGCluster != cr.Name {
+		if pgBackup.Spec.PGCluster != cr.Name || pgBackup.Spec.RepoName != repoName {
 			continue
 		}
 		list = append(list, pgBackup)
