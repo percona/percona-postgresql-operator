@@ -436,9 +436,9 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 
 	// at this point, the Job either wasn't found or it has failed, so the it
 	// should be created
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.Metadata.
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Annotations, cluster.Spec.Metadata.
 		GetAnnotationsOrNil())
-	labels := naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
+	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGDataDir: "",
@@ -480,6 +480,7 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
+				Tolerations: cluster.Spec.DataSource.Volumes.PGDataVolume.Tolerations,
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
@@ -558,9 +559,9 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		}
 	}
 
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.Metadata.
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGWALVolume.Annotations, cluster.Spec.Metadata.
 		GetAnnotationsOrNil())
-	labels := naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
+	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGWALVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGWalDir: "",
@@ -598,6 +599,7 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
+				Tolerations: cluster.Spec.DataSource.Volumes.PGWALVolume.Tolerations,
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
@@ -676,9 +678,9 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 		}
 	}
 
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGBackRestVolume.Annotations,
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
-	labels := naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
+	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGBackRestVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGBackRestRepoDir: "",
@@ -721,6 +723,7 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
+				Tolerations: cluster.Spec.DataSource.Volumes.PGBackRestVolume.Tolerations,
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
