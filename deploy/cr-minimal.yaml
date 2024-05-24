@@ -2,14 +2,14 @@ apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   labels:
-    pgo-version: 1.6.0
+    pgo-version: 1.7.0
   name: minimal-cluster
 spec:
   database: pgdb
   port: "5432"
   user: pguser
   pgPrimary:
-    image: percona/percona-postgresql-operator:1.6.0-ppg14-postgres-ha
+    image: perconalab/percona-postgresql-operator:main-ppg14-postgres-ha
     volumeSpec:
       size: 1Gi
       accessmode: ReadWriteOnce
@@ -18,13 +18,13 @@ spec:
     hotStandby:
       size: 0
   pgBouncer:
-    image: percona/percona-postgresql-operator:1.6.0-ppg14-pgbouncer
+    image: perconalab/percona-postgresql-operator:main-ppg14-pgbouncer
     size: 1
     expose:
       serviceType: ClusterIP
   backup:
-    image: percona/percona-postgresql-operator:1.6.0-ppg14-pgbackrest
-    backrestRepoImage: percona/percona-postgresql-operator:1.6.0-ppg14-pgbackrest-repo
+    image: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest
+    backrestRepoImage: perconalab/percona-postgresql-operator:main-ppg14-pgbackrest-repo
     volumeSpec:
       size: 1Gi
       accessmode: ReadWriteOnce

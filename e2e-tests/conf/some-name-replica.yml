@@ -22,4 +22,4 @@ spec:
   serviceType: ''
   tolerations: []
   userlabels:
-    pgo-version: 1.6.0
+    pgo-version: 1.7.0
