@@ -40,8 +40,8 @@ spec:
 #      storagetype: dynamic
 #      storageclass: ""
 #      matchLabels: ""
-#  userLabels:
-#    pgo-version: "1.6.0"
+  userLabels:
+    pgo-version: "1.6.0"
   pgPrimary:
     image: percona/percona-postgresql-operator:1.6.0-ppg14-postgres-ha
 #    imagePullPolicy: Always
@@ -85,7 +85,7 @@ spec:
 #    customconfig: ""
   pmm:
     enabled: false
-    image: percona/pmm-client:2.41.2
+    image: percona/pmm-client:2.36.0
 #    imagePullPolicy: Always
     serverHost: monitoring-service
     serverUser: admin
@@ -179,7 +179,7 @@ spec:
 #        labels:
 #          pg-cluster-label: cluster1
   pgBadger:
-    enabled: false
+    enabled: true
     image: percona/percona-postgresql-operator:1.6.0-ppg14-pgbadger
 #    imagePullPolicy: Always
     port: 10000
