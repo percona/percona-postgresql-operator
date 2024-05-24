@@ -60,8 +60,9 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 			}
 			return errors.Wrap(err, "get pgBackRest info")
 		}
+
 		for _, pgBackup := range pbList {
-			if pgBackup.Status.State != v2.BackupSucceeded {
+			if pgBackup.Status.State != v2.BackupSucceeded || pgBackup.CompareVersion("2.4.0") < 0 {
 				continue
 			}
 
@@ -81,6 +82,7 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 			if err := r.Client.Delete(ctx, &pgBackup); err != nil {
 				return errors.Wrapf(err, "delete backup %s/%s", pgBackup.Name, pgBackup.Namespace)
 			}
+			log.Info("Deleting outdated backup", "backup name", pgBackup.Name)
 		}
 	}
 	return nil

@@ -107,6 +107,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		}
 
 		pgBackup.Status.Repo = repo
+		pgBackup.Status.CRVersion = pgCluster.Spec.CRVersion
 		switch {
 		case repo.S3 != nil:
 			pgBackup.Status.StorageType = v2.PGBackupStorageTypeS3

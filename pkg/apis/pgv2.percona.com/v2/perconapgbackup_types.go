@@ -3,6 +3,7 @@ package v2
 import (
 	"fmt"
 
+	v "github.com/hashicorp/go-version"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
@@ -78,6 +79,7 @@ type PerconaPGBackupStatus struct {
 	Repo        *crunchyv1beta1.PGBackRestRepo `json:"repo,omitempty"`
 	Image       string                         `json:"image,omitempty"`
 	BackupName  string                         `json:"backupName,omitempty"`
+	CRVersion   string                         `json:"crVersion,omitempty"`
 }
 
 type PGBackupStorageType string
@@ -99,4 +101,12 @@ const (
 
 func (b *PerconaPGBackup) Default() {
 	b.Spec.Options = append(b.Spec.Options, fmt.Sprintf(`--annotation="%s"="%s"`, pgbackrest.AnnotationBackupName, b.Name))
+}
+
+func (b *PerconaPGBackup) CompareVersion(ver string) int {
+	if b.Status.CRVersion == "" {
+		return -1
+	}
+	backupVersion := v.Must(v.NewVersion(b.Status.CRVersion))
+	return backupVersion.Compare(v.Must(v.NewVersion(ver)))
 }
