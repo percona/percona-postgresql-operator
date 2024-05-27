@@ -2,7 +2,7 @@ apiVersion: pg.percona.com/v1
 kind: PerconaPGCluster
 metadata:
   labels:
-    pgo-version: 1.6.0
+    pgo-version: 1.7.0
   name: some-name
 spec:
 #  secretsName: some-name-users
@@ -41,7 +41,7 @@ spec:
 #      storageclass: ""
 #      matchLabels: ""
 #  userLabels:
-#    pgo-version: "1.6.0"
+#    pgo-version: "1.7.0"
   pgPrimary:
     affinity:
      antiAffinityType: preferred

@@ -4,7 +4,7 @@
   <img width="150" src="../../docs/static/logos/pgo.svg" alt="PGO: The Postgres Operator from Crunchy Data"/>
 </p>
 
-Latest Release: 1.6.0
+Latest Release: 1.7.0
 
 ## General
 

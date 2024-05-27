@@ -73,11 +73,11 @@ main() {
 	cluster="some-name"
 
 	operator_action='install'
-	create_or_upgrade_to_version ${cluster} '1.5.0' "${test_dir}/conf/1.4.0_operator.yaml" 'dynamic' "$operator_action"
+	create_or_upgrade_to_version ${cluster} '1.5.1' "${test_dir}/conf/1.5.1_operator.yaml" 'dynamic' "$operator_action"
 	operator_action='update'
-	create_or_upgrade_to_version ${cluster} '1.5.1' "${test_dir}/conf/1.5.0_operator.yaml" 'dynamic' "$operator_action"
+	create_or_upgrade_to_version ${cluster} '1.6.0' "${test_dir}/conf/1.6.0_operator.yaml" 'dynamic' "$operator_action"
 
-	LATEST_TAG='1.6.0'
+	LATEST_TAG='1.7.0'
 	IMAGE_OPERATOR="${TARGET_IMAGE_OPERATOR:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-postgres-operator"}"
 	IMAGE_DEPLOYER="${TARGET_IMAGE_DEPLOYER:-"perconalab/percona-postgresql-operator:${GIT_BRANCH}-pgo-deployer"}"
 
