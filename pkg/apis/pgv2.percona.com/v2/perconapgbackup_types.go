@@ -5,7 +5,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -97,6 +96,12 @@ const (
 	PGBackupTypeIncremental  PGBackupType = "incremental"
 )
 
+const (
+	PGBackrestAnnotationBackupName = "percona.com/backup-name"
+	PGBackrestAnnotationJobName    = "percona.com/backup-job-name"
+	PGBackrestAnnotationJobType    = "percona.com/backup-job-type"
+)
+
 func (b *PerconaPGBackup) Default() {
-	b.Spec.Options = append(b.Spec.Options, fmt.Sprintf(`--annotation="%s"="%s"`, pgbackrest.AnnotationBackupName, b.Name))
+	b.Spec.Options = append(b.Spec.Options, fmt.Sprintf(`--annotation="%s"="%s"`, PGBackrestAnnotationBackupName, b.Name))
 }
