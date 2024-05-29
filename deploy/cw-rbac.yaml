@@ -133,6 +133,7 @@ rules:
   - pgv2.percona.com
   resources:
   - perconapgclusters
+  - perconapgupgrades
   verbs:
   - create
   - get
@@ -145,6 +146,7 @@ rules:
   resources:
   - perconapgclusters/status
   - perconapgrestores/status
+  - perconapgupgrades/status
   verbs:
   - patch
   - update
@@ -189,7 +191,6 @@ rules:
   - postgres-operator.crunchydata.com
   resources:
   - pgadmins
-  - pgupgrades
   verbs:
   - get
   - list
@@ -213,6 +214,7 @@ rules:
 - apiGroups:
   - postgres-operator.crunchydata.com
   resources:
+  - pgupgrades
   - postgresclusters
   verbs:
   - create

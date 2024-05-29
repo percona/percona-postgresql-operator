@@ -34,6 +34,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
+	"github.com/percona/percona-postgresql-operator/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
@@ -384,18 +385,25 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster)
 		return
 	}
 
-	extensions := make([]string, 0)
+	extensionKeys := make([]string, 0)
 	for _, extension := range cr.Spec.Extensions.Custom {
-		key := GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
-		extensions = append(extensions, key)
+		key := extensions.GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
+		extensionKeys = append(extensionKeys, key)
 	}
-	container := ExtensionInstallerContainer(cr.Spec.PostgresVersion, &cr.Spec.Extensions, strings.Join(extensions, ","), cr.Spec.OpenShift)
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
-		set.InitContainers = append(set.InitContainers, ExtensionRelocatorContainer(cr.Spec.Image, cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion))
-		set.InitContainers = append(set.InitContainers, container)
-		set.VolumeMounts = append(set.VolumeMounts, ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
+		set.InitContainers = append(set.InitContainers, extensions.ExtensionRelocatorContainer(
+			cr, cr.Spec.Image, cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion,
+		))
+		set.InitContainers = append(set.InitContainers, extensions.ExtensionInstallerContainer(
+			cr,
+			cr.Spec.PostgresVersion,
+			&cr.Spec.Extensions,
+			strings.Join(extensionKeys, ","),
+			cr.Spec.OpenShift,
+		))
+		set.VolumeMounts = append(set.VolumeMounts, extensions.ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
 	}
 }
 

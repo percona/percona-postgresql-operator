@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      
+      get_cr \
+        | yq eval '
+          .spec.postgresVersion = 12 |
+          .spec.image = "perconalab/percona-postgresql-operator:main-ppg12-postgres" |
+          .spec.instances[0].dataVolumeClaimSpec.resources.requests.storage = "3Gi" |
+          .spec.proxy.pgBouncer.image = "perconalab/percona-postgresql-operator:main-ppg12-pgbouncer" |
+          .spec.backups.pgbackrest.image = "perconalab/percona-postgresql-operator:main-ppg12-pgbackrest" |
+          .spec.patroni.dynamicConfiguration.postgresql.parameters.shared_preload_libraries = "pg_cron" |
+          .spec.extensions.custom += [{"name": "pg_cron", "version": "1.6.1"}]' \
+        | kubectl -n "${NAMESPACE}" apply -f -

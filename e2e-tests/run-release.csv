@@ -1,6 +1,7 @@
 custom-extensions
 demand-backup
 init-deploy
+major-upgrade
 migration-backup-s3
 monitoring
 one-pod

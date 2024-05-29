@@ -1,29 +1,38 @@
-// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package v1beta1
+package v2
 
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-// PGUpgradeSpec defines the desired state of PGUpgrade
-type PGUpgradeSpec struct {
+func init() {
+	SchemeBuilder.Register(&PerconaPGUpgrade{}, &PerconaPGUpgradeList{})
+}
 
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// PerconaPGUpgrade is the Schema for the perconapgupgrades API
+type PerconaPGUpgrade struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+
+	Spec   PerconaPGUpgradeSpec   `json:"spec"`
+	Status PerconaPGUpgradeStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// PerconaPGRestoreList contains a list of PerconaPGRestore
+type PerconaPGUpgradeList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []PerconaPGUpgrade `json:"items"`
+}
+
+type PerconaPGUpgradeSpec struct {
 	// +optional
-	Metadata *Metadata `json:"metadata,omitempty"`
+	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
 
 	// The name of the cluster to be updated
 	// +required
@@ -31,8 +40,8 @@ type PGUpgradeSpec struct {
 	PostgresClusterName string `json:"postgresClusterName"`
 
 	// The image name to use for major PostgreSQL upgrades.
-	// +optional
-	Image *string `json:"image,omitempty"`
+	// +required
+	Image *string `json:"image"`
 
 	// ImagePullPolicy is used to determine when Kubernetes will attempt to
 	// pull (download) container images.
@@ -58,7 +67,7 @@ type PGUpgradeSpec struct {
 
 	// The major version of PostgreSQL before the upgrade.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Minimum=12
 	// +kubebuilder:validation:Maximum=16
 	FromPostgresVersion int `json:"fromPostgresVersion"`
 
@@ -69,7 +78,7 @@ type PGUpgradeSpec struct {
 
 	// The major version of PostgreSQL to be upgraded to.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Minimum=13
 	// +kubebuilder:validation:Maximum=16
 	ToPostgresVersion int `json:"toPostgresVersion"`
 
@@ -110,41 +119,6 @@ type PGUpgradeSpec struct {
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
-// PGUpgradeStatus defines the observed state of PGUpgrade
-type PGUpgradeStatus struct {
-	// conditions represent the observations of PGUpgrade's current state.
-	// +optional
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
-	// observedGeneration represents the .metadata.generation on which the status was based.
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
-// PGUpgrade is the Schema for the pgupgrades API
-type PGUpgrade struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   PGUpgradeSpec   `json:"spec,omitempty"`
-	Status PGUpgradeStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// PGUpgradeList contains a list of PGUpgrade
-type PGUpgradeList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PGUpgrade `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&PGUpgrade{}, &PGUpgradeList{})
+type PerconaPGUpgradeStatus struct {
+	crunchyv1beta1.PGUpgradeStatus `json:",inline"`
 }
