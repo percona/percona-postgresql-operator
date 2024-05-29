@@ -6,9 +6,16 @@ commands:
       set -o xtrace
 
       source ../../functions
+      
+      initial_backup=$(kubectl -n ${NAMESPACE} get pg-backup --sort-by='.status.completed' --no-headers  | head -n 1 | awk '{print $1}')
+      initial_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup ${initial_backup} -o json | jq '.status.latestRestorableTime')
 
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
+        "postgres:$(get_psql_user_pass pitr-pguser-postgres)@$(get_psql_user_host pitr-pguser-postgres)"
+      
       latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup pitr-full -o json | jq '.status.latestRestorableTime')
-      until [ "${latest_restorable_time}" != "null" ]; do
+      until [ "${latest_restorable_time}" != "${initial_restorable_time}" ]; do
         sleep 5
         latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup pitr-full -o json | jq '.status.latestRestorableTime')
       done
