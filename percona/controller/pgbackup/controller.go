@@ -2,6 +2,7 @@ package pgbackup
 
 import (
 	"context"
+	"io"
 	"path"
 	"time"
 
