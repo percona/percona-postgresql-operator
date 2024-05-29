@@ -41,7 +41,10 @@ func PostgreSQL(
 	fixTimezone := `sed -E 's/([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\+\-][0-9]{2})/\1\2/' | sed 's/UTC/Z/'`
 	extractCommitTime := `awk '{print $(NF-2) "T" $(NF-1) " " $(NF)}' | ` + fixTimezone + ``
 	validateCommitTime := `grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2}`
-	archive := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-push "%p" && timestamp=$(pg_waldump "%p" | grep COMMIT | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `)$'); if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgwal/latest_commit_timestamp.txt; fi`
+	archive := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-push "%p"`
+	archive += ` && timestamp=$(pg_waldump "%p" | grep COMMIT | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `)$');`
+	archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgwal/latest_commit_timestamp.txt; fi`
+
 	outParameters.Mandatory.Add("archive_mode", "on")
 	outParameters.Mandatory.Add("archive_command", archive)
 
