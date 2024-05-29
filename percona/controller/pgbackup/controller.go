@@ -2,10 +2,7 @@ package pgbackup
 
 import (
 	"context"
-	"flag"
-	"io"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -21,7 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
@@ -175,7 +171,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 			bcp.Status.State = v2.BackupRunning
 			bcp.Status.JobName = job.Name
-			bcp.Status.BackupType = getBackupType(job)
 
 			return r.Client.Status().Update(ctx, bcp)
 		}); err != nil {
@@ -279,44 +274,6 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 	return destination
 }
 
-func getBackupType(job *batchv1.Job) v2.PGBackupType {
-	var backupContainer corev1.Container
-	for _, container := range job.Spec.Template.Spec.Containers {
-		if len(container.Command) > 0 && container.Name == naming.PGBackRestRepoContainerName {
-			backupContainer = container
-			break
-		}
-	}
-	cmdOpts := ""
-	for _, env := range backupContainer.Env {
-		if env.Name == "COMMAND_OPTS" {
-			cmdOpts = env.Value
-			break
-		}
-	}
-	backupType := getBackupTypeFromOpts(cmdOpts)
-	switch backupType {
-	case postgrescluster.Differential:
-		return v2.PGBackupTypeDifferential
-	case postgrescluster.Incremental:
-		return v2.PGBackupTypeIncremental
-	case postgrescluster.Full:
-		return v2.PGBackupTypeFull
-	default:
-		// Incremental is default: https://pgbackrest.org/command.html#command-backup/category-command/option-type
-		return v2.PGBackupTypeIncremental
-	}
-}
-
-func getBackupTypeFromOpts(opts string) string {
-	flagSet := flag.NewFlagSet("", flag.ErrorHandling(-1))
-	flagSet.SetOutput(io.Discard)
-
-	backupType := flagSet.String("type", "", "")
-	_ = flagSet.Parse(strings.Split(opts, " "))
-	return *backupType
-}
-
 func getReadyInstancePod(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (*corev1.Pod, error) {
 	pods := &corev1.PodList{}
 	selector, err := naming.AsSelector(naming.ClusterInstances(pgBackup.Spec.PGCluster))
@@ -353,13 +310,13 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 
 			// We mark completed backups with the AnnotationJobName.
 			// We should look for a backup without an AnnotationJobName that matches the AnnotationBackupName we're interested in.
-			if v := backup.Annotation[pgbackrest.AnnotationJobName]; v != "" && v != pgBackup.Status.JobName {
+			if v := backup.Annotation[v2.PGBackrestAnnotationJobName]; v != "" && v != pgBackup.Status.JobName {
 				continue
 			}
 
-			backupType := backup.Annotation[pgbackrest.AnnotationJobType]
+			backupType := backup.Annotation[v2.PGBackrestAnnotationJobType]
 			if (backupType != pgBackup.Annotations[v2.AnnotationPGBackrestBackupJobType] ||
-				backupType != string(naming.BackupReplicaCreate)) && backup.Annotation[pgbackrest.AnnotationBackupName] != pgBackup.Name {
+				backupType != string(naming.BackupReplicaCreate)) && backup.Annotation[v2.PGBackrestAnnotationBackupName] != pgBackup.Name {
 				continue
 			}
 
@@ -372,6 +329,7 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 					}
 
 					bcp.Status.BackupName = backup.Label
+					bcp.Status.BackupType = backup.Type
 
 					return c.Status().Update(ctx, bcp)
 				}); err != nil {
@@ -380,7 +338,7 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 			}
 
 			if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, pgBackup.Spec.RepoName, map[string]string{
-				pgbackrest.AnnotationJobName: pgBackup.Status.JobName,
+				v2.PGBackrestAnnotationJobName: pgBackup.Status.JobName,
 			}); err != nil {
 				return errors.Wrap(err, "set annotations to backup")
 			}

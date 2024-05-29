@@ -628,7 +628,7 @@ check_jobs_and_pgbackups() {
 				| yq '.spec.template.metadata.labels."postgres-operator.crunchydata.com/pgbackrest-cronjob"')
 		fi
 		if [[ $job_backup_type == "replica-create" ]]; then
-			job_backup_type="incremental"
+			job_backup_type="full"
 		fi
 		if [[ $job_backup_type == "manual" ]]; then
 			job_backup_type="full"
