@@ -9,8 +9,6 @@ metadata:
 spec:
   pgCluster: scheduled-backup
   repoName: repo2
-status:
-  backupType: full
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
@@ -20,7 +18,7 @@ spec:
   pgCluster: scheduled-backup
   repoName: repo1
 status:
-  backupType: incremental
+  backupType: full
   state: Succeeded
 ---
 apiVersion: pgv2.percona.com/v2
