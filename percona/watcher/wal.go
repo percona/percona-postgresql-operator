@@ -66,10 +66,11 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 			}
 
 			latestRestorableTime := latestBackup.Status.LatestRestorableTime
+			log.Info("Latest commit timestamp", "timestamp", ts, "latestRestorableTime", latestRestorableTime.Time)
 			if latestRestorableTime.Time == nil || latestRestorableTime.UTC().Before(ts.Time) {
 				log.Info("Triggering PGBackup reconcile",
 					"latestBackup", latestBackup.Name,
-					"latestRestorableTime", latestRestorableTime,
+					"latestRestorableTime", latestRestorableTime.Time,
 					"latestCommitTimestamp", ts,
 				)
 				eventChan <- event.GenericEvent{
@@ -104,6 +105,10 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 		if latest.Status.CompletedAt == nil || backup.Status.CompletedAt.After(latest.Status.CompletedAt.Time) {
 			latest = &backup
 		}
+	}
+
+	if latest.Status.CompletedAt == nil {
+		return nil, errors.New("no completed backups found")
 	}
 
 	return latest, nil
