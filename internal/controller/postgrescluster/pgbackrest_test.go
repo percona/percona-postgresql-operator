@@ -56,7 +56,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
-	perconaPgbackrest "github.com/percona/percona-postgresql-operator/percona/pgbackrest"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -958,7 +958,7 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 		case "COMMAND_OPTS":
 			assert.Assert(t, env.Value == "--stanza=db --repo=1"+
 				// K8SPG-506: adding label to get info about this backup in `pgbackrest info`
-				fmt.Sprintf(` --annotation="%s"="%s"`, perconaPgbackrest.AnnotationJobType, naming.BackupReplicaCreate),
+				fmt.Sprintf(` --annotation="%s"="%s"`, v2.PGBackrestAnnotationJobType, naming.BackupReplicaCreate),
 			)
 
 		case "COMPARE_HASH":

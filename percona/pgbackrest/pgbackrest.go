@@ -12,12 +12,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
-)
-
-const (
-	AnnotationBackupName = "percona.com/backup-name"
-	AnnotationJobName    = "percona.com/backup-job-name"
-	AnnotationJobType    = "percona.com/backup-job-type"
+	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
 type InfoOutput []InfoStanza
@@ -25,6 +20,7 @@ type InfoOutput []InfoStanza
 type InfoBackup struct {
 	Annotation map[string]string `json:"annotation,omitempty"`
 	Label      string            `json:"label,omitempty"`
+	Type       v2.PGBackupType   `json:"type,omitempty"`
 }
 
 type InfoStanza struct {
