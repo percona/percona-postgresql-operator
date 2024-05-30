@@ -3,6 +3,7 @@ package pgbackup
 import (
 	"context"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -246,24 +247,6 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 	}
 
 	return destination
-}
-
-func getReadyInstancePod(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (*corev1.Pod, error) {
-	pods := &corev1.PodList{}
-	selector, err := naming.AsSelector(naming.ClusterInstances(pgBackup.Spec.PGCluster))
-	if err != nil {
-		return nil, err
-	}
-	if err := c.List(ctx, pods, client.InNamespace(pgBackup.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
-		return nil, errors.Wrap(err, "list pods")
-	}
-	for _, pod := range pods.Items {
-		if pod.Status.Phase != corev1.PodRunning {
-			continue
-		}
-		return &pod, nil
-	}
-	return nil, errors.New("no running instance found")
 }
 
 func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod, pgBackup *v2.PerconaPGBackup) error {

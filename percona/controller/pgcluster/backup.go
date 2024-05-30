@@ -69,7 +69,7 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 			backupPresent := false
 			for _, info := range info {
 				for _, backupInfo := range info.Backup {
-					if backupInfo.Annotation[pgbackrest.AnnotationJobName] == pgBackup.Status.JobName {
+					if backupInfo.Annotation[v2.PGBackrestAnnotationJobName] == pgBackup.Status.JobName {
 						backupPresent = true
 						break
 					}
