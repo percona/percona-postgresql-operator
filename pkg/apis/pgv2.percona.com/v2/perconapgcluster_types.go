@@ -240,9 +240,9 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		case corev1.LastAppliedConfigAnnotation:
 			continue
 		default:
-			if strings.HasPrefix(k, annotationPrefix) {
+			if strings.HasPrefix(k, AnnotationPrefix) {
 				a := strings.Split(k, "/")
-				annotations[crunchyAnnotationPrefix+a[1]] = v
+				annotations[CrunchyAnnotationPrefix+a[1]] = v
 			} else {
 				annotations[k] = v
 			}
@@ -807,8 +807,8 @@ const (
 )
 
 const (
-	annotationPrefix        = "pgv2.percona.com/"
-	crunchyAnnotationPrefix = "postgres-operator.crunchydata.com/"
+	AnnotationPrefix        = "pgv2.percona.com/"
+	CrunchyAnnotationPrefix = "postgres-operator.crunchydata.com/"
 )
 
 const (
@@ -817,7 +817,7 @@ const (
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.  Also used to annotate the backup Job itself as needed to identify the backup
 	// ID associated with a specific manual backup Job.
-	AnnotationPGBackrestBackup = annotationPrefix + "pgbackrest-backup"
+	AnnotationPGBackrestBackup = AnnotationPrefix + "pgbackrest-backup"
 
 	// AnnotationPGBackrestBackupJobName is the annotation that is added to a PerconaPGClusterBackup.
 	// The value of the annotation will be a name of an existing backup job
@@ -831,19 +831,19 @@ const (
 	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.
-	AnnotationPGBackRestRestore = annotationPrefix + "pgbackrest-restore"
+	AnnotationPGBackRestRestore = AnnotationPrefix + "pgbackrest-restore"
 
 	// AnnotationPMMSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case PMM credentials are rotated.
-	AnnotationPMMSecretHash = annotationPrefix + "pmm-secret-hash"
+	AnnotationPMMSecretHash = AnnotationPrefix + "pmm-secret-hash"
 
 	// AnnotationMonitorUserSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case monitor user password is changed.
-	AnnotationMonitorUserSecretHash = annotationPrefix + "monitor-user-secret-hash"
+	AnnotationMonitorUserSecretHash = AnnotationPrefix + "monitor-user-secret-hash"
 
 	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
 	// indicate that backup is in progress.
-	AnnotationBackupInProgress = annotationPrefix + "backup-in-progress"
+	AnnotationBackupInProgress = AnnotationPrefix + "backup-in-progress"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"
