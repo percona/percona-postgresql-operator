@@ -14,6 +14,8 @@ commands:
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
         "postgres:$(get_psql_user_pass pitr-pguser-postgres)@$(get_psql_user_host pitr-pguser-postgres)"
       
+      sleep 70 # sleep more than archive_timeout
+      
       latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup pitr-full -o json | jq '.status.latestRestorableTime')
       until [ "${latest_restorable_time}" != "${initial_restorable_time}" ]; do
         sleep 5
@@ -36,4 +38,4 @@ commands:
         - --type=time
         - --target=${latest_restorable_time}
       EOF
-    timeout: 300
+    timeout: 360
