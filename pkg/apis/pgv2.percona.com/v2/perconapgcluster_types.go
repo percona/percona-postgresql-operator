@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -274,7 +273,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 
-	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Labels[naming.LabelVersion])
+	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion)
+	// postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Labels[naming.LabelVersion])
 	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		repo := postgresCluster.Spec.Backups.PGBackRest.Repos[i]
 
