@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-	"io"
 
 	// #nosec G501
 	"crypto/md5"
@@ -62,10 +61,6 @@ type PGClusterReconciler struct {
 	Watchers             *registry.Registry
 	ExternalChan         chan event.GenericEvent
 	StopExternalWatchers chan event.DeleteEvent
-	PodExec              func(
-		namespace, pod, container string,
-		stdin io.Reader, stdout, stderr io.Writer, command ...string,
-	) error
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager

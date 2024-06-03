@@ -2,7 +2,6 @@ package pgbackup
 
 import (
 	"context"
-	"io"
 	"path"
 	"time"
 
@@ -41,10 +40,6 @@ type PGBackupReconciler struct {
 	Client client.Client
 
 	ExternalChan chan event.GenericEvent
-	PodExec      func(
-		namespace, pod, container string,
-		stdin io.Reader, stdout, stderr io.Writer, command ...string,
-	) error
 }
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
