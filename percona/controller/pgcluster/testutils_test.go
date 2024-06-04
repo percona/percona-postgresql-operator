@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"go.opentelemetry.io/otel"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -69,21 +68,21 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	return cr, nil
 }
 
-func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
+func readDefaultBackup(name, namespace string) (*v2.PerconaPGBackup, error) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "backup.yaml"))
 	if err != nil {
 		return nil, err
 	}
 
-	cr := &appsv1.Deployment{}
+	bcp := &v2.PerconaPGBackup{}
 
-	if err := yaml.Unmarshal(data, cr); err != nil {
+	if err := yaml.Unmarshal(data, bcp); err != nil {
 		return nil, err
 	}
 
-	cr.Name = name
-	cr.Namespace = namespace
-	return cr, nil
+	bcp.Name = name
+	bcp.Namespace = namespace
+	return bcp, nil
 }
 
 type fakeClient struct {
