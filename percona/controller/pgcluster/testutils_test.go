@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"go.opentelemetry.io/otel"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -58,6 +59,23 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	}
 
 	cr := &v2.PerconaPGCluster{}
+
+	if err := yaml.Unmarshal(data, cr); err != nil {
+		return nil, err
+	}
+
+	cr.Name = name
+	cr.Namespace = namespace
+	return cr, nil
+}
+
+func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "operator.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &appsv1.Deployment{}
 
 	if err := yaml.Unmarshal(data, cr); err != nil {
 		return nil, err
