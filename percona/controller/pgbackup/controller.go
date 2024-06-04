@@ -12,13 +12,18 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -33,11 +38,16 @@ var ErrBackupJobNotFound = errors.New("backup Job not found")
 // Reconciler holds resources for the PerconaPGBackup reconciler
 type PGBackupReconciler struct {
 	Client client.Client
+
+	ExternalChan chan event.GenericEvent
 }
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
 func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGBackup{}).Complete(r)
+	return (builder.ControllerManagedBy(mgr).
+		For(&v2.PerconaPGBackup{}).
+		WatchesRawSource(source.Channel(r.ExternalChan, &handler.EnqueueRequestForObject{})).
+		Complete(r))
 }
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update
@@ -59,10 +69,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			log.Error(err, "unable to fetch PerconaPGBackup")
 		}
 		return reconcile.Result{}, err
-	}
-
-	if pgBackup.Status.State == v2.BackupSucceeded || pgBackup.Status.State == v2.BackupFailed {
-		return reconcile.Result{}, nil
 	}
 
 	pgBackup.Default()
@@ -205,6 +211,23 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 			return r.Client.Status().Update(ctx, bcp)
 		}); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+		}
+
+		return reconcile.Result{}, nil
+	case v2.BackupSucceeded:
+		execCli, err := clientcmd.NewClient()
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "failed to create exec client")
+		}
+
+		latestRestorableTime, err := watcher.GetLatestCommitTimestamp(ctx, r.Client, execCli, pgCluster)
+		if err == nil {
+			log.Info("Got latest restorable timestamp", "timestamp", latestRestorableTime)
+			pgBackup.Status.LatestRestorableTime.Time = latestRestorableTime
+		}
+
+		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 

@@ -94,7 +94,7 @@ var _ = Describe("Ensure Version", Ordered, func() {
 
 	Context("Reconcile controller", func() {
 		It("Controller should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -108,7 +108,7 @@ var _ = Describe("Ensure Version", Ordered, func() {
 			It("should succeed while using default version service endpoint", func() {
 				Expect(os.Setenv("PERCONA_VS_FALLBACK_URI", defaultEndpoint)).To(Succeed())
 
-				vm := reconciler().getVersionMeta(cr, operatorDepl)
+				vm := reconciler(cr).getVersionMeta(cr, operatorDepl)
 				Expect(version.EnsureVersion(ctx, vm)).To(Succeed())
 			})
 		})
@@ -121,7 +121,7 @@ var _ = Describe("Ensure Version", Ordered, func() {
 			It("should fail while using unimplemented version service endpoint", func() {
 				Expect(os.Setenv("PERCONA_VS_FALLBACK_URI", unimplEndpoint)).To(Succeed())
 
-				vm := reconciler().getVersionMeta(cr, operatorDepl)
+				vm := reconciler(cr).getVersionMeta(cr, operatorDepl)
 				Expect(version.EnsureVersion(ctx, vm)).NotTo(BeNil())
 			})
 		})
@@ -139,6 +139,13 @@ func (vs *fakeVS) Apply(_ context.Context, req any) (any, error) {
 	if vs.unimplemented {
 		return nil, errors.New("unimplemented")
 	}
+
+	rec := reconciler(&v2.PerconaPGCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "fake",
+			Namespace: "fake",
+		},
+	})
 
 	r := req.(*pbVersion.ApplyRequest)
 
@@ -163,10 +170,10 @@ func (vs *fakeVS) Apply(_ context.Context, req any) (any, error) {
 		BackupVersion:      "",
 		CustomResourceUid:  vs.crUID,
 		DatabaseVersion:    "14",
-		KubeVersion:        reconciler().KubeVersion,
+		KubeVersion:        rec.KubeVersion,
 		NamespaceUid:       "",
 		OperatorVersion:    v2.Version,
-		Platform:           reconciler().Platform,
+		Platform:           rec.Platform,
 		PmmVersion:         "",
 		PmmEnabled:         true,
 		HelmDeployCr:       true,

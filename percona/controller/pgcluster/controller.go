@@ -2,6 +2,8 @@ package pgcluster
 
 import (
 	"context"
+
+	// #nosec G501
 	"crypto/md5"
 	"fmt"
 	"reflect"
@@ -34,6 +36,8 @@ import (
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
+	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
+	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -45,15 +49,18 @@ const (
 
 // Reconciler holds resources for the PerconaPGCluster reconciler
 type PGClusterReconciler struct {
-	Client            client.Client
-	Owner             client.FieldOwner
-	Recorder          record.EventRecorder
-	Tracer            trace.Tracer
-	Platform          string
-	KubeVersion       string
-	CrunchyController controller.Controller
-	IsOpenShift       bool
-	Cron              CronRegistry
+	Client               client.Client
+	Owner                client.FieldOwner
+	Recorder             record.EventRecorder
+	Tracer               trace.Tracer
+	Platform             string
+	KubeVersion          string
+	CrunchyController    controller.Controller
+	IsOpenShift          bool
+	Cron                 CronRegistry
+	Watchers             *registry.Registry
+	ExternalChan         chan event.GenericEvent
+	StopExternalWatchers chan event.DeleteEvent
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
@@ -156,7 +163,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret] 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	log := logging.FromContext(ctx)
+	log := logging.FromContext(ctx).WithValues("cluster", request.Name, "namespace", request.Namespace)
 
 	cr := &v2.PerconaPGCluster{}
 	if err := r.Client.Get(ctx, request.NamespacedName, cr); err != nil {
@@ -182,7 +189,13 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		},
 	}
 
+	if err := r.ensureFinalizers(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
+	}
+
 	if cr.DeletionTimestamp != nil {
+		log.Info("Deleting PerconaPGCluster")
+
 		// We're deleting PostgresCluster explicitly to let Crunchy controller run its finalizers and not mess with us.
 		if err := r.Client.Delete(ctx, postgresCluster); client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "delete postgres cluster")
@@ -198,6 +211,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		return reconcile.Result{}, nil
+	}
+
+	if err := r.startExternalWatchers(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "start external watchers")
 	}
 
 	if err := r.reconcileVersion(ctx, cr); err != nil {
@@ -424,4 +441,39 @@ func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGClus
 	}
 
 	return false, nil
+}
+
+func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+
+	watcherName, watcherFunc := watcher.GetWALWatcher(cr)
+	if r.Watchers.IsExist(watcherName) {
+		return nil
+	}
+
+	if err := r.Watchers.Add(watcherName, watcherFunc); err != nil {
+		return errors.Wrap(err, "add WAL watcher")
+	}
+
+	log.Info("Starting WAL watcher", "name", watcherName)
+
+	go watcherFunc(ctx, r.Client, r.ExternalChan, r.StopExternalWatchers, cr)
+
+	return nil
+}
+
+func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	for _, finalizer := range cr.Finalizers {
+		if finalizer == v2.FinalizerStopWatchers {
+			return nil
+		}
+	}
+
+	orig := cr.DeepCopy()
+	cr.Finalizers = append(cr.Finalizers, v2.FinalizerStopWatchers)
+	if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "patch finalizers")
+	}
+
+	return nil
 }
