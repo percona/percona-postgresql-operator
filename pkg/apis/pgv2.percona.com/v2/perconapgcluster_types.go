@@ -274,7 +274,6 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 
 	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion)
-	// postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Labels[naming.LabelVersion])
 	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		repo := postgresCluster.Spec.Backups.PGBackRest.Repos[i]
 
