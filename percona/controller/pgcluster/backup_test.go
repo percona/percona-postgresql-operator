@@ -45,7 +45,7 @@ func TestBackupOwnerReference(t *testing.T) {
 		t.Fatalf("failed to build fake client: %v", err)
 	}
 
-	reconciler := reconciler()
+	reconciler := reconciler(cr)
 	reconciler.Client = fakeClient
 	crunchyReconciler := crunchyReconciler()
 	crunchyReconciler.Client = fakeClient

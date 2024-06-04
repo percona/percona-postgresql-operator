@@ -56,7 +56,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		})
 
 		It("should reconcile and create Crunchy PostgreCluster", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -76,7 +76,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 				)
 			})
 
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
@@ -111,7 +111,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		})
 
 		It("should reconcile and create Crunchy PostgreCluster", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -121,7 +121,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 				pgc.Status.Proxy.PGBouncer.Replicas = 1
 			})
 
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
@@ -145,7 +145,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		})
 
 		It("should reconcile and create Crunchy PostgreCluster", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -247,7 +247,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		})
 
 		It("should reconcile and create Crunchy PostgreCluster", func() {
-			_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -269,7 +269,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					}
 				})
 
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -290,7 +290,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					}
 				})
 
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -306,7 +306,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					})
 				Expect(k8sClient.Status().Update(ctx, pgBouncerSVC)).Should(Succeed())
 
-				_, err = reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -322,7 +322,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 })
 
 func reconcileAndAssertState(ctx context.Context, nn types.NamespacedName, cr *v2.PerconaPGCluster, expectedState v2.AppState) {
-	_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: nn})
+	_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: nn})
 	Expect(err).NotTo(HaveOccurred())
 
 	Eventually(func() bool {
