@@ -1,0 +1,9 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  name: one-pod-full
+spec:
+  pgCluster: one-pod
+  repoName: repo1
+  options:
+    - --type=full

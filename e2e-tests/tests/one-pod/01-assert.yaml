@@ -1,0 +1,108 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: one-pod
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: one-pod
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: one-pod-pgbouncer
+  labels:
+    postgres-operator.crunchydata.com/cluster: one-pod
+    postgres-operator.crunchydata.com/role: pgbouncer
+  annotations:
+    deployment.kubernetes.io/revision: '1'
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: one-pod
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 1
+  updatedReplicas: 1
+  readyReplicas: 1
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: one-pod
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: one-pod
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: one-pod
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 1
+      replicas: 1
+      updatedReplicas: 1
+  observedGeneration: 1
+  pgbackrest:
+    repos:
+      - name: repo1
+        stanzaCreated: true
+  proxy:
+    pgBouncer:
+      readyReplicas: 1
+      replicas: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: one-pod
+status:
+  pgbouncer:
+    ready: 1
+    size: 1
+  postgres:
+    instances:
+    - name: instance1
+      ready: 1
+      size: 1
+    ready: 1
+    size: 1
+  state: ready
