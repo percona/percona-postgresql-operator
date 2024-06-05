@@ -29,6 +29,8 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	cruntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -48,6 +50,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	perconaRuntime "github.com/percona/percona-postgresql-operator/percona/runtime"
+	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -168,25 +171,56 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return errors.New("missing controller in manager")
 	}
 
+	externalEvents := make(chan event.GenericEvent)
+	stopChan := make(chan event.DeleteEvent)
+
 	pc := &pgcluster.PGClusterReconciler{
-		Client:            mgr.GetClient(),
-		Owner:             pgcluster.PGClusterControllerName,
-		Recorder:          mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
-		Tracer:            otel.Tracer(pgcluster.PGClusterControllerName),
-		Platform:          detectPlatform(ctx, mgr.GetConfig()),
-		KubeVersion:       getServerVersion(ctx, mgr.GetConfig()),
-		CrunchyController: cm.Controller(),
-		IsOpenShift:       isOpenshift(ctx, mgr.GetConfig()),
-		Cron:              pgcluster.NewCronRegistry(),
+		Client:               mgr.GetClient(),
+		Owner:                pgcluster.PGClusterControllerName,
+		Recorder:             mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
+		Tracer:               otel.Tracer(pgcluster.PGClusterControllerName),
+		Platform:             detectPlatform(ctx, mgr.GetConfig()),
+		KubeVersion:          getServerVersion(ctx, mgr.GetConfig()),
+		CrunchyController:    cm.Controller(),
+		IsOpenShift:          isOpenshift(ctx, mgr.GetConfig()),
+		Cron:                 pgcluster.NewCronRegistry(),
+		ExternalChan:         externalEvents,
+		StopExternalWatchers: stopChan,
+		Watchers:             registry.New(),
 	}
 	if err := pc.SetupWithManager(mgr); err != nil {
 		return err
 	}
 
 	pb := &pgbackup.PGBackupReconciler{
-		Client: mgr.GetClient(),
+		Client:       mgr.GetClient(),
+		ExternalChan: externalEvents,
 	}
 	if err := pb.SetupWithManager(mgr); err != nil {
+		return err
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v2.PerconaPGBackup{},
+		"spec.pgCluster",
+		func(rawObj client.Object) []string {
+			backup := rawObj.(*v2.PerconaPGBackup)
+			return []string{backup.Spec.PGCluster}
+		},
+	); err != nil {
+		return err
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v2.PerconaPGBackup{},
+		"status.state",
+		func(rawObj client.Object) []string {
+			backup := rawObj.(*v2.PerconaPGBackup)
+			return []string{string(backup.Status.State)}
+		},
+	); err != nil {
 		return err
 	}
 

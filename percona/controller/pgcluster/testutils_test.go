@@ -16,23 +16,47 @@ import (
 	"k8s.io/component-base/featuregate"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
+	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
+	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 var k8sClient client.Client
 
-func reconciler() *PGClusterReconciler {
+func reconciler(cr *v2.PerconaPGCluster) *PGClusterReconciler {
+	externalChan := make(chan event.GenericEvent)
+	stopChan := make(chan event.DeleteEvent)
+
+	watcherName, _ := watcher.GetWALWatcher(cr)
+	reg := registry.New()
+
+	dummyWatchwer := func() {
+		for range stopChan {
+			return
+		}
+	}
+	err := reg.Add(watcherName, dummyWatchwer)
+	if err != nil {
+		panic(err)
+	}
+
+	go dummyWatchwer()
+
 	return (&PGClusterReconciler{
-		Client:      k8sClient,
-		Platform:    "unknown",
-		KubeVersion: "1.25",
-		Cron:        NewCronRegistry(),
+		Client:               k8sClient,
+		Platform:             "unknown",
+		KubeVersion:          "1.26",
+		Cron:                 NewCronRegistry(),
+		Watchers:             reg,
+		ExternalChan:         externalChan,
+		StopExternalWatchers: stopChan,
 	})
 }
 
