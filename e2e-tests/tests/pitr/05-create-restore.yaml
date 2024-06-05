@@ -13,8 +13,14 @@ commands:
       run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
         "postgres:$(get_psql_user_pass pitr-pguser-postgres)@$(get_psql_user_host pitr-pguser-postgres)"
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' \
+        "postgres:$(get_psql_user_pass pitr-pguser-postgres)@$(get_psql_user_host pitr-pguser-postgres)"
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100503)' \
+        "postgres:$(get_psql_user_pass pitr-pguser-postgres)@$(get_psql_user_host pitr-pguser-postgres)"
       
-      sleep 70 # sleep more than archive_timeout
+      sleep 140 # sleep for 2 x archive_timeout + 20 seconds
       
       latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup pitr-full -o json | jq '.status.latestRestorableTime')
       until [ "${latest_restorable_time}" != "${initial_restorable_time}" ]; do

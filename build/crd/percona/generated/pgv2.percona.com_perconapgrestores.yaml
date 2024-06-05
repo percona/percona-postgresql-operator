@@ -4,7 +4,6 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  creationTimestamp: null
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -40,22 +39,28 @@ spec:
           Restore
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
             properties:
               options:
-                description: Command line options to include when running the pgBackRest
-                  restore command. https://pgbackrest.org/command.html#command-restore
+                description: |-
+                  Command line options to include when running the pgBackRest restore command.
+                  https://pgbackrest.org/command.html#command-restore
                 items:
                   type: string
                 type: array
@@ -63,9 +68,10 @@ spec:
                 description: The name of the PerconaPGCluster to perform restore.
                 type: string
               repoName:
-                description: The name of the pgBackRest repo within the source PostgresCluster
-                  that contains the backups that should be utilized to perform a pgBackRest
-                  restore when initializing the data source for the new PostgresCluster.
+                description: |-
+                  The name of the pgBackRest repo within the source PostgresCluster that contains the backups
+                  that should be utilized to perform a pgBackRest restore when initializing the data source
+                  for the new PostgresCluster.
                 pattern: ^repo[1-4]
                 type: string
             required:
