@@ -188,6 +188,7 @@ func (vs *fakeVS) Apply(_ context.Context, req any) (any, error) {
 
 	return &pbVersion.VersionResponse{}, nil
 }
+
 func fakeVersionService(addr string, gwport int, unimplemented bool, crUID string) *fakeVS {
 	return &fakeVS{
 		addr:          addr,
@@ -204,6 +205,7 @@ type mockClientConn struct {
 func (m *mockClientConn) Invoke(ctx context.Context, method string, args, reply any, opts ...grpc.CallOption) error {
 	return grpcmock.InvokeUnary(ctx, method, args, reply, grpcmock.WithInsecure(), grpcmock.WithCallOptions(opts...), grpcmock.WithContextDialer(m.dialer))
 }
+
 func (m *mockClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 	return nil, errors.New("unimplemented")
 }

@@ -129,6 +129,13 @@ func (r *PGClusterReconciler) watchPGBackups() handler.TypedFuncs[*v2.PerconaPGB
 				Name:      pgBackup.Spec.PGCluster,
 			}})
 		},
+		DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[*v2.PerconaPGBackup], q workqueue.RateLimitingInterface) {
+			pgBackup := e.Object
+			q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+				Namespace: pgBackup.GetNamespace(),
+				Name:      pgBackup.Spec.PGCluster,
+			}})
+		},
 	}
 }
 
