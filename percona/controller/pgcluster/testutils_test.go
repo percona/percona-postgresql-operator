@@ -76,6 +76,23 @@ func backupReconciler() *pgbackup.PGBackupReconciler {
 	}
 }
 
+func readTestCR(name, namespace, testFile string) (*v2.PerconaPGCluster, error) {
+	data, err := os.ReadFile(filepath.Join("testdata", testFile))
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &v2.PerconaPGCluster{}
+
+	if err := yaml.Unmarshal(data, cr); err != nil {
+		return nil, err
+	}
+
+	cr.Name = name
+	cr.Namespace = namespace
+	return cr, nil
+}
+
 func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
 	if err != nil {
