@@ -12,5 +12,6 @@ self-healing
 start-from-backup
 tablespaces
 telemetry-transfer
+upgrade-consistency
 upgrade-minor
 users
