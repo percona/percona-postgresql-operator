@@ -138,7 +138,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 		return nil, errors.Wrap(err, "parse commit timestamp")
 	}
 
-	commitTsMeta := metav1.NewTime(commitTs.Round(time.Second).UTC())
+	commitTsMeta := metav1.NewTime(commitTs.UTC())
 
 	return &commitTsMeta, nil
 }
