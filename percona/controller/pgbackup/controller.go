@@ -368,10 +368,8 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 				return nil
 			}
 			delete(pgCluster.Annotations, annotation)
-			if err := c.Update(ctx, pgCluster); err != nil {
-				return err
-			}
-			return nil
+
+			return c.Update(ctx, pgCluster)
 		})
 	}
 
@@ -391,12 +389,18 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		// Remove PGBackRest labels to prevent the job from being included in
 		// repoResources.manualBackupJobs and deleted by the cleanupRepoResources
 		// or reconcileManualBackup methods.
-		for k := range naming.PGBackRestLabels(pgBackup.Spec.PGCluster) {
-			delete(job.Labels, k)
-		}
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			j := new(batchv1.Job)
+			if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+				return errors.Wrap(err, "get job")
+			}
+			for k := range naming.PGBackRestLabels(pgBackup.Spec.PGCluster) {
+				delete(j.Labels, k)
+			}
 
-		if err := c.Update(ctx, job); err != nil {
-			return nil, errors.Wrap(err, "update backup job annotation")
+			return c.Update(ctx, j)
+		}); err != nil {
+			return nil, errors.Wrap(err, "update backup job labels")
 		}
 
 		pgCluster := new(v1beta1.PostgresCluster)
