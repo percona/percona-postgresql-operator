@@ -103,7 +103,7 @@ func (t *PITRestoreDateTime) UnmarshalJSON(b []byte) (err error) {
 		return err
 	}
 
-	pt, err := time.Parse("2006-01-02 15:04:05-0700", str)
+	pt, err := time.Parse("2006-01-02 15:04:05.000000-0700", str)
 	if err != nil {
 		return
 	}
@@ -119,7 +119,7 @@ func (t *PITRestoreDateTime) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.Time.Format("2006-01-02 15:04:05-0700"))
+	return json.Marshal(t.Time.Format("2006-01-02 15:04:05.000000-0700"))
 }
 
 type PGBackupStorageType string
