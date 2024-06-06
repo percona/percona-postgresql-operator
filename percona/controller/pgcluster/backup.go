@@ -55,7 +55,7 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 		info, err = pgbackrest.GetInfo(ctx, readyPod, repo.Name)
 		if err != nil {
 			if errors.Is(err, pgbackrest.ErrNoValidBackups) {
-				log.Error(err, "Failed to get pgbackrest info", "repo", repo.Name)
+				log.Info("There are no info about backups in the pgbackrest", "repo", repo.Name)
 				continue
 			}
 			return errors.Wrap(err, "get pgBackRest info")

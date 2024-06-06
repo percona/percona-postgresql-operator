@@ -39,6 +39,12 @@ type InfoStanza struct {
 
 var ErrNoValidBackups = errors.New("no valid backups")
 
+const (
+	statusOK = 0
+	// statusNoValidBackups means that there are no backups in pgbackrest
+	statusNoValidBackups = 2
+)
+
 func GetInfo(ctx context.Context, pod *corev1.Pod, repoName string) (InfoOutput, error) {
 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
 
@@ -59,9 +65,9 @@ func GetInfo(ctx context.Context, pod *corev1.Pod, repoName string) (InfoOutput,
 
 	for _, elem := range out {
 		switch elem.Status.Code {
-		case 2:
+		case statusNoValidBackups:
 			return InfoOutput{}, ErrNoValidBackups
-		case 0:
+		case statusOK:
 			continue
 		default:
 			return InfoOutput{}, errors.Errorf("pgBackRest info command failed with code %d: %s", int(elem.Status.Code), elem.Status.Message)
