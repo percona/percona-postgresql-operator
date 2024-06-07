@@ -50,31 +50,17 @@ type PerconaPGUpgradeSpec struct {
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
-	// TODO(benjaminjb) Check the behavior: does updating ImagePullSecrets cause
-	// all running PGUpgrade pods to restart?
-
 	// The image pull secrets used to pull from a private registry.
 	// Changing this value causes all running PGUpgrade pods to restart.
 	// https://k8s.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
-	// TODO(benjaminjb): define webhook validation to make sure
-	// `fromPostgresVersion` is below `toPostgresVersion`
-	// or leverage other validation rules, such as the Common Expression Language
-	// rules currently in alpha as of Kubernetes 1.23
-	// - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation-rules
-
 	// The major version of PostgreSQL before the upgrade.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
 	// +kubebuilder:validation:Maximum=16
 	FromPostgresVersion int `json:"fromPostgresVersion"`
-
-	// TODO(benjaminjb): define webhook validation to make sure
-	// `fromPostgresVersion` is below `toPostgresVersion`
-	// or leverage other validation rules, such as the Common Expression Language
-	// rules currently in alpha as of Kubernetes 1.23
 
 	// The major version of PostgreSQL to be upgraded to.
 	// +kubebuilder:validation:Required
@@ -95,9 +81,6 @@ type PerconaPGUpgradeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// TODO(benjaminjb) Check the behavior: does updating PriorityClassName cause
-	// PGUpgrade to restart?
 
 	// Priority class name for the PGUpgrade pod. Changing this
 	// value causes PGUpgrade pod to restart.
@@ -122,3 +105,5 @@ type PerconaPGUpgradeSpec struct {
 type PerconaPGUpgradeStatus struct {
 	crunchyv1beta1.PGUpgradeStatus `json:",inline"`
 }
+
+const AnnotationAllowUpgrade = "pgv2.percona.com/allow-upgrade"

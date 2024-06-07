@@ -222,7 +222,7 @@ func (r *PGUpgradeReconciler) annotateCluster(ctx context.Context, pgCluster *pg
 		pgCluster.Annotations = make(map[string]string)
 	}
 
-	pgCluster.Annotations["pgv2.percona.com/allow-upgrade"] = pgUpgrade.Name
+	pgCluster.Annotations[pgv2.AnnotationAllowUpgrade] = pgUpgrade.Name
 
 	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
 }
@@ -230,7 +230,7 @@ func (r *PGUpgradeReconciler) annotateCluster(ctx context.Context, pgCluster *pg
 func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pgv2.PerconaPGCluster, oldVersion, newVersion int) error {
 	orig := pgCluster.DeepCopy()
 
-	delete(pgCluster.Annotations, "pgv2.percona.com/allow-upgrade")
+	delete(pgCluster.Annotations, pgv2.AnnotationAllowUpgrade)
 
 	pgCluster.Spec.PostgresVersion = newVersion
 
