@@ -8,4 +8,7 @@ commands:
 
       source ../../functions
 
-      get_cr ${RANDOM}| kubectl -n "${NAMESPACE}" apply -f -
+      get_cr ${RANDOM} \
+        | yq '.spec.backups.pgbackrest.global.repo1-retention-full="2"' \
+        | yq '.spec.backups.pgbackrest.global.repo1-retention-full-type="count"' \
+        | kubectl -n "${NAMESPACE}" apply -f -

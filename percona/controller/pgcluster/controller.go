@@ -221,8 +221,8 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile version")
 	}
 
-	if err := r.reconcileBackupJobs(ctx, cr); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "reconcile backup jobs")
+	if err := r.reconcileBackups(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile backups")
 	}
 
 	if err := r.addPMMSidecar(ctx, cr); err != nil {

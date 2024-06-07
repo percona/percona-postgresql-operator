@@ -96,6 +96,8 @@ spec:
               completed:
                 format: date-time
                 type: string
+              crVersion:
+                type: string
               destination:
                 type: string
               image:
