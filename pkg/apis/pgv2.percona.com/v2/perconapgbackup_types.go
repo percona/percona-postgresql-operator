@@ -1,8 +1,11 @@
 package v2
 
 import (
+	"encoding/json"
 	"fmt"
+	"time"
 
+	v "github.com/hashicorp/go-version"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -68,15 +71,58 @@ const (
 )
 
 type PerconaPGBackupStatus struct {
-	JobName     string                         `json:"jobName,omitempty"`
-	State       PGBackupState                  `json:"state,omitempty"`
-	CompletedAt *metav1.Time                   `json:"completed,omitempty"`
-	Destination string                         `json:"destination,omitempty"`
-	BackupType  PGBackupType                   `json:"backupType,omitempty"`
-	StorageType PGBackupStorageType            `json:"storageType,omitempty"`
-	Repo        *crunchyv1beta1.PGBackRestRepo `json:"repo,omitempty"`
-	Image       string                         `json:"image,omitempty"`
-	BackupName  string                         `json:"backupName,omitempty"`
+	JobName              string                         `json:"jobName,omitempty"`
+	State                PGBackupState                  `json:"state,omitempty"`
+	CompletedAt          *metav1.Time                   `json:"completed,omitempty"`
+	Destination          string                         `json:"destination,omitempty"`
+	BackupType           PGBackupType                   `json:"backupType,omitempty"`
+	StorageType          PGBackupStorageType            `json:"storageType,omitempty"`
+	Repo                 *crunchyv1beta1.PGBackRestRepo `json:"repo,omitempty"`
+	Image                string                         `json:"image,omitempty"`
+	BackupName           string                         `json:"backupName,omitempty"`
+	CRVersion            string                         `json:"crVersion,omitempty"`
+	LatestRestorableTime PITRestoreDateTime             `json:"latestRestorableTime,omitempty"`
+}
+
+// +kubebuilder:validation:Type=string
+type PITRestoreDateTime struct {
+	*metav1.Time `json:",inline"`
+}
+
+func (PITRestoreDateTime) OpenAPISchemaType() []string { return []string{"string"} }
+
+func (PITRestoreDateTime) OpenAPISchemaFormat() string { return "" }
+
+func (t *PITRestoreDateTime) UnmarshalJSON(b []byte) (err error) {
+	if len(b) == 4 && string(b) == "null" {
+		mt := metav1.NewTime(time.Time{})
+		t.Time = &mt
+		return nil
+	}
+
+	var str string
+
+	if err = json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+
+	pt, err := time.Parse("2006-01-02 15:04:05.000000-0700", str)
+	if err != nil {
+		return
+	}
+
+	mt := metav1.NewTime(pt)
+	t.Time = &mt
+
+	return nil
+}
+
+func (t *PITRestoreDateTime) MarshalJSON() ([]byte, error) {
+	if t.Time == nil {
+		return []byte("null"), nil
+	}
+
+	return json.Marshal(t.Time.Format("2006-01-02 15:04:05.000000-0700"))
 }
 
 type PGBackupStorageType string
@@ -104,4 +150,12 @@ const (
 
 func (b *PerconaPGBackup) Default() {
 	b.Spec.Options = append(b.Spec.Options, fmt.Sprintf(`--annotation="%s"="%s"`, PGBackrestAnnotationBackupName, b.Name))
+}
+
+func (b *PerconaPGBackup) CompareVersion(ver string) int {
+	if b.Status.CRVersion == "" {
+		return -1
+	}
+	backupVersion := v.Must(v.NewVersion(b.Status.CRVersion))
+	return backupVersion.Compare(v.Must(v.NewVersion(ver)))
 }

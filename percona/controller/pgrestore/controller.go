@@ -124,15 +124,16 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		pgRestore.Status.State = status
-		if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "update pgRestore status")
-		}
-
 		if err := disableRestore(ctx, r.Client, pgCluster); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "disable restore")
 		}
 
+		// Don't add code after the status update.
+		// Otherwise, it's possible to get a problem like this: https://perconadev.atlassian.net/browse/K8SPG-509
+		pgRestore.Status.State = status
+		if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "update pgRestore status")
+		}
 		return reconcile.Result{}, nil
 	default:
 		return reconcile.Result{}, nil

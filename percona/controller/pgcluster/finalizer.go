@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
@@ -143,6 +144,18 @@ func (r *PGClusterReconciler) deletePVCAndSecrets(ctx context.Context, cr *v2.Pe
 	return nil
 }
 
+func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+	log.Info("Stopping external watchers", "cluster", cr.Name, "namespace", cr.Namespace)
+
+	r.StopExternalWatchers <- event.DeleteEvent{Object: cr}
+	for _, watcherName := range r.Watchers.Names() {
+		r.Watchers.Remove(watcherName)
+	}
+
+	return nil
+}
+
 func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeletePVC, r.deletePVCAndSecrets); err != nil {
 		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeletePVC)
@@ -150,6 +163,10 @@ func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaP
 
 	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeleteSSL, r.deleteTLSSecrets); err != nil {
 		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeleteSSL)
+	}
+
+	if err := r.runFinalizer(ctx, cr, v2.FinalizerStopWatchers, r.stopExternalWatchers); err != nil {
+		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerStopWatchers)
 	}
 
 	return nil

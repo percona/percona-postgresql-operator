@@ -16,6 +16,7 @@
 package pgbackrest
 
 import (
+	"strings"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -30,9 +31,19 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	PostgreSQL(cluster, parameters)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
-		"archive_mode":    "on",
-		"archive_command": `pgbackrest --stanza=db archive-push "%p"`,
-		"restore_command": `pgbackrest --stanza=db archive-get %f "%p"`,
+		"archive_mode": "on",
+		"archive_command": strings.Join([]string{
+			`pgbackrest --stanza=db archive-push "%p"`,
+			` && timestamp=$(pg_waldump "%p" | grep COMMIT | awk '{print $(NF`,
+			`-2) "T" $(NF-1) " " $(NF)}' | sed -E 's/([0-9]{4}-[0-9]{2}-[0-9]`,
+			`{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\+\-][0-9]{2})/\`,
+			`1\2/' | sed 's/UTC/Z/' | tail -n 1 | grep -E '^[0-9]{4}-[0-9]{2}`,
+			`-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})`,
+			"$'); if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgwal/l",
+			"atest_commit_timestamp.txt; fi",
+		}, ""),
+		"restore_command":        `pgbackrest --stanza=db archive-get %f "%p"`,
+		"track_commit_timestamp": "true",
 	})
 
 	assert.DeepEqual(t, parameters.Default.AsMap(), map[string]string{
@@ -46,8 +57,18 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	PostgreSQL(cluster, parameters)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
-		"archive_mode":    "on",
-		"archive_command": `pgbackrest --stanza=db archive-push "%p"`,
-		"restore_command": `pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
+		"archive_mode": "on",
+		"archive_command": strings.Join([]string{
+			`pgbackrest --stanza=db archive-push "%p"`,
+			` && timestamp=$(pg_waldump "%p" | grep COMMIT | awk '{print $(NF`,
+			`-2) "T" $(NF-1) " " $(NF)}' | sed -E 's/([0-9]{4}-[0-9]{2}-[0-9]`,
+			`{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\+\-][0-9]{2})/\`,
+			`1\2/' | sed 's/UTC/Z/' | tail -n 1 | grep -E '^[0-9]{4}-[0-9]{2}`,
+			`-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})`,
+			"$'); if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgwal/l",
+			"atest_commit_timestamp.txt; fi",
+		}, ""),
+		"restore_command":        `pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
+		"track_commit_timestamp": "true",
 	})
 }

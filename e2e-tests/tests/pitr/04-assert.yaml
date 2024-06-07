@@ -6,23 +6,7 @@ kind: Job
 apiVersion: batch/v1
 metadata:
   annotations:
-    postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full
-  labels:
-    postgres-operator.crunchydata.com/pgbackrest-backup: manual
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
-  ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
-      kind: PerconaPGBackup
-      controller: true
-      blockOwnerDeletion: true
-status:
-  succeeded: 1
----
-kind: Job
-apiVersion: batch/v1
-metadata:
-  annotations:
-    postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full
+    postgres-operator.crunchydata.com/pgbackrest-backup: pitr-full
   labels:
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
@@ -37,9 +21,9 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
-  name: demand-backup-full
+  name: pitr-full
 spec:
-  pgCluster: demand-backup
+  pgCluster: pitr
   repoName: repo1
   options:
     - --type=full
