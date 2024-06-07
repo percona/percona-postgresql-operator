@@ -77,7 +77,7 @@ func backupReconciler() *pgbackup.PGBackupReconciler {
 }
 
 func readTestCR(name, namespace, testFile string) (*v2.PerconaPGCluster, error) {
-	data, err := os.ReadFile(filepath.Join("testdata", testFile))
+	data, err := os.ReadFile(filepath.Join("..", "testdata", testFile))
 	if err != nil {
 		return nil, err
 	}

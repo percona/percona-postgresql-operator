@@ -145,12 +145,12 @@ spec:
 #      limits:
 #        cpu: 2.0
 #        memory: 4Gi
-#    containers:
-#      replicaCertCopy:
-#        resources:
-#          limits:
-#            cpu: 200m
-#            memory: 128Mi
+    containers:
+      replicaCertCopy:
+        resources:
+          limits:
+            cpu: 200m
+            memory: 128Mi
 #    sidecars:
 #    - name: testcontainer
 #      image: mycontainer1:latest
@@ -224,12 +224,12 @@ spec:
 #        limits:
 #          cpu: 200m
 #          memory: 128Mi
-#      containers:
-#        pgbouncerConfig:
-#          resources:
-#            limits:
-#              cpu: 200m
-#              memory: 128Mi
+      containers:
+        pgbouncerConfig:
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
 #
 #      expose:
 #        annotations:
@@ -299,17 +299,17 @@ spec:
 #        labels:
       image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
 #      
-#      containers:
-#        pgbackrest:
-#          resources:
-#            limits:
-#              cpu: 200m
-#              memory: 128Mi
-#        pgbackrestConfig:
-#          resources:
-#            limits:
-#              cpu: 200m
-#              memory: 128Mi
+      containers:
+        pgbackrest:
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+        pgbackrestConfig:
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
 #      
 #      configuration:
 #        - secret:
