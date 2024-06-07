@@ -1,3 +1,6 @@
+//go:build envtest
+// +build envtest
+
 package pgcluster
 
 import (
