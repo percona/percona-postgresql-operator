@@ -45,3 +45,11 @@ spec:
     - --type=full
 status:
   state: Succeeded
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: demand-backup
+  generation: 4
+status:
+  observedGeneration: 4
