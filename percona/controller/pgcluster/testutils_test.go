@@ -111,7 +111,7 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 }
 
 func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "operator.yaml"))
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +125,23 @@ func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
 	cr.Name = name
 	cr.Namespace = namespace
 	return cr, nil
+}
+
+func readDefaultBackup(name, namespace string) (*v2.PerconaPGBackup, error) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "backup.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	bcp := &v2.PerconaPGBackup{}
+
+	if err := yaml.Unmarshal(data, bcp); err != nil {
+		return nil, err
+	}
+
+	bcp.Name = name
+	bcp.Namespace = namespace
+	return bcp, nil
 }
 
 type fakeClient struct {

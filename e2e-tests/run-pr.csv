@@ -2,13 +2,15 @@ custom-extensions
 demand-backup
 init-deploy
 monitoring
+one-pod
 operator-self-healing
+pitr
 scaling
 scheduled-backup
 self-healing
 start-from-backup
 tablespaces
 telemetry-transfer
+upgrade-consistency
 upgrade-minor
 users
-pitr
