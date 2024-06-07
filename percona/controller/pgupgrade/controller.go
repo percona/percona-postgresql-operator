@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -103,42 +104,43 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}()
 
-	for _, cond := range pgUpgrade.Status.Conditions {
-		log.V(1).Info("PGUpgrade condition", "cluster", pgCluster.Name, "type", cond.Type, "status", cond.Status, "reason", cond.Reason, "message", cond.Message)
-		switch {
-		case cond.Type == "Progressing" && cond.Reason != "PGUpgradeCompleted":
-			if cond.Reason == "PGUpgradeInvalidForCluster" {
-				log.Info("PGUpgrade invalid for cluster", "cluster", pgCluster.Name)
-				return reconcile.Result{}, nil
-			} else if cond.Reason == "PGClusterNotShutdown" {
-				log.Info("Pausing PGCluster", "PGCluster", pgCluster.Name)
-				if err := r.pauseCluster(ctx, pgCluster); err != nil {
-					return reconcile.Result{}, errors.Wrap(err, "pause PGCluster")
-				}
-			} else if cond.Reason == "PGClusterMissingRequiredAnnotation" {
-				if err := r.annotateCluster(ctx, pgCluster, perconaPGUpgrade); err != nil {
-					return reconcile.Result{}, errors.Wrap(err, "annotate PGCluster")
-				}
-				log.Info("Annotating PGCluster", "cluster", pgCluster.Name)
-			}
-
-			log.Info("Waiting for PGUpgrade to complete", "cluster", pgCluster.Name)
+	if cond := meta.FindStatusCondition(pgUpgrade.Status.Conditions, "Progressing"); cond != nil {
+		log.Info("PGUpgrade progressing", "reason", cond.Reason, "message", cond.Message, "type", cond.Type, "status", cond.Status)
+		if cond.Status == metav1.ConditionTrue {
+			log.Info("PGUpgrade in progress", "cluster", pgCluster.Name)
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
-		case cond.Type == "Succeeded":
-			if cond.Reason == "PGUpgradeFailed" {
-				log.Info("PGUpgrade failed", "cluster", pgCluster.Name)
-				return reconcile.Result{}, nil
-			} else if cond.Reason == "PGUpgradeSucceeded" {
-				if err := r.finalizeUpgrade(ctx, pgCluster, perconaPGUpgrade.Spec.FromPostgresVersion, perconaPGUpgrade.Spec.ToPostgresVersion); err != nil {
-					return reconcile.Result{}, errors.Wrap(err, "finalize upgrade")
-				}
+		}
 
-				log.Info("Resuming PGCluster", "PGCluster", pgCluster.Name)
-				if err := r.resumeCluster(ctx, pgCluster); err != nil {
-					return reconcile.Result{}, errors.Wrap(err, "resume PGCluster")
-				}
+		switch cond.Reason {
+		case "PGUpgradeInvalidForCluster":
+			log.Info("PGUpgrade invalid for cluster", "cluster", pgCluster.Name)
+			return reconcile.Result{}, nil
+		case "PGClusterNotShutdown":
+			log.Info("Pausing PGCluster", "PGCluster", pgCluster.Name)
+			if err := r.pauseCluster(ctx, pgCluster); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "pause PGCluster")
+			}
+		case "PGClusterMissingRequiredAnnotation":
+			log.Info("Annotating PGCluster", "cluster", pgCluster.Name)
+			if err := r.annotateCluster(ctx, pgCluster, perconaPGUpgrade); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "annotate PGCluster")
+			}
+		}
+	}
 
-				return reconcile.Result{}, nil
+	if cond := meta.FindStatusCondition(pgUpgrade.Status.Conditions, "Succeeded"); cond != nil {
+		log.Info("PGUpgrade succeeded", "reason", cond.Reason, "message", cond.Message, "type", cond.Type, "status", cond.Status)
+		switch cond.Reason {
+		case "PGUpgradeFailed":
+			log.Info("PGUpgrade failed", "cluster", pgCluster.Name)
+			return reconcile.Result{}, nil
+		case "PGUpgradeSucceeded":
+			if err := r.finalizeUpgrade(ctx, pgCluster, perconaPGUpgrade.Spec.FromPostgresVersion, perconaPGUpgrade.Spec.ToPostgresVersion); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "finalize upgrade")
+			}
+			log.Info("Resuming PGCluster", "PGCluster", pgCluster.Name)
+			if err := r.resumeCluster(ctx, pgCluster); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "resume PGCluster")
 			}
 		}
 	}
