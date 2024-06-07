@@ -107,14 +107,15 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 		log.V(1).Info("PGUpgrade condition", "cluster", pgCluster.Name, "type", cond.Type, "status", cond.Status, "reason", cond.Reason, "message", cond.Message)
 		switch {
 		case cond.Type == "Progressing" && cond.Reason != "PGUpgradeCompleted":
-			if cond.Reason == "PGClusterNotShutdown" {
+			if cond.Reason == "PGUpgradeInvalidForCluster" {
+				log.Info("PGUpgrade invalid for cluster", "cluster", pgCluster.Name)
+				return reconcile.Result{}, nil
+			} else if cond.Reason == "PGClusterNotShutdown" {
 				log.Info("Pausing PGCluster", "PGCluster", pgCluster.Name)
 				if err := r.pauseCluster(ctx, pgCluster); err != nil {
 					return reconcile.Result{}, errors.Wrap(err, "pause PGCluster")
 				}
-			}
-
-			if cond.Reason == "PGClusterMissingRequiredAnnotation" {
+			} else if cond.Reason == "PGClusterMissingRequiredAnnotation" {
 				if err := r.annotateCluster(ctx, pgCluster, perconaPGUpgrade); err != nil {
 					return reconcile.Result{}, errors.Wrap(err, "annotate PGCluster")
 				}
@@ -127,9 +128,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 			if cond.Reason == "PGUpgradeFailed" {
 				log.Info("PGUpgrade failed", "cluster", pgCluster.Name)
 				return reconcile.Result{}, nil
-			}
-
-			if cond.Reason == "PGUpgradeSucceeded" {
+			} else if cond.Reason == "PGUpgradeSucceeded" {
 				if err := r.finalizeUpgrade(ctx, pgCluster, perconaPGUpgrade.Spec.FromPostgresVersion, perconaPGUpgrade.Spec.ToPostgresVersion); err != nil {
 					return reconcile.Result{}, errors.Wrap(err, "finalize upgrade")
 				}
