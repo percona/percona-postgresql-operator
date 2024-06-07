@@ -79,6 +79,15 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 				continue
 			}
 
+			// After the pg-backup is deleted, the job is not deleted immediately.
+			// We need to set the DeletionTimestamp for a job so that `reconcileBackupJob` doesn't create a new pg-backup before the job deletion.
+			job := new(batchv1.Job)
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job); err != nil {
+				return errors.Wrap(err, "get backup job")
+			}
+			if err := r.Client.Delete(ctx, job); err != nil {
+				return errors.Wrapf(err, "delete job %s/%s", job.Name, job.Namespace)
+			}
 			if err := r.Client.Delete(ctx, &pgBackup); err != nil {
 				return errors.Wrapf(err, "delete backup %s/%s", pgBackup.Name, pgBackup.Namespace)
 			}
@@ -148,6 +157,9 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 	if pb == nil {
 		if job.Labels[naming.LabelPGBackRestBackup] == string(naming.BackupManual) {
 			// we shouldn't create pg-backup for manual backup jobs and should wait until it's pg-backup will have `.status.jobName`
+			return nil
+		}
+		if job.DeletionTimestamp != nil {
 			return nil
 		}
 		// Create PerconaPGBackup resource for backup job,
