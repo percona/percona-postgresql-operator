@@ -57,8 +57,6 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	log.Info("Reconciling PerconaPGUpgrade", "PerconaPGUpgrade", perconaPGUpgrade.Name)
-
 	pgCluster := &pgv2.PerconaPGCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      perconaPGUpgrade.Spec.PostgresClusterName,
@@ -85,7 +83,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 				return reconcile.Result{}, errors.Wrap(err, "create PGUpgrade")
 			}
 
-			log.Info("PGUpgrade created", "PGUpgrade", pgUpgrade.Name)
+			log.Info("PGUpgrade created", "cluster", pgCluster.Name)
 
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		}
@@ -93,8 +91,20 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrapf(err, "get PGUpgrade %s/%s", pgUpgrade.Namespace, pgUpgrade.Name)
 	}
 
+	defer func() {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			perconaPGUpgrade.Status.Conditions = pgUpgrade.Status.Conditions
+			perconaPGUpgrade.Status.ObservedGeneration = perconaPGUpgrade.Generation
+
+			return r.Client.Status().Update(ctx, perconaPGUpgrade)
+		})
+		if err != nil {
+			log.Error(err, "update PerconaPGUpgrade status")
+		}
+	}()
+
 	for _, cond := range pgUpgrade.Status.Conditions {
-		log.Info("PGUpgrade condition", "type", cond.Type, "status", cond.Status, "reason", cond.Reason, "message", cond.Message)
+		log.V(1).Info("PGUpgrade condition", "cluster", pgCluster.Name, "type", cond.Type, "status", cond.Status, "reason", cond.Reason, "message", cond.Message)
 		switch {
 		case cond.Type == "Progressing" && cond.Reason != "PGUpgradeCompleted":
 			if cond.Reason == "PGClusterNotShutdown" {
@@ -108,14 +118,14 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 				if err := r.annotateCluster(ctx, pgCluster, perconaPGUpgrade); err != nil {
 					return reconcile.Result{}, errors.Wrap(err, "annotate PGCluster")
 				}
-				log.Info("Annotating PGCluster", "PGCluster", pgCluster.Name)
+				log.Info("Annotating PGCluster", "cluster", pgCluster.Name)
 			}
 
-			log.Info("Waiting for PGUpgrade to complete", "PGUpgrade", pgUpgrade.Name)
+			log.Info("Waiting for PGUpgrade to complete", "cluster", pgCluster.Name)
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		case cond.Type == "Succeeded":
 			if cond.Reason == "PGUpgradeFailed" {
-				log.Info("PGUpgrade failed", "PGUpgrade", pgUpgrade.Name)
+				log.Info("PGUpgrade failed", "cluster", pgCluster.Name)
 				return reconcile.Result{}, nil
 			}
 
@@ -131,21 +141,8 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 				return reconcile.Result{}, nil
 			}
-
-			log.Info("What is this condition?", "condition", cond.Type, "reason", cond.Reason, "message", cond.Message)
 		}
 	}
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		perconaPGUpgrade.Status.Conditions = pgUpgrade.Status.Conditions
-		perconaPGUpgrade.Status.ObservedGeneration = perconaPGUpgrade.Generation
-
-		return r.Client.Status().Update(ctx, perconaPGUpgrade)
-	})
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "update PerconaPGUpgrade status")
-	}
-
-	log.Info("PGUpgrade reconciled", "PGUpgrade", pgUpgrade.Name)
 
 	return reconcile.Result{}, nil
 }
@@ -169,7 +166,7 @@ func (r *PGUpgradeReconciler) createPGUpgrade(ctx context.Context, cluster *pgv2
 	pgUpgrade.Spec.InitContainers = perconaPGUpgrade.Spec.InitContainers
 
 	if cluster.Spec.Extensions.Storage.Secret == nil {
-		return nil
+		return r.Client.Create(ctx, pgUpgrade)
 	}
 
 	for _, pgVersion := range []int{perconaPGUpgrade.Spec.FromPostgresVersion, perconaPGUpgrade.Spec.ToPostgresVersion} {
