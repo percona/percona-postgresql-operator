@@ -106,6 +106,7 @@ rules:
   - perconapgbackups
   verbs:
   - create
+  - delete
   - get
   - list
   - update
