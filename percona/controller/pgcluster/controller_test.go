@@ -1181,7 +1181,7 @@ var _ = Describe("Security context", Ordered, func() {
 	})
 })
 
-var _ = Describe("Sidecar resources", Ordered, func() {
+var _ = Describe("Operator-created sidecar container resources", Ordered, func() {
 	ctx := context.Background()
 
 	const crName = "sidecar-resources"
