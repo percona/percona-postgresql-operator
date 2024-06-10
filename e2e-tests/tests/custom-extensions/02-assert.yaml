@@ -22,7 +22,7 @@ spec:
       - name: postgres-startup
       - command:
         - /usr/local/bin/relocate-extensions.sh
-        name: extension-relocator
+        name: extension-relocator-16
         resources: {}
         volumeMounts:
         - mountPath: /pgdata
@@ -45,7 +45,7 @@ spec:
         envFrom:
         - secretRef:
             name: aws-s3-secret
-        name: extension-installer
+        name: extension-installer-16
         resources: {}
         volumeMounts:
         - mountPath: /pgdata

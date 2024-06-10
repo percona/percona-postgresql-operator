@@ -23,7 +23,10 @@ const (
 	LatestCommitTimestampFile = "/pgwal/latest_commit_timestamp.txt"
 )
 
-var LatestTimestampFileNotFound = errors.Errorf("%s not found in container", LatestCommitTimestampFile)
+var (
+	LatestTimestampFileNotFound = errors.Errorf("%s not found in container", LatestCommitTimestampFile)
+	PrimaryPodNotFound          = errors.New("primary pod not found")
+)
 
 type WALWatcher func(context.Context, client.Client, chan event.GenericEvent, chan event.DeleteEvent, *pgv2.PerconaPGCluster)
 
@@ -49,9 +52,19 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 		select {
 		case <-ticker.C:
 			log.V(1).Info("Running WAL watcher")
+
+			localCr := cr.DeepCopy()
+			err := cli.Get(ctx, client.ObjectKeyFromObject(cr), localCr)
+			if err != nil {
+				log.Error(err, "get cluster")
+				continue
+			}
+
 			ts, err := GetLatestCommitTimestamp(ctx, cli, execCli, cr)
 			if err != nil {
-				if errors.Is(err, LatestTimestampFileNotFound) {
+				if errors.Is(err, PrimaryPodNotFound) && localCr.Status.State != pgv2.AppStateReady {
+					log.V(1).Info("Primary pod not found, skipping WAL watcher")
+				} else if errors.Is(err, LatestTimestampFileNotFound) {
 					log.V(1).Info("Latest commit timestamp file not found", "file", LatestCommitTimestampFile)
 				} else {
 					log.Error(err, "get latest commit timestamp")
@@ -119,7 +132,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 
 	primary, err := getPrimaryPod(ctx, cli, cr)
 	if err != nil {
-		return nil, errors.Wrap(err, "get primary pod")
+		return nil, PrimaryPodNotFound
 	}
 
 	log.V(1).Info("Getting latest commit timestamp from primary pod", "pod", primary.Name)

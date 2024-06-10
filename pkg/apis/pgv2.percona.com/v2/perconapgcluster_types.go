@@ -680,7 +680,7 @@ type PGInstanceSetSpec struct {
 	// +optional
 	TablespaceVolumes []crunchyv1beta1.TablespaceVolume `json:"tablespaceVolumes,omitempty"`
 
-	// The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes
+	// The list of volume mounts to mount to PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`

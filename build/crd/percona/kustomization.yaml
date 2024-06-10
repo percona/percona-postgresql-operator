@@ -5,3 +5,4 @@ resources:
 - generated/pgv2.percona.com_perconapgclusters.yaml
 - generated/pgv2.percona.com_perconapgbackups.yaml
 - generated/pgv2.percona.com_perconapgrestores.yaml
+- generated/pgv2.percona.com_perconapgupgrades.yaml

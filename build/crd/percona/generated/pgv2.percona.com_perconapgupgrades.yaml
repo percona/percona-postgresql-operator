@@ -1,25 +1,23 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  labels:
-    app.kubernetes.io/name: pgo
-    app.kubernetes.io/version: 5.5.1
-  name: pgupgrades.postgres-operator.crunchydata.com
+  name: perconapgupgrades.pgv2.percona.com
 spec:
-  group: postgres-operator.crunchydata.com
+  group: pgv2.percona.com
   names:
-    kind: PGUpgrade
-    listKind: PGUpgradeList
-    plural: pgupgrades
-    singular: pgupgrade
+    kind: PerconaPGUpgrade
+    listKind: PerconaPGUpgradeList
+    plural: perconapgupgrades
+    singular: perconapgupgrade
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - name: v2
     schema:
       openAPIV3Schema:
-        description: PGUpgrade is the Schema for the pgupgrades API
+        description: PerconaPGUpgrade is the Schema for the perconapgupgrades API
         properties:
           apiVersion:
             description: |-
@@ -39,7 +37,6 @@ spec:
           metadata:
             type: object
           spec:
-            description: PGUpgradeSpec defines the desired state of PGUpgrade
             properties:
               affinity:
                 description: |-
@@ -966,7 +963,7 @@ spec:
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
                 maximum: 16
-                minimum: 10
+                minimum: 12
                 type: integer
               image:
                 description: The image name to use for major PostgreSQL upgrades.
@@ -993,7 +990,14 @@ spec:
                   properties:
                     name:
                       default: ""
-                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        TODO: Add other useful fields. apiVersion, kind, uid?
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                       type: string
                   type: object
                   x-kubernetes-map-type: atomic
@@ -2511,7 +2515,7 @@ spec:
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
                 maximum: 16
-                minimum: 10
+                minimum: 13
                 type: integer
               tolerations:
                 description: |-
@@ -2624,11 +2628,11 @@ spec:
                 type: array
             required:
             - fromPostgresVersion
+            - image
             - postgresClusterName
             - toPostgresVersion
             type: object
           status:
-            description: PGUpgradeStatus defines the observed state of PGUpgrade
             properties:
               conditions:
                 description: conditions represent the observations of PGUpgrade's
@@ -2711,6 +2715,9 @@ spec:
                 minimum: 0
                 type: integer
             type: object
+        required:
+        - metadata
+        - spec
         type: object
     served: true
     storage: true

@@ -96,12 +96,12 @@ deploy_s3_secrets() {
 		>"${TEMP_DIR}/pgbackrest-secret.ini"
 
 	case ${test_name} in
-		scheduled-backup)
+		"scheduled-backup")
 			printf 'repo2-gcs-key=/etc/pgbackrest/conf.d/gcs-key.json\n' >>"${TEMP_DIR}/pgbackrest-secret.ini"
 			yq eval '.stringData["credentials.json"]' ${TESTS_CONFIG_DIR}/cloud-secret-minio-gw.yml >${TEMP_DIR}/gcs-key.json
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini" --from-file=gcs-key.json=${TEMP_DIR}/gcs-key.json
 			;;
-		custom-extensions)
+		"custom-extensions" | "major-upgrade")
 			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
 			;;
 		*)
@@ -170,7 +170,7 @@ get_cr() {
 				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
 			;;
-		"custom-extensions")
+		"custom-extensions" | "major-upgrade")
 			yq eval -i '
 				.spec.extensions.image = "'$IMAGE'" |
 				.spec.extensions.imagePullPolicy = "Always" |

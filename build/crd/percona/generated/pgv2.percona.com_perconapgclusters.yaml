@@ -12938,7 +12938,7 @@ spec:
                       type: array
                     volumeMounts:
                       description: |-
-                        The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes
+                        The list of volume mounts to mount to PostgreSQL instance pods. Changing this value causes
                         PostgreSQL to restart.
                       items:
                         description: VolumeMount describes a mounting of a Volume
