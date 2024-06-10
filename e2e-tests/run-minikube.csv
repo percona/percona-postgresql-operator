@@ -1,11 +1,13 @@
 custom-extensions
 demand-backup
 init-deploy
+one-pod
 operator-self-healing
 scaling
 scheduled-backup
 self-healing
 start-from-backup
 telemetry-transfer
+upgrade-consistency
 upgrade-minor
 users

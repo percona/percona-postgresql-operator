@@ -14,9 +14,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	gs "github.com/onsi/gomega/gstruct"
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -68,7 +71,7 @@ var _ = Describe("PG Cluster", Ordered, func() {
 
 	Context("Reconcile controller", func() {
 		It("Controller should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -114,7 +117,7 @@ var _ = Describe("Annotations", Ordered, func() {
 
 	Context("Reconcile controller", func() {
 		It("Controller should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -173,7 +176,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 	Context("Reconcile controller", func() {
 		It("Controller should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -215,7 +218,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 					},
 				})).Should(Succeed())
 
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -240,7 +243,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 					},
 				})).Should(Succeed())
 
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -278,7 +281,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				cr.Spec.PMM.Enabled = false
 				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
 
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -339,7 +342,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 	})
 
 	It("controller should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -355,7 +358,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 
 	When("PMM is enabled", Ordered, func() {
 		It("should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -393,7 +396,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 		})
 
 		It("should reconcile", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -422,6 +425,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 
 // tracerWithCounter is a tracer that counts the number of times the Reconcile is called. It should be used for crunchy reconciler.
 type tracerWithCounter struct {
+	noop.Tracer
 	counter int
 	t       trace.Tracer
 }
@@ -445,7 +449,12 @@ var _ = Describe("Watching secrets", Ordered, func() {
 	const ns = crName
 
 	crunchyR := crunchyReconciler()
-	r := reconciler()
+	r := reconciler(&v2.PerconaPGCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	})
 
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -665,7 +674,7 @@ var _ = Describe("Users", Ordered, func() {
 		})
 
 		It("should add default user", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -694,7 +703,7 @@ var _ = Describe("Users", Ordered, func() {
 			})
 
 			It("should add monitor user along side the default user", func() {
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -726,6 +735,26 @@ var _ = Describe("Users", Ordered, func() {
 		It("should delete cr and all secrets", func() {
 			Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
 			Expect(k8sClient.DeleteAllOf(context.Background(), &corev1.Secret{}, client.InNamespace(ns)))
+
+			Eventually(func() error {
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				if err != nil {
+					return err
+				}
+
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				if err != nil {
+					return err
+				}
+
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v2.PerconaPGCluster))
+				if k8serrors.IsNotFound(err) {
+					return nil
+				}
+
+				return errors.New("cluster not deleted")
+			}, time.Second*15, time.Millisecond*250).Should(BeNil())
+
 		})
 	})
 
@@ -739,7 +768,7 @@ var _ = Describe("Users", Ordered, func() {
 		})
 
 		It("should create defaul and monitor user", func() {
-			_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -804,7 +833,7 @@ var _ = Describe("Version labels", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -902,7 +931,7 @@ var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -970,7 +999,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -985,7 +1014,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
 			})
 			It("should reconcile", func() {
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -1017,7 +1046,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
 			})
 			It("should reconcile", func() {
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -1046,7 +1075,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 				Expect(k8sClient.Update(ctx, cr)).To(Succeed())
 			})
 			It("should reconcile", func() {
-				_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
 				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -1109,7 +1138,7 @@ var _ = Describe("Security context", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
@@ -1152,5 +1181,93 @@ var _ = Describe("Security context", Ordered, func() {
 		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(sts.Spec.Template.Spec.SecurityContext).To(Equal(podSecContext))
+	})
+})
+
+var _ = Describe("Operator-created sidecar container resources", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "sidecar-resources"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readTestCR(crName, ns, "sidecar-resources-cr.yaml")
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster", func() {
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should apply resources to pgbackrest, pgbackrest-config and replication-cert-copy sidecar containers in instance pods", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":    "postgres",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			for _, c := range sts.Spec.Template.Spec.Containers {
+				if c.Name == "replication-cert-copy" {
+					Expect(c.Resources.Limits.Cpu()).Should(Equal(cr.Spec.InstanceSets[0].Containers.ReplicaCertCopy.Resources.Limits.Cpu()))
+					Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.InstanceSets[0].Containers.ReplicaCertCopy.Resources.Limits.Memory()))
+				}
+				if c.Name == "pgbackrest" {
+					Expect(c.Resources.Limits.Cpu()).Should(Equal(cr.Spec.Backups.PGBackRest.Containers.PGBackRest.Resources.Limits.Cpu()))
+					Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.Backups.PGBackRest.Containers.PGBackRest.Resources.Limits.Memory()))
+				}
+				if c.Name == "pgbackrest-config" {
+					Expect(c.Resources.Limits.Cpu()).Should(Equal(cr.Spec.Backups.PGBackRest.Containers.PGBackRestConfig.Resources.Limits.Cpu()))
+					Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.Backups.PGBackRest.Containers.PGBackRestConfig.Resources.Limits.Memory()))
+				}
+			}
+		}
+	})
+
+	It("should apply resources to pgbouncer-config sidecar container in pgbouncer pods", func() {
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-pgbouncer",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, c := range deployment.Spec.Template.Spec.Containers {
+			if c.Name == "pgbouncer-config" {
+				Expect(c.Resources.Limits.Cpu()).Should(Equal(cr.Spec.Proxy.PGBouncer.Containers.PGBouncerConfig.Resources.Limits.Cpu()))
+				Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.Proxy.PGBouncer.Containers.PGBouncerConfig.Resources.Limits.Memory()))
+			}
+		}
 	})
 })

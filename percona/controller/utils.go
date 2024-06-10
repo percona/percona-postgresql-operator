@@ -1,10 +1,16 @@
 package controller
 
 import (
+	"context"
+
+	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 )
 
 // jobCompleted returns "true" if the Job provided completed successfully.  Otherwise it returns
@@ -52,4 +58,22 @@ func (m *CustomManager) Add(r manager.Runnable) error {
 		m.ctrl = ctrl
 	}
 	return nil
+}
+
+func GetReadyInstancePod(ctx context.Context, c client.Client, clusterName, namespace string) (*corev1.Pod, error) {
+	pods := &corev1.PodList{}
+	selector, err := naming.AsSelector(naming.ClusterInstances(clusterName))
+	if err != nil {
+		return nil, err
+	}
+	if err := c.List(ctx, pods, client.InNamespace(namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		return nil, errors.Wrap(err, "list pods")
+	}
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+		return &pod, nil
+	}
+	return nil, errors.New("no running instance found")
 }

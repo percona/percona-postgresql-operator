@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      POSTGRES_V1_CLUSTER_NAME=$(kubectl -n $NAMESPACE get configmap/v1-cluster-name --template='{{index .data "v1-cluster-name"}}')
+      POSTGRES_V1_PASS=$(kubectl -n $NAMESPACE get secret/$POSTGRES_V1_CLUSTER_NAME-postgres-secret --template='{{.data.password | base64decode}}')
+
+      data=$(run_psql '\c myapp \\\ SELECT * from myApp;' "postgres://postgres:$POSTGRES_V1_PASS@$POSTGRES_V1_CLUSTER_NAME")
+
+      kubectl create configmap -n "$NAMESPACE" 04-read-from-primary --from-literal=data="$data"

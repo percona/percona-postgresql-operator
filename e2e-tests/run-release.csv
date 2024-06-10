@@ -3,11 +3,15 @@ demand-backup
 init-deploy
 migration-backup-s3
 monitoring
+one-pod
 operator-self-healing
+pitr
 scaling
 scheduled-backup
 self-healing
 start-from-backup
+tablespaces
 telemetry-transfer
+upgrade-consistency
 upgrade-minor
 users

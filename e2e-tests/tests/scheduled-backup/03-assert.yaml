@@ -17,5 +17,13 @@ spec:
   pgCluster: scheduled-backup
   repoName: repo1
 status:
-  backupType: incremental
+  backupType: full
   state: Succeeded
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: scheduled-backup
+  generation: 1
+status:
+  observedGeneration: 1

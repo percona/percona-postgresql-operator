@@ -90,16 +90,22 @@ spec:
             type: object
           status:
             properties:
+              backupName:
+                type: string
               backupType:
                 type: string
               completed:
                 format: date-time
+                type: string
+              crVersion:
                 type: string
               destination:
                 type: string
               image:
                 type: string
               jobName:
+                type: string
+              latestRestorableTime:
                 type: string
               repo:
                 description: PGBackRestRepo represents a pgBackRest repository.  Only

@@ -436,6 +436,7 @@ release: generate
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbackrest#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: percona/pmm-client:@@SET_TAG@@#}" deploy/cr.yaml
+	sed -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 
 # Prepare main branch after release
 MAJOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f1)
@@ -449,3 +450,4 @@ after-release: generate
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbackrest#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: perconalab/pmm-client:dev-latest#}" deploy/cr.yaml
+	sed -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go

@@ -36,7 +36,6 @@ spec:
 
 #  pause: true
 #  unmanaged: true
-
 #  dataSource:
 #    postgresCluster:
 #      clusterName: cluster1
@@ -44,6 +43,11 @@ spec:
 #      options:
 #      - --type=time
 #      - --target="2021-06-09 14:15:11-04"
+#      tolerations:
+#      - effect: NoSchedule
+#        key: role
+#        operator: Equal
+#        value: connection-poolers
 #    pgbackrest:
 #      stanza: db
 #      configuration:
@@ -57,6 +61,49 @@ spec:
 #          bucket: "my-bucket"
 #          endpoint: "s3.ca-central-1.amazonaws.com"
 #          region: "ca-central-1"
+#      tolerations:
+#      - effect: NoSchedule
+#        key: role
+#        operator: Equal
+#        value: connection-poolers
+#    volumes:
+#      pgDataVolume:
+#        pvcName: cluster1
+#        directory: cluster1
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
+#      pgWALVolume:
+#        pvcName: cluster1-pvc-name
+#        directory: some-dir
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
+#      pgBackRestVolume:
+#        pvcName: cluster1-pgbr-repo
+#        directory: cluster1-backrest-shared-repo
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
+#        annotations:
+#          test-annotation: value
+#        labels:
+#          test-label: value
+
 
   image: perconalab/percona-postgresql-operator:main-ppg16-postgres
   imagePullPolicy: Always
@@ -97,7 +144,12 @@ spec:
 #      limits:
 #        cpu: 2.0
 #        memory: 4Gi
-#
+#    containers:
+#      replicaCertCopy:
+#        resources:
+#          limits:
+#            cpu: 200m
+#            memory: 128Mi
 #    sidecars:
 #    - name: testcontainer
 #      image: mycontainer1:latest
@@ -153,6 +205,14 @@ spec:
       resources:
         requests:
           storage: 1Gi
+#    tablespaceVolumes:
+#      - name: user
+#        dataVolumeClaimSpec:
+#          accessModes:
+#            - 'ReadWriteOnce'
+#          resources:
+#            requests:
+#              storage: 1Gi
 
   proxy:
     pgBouncer:
@@ -163,6 +223,12 @@ spec:
 #        limits:
 #          cpu: 200m
 #          memory: 128Mi
+#      containers:
+#        pgbouncerConfig:
+#          resources:
+#            limits:
+#              cpu: 200m
+#              memory: 128Mi
 #
 #      expose:
 #        annotations:
@@ -231,6 +297,19 @@ spec:
 #      metadata:
 #        labels:
       image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
+#      
+#      containers:
+#        pgbackrest:
+#          resources:
+#            limits:
+#              cpu: 200m
+#              memory: 128Mi
+#        pgbackrestConfig:
+#          resources:
+#            limits:
+#              cpu: 200m
+#              memory: 128Mi
+#      
 #      configuration:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
@@ -344,6 +423,11 @@ spec:
 #    restore:
 #      enabled: true
 #      repoName: repo1
+#      tolerations:
+#      - effect: NoSchedule
+#        key: role
+#        operator: Equal
+#        value: connection-poolers
 #      options:
 #       PITR restore in place
 #       - --type=time
@@ -358,6 +442,12 @@ spec:
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
 #  patroni:
+#    # Some values of the Liveness/Readiness probes of the patroni container are calulated using syncPeriodSeconds by the following formulas:
+#    # - timeoutSeconds:   syncPeriodSeconds / 2;
+#    # - periodSeconds:    syncPeriodSeconds;
+#    # - failureThreshold: leaderLeaseDurationSeconds / syncPeriodSeconds.
+#    syncPeriodSeconds: 10 # default: 10
+#    leaderLeaseDurationSeconds: 30 # default: 30
 #    dynamicConfiguration:
 #      postgresql:
 #        parameters:
@@ -373,6 +463,7 @@ spec:
 #      type: s3
 #      bucket: pg-extensions
 #      region: eu-central-1
+#      endpoint: s3.eu-central-1.amazonaws.com
 #      secret:
 #        name: cluster1-extensions-secret
 #    builtin:
