@@ -174,14 +174,18 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 
 	// Replace all containers with one that does the upgrade.
 	job.Spec.Template.Spec.EphemeralContainers = nil
-	job.Spec.Template.Spec.InitContainers = nil
+	job.Spec.Template.Spec.InitContainers = upgrade.Spec.InitContainers
+
+	volumeMounts := database.VolumeMounts
+	volumeMounts = append(volumeMounts, upgrade.Spec.VolumeMounts...)
+
 	job.Spec.Template.Spec.Containers = []corev1.Container{{
 		// Copy volume mounts and the security context needed to access them
 		// from the database container. There is a downward API volume that
 		// refers back to the container by name, so use that same name here.
 		Name:            database.Name,
 		SecurityContext: database.SecurityContext,
-		VolumeMounts:    database.VolumeMounts,
+		VolumeMounts:    volumeMounts,
 
 		// Use our upgrade command and the specified image and resources.
 		Command:         upgradeCommand(upgrade, fetchKeyCommand),

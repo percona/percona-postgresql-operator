@@ -37,6 +37,7 @@ import (
 	//"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/internal/bridge"
 	"github.com/percona/percona-postgresql-operator/internal/bridge/crunchybridgecluster"
+	"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/controller/standalone_pgadmin"
@@ -48,6 +49,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
+	perconaPGUpgrade "github.com/percona/percona-postgresql-operator/percona/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	perconaRuntime "github.com/percona/percona-postgresql-operator/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
@@ -234,15 +236,22 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return err
 	}
 
-	//upgradeReconciler := &pgupgrade.PGUpgradeReconciler{
-	//	Client: mgr.GetClient(),
-	//	Owner:  "pgupgrade-controller",
-	//	Scheme: mgr.GetScheme(),
-	//}
+	upgradeReconciler := &pgupgrade.PGUpgradeReconciler{
+		Client: mgr.GetClient(),
+		Owner:  "pgupgrade-controller",
+		Scheme: mgr.GetScheme(),
+	}
 
-	//if err := upgradeReconciler.SetupWithManager(mgr); err != nil {
-	//	return errors.Wrap(err, "unable to create PGUpgrade controller")
-	//}
+	if err := upgradeReconciler.SetupWithManager(mgr); err != nil {
+		return errors.Wrap(err, "unable to create PGUpgrade controller")
+	}
+
+	pu := &perconaPGUpgrade.PGUpgradeReconciler{
+		Client: mgr.GetClient(),
+	}
+	if err := pu.SetupWithManager(mgr); err != nil {
+		return err
+	}
 
 	pgAdminReconciler := &standalone_pgadmin.PGAdminReconciler{
 		Client:      mgr.GetClient(),

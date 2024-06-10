@@ -526,10 +526,11 @@ type CustomExtensionSpec struct {
 
 type CustomExtensionsStorageSpec struct {
 	// +kubebuilder:validation:Enum={s3,gcs,azure}
-	Type   string                   `json:"type,omitempty"`
-	Bucket string                   `json:"bucket,omitempty"`
-	Region string                   `json:"region,omitempty"`
-	Secret *corev1.SecretProjection `json:"secret,omitempty"`
+	Type     string                   `json:"type,omitempty"`
+	Bucket   string                   `json:"bucket,omitempty"`
+	Region   string                   `json:"region,omitempty"`
+	Endpoint string                   `json:"endpoint,omitempty"`
+	Secret   *corev1.SecretProjection `json:"secret,omitempty"`
 }
 
 type BuiltInExtensionsSpec struct {
@@ -679,7 +680,7 @@ type PGInstanceSetSpec struct {
 	// +optional
 	TablespaceVolumes []crunchyv1beta1.TablespaceVolume `json:"tablespaceVolumes,omitempty"`
 
-	// The list of volume mounts to mount to PostgreSQL instance pods. Chaning this value causes
+	// The list of volume mounts to mount to PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
@@ -695,6 +696,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Name:                      p.Name,
 		Affinity:                  p.Affinity,
 		Containers:                p.Sidecars,
+		Sidecars:                  p.Containers,
 		InitContainers:            p.InitContainers,
 		PriorityClassName:         p.PriorityClassName,
 		Replicas:                  p.Replicas,
@@ -870,6 +872,7 @@ func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
 		Affinity:                  p.Affinity,
 		Config:                    p.Config,
 		Containers:                p.Sidecars,
+		Sidecars:                  p.Containers,
 		CustomTLSSecret:           p.CustomTLSSecret,
 		ExposeSuperusers:          p.ExposeSuperusers,
 		Image:                     p.Image,

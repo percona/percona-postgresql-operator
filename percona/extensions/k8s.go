@@ -1,4 +1,4 @@
-package pgcluster
+package extensions
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
 func GetExtensionKey(pgMajor int, name, version string) string {
@@ -15,9 +15,14 @@ func GetExtensionKey(pgMajor int, name, version string) string {
 
 // ExtensionRelocatorContainer returns a container that will relocate extensions from the base image (i.e. pg_stat_monitor, pg_audit)
 // to the data directory so we don't lose them when user adds a custom extension.
-func ExtensionRelocatorContainer(image string, imagePullPolicy corev1.PullPolicy, postgresVersion int) corev1.Container {
+func ExtensionRelocatorContainer(cr *pgv2.PerconaPGCluster, image string, imagePullPolicy corev1.PullPolicy, postgresVersion int) corev1.Container {
+	containerName := "extension-relocator"
+	if cr.CompareVersion("2.4.0") >= 0 {
+		containerName = fmt.Sprintf("extension-relocator-%d", postgresVersion)
+	}
+
 	return corev1.Container{
-		Name:            "extension-relocator",
+		Name:            containerName,
 		Image:           image,
 		ImagePullPolicy: imagePullPolicy,
 		Command:         []string{"/usr/local/bin/relocate-extensions.sh"},
@@ -36,7 +41,7 @@ func ExtensionRelocatorContainer(image string, imagePullPolicy corev1.PullPolicy
 	}
 }
 
-func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, extensions string, openshift *bool) corev1.Container {
+func ExtensionInstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int, spec *pgv2.ExtensionsSpec, extensions string, openshift *bool) corev1.Container {
 	mounts := []corev1.VolumeMount{
 		{
 			Name:      "postgres-data",
@@ -45,8 +50,13 @@ func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, e
 	}
 	mounts = append(mounts, ExtensionVolumeMounts(postgresVersion)...)
 
+	containerName := "extension-installer"
+	if cr.CompareVersion("2.4.0") >= 0 {
+		containerName = fmt.Sprintf("extension-installer-%d", postgresVersion)
+	}
+
 	container := corev1.Container{
-		Name:            "extension-installer",
+		Name:            containerName,
 		Image:           spec.Image,
 		ImagePullPolicy: spec.ImagePullPolicy,
 		Command:         []string{"/usr/local/bin/install-extensions.sh"},
@@ -54,6 +64,10 @@ func ExtensionInstallerContainer(postgresVersion int, spec *v2.ExtensionsSpec, e
 			{
 				Name:  "STORAGE_TYPE",
 				Value: spec.Storage.Type,
+			},
+			{
+				Name:  "STORAGE_ENDPOINT",
+				Value: spec.Storage.Endpoint,
 			},
 			{
 				Name:  "STORAGE_REGION",

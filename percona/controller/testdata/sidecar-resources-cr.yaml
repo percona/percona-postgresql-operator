@@ -1,0 +1,99 @@
+
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: cluster1
+spec:
+  crVersion: 2.4.0
+
+  image: perconalab/percona-postgresql-operator:main-ppg16-postgres
+  imagePullPolicy: Always
+  postgresVersion: 16
+
+  instances:
+  - name: instance1
+    replicas: 3
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                postgres-operator.crunchydata.com/data: postgres
+            topologyKey: kubernetes.io/hostname
+    containers:
+      replicaCertCopy:
+        resources:
+          limits:
+            cpu: 200m
+            memory: 128Mi
+    dataVolumeClaimSpec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  proxy:
+    pgBouncer:
+      replicas: 3
+      image: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
+      containers:
+        pgbouncerConfig:
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  postgres-operator.crunchydata.com/role: pgbouncer
+              topologyKey: kubernetes.io/hostname
+
+  backups:
+    pgbackrest:
+      image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
+#      
+      containers:
+        pgbackrest:
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+        pgbackrestConfig:
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      repoHost:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+             - weight: 1
+               podAffinityTerm:
+                 labelSelector:
+                   matchLabels:
+                     postgres-operator.crunchydata.com/data: pgbackrest
+                 topologyKey: kubernetes.io/hostname
+      manual:
+        repoName: repo1
+        options:
+         - --type=full
+      repos:
+      - name: repo1
+        schedules:
+          full: "0 0 * * 6"
+        volume:
+          volumeClaimSpec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+
