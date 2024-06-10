@@ -323,6 +323,23 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil
 	}
 
+	if version != int64(upgrade.Spec.FromPostgresVersion) &&
+		statusVersion != int64(upgrade.Spec.ToPostgresVersion) {
+		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
+			ObservedGeneration: upgrade.Generation,
+			Type:               ConditionPGUpgradeProgressing,
+			Status:             metav1.ConditionFalse,
+			Reason:             "PGUpgradeInvalidForCluster",
+			Message: fmt.Sprintf(
+				"Current postgres version is %d, but upgrade expected %d",
+				version, upgrade.Spec.FromPostgresVersion),
+		})
+
+		return ctrl.Result{}, nil
+	}
+
+	setStatusToProgressingIfReasonWas("PGUpgradeInvalidForCluster", upgrade)
+
 	// The upgrade needs to manipulate the data directory of the primary while
 	// Postgres is stopped. Wait until all instances are gone and the primary
 	// is identified.
@@ -358,23 +375,6 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	setStatusToProgressingIfReasonWas("PGClusterPrimaryNotIdentified", upgrade)
-
-	if version != int64(upgrade.Spec.FromPostgresVersion) &&
-		statusVersion != int64(upgrade.Spec.ToPostgresVersion) {
-		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
-			ObservedGeneration: upgrade.Generation,
-			Type:               ConditionPGUpgradeProgressing,
-			Status:             metav1.ConditionFalse,
-			Reason:             "PGUpgradeInvalidForCluster",
-			Message: fmt.Sprintf(
-				"Current postgres version is %d, but upgrade expected %d",
-				version, upgrade.Spec.FromPostgresVersion),
-		})
-
-		return ctrl.Result{}, nil
-	}
-
-	setStatusToProgressingIfReasonWas("PGUpgradeInvalidForCluster", upgrade)
 
 	// Each upgrade can specify one cluster, but we also want to ensure that
 	// each cluster is managed by at most one upgrade. Check that the specified
