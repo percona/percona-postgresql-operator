@@ -1183,3 +1183,91 @@ var _ = Describe("Security context", Ordered, func() {
 		Expect(sts.Spec.Template.Spec.SecurityContext).To(Equal(podSecContext))
 	})
 })
+
+var _ = Describe("Operator-created sidecar container resources", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "sidecar-resources"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readTestCR(crName, ns, "sidecar-resources-cr.yaml")
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster", func() {
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should apply resources to pgbackrest, pgbackrest-config and replication-cert-copy sidecar containers in instance pods", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":    "postgres",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			for _, c := range sts.Spec.Template.Spec.Containers {
+				if c.Name == "replication-cert-copy" {
+					Expect(c.Resources.Limits.Cpu()).Should(Equal(cr.Spec.InstanceSets[0].Containers.ReplicaCertCopy.Resources.Limits.Cpu()))
+					Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.InstanceSets[0].Containers.ReplicaCertCopy.Resources.Limits.Memory()))
+				}
+				if c.Name == "pgbackrest" {
+					Expect(c.Resources.Limits.Cpu()).Should(Equal(cr.Spec.Backups.PGBackRest.Containers.PGBackRest.Resources.Limits.Cpu()))
+					Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.Backups.PGBackRest.Containers.PGBackRest.Resources.Limits.Memory()))
+				}
+				if c.Name == "pgbackrest-config" {
+					Expect(c.Resources.Limits.Cpu()).Should(Equal(cr.Spec.Backups.PGBackRest.Containers.PGBackRestConfig.Resources.Limits.Cpu()))
+					Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.Backups.PGBackRest.Containers.PGBackRestConfig.Resources.Limits.Memory()))
+				}
+			}
+		}
+	})
+
+	It("should apply resources to pgbouncer-config sidecar container in pgbouncer pods", func() {
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-pgbouncer",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, c := range deployment.Spec.Template.Spec.Containers {
+			if c.Name == "pgbouncer-config" {
+				Expect(c.Resources.Limits.Cpu()).Should(Equal(cr.Spec.Proxy.PGBouncer.Containers.PGBouncerConfig.Resources.Limits.Cpu()))
+				Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.Proxy.PGBouncer.Containers.PGBouncerConfig.Resources.Limits.Memory()))
+			}
+		}
+	})
+})

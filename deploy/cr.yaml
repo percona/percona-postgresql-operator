@@ -148,8 +148,8 @@ spec:
 #      replicaCertCopy:
 #        resources:
 #          limits:
-#          cpu: 1.0
-#          memory: 1Gi
+#            cpu: 200m
+#            memory: 128Mi
 #    sidecars:
 #    - name: testcontainer
 #      image: mycontainer1:latest
@@ -227,8 +227,8 @@ spec:
 #        pgbouncerConfig:
 #          resources:
 #            limits:
-#            cpu: 1.0
-#            memory: 1Gi
+#              cpu: 200m
+#              memory: 128Mi
 #
 #      expose:
 #        annotations:
@@ -302,13 +302,13 @@ spec:
 #        pgbackrest:
 #          resources:
 #            limits:
-#            cpu: 1.0
-#            memory: 1Gi
+#              cpu: 200m
+#              memory: 128Mi
 #        pgbackrestConfig:
 #          resources:
 #            limits:
-#            cpu: 1.0
-#            memory: 1Gi
+#              cpu: 200m
+#              memory: 128Mi
 #      
 #      configuration:
 #        - secret:
