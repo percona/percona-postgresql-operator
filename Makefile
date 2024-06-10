@@ -315,9 +315,7 @@ generate-rbac: ## Generate rbac
 	$(KUSTOMIZE) build ./config/rbac/namespace/ > ./deploy/rbac.yaml
 
 generate-crd: generate-crunchy-crd generate-percona-crd
-	cat ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml > ./deploy/crd.yaml
-	echo --- >> ./deploy/crd.yaml
-	cat ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml >> ./deploy/crd.yaml
+	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
 
 generate-percona-crd:
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
