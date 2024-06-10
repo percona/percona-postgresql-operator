@@ -15,8 +15,13 @@ type S3 struct {
 	svc *s3.S3
 }
 
-func NewS3(region, bucket string) *S3 {
+func NewS3(endpoint, region, bucket string) *S3 {
 	cfg := aws.NewConfig().WithRegion(region)
+
+	if endpoint != "" {
+		cfg = cfg.WithEndpoint(endpoint)
+	}
+
 	sess := session.Must(session.NewSession(cfg))
 	svc := s3.New(sess)
 

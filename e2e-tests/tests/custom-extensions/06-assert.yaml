@@ -36,6 +36,7 @@ spec:
         env:
         - name: STORAGE_TYPE
           value: s3
+        - name: STORAGE_ENDPOINT
         - name: STORAGE_REGION
           value: eu-central-1
         - name: STORAGE_BUCKET

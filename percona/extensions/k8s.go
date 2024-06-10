@@ -66,6 +66,10 @@ func ExtensionInstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int,
 				Value: spec.Storage.Type,
 			},
 			{
+				Name:  "STORAGE_ENDPOINT",
+				Value: spec.Storage.Endpoint,
+			},
+			{
 				Name:  "STORAGE_REGION",
 				Value: spec.Storage.Region,
 			},
