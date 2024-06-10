@@ -100,6 +100,14 @@ type PGUpgradeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Init container to run before the upgrade container.
+	// +optional
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
+
+	// The list of volume mounts to mount to upgrade pod.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 // PGUpgradeStatus defines the observed state of PGUpgrade

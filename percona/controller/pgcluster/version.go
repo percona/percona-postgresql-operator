@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -67,12 +68,12 @@ func (r *PGClusterReconciler) getVersionMeta(cr *v2.PerconaPGCluster, operatorDe
 		}
 	}
 
-	extensions := make([]string, 0)
+	extensionKeys := make([]string, 0)
 	for _, extension := range cr.Spec.Extensions.Custom {
-		key := GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
-		extensions = append(extensions, key)
+		key := extensions.GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
+		extensionKeys = append(extensionKeys, key)
 	}
-	vm.Extensions = strings.Join(extensions, ",")
+	vm.Extensions = strings.Join(extensionKeys, ",")
 
 	return vm
 }

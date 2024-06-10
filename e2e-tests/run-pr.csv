@@ -1,6 +1,7 @@
 custom-extensions
 demand-backup
 init-deploy
+major-upgrade
 monitoring
 one-pod
 operator-self-healing
