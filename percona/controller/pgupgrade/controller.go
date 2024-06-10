@@ -120,11 +120,13 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 			if err := r.pauseCluster(ctx, pgCluster); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "pause PGCluster")
 			}
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		case "PGClusterMissingRequiredAnnotation":
 			log.Info("Annotating PGCluster", "cluster", pgCluster.Name)
 			if err := r.annotateCluster(ctx, pgCluster, perconaPGUpgrade); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "annotate PGCluster")
 			}
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 	}
 
