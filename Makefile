@@ -266,10 +266,14 @@ check-generate: generate-rbac
 	git diff --exit-code -- pkg/apis
 
 .PHONY: generate
-generate: ## Generate crd, deepcopy functions, and rbac
+generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
+generate: kustomize
 generate: generate-crd
 generate: generate-deepcopy
 generate: generate-rbac
+generate: generate-manager
+generate: generate-bundle
+generate: generate-cw
 
 .PHONY: generate-crunchy-crd
 generate-crunchy-crd: ## Generate crd
@@ -309,6 +313,39 @@ generate-rbac: ## Generate rbac
 	GOBIN='$(CURDIR)/hack/tools' ./hack/generate-rbac.sh \
 		'./...' 'config/rbac/'
 	$(KUSTOMIZE) build ./config/rbac/namespace/ > ./deploy/rbac.yaml
+
+generate-crd: generate-crunchy-crd generate-percona-crd
+	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
+
+generate-percona-crd:
+	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
+		crd:crdVersions='v1' \
+		paths='./pkg/apis/pgv2.percona.com/...' \
+		output:dir='build/crd/percona/generated' # build/crd/generated/{group}_{plural}.yaml
+	$(KUSTOMIZE) build ./build/crd/percona/ > ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml
+
+generate-manager:
+	cd ./config/manager/namespace/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/manager/namespace/ > ./deploy/operator.yaml
+
+generate-bundle:
+	cd ./config/bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/bundle/ > ./deploy/bundle.yaml
+
+generate-cw: generate-cw-rbac generate-cw-manager generate-cw-bundle
+
+generate-cw-rbac:
+	$(KUSTOMIZE) build ./config/rbac/cluster/ > ./deploy/cw-rbac.yaml
+
+generate-cw-manager:
+	cd ./config/manager/cluster && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/manager/cluster/ > ./deploy/cw-operator.yaml
+
+generate-cw-bundle:
+	cd ./config/cw-bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
+	$(KUSTOMIZE) build ./config/cw-bundle/ > ./deploy/cw-bundle.yaml
+
+
 
 ##@ Release
 
@@ -358,39 +395,6 @@ build-docker-image:
 
 build-extension-installer-image:
 	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE)-ext-installer COMPONENT=extension-installer $(ROOT_REPO)/e2e-tests/build
-
-generate: kustomize generate-crd generate-deepcopy generate-rbac generate-manager generate-bundle generate-cw
-
-generate-crd: generate-crunchy-crd generate-percona-crd
-	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
-
-generate-percona-crd:
-	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
-		paths='./pkg/apis/pgv2.percona.com/...' \
-		output:dir='build/crd/percona/generated' # build/crd/generated/{group}_{plural}.yaml
-	$(KUSTOMIZE) build ./build/crd/percona/ > ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml
-
-generate-manager:
-	cd ./config/manager/namespace/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	$(KUSTOMIZE) build ./config/manager/namespace/ > ./deploy/operator.yaml
-
-generate-bundle:
-	cd ./config/bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	$(KUSTOMIZE) build ./config/bundle/ > ./deploy/bundle.yaml
-
-generate-cw: generate-cw-rbac generate-cw-manager generate-cw-bundle
-
-generate-cw-rbac:
-	$(KUSTOMIZE) build ./config/rbac/cluster/ > ./deploy/cw-rbac.yaml
-
-generate-cw-manager:
-	cd ./config/manager/cluster && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	$(KUSTOMIZE) build ./config/manager/cluster/ > ./deploy/cw-operator.yaml
-
-generate-cw-bundle:
-	cd ./config/cw-bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	$(KUSTOMIZE) build ./config/cw-bundle/ > ./deploy/cw-bundle.yaml
 
 SWAGGER = $(shell pwd)/bin/swagger
 swagger: ## Download swagger locally if necessary.
