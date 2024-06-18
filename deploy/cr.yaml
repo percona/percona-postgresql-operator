@@ -187,8 +187,10 @@ spec:
 #      supplementalGroups:
 #      - 1001
 #      sysctls:
-#      - net.ipv4.tcp_keepalive_time=600
-#      - net.ipv4.tcp_keepalive_intvl=60
+#      - name: net.ipv4.tcp_keepalive_time
+#        value: "600"
+#      - name: net.ipv4.tcp_keepalive_intvl
+#        value: "60"
 #
 #    walVolumeClaimSpec:
 #       storageClassName: standard
@@ -270,8 +272,10 @@ spec:
 #        supplementalGroups:
 #        - 1001
 #        sysctls:
-#        - net.ipv4.tcp_keepalive_time=600
-#        - net.ipv4.tcp_keepalive_intvl=60
+#        - name: net.ipv4.tcp_keepalive_time
+#          value: "600"
+#        - name: net.ipv4.tcp_keepalive_intvl
+#          value: "60"
 #
 #      topologySpreadConstraints:
 #        - maxSkew: 1
@@ -340,8 +344,10 @@ spec:
 #          supplementalGroups:
 #          - 1001
 #          sysctls:
-#          - net.ipv4.tcp_keepalive_time=600
-#          - net.ipv4.tcp_keepalive_intvl=60
+#          - name: net.ipv4.tcp_keepalive_time
+#            value: "600"
+#          - name: net.ipv4.tcp_keepalive_intvl
+#            value: "60"
 #
 #      global:
 #        repo1-retention-full: "14"
@@ -387,8 +393,10 @@ spec:
 #          supplementalGroups:
 #          - 1001
 #          sysctls:
-#          - net.ipv4.tcp_keepalive_time=600
-#          - net.ipv4.tcp_keepalive_intvl=60
+#          - name: net.ipv4.tcp_keepalive_time
+#            value: "600"
+#          - name: net.ipv4.tcp_keepalive_intvl
+#            value: "60"
 #
       manual:
         repoName: repo1
