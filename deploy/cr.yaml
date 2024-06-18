@@ -368,6 +368,11 @@ spec:
                    matchLabels:
                      postgres-operator.crunchydata.com/data: pgbackrest
                  topologyKey: kubernetes.io/hostname
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
 #        priorityClassName: high-priority
 #
 #        topologySpreadConstraints:
