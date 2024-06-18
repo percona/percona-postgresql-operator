@@ -428,20 +428,13 @@ spec:
 #        azure:
 #          container: "<YOUR_AZURE_CONTAINER>"
 #
-#    restore:
-#      enabled: true
-#      repoName: repo1
-#      tolerations:
-#      - effect: NoSchedule
-#        key: role
-#        operator: Equal
-#        value: connection-poolers
-#      options:
-#       PITR restore in place
-#       - --type=time
-#       - --target="2021-06-09 14:15:11-04"
-#       restore individual databases
-#       - --db-include=hippo
+#      restore:
+#        repoName: repo1
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
 
   pmm:
     enabled: false
