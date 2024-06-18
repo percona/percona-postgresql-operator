@@ -1,0 +1,18 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      
+      sleep 140 # sleep for 2 x archive_timeout + 20 seconds for good measure
+      
+      latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup pitr-full-2 -o json | jq '.status.latestRestorableTime')
+      
+      if [ "${latest_restorable_time}" != "null" ]; then
+        echo "latest restorable time should be null"
+        exit 1
+      fi
+    timeout: 150
