@@ -301,7 +301,7 @@ spec:
 #      metadata:
 #        labels:
       image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
-#      
+#
 #      containers:
 #        pgbackrest:
 #          resources:
@@ -313,7 +313,7 @@ spec:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
-#      
+#
 #      configuration:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
@@ -368,6 +368,11 @@ spec:
                    matchLabels:
                      postgres-operator.crunchydata.com/data: pgbackrest
                  topologyKey: kubernetes.io/hostname
+#        tolerations:
+#        - effect: NoSchedule
+#          key: role
+#          operator: Equal
+#          value: connection-poolers
 #        priorityClassName: high-priority
 #
 #        topologySpreadConstraints:
