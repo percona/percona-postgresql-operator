@@ -539,7 +539,8 @@ type BuiltInExtensionsSpec struct {
 }
 
 type ExtensionsSpec struct {
-	Image           string                      `json:"image,omitempty"`
+	// +kubebuilder:validation:Required
+	Image           string                      `json:"image"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
 	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
 	BuiltIn         BuiltInExtensionsSpec       `json:"builtin,omitempty"`
