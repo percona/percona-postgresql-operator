@@ -21,6 +21,10 @@ type InfoBackup struct {
 	Annotation map[string]string `json:"annotation,omitempty"`
 	Label      string            `json:"label,omitempty"`
 	Type       v2.PGBackupType   `json:"type,omitempty"`
+	Timestamp  struct {
+		Start int64 `json:"start,omitempty"`
+		Stop  int64 `json:"stop,omitempty"`
+	} `json:"timestamp,omitempty"`
 }
 
 type InfoStanza struct {
