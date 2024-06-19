@@ -16,6 +16,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
+	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -24,8 +25,9 @@ const (
 )
 
 var (
-	LatestTimestampFileNotFound = errors.Errorf("%s not found in container", LatestCommitTimestampFile)
-	PrimaryPodNotFound          = errors.New("primary pod not found")
+	LatestTimestampFileNotFound        = errors.Errorf("%s not found in container", LatestCommitTimestampFile)
+	PrimaryPodNotFound                 = errors.New("primary pod not found")
+	LatestTimestampIsBeforeBackupStart = errors.New("latest commit timestamp is before backup start timestamp")
 )
 
 type WALWatcher func(context.Context, client.Client, chan event.GenericEvent, chan event.DeleteEvent, *pgv2.PerconaPGCluster)
@@ -60,21 +62,24 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 				continue
 			}
 
-			ts, err := GetLatestCommitTimestamp(ctx, cli, execCli, cr)
-			if err != nil {
-				if errors.Is(err, PrimaryPodNotFound) && localCr.Status.State != pgv2.AppStateReady {
-					log.V(1).Info("Primary pod not found, skipping WAL watcher")
-				} else if errors.Is(err, LatestTimestampFileNotFound) {
-					log.V(1).Info("Latest commit timestamp file not found", "file", LatestCommitTimestampFile)
-				} else {
-					log.Error(err, "get latest commit timestamp")
-				}
-				continue
-			}
-
 			latestBackup, err := getLatestBackup(ctx, cli, cr)
 			if err != nil {
 				log.Error(err, "get latest backup")
+				continue
+			}
+
+			ts, err := GetLatestCommitTimestamp(ctx, cli, execCli, cr, latestBackup)
+			if err != nil {
+				switch {
+				case errors.Is(err, PrimaryPodNotFound) && localCr.Status.State != pgv2.AppStateReady:
+					log.V(1).Info("Primary pod not found, skipping WAL watcher")
+				case errors.Is(err, LatestTimestampFileNotFound):
+					log.V(1).Info("Latest commit timestamp file not found", "file", LatestCommitTimestampFile)
+				case errors.Is(err, LatestTimestampIsBeforeBackupStart):
+					log.V(1).Info("Latest commit timestamp is before backup start timestamp")
+				default:
+					log.Error(err, "get latest commit timestamp")
+				}
 				continue
 			}
 
@@ -127,7 +132,7 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 	return latest, nil
 }
 
-func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *clientcmd.Client, cr *pgv2.PerconaPGCluster) (*metav1.Time, error) {
+func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *clientcmd.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (*metav1.Time, error) {
 	log := logging.FromContext(ctx)
 
 	primary, err := getPrimaryPod(ctx, cli, cr)
@@ -152,6 +157,15 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 	}
 
 	commitTsMeta := metav1.NewTime(commitTs.UTC())
+
+	backupStartTs, err := getBackupStartTimestamp(ctx, cli, cr, backup)
+	if err != nil {
+		return nil, errors.Wrap(err, "get backup start timestamp")
+	}
+
+	if commitTsMeta.Time.Before(backupStartTs) {
+		return nil, LatestTimestampIsBeforeBackupStart
+	}
 
 	return &commitTsMeta, nil
 }
@@ -178,4 +192,26 @@ func getPrimaryPod(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGClu
 	}
 
 	return &podList.Items[0], nil
+}
+
+func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (time.Time, error) {
+	primary, err := getPrimaryPod(ctx, cli, cr)
+	if err != nil {
+		return time.Time{}, PrimaryPodNotFound
+	}
+
+	pgbackrestInfo, err := pgbackrest.GetInfo(ctx, primary, backup.Spec.RepoName)
+	if err != nil {
+		return time.Time{}, errors.Wrap(err, "get pgbackrest info")
+	}
+
+	for _, info := range pgbackrestInfo {
+		for _, b := range info.Backup {
+			if b.Annotation[pgv2.PGBackrestAnnotationJobName] == backup.Status.JobName {
+				return time.Unix(b.Timestamp.Start, 0), nil
+			}
+		}
+	}
+
+	return time.Time{}, errors.New("backup not found in pgbackrest info")
 }
