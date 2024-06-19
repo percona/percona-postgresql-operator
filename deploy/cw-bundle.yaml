@@ -8778,6 +8778,8 @@ spec:
                         - azure
                         type: string
                     type: object
+                required:
+                - image
                 type: object
               image:
                 description: The image name to use for PostgreSQL containers.
