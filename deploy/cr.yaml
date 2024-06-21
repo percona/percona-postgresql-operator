@@ -105,7 +105,7 @@ spec:
 #          test-label: value
 
 
-  image: percona/percona-postgresql-operator:2.4.0-ppg16-postgres
+  image: percona/percona-postgresql-operator:2.4.0-ppg16.3-postgres
   imagePullPolicy: Always
   postgresVersion: 16
 #  port: 5432
@@ -219,7 +219,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: percona/percona-postgresql-operator:2.4.0-ppg16-pgbouncer
+      image: percona/percona-postgresql-operator:2.4.0-ppg16.3-pgbouncer1.22.1
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -300,7 +300,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: percona/percona-postgresql-operator:2.4.0-ppg16-pgbackrest
+      image: percona/percona-postgresql-operator:2.4.0-ppg16.3-pgbackrest2.51-1
 #
 #      containers:
 #        pgbackrest:
