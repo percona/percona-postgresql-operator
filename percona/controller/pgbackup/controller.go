@@ -357,17 +357,6 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 }
 
 func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup, job *batchv1.Job) (*reconcile.Result, error) {
-	if job.Labels[naming.LabelPGBackRestBackup] != string(naming.BackupManual) {
-		return nil, nil
-	}
-	runningBackup, err := getBackupInProgress(ctx, c, pgBackup.Spec.PGCluster, pgBackup.Namespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "get backup in progress")
-	}
-	if runningBackup != pgBackup.Name {
-		return nil, nil
-	}
-
 	if checkBackupJob(job) == v2.BackupSucceeded {
 		readyPod, err := controller.GetReadyInstancePod(ctx, c, pgBackup.Spec.PGCluster, pgBackup.Namespace)
 		if err != nil {
@@ -377,6 +366,17 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		if err := updatePGBackrestInfo(ctx, c, readyPod, pgBackup); err != nil {
 			return nil, errors.Wrap(err, "update pgbackrest info")
 		}
+	}
+
+	if job.Labels[naming.LabelPGBackRestBackup] != string(naming.BackupManual) {
+		return nil, nil
+	}
+	runningBackup, err := getBackupInProgress(ctx, c, pgBackup.Spec.PGCluster, pgBackup.Namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "get backup in progress")
+	}
+	if runningBackup != pgBackup.Name {
+		return nil, nil
 	}
 
 	deleteAnnotation := func(annotation string) (bool, error) {
@@ -440,14 +440,16 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return nil, errors.Wrap(err, "update backup job labels")
 	}
 
-	pgCluster := new(v1beta1.PostgresCluster)
-	if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pgCluster); err != nil {
-		return nil, errors.Wrap(err, "get PostgresCluster")
-	}
-	origPGCluster := pgCluster.DeepCopy()
-	pgCluster.Status.PGBackRest.ManualBackup = nil
-	if err := c.Status().Patch(ctx, pgCluster, client.MergeFrom(origPGCluster)); err != nil {
-		return nil, errors.Wrap(err, "failed to patch PostgresCluster")
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		pgCluster := new(v1beta1.PostgresCluster)
+		if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pgCluster); err != nil {
+			return errors.Wrap(err, "get PostgresCluster")
+		}
+		pgCluster.Status.PGBackRest.ManualBackup = nil
+
+		return c.Status().Update(ctx, pgCluster)
+	}); err != nil {
+		return nil, errors.Wrap(err, "update postgrescluster")
 	}
 
 	deleted, err = deleteAnnotation(pNaming.AnnotationBackupInProgress)
