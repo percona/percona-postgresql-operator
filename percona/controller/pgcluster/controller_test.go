@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
@@ -257,7 +258,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 			It("should have PMM secret hash", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(v2.AnnotationPMMSecretHash))
+				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
 			})
 
 			It("should label PMM secret", func() {
@@ -383,7 +384,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 
 			Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 				"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
-					"Annotations": HaveKeyWithValue(v2.AnnotationMonitorUserSecretHash, currentHash),
+					"Annotations": HaveKeyWithValue(pNaming.AnnotationMonitorUserSecretHash, currentHash),
 				}),
 			})))
 		})
@@ -416,7 +417,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 
 			Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 				"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
-					"Annotations": HaveKeyWithValue(v2.AnnotationMonitorUserSecretHash, currentHash),
+					"Annotations": HaveKeyWithValue(pNaming.AnnotationMonitorUserSecretHash, currentHash),
 				}),
 			})))
 		})
