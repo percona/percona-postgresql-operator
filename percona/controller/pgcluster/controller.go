@@ -36,6 +36,7 @@ import (
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
@@ -337,7 +338,7 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaP
 		if set.Metadata.Annotations == nil {
 			set.Metadata.Annotations = make(map[string]string)
 		}
-		set.Metadata.Annotations[v2.AnnotationPMMSecretHash] = pmmSecretHash
+		set.Metadata.Annotations[pNaming.AnnotationPMMSecretHash] = pmmSecretHash
 
 		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
 	}
@@ -381,7 +382,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 		}
 
 		// If the currentHash is the same  is the on the STS, restart will not  happen
-		set.Metadata.Annotations[v2.AnnotationMonitorUserSecretHash] = currentHash
+		set.Metadata.Annotations[pNaming.AnnotationMonitorUserSecretHash] = currentHash
 	}
 
 	return nil

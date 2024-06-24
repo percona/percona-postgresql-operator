@@ -3,7 +3,6 @@ package pgbackup
 import (
 	"context"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -23,6 +22,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -156,7 +156,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 				if bcp.Annotations == nil {
 					bcp.Annotations = make(map[string]string)
 				}
-				bcp.Annotations[v2.AnnotationPGBackrestBackupJobType] = job.Labels[naming.LabelPGBackRestBackup]
+				bcp.Annotations[pNaming.AnnotationPGBackrestBackupJobType] = job.Labels[naming.LabelPGBackRestBackup]
 			default:
 				return errors.Errorf("unknown value for %s label: %s", naming.LabelPGBackRestBackup, job.Labels[naming.LabelPGBackRestBackup])
 			}
@@ -257,9 +257,8 @@ func getBackupInProgress(ctx context.Context, c client.Client, clusterName, ns s
 		return "", errors.Wrap(err, "get PostgresCluster")
 	}
 
-	annotation := v2.AnnotationBackupInProgress
-	spl := strings.Split(annotation, "/")
-	crunchyAnnotation := v2.CrunchyAnnotationPrefix + spl[1]
+	annotation := pNaming.AnnotationBackupInProgress
+	crunchyAnnotation := pNaming.ToCrunchyAnnotation(annotation)
 
 	if crunchyCluster.Annotations[crunchyAnnotation] != "" {
 		return crunchyCluster.Annotations[crunchyAnnotation], nil
@@ -324,7 +323,7 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 			}
 
 			backupType := backup.Annotation[v2.PGBackrestAnnotationJobType]
-			if (backupType != pgBackup.Annotations[v2.AnnotationPGBackrestBackupJobType] ||
+			if (backupType != pgBackup.Annotations[pNaming.AnnotationPGBackrestBackupJobType] ||
 				backupType != string(naming.BackupReplicaCreate)) && backup.Annotation[v2.PGBackrestAnnotationBackupName] != pgBackup.Name {
 				continue
 			}
@@ -358,14 +357,6 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 }
 
 func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup, job *batchv1.Job) (*reconcile.Result, error) {
-	readyPod, err := controller.GetReadyInstancePod(ctx, c, pgBackup.Spec.PGCluster, pgBackup.Namespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "get ready instance pod")
-	}
-
-	if err := updatePGBackrestInfo(ctx, c, readyPod, pgBackup); err != nil {
-		return nil, errors.Wrap(err, "update pgbackrest info")
-	}
 	if job.Labels[naming.LabelPGBackRestBackup] != string(naming.BackupManual) {
 		return nil, nil
 	}
@@ -377,17 +368,24 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return nil, nil
 	}
 
+	if checkBackupJob(job) == v2.BackupSucceeded {
+		readyPod, err := controller.GetReadyInstancePod(ctx, c, pgBackup.Spec.PGCluster, pgBackup.Namespace)
+		if err != nil {
+			return nil, errors.Wrap(err, "get ready instance pod")
+		}
+
+		if err := updatePGBackrestInfo(ctx, c, readyPod, pgBackup); err != nil {
+			return nil, errors.Wrap(err, "update pgbackrest info")
+		}
+	}
+
 	deleteAnnotation := func(annotation string) (bool, error) {
 		pgCluster := new(v1beta1.PostgresCluster)
 		if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pgCluster); err != nil {
 			return false, errors.Wrap(err, "get PostgresCluster")
 		}
 
-		crunchyAnnotation := annotation
-		if strings.HasPrefix(annotation, v2.AnnotationPrefix) {
-			spl := strings.Split(annotation, "/")
-			crunchyAnnotation = v2.CrunchyAnnotationPrefix + spl[1]
-		}
+		crunchyAnnotation := pNaming.ToCrunchyAnnotation(annotation)
 		// We should be sure that annotation is deleted from crunchy's cluster
 		_, ok := pgCluster.Annotations[crunchyAnnotation]
 		if !ok {
@@ -452,9 +450,9 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return nil, errors.Wrap(err, "failed to patch PostgresCluster")
 	}
 
-	deleted, err = deleteAnnotation(v2.AnnotationBackupInProgress)
+	deleted, err = deleteAnnotation(pNaming.AnnotationBackupInProgress)
 	if err != nil {
-		return nil, errors.Wrapf(err, "delete %s annotation", v2.AnnotationBackupInProgress)
+		return nil, errors.Wrapf(err, "delete %s annotation", pNaming.AnnotationBackupInProgress)
 	}
 	if !deleted {
 		return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
@@ -470,14 +468,14 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 		if err != nil {
 			return err
 		}
-		if a := pg.Annotations[v2.AnnotationBackupInProgress]; a != "" && a != pb.Name {
+		if a := pg.Annotations[pNaming.AnnotationBackupInProgress]; a != "" && a != pb.Name {
 			return errors.Errorf("backup %s already in progress", a)
 		}
 		if pg.Annotations == nil {
 			pg.Annotations = make(map[string]string)
 		}
 		pg.Annotations[naming.PGBackRestBackup] = pb.Name
-		pg.Annotations[v2.AnnotationBackupInProgress] = pb.Name
+		pg.Annotations[pNaming.AnnotationBackupInProgress] = pb.Name
 
 		if pg.Spec.Backups.PGBackRest.Manual == nil {
 			pg.Spec.Backups.PGBackRest.Manual = new(v1beta1.PGBackRestManualBackup)
@@ -495,7 +493,7 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 }
 
 func findBackupJob(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) (*batchv1.Job, error) {
-	if jobName := pb.GetAnnotations()[v2.AnnotationPGBackrestBackupJobName]; jobName != "" {
+	if jobName := pb.GetAnnotations()[pNaming.AnnotationPGBackrestBackupJobName]; jobName != "" {
 		job := new(batchv1.Job)
 		err := c.Get(ctx, types.NamespacedName{Name: jobName, Namespace: pb.Namespace}, job)
 		if err != nil {
