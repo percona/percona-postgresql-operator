@@ -13,25 +13,25 @@ commands:
       curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/v${lower_ver}/deploy/cr.yaml" >"${TEMP_DIR}/cr_lower.yaml"
 
       # get PG version which we want to test
-      pg_ver=$(echo "$IMAGE_POSTGRESQL" | cut -d':' -f2 | grep -oE '\-ppg[0-9]+-' | grep -oE '[0-9]+' | tr -d '-')
+      pg_ver=$PG_VER
       pg_exists=0
-      pg_exists=$(curl -s https://check.percona.com/versions/v1/pg-operator/${lower_ver} | jq '.versions[].matrix.postgresql | with_entries(select(.key | startswith("'${pg_ver}'"))) | length')
+      pg_exists=$(curl -s https://check.percona.com/versions/v1/pg-operator/${lower_ver} | jq '.versions[].matrix.postgresql | with_entries(select(.key | startswith("'$pg_ver'"))) | length')
       # if the lower version of operator doesn't have new PG version we will use lower PG version
       # but in that case not the intended targer PG database image will be tested
       # (this should happen once a year on major PG version release, but only for this latest version)
       if [ $pg_exists -eq 0 ]; then
           pg_ver=$((pg_ver - 1))
       fi
-      echo "${pg_ver}" >"${TEMP_DIR}/pg_ver.txt"
+      echo $pg_ver >"${TEMP_DIR}/pg_ver.txt"
 
       yq -i eval '
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |
-          .spec.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-postgres" |
-          .spec.postgresVersion = '${pg_ver}' |
-          .spec.proxy.pgBouncer.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-pgbouncer" |
+          .spec.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-postgres" |
+          .spec.postgresVersion = '$pg_ver' |
+          .spec.proxy.pgBouncer.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-pgbouncer" |
           .spec.backups.pgbackrest.repos[0].schedules = null |
-          .spec.backups.pgbackrest.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'${pg_ver}'-pgbackrest" |
+          .spec.backups.pgbackrest.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-pgbackrest" |
           .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
           .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' "${TEMP_DIR}/cr_lower.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"

@@ -8,15 +8,15 @@ commands:
       source ../../functions
 
       pg_ver_lower="$(cat ${TEMP_DIR}/pg_ver.txt)"
-      pg_ver_upper=$(echo "$IMAGE_POSTGRESQL" | cut -d':' -f2 | grep -oE '\-ppg[0-9]+-' | grep -oE '[0-9]+' | tr -d '-')
+      pg_ver_upper=$PG_VER
       target_image_postgresql=$IMAGE_POSTGRESQL
       target_image_pgbouncer=$IMAGE_PGBOUNCER
       target_image_backrest=$IMAGE_BACKREST
 
-      if [ "${pg_ver_lower}" != "${pg_ver_upper}" ]; then
-          target_image_postgresql="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-postgres"
-          target_image_pgbouncer="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-pgbouncer"
-          target_image_backrest="perconalab/percona-postgresql-operator:main-ppg${pg_ver_lower}-pgbackrest"
+      if [ "$pg_ver_lower" != "$pg_ver_upper" ]; then
+          target_image_postgresql="perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-postgres"
+          target_image_pgbouncer="perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-pgbouncer"
+          target_image_backrest="perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-pgbackrest"
       fi
       cr_ver=$(yq '.spec.crVersion' $DEPLOY_DIR/cr.yaml)
 
