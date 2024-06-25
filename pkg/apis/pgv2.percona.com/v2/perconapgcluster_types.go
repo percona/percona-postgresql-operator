@@ -3,7 +3,6 @@ package v2
 import (
 	"context"
 	"os"
-	"strings"
 
 	gover "github.com/hashicorp/go-version"
 	v "github.com/hashicorp/go-version"
@@ -14,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -241,12 +241,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		case corev1.LastAppliedConfigAnnotation:
 			continue
 		default:
-			if strings.HasPrefix(k, AnnotationPrefix) {
-				a := strings.Split(k, "/")
-				annotations[CrunchyAnnotationPrefix+a[1]] = v
-			} else {
-				annotations[k] = v
-			}
+			annotations[pNaming.ToCrunchyAnnotation(k)] = v
 		}
 	}
 	postgresCluster.Annotations = annotations
@@ -906,46 +901,6 @@ const labelPrefix = "pgv2.percona.com/"
 const (
 	LabelOperatorVersion = labelPrefix + "version"
 	LabelPMMSecret       = labelPrefix + "pmm-secret"
-)
-
-const (
-	AnnotationPrefix        = "pgv2.percona.com/"
-	CrunchyAnnotationPrefix = "postgres-operator.crunchydata.com/"
-)
-
-const (
-	// AnnotationPGBackrestBackup is the annotation that is added to a PerconaPGCluster to initiate a manual
-	// backup.  The value of the annotation will be a unique identifier for a backup Job (e.g. a
-	// timestamp), which will be stored in the PostgresCluster status to properly track completion
-	// of the Job.  Also used to annotate the backup Job itself as needed to identify the backup
-	// ID associated with a specific manual backup Job.
-	AnnotationPGBackrestBackup = AnnotationPrefix + "pgbackrest-backup"
-
-	// AnnotationPGBackrestBackupJobName is the annotation that is added to a PerconaPGClusterBackup.
-	// The value of the annotation will be a name of an existing backup job
-	AnnotationPGBackrestBackupJobName = AnnotationPGBackrestBackup + "-job-name"
-
-	// AnnotationPGBackrestBackupJobType is the annotation that is added to a PerconaPGClusterBackup.
-	// The value of the annotation will be a type of a backup (e.g. "manual" or "replica-create).
-	AnnotationPGBackrestBackupJobType = AnnotationPGBackrestBackup + "-job-type"
-
-	// AnnotationPGBackRestRestore is the annotation that is added to a PerconaPGCluster to initiate an in-place
-	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a
-	// timestamp), which will be stored in the PostgresCluster status to properly track completion
-	// of the Job.
-	AnnotationPGBackRestRestore = AnnotationPrefix + "pgbackrest-restore"
-
-	// AnnotationPMMSecretHash is the annotation that is added to instance annotations to
-	// rollout restart PG pods in case PMM credentials are rotated.
-	AnnotationPMMSecretHash = AnnotationPrefix + "pmm-secret-hash"
-
-	// AnnotationMonitorUserSecretHash is the annotation that is added to instance annotations to
-	// rollout restart PG pods in case monitor user password is changed.
-	AnnotationMonitorUserSecretHash = AnnotationPrefix + "monitor-user-secret-hash"
-
-	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
-	// indicate that backup is in progress.
-	AnnotationBackupInProgress = AnnotationPrefix + "backup-in-progress"
 )
 
 const DefaultVersionServiceEndpoint = "https://check.percona.com"
