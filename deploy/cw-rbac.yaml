@@ -185,6 +185,7 @@ rules:
   resources:
   - crunchybridgeclusters/finalizers
   - crunchybridgeclusters/status
+  - postgresclusters/status
   verbs:
   - patch
   - update
@@ -209,7 +210,6 @@ rules:
   resources:
   - pgadmins/status
   - pgupgrades/status
-  - postgresclusters/status
   verbs:
   - patch
 - apiGroups:
