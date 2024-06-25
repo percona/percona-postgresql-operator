@@ -43,7 +43,7 @@ func PostgreSQL(
 	validateCommitTime := `grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2}`
 	archive := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-push "%p"`
 	archive += ` && timestamp=$(pg_waldump "%p" | grep COMMIT | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `)$');`
-	archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgwal/latest_commit_timestamp.txt; fi`
+	archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
 
 	outParameters.Mandatory.Add("archive_mode", "on")
 	outParameters.Mandatory.Add("archive_command", archive)
