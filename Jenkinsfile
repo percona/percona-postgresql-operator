@@ -233,8 +233,8 @@ void prepareNode() {
 
         kubectl krew install assert
 
-        # v0.16.0 kuttl version
-        kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/e450fd06ebe9ce200355726b81d13e5e59b9bf47/plugins/kuttl.yaml
+        # v0.17.0 kuttl version
+        kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/336ef83542fd2f783bfa2c075b24599e834dcc77/plugins/kuttl.yaml
         echo \$(kubectl kuttl --version) is installed
 
         sudo tee /etc/yum.repos.d/google-cloud-sdk.repo << EOF
