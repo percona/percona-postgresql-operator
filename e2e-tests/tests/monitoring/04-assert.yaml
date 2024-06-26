@@ -1,3 +1,21 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  labels:
+    e2e: monitoring
+  name: monitoring
+status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+      - name: instance1
+        ready: 3
+        size: 3
+    ready: 3
+    size: 3
+  state: ready
 ---
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
@@ -14,6 +32,26 @@ status:
       replicas: 3
       updatedReplicas: 3
 ---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: monitoring
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: monitoring
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 3
+  replicas: 1
+  readyReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
 kind: Pod
 apiVersion: v1
 metadata:
@@ -27,12 +65,3 @@ metadata:
       kind: StatefulSet
 status:
   phase: Running
-  conditions:
-    - type: Initialized
-      status: 'True'
-    - type: Ready
-      status: 'True'
-    - type: ContainersReady
-      status: 'True'
-    - type: PodScheduled
-      status: 'True'
