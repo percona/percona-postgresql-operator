@@ -41,6 +41,7 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr manager.Manager) error {
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/status,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/finalizers,verbs=patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch;patch;update
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=pgupgrades,verbs=get;list;create;update;patch;delete;watch
 
