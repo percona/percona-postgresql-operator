@@ -45283,6 +45283,7 @@ rules:
   resources:
   - perconapgclusters/status
   - perconapgrestores/status
+  - perconapgupgrades/finalizers
   - perconapgupgrades/status
   verbs:
   - patch
