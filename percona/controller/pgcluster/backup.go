@@ -14,17 +14,22 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
 func (r *PGClusterReconciler) reconcileBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+
 	if err := r.reconcileBackupJobs(ctx, cr); err != nil {
 		return errors.Wrap(err, "reconcile backup jobs")
 	}
 
 	if err := r.cleanupOutdatedBackups(ctx, cr); err != nil {
-		return errors.Wrap(err, "cleanup outdated backups")
+		// If the user has invalid pgbackrest credentials, this could stop the reconcile.
+		// We should just print an error message.
+		log.Error(err, "failed to cleanup outdated backups")
 	}
 
 	return nil
@@ -117,7 +122,7 @@ func (r *PGClusterReconciler) reconcileBackupJobs(ctx context.Context, cr *v2.Pe
 }
 
 func checkBackupAnnotations(ctx context.Context, cl client.Client, cr *v2.PerconaPGCluster) error {
-	backupName := cr.Annotations[v2.AnnotationBackupInProgress]
+	backupName := cr.Annotations[pNaming.AnnotationBackupInProgress]
 	if backupName == "" {
 		return nil
 	}
@@ -137,7 +142,7 @@ func checkBackupAnnotations(ctx context.Context, cl client.Client, cr *v2.Percon
 			return err
 		}
 
-		delete(cr.Annotations, v2.AnnotationBackupInProgress)
+		delete(cr.Annotations, pNaming.AnnotationBackupInProgress)
 		delete(cr.Annotations, naming.PGBackRestBackup)
 
 		return cl.Update(ctx, cr)
@@ -169,7 +174,7 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 				GenerateName: job.Name + "-",
 				Namespace:    job.Namespace,
 				Annotations: map[string]string{
-					v2.AnnotationPGBackrestBackupJobName: job.Name,
+					pNaming.AnnotationPGBackrestBackupJobName: job.Name,
 				},
 			},
 			Spec: v2.PerconaPGBackupSpec{
@@ -212,7 +217,7 @@ func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster
 
 	for _, pb := range pbList {
 		pb := pb
-		if pb.GetAnnotations()[v2.AnnotationPGBackrestBackupJobName] == job.Name || pb.Status.JobName == job.Name {
+		if pb.GetAnnotations()[pNaming.AnnotationPGBackrestBackupJobName] == job.Name || pb.Status.JobName == job.Name {
 			return &pb, nil
 		}
 	}

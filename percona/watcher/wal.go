@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	LatestCommitTimestampFile = "/pgwal/latest_commit_timestamp.txt"
+	LatestCommitTimestampFile = "/pgdata/latest_commit_timestamp.txt"
 )
 
 var (

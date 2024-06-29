@@ -45283,6 +45283,7 @@ rules:
   resources:
   - perconapgclusters/status
   - perconapgrestores/status
+  - perconapgupgrades/finalizers
   - perconapgupgrades/status
   verbs:
   - patch
@@ -45321,6 +45322,7 @@ rules:
   resources:
   - crunchybridgeclusters/finalizers
   - crunchybridgeclusters/status
+  - postgresclusters/status
   verbs:
   - patch
   - update
@@ -45345,7 +45347,6 @@ rules:
   resources:
   - pgadmins/status
   - pgupgrades/status
-  - postgresclusters/status
   verbs:
   - patch
 - apiGroups:
@@ -45430,7 +45431,7 @@ spec:
           value: INFO
         - name: DISABLE_TELEMETRY
           value: "false"
-        image: perconalab/percona-postgresql-operator:main
+        image: percona/percona-postgresql-operator:2.4.0
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

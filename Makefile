@@ -206,7 +206,7 @@ check-envtest: get-pgmonitor
 		$(GO_TEST) -count=1 -cover -tags=envtest ./...
 
 # The "PGO_TEST_TIMEOUT_SCALE" environment variable (default: 1) can be set to a
-# positive number that extends test timeouts. The following runs tests with 
+# positive number that extends test timeouts. The following runs tests with
 # timeouts that are 20% longer than normal:
 # make check-envtest-existing PGO_TEST_TIMEOUT_SCALE=1.2
 .PHONY: check-envtest-existing
