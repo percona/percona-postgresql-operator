@@ -1,0 +1,18 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+          | yq ".metadata.name=\"${test_name}-primary\"" \
+          | yq "del(.spec.backups.pgbackrest.repos[0].schedules)" \
+          | yq "del(.spec.backups.pgbackrest.repos[0].volume)" \
+          | yq ".spec.backups.pgbackrest.repos[0].gcs.bucket=\"pg-operator-testing\"" \
+          | yq ".spec.backups.pgbackrest.configuration[0].secret.name=\"standby-pgbackrest-secrets\"" \
+          | yq ".spec.backups.pgbackrest.global.repo1-path = \"/backrestrepo/postgres-operator/'${test_name}${RANDOM}'/repo1\"" \
+          | kubectl -n "${NAMESPACE}" apply -f -
