@@ -8,6 +8,6 @@ commands:
 
       source ../../functions
 
-      get_cr "-2" \
+      get_cr "finalizers-2" \
         | yq eval '.metadata.finalizers += ["percona.com/delete-pvc", "percona.com/delete-ssl"]' \
         | kubectl -n "${NAMESPACE}" apply -f -

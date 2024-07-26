@@ -8,4 +8,4 @@ commands:
 
       source ../../functions
 
-      get_cr ${RANDOM}| kubectl -n "${NAMESPACE}" apply -f -
+      get_cr "users" ${RANDOM}| kubectl -n "${NAMESPACE}" apply -f -
