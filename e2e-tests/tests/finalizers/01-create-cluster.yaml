@@ -8,7 +8,6 @@ commands:
 
       source ../../functions
 
-      get_cr "demand-backup" ${RANDOM} \
-        | yq '.spec.backups.pgbackrest.global.repo1-retention-full="2"' \
-        | yq '.spec.backups.pgbackrest.global.repo1-retention-full-type="count"' \
+      get_cr \
+        | yq eval '.metadata.finalizers += ["percona.com/delete-pvc", "percona.com/delete-ssl"]' \
         | kubectl -n "${NAMESPACE}" apply -f -

@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      get_cr ${RANDOM} \
+      get_cr "tablespaces" ${RANDOM} \
         | yq eval '
             .spec.instances[].tablespaceVolumes[0].name="myts" |
             .spec.instances[].tablespaceVolumes[0].dataVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |

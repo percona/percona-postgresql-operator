@@ -148,7 +148,13 @@ func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.P
 	log := logging.FromContext(ctx)
 	log.Info("Stopping external watchers", "cluster", cr.Name, "namespace", cr.Namespace)
 
-	r.StopExternalWatchers <- event.DeleteEvent{Object: cr}
+	select {
+	case r.StopExternalWatchers <- event.DeleteEvent{Object: cr}:
+		log.Info("External watchers are stopped", "cluster", cr.Name, "namespace", cr.Namespace)
+	default:
+		log.Info("External watchers are already stopped", "cluster", cr.Name, "namespace", cr.Namespace)
+	}
+
 	for _, watcherName := range r.Watchers.Names() {
 		r.Watchers.Remove(watcherName)
 	}
@@ -187,6 +193,7 @@ func (r *PGClusterReconciler) runFinalizer(ctx context.Context, cr *v2.PerconaPG
 	}
 
 	if controllerutil.RemoveFinalizer(cr, finalizer) {
+		log.Info("Removing finalizer", "name", finalizer)
 		if err := r.Client.Patch(ctx, cr, client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "remove finalizers")
 		}
