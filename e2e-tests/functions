@@ -121,19 +121,23 @@ get_client_pod() {
 }
 
 get_cr() {
-	local name_suffix=$1
+	local cr_name=$1
+	if [ -z ${cr_name} ]; then
+		cr_name=${test_name}
+	fi
+	local repo_path=$2
 
 	yq eval '
-		.metadata.name = "'$test_name'" |
-		.metadata.labels = {"e2e":"'$test_name'"} |
+		.metadata.name = "'${cr_name}'" |
+		.metadata.labels = {"e2e":"'${cr_name}'"} |
 		.spec.postgresVersion = '$PG_VER' |
 		.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
-		.spec.users += [{"name":"'$test_name'","password":{"type":"AlphaNumeric"}}] |
+		.spec.users += [{"name":"'${cr_name}'","password":{"type":"AlphaNumeric"}}] |
 		.spec.image = "'$IMAGE_POSTGRESQL'" |
 		.spec.backups.pgbackrest.image = "'$IMAGE_BACKREST'" |
 		.spec.proxy.pgBouncer.image = "'$IMAGE_PGBOUNCER'" |
 		.spec.pmm.image = "'$IMAGE_PMM_CLIENT'" |
-		.spec.pmm.secret = "'$test_name'-pmm-secret"
+		.spec.pmm.secret = "'${cr_name}'-pmm-secret"
 		' $DEPLOY_DIR/cr.yaml >$TEMP_DIR/cr.yaml
 
 	if [[ $OPENSHIFT ]]; then
@@ -143,16 +147,16 @@ get_cr() {
 	case $test_name in
 		"demand-backup" | "start-from-backup")
 			yq eval -i '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'$test_name'-pgbackrest-secrets"}}] |
+				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${cr_name}'-pgbackrest-secrets"}}] |
 				.spec.backups.pgbackrest.manual.repoName = "repo1" |
 				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
-				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'$test_name${name_suffix:+-$name_suffix}'/repo1" |
+				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
 				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
 				' $TEMP_DIR/cr.yaml
 
 			if [[ $test_name == "start-from-backup" ]]; then
 				yq eval -i '
-					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'$test_name'-pgbackrest-secrets"}}] |
+					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${cr_name}'-pgbackrest-secrets"}}] |
 					.spec.dataSource.pgbackrest.stanza = "db" |
 					.spec.dataSource.pgbackrest.global.repo1-path = "/cluster-source/demand-backup-ppg'$PG_VER'/repo1" |
 					.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
@@ -161,11 +165,11 @@ get_cr() {
 			;;
 		"scheduled-backup")
 			yq eval -i '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'$test_name'-pgbackrest-secrets"}}] |
+				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${cr_name}'-pgbackrest-secrets"}}] |
 				.spec.backups.pgbackrest.manual.repoName = "repo1" |
 				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
-				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'$test_name${name_suffix:+-$name_suffix}'/repo1" |
-				.spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'$test_name${name_suffix:+-$name_suffix}'/repo2" |
+				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
+				.spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo2" |
 				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
 				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml

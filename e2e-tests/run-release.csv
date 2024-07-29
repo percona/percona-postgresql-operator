@@ -1,5 +1,6 @@
 custom-extensions
 demand-backup
+finalizers
 init-deploy
 major-upgrade
 migration-backup-s3
