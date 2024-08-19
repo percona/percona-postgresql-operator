@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/util"
@@ -241,7 +242,19 @@ func TestAddConfigToInstancePod(t *testing.T) {
           path: pgbackrest_instance.conf
         - key: config-hash
           path: config-hash
+        - key: pgbackrest-server.conf
+          path: ~postgres-operator_server.conf
         name: hippo-pgbackrest-config
+    - secret:
+        items:
+        - key: pgbackrest.ca-roots
+          path: ~postgres-operator/tls-ca.crt
+        - key: pgbackrest-client.crt
+          path: ~postgres-operator/client-tls.crt
+        - key: pgbackrest-client.key
+          mode: 384
+          path: ~postgres-operator/client-tls.key
+        name: hippo-pgbackrest
 		`))
 	})
 
@@ -253,7 +266,7 @@ func TestAddConfigToInstancePod(t *testing.T) {
 		AddConfigToInstancePod(cluster, out)
 		alwaysExpect(t, out)
 
-		// Instance configuration files but no certificates.
+		// Instance configuration and certificates.
 		assert.Assert(t, marshalMatches(out.Volumes, `
 - name: pgbackrest-config
   projected:
@@ -264,7 +277,19 @@ func TestAddConfigToInstancePod(t *testing.T) {
           path: pgbackrest_instance.conf
         - key: config-hash
           path: config-hash
+        - key: pgbackrest-server.conf
+          path: ~postgres-operator_server.conf
         name: hippo-pgbackrest-config
+    - secret:
+        items:
+        - key: pgbackrest.ca-roots
+          path: ~postgres-operator/tls-ca.crt
+        - key: pgbackrest-client.crt
+          path: ~postgres-operator/client-tls.crt
+        - key: pgbackrest-client.key
+          mode: 384
+          path: ~postgres-operator/client-tls.key
+        name: hippo-pgbackrest
 		`))
 	})
 
@@ -305,7 +330,6 @@ func TestAddConfigToInstancePod(t *testing.T) {
           mode: 384
           path: ~postgres-operator/client-tls.key
         name: hippo-pgbackrest
-        optional: true
 		`))
 	})
 }
@@ -551,6 +575,9 @@ func TestAddConfigToRestorePod(t *testing.T) {
 }
 
 func TestAddServerToInstancePod(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
 	cluster.Default()
@@ -588,7 +615,7 @@ func TestAddServerToInstancePod(t *testing.T) {
 		}
 
 		out := pod.DeepCopy()
-		AddServerToInstancePod(cluster, out, "instance-secret-name")
+		AddServerToInstancePod(ctx, cluster, out, "instance-secret-name")
 
 		// Only Containers and Volumes fields have changed.
 		assert.DeepEqual(t, pod, *out, cmpopts.IgnoreFields(pod, "Containers", "Volumes"))
@@ -620,6 +647,8 @@ func TestAddServerToInstancePod(t *testing.T) {
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbackrest/server
     name: pgbackrest-server
@@ -634,21 +663,21 @@ func TestAddServerToInstancePod(t *testing.T) {
   - --
   - |-
     monitor() {
-    exec {fd}<> <(:)
+    exec {fd}<> <(:||:)
     until read -r -t 5 -u "${fd}"; do
       if
-        [ "${filename}" -nt "/proc/self/fd/${fd}" ] &&
+        [[ "${filename}" -nt "/proc/self/fd/${fd}" ]] &&
         pkill -HUP --exact --parent=0 pgbackrest
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --dereference --format='Loaded configuration dated %y' "${filename}"
       elif
-        { [ "${directory}" -nt "/proc/self/fd/${fd}" ] ||
-          [ "${authority}" -nt "/proc/self/fd/${fd}" ]
+        { [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] ||
+          [[ "${authority}" -nt "/proc/self/fd/${fd}" ]]
         } &&
         pkill -HUP --exact --parent=0 pgbackrest
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --format='Loaded certificates dated %y' "${directory}"
       fi
     done
@@ -669,6 +698,8 @@ func TestAddServerToInstancePod(t *testing.T) {
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbackrest/server
     name: pgbackrest-server
@@ -696,7 +727,12 @@ func TestAddServerToInstancePod(t *testing.T) {
 	})
 
 	t.Run("AddTablespaces", func(t *testing.T) {
-		assert.NilError(t, util.AddAndSetFeatureGates(string(util.TablespaceVolumes+"=true")))
+		gate := feature.NewGate()
+		assert.NilError(t, gate.SetFromMap(map[string]bool{
+			feature.TablespaceVolumes: true,
+		}))
+		ctx := feature.NewContext(ctx, gate)
+
 		clusterWithTablespaces := cluster.DeepCopy()
 		clusterWithTablespaces.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
 			{
@@ -709,7 +745,7 @@ func TestAddServerToInstancePod(t *testing.T) {
 
 		out := pod.DeepCopy()
 		out.Volumes = append(out.Volumes, corev1.Volume{Name: "tablespace-trial"}, corev1.Volume{Name: "tablespace-castle"})
-		AddServerToInstancePod(clusterWithTablespaces, out, "instance-secret-name")
+		AddServerToInstancePod(ctx, clusterWithTablespaces, out, "instance-secret-name")
 
 		// Only Containers and Volumes fields have changed.
 		assert.DeepEqual(t, pod, *out, cmpopts.IgnoreFields(pod, "Containers", "Volumes"))
@@ -736,6 +772,8 @@ func TestAddServerToInstancePod(t *testing.T) {
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbackrest/server
     name: pgbackrest-server
@@ -754,21 +792,21 @@ func TestAddServerToInstancePod(t *testing.T) {
   - --
   - |-
     monitor() {
-    exec {fd}<> <(:)
+    exec {fd}<> <(:||:)
     until read -r -t 5 -u "${fd}"; do
       if
-        [ "${filename}" -nt "/proc/self/fd/${fd}" ] &&
+        [[ "${filename}" -nt "/proc/self/fd/${fd}" ]] &&
         pkill -HUP --exact --parent=0 pgbackrest
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --dereference --format='Loaded configuration dated %y' "${filename}"
       elif
-        { [ "${directory}" -nt "/proc/self/fd/${fd}" ] ||
-          [ "${authority}" -nt "/proc/self/fd/${fd}" ]
+        { [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] ||
+          [[ "${authority}" -nt "/proc/self/fd/${fd}" ]]
         } &&
         pkill -HUP --exact --parent=0 pgbackrest
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --format='Loaded certificates dated %y' "${directory}"
       fi
     done
@@ -787,6 +825,8 @@ func TestAddServerToInstancePod(t *testing.T) {
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbackrest/server
     name: pgbackrest-server
@@ -796,6 +836,9 @@ func TestAddServerToInstancePod(t *testing.T) {
 }
 
 func TestAddServerToRepoPod(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
 	cluster.Default()
@@ -826,7 +869,7 @@ func TestAddServerToRepoPod(t *testing.T) {
 		}
 
 		out := pod.DeepCopy()
-		AddServerToRepoPod(cluster, out)
+		AddServerToRepoPod(ctx, cluster, out)
 
 		// Only Containers and Volumes fields have changed.
 		assert.DeepEqual(t, pod, *out, cmpopts.IgnoreFields(pod, "Containers", "Volumes"))
@@ -855,6 +898,8 @@ func TestAddServerToRepoPod(t *testing.T) {
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbackrest/server
     name: pgbackrest-server
@@ -865,21 +910,21 @@ func TestAddServerToRepoPod(t *testing.T) {
   - --
   - |-
     monitor() {
-    exec {fd}<> <(:)
+    exec {fd}<> <(:||:)
     until read -r -t 5 -u "${fd}"; do
       if
-        [ "${filename}" -nt "/proc/self/fd/${fd}" ] &&
+        [[ "${filename}" -nt "/proc/self/fd/${fd}" ]] &&
         pkill -HUP --exact --parent=0 pgbackrest
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --dereference --format='Loaded configuration dated %y' "${filename}"
       elif
-        { [ "${directory}" -nt "/proc/self/fd/${fd}" ] ||
-          [ "${authority}" -nt "/proc/self/fd/${fd}" ]
+        { [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] ||
+          [[ "${authority}" -nt "/proc/self/fd/${fd}" ]]
         } &&
         pkill -HUP --exact --parent=0 pgbackrest
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --format='Loaded certificates dated %y' "${directory}"
       fi
     done
@@ -900,6 +945,8 @@ func TestAddServerToRepoPod(t *testing.T) {
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbackrest/server
     name: pgbackrest-server

@@ -24,9 +24,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -103,8 +103,8 @@ func TestSecret(t *testing.T) {
 func TestPod(t *testing.T) {
 	t.Parallel()
 
-	// Initialize the feature gate
-	assert.NilError(t, util.AddAndSetFeatureGates(""))
+	features := feature.NewGate()
+	ctx := feature.NewContext(context.Background(), features)
 
 	cluster := new(v1beta1.PostgresCluster)
 	configMap := new(corev1.ConfigMap)
@@ -112,7 +112,7 @@ func TestPod(t *testing.T) {
 	secret := new(corev1.Secret)
 	pod := new(corev1.PodSpec)
 
-	call := func() { Pod(cluster, configMap, primaryCertificate, secret, pod) }
+	call := func() { Pod(ctx, cluster, configMap, primaryCertificate, secret, pod) }
 
 	t.Run("Disabled", func(t *testing.T) {
 		before := pod.DeepCopy()
@@ -148,6 +148,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbouncer
     name: pgbouncer-config
@@ -158,11 +160,11 @@ containers:
   - --
   - |-
     monitor() {
-    exec {fd}<> <(:)
-    while read -r -t 5 -u "${fd}" || true; do
-      if [ "${directory}" -nt "/proc/self/fd/${fd}" ] && pkill -HUP --exact pgbouncer
+    exec {fd}<> <(:||:)
+    while read -r -t 5 -u "${fd}" ||:; do
+      if [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] && pkill -HUP --exact pgbouncer
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --format='Loaded configuration dated %y' "${directory}"
       fi
     done
@@ -179,6 +181,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbouncer
     name: pgbouncer-config
@@ -258,6 +262,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbouncer
     name: pgbouncer-config
@@ -268,11 +274,11 @@ containers:
   - --
   - |-
     monitor() {
-    exec {fd}<> <(:)
-    while read -r -t 5 -u "${fd}" || true; do
-      if [ "${directory}" -nt "/proc/self/fd/${fd}" ] && pkill -HUP --exact pgbouncer
+    exec {fd}<> <(:||:)
+    while read -r -t 5 -u "${fd}" ||:; do
+      if [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] && pkill -HUP --exact pgbouncer
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --format='Loaded configuration dated %y' "${directory}"
       fi
     done
@@ -294,6 +300,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbouncer
     name: pgbouncer-config
@@ -364,6 +372,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbouncer
     name: pgbouncer-config
@@ -374,11 +384,11 @@ containers:
   - --
   - |-
     monitor() {
-    exec {fd}<> <(:)
-    while read -r -t 5 -u "${fd}" || true; do
-      if [ "${directory}" -nt "/proc/self/fd/${fd}" ] && pkill -HUP --exact pgbouncer
+    exec {fd}<> <(:||:)
+    while read -r -t 5 -u "${fd}" ||:; do
+      if [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] && pkill -HUP --exact pgbouncer
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --format='Loaded configuration dated %y' "${directory}"
       fi
     done
@@ -399,6 +409,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbouncer
     name: pgbouncer-config
@@ -445,7 +457,9 @@ volumes:
 		})
 
 		t.Run("SidecarEnabled", func(t *testing.T) {
-			assert.NilError(t, util.AddAndSetFeatureGates(string(util.PGBouncerSidecars+"=true")))
+			assert.NilError(t, features.SetFromMap(map[string]bool{
+				feature.PGBouncerSidecars: true,
+			}))
 			call()
 
 			assert.Equal(t, len(pod.Containers), 3, "expected 3 containers in Pod, got %d", len(pod.Containers))

@@ -10,7 +10,7 @@ ARG BUILD_TIME
 ARG GO_LDFLAGS
 ARG GOOS=linux
 ARG TARGETARCH
-ARG CGO_ENABLED=0
+ARG CGO_ENABLED=1
 
 COPY . .
 
@@ -46,6 +46,9 @@ COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
 COPY --from=go_builder /usr/local/bin/extension-installer /usr/local/bin
 COPY --from=go_builder /licenses /licenses
 COPY build/postgres-operator/install-extensions.sh /usr/local/bin
+COPY hack/tools/queries /opt/crunchy/conf
+
+RUN chgrp -R 0 /opt/crunchy/conf && chmod -R g=u opt/crunchy/conf
 
 USER 2
 

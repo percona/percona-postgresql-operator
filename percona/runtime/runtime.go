@@ -20,16 +20,11 @@ var refreshInterval = 60 * time.Minute
 func CreateRuntimeManager(namespaces string, config *rest.Config,
 	disableMetrics bool) (manager.Manager, error) {
 
-	pgoScheme, err := r.CreatePostgresOperatorScheme()
-	if err != nil {
-		return nil, err
-	}
-
 	options := manager.Options{
 		Cache: cache.Options{
 			SyncPeriod: &refreshInterval,
 		},
-		Scheme: pgoScheme,
+		Scheme: r.Scheme,
 	}
 
 	nn := strings.Split(namespaces, ",")

@@ -1,8 +1,3 @@
-//go:build envtest
-// +build envtest
-
-package postgrescluster
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +12,8 @@ package postgrescluster
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+
+package postgrescluster
 
 import (
 	"context"
@@ -37,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
@@ -538,13 +534,13 @@ func TestReconcilePatroniStatus(t *testing.T) {
 		t.Run(fmt.Sprintf("%+v", tc), func(t *testing.T) {
 			postgresCluster, observedInstances := createResources(i, tc.readyReplicas,
 				tc.writeAnnotation)
-			result, err := r.reconcilePatroniStatus(ctx, postgresCluster, observedInstances)
+			requeue, err := r.reconcilePatroniStatus(ctx, postgresCluster, observedInstances)
 			if tc.requeueExpected {
 				assert.NilError(t, err)
-				assert.Assert(t, result.RequeueAfter == 1*time.Second)
+				assert.Equal(t, requeue, time.Second)
 			} else {
 				assert.NilError(t, err)
-				assert.DeepEqual(t, result, reconcile.Result{})
+				assert.Equal(t, requeue, time.Duration(0))
 			}
 		})
 	}
@@ -558,7 +554,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 	var timelineCallNoLeader, timelineCall bool
 	r := Reconciler{
 		Client: client,
-		PodExec: func(namespace, pod, container string,
+		PodExec: func(ctx context.Context, namespace, pod, container string,
 			stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
 			called = true
 			switch {

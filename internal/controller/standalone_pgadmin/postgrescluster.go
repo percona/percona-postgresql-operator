@@ -17,11 +17,12 @@ package standalone_pgadmin
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
-
-	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgadmins",verbs={list}
@@ -44,6 +45,10 @@ func (r *PGAdminReconciler) findPGAdminsForPostgresCluster(
 	}) == nil {
 		for i := range pgadmins.Items {
 			for _, serverGroup := range pgadmins.Items[i].Spec.ServerGroups {
+				if serverGroup.PostgresClusterName == cluster.GetName() {
+					matching = append(matching, &pgadmins.Items[i])
+					continue
+				}
 				if selector, err := naming.AsSelector(serverGroup.PostgresClusterSelector); err == nil {
 					if selector.Matches(labels.Set(cluster.GetLabels())) {
 						matching = append(matching, &pgadmins.Items[i])
@@ -67,6 +72,19 @@ func (r *PGAdminReconciler) getClustersForPGAdmin(
 	var selector labels.Selector
 
 	for _, serverGroup := range pgAdmin.Spec.ServerGroups {
+		cluster := &v1beta1.PostgresCluster{}
+		if serverGroup.PostgresClusterName != "" {
+			err = r.Get(ctx, types.NamespacedName{
+				Name:      serverGroup.PostgresClusterName,
+				Namespace: pgAdmin.GetNamespace(),
+			}, cluster)
+			if err == nil {
+				matching[serverGroup.Name] = &v1beta1.PostgresClusterList{
+					Items: []v1beta1.PostgresCluster{*cluster},
+				}
+			}
+			continue
+		}
 		if selector, err = naming.AsSelector(serverGroup.PostgresClusterSelector); err == nil {
 			var filteredList v1beta1.PostgresClusterList
 			err = r.List(ctx, &filteredList,

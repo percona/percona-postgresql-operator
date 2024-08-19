@@ -12,18 +12,11 @@ QUERIES_CONFIG_DIR ?= hack/tools/queries
 # Buildah's "build" used to be "bud". Use the alias to be compatible for a while.
 BUILDAH_BUILD ?= buildah bud
 
-DEBUG_BUILD ?= false
-GO ?= go
-GO_BUILD = $(GO_CMD) build -trimpath
-GO_CMD = $(GO_ENV) $(GO)
+GO ?= CGO_ENABLED=1 go
+GO_BUILD = $(GO) build -trimpath
 GO_TEST ?= $(GO) test
 KUTTL ?= kubectl-kuttl
 KUTTL_TEST ?= $(KUTTL) test
-
-# Disable optimizations if creating a debug build
-ifeq ("$(DEBUG_BUILD)", "true")
-	GO_BUILD = $(GO_CMD) build -gcflags='all=-N -l'
-endif
 
 ##@ General
 
@@ -191,22 +184,22 @@ build-postgres-operator-image: build/postgres-operator/Dockerfile
 ##@ Test
 .PHONY: check
 check: ## Run basic go tests with coverage output
-	$(GO_TEST) -cover ./...
+check: get-pgmonitor
+	QUERIES_CONFIG_DIR="$(CURDIR)/${QUERIES_CONFIG_DIR}" $(GO_TEST) -cover ./...
 
 # Available versions: curl -s 'https://storage.googleapis.com/kubebuilder-tools/' | grep -o '<Key>[^<]*</Key>'
 # - KUBEBUILDER_ATTACH_CONTROL_PLANE_OUTPUT=true
 .PHONY: check-envtest
 check-envtest: ## Run check using envtest and a mock kube api
-check-envtest: ENVTEST_USE = hack/tools/setup-envtest --bin-dir=$(CURDIR)/hack/tools/envtest use $(ENVTEST_K8S_VERSION)
+check-envtest: ENVTEST_USE = $(ENVTEST) --bin-dir=$(CURDIR)/hack/tools/envtest use $(ENVTEST_K8S_VERSION)
 check-envtest: SHELL = bash
-check-envtest: get-pgmonitor
-	GOBIN='$(CURDIR)/hack/tools' $(GO) install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+check-envtest: get-pgmonitor tools/setup-envtest
 	@$(ENVTEST_USE) --print=overview && echo
 	source <($(ENVTEST_USE) --print=env) && PGO_NAMESPACE="postgres-operator" QUERIES_CONFIG_DIR="$(CURDIR)/${QUERIES_CONFIG_DIR}" \
-		$(GO_TEST) -count=1 -cover -tags=envtest ./...
+		$(GO_TEST) -count=1 -cover ./...
 
 # The "PGO_TEST_TIMEOUT_SCALE" environment variable (default: 1) can be set to a
-# positive number that extends test timeouts. The following runs tests with
+# positive number that extends test timeouts. The following runs tests with 
 # timeouts that are 20% longer than normal:
 # make check-envtest-existing PGO_TEST_TIMEOUT_SCALE=1.2
 .PHONY: check-envtest-existing
@@ -230,7 +223,7 @@ generate-kuttl: export KUTTL_PG_UPGRADE_FROM_VERSION ?= 15
 generate-kuttl: export KUTTL_PG_UPGRADE_TO_VERSION ?= 16
 generate-kuttl: export KUTTL_PG_VERSION ?= 16
 generate-kuttl: export KUTTL_POSTGIS_VERSION ?= 3.4
-generate-kuttl: export KUTTL_PSQL_IMAGE ?= registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-16.2-0
+generate-kuttl: export KUTTL_PSQL_IMAGE ?= registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-16.3-1
 generate-kuttl: export KUTTL_TEST_DELETE_NAMESPACE ?= kuttl-test-delete-namespace
 generate-kuttl: ## Generate kuttl tests
 	[ ! -d testing/kuttl/e2e-generated ] || rm -r testing/kuttl/e2e-generated
@@ -242,7 +235,6 @@ generate-kuttl: ## Generate kuttl tests
 	14 ) export KUTTL_BITNAMI_IMAGE_TAG=14.5.0-debian-11-r37 ;; \
 	13 ) export KUTTL_BITNAMI_IMAGE_TAG=13.8.0-debian-11-r39 ;; \
 	12 ) export KUTTL_BITNAMI_IMAGE_TAG=12.12.0-debian-11-r40 ;; \
-	11 ) export KUTTL_BITNAMI_IMAGE_TAG=11.17.0-debian-11-r39 ;; \
 	esac; \
 	render() { envsubst '"'"' \
 		$$KUTTL_PG_UPGRADE_FROM_VERSION $$KUTTL_PG_UPGRADE_TO_VERSION \
@@ -346,7 +338,6 @@ generate-cw-bundle:
 	$(KUSTOMIZE) build ./config/cw-bundle/ > ./deploy/cw-bundle.yaml
 
 
-
 ##@ Release
 
 .PHONY: license licenses
@@ -390,7 +381,7 @@ ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
-build-docker-image:
+build-docker-image: get-pgmonitor
 	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE) $(ROOT_REPO)/e2e-tests/build
 
 build-extension-installer-image:

@@ -1,6 +1,3 @@
-//go:build envtest
-// +build envtest
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +17,7 @@ package pgmonitor
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -31,6 +29,10 @@ import (
 )
 
 func TestGenerateDefaultExporterQueries(t *testing.T) {
+	if os.Getenv("QUERIES_CONFIG_DIR") == "" {
+		t.Skip("QUERIES_CONFIG_DIR must be set")
+	}
+
 	ctx := context.Background()
 	cluster := &v1beta1.PostgresCluster{}
 

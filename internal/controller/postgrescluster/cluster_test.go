@@ -1,8 +1,3 @@
-//go:build envtest
-// +build envtest
-
-package postgrescluster
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +12,8 @@ package postgrescluster
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+
+package postgrescluster
 
 import (
 	"context"
@@ -632,8 +629,6 @@ labels:
   app.kubernetes.io/managed-by: percona-postgresql-operator
   app.kubernetes.io/name: percona-postgresql
   app.kubernetes.io/part-of: percona-postgresql
-  postgres-operator.crunchydata.com/cluster: pg5
-  postgres-operator.crunchydata.com/role: primary
 name: pg5-primary
 namespace: ns2
 ownerReferences:
@@ -666,7 +661,6 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    postgres-operator.crunchydata.com/cluster: pg5
     postgres-operator.crunchydata.com/role: primary
   name: pg5-primary
   namespace: ns2

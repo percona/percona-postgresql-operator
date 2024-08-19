@@ -102,7 +102,6 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 	// create an empty map for the config data
 	initialize.StringMap(&cm.Data)
 
-	addDedicatedHost := DedicatedRepoHostEnabled(postgresCluster)
 	pgdataDir := postgres.DataDirectory(postgresCluster)
 	// Port will always be populated, since the API will set a default of 5432 if not provided
 	pgPort := *postgresCluster.Spec.Port
@@ -115,13 +114,14 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 			postgresCluster.Spec.Backups.PGBackRest.Global,
 		).String()
 
-	// As the cluster transitions from having a repository host to having none,
 	// PostgreSQL instances that have not rolled out expect to mount a server
 	// config file. Always populate that file so those volumes stay valid and
-	// Kubernetes propagates their contents to those pods.
+	// Kubernetes propagates their contents to those pods. The repo host name
+	// given below should always be set, but this guards for cases when it might
+	// not be.
 	cm.Data[serverConfigMapKey] = ""
 
-	if addDedicatedHost && repoHostName != "" {
+	if repoHostName != "" {
 		cm.Data[serverConfigMapKey] = iniGeneratedWarning +
 			serverConfig(postgresCluster).String()
 
@@ -233,8 +233,8 @@ bash -xc "pgbackrest restore ${opts}"
 rm -f "${pgdata}/patroni.dynamic.json"
 export PGDATA="${pgdata}" PGHOST='/tmp'
 
-until [ "${recovery=}" = 'f' ]; do
-if [ -z "${recovery}" ]; then
+until [[ "${recovery=}" == 'f' ]]; do
+if [[ -z "${recovery}" ]]; then
 control=$(pg_controldata)
 read -r max_conn <<< "${control##*max_connections setting:}"
 read -r max_lock <<< "${control##*max_locks_per_xact setting:}"
@@ -254,7 +254,7 @@ unix_socket_directories = '/tmp'` +
 		ekc + `
 huge_pages = ` + hugePagesSetting + `
 EOF
-if [ "$(< "${pgdata}/PG_VERSION")" -ge 12 ]; then
+if [[ "$(< "${pgdata}/PG_VERSION")" -ge 12 ]]; then
 read -r max_wals <<< "${control##*max_wal_senders setting:}"
 echo >> /tmp/postgres.restore.conf "max_wal_senders = '${max_wals}'"
 fi
@@ -266,7 +266,7 @@ recovery=$(psql -Atc "SELECT CASE
   WHEN NOT pg_catalog.pg_is_in_recovery() THEN false
   WHEN NOT pg_catalog.pg_is_wal_replay_paused() THEN true
   ELSE pg_catalog.pg_wal_replay_resume()::text = ''
-END recovery" && sleep 1) || true
+END recovery" && sleep 1) ||:
 done
 
 pg_ctl stop --silent --wait --timeout=31536000
@@ -292,6 +292,10 @@ func populatePGInstanceConfigurationMap(
 	global := iniMultiSet{}
 	stanza := iniMultiSet{}
 
+	// For faster and more robust WAL archiving, we turn on pgBackRest archive-async.
+	global.Set("archive-async", "y")
+	// pgBackRest spool-path should always be co-located with the Postgres WAL path.
+	global.Set("spool-path", "/pgdata/pgbackrest-spool")
 	// pgBackRest will log to the pgData volume for commands run on the PostgreSQL instance
 	global.Set("log-path", naming.PGBackRestPGDataLogPath)
 
@@ -369,11 +373,16 @@ func populateRepoHostConfigurationMap(
 		if !pgBackRestLogPathSet && repo.Volume != nil {
 			// pgBackRest will log to the first configured repo volume when commands
 			// are run on the pgBackRest repo host. With our previous check in
-			// DedicatedRepoHostEnabled(), we've already validated that at least one
+			// RepoHostVolumeDefined(), we've already validated that at least one
 			// defined repo has a volume.
 			global.Set("log-path", fmt.Sprintf(naming.PGBackRestRepoLogPath, repo.Name))
 			pgBackRestLogPathSet = true
 		}
+	}
+
+	// If no log path was set, don't log because the default path is not writable.
+	if !pgBackRestLogPathSet {
+		global.Set("log-level-file", "off")
 	}
 
 	for option, val := range globalConfig {
@@ -452,21 +461,21 @@ func reloadCommand(name string) []string {
 	// mtimes.
 	// - https://unix.stackexchange.com/a/407383
 	const script = `
-exec {fd}<> <(:)
+exec {fd}<> <(:||:)
 until read -r -t 5 -u "${fd}"; do
   if
-    [ "${filename}" -nt "/proc/self/fd/${fd}" ] &&
+    [[ "${filename}" -nt "/proc/self/fd/${fd}" ]] &&
     pkill -HUP --exact --parent=0 pgbackrest
   then
-    exec {fd}>&- && exec {fd}<> <(:)
+    exec {fd}>&- && exec {fd}<> <(:||:)
     stat --dereference --format='Loaded configuration dated %y' "${filename}"
   elif
-    { [ "${directory}" -nt "/proc/self/fd/${fd}" ] ||
-      [ "${authority}" -nt "/proc/self/fd/${fd}" ]
+    { [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] ||
+      [[ "${authority}" -nt "/proc/self/fd/${fd}" ]]
     } &&
     pkill -HUP --exact --parent=0 pgbackrest
   then
-    exec {fd}>&- && exec {fd}<> <(:)
+    exec {fd}>&- && exec {fd}<> <(:||:)
     stat --format='Loaded certificates dated %y' "${directory}"
   fi
 done

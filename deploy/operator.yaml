@@ -45,7 +45,7 @@ spec:
           value: INFO
         - name: DISABLE_TELEMETRY
           value: "false"
-        image: perconalab/percona-postgresql-operator:main
+        image: perconalab/percona-postgresql-operator:k8spg-260
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

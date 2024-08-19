@@ -2,12 +2,11 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: service-account-percona-postgresql-operator
+  name: postgres-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: percona-postgresql-operator
+  name: postgres-operator
 subjects:
 - kind: ServiceAccount
-  name: percona-postgresql-operator
-  namespace: pg-operator
+  name: pgo

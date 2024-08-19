@@ -66,7 +66,9 @@ func crunchyReconciler() *postgrescluster.Reconciler {
 		Owner:    postgrescluster.ControllerName,
 		Recorder: new(record.FakeRecorder),
 		Tracer:   otel.Tracer("test"),
-		PodExec:  func(string, string, string, io.Reader, io.Writer, io.Writer, ...string) error { return nil },
+		PodExec: func(context.Context, string, string, string, io.Reader, io.Writer, io.Writer, ...string) error {
+			return nil
+		},
 	}
 }
 

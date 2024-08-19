@@ -19,9 +19,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: |-
-          CrunchyBridgeCluster is the Schema for the crunchybridgeclusters API
-          This Custom Resource requires enabling CrunchyBridgeClusters feature gate
+        description: CrunchyBridgeCluster is the Schema for the crunchybridgeclusters
+          API
         properties:
           apiVersion:
             description: |-
@@ -60,6 +59,11 @@ spec:
                   Whether the cluster is high availability,
                   meaning that it has a secondary it can fail over to quickly
                   in case the primary becomes unavailable.
+                type: boolean
+              isProtected:
+                description: |-
+                  Whether the cluster is protected. Protected clusters can't be destroyed until
+                  their protected flag is removed
                 type: boolean
               majorVersion:
                 description: |-

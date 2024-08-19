@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -198,7 +198,7 @@ func InstancePod(ctx context.Context,
 		ImagePullPolicy: container.ImagePullPolicy,
 		SecurityContext: initialize.RestrictedSecurityContext(),
 
-		VolumeMounts: []corev1.VolumeMount{certVolumeMount},
+		VolumeMounts: []corev1.VolumeMount{certVolumeMount, dataVolumeMount},
 	}
 
 	if inInstanceSpec.Sidecars != nil &&
@@ -210,7 +210,7 @@ func InstancePod(ctx context.Context,
 	startup := corev1.Container{
 		Name: naming.ContainerPostgresStartup,
 
-		Command: startupCommand(inCluster, inInstanceSpec),
+		Command: startupCommand(ctx, inCluster, inInstanceSpec),
 		Env:     Environment(inCluster),
 
 		Image:           container.Image,
@@ -279,7 +279,7 @@ func InstancePod(ctx context.Context,
 
 	// If the InstanceSidecars feature gate is enabled and instance sidecars are
 	// defined, add the defined container to the Pod.
-	if util.DefaultMutableFeatureGate.Enabled(util.InstanceSidecars) &&
+	if feature.Enabled(ctx, feature.InstanceSidecars) &&
 		inInstanceSpec.Containers != nil {
 		outInstancePod.Containers = append(outInstancePod.Containers, inInstanceSpec.Containers...)
 	}
@@ -298,8 +298,7 @@ func PodSecurityContext(cluster *v1beta1.PostgresCluster) *corev1.PodSecurityCon
 	// - https://docs.k8s.io/concepts/security/pod-security-standards/
 	for i := range cluster.Spec.SupplementalGroups {
 		if gid := cluster.Spec.SupplementalGroups[i]; gid > 0 {
-			podSecurityContext.SupplementalGroups =
-				append(podSecurityContext.SupplementalGroups, gid)
+			podSecurityContext.SupplementalGroups = append(podSecurityContext.SupplementalGroups, gid)
 		}
 	}
 
