@@ -247,8 +247,6 @@ repo_gpgcheck=0
 gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 EOF
         sudo yum install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
-
-        curl -sL https://github.com/mitchellh/golicense/releases/download/v0.2.0/golicense_0.2.0_linux_x86_64.tar.gz | sudo tar -C /usr/local/bin -xzf - golicense
     """
 }
 
@@ -361,35 +359,6 @@ pipeline {
                              "
                              diff -u ./e2e-tests/license/compare/go-licenses go-licenses-new
                          """
-                     }
-                 }
-                 stage('GoLicense test') {
-                     steps {
-                         sh '''
-                             mkdir -p $WORKSPACE/src/github.com/percona
-                             ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
-                             sg docker -c "
-                                 docker run \
-                                     --rm \
-                                     -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
-                                     -w /go/src/github.com/percona/percona-postgresql-operator \
-                                     -e GO111MODULE=on \
-                                     -e GOFLAGS='-buildvcs=false' \
-                                     golang:1.22 sh -c 'go build -v -o percona-postgresql-operator github.com/percona/percona-postgresql-operator/cmd/postgres-operator'
-                             "
-                         '''
-
-                         withCredentials([string(credentialsId: 'GITHUB_API_TOKEN', variable: 'GITHUB_TOKEN')]) {
-                             sh """
-                                 golicense -plain ./percona-postgresql-operator \
-                                     | grep -v 'license not found' \
-                                     | sed -r 's/^[^ ]+[ ]+//' \
-                                     | sort \
-                                     | uniq \
-                                     > golicense-new || true
-                                 diff -u ./e2e-tests/license/compare/golicense golicense-new
-                             """
-                         }
                      }
                  }
              }
