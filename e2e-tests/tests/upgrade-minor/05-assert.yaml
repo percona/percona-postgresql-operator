@@ -103,8 +103,6 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
-  annotations:
-    postgres-operator.crunchydata.com/pgbackrest-config: pgbackrest
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGBackup
