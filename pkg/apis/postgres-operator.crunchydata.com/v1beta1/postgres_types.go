@@ -62,8 +62,6 @@ type PostgresUserSpec struct {
 	// More info: https://www.postgresql.org/docs/current/role-attributes.html
 	// +kubebuilder:validation:MaxLength=200
 	// +kubebuilder:validation:Pattern=`^[^;]*$`
-	// +kubebuilder:validation:XValidation:rule=`!self.matches("(?i:PASSWORD)")`,message="cannot assign password"
-	// +kubebuilder:validation:XValidation:rule=`!self.matches("(?:--|/[*]|[*]/)")`,message="cannot contain comments"
 	// +optional
 	Options string `json:"options,omitempty"`
 

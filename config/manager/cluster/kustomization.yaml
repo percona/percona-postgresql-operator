@@ -9,4 +9,4 @@ patchesStrategicMerge:
 images:
 - name: postgres-operator
   newName: perconalab/percona-postgresql-operator
-  newTag: k8spg-260
+  newTag: main

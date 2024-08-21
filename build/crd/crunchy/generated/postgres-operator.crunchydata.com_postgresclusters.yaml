@@ -19495,11 +19495,6 @@ spec:
                       maxLength: 200
                       pattern: ^[^;]*$
                       type: string
-                      x-kubernetes-validations:
-                      - message: cannot assign password
-                        rule: '!self.matches("(?i:PASSWORD)")'
-                      - message: cannot contain comments
-                        rule: '!self.matches("(?:--|/[*]|[*]/)")'
                     password:
                       description: Properties of the password generated for this user.
                       properties:

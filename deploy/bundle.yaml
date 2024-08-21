@@ -17975,11 +17975,6 @@ spec:
                       maxLength: 200
                       pattern: ^[^;]*$
                       type: string
-                      x-kubernetes-validations:
-                      - message: cannot assign password
-                        rule: '!self.matches("(?i:PASSWORD)")'
-                      - message: cannot contain comments
-                        rule: '!self.matches("(?:--|/[*]|[*]/)")'
                     password:
                       description: Properties of the password generated for this user.
                       properties:
@@ -44864,11 +44859,6 @@ spec:
                       maxLength: 200
                       pattern: ^[^;]*$
                       type: string
-                      x-kubernetes-validations:
-                      - message: cannot assign password
-                        rule: '!self.matches("(?i:PASSWORD)")'
-                      - message: cannot contain comments
-                        rule: '!self.matches("(?:--|/[*]|[*]/)")'
                     password:
                       description: Properties of the password generated for this user.
                       properties:
@@ -45604,7 +45594,7 @@ spec:
           value: INFO
         - name: DISABLE_TELEMETRY
           value: "false"
-        image: perconalab/percona-postgresql-operator:k8spg-260
+        image: perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
