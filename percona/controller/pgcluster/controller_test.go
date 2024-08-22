@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
@@ -472,7 +473,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		err := k8sClient.Create(ctx, namespace)
 
 		Expect(err).To(Not(HaveOccurred()))
-		mgr, err := runtime.CreateRuntimeManager(ns, cfg, true)
+		mgr, err := runtime.NewManager(cfg, manager.Options{})
 		Expect(err).To(Succeed())
 		Expect(v2.AddToScheme(mgr.GetScheme())).To(Succeed())
 
