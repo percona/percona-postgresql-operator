@@ -45536,16 +45536,17 @@ rules:
   - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: percona-postgresql-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: percona-postgresql-operator
 subjects:
 - kind: ServiceAccount
   name: percona-postgresql-operator
+  namespace: pg-operator
 ---
 apiVersion: apps/v1
 kind: Deployment
