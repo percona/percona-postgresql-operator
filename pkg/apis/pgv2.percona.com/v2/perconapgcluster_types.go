@@ -478,6 +478,13 @@ type PGBackRestArchive struct {
 	Containers *crunchyv1beta1.PGBackRestSidecars `json:"containers,omitempty"`
 }
 
+type PMMQuerySource string
+
+const (
+	PgStatMonitor PMMQuerySource = "pgstatmonitor"
+	PgStatements  PMMQuerySource = "pgstatements"
+)
+
 type PMMSpec struct {
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
@@ -497,6 +504,10 @@ type PMMSpec struct {
 
 	// +kubebuilder:validation:Required
 	Secret string `json:"secret,omitempty"`
+
+	// +kubebuilder:validation:Enum={pgstatmonitor,pgstatements}
+	// +kubebuilder:validation:Required
+	QuerySource PMMQuerySource `json:"querySource,omitempty"`
 
 	// Compute resources of a PMM container.
 	// +optional

@@ -13519,6 +13519,11 @@ spec:
                     - Never
                     - IfNotPresent
                     type: string
+                  querySource:
+                    enum:
+                    - pgstatmonitor
+                    - pgstatements
+                    type: string
                   resources:
                     description: Compute resources of a PMM container.
                     properties:
