@@ -119,10 +119,10 @@ func (r *Reconciler) generateClusterPrimaryService(
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
 	service.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePrimary,
-		})
+		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
 
 	err := errors.WithStack(r.setControllerReference(cluster, service))
 
@@ -213,10 +213,10 @@ func (r *Reconciler) generateClusterReplicaService(
 	// add our labels last so they aren't overwritten
 	service.Labels = naming.Merge(
 		service.Labels,
-		map[string]string{
+		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RoleReplica,
-		})
+		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
 
 	// The TargetPort must be the name (not the number) of the PostgreSQL
 	// ContainerPort. This name allows the port number to differ between Pods,

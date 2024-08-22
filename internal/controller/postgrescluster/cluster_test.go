@@ -629,6 +629,8 @@ labels:
   app.kubernetes.io/managed-by: percona-postgresql-operator
   app.kubernetes.io/name: percona-postgresql
   app.kubernetes.io/part-of: percona-postgresql
+  postgres-operator.crunchydata.com/cluster: pg5
+  postgres-operator.crunchydata.com/role: primary
 name: pg5-primary
 namespace: ns2
 ownerReferences:
@@ -661,6 +663,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
+    postgres-operator.crunchydata.com/cluster: pg5
     postgres-operator.crunchydata.com/role: primary
   name: pg5-primary
   namespace: ns2
