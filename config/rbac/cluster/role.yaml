@@ -215,7 +215,6 @@ rules:
   resources:
   - pgadmins/status
   - pgupgrades/status
-  - postgresclusters/status
   verbs:
   - patch
 - apiGroups:
@@ -231,6 +230,14 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - postgres-operator.crunchydata.com
+  resources:
+  - postgresclusters/status
+  verbs:
+  - create
+  - patch
+  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
