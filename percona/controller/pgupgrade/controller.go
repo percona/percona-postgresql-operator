@@ -2,7 +2,6 @@ package pgupgrade
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -138,7 +137,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 			log.Info("PGUpgrade failed", "cluster", pgCluster.Name)
 			return reconcile.Result{}, nil
 		case "PGUpgradeSucceeded":
-			if err := r.finalizeUpgrade(ctx, pgCluster, perconaPGUpgrade.Spec.FromPostgresVersion, perconaPGUpgrade.Spec.ToPostgresVersion); err != nil {
+			if err := r.finalizeUpgrade(ctx, pgCluster, perconaPGUpgrade); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "finalize upgrade")
 			}
 			log.Info("Resuming PGCluster", "PGCluster", pgCluster.Name)
@@ -231,19 +230,24 @@ func (r *PGUpgradeReconciler) annotateCluster(ctx context.Context, pgCluster *pg
 	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
 }
 
-func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pgv2.PerconaPGCluster, oldVersion, newVersion int) error {
+func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pgv2.PerconaPGCluster, pgUpgrade *pgv2.PerconaPGUpgrade) error {
+	log := logging.FromContext(ctx)
+
 	orig := pgCluster.DeepCopy()
 
 	delete(pgCluster.Annotations, pgv2.AnnotationAllowUpgrade)
 
-	pgCluster.Spec.PostgresVersion = newVersion
+	pgCluster.Spec.PostgresVersion = pgUpgrade.Spec.ToPostgresVersion
+	pgCluster.Spec.Image = pgUpgrade.Spec.ToPostgresImage
+	pgCluster.Spec.Proxy.PGBouncer.Image = pgUpgrade.Spec.ToPgBouncerImage
+	pgCluster.Spec.Backups.PGBackRest.Image = pgUpgrade.Spec.ToPgBackRestImage
 
-	oldVerStr := fmt.Sprintf("ppg%d", oldVersion)
-	newVerStr := fmt.Sprintf("ppg%d", newVersion)
-
-	pgCluster.Spec.Image = strings.Replace(pgCluster.Spec.Image, oldVerStr, newVerStr, 1)
-	pgCluster.Spec.Proxy.PGBouncer.Image = strings.Replace(pgCluster.Spec.Proxy.PGBouncer.Image, oldVerStr, newVerStr, 1)
-	pgCluster.Spec.Backups.PGBackRest.Image = strings.Replace(pgCluster.Spec.Backups.PGBackRest.Image, oldVerStr, newVerStr, 1)
+	log.Info("Finalizing upgrade",
+		"newPostgresVersion", pgCluster.Spec.PostgresVersion,
+		"newPostgresImage", pgCluster.Spec.Image,
+		"newPgBouncerImage", pgCluster.Spec.Proxy.PGBouncer.Image,
+		"newPgBackRestImage", pgCluster.Spec.Backups.PGBackRest.Image,
+	)
 
 	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
 }
