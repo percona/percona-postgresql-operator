@@ -18,7 +18,6 @@ limitations under the License.
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -39,17 +38,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	//"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
-	"github.com/percona/percona-postgresql-operator/internal/bridge"
-	"github.com/percona/percona-postgresql-operator/internal/bridge/crunchybridgecluster"
+
 	"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/controller/standalone_pgadmin"
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/upgradecheck"
-	"github.com/percona/percona-postgresql-operator/internal/util"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
@@ -72,16 +70,6 @@ func assertNoError(err error) {
 }
 
 func main() {
-	// Set any supplied feature gates; panic on any unrecognized feature gate
-	err := util.AddAndSetFeatureGates(os.Getenv("PGO_FEATURE_GATES"))
-	assertNoError(err)
-	// Needed for PMM
-	err = util.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
-		string(util.InstanceSidecars):  true,
-		string(util.TablespaceVolumes): true,
-	})
-	assertNoError(err)
-
 	otelFlush, err := initOpenTelemetry()
 	assertNoError(err)
 	defer otelFlush()
@@ -99,17 +87,15 @@ func main() {
 	log := logging.FromContext(ctx)
 	log.V(1).Info("debug flag set to true")
 
-	// We are forcing `InstanceSidecars` feature to be enabled.
-	// It's necessary to get actual feature gate values instead of using
-	// `PGO_FEATURE_GATES` env var to print logs
-	var featureGates []string
-	for k := range util.DefaultMutableFeatureGate.GetAll() {
-		f := string(k) + "=" + strconv.FormatBool(util.DefaultMutableFeatureGate.Enabled(k))
-		featureGates = append(featureGates, f)
-	}
+	features := feature.NewGate()
+	err = features.SetFromMap(map[string]bool{
+		string(feature.InstanceSidecars):  true, // needed for PMM
+		string(feature.TablespaceVolumes): true,
+	})
+	assertNoError(err)
 
-	log.Info("feature gates enabled",
-		"PGO_FEATURE_GATES", strings.Join(featureGates, ","))
+	assertNoError(features.Set(os.Getenv("PGO_FEATURE_GATES")))
+	log.Info("feature gates enabled", "PGO_FEATURE_GATES", features.String())
 
 	cruntime.SetLogger(log)
 
@@ -125,7 +111,13 @@ func main() {
 
 	namespaces, err := k8s.GetWatchNamespace()
 	assertNoError(err)
-	mgr, err := perconaRuntime.CreateRuntimeManager(namespaces, cfg, false)
+
+	mgr, err := perconaRuntime.CreateRuntimeManager(
+		namespaces,
+		cfg,
+		false,
+		features,
+	)
 	assertNoError(err)
 
 	// Add Percona custom resource types to scheme
@@ -258,26 +250,6 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 
 	if err := pgAdminReconciler.SetupWithManager(mgr); err != nil {
 		return errors.Wrap(err, "unable to create PGAdmin controller")
-	}
-
-	if util.DefaultMutableFeatureGate.Enabled(util.CrunchyBridgeClusters) {
-		constructor := func() bridge.ClientInterface {
-			client := bridge.NewClient(os.Getenv("PGO_BRIDGE_URL"), versionString)
-			client.Transport = otelTransportWrapper()(http.DefaultTransport)
-			return client
-		}
-
-		crunchyBridgeClusterReconciler := &crunchybridgecluster.CrunchyBridgeClusterReconciler{
-			Client: mgr.GetClient(),
-			Owner:  "crunchybridgecluster-controller",
-			// TODO(crunchybridgecluster): recorder?
-			// Recorder: mgr.GetEventRecorderFor(naming...),
-			NewClient: constructor,
-		}
-
-		if err := crunchyBridgeClusterReconciler.SetupWithManager(mgr); err != nil {
-			return errors.Wrap(err, "unable to create CrunchyBridgeCluster controller")
-		}
 	}
 
 	return nil
