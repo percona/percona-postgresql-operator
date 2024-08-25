@@ -82,7 +82,7 @@ metadata:
     postgres-operator.crunchydata.com/cluster: upgrade-minor
     postgres-operator.crunchydata.com/role: pgbouncer
   annotations:
-    deployment.kubernetes.io/revision: '2'
+    deployment.kubernetes.io/revision: '3'
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
@@ -90,7 +90,7 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
+  observedGeneration: 3
   replicas: 3
   updatedReplicas: 3
   readyReplicas: 3
