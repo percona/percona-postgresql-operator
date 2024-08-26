@@ -227,7 +227,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile backups")
 	}
 
-	if err := r.addPMMSidecar(ctx, cr); err != nil {
+	if err := r.reconcilePMM(ctx, cr, postgresCluster); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
 	}
 
@@ -280,7 +280,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	return ctrl.Result{}, nil
 }
 
-func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPGCluster, postgresCluster *v1beta1.PostgresCluster) error {
 	if !cr.PMMEnabled() {
 		return nil
 	}
@@ -341,6 +341,12 @@ func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaP
 		set.Metadata.Annotations[pNaming.AnnotationPMMSecretHash] = pmmSecretHash
 
 		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
+	}
+
+	if cr.Spec.PMM.QuerySource == v2.PgStatStatements {
+		postgresCluster.Spec.Extensions.PGStatStatements = true
+	} else {
+		postgresCluster.Spec.Extensions.PGStatStatements = false
 	}
 
 	return nil

@@ -481,8 +481,8 @@ type PGBackRestArchive struct {
 type PMMQuerySource string
 
 const (
-	PgStatMonitor PMMQuerySource = "pgstatmonitor"
-	PgStatements  PMMQuerySource = "pgstatements"
+	PgStatMonitor    PMMQuerySource = "pgstatmonitor"
+	PgStatStatements PMMQuerySource = "pgstatstatements"
 )
 
 type PMMSpec struct {

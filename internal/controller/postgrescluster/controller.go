@@ -49,6 +49,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/internal/pgstatmonitor"
+	"github.com/percona/percona-postgresql-operator/internal/pgstatstatements"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
@@ -270,6 +271,9 @@ func (r *Reconciler) Reconcile(
 	}
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
+	}
+	if cluster.Spec.Extensions.PGStatMonitor {
+		pgstatmonitor.PostgreSQLParameters(&pgParameters)
 	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
