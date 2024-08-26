@@ -64,7 +64,7 @@ spec:
 status:
   availableReplicas: 1
   collisionCount: 0
-  observedGeneration: 2
+  observedGeneration: 3
   readyReplicas: 1
   replicas: 1
   updatedReplicas: 1
