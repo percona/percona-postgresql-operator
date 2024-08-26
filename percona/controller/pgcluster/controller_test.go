@@ -477,6 +477,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 	BeforeAll(func() {
 		By("Creating the Namespace to perform the tests")
 		err := k8sClient.Create(ctx, namespace)
+		Expect(err).NotTo(HaveOccurred())
 
 		gate := feature.NewGate()
 		err = gate.SetFromMap(map[string]bool{})

@@ -661,6 +661,7 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	return repo, nil
 }
 
+// nolint:unparam
 func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresCluster,
 	spec corev1.PersistentVolumeClaimSpec, repoName string,
 	repoResources *RepoResources) (*corev1.PersistentVolumeClaim, error) {
