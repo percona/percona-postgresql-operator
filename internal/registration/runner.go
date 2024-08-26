@@ -162,7 +162,7 @@ func (r *Runner) Required(
 func (r *Runner) NeedLeaderElection() bool { return true }
 
 // Start watches for a mounted registration token when enabled. It blocks
-// until ctx is cancelled.
+// until ctx is canceled.
 func (r *Runner) Start(ctx context.Context) error {
 	var ticks <-chan time.Time
 
