@@ -13,14 +13,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/component-base/featuregate"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
@@ -164,21 +162,12 @@ func (f *fakeClient) Patch(ctx context.Context, obj client.Object, patch client.
 }
 
 func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...client.Object) (client.Client, error) {
-	features := map[featuregate.Feature]featuregate.FeatureSpec{
-		util.TablespaceVolumes: {Default: true},
-		util.InstanceSidecars:  {Default: true},
-		util.PGBouncerSidecars: {Default: true},
-	}
-	if err := util.DefaultMutableFeatureGate.Add(features); err != nil {
-		return nil, err
-	}
-
 	s := scheme.Scheme
 
-	if err := v1beta1.AddToScheme(scheme.Scheme); err != nil {
+	if err := v1beta1.AddToScheme(s); err != nil {
 		return nil, err
 	}
-	if err := v2.AddToScheme(scheme.Scheme); err != nil {
+	if err := v2.AddToScheme(s); err != nil {
 		return nil, err
 	}
 

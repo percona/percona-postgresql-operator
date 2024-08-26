@@ -31,7 +31,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
-	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -595,7 +594,6 @@ func TestAddServerToInstancePod(t *testing.T) {
 	}
 
 	t.Run("CustomResources", func(t *testing.T) {
-		assert.NilError(t, util.AddAndSetFeatureGates(string(util.TablespaceVolumes+"=false")))
 		cluster := cluster.DeepCopy()
 		cluster.Spec.Backups.PGBackRest.Sidecars = &v1beta1.PGBackRestSidecars{
 			PGBackRest: &v1beta1.Sidecar{
