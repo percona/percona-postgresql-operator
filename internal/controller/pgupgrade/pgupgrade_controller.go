@@ -175,9 +175,10 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return
 	}
 
-	if !r.UpgradeAuthorized(upgrade) {
-		return ctrl.Result{}, nil
-	}
+	// PERCONA: Don't require registration for major upgrades
+	// if !r.UpgradeAuthorized(upgrade) {
+	// 	return ctrl.Result{}, nil
+	// }
 
 	// Set progressing condition to true if it doesn't exist already
 	setStatusToProgressingIfReasonWas("", upgrade)
