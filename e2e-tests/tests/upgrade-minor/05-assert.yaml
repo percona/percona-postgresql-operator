@@ -32,7 +32,7 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  generation: 2
+  generation: 3
   labels:
     app.kubernetes.io/component: pg
     app.kubernetes.io/instance: upgrade-minor
