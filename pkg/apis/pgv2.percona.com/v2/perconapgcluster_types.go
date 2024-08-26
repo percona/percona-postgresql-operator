@@ -302,7 +302,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			},
 		})
 
-		if cr.Spec.Users == nil || len(cr.Spec.Users) == 0 {
+		if len(cr.Spec.Users) == 0 {
 			// Add default user: <cluster-name>-pguser-<cluster-name>
 			users = append(users, crunchyv1beta1.PostgresUserSpec{
 				Name: crunchyv1beta1.PostgresIdentifier(cr.Name),

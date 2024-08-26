@@ -6,7 +6,6 @@ linters:
     - errchkjson
     - gci
     - gofumpt
-    - scopelint
   enable:
     - depguard
     - gomodguard
