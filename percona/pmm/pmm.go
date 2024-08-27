@@ -16,8 +16,10 @@ const (
 
 func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 	ports := []corev1.ContainerPort{{ContainerPort: 7777}}
+
 	for port := 30100; port <= 30105; port++ {
-		ports = append(ports, corev1.ContainerPort{ContainerPort: int32(port)})
+		// can't overflow int32, disable linter
+		ports = append(ports, corev1.ContainerPort{ContainerPort: int32(port)}) // nolint:gosec
 	}
 
 	pmmSpec := pgc.Spec.PMM

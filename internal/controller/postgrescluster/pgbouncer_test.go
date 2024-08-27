@@ -1,6 +1,3 @@
-//go:build envtest
-// +build envtest
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -389,6 +386,7 @@ func TestGeneratePGBouncerDeployment(t *testing.T) {
 	_, cc := setupKubernetes(t)
 	require.ParallelCapacity(t, 0)
 
+	ctx := context.Background()
 	reconciler := &Reconciler{Client: cc}
 
 	cluster := &v1beta1.PostgresCluster{}
@@ -405,7 +403,7 @@ func TestGeneratePGBouncerDeployment(t *testing.T) {
 			cluster := cluster.DeepCopy()
 			cluster.Spec.Proxy = spec
 
-			deploy, specified, err := reconciler.generatePGBouncerDeployment(cluster, nil, nil, nil)
+			deploy, specified, err := reconciler.generatePGBouncerDeployment(ctx, cluster, nil, nil, nil)
 			assert.NilError(t, err)
 			assert.Assert(t, !specified)
 
@@ -438,7 +436,7 @@ namespace: ns3
 		}
 
 		deploy, specified, err := reconciler.generatePGBouncerDeployment(
-			cluster, primary, configmap, secret)
+			ctx, cluster, primary, configmap, secret)
 		assert.NilError(t, err)
 		assert.Assert(t, specified)
 
@@ -478,7 +476,7 @@ namespace: ns3
 
 	t.Run("PodSpec", func(t *testing.T) {
 		deploy, specified, err := reconciler.generatePGBouncerDeployment(
-			cluster, primary, configmap, secret)
+			ctx, cluster, primary, configmap, secret)
 		assert.NilError(t, err)
 		assert.Assert(t, specified)
 
@@ -524,7 +522,7 @@ topologySpreadConstraints:
 			cluster.Spec.DisableDefaultPodScheduling = initialize.Bool(true)
 
 			deploy, specified, err := reconciler.generatePGBouncerDeployment(
-				cluster, primary, configmap, secret)
+				ctx, cluster, primary, configmap, secret)
 			assert.NilError(t, err)
 			assert.Assert(t, specified)
 

@@ -1,5 +1,3 @@
-package runtime
-
 /*
 Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,83 +13,71 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+package runtime
+
 import (
-	"time"
+	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+
+	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-// default refresh interval in minutes
-var refreshInterval = 60 * time.Minute
+type (
+	CacheConfig = cache.Config
+	Manager     = manager.Manager
+	Options     = manager.Options
+)
 
-// CreateRuntimeManager creates a new controller runtime manager for the PostgreSQL Operator.  The
-// manager returned is configured specifically for the PostgreSQL Operator, and includes any
-// controllers that will be responsible for managing PostgreSQL clusters using the
-// 'postgrescluster' custom resource.  Additionally, the manager will only watch for resources in
-// the namespace specified, with an empty string resulting in the manager watching all namespaces.
-func CreateRuntimeManager(namespace string, config *rest.Config,
-	disableMetrics bool) (manager.Manager, error) {
+// Scheme associates standard Kubernetes API objects and PGO API objects with Go structs.
+var Scheme *runtime.Scheme = runtime.NewScheme()
 
-	pgoScheme, err := CreatePostgresOperatorScheme()
-	if err != nil {
-		return nil, err
+func init() {
+	if err := scheme.AddToScheme(Scheme); err != nil {
+		panic(err)
 	}
-
-	options := manager.Options{
-		Cache: cache.Options{
-			SyncPeriod: &refreshInterval,
-		},
-		Scheme: pgoScheme,
+	if err := v1beta1.AddToScheme(Scheme); err != nil {
+		panic(err)
 	}
-	if len(namespace) > 0 {
-		options.Cache.DefaultNamespaces = map[string]cache.Config{
-			namespace: {},
-		}
-	}
-	if disableMetrics {
-		options.HealthProbeBindAddress = "0"
-		options.Metrics = metricsServer.Options{
-			BindAddress: "0",
-		}
-	}
-
-	// create controller runtime manager
-	mgr, err := manager.New(config, options)
-	if err != nil {
-		return nil, err
-	}
-
-	return mgr, nil
 }
 
-// GetConfig creates a *rest.Config for talking to a Kubernetes API server.
+// GetConfig returns a Kubernetes client configuration from KUBECONFIG or the
+// service account Kubernetes gives to pods.
 func GetConfig() (*rest.Config, error) { return config.GetConfig() }
 
-// CreatePostgresOperatorScheme creates a scheme containing the resource types required by the
-// PostgreSQL Operator.  This includes any custom resource types specific to the PostgreSQL
-// Operator, as well as any standard Kubernetes resource types.
-func CreatePostgresOperatorScheme() (*runtime.Scheme, error) {
+// NewManager returns a Manager that interacts with the Kubernetes API of config.
+// When config is nil, it reads from KUBECONFIG or the local service account.
+// When options.Scheme is nil, it uses the Scheme from this package.
+func NewManager(config *rest.Config, options manager.Options) (manager.Manager, error) {
+	var m manager.Manager
+	var err error
 
-	// create a new scheme specifically for this manager
-	pgoScheme := runtime.NewScheme()
-
-	// add standard resource types to the scheme
-	if err := scheme.AddToScheme(pgoScheme); err != nil {
-		return nil, err
+	if config == nil {
+		config, err = GetConfig()
 	}
 
-	// add custom resource types to the default scheme
-	if err := v1beta1.AddToScheme(pgoScheme); err != nil {
-		return nil, err
+	if options.Scheme == nil {
+		options.Scheme = Scheme
 	}
 
-	return pgoScheme, nil
+	if err == nil {
+		m, err = manager.New(config, options)
+	}
+
+	return m, err
 }
+
+// SetLogger assigns the default Logger used by [sigs.k8s.io/controller-runtime].
+func SetLogger(logger logging.Logger) { log.SetLogger(logger) }
+
+// SignalHandler returns a Context that is canceled on SIGINT or SIGTERM.
+func SignalHandler() context.Context { return signals.SetupSignalHandler() }

@@ -1,6 +1,3 @@
-//go:build envtest
-// +build envtest
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -787,9 +784,12 @@ func TestReconcilePGAdminUsers(t *testing.T) {
 	t.Run("PodTerminating", func(t *testing.T) {
 		pod := pod.DeepCopy()
 
+		// Must add finalizer when adding deletion timestamp otherwise fake client will panic:
+		// https://github.com/kubernetes-sigs/controller-runtime/pull/2316
+		pod.Finalizers = append(pod.Finalizers, "some-finalizer")
+
 		pod.DeletionTimestamp = new(metav1.Time)
 		*pod.DeletionTimestamp = metav1.Now()
-		pod.ObjectMeta.Finalizers = []string{"kubernetes"}
 		pod.Status.ContainerStatuses =
 			[]corev1.ContainerStatus{{Name: naming.ContainerPGAdmin}}
 		pod.Status.ContainerStatuses[0].State.Running =
@@ -816,7 +816,7 @@ func TestReconcilePGAdminUsers(t *testing.T) {
 
 		calls := 0
 		r.PodExec = func(
-			namespace, pod, container string,
+			ctx context.Context, namespace, pod, container string,
 			stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
 			calls++

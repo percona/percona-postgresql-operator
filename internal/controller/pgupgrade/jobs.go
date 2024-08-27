@@ -174,6 +174,7 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 
 	// Replace all containers with one that does the upgrade.
 	job.Spec.Template.Spec.EphemeralContainers = nil
+
 	job.Spec.Template.Spec.InitContainers = upgrade.Spec.InitContainers
 
 	volumeMounts := database.VolumeMounts

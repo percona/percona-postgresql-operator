@@ -334,3 +334,33 @@ func WithPerconaLabels(set map[string]string, clusterName, component, crVersion 
 
 	return labels.Merge(set, ls)
 }
+
+// StandalonePGAdminLabels return labels for standalone pgAdmin resources
+func StandalonePGAdminLabels(pgAdminName string) labels.Set {
+	return map[string]string{
+		LabelStandalonePGAdmin: pgAdminName,
+		LabelRole:              RolePGAdmin,
+	}
+}
+
+// StandalonePGAdminSelector provides a selector for standalone pgAdmin resources
+func StandalonePGAdminSelector(pgAdminName string) labels.Selector {
+	return StandalonePGAdminLabels(pgAdminName).AsSelector()
+}
+
+// StandalonePGAdminDataLabels returns the labels for standalone pgAdmin resources
+// that contain or mount data
+func StandalonePGAdminDataLabels(pgAdminName string) labels.Set {
+	return labels.Merge(
+		StandalonePGAdminLabels(pgAdminName),
+		map[string]string{
+			LabelData: DataPGAdmin,
+		},
+	)
+}
+
+// StandalonePGAdminDataSelector returns a selector for standalone pgAdmin resources
+// that contain or mount data
+func StandalonePGAdminDataSelector(pgAdmiName string) labels.Selector {
+	return StandalonePGAdminDataLabels(pgAdmiName).AsSelector()
+}

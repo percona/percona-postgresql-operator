@@ -16,14 +16,15 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -55,7 +56,7 @@ recreate() (
 safelink() (
   local desired="$1" name="$2" current
   current=$(realpath "${name}")
-  if [ "${current}" = "${desired}" ]; then return; fi
+  if [[ "${current}" == "${desired}" ]]; then return; fi
   set -x; mv --no-target-directory "${current}" "${desired}"
   ln --no-dereference --force --symbolic "${desired}" "${name}"
 )
@@ -102,12 +103,17 @@ func DataDirectory(cluster *v1beta1.PostgresCluster) string {
 func WALDirectory(
 	cluster *v1beta1.PostgresCluster, instance *v1beta1.PostgresInstanceSetSpec,
 ) string {
-	// When no WAL volume is specified, store WAL files on the main data volume.
-	walStorage := dataMountPath
+	return fmt.Sprintf("%s/pg%d_wal", WALStorage(instance), cluster.Spec.PostgresVersion)
+}
+
+// WALStorage returns the absolute path to the disk where an instance stores its
+// WAL files. Use [WALDirectory] for the exact directory that Postgres uses.
+func WALStorage(instance *v1beta1.PostgresInstanceSetSpec) string {
 	if instance.WALVolumeClaimSpec != nil {
-		walStorage = walMountPath
+		return walMountPath
 	}
-	return fmt.Sprintf("%s/pg%d_wal", walStorage, cluster.Spec.PostgresVersion)
+	// When no WAL volume is specified, store WAL files on the main data volume.
+	return dataMountPath
 }
 
 // Environment returns the environment variables required to invoke PostgreSQL
@@ -172,15 +178,38 @@ func reloadCommand(name string) []string {
 	// mtimes.
 	// - https://unix.stackexchange.com/a/407383
 	script := fmt.Sprintf(`
+# Parameters for curl when managing autogrow annotation.
+APISERVER="https://kubernetes.default.svc"
+SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
+NAMESPACE=$(cat ${SERVICEACCOUNT}/namespace)
+TOKEN=$(cat ${SERVICEACCOUNT}/token)
+CACERT=${SERVICEACCOUNT}/ca.crt
+
 declare -r directory=%q
-exec {fd}<> <(:)
-while read -r -t 5 -u "${fd}" || true; do
-  if [ "${directory}" -nt "/proc/self/fd/${fd}" ] &&
+exec {fd}<> <(:||:)
+while read -r -t 5 -u "${fd}" ||:; do
+  # Manage replication certificate.
+  if [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] &&
     install -D --mode=0600 -t %q "${directory}"/{%s,%s,%s} &&
     pkill -HUP --exact --parent=1 postgres
   then
-    exec {fd}>&- && exec {fd}<> <(:)
+    exec {fd}>&- && exec {fd}<> <(:||:)
     stat --format='Loaded certificates dated %%y' "${directory}"
+  fi
+
+  # Manage autogrow annotation.
+  # Return size in Mebibytes.
+  size=$(df --human-readable --block-size=M /pgdata | awk 'FNR == 2 {print $2}')
+  use=$(df --human-readable /pgdata | awk 'FNR == 2 {print $5}')
+  sizeInt="${size//M/}"
+  # Use the sed punctuation class, because the shell will not accept the percent sign in an expansion.
+  useInt=$(echo $use | sed 's/[[:punct:]]//g')
+  triggerExpansion="$((useInt > 75))"
+  if [ $triggerExpansion -eq 1 ]; then
+    newSize="$(((sizeInt / 2)+sizeInt))"
+    newSizeMi="${newSize}Mi"
+    d='[{"op": "add", "path": "/metadata/annotations/suggested-pgdata-pvc-size", "value": "'"$newSizeMi"'"}]'
+    curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -XPATCH "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}?fieldManager=kubectl-annotate" -H "Content-Type: application/json-patch+json" --data "$d"
   fi
 done
 `,
@@ -201,6 +230,7 @@ done
 // startupCommand returns an entrypoint that prepares the filesystem for
 // PostgreSQL.
 func startupCommand(
+	ctx context.Context,
 	cluster *v1beta1.PostgresCluster, instance *v1beta1.PostgresInstanceSetSpec,
 ) []string {
 	version := fmt.Sprint(cluster.Spec.PostgresVersion)
@@ -209,7 +239,7 @@ func startupCommand(
 	// If the user requests tablespaces, we want to make sure the directories exist with the
 	// correct owner and permissions.
 	tablespaceCmd := ""
-	if util.DefaultMutableFeatureGate.Enabled(util.TablespaceVolumes) {
+	if feature.Enabled(ctx, feature.TablespaceVolumes) {
 		// This command checks if a dir exists and if not, creates it;
 		// if the dir does exist, then we `recreate` it to make sure the owner is correct;
 		// if the dir exists with the wrong owner and is not writeable, we error.
@@ -280,27 +310,32 @@ chmod +x /tmp/pg_rewind_tde.sh
 
 		// Log the effective user ID and all the group IDs.
 		`echo Initializing ...`,
-		`results 'uid' "$(id -u)" 'gid' "$(id -G)"`,
+		`results 'uid' "$(id -u ||:)" 'gid' "$(id -G ||:)"`,
+
+		// The pgbackrest spool path should be co-located with wal. If a wal volume exists, symlink the spool-path to it.
+		`if [[ "${pgwal_directory}" == *"pgwal/"* ]] && [[ ! -d "/pgwal/pgbackrest-spool" ]];then rm -rf "/pgdata/pgbackrest-spool" && mkdir -p "/pgwal/pgbackrest-spool" && ln --force --symbolic "/pgwal/pgbackrest-spool" "/pgdata/pgbackrest-spool";fi`,
+		// When a pgwal volume is removed, the symlink will be broken; force pgbackrest to recreate spool-path.
+		`if [[ ! -e "/pgdata/pgbackrest-spool" ]];then rm -rf /pgdata/pgbackrest-spool;fi`,
 
 		// Abort when the PostgreSQL version installed in the image does not
 		// match the cluster spec.
-		`results 'postgres path' "$(command -v postgres)"`,
-		`results 'postgres version' "${postgres_version:=$(postgres --version)}"`,
+		`results 'postgres path' "$(command -v postgres ||:)"`,
+		`results 'postgres version' "${postgres_version:=$(postgres --version ||:)}"`,
 		`[[ "${postgres_version}" =~ ") ${expected_major_version}"($|[^0-9]) ]] ||`,
 		`halt Expected PostgreSQL version "${expected_major_version}"`,
 
 		// Abort when the configured data directory is not $PGDATA.
 		// - https://www.postgresql.org/docs/current/runtime-config-file-locations.html
 		`results 'config directory' "${PGDATA:?}"`,
-		`postgres_data_directory=$([ -d "${PGDATA}" ] && postgres -C data_directory || echo "${PGDATA}")`,
+		`postgres_data_directory=$([[ -d "${PGDATA}" ]] && postgres -C data_directory || echo "${PGDATA}")`,
 		`results 'data directory' "${postgres_data_directory}"`,
 		`[[ "${postgres_data_directory}" == "${PGDATA}" ]] ||`,
 		`halt Expected matching config and data directories`,
 
 		// Determine if the data directory has been prepared for bootstrapping the cluster
 		`bootstrap_dir="${postgres_data_directory}_bootstrap"`,
-		`[ -d "${bootstrap_dir}" ] && results 'bootstrap directory' "${bootstrap_dir}"`,
-		`[ -d "${bootstrap_dir}" ] && postgres_data_directory="${bootstrap_dir}"`,
+		`[[ -d "${bootstrap_dir}" ]] && results 'bootstrap directory' "${bootstrap_dir}"`,
+		`[[ -d "${bootstrap_dir}" ]] && postgres_data_directory="${bootstrap_dir}"`,
 
 		// PostgreSQL requires its directory to be writable by only itself.
 		// Pod "securityContext.fsGroup" sets g+w on directories for *some*
@@ -346,14 +381,11 @@ chmod +x /tmp/pg_rewind_tde.sh
 			naming.ReplicationCACert),
 
 		// Add the pg_rewind wrapper script, if TDE is enabled.
-		func() string {
-			if pg_rewind_override == "" || tablespaceCmd == "" {
-				return pg_rewind_override + tablespaceCmd
-			}
-			return strings.Join([]string{pg_rewind_override, tablespaceCmd}, "\n")
-		}(),
+		pg_rewind_override,
+
+		tablespaceCmd,
 		// When the data directory is empty, there's nothing more to do.
-		`[ -f "${postgres_data_directory}/PG_VERSION" ] || exit 0`,
+		`[[ -f "${postgres_data_directory}/PG_VERSION" ]] || exit 0`,
 
 		// Abort when the data directory is not empty and its version does not
 		// match the cluster spec.
@@ -377,7 +409,7 @@ chmod +x /tmp/pg_rewind_tde.sh
 		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/bin/initdb/initdb.c;hb=REL_13_0#l2718
 		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/bin/pg_basebackup/pg_basebackup.c;hb=REL_13_0#l2621
 		`safelink "${pgwal_directory}" "${postgres_data_directory}/pg_wal"`,
-		`results 'wal directory' "$(realpath "${postgres_data_directory}/pg_wal")"`,
+		`results 'wal directory' "$(realpath "${postgres_data_directory}/pg_wal" ||:)"`,
 
 		// Early versions of PGO create replicas with a recovery signal file.
 		// Patroni also creates a standby signal file before starting Postgres,

@@ -10,16 +10,24 @@ ARG BUILD_TIME
 ARG GO_LDFLAGS
 ARG GOOS=linux
 ARG TARGETARCH
-ARG CGO_ENABLED=0
+ARG OPERATOR_CGO_ENABLED=1
+ARG EXTENSION_INSTALLER_CGO_ENABLED=0
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
 
 COPY . .
 
+RUN echo "Building on $BUILDPLATFORM, for $TARGETPLATFORM"
+
 RUN mkdir -p build/_output/bin \
-   && CGO_ENABLED=$CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
+   && if [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
+        apt-get update -y && apt-get install gcc-aarch64-linux-gnu -y && export CC=aarch64-linux-gnu-gcc; \
+      fi \
+   && CGO_ENABLED=$OPERATOR_CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
        go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/postgres-operator \
                ./cmd/postgres-operator \
-    && CGO_ENABLED=$CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
+    && CGO_ENABLED=$EXTENSION_INSTALLER_CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
        go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
            -o build/_output/bin/extension-installer \
                ./cmd/extension-installer \
@@ -46,6 +54,9 @@ COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
 COPY --from=go_builder /usr/local/bin/extension-installer /usr/local/bin
 COPY --from=go_builder /licenses /licenses
 COPY build/postgres-operator/install-extensions.sh /usr/local/bin
+COPY hack/tools/queries /opt/crunchy/conf
+
+RUN chgrp -R 0 /opt/crunchy/conf && chmod -R g=u opt/crunchy/conf
 
 USER 2
 

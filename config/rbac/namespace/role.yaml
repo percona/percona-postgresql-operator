@@ -101,6 +101,15 @@ rules:
   - update
   - watch
 - apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - update
+  - watch
+- apiGroups:
   - pgv2.percona.com
   resources:
   - perconapgbackups
@@ -182,7 +191,6 @@ rules:
   resources:
   - crunchybridgeclusters/finalizers
   - crunchybridgeclusters/status
-  - postgresclusters/status
   verbs:
   - patch
   - update
@@ -222,6 +230,14 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - postgres-operator.crunchydata.com
+  resources:
+  - postgresclusters/status
+  verbs:
+  - create
+  - patch
+  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:

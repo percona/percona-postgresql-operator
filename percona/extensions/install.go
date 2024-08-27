@@ -51,7 +51,7 @@ func Install(key, archivePath, extensionPath string) error {
 
 			for {
 				_, err := io.CopyN(outFile, tReader, 1024)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				if err != nil {
