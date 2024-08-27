@@ -13927,7 +13927,7 @@ spec:
                   querySource:
                     enum:
                     - pgstatmonitor
-                    - pgstatements
+                    - pgstatstatements
                     type: string
                   resources:
                     description: Compute resources of a PMM container.
