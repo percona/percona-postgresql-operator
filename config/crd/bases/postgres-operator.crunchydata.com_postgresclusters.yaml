@@ -8152,6 +8152,8 @@ spec:
                     type: boolean
                   pgStatMonitor:
                     type: boolean
+                  pgStatStatements:
+                    type: boolean
                 type: object
               image:
                 description: |-
