@@ -43,5 +43,4 @@ func PostgreSQLParameters(outParameters *postgres.Parameters) {
 	shared := outParameters.Mandatory.Value("shared_preload_libraries")
 	outParameters.Mandatory.Add("shared_preload_libraries",
 		strings.TrimPrefix(shared+",pg_stat_statements", ","))
-	// outParameters.Mandatory.Add("pg_stat_statements.pgsm_query_max_len", "2048")
 }
