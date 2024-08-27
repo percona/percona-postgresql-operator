@@ -91,16 +91,15 @@ func TestReconcileCerts(t *testing.T) {
 	replicaService.Name = "the-replicas"
 
 	t.Run("check root certificate reconciliation", func(t *testing.T) {
-
 		initialRoot, err := r.reconcileRootCertificate(ctx, cluster1)
 		assert.NilError(t, err)
 
-		rootSecret := &corev1.Secret{}
-		rootSecret.Namespace, rootSecret.Name = namespace, naming.RootCertSecret
+		rootSecret := &corev1.Secret{
+			ObjectMeta: naming.PostgresRootCASecret(cluster1),
+		}
 		rootSecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 
 		t.Run("check root CA secret first owner reference", func(t *testing.T) {
-
 			err := tClient.Get(ctx, client.ObjectKeyFromObject(rootSecret), rootSecret)
 			assert.NilError(t, err)
 
@@ -119,7 +118,6 @@ func TestReconcileCerts(t *testing.T) {
 		})
 
 		t.Run("check root CA secret second owner reference", func(t *testing.T) {
-
 			_, err := r.reconcileRootCertificate(ctx, cluster2)
 			assert.NilError(t, err)
 
@@ -144,8 +142,8 @@ func TestReconcileCerts(t *testing.T) {
 		})
 
 		t.Run("root certificate is returned correctly", func(t *testing.T) {
-
-			fromSecret, err := getCertFromSecret(ctx, tClient, naming.RootCertSecret, namespace, "root.crt")
+			rootCertMeta := naming.PostgresRootCASecret(cluster1)
+			fromSecret, err := getCertFromSecret(ctx, tClient, rootCertMeta.Name, rootCertMeta.Namespace, "root.crt")
 			assert.NilError(t, err)
 
 			// assert returned certificate matches the one created earlier
@@ -157,7 +155,8 @@ func TestReconcileCerts(t *testing.T) {
 			// create an empty secret and apply the change
 			emptyRootSecret := &corev1.Secret{}
 			emptyRootSecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-			emptyRootSecret.Namespace, emptyRootSecret.Name = namespace, naming.RootCertSecret
+			rootCertMeta := naming.PostgresRootCASecret(cluster1)
+			emptyRootSecret.ObjectMeta = rootCertMeta
 			emptyRootSecret.Data = make(map[string][]byte)
 			err = errors.WithStack(r.apply(ctx, emptyRootSecret))
 			assert.NilError(t, err)
@@ -166,7 +165,7 @@ func TestReconcileCerts(t *testing.T) {
 			returnedRoot, err := r.reconcileRootCertificate(ctx, cluster1)
 			assert.NilError(t, err)
 
-			fromSecret, err := getCertFromSecret(ctx, tClient, naming.RootCertSecret, namespace, "root.crt")
+			fromSecret, err := getCertFromSecret(ctx, tClient, rootCertMeta.Name, rootCertMeta.Namespace, "root.crt")
 			assert.NilError(t, err)
 
 			// check that the cert from the secret does not equal the initial certificate
@@ -175,11 +174,9 @@ func TestReconcileCerts(t *testing.T) {
 			// check that the returned cert matches the cert from the secret
 			assert.DeepEqual(t, *fromSecret, returnedRoot.Certificate)
 		})
-
 	})
 
 	t.Run("check leaf certificate reconciliation", func(t *testing.T) {
-
 		initialRoot, err := r.reconcileRootCertificate(ctx, cluster1)
 		assert.NilError(t, err)
 
@@ -213,12 +210,12 @@ func TestReconcileCerts(t *testing.T) {
 		})
 
 		t.Run("check that the leaf certs update when root changes", func(t *testing.T) {
-
 			// force the generation of a new root cert
 			// create an empty secret and apply the change
 			emptyRootSecret := &corev1.Secret{}
 			emptyRootSecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-			emptyRootSecret.Namespace, emptyRootSecret.Name = namespace, naming.RootCertSecret
+			rootCertMeta := naming.PostgresRootCASecret(cluster1)
+			emptyRootSecret.ObjectMeta = rootCertMeta
 			emptyRootSecret.Data = make(map[string][]byte)
 			err = errors.WithStack(r.apply(ctx, emptyRootSecret))
 
@@ -245,9 +242,7 @@ func TestReconcileCerts(t *testing.T) {
 
 			// check that the leaf cert did not change after another reconciliation
 			assert.DeepEqual(t, newLeaf2, newLeaf)
-
 		})
-
 	})
 
 	t.Run("check cluster certificate secret reconciliation", func(t *testing.T) {
@@ -343,7 +338,8 @@ func TestReconcileCerts(t *testing.T) {
 			// create an empty secret and apply the change
 			emptyRootSecret := &corev1.Secret{}
 			emptyRootSecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-			emptyRootSecret.Namespace, emptyRootSecret.Name = namespace, naming.RootCertSecret
+			rootCertMeta := naming.PostgresRootCASecret(cluster1)
+			emptyRootSecret.ObjectMeta = rootCertMeta
 			emptyRootSecret.Data = make(map[string][]byte)
 			err = errors.WithStack(r.apply(ctx, emptyRootSecret))
 			assert.NilError(t, err)
