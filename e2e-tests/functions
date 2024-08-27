@@ -710,14 +710,5 @@ deploy_cert_manager() {
 	kubectl create namespace cert-manager || :
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
 	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false || : 2>/dev/null
-	if [ "$OPENSHIFT" == "4.10" ]; then
-		oc delete scc restricted-seccomp || true
-		oc get scc restricted -o yaml | yq eval '.metadata.name = "restricted-seccomp" |
-		.seccompProfiles[0] = "runtime/default"' \
-			| oc create -f -
-		oc adm policy add-scc-to-user restricted-seccomp -z cert-manager
-		oc adm policy add-scc-to-user restricted-seccomp -z cert-manager-cainjector
-		oc adm policy add-scc-to-user restricted-seccomp -z cert-manager-webhook
-	fi
 	sleep 70
 }
