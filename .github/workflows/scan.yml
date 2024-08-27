@@ -28,7 +28,7 @@ jobs:
           export DOCKER_PUSH=0
           export DOCKER_SQUASH=0
           export DOCKER_DEFAULT_PLATFORM='linux/arm64'
-          ./e2e-tests/build
+          make build-docker-image
 
       - name: Run Trivy vulnerability scanner image (linux/arm64)
         uses: aquasecurity/trivy-action@0.24.0
@@ -46,7 +46,7 @@ jobs:
           export DOCKER_PUSH=0
           export DOCKER_SQUASH=0
           export DOCKER_DEFAULT_PLATFORM='linux/amd64'
-          ./e2e-tests/build
+          make build-docker-image
 
       - name: Run Trivy vulnerability scanner image (linux/amd64)
         uses: aquasecurity/trivy-action@0.24.0

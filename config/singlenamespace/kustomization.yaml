@@ -6,9 +6,6 @@ namespace: postgres-operator
 labels:
 - includeSelectors: true
   pairs:
-    app.kubernetes.io/name: pgo
-    # The version below should match the version on the PostgresCluster CRD
-    app.kubernetes.io/version: 5.5.1
     postgres-operator.crunchydata.com/control-plane: postgres-operator
 
 resources:
@@ -22,4 +19,4 @@ images:
   newTag: latest
 
 patches:
-- manager-target.yaml
+- path: manager-target.yaml

@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: 5.4.2
@@ -13770,7 +13770,7 @@ spec:
                       Patroni dynamic configuration settings. Changes to this value will be
                       automatically reloaded without validation. Changes to certain PostgreSQL
                       parameters cause PostgreSQL to restart.
-                      More info: https://patroni.readthedocs.io/en/latest/SETTINGS.html
+                      More info: https://patroni.readthedocs.io/en/latest/dynamic_configuration.html
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   leaderLeaseDurationSeconds:
@@ -16938,6 +16938,18 @@ spec:
                       service:
                         description: Specification of the service that exposes PgBouncer.
                         properties:
+                          externalTrafficPolicy:
+                            description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies'
+                            enum:
+                            - Cluster
+                            - Local
+                            type: string
+                          internalTrafficPolicy:
+                            description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies'
+                            enum:
+                            - Cluster
+                            - Local
+                            type: string
                           loadBalancerSourceRanges:
                             description: |-
                               LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -17272,6 +17284,18 @@ spec:
                 description: Specification of the service that exposes PostgreSQL
                   replica instances
                 properties:
+                  externalTrafficPolicy:
+                    description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies'
+                    enum:
+                    - Cluster
+                    - Local
+                    type: string
+                  internalTrafficPolicy:
+                    description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies'
+                    enum:
+                    - Cluster
+                    - Local
+                    type: string
                   loadBalancerSourceRanges:
                     description: |-
                       LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -17312,6 +17336,18 @@ spec:
                 description: Specification of the service that exposes the PostgreSQL
                   primary instance.
                 properties:
+                  externalTrafficPolicy:
+                    description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies'
+                    enum:
+                    - Cluster
+                    - Local
+                    type: string
+                  internalTrafficPolicy:
+                    description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies'
+                    enum:
+                    - Cluster
+                    - Local
+                    type: string
                   loadBalancerSourceRanges:
                     description: |-
                       LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -18985,6 +19021,18 @@ spec:
                       service:
                         description: Specification of the service that exposes pgAdmin.
                         properties:
+                          externalTrafficPolicy:
+                            description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies'
+                            enum:
+                            - Cluster
+                            - Local
+                            type: string
+                          internalTrafficPolicy:
+                            description: 'More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies'
+                            enum:
+                            - Cluster
+                            - Local
+                            type: string
                           loadBalancerSourceRanges:
                             description: |-
                               LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -19286,6 +19334,7 @@ spec:
                         ALTER ROLE options except for PASSWORD. This field is ignored for the
                         "postgres" user.
                         More info: https://www.postgresql.org/docs/current/role-attributes.html
+                      maxLength: 200
                       pattern: ^[^;]*$
                       type: string
                     password:
@@ -19314,6 +19363,7 @@ spec:
                   required:
                   - name
                   type: object
+                maxItems: 64
                 type: array
                 x-kubernetes-list-map-keys:
                 - name
@@ -19401,6 +19451,11 @@ spec:
                 description: Current state of PostgreSQL instances.
                 items:
                   properties:
+                    desiredPGDataVolume:
+                      additionalProperties:
+                        type: string
+                      description: Desired Size of the pgData volume
+                      type: object
                     name:
                       type: string
                     readyReplicas:
@@ -19673,8 +19728,6 @@ spec:
                     type: object
                 type: object
               registrationRequired:
-                description: Version information for installations with a registration
-                  requirement.
                 properties:
                   pgoVersion:
                     type: string
@@ -19688,8 +19741,6 @@ spec:
                 description: The instance set associated with the startupInstance
                 type: string
               tokenRequired:
-                description: Signals the need for a token to be applied when registration
-                  is required.
                 type: string
               userInterface:
                 description: Current state of the PostgreSQL user interface.

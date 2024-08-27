@@ -31,7 +31,7 @@ import (
 // watchPods returns a handler.EventHandler for Pods.
 func (*Reconciler) watchPods() handler.Funcs {
 	return handler.Funcs{
-		UpdateFunc: func(_ context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			labels := e.ObjectNew.GetLabels()
 			cluster := labels[naming.LabelCluster]
 
@@ -65,6 +65,17 @@ func (*Reconciler) watchPods() handler.Funcs {
 			if len(cluster) != 0 &&
 				!patroni.PodIsPrimary(e.ObjectOld) &&
 				patroni.PodIsPrimary(e.ObjectNew) {
+				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+					Namespace: e.ObjectNew.GetNamespace(),
+					Name:      cluster,
+				}})
+				return
+			}
+
+			oldAnnotations := e.ObjectOld.GetAnnotations()
+			newAnnotations := e.ObjectNew.GetAnnotations()
+			// If the suggested-pgdata-pvc-size annotation is added or changes, reconcile.
+			if len(cluster) != 0 && oldAnnotations["suggested-pgdata-pvc-size"] != newAnnotations["suggested-pgdata-pvc-size"] {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      cluster,

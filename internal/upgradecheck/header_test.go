@@ -1,8 +1,3 @@
-//go:build envtest
-// +build envtest
-
-package upgradecheck
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,11 +13,12 @@ package upgradecheck
  limitations under the License.
 */
 
+package upgradecheck
+
 import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -33,31 +29,18 @@ import (
 	// Google Kubernetes Engine / Google Cloud Platform authentication provider
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
-	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestGenerateHeader(t *testing.T) {
 	setupDeploymentID(t)
 	ctx := context.Background()
-	env := &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
-	}
-	cfg, err := env.Start()
-	assert.NilError(t, err)
-	t.Cleanup(func() { assert.Check(t, env.Stop()) })
-
-	pgoScheme, err := runtime.CreatePostgresOperatorScheme()
-	assert.NilError(t, err)
-	cc, err := crclient.New(cfg, crclient.Options{Scheme: pgoScheme})
-	assert.NilError(t, err)
-
+	cfg, cc := require.Kubernetes2(t)
 	setupNamespace(t, cc)
 
 	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
@@ -141,14 +124,7 @@ func TestGenerateHeader(t *testing.T) {
 
 func TestEnsureID(t *testing.T) {
 	ctx := context.Background()
-	env := &envtest.Environment{}
-	config, err := env.Start()
-	assert.NilError(t, err)
-	t.Cleanup(func() { assert.Check(t, env.Stop()) })
-
-	cc, err := crclient.New(config, crclient.Options{})
-	assert.NilError(t, err)
-
+	cc := require.Kubernetes(t)
 	setupNamespace(t, cc)
 
 	t.Run("success, no id set in mem or configmap", func(t *testing.T) {
@@ -284,14 +260,7 @@ func TestEnsureID(t *testing.T) {
 
 func TestManageUpgradeCheckConfigMap(t *testing.T) {
 	ctx := context.Background()
-	env := &envtest.Environment{}
-	config, err := env.Start()
-	assert.NilError(t, err)
-	t.Cleanup(func() { assert.Check(t, env.Stop()) })
-
-	cc, err := crclient.New(config, crclient.Options{})
-	assert.NilError(t, err)
-
+	cc := require.Kubernetes(t)
 	setupNamespace(t, cc)
 
 	t.Run("no namespace given", func(t *testing.T) {
@@ -417,14 +386,7 @@ func TestManageUpgradeCheckConfigMap(t *testing.T) {
 
 func TestApplyConfigMap(t *testing.T) {
 	ctx := context.Background()
-	env := &envtest.Environment{}
-	config, err := env.Start()
-	assert.NilError(t, err)
-	t.Cleanup(func() { assert.Check(t, env.Stop()) })
-
-	cc, err := crclient.New(config, crclient.Options{})
-	assert.NilError(t, err)
-
+	cc := require.Kubernetes(t)
 	setupNamespace(t, cc)
 
 	t.Run("successful create", func(t *testing.T) {

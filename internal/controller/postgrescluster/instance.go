@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
@@ -209,7 +212,7 @@ type observedInstances struct {
 	byName     map[string]*Instance
 	bySet      map[string][]*Instance
 	forCluster []*Instance
-	setNames   sets.String
+	setNames   sets.Set[string]
 }
 
 // newObservedInstances builds an observedInstances from Kubernetes API objects.
@@ -221,7 +224,7 @@ func newObservedInstances(
 	observed := observedInstances{
 		byName:   make(map[string]*Instance),
 		bySet:    make(map[string][]*Instance),
-		setNames: make(sets.String),
+		setNames: make(sets.Set[string]),
 	}
 
 	sets := make(map[string]*v1beta1.PostgresInstanceSetSpec)
@@ -302,6 +305,8 @@ func (r *Reconciler) observeInstances(
 	pods := &corev1.PodList{}
 	runners := &appsv1.StatefulSetList{}
 
+	autogrow := feature.Enabled(ctx, feature.AutoGrowVolumes)
+
 	selector, err := naming.AsSelector(naming.ClusterInstances(cluster.Name))
 	if err == nil {
 		err = errors.WithStack(
@@ -320,13 +325,28 @@ func (r *Reconciler) observeInstances(
 
 	observed := newObservedInstances(cluster, runners.Items, pods.Items)
 
+	// Save desired volume size values in case the status is removed.
+	// This may happen in cases where the Pod is restarted, the cluster
+	// is shutdown, etc. Only save values for instances defined in the spec.
+	previousDesiredRequests := make(map[string]string)
+	if autogrow {
+		for _, statusIS := range cluster.Status.InstanceSets {
+			if statusIS.DesiredPGDataVolume != nil {
+				for k, v := range statusIS.DesiredPGDataVolume {
+					previousDesiredRequests[k] = v
+				}
+			}
+		}
+	}
+
 	// Fill out status sorted by set name.
 	cluster.Status.InstanceSets = cluster.Status.InstanceSets[:0]
-	for _, name := range observed.setNames.List() {
+	for _, name := range sets.List(observed.setNames) {
 		status := v1beta1.PostgresInstanceSetStatus{Name: name}
+		status.DesiredPGDataVolume = make(map[string]string)
 
 		for _, instance := range observed.bySet[name] {
-			status.Replicas += int32(len(instance.Pods))
+			status.Replicas += int32(len(instance.Pods)) // nolint:gosec
 
 			if ready, known := instance.IsReady(); known && ready {
 				status.ReadyReplicas++
@@ -334,12 +354,93 @@ func (r *Reconciler) observeInstances(
 			if matches, known := instance.PodMatchesPodTemplate(); known && matches {
 				status.UpdatedReplicas++
 			}
+			if autogrow {
+				// Store desired pgData volume size for each instance Pod.
+				// The 'suggested-pgdata-pvc-size' annotation value is stored in the PostgresCluster
+				// status so that 1) it is available to the function 'reconcilePostgresDataVolume'
+				// and 2) so that the value persists after Pod restart and cluster shutdown events.
+				for _, pod := range instance.Pods {
+					// don't set an empty status
+					if pod.Annotations["suggested-pgdata-pvc-size"] != "" {
+						status.DesiredPGDataVolume[instance.Name] = pod.Annotations["suggested-pgdata-pvc-size"]
+					}
+				}
+			}
+		}
+
+		// If autogrow is enabled, get the desired volume size for each instance.
+		if autogrow {
+			for _, instance := range observed.bySet[name] {
+				status.DesiredPGDataVolume[instance.Name] = r.storeDesiredRequest(ctx, cluster,
+					name, status.DesiredPGDataVolume[instance.Name], previousDesiredRequests[instance.Name])
+			}
 		}
 
 		cluster.Status.InstanceSets = append(cluster.Status.InstanceSets, status)
 	}
 
 	return observed, err
+}
+
+// storeDesiredRequest saves the appropriate request value to the PostgresCluster
+// status. If the value has grown, create an Event.
+func (r *Reconciler) storeDesiredRequest(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+	instanceSetName, desiredRequest, desiredRequestBackup string,
+) string {
+	var current resource.Quantity
+	var previous resource.Quantity
+	var err error
+	log := logging.FromContext(ctx)
+
+	// Parse the desired request from the cluster's status.
+	if desiredRequest != "" {
+		current, err = resource.ParseQuantity(desiredRequest)
+		if err != nil {
+			log.Error(err, "Unable to parse pgData volume request from status ("+
+				desiredRequest+") for "+cluster.Name+"/"+instanceSetName)
+			// If there was an error parsing the value, treat as unset (equivalent to zero).
+			desiredRequest = ""
+			current, _ = resource.ParseQuantity("")
+
+		}
+	}
+
+	// Parse the desired request from the status backup.
+	if desiredRequestBackup != "" {
+		previous, err = resource.ParseQuantity(desiredRequestBackup)
+		if err != nil {
+			log.Error(err, "Unable to parse pgData volume request from status backup ("+
+				desiredRequestBackup+") for "+cluster.Name+"/"+instanceSetName)
+			// If there was an error parsing the value, treat as unset (equivalent to zero).
+			desiredRequestBackup = ""
+			previous, _ = resource.ParseQuantity("")
+
+		}
+	}
+
+	// Determine if the limit is set for this instance set.
+	var limitSet bool
+	for _, specInstance := range cluster.Spec.InstanceSets {
+		if specInstance.Name == instanceSetName {
+			limitSet = !specInstance.DataVolumeClaimSpec.Resources.Limits.Storage().IsZero()
+		}
+	}
+
+	if limitSet && current.Value() > previous.Value() {
+		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeAutoGrow",
+			"pgData volume expansion to %v requested for %s/%s.",
+			current.String(), cluster.Name, instanceSetName)
+	}
+
+	// If the desired size was not observed, update with previously stored value.
+	// This can happen in scenarios where the annotation on the Pod is missing
+	// such as when the cluster is shutdown or a Pod is in the middle of a restart.
+	if desiredRequest == "" {
+		desiredRequest = desiredRequestBackup
+	}
+
+	return desiredRequest
 }
 
 // +kubebuilder:rbac:groups="",resources="pods",verbs={list}
@@ -402,7 +503,7 @@ func (r *Reconciler) deleteInstances(
 		// mistake that something else is deleting objects. Use RequeueAfter to
 		// avoid being rate-limited due to a deluge of delete events.
 		if err != nil {
-			result.RequeueAfter = 10 * time.Second
+			result = runtime.RequeueWithoutBackoff(10 * time.Second)
 		}
 		return client.IgnoreNotFound(err)
 	}
@@ -591,7 +692,7 @@ func (r *Reconciler) cleanupPodDisruptionBudgets(
 	}
 
 	if err == nil {
-		setNames := sets.String{}
+		setNames := sets.Set[string]{}
 		for _, set := range cluster.Spec.InstanceSets {
 			setNames.Insert(set.Name)
 		}
@@ -692,7 +793,7 @@ func (r *Reconciler) rolloutInstance(
 
 	pod := instance.Pods[0]
 	exec := func(_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
-		return r.PodExec(pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
+		return r.PodExec(ctx, pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 	}
 
 	primary, known := instance.IsPrimary()
@@ -1098,7 +1199,7 @@ func (r *Reconciler) reconcileInstance(
 			&instance.Spec.Template.Spec)
 
 		addPGBackRestToInstancePodSpec(
-			cluster, instanceCertificates, &instance.Spec.Template.Spec)
+			ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)
 
 		err = patroni.InstancePod(
 			ctx, cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
@@ -1107,7 +1208,7 @@ func (r *Reconciler) reconcileInstance(
 
 	// Add pgMonitor resources to the instance Pod spec
 	if err == nil {
-		err = addPGMonitorToInstancePodSpec(cluster, &instance.Spec.Template, exporterQueriesConfig, exporterWebConfig)
+		err = addPGMonitorToInstancePodSpec(ctx, cluster, &instance.Spec.Template, exporterQueriesConfig, exporterWebConfig)
 	}
 
 	// add nss_wrapper init container and add nss_wrapper env vars to the database and pgbackrest
@@ -1119,7 +1220,6 @@ func (r *Reconciler) reconcileInstance(
 			&instance.Spec.Template)
 
 	}
-
 	sizeLimit := getTMPSizeLimit(instance.Labels[naming.LabelVersion], spec.Resources)
 
 	// add an emptyDir volume to the PodTemplateSpec and an associated '/tmp' volume mount to
@@ -1278,13 +1378,12 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 
 // addPGBackRestToInstancePodSpec adds pgBackRest configurations and sidecars
 // to the PodSpec.
-func addPGBackRestToInstancePodSpec(cluster *v1beta1.PostgresCluster,
+func addPGBackRestToInstancePodSpec(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	instanceCertificates *corev1.Secret, instancePod *corev1.PodSpec,
 ) {
-	if pgbackrest.DedicatedRepoHostEnabled(cluster) {
-		pgbackrest.AddServerToInstancePod(cluster, instancePod,
-			instanceCertificates.Name)
-	}
+	pgbackrest.AddServerToInstancePod(ctx, cluster, instancePod,
+		instanceCertificates.Name)
 
 	pgbackrest.AddConfigToInstancePod(cluster, instancePod)
 }
