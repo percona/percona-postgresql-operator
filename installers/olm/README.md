@@ -108,7 +108,6 @@ with the following command:
 
 this command was used to generate the updated registry database, but this step
 is no longer required when validating the OLM bundles.
-
 - https://github.com/operator-framework/operator-registry/blob/master/docs/design/opm-tooling.md#add-1
 
 ```sh

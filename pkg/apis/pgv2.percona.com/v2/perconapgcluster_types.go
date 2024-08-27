@@ -302,7 +302,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			},
 		})
 
-		if cr.Spec.Users == nil || len(cr.Spec.Users) == 0 {
+		if len(cr.Spec.Users) == 0 {
 			// Add default user: <cluster-name>-pguser-<cluster-name>
 			users = append(users, crunchyv1beta1.PostgresUserSpec{
 				Name: crunchyv1beta1.PostgresIdentifier(cr.Name),
@@ -929,7 +929,7 @@ func GetDefaultVersionServiceEndpoint() string {
 const (
 	FinalizerDeletePVC    = "percona.com/delete-pvc"
 	FinalizerDeleteSSL    = "percona.com/delete-ssl"
-	FinalizerStopWatchers = "percona.com/stop-watchers"
+	FinalizerStopWatchers = "percona.com/stop-watchers" //nolint:gosec
 )
 
 const (

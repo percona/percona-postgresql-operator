@@ -1,6 +1,3 @@
-//go:build envtest
-// +build envtest
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,15 +17,15 @@ package postgrescluster
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	// Google Kubernetes Engine / Google Cloud Platform authentication provider
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -38,14 +35,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 var suite struct {
 	Client client.Client
 	Config *rest.Config
-	Scheme *runtime.Scheme
 
 	Environment   *envtest.Environment
 	ServerVersion *version.Version
@@ -60,6 +56,10 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	if os.Getenv("KUBEBUILDER_ASSETS") == "" && !strings.EqualFold(os.Getenv("USE_EXISTING_CLUSTER"), "true") {
+		Skip("skipping")
+	}
+
 	logging.SetLogSink(logging.Logrus(GinkgoWriter, "test", 1, 1))
 	log.SetLogger(logging.FromContext(context.Background()))
 
@@ -68,15 +68,13 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 	}
 
-	suite.Scheme = runtime.NewScheme()
-	Expect(scheme.AddToScheme(suite.Scheme)).To(Succeed())
-	Expect(v1beta1.AddToScheme(suite.Scheme)).To(Succeed())
-
 	_, err := suite.Environment.Start()
 	Expect(err).ToNot(HaveOccurred())
 
+	DeferCleanup(suite.Environment.Stop)
+
 	suite.Config = suite.Environment.Config
-	suite.Client, err = client.New(suite.Config, client.Options{Scheme: suite.Scheme})
+	suite.Client, err = client.New(suite.Config, client.Options{Scheme: runtime.Scheme})
 	Expect(err).ToNot(HaveOccurred())
 
 	dc, err := discovery.NewDiscoveryClientForConfig(suite.Config)
@@ -90,6 +88,5 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	By("tearing down the test environment")
-	Expect(suite.Environment.Stop()).To(Succeed())
+
 })

@@ -191,8 +191,8 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 
 	if err == nil {
 		ctx := logging.NewContext(ctx, logging.FromContext(ctx).WithValues("revision", revision))
-		err = action(ctx, func(_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
-			return r.PodExec(pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
+		err = action(ctx, func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+			return r.PodExec(ctx, pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 		})
 	}
 	if err == nil {
@@ -328,6 +328,12 @@ func (r *Reconciler) generatePGBouncerService(
 			}
 			servicePort.NodePort = *spec.NodePort
 		}
+		if spec.ExternalTrafficPolicy != nil {
+			service.Spec.ExternalTrafficPolicy = *spec.ExternalTrafficPolicy
+		}
+		if spec.InternalTrafficPolicy != nil {
+			service.Spec.InternalTrafficPolicy = spec.InternalTrafficPolicy
+		}
 	}
 	service.Spec.Ports = []corev1.ServicePort{servicePort}
 
@@ -364,7 +370,7 @@ func (r *Reconciler) reconcilePGBouncerService(
 
 // generatePGBouncerDeployment returns an appsv1.Deployment that runs PgBouncer pods.
 func (r *Reconciler) generatePGBouncerDeployment(
-	cluster *v1beta1.PostgresCluster,
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	primaryCertificate *corev1.SecretProjection,
 	configmap *corev1.ConfigMap, secret *corev1.Secret,
 ) (*appsv1.Deployment, bool, error) {
@@ -472,7 +478,7 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	err := errors.WithStack(r.setControllerReference(cluster, deploy))
 
 	if err == nil {
-		pgbouncer.Pod(cluster, configmap, primaryCertificate, secret, &deploy.Spec.Template.Spec)
+		pgbouncer.Pod(ctx, cluster, configmap, primaryCertificate, secret, &deploy.Spec.Template.Spec)
 	}
 
 	return deploy, true, err
@@ -488,7 +494,7 @@ func (r *Reconciler) reconcilePGBouncerDeployment(
 	configmap *corev1.ConfigMap, secret *corev1.Secret,
 ) error {
 	deploy, specified, err := r.generatePGBouncerDeployment(
-		cluster, primaryCertificate, configmap, secret)
+		ctx, cluster, primaryCertificate, configmap, secret)
 
 	// Set observations whether the deployment exists or not.
 	defer func() {

@@ -9,6 +9,7 @@ linters:
   disable-all: true
   enable:
     - contextcheck
+    - err113
     - errchkjson
     - gocritic
     - godot

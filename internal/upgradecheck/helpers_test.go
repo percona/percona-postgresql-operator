@@ -1,5 +1,3 @@
-package upgradecheck
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +12,8 @@ package upgradecheck
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+
+package upgradecheck
 
 import (
 	"context"
@@ -83,10 +83,6 @@ func setupDeploymentID(t *testing.T) string {
 
 func setupFakeClientWithPGOScheme(t *testing.T, includeCluster bool) crclient.Client {
 	t.Helper()
-	pgoScheme, err := runtime.CreatePostgresOperatorScheme()
-	if err != nil {
-		t.Fatal(err)
-	}
 	if includeCluster {
 		pc := &v1beta1.PostgresClusterList{
 			Items: []v1beta1.PostgresCluster{
@@ -102,9 +98,9 @@ func setupFakeClientWithPGOScheme(t *testing.T, includeCluster bool) crclient.Cl
 				},
 			},
 		}
-		return fake.NewClientBuilder().WithScheme(pgoScheme).WithLists(pc).Build()
+		return fake.NewClientBuilder().WithScheme(runtime.Scheme).WithLists(pc).Build()
 	}
-	return fake.NewClientBuilder().WithScheme(pgoScheme).Build()
+	return fake.NewClientBuilder().WithScheme(runtime.Scheme).Build()
 }
 
 func setupVersionServer(t *testing.T, works bool) (version.Info, *httptest.Server) {

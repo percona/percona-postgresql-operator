@@ -1,5 +1,3 @@
-package postgrescluster
-
 /*
 Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+package postgrescluster
 
 import (
 	"context"
@@ -192,9 +192,7 @@ func (r *Reconciler) releaseObject(ctx context.Context,
 // StatefulSets within the cluster as needed to manage controller ownership refs.
 func (r *Reconciler) controllerRefHandlerFuncs() *handler.Funcs {
 
-	// var err error
-	ctx := context.Background()
-	log := logging.FromContext(ctx)
+	log := logging.FromContext(context.Background())
 	errMsg := "managing StatefulSet controller refs"
 
 	return &handler.Funcs{

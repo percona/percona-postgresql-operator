@@ -175,6 +175,7 @@ type PostgresClusterSpec struct {
 	// from this list does NOT drop the user nor revoke their access.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	Users []PostgresUserSpec `json:"users,omitempty"`
 
@@ -365,11 +366,9 @@ type PostgresClusterStatus struct {
 	// +optional
 	PGBackRest *PGBackRestStatus `json:"pgbackrest,omitempty"`
 
-	// Version information for installations with a registration requirement.
 	// +optional
 	RegistrationRequired *RegistrationRequirementStatus `json:"registrationRequired,omitempty"`
 
-	// Signals the need for a token to be applied when registration is required.
 	// +optional
 	TokenRequired string `json:"tokenRequired,omitempty"`
 
@@ -426,8 +425,7 @@ const (
 	PersistentVolumeResizing   = "PersistentVolumeResizing"
 	PostgresClusterProgressing = "Progressing"
 	ProxyAvailable             = "ProxyAvailable"
-	RegistrationRequired       = "RegistrationRequired"
-	TokenRequired              = "TokenRequired"
+	Registered                 = "Registered"
 )
 
 type PostgresInstanceSetSpec struct {
@@ -591,6 +589,10 @@ type PostgresInstanceSetStatus struct {
 	// Total number of pods that have the desired specification.
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+
+	// Desired Size of the pgData volume
+	// +optional
+	DesiredPGDataVolume map[string]string `json:"desiredPGDataVolume,omitempty"`
 }
 
 // PostgresProxySpec is a union of the supported PostgreSQL proxies.

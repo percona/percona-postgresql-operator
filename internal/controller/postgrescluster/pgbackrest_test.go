@@ -1,8 +1,3 @@
-//go:build envtest
-// +build envtest
-
-package postgrescluster
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +12,8 @@ package postgrescluster
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+
+package postgrescluster
 
 import (
 	"context"
@@ -187,11 +184,11 @@ func TestReconcilePGBackRest(t *testing.T) {
 		t.Skip("USE_EXISTING_CLUSTER: Test fails due to garbage collection")
 	}
 
-	tEnv, tClient := setupKubernetes(t)
+	cfg, tClient := setupKubernetes(t)
 	require.ParallelCapacity(t, 2)
 
 	r := &Reconciler{}
-	ctx, cancel := setupManager(t, tEnv.Config, func(mgr manager.Manager) {
+	ctx, cancel := setupManager(t, cfg, func(mgr manager.Manager) {
 		r = &Reconciler{
 			Client:   mgr.GetClient(),
 			Recorder: mgr.GetEventRecorderFor(ControllerName),
@@ -420,24 +417,18 @@ topologySpreadConstraints:
 			t.Errorf("status condition PGBackRestRepoHostsReady is missing")
 		}
 
-		events := &corev1.EventList{}
-		if err := wait.Poll(time.Second/2, Scale(time.Second*2), func() (bool, error) {
-			if err := tClient.List(ctx, events, &client.MatchingFields{
-				"involvedObject.kind":      "PostgresCluster",
-				"involvedObject.name":      clusterName,
-				"involvedObject.namespace": ns.Name,
-				"involvedObject.uid":       clusterUID,
-				"reason":                   "RepoHostCreated",
-			}); err != nil {
-				return false, err
-			}
-			if len(events.Items) != 1 {
-				return false, nil
-			}
-			return true, nil
-		}); err != nil {
-			t.Error(err)
-		}
+		assert.Check(t, wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*2), false,
+			func(ctx context.Context) (bool, error) {
+				events := &corev1.EventList{}
+				err := tClient.List(ctx, events, &client.MatchingFields{
+					"involvedObject.kind":      "PostgresCluster",
+					"involvedObject.name":      clusterName,
+					"involvedObject.namespace": ns.Name,
+					"involvedObject.uid":       clusterUID,
+					"reason":                   "RepoHostCreated",
+				})
+				return len(events.Items) == 1, err
+			}))
 	})
 
 	t.Run("verify pgbackrest repo volumes", func(t *testing.T) {
@@ -674,11 +665,11 @@ func TestReconcilePGBackRestRBAC(t *testing.T) {
 }
 
 func TestReconcileStanzaCreate(t *testing.T) {
-	tEnv, tClient := setupKubernetes(t)
+	cfg, tClient := setupKubernetes(t)
 	require.ParallelCapacity(t, 0)
 
 	r := &Reconciler{}
-	ctx, cancel := setupManager(t, tEnv.Config, func(mgr manager.Manager) {
+	ctx, cancel := setupManager(t, cfg, func(mgr manager.Manager) {
 		r = &Reconciler{
 			Client:   mgr.GetClient(),
 			Recorder: mgr.GetEventRecorderFor(ControllerName),
@@ -710,13 +701,13 @@ func TestReconcileStanzaCreate(t *testing.T) {
 		},
 	}})
 
-	stanzaCreateFail := func(namespace, pod, container string, stdin io.Reader, stdout,
-		stderr io.Writer, command ...string) error {
+	stanzaCreateFail := func(ctx context.Context, namespace, pod, container string, stdin io.Reader,
+		stdout, stderr io.Writer, command ...string) error {
 		return errors.New("fake stanza create failed")
 	}
 
-	stanzaCreateSuccess := func(namespace, pod, container string, stdin io.Reader, stdout,
-		stderr io.Writer, command ...string) error {
+	stanzaCreateSuccess := func(ctx context.Context, namespace, pod, container string, stdin io.Reader,
+		stdout, stderr io.Writer, command ...string) error {
 		return nil
 	}
 
@@ -734,23 +725,18 @@ func TestReconcileStanzaCreate(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Assert(t, !configHashMismatch)
 
-	events := &corev1.EventList{}
-	err = wait.Poll(time.Second/2, Scale(time.Second*2), func() (bool, error) {
-		if err := tClient.List(ctx, events, &client.MatchingFields{
-			"involvedObject.kind":      "PostgresCluster",
-			"involvedObject.name":      clusterName,
-			"involvedObject.namespace": ns.Name,
-			"involvedObject.uid":       clusterUID,
-			"reason":                   "StanzasCreated",
-		}); err != nil {
-			return false, err
-		}
-		if len(events.Items) != 1 {
-			return false, nil
-		}
-		return true, nil
-	})
-	assert.NilError(t, err)
+	assert.NilError(t, wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*2), false,
+		func(ctx context.Context) (bool, error) {
+			events := &corev1.EventList{}
+			err := tClient.List(ctx, events, &client.MatchingFields{
+				"involvedObject.kind":      "PostgresCluster",
+				"involvedObject.name":      clusterName,
+				"involvedObject.namespace": ns.Name,
+				"involvedObject.uid":       clusterUID,
+				"reason":                   "StanzasCreated",
+			})
+			return len(events.Items) == 1, err
+		}))
 
 	// status should indicate stanzas were created
 	for _, r := range postgresCluster.Status.PGBackRest.Repos {
@@ -778,73 +764,22 @@ func TestReconcileStanzaCreate(t *testing.T) {
 	assert.Error(t, err, "fake stanza create failed: ")
 	assert.Assert(t, !configHashMismatch)
 
-	events = &corev1.EventList{}
-	err = wait.Poll(time.Second/2, Scale(time.Second*2), func() (bool, error) {
-		if err := tClient.List(ctx, events, &client.MatchingFields{
-			"involvedObject.kind":      "PostgresCluster",
-			"involvedObject.name":      clusterName,
-			"involvedObject.namespace": ns.Name,
-			"involvedObject.uid":       clusterUID,
-			"reason":                   "UnableToCreateStanzas",
-		}); err != nil {
-			return false, err
-		}
-		if len(events.Items) != 1 {
-			return false, nil
-		}
-		return true, nil
-	})
-	assert.NilError(t, err)
+	assert.NilError(t, wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*2), false,
+		func(ctx context.Context) (bool, error) {
+			events := &corev1.EventList{}
+			err := tClient.List(ctx, events, &client.MatchingFields{
+				"involvedObject.kind":      "PostgresCluster",
+				"involvedObject.name":      clusterName,
+				"involvedObject.namespace": ns.Name,
+				"involvedObject.uid":       clusterUID,
+				"reason":                   "UnableToCreateStanzas",
+			})
+			return len(events.Items) == 1, err
+		}))
 
 	// status should indicate stanza were not created
 	for _, r := range postgresCluster.Status.PGBackRest.Repos {
 		assert.Assert(t, !r.StanzaCreated)
-	}
-}
-
-func TestGetPGBackRestExecSelector(t *testing.T) {
-
-	testCases := []struct {
-		cluster           *v1beta1.PostgresCluster
-		repo              v1beta1.PGBackRestRepo
-		desc              string
-		expectedSelector  string
-		expectedContainer string
-	}{{
-		desc: "volume repo defined dedicated repo host enabled",
-		cluster: &v1beta1.PostgresCluster{
-			ObjectMeta: metav1.ObjectMeta{Name: "hippo"},
-		},
-		repo: v1beta1.PGBackRestRepo{
-			Name:   "repo1",
-			Volume: &v1beta1.RepoPVC{},
-		},
-		expectedSelector: "postgres-operator.crunchydata.com/cluster=hippo," +
-			"postgres-operator.crunchydata.com/pgbackrest=," +
-			"postgres-operator.crunchydata.com/pgbackrest-dedicated=",
-		expectedContainer: "pgbackrest",
-	}, {
-		desc: "cloud repo defined no repo host enabled",
-		cluster: &v1beta1.PostgresCluster{
-			ObjectMeta: metav1.ObjectMeta{Name: "hippo"},
-		},
-		repo: v1beta1.PGBackRestRepo{
-			Name: "repo1",
-			S3:   &v1beta1.RepoS3{},
-		},
-		expectedSelector: "postgres-operator.crunchydata.com/cluster=hippo," +
-			"postgres-operator.crunchydata.com/instance," +
-			"postgres-operator.crunchydata.com/role=master",
-		expectedContainer: "database",
-	}}
-
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			selector, container, err := getPGBackRestExecSelector(tc.cluster, tc.repo)
-			assert.NilError(t, err)
-			assert.Assert(t, selector.String() == tc.expectedSelector)
-			assert.Assert(t, container == tc.expectedContainer)
-		})
 	}
 }
 
@@ -933,17 +868,13 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 	//}
 	//assert.Assert(t, foundOwnershipRef)
 
-	var foundConfigAnnotation, foundHashAnnotation bool
+	var foundHashAnnotation bool
 	// verify annotations
 	for k, v := range backupJob.GetAnnotations() {
-		if k == naming.PGBackRestCurrentConfig && v == naming.PGBackRestRepoContainerName {
-			foundConfigAnnotation = true
-		}
 		if k == naming.PGBackRestConfigHash && v == configHash {
 			foundHashAnnotation = true
 		}
 	}
-	assert.Assert(t, foundConfigAnnotation)
 	assert.Assert(t, foundHashAnnotation)
 
 	// verify container & env vars
@@ -1018,11 +949,11 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 }
 
 func TestReconcileManualBackup(t *testing.T) {
-	tEnv, tClient := setupKubernetes(t)
+	cfg, tClient := setupKubernetes(t)
 	require.ParallelCapacity(t, 2)
 
 	r := &Reconciler{}
-	_, cancel := setupManager(t, tEnv.Config, func(mgr manager.Manager) {
+	_, cancel := setupManager(t, cfg, func(mgr manager.Manager) {
 		r = &Reconciler{
 			Client:   mgr.GetClient(),
 			Recorder: mgr.GetEventRecorderFor(ControllerName),
@@ -1434,23 +1365,18 @@ func TestReconcileManualBackup(t *testing.T) {
 
 					// if an event is expected, the check for it
 					if tc.expectedEventReason != "" {
-						events := &corev1.EventList{}
-						err = wait.Poll(time.Second/2, Scale(time.Second*2), func() (bool, error) {
-							if err := tClient.List(ctx, events, &client.MatchingFields{
-								"involvedObject.kind":      "PostgresCluster",
-								"involvedObject.name":      clusterName,
-								"involvedObject.namespace": ns.GetName(),
-								"involvedObject.uid":       string(postgresCluster.GetUID()),
-								"reason":                   tc.expectedEventReason,
-							}); err != nil {
-								return false, err
-							}
-							if len(events.Items) != 1 {
-								return false, nil
-							}
-							return true, nil
-						})
-						assert.NilError(t, err)
+						assert.NilError(t, wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*2), false,
+							func(ctx context.Context) (bool, error) {
+								events := &corev1.EventList{}
+								err := tClient.List(ctx, events, &client.MatchingFields{
+									"involvedObject.kind":      "PostgresCluster",
+									"involvedObject.name":      clusterName,
+									"involvedObject.namespace": ns.GetName(),
+									"involvedObject.uid":       string(postgresCluster.GetUID()),
+									"reason":                   tc.expectedEventReason,
+								})
+								return len(events.Items) == 1, err
+							}))
 					}
 					return
 				}
@@ -1675,11 +1601,11 @@ func TestGetPGBackRestResources(t *testing.T) {
 			jobCount: 0, pvcCount: 0, hostCount: 1,
 		},
 	}, {
-		desc: "no dedicated repo host defined delete dedicated sts",
+		desc: "no dedicated repo host defined, dedicated sts not deleted",
 		createResources: []client.Object{
 			&appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "delete-dedicated",
+					Name:      "keep-dedicated-two",
 					Namespace: namespace,
 					Labels:    naming.PGBackRestDedicatedLabels(clusterName),
 				},
@@ -1708,43 +1634,8 @@ func TestGetPGBackRestResources(t *testing.T) {
 			},
 		},
 		result: testResult{
-			jobCount: 0, pvcCount: 0, hostCount: 0,
-		},
-	}, {
-		desc: "no repo host defined delete dedicated sts",
-		createResources: []client.Object{
-			&appsv1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "delete-dedicated-no-repo-host",
-					Namespace: namespace,
-					Labels:    naming.PGBackRestDedicatedLabels(clusterName),
-				},
-				Spec: appsv1.StatefulSetSpec{
-					Selector: metav1.SetAsLabelSelector(
-						naming.PGBackRestDedicatedLabels(clusterName)),
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: naming.PGBackRestDedicatedLabels(clusterName),
-						},
-						Spec: corev1.PodSpec{},
-					},
-				},
-			},
-		},
-		cluster: &v1beta1.PostgresCluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      clusterName,
-				Namespace: namespace,
-				UID:       types.UID(clusterUID),
-			},
-			Spec: v1beta1.PostgresClusterSpec{
-				Backups: v1beta1.Backups{
-					PGBackRest: v1beta1.PGBackRestArchive{},
-				},
-			},
-		},
-		result: testResult{
-			jobCount: 0, pvcCount: 0, hostCount: 0,
+			// Host count is 2 due to previous repo host sts not being deleted.
+			jobCount: 0, pvcCount: 0, hostCount: 2,
 		},
 	}}
 
@@ -1769,11 +1660,11 @@ func TestGetPGBackRestResources(t *testing.T) {
 }
 
 func TestReconcilePostgresClusterDataSource(t *testing.T) {
-	tEnv, tClient := setupKubernetes(t)
+	cfg, tClient := setupKubernetes(t)
 	require.ParallelCapacity(t, 4)
 
 	r := &Reconciler{}
-	ctx, cancel := setupManager(t, tEnv.Config, func(mgr manager.Manager) {
+	ctx, cancel := setupManager(t, cfg, func(mgr manager.Manager) {
 		r = &Reconciler{
 			Client:   tClient,
 			Recorder: mgr.GetEventRecorderFor(ControllerName),
@@ -2045,23 +1936,17 @@ func TestReconcilePostgresClusterDataSource(t *testing.T) {
 
 				if tc.result.invalidSourceCluster || tc.result.invalidSourceRepo ||
 					tc.result.invalidOptions {
-					events := &corev1.EventList{}
-					if err := wait.Poll(time.Second/2, Scale(time.Second*2), func() (bool, error) {
-						if err := tClient.List(ctx, events, &client.MatchingFields{
-							"involvedObject.kind":      "PostgresCluster",
-							"involvedObject.name":      clusterName,
-							"involvedObject.namespace": namespace,
-							"reason":                   "InvalidDataSource",
-						}); err != nil {
-							return false, err
-						}
-						if len(events.Items) != 1 {
-							return false, nil
-						}
-						return true, nil
-					}); err != nil {
-						t.Error(err)
-					}
+					assert.Check(t, wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*2), false,
+						func(ctx context.Context) (bool, error) {
+							events := &corev1.EventList{}
+							err := tClient.List(ctx, events, &client.MatchingFields{
+								"involvedObject.kind":      "PostgresCluster",
+								"involvedObject.name":      clusterName,
+								"involvedObject.namespace": namespace,
+								"reason":                   "InvalidDataSource",
+							})
+							return len(events.Items) == 1, err
+						}))
 				}
 			})
 		}
@@ -2069,11 +1954,11 @@ func TestReconcilePostgresClusterDataSource(t *testing.T) {
 }
 
 func TestReconcileCloudBasedDataSource(t *testing.T) {
-	tEnv, tClient := setupKubernetes(t)
+	cfg, tClient := setupKubernetes(t)
 	require.ParallelCapacity(t, 4)
 
 	r := &Reconciler{}
-	ctx, cancel := setupManager(t, tEnv.Config, func(mgr manager.Manager) {
+	ctx, cancel := setupManager(t, cfg, func(mgr manager.Manager) {
 		r = &Reconciler{
 			Client:   tClient,
 			Recorder: mgr.GetEventRecorderFor(ControllerName),
@@ -2109,7 +1994,7 @@ func TestReconcileCloudBasedDataSource(t *testing.T) {
 			result: testResult{
 				configCount: 1, jobCount: 1, pvcCount: 1,
 				expectedClusterCondition: nil,
-				conf:                     "|\n  # Generated by postgres-operator. DO NOT EDIT.\n  # Your changes will not be saved.\n\n  [global]\n  log-path = /pgdata/pgbackrest/log\n  repo1-path = /pgbackrest/repo1\n\n  [db]\n  pg1-path = /pgdata/pg13\n  pg1-port = 5432\n  pg1-socket-path = /tmp/postgres\n",
+				conf:                     "|\n  # Generated by postgres-operator. DO NOT EDIT.\n  # Your changes will not be saved.\n\n  [global]\n  archive-async = y\n  log-path = /pgdata/pgbackrest/log\n  repo1-path = /pgbackrest/repo1\n  spool-path = /pgdata/pgbackrest-spool\n\n  [db]\n  pg1-path = /pgdata/pg13\n  pg1-port = 5432\n  pg1-socket-path = /tmp/postgres\n",
 			},
 		}, {
 			desc: "global/configuration set",
@@ -2126,7 +2011,7 @@ func TestReconcileCloudBasedDataSource(t *testing.T) {
 			result: testResult{
 				configCount: 1, jobCount: 1, pvcCount: 1,
 				expectedClusterCondition: nil,
-				conf:                     "|\n  # Generated by postgres-operator. DO NOT EDIT.\n  # Your changes will not be saved.\n\n  [global]\n  log-path = /pgdata/pgbackrest/log\n  repo1-path = elephant\n\n  [db]\n  pg1-path = /pgdata/pg13\n  pg1-port = 5432\n  pg1-socket-path = /tmp/postgres\n",
+				conf:                     "|\n  # Generated by postgres-operator. DO NOT EDIT.\n  # Your changes will not be saved.\n\n  [global]\n  archive-async = y\n  log-path = /pgdata/pgbackrest/log\n  repo1-path = elephant\n  spool-path = /pgdata/pgbackrest-spool\n\n  [db]\n  pg1-path = /pgdata/pg13\n  pg1-port = 5432\n  pg1-socket-path = /tmp/postgres\n",
 			},
 		}, {
 			desc: "invalid option: stanza",
@@ -2141,7 +2026,7 @@ func TestReconcileCloudBasedDataSource(t *testing.T) {
 			result: testResult{
 				configCount: 1, jobCount: 0, pvcCount: 1,
 				expectedClusterCondition: nil,
-				conf:                     "|\n  # Generated by postgres-operator. DO NOT EDIT.\n  # Your changes will not be saved.\n\n  [global]\n  log-path = /pgdata/pgbackrest/log\n  repo1-path = /pgbackrest/repo1\n\n  [db]\n  pg1-path = /pgdata/pg13\n  pg1-port = 5432\n  pg1-socket-path = /tmp/postgres\n",
+				conf:                     "|\n  # Generated by postgres-operator. DO NOT EDIT.\n  # Your changes will not be saved.\n\n  [global]\n  archive-async = y\n  log-path = /pgdata/pgbackrest/log\n  repo1-path = /pgbackrest/repo1\n  spool-path = /pgdata/pgbackrest-spool\n\n  [db]\n  pg1-path = /pgdata/pg13\n  pg1-port = 5432\n  pg1-socket-path = /tmp/postgres\n",
 			},
 		}, {
 			desc: "cluster bootstrapped init condition missing",
@@ -2160,7 +2045,7 @@ func TestReconcileCloudBasedDataSource(t *testing.T) {
 					Reason:  "ClusterAlreadyBootstrapped",
 					Message: "The cluster is already bootstrapped",
 				},
-				conf: "|\n  # Generated by postgres-operator. DO NOT EDIT.\n  # Your changes will not be saved.\n\n  [global]\n  log-path = /pgdata/pgbackrest/log\n  repo1-path = /pgbackrest/repo1\n\n  [db]\n  pg1-path = /pgdata/pg13\n  pg1-port = 5432\n  pg1-socket-path = /tmp/postgres\n",
+				conf: "|\n  # Generated by postgres-operator. DO NOT EDIT.\n  # Your changes will not be saved.\n\n  [global]\n  archive-async = y\n log-path = /pgdata/pgbackrest/log\n  repo1-path = /pgbackrest/repo1\n  spool-path = /pgdata/pgbackrest-spool\n\n  [db]\n  pg1-path = /pgdata/pg13\n  pg1-port = 5432\n  pg1-socket-path = /tmp/postgres\n",
 			},
 		}}
 
@@ -2497,12 +2382,11 @@ func TestCopyConfigurationResources(t *testing.T) {
 
 func TestGenerateBackupJobIntent(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		spec, err := generateBackupJobSpecIntent(
+		spec := generateBackupJobSpecIntent(
 			&v1beta1.PostgresCluster{}, v1beta1.PGBackRestRepo{},
 			"",
 			nil, nil,
 		)
-		assert.NilError(t, err)
 		assert.Assert(t, marshalMatches(spec.Template.Spec, `
 containers:
 - command:
@@ -2515,10 +2399,10 @@ containers:
   - name: COMPARE_HASH
     value: "true"
   - name: CONTAINER
-    value: database
+    value: pgbackrest
   - name: NAMESPACE
   - name: SELECTOR
-    value: postgres-operator.crunchydata.com/cluster=,postgres-operator.crunchydata.com/instance,postgres-operator.crunchydata.com/role=master
+    value: postgres-operator.crunchydata.com/cluster=,postgres-operator.crunchydata.com/pgbackrest=,postgres-operator.crunchydata.com/pgbackrest-dedicated=
   name: pgbackrest
   resources: {}
   securityContext:
@@ -2529,6 +2413,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /etc/pgbackrest/conf.d
     name: pgbackrest-config
@@ -2543,11 +2429,23 @@ volumes:
     sources:
     - configMap:
         items:
-        - key: pgbackrest_instance.conf
-          path: pgbackrest_instance.conf
+        - key: pgbackrest_repo.conf
+          path: pgbackrest_repo.conf
         - key: config-hash
           path: config-hash
+        - key: pgbackrest-server.conf
+          path: ~postgres-operator_server.conf
         name: -pgbackrest-config
+    - secret:
+        items:
+        - key: pgbackrest.ca-roots
+          path: ~postgres-operator/tls-ca.crt
+        - key: pgbackrest-client.crt
+          path: ~postgres-operator/client-tls.crt
+        - key: pgbackrest-client.key
+          mode: 384
+          path: ~postgres-operator/client-tls.key
+        name: -pgbackrest
 		`))
 	})
 
@@ -2557,12 +2455,11 @@ volumes:
 				ImagePullPolicy: corev1.PullAlways,
 			},
 		}
-		job, err := generateBackupJobSpecIntent(
+		job := generateBackupJobSpecIntent(
 			cluster, v1beta1.PGBackRestRepo{},
 			"",
 			nil, nil,
 		)
-		assert.NilError(t, err)
 		assert.Equal(t, job.Template.Spec.Containers[0].ImagePullPolicy, corev1.PullAlways)
 	})
 
@@ -2573,12 +2470,11 @@ volumes:
 			cluster.Spec.Backups = v1beta1.Backups{
 				PGBackRest: v1beta1.PGBackRestArchive{},
 			}
-			job, err := generateBackupJobSpecIntent(
+			job := generateBackupJobSpecIntent(
 				cluster, v1beta1.PGBackRestRepo{},
 				"",
 				nil, nil,
 			)
-			assert.NilError(t, err)
 			assert.DeepEqual(t, job.Template.Spec.Containers[0].Resources,
 				corev1.ResourceRequirements{})
 		})
@@ -2591,12 +2487,11 @@ volumes:
 					},
 				},
 			}
-			job, err := generateBackupJobSpecIntent(
+			job := generateBackupJobSpecIntent(
 				cluster, v1beta1.PGBackRestRepo{},
 				"",
 				nil, nil,
 			)
-			assert.NilError(t, err)
 			assert.DeepEqual(t, job.Template.Spec.Containers[0].Resources,
 				corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
@@ -2631,12 +2526,11 @@ volumes:
 				},
 			},
 		}
-		job, err := generateBackupJobSpecIntent(
+		job := generateBackupJobSpecIntent(
 			cluster, v1beta1.PGBackRestRepo{},
 			"",
 			nil, nil,
 		)
-		assert.NilError(t, err)
 		assert.Equal(t, job.Template.Spec.Affinity, affinity)
 	})
 
@@ -2645,12 +2539,11 @@ volumes:
 		cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
 			PriorityClassName: initialize.String("some-priority-class"),
 		}
-		job, err := generateBackupJobSpecIntent(
+		job := generateBackupJobSpecIntent(
 			cluster, v1beta1.PGBackRestRepo{},
 			"",
 			nil, nil,
 		)
-		assert.NilError(t, err)
 		assert.Equal(t, job.Template.Spec.PriorityClassName, "some-priority-class")
 	})
 
@@ -2664,12 +2557,11 @@ volumes:
 		cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
 			Tolerations: tolerations,
 		}
-		job, err := generateBackupJobSpecIntent(
+		job := generateBackupJobSpecIntent(
 			cluster, v1beta1.PGBackRestRepo{},
 			"",
 			nil, nil,
 		)
-		assert.NilError(t, err)
 		assert.DeepEqual(t, job.Template.Spec.Tolerations, tolerations)
 	})
 
@@ -2679,18 +2571,16 @@ volumes:
 		t.Run("Undefined", func(t *testing.T) {
 			cluster.Spec.Backups.PGBackRest.Jobs = nil
 
-			spec, err := generateBackupJobSpecIntent(
+			spec := generateBackupJobSpecIntent(
 				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
 			)
-			assert.NilError(t, err)
 			assert.Assert(t, spec.TTLSecondsAfterFinished == nil)
 
 			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{}
 
-			spec, err = generateBackupJobSpecIntent(
+			spec = generateBackupJobSpecIntent(
 				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
 			)
-			assert.NilError(t, err)
 			assert.Assert(t, spec.TTLSecondsAfterFinished == nil)
 		})
 
@@ -2699,10 +2589,9 @@ volumes:
 				TTLSecondsAfterFinished: initialize.Int32(0),
 			}
 
-			spec, err := generateBackupJobSpecIntent(
+			spec := generateBackupJobSpecIntent(
 				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
 			)
-			assert.NilError(t, err)
 			if assert.Check(t, spec.TTLSecondsAfterFinished != nil) {
 				assert.Equal(t, *spec.TTLSecondsAfterFinished, int32(0))
 			}
@@ -2713,10 +2602,9 @@ volumes:
 				TTLSecondsAfterFinished: initialize.Int32(100),
 			}
 
-			spec, err := generateBackupJobSpecIntent(
+			spec := generateBackupJobSpecIntent(
 				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
 			)
-			assert.NilError(t, err)
 			if assert.Check(t, spec.TTLSecondsAfterFinished != nil) {
 				assert.Equal(t, *spec.TTLSecondsAfterFinished, int32(100))
 			}
@@ -2728,16 +2616,17 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 	_, cc := setupKubernetes(t)
 	require.ParallelCapacity(t, 0)
 
+	ctx := context.Background()
 	r := Reconciler{Client: cc}
 
 	t.Run("empty", func(t *testing.T) {
-		_, err := r.generateRepoHostIntent(&v1beta1.PostgresCluster{}, "", &RepoResources{},
+		_, err := r.generateRepoHostIntent(ctx, &v1beta1.PostgresCluster{}, "", &RepoResources{},
 			&observedInstances{})
 		assert.NilError(t, err)
 	})
 
 	cluster := &v1beta1.PostgresCluster{}
-	sts, err := r.generateRepoHostIntent(cluster, "", &RepoResources{}, &observedInstances{})
+	sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, &observedInstances{})
 	assert.NilError(t, err)
 
 	t.Run("ServiceAccount", func(t *testing.T) {
@@ -2758,7 +2647,7 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 			},
 		}
 		observed := &observedInstances{forCluster: []*Instance{{Pods: []*corev1.Pod{{}}}}}
-		sts, err := r.generateRepoHostIntent(cluster, "", &RepoResources{}, observed)
+		sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, observed)
 		assert.NilError(t, err)
 		assert.Equal(t, *sts.Spec.Replicas, int32(1))
 	})
@@ -2770,7 +2659,7 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 			},
 		}
 		observed := &observedInstances{forCluster: []*Instance{{}}}
-		sts, err := r.generateRepoHostIntent(cluster, "", &RepoResources{}, observed)
+		sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, observed)
 		assert.NilError(t, err)
 		assert.Equal(t, *sts.Spec.Replicas, int32(0))
 	})
@@ -3439,11 +3328,11 @@ func TestPrepareForRestore(t *testing.T) {
 }
 
 func TestReconcileScheduledBackups(t *testing.T) {
-	tEnv, tClient := setupKubernetes(t)
+	cfg, tClient := setupKubernetes(t)
 	require.ParallelCapacity(t, 2)
 
 	r := &Reconciler{}
-	_, cancel := setupManager(t, tEnv.Config, func(mgr manager.Manager) {
+	_, cancel := setupManager(t, cfg, func(mgr manager.Manager) {
 		r = &Reconciler{
 			Client:   mgr.GetClient(),
 			Recorder: mgr.GetEventRecorderFor(ControllerName),
@@ -3635,23 +3524,18 @@ func TestReconcileScheduledBackups(t *testing.T) {
 
 					// if an event is expected, the check for it
 					if tc.expectedEventReason != "" {
-						events := &corev1.EventList{}
-						err := wait.Poll(time.Second/2, Scale(time.Second*2), func() (bool, error) {
-							if err := tClient.List(ctx, events, &client.MatchingFields{
-								"involvedObject.kind":      "PostgresCluster",
-								"involvedObject.name":      clusterName,
-								"involvedObject.namespace": ns.GetName(),
-								"involvedObject.uid":       string(postgresCluster.GetUID()),
-								"reason":                   tc.expectedEventReason,
-							}); err != nil {
-								return false, err
-							}
-							if len(events.Items) != 1 {
-								return false, nil
-							}
-							return true, nil
-						})
-						assert.NilError(t, err)
+						assert.NilError(t, wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*2), false,
+							func(ctx context.Context) (bool, error) {
+								events := &corev1.EventList{}
+								err := tClient.List(ctx, events, &client.MatchingFields{
+									"involvedObject.kind":      "PostgresCluster",
+									"involvedObject.name":      clusterName,
+									"involvedObject.namespace": ns.GetName(),
+									"involvedObject.uid":       string(postgresCluster.GetUID()),
+									"reason":                   tc.expectedEventReason,
+								})
+								return len(events.Items) == 1, err
+							}))
 					}
 				} else if !tc.expectReconcile && tc.expectRequeue {
 					// expect requeue, no reconcile

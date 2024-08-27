@@ -243,7 +243,7 @@ func DynamicConfiguration(
 			// Some libraries belong at specific positions in the list, so figure
 			// that out as well.
 			if k == "shared_preload_libraries" {
-				// Load mandatory libraries ahead of user-defined libraries.
+				// Load user-defined libraries ahead of mandatory libraries.
 				if s, ok := parameters[k].(string); ok && len(s) > 0 {
 					v = s + "," + v
 				}

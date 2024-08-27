@@ -196,7 +196,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if cr.DeletionTimestamp != nil {
-		log.Info("Deleting PerconaPGCluster")
+		log.Info("Deleting PerconaPGCluster", "deletionTimestamp", cr.DeletionTimestamp)
 
 		// We're deleting PostgresCluster explicitly to let Crunchy controller run its finalizers and not mess with us.
 		if err := r.Client.Delete(ctx, postgresCluster); client.IgnoreNotFound(err) != nil {
