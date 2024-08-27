@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -73,37 +72,23 @@ func (r *PGClusterReconciler) deleteUserSecrets(ctx context.Context, cr *v2.Perc
 func (r *PGClusterReconciler) deleteTLSSecrets(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
-	secrets := []corev1.Secret{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Name + "-pgbackrest",
-				Namespace: cr.Namespace,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Name + "-pgbouncer",
-				Namespace: cr.Namespace,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf(naming.ClusterCertSecret, cr.Name),
-				Namespace: cr.Namespace,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      naming.RootCertSecret,
-				Namespace: cr.Namespace,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Name + "-replication-cert",
-				Namespace: cr.Namespace,
-			},
-		},
+	crunchyCluster, err := cr.ToCrunchy(ctx, nil, r.Client.Scheme())
+	if err != nil {
+		return errors.Wrap(err, "to crunchy")
+	}
+
+	secretsMeta := []metav1.ObjectMeta{
+		naming.PGBackRestSecret(crunchyCluster),
+		naming.ClusterPGBouncer(crunchyCluster),
+	}
+	if cr.Spec.Secrets.CustomRootCATLSSecret == nil {
+		secretsMeta = append(secretsMeta, naming.PostgresRootCASecret(crunchyCluster))
+	}
+	if cr.Spec.Secrets.CustomTLSSecret == nil {
+		secretsMeta = append(secretsMeta, naming.PostgresTLSSecret(crunchyCluster))
+	}
+	if cr.Spec.Secrets.CustomReplicationClientTLSSecret == nil {
+		secretsMeta = append(secretsMeta, naming.ReplicationClientCertSecret(crunchyCluster))
 	}
 
 	for _, instance := range cr.Spec.InstanceSets {
@@ -119,12 +104,14 @@ func (r *PGClusterReconciler) deleteTLSSecrets(ctx context.Context, cr *v2.Perco
 			return errors.Wrap(err, "get instance TLS secrets")
 		}
 
-		secrets = append(secrets, secretList.Items...)
+		for _, s := range secretList.Items {
+			secretsMeta = append(secretsMeta, s.ObjectMeta)
+		}
 	}
 
-	for i, secret := range secrets {
+	for _, secret := range secretsMeta {
 		log.Info("Deleting secret", "name", secret.Name)
-		if err := r.Client.Delete(ctx, &secrets[i]); client.IgnoreNotFound(err) != nil {
+		if err := r.Client.Delete(ctx, &corev1.Secret{ObjectMeta: secret}); client.IgnoreNotFound(err) != nil {
 			return errors.Wrapf(err, "delete secret %s", secret.Name)
 		}
 	}

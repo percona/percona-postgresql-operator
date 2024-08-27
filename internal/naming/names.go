@@ -90,8 +90,10 @@ const (
 )
 
 const (
+	// K8SPG-555: use PostgresRootCASecret instead.
 	// RootCertSecret is the default root certificate secret name
-	RootCertSecret = "pgo-root-cacert" /* #nosec */
+	// RootCertSecret = "pgo-root-cacert" /* #nosec */
+
 	// ClusterCertSecret is the default cluster leaf certificate secret name
 	ClusterCertSecret = "%s-cluster-cert" /* #nosec */
 )
@@ -309,7 +311,8 @@ func InstanceCertificates(instance metav1.Object) metav1.ObjectMeta {
 // InstanceSet returns the ObjectMeta necessary to lookup the objects
 // associated with a single instance set. Includes PodDisruptionBudgets
 func InstanceSet(cluster *v1beta1.PostgresCluster,
-	set *v1beta1.PostgresInstanceSetSpec) metav1.ObjectMeta {
+	set *v1beta1.PostgresInstanceSetSpec,
+) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      cluster.Name + "-set-" + set.Name,
 		Namespace: cluster.Namespace,
@@ -481,7 +484,8 @@ func PGBackRestRBAC(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 
 // PGBackRestRepoVolume returns the ObjectMeta for a pgBackRest repository volume
 func PGBackRestRepoVolume(cluster *v1beta1.PostgresCluster,
-	repoName string) metav1.ObjectMeta {
+	repoName string,
+) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      fmt.Sprintf("%s-%s", cluster.GetName(), repoName),
 		Namespace: cluster.GetNamespace(),
@@ -541,6 +545,16 @@ func PostgresCustomUserSecretName(cluster *v1beta1.PostgresCluster, name string)
 	return metav1.ObjectMeta{
 		Namespace: cluster.Namespace,
 		Name:      name,
+	}
+}
+
+// PostgresRootCASecret returns the ObjectMeta necessary to lookup the Secret
+// containing the root CA certificates and key
+// Part of K8SPG-555 ticket.
+func PostgresRootCASecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-cluster-ca-cert",
 	}
 }
 
