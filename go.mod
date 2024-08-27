@@ -20,7 +20,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/xdg-go/stringprep v1.0.4
-	go.nhat.io/grpcmock v0.26.0
+	go.nhat.io/grpcmock v0.27.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0
 	go.opentelemetry.io/otel v1.29.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0
