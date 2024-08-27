@@ -272,8 +272,8 @@ func (r *Reconciler) Reconcile(
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
 	}
-	if cluster.Spec.Extensions.PGStatMonitor {
-		pgstatmonitor.PostgreSQLParameters(&pgParameters)
+	if cluster.Spec.Extensions.PGStatStatements {
+		pgstatstatements.PostgreSQLParameters(&pgParameters)
 	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
