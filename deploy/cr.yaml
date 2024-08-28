@@ -297,7 +297,7 @@ spec:
 #          pool_mode: transaction
 
   backups:
-    trackLatestRestorableTime: false
+#    trackLatestRestorableTime: true
     pgbackrest:
 #      metadata:
 #        labels:
