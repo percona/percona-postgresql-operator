@@ -2,7 +2,6 @@ package pgstatstatements
 
 import (
 	"context"
-	"strings"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
