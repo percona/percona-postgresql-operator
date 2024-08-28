@@ -1,5 +1,3 @@
-package util
-
 /*
  Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +13,10 @@ package util
  limitations under the License.
 */
 
-import (
-	"regexp"
-	"strings"
+package util
 
-	"golang.org/x/mod/semver"
+import (
+	"strings"
 )
 
 // SQLQuoteIdentifier quotes an "identifier" (e.g. a table or a column name) to
@@ -73,21 +70,4 @@ func SQLQuoteLiteral(literal string) string {
 		literal = `'` + literal + `'`
 	}
 	return literal
-}
-
-// SemanticMajorMinorPatch function takes a version string and returns a
-// semantically formatted version string with just major, minor, and patch.
-// For example, "1.2.3-0-amd" would yield "v1.2.3". If it cannot produce a
-// valid semantic major.minor.patch version string it will return an empty
-// string.
-func SemanticMajorMinorPatch(versionString string) string {
-	re := regexp.MustCompile(`\d+\.\d+\.\d+`)
-
-	semanticVersionString := "v" + re.FindString(versionString)
-
-	if !semver.IsValid(semanticVersionString) {
-		return ""
-	}
-
-	return semanticVersionString
 }

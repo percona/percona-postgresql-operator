@@ -48,9 +48,9 @@ func (r *Reconciler) reconcileClusterConfigMap(
 
 	clusterConfigMap.Annotations = naming.Merge(cluster.Spec.Metadata.GetAnnotationsOrNil())
 	clusterConfigMap.Labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(map[string]string{
+		map[string]string{
 			naming.LabelCluster: cluster.Name,
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+		})
 
 	if err == nil {
 		err = patroni.ClusterConfigMap(ctx, cluster, pgHBAs, pgParameters,
@@ -77,9 +77,9 @@ func (r *Reconciler) reconcileClusterPodService(
 
 	clusterPodService.Annotations = naming.Merge(cluster.Spec.Metadata.GetAnnotationsOrNil())
 	clusterPodService.Labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(map[string]string{
+		map[string]string{
 			naming.LabelCluster: cluster.Name,
-		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
+		})
 
 	// Allocate no IP address (headless) and match any Pod with the cluster
 	// label, regardless of its readiness. Not particularly useful by itself, but
@@ -290,8 +290,8 @@ func (r *Reconciler) reconcileClusterReplicaService(
 func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, observed *observedInstances,
 	clusterVolumes []corev1.PersistentVolumeClaim,
-	rootCA *pki.RootCertificateAuthority,
-) (bool, error) {
+	rootCA *pki.RootCertificateAuthority) (bool, error) {
+
 	// a hash func to hash the pgBackRest restore options
 	hashFunc := func(jobConfigs []string) (string, error) {
 		return safeHash32(func(w io.Writer) (err error) {
@@ -384,7 +384,8 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	}
 	var configChanged bool
 	if restoreJob != nil {
-		configChanged = (configHash != restoreJob.GetAnnotations()[naming.PGBackRestConfigHash])
+		configChanged =
+			(configHash != restoreJob.GetAnnotations()[naming.PGBackRestConfigHash])
 	}
 
 	// Proceed with preparing the cluster for restore (e.g. tearing down runners, the DCS,

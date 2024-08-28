@@ -17,15 +17,18 @@ limitations under the License.
 
 import (
 	"context"
-	"net/http"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"time"
+	"unicode"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	uzap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	cruntime "sigs.k8s.io/controller-runtime"
@@ -35,16 +38,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	//"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
-	"github.com/percona/percona-postgresql-operator/internal/bridge"
-	"github.com/percona/percona-postgresql-operator/internal/bridge/crunchybridgecluster"
+
 	"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/controller/standalone_pgadmin"
+	"github.com/percona/percona-postgresql-operator/internal/feature"
+	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/upgradecheck"
-	"github.com/percona/percona-postgresql-operator/internal/util"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
@@ -54,6 +57,7 @@ import (
 	perconaRuntime "github.com/percona/percona-postgresql-operator/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 var versionString string
@@ -65,26 +69,7 @@ func assertNoError(err error) {
 	}
 }
 
-//func initLogging() {
-//	// Configure a singleton that treats logr.Logger.V(1) as logrus.DebugLevel.
-//	var verbosity int
-//	if strings.EqualFold(os.Getenv("CRUNCHY_DEBUG"), "true") {
-//		verbosity = 1
-//	}
-//	logging.SetLogSink(logging.Logrus(os.Stdout, versionString, 1, verbosity))
-//}
-
 func main() {
-	// Set any supplied feature gates; panic on any unrecognized feature gate
-	err := util.AddAndSetFeatureGates(os.Getenv("PGO_FEATURE_GATES"))
-	assertNoError(err)
-	// Needed for PMM
-	err = util.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
-		string(util.InstanceSidecars):  true,
-		string(util.TablespaceVolumes): true,
-	})
-	assertNoError(err)
-
 	otelFlush, err := initOpenTelemetry()
 	assertNoError(err)
 	defer otelFlush()
@@ -102,17 +87,15 @@ func main() {
 	log := logging.FromContext(ctx)
 	log.V(1).Info("debug flag set to true")
 
-	// We are forcing `InstanceSidecars` feature to be enabled.
-	// It's necessary to get actual feature gate values instead of using
-	// `PGO_FEATURE_GATES` env var to print logs
-	var featureGates []string
-	for k := range util.DefaultMutableFeatureGate.GetAll() {
-		f := string(k) + "=" + strconv.FormatBool(util.DefaultMutableFeatureGate.Enabled(k))
-		featureGates = append(featureGates, f)
-	}
+	features := feature.NewGate()
+	err = features.SetFromMap(map[string]bool{
+		string(feature.InstanceSidecars):  true, // needed for PMM
+		string(feature.TablespaceVolumes): true,
+	})
+	assertNoError(err)
 
-	log.Info("feature gates enabled",
-		"PGO_FEATURE_GATES", strings.Join(featureGates, ","))
+	assertNoError(features.Set(os.Getenv("PGO_FEATURE_GATES")))
+	log.Info("feature gates enabled", "PGO_FEATURE_GATES", features.String())
 
 	cruntime.SetLogger(log)
 
@@ -128,7 +111,13 @@ func main() {
 
 	namespaces, err := k8s.GetWatchNamespace()
 	assertNoError(err)
-	mgr, err := perconaRuntime.CreateRuntimeManager(namespaces, cfg, false)
+
+	mgr, err := perconaRuntime.CreateRuntimeManager(
+		namespaces,
+		cfg,
+		false,
+		features,
+	)
 	assertNoError(err)
 
 	// Add Percona custom resource types to scheme
@@ -239,7 +228,6 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	upgradeReconciler := &pgupgrade.PGUpgradeReconciler{
 		Client: mgr.GetClient(),
 		Owner:  "pgupgrade-controller",
-		Scheme: mgr.GetScheme(),
 	}
 
 	if err := upgradeReconciler.SetupWithManager(mgr); err != nil {
@@ -257,7 +245,6 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Client:      mgr.GetClient(),
 		Owner:       "pgadmin-controller",
 		Recorder:    mgr.GetEventRecorderFor(naming.ControllerPGAdmin),
-		Scheme:      mgr.GetScheme(),
 		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
 	}
 
@@ -265,61 +252,70 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return errors.Wrap(err, "unable to create PGAdmin controller")
 	}
 
-	if util.DefaultMutableFeatureGate.Enabled(util.CrunchyBridgeClusters) {
-		constructor := func() *bridge.Client {
-			client := bridge.NewClient(os.Getenv("PGO_BRIDGE_URL"), versionString)
-			client.Transport = otelTransportWrapper()(http.DefaultTransport)
-			return client
-		}
-
-		crunchyBridgeClusterReconciler := &crunchybridgecluster.CrunchyBridgeClusterReconciler{
-			Client: mgr.GetClient(),
-			Owner:  "crunchybridgecluster-controller",
-			// TODO(crunchybridgecluster): recorder?
-			// Recorder: mgr.GetEventRecorderFor(naming...),
-			Scheme:    mgr.GetScheme(),
-			NewClient: constructor,
-		}
-
-		if err := crunchyBridgeClusterReconciler.SetupWithManager(mgr); err != nil {
-			return errors.Wrap(err, "unable to create CrunchyBridgeCluster controller")
-		}
-	}
-
 	return nil
 }
 
-func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
-	log := logging.FromContext(ctx)
+//+kubebuilder:rbac:groups="coordination.k8s.io",resources="leases",verbs={get,create,update}
 
-	const sccGroupName, sccKind = "security.openshift.io", "SecurityContextConstraints"
+func initManager() (runtime.Options, error) {
+	log := logging.FromContext(context.Background())
 
-	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
+	options := runtime.Options{}
+	options.Cache.SyncPeriod = initialize.Pointer(time.Hour)
 
-	groups, err := client.ServerGroups()
-	if err != nil {
-		assertNoError(err)
-	}
-	for _, g := range groups.Groups {
-		if g.Name != sccGroupName {
-			continue
+	options.HealthProbeBindAddress = ":8081"
+
+	// Enable leader elections when configured with a valid Lease.coordination.k8s.io name.
+	// - https://docs.k8s.io/concepts/architecture/leases
+	// - https://releases.k8s.io/v1.30.0/pkg/apis/coordination/validation/validation.go#L26
+	if lease := os.Getenv("PGO_CONTROLLER_LEASE_NAME"); len(lease) > 0 {
+		if errs := validation.IsDNS1123Subdomain(lease); len(errs) > 0 {
+			return options, fmt.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
 		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == sccKind {
-					log.Info("detected OpenShift environment")
-					return true
-				}
-			}
-		}
+
+		options.LeaderElection = true
+		options.LeaderElectionID = lease
+		options.LeaderElectionNamespace = os.Getenv("PGO_NAMESPACE")
 	}
 
-	return false
+	// Check PGO_TARGET_NAMESPACE for backwards compatibility with
+	// "singlenamespace" installations
+	singlenamespace := strings.TrimSpace(os.Getenv("PGO_TARGET_NAMESPACE"))
+
+	// Check PGO_TARGET_NAMESPACES for non-cluster-wide, multi-namespace
+	// installations
+	multinamespace := strings.TrimSpace(os.Getenv("PGO_TARGET_NAMESPACES"))
+
+	// Initialize DefaultNamespaces if any target namespaces are set
+	if len(singlenamespace) > 0 || len(multinamespace) > 0 {
+		options.Cache.DefaultNamespaces = map[string]runtime.CacheConfig{}
+	}
+
+	if len(singlenamespace) > 0 {
+		options.Cache.DefaultNamespaces[singlenamespace] = runtime.CacheConfig{}
+	}
+
+	if len(multinamespace) > 0 {
+		for _, namespace := range strings.FieldsFunc(multinamespace, func(c rune) bool {
+			return c != '-' && !unicode.IsLetter(c) && !unicode.IsNumber(c)
+		}) {
+			options.Cache.DefaultNamespaces[namespace] = runtime.CacheConfig{}
+		}
+	}
+
+	options.Controller.GroupKindConcurrency = map[string]int{
+		"PostgresCluster." + v1beta1.GroupVersion.Group: 2,
+	}
+
+	if s := os.Getenv("PGO_WORKERS"); s != "" {
+		if i, err := strconv.Atoi(s); err == nil && i > 0 {
+			options.Controller.GroupKindConcurrency["PostgresCluster."+v1beta1.GroupVersion.Group] = i
+		} else {
+			log.Error(err, "PGO_WORKERS must be a positive number")
+		}
+	}
+
+	return options, nil
 }
 
 func isGKE(ctx context.Context, cfg *rest.Config) bool {
@@ -418,6 +414,7 @@ func getServerVersion(ctx context.Context, cfg *rest.Config) string {
 			"response", err.Error())
 		return ""
 	}
+
 	return versionInfo.String()
 }
 
@@ -456,4 +453,37 @@ func getLogLevel() zapcore.LevelEnabler {
 	default:
 		return zapcore.InfoLevel
 	}
+}
+
+func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
+	log := logging.FromContext(ctx)
+
+	const sccGroupName, sccKind = "security.openshift.io", "SecurityContextConstraints"
+
+	client, err := discovery.NewDiscoveryClientForConfig(cfg)
+	assertNoError(err)
+
+	groups, err := client.ServerGroups()
+	if err != nil {
+		assertNoError(err)
+	}
+	for _, g := range groups.Groups {
+		if g.Name != sccGroupName {
+			continue
+		}
+		for _, v := range g.Versions {
+			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
+			if err != nil {
+				assertNoError(err)
+			}
+			for _, r := range resourceList.APIResources {
+				if r.Kind == sccKind {
+					log.Info("detected Openshift environment")
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }

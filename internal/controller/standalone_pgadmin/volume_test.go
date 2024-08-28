@@ -1,6 +1,3 @@
-//go:build envtest
-// +build envtest
-
 // Copyright 2023 - 2024 Crunchy Data Solutions, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -91,10 +88,7 @@ volumeMode: Filesystem
 }
 
 func TestHandlePersistentVolumeClaimError(t *testing.T) {
-	scheme, err := runtime.CreatePostgresOperatorScheme()
-	assert.NilError(t, err)
-
-	recorder := events.NewRecorder(t, scheme)
+	recorder := events.NewRecorder(t, runtime.Scheme)
 	reconciler := &PGAdminReconciler{
 		Recorder: recorder,
 	}

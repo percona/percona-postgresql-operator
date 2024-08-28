@@ -23,9 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/util"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -70,11 +70,9 @@ func TestTablespaceVolumeMount(t *testing.T) {
 }
 
 func TestInstancePod(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-
-	// Initialize the feature gate
-	assert.NilError(t, util.AddAndSetFeatureGates(""))
-
 	cluster := new(v1beta1.PostgresCluster)
 	cluster.Default()
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
@@ -160,6 +158,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /pgconf/tls
     name: cert-volume
@@ -175,15 +175,38 @@ containers:
   - --
   - |-
     monitor() {
+    # Parameters for curl when managing autogrow annotation.
+    APISERVER="https://kubernetes.default.svc"
+    SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
+    NAMESPACE=$(cat ${SERVICEACCOUNT}/namespace)
+    TOKEN=$(cat ${SERVICEACCOUNT}/token)
+    CACERT=${SERVICEACCOUNT}/ca.crt
+
     declare -r directory="/pgconf/tls"
-    exec {fd}<> <(:)
-    while read -r -t 5 -u "${fd}" || true; do
-      if [ "${directory}" -nt "/proc/self/fd/${fd}" ] &&
+    exec {fd}<> <(:||:)
+    while read -r -t 5 -u "${fd}" ||:; do
+      # Manage replication certificate.
+      if [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] &&
         install -D --mode=0600 -t "/tmp/replication" "${directory}"/{replication/tls.crt,replication/tls.key,replication/ca.crt} &&
         pkill -HUP --exact --parent=1 postgres
       then
-        exec {fd}>&- && exec {fd}<> <(:)
+        exec {fd}>&- && exec {fd}<> <(:||:)
         stat --format='Loaded certificates dated %y' "${directory}"
+      fi
+
+      # Manage autogrow annotation.
+      # Return size in Mebibytes.
+      size=$(df --human-readable --block-size=M /pgdata | awk 'FNR == 2 {print $2}')
+      use=$(df --human-readable /pgdata | awk 'FNR == 2 {print $5}')
+      sizeInt="${size//M/}"
+      # Use the sed punctuation class, because the shell will not accept the percent sign in an expansion.
+      useInt=$(echo $use | sed 's/[[:punct:]]//g')
+      triggerExpansion="$((useInt > 75))"
+      if [ $triggerExpansion -eq 1 ]; then
+        newSize="$(((sizeInt / 2)+sizeInt))"
+        newSizeMi="${newSize}Mi"
+        d='[{"op": "add", "path": "/metadata/annotations/suggested-pgdata-pvc-size", "value": "'"$newSizeMi"'"}]'
+        curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -XPATCH "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}?fieldManager=kubectl-annotate" -H "Content-Type: application/json-patch+json" --data "$d"
       fi
     done
     }; export -f monitor; exec -a "$0" bash -ceu monitor
@@ -201,10 +224,14 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /pgconf/tls
     name: cert-volume
     readOnly: true
+  - mountPath: /pgdata
+    name: postgres-data
 initContainers:
 - command:
   - bash
@@ -222,24 +249,26 @@ initContainers:
     safelink() (
       local desired="$1" name="$2" current
       current=$(realpath "${name}")
-      if [ "${current}" = "${desired}" ]; then return; fi
+      if [[ "${current}" == "${desired}" ]]; then return; fi
       set -x; mv --no-target-directory "${current}" "${desired}"
       ln --no-dereference --force --symbolic "${desired}" "${name}"
     )
     echo Initializing ...
-    results 'uid' "$(id -u)" 'gid' "$(id -G)"
-    results 'postgres path' "$(command -v postgres)"
-    results 'postgres version' "${postgres_version:=$(postgres --version)}"
+    results 'uid' "$(id -u ||:)" 'gid' "$(id -G ||:)"
+    if [[ "${pgwal_directory}" == *"pgwal/"* ]] && [[ ! -d "/pgwal/pgbackrest-spool" ]];then rm -rf "/pgdata/pgbackrest-spool" && mkdir -p "/pgwal/pgbackrest-spool" && ln --force --symbolic "/pgwal/pgbackrest-spool" "/pgdata/pgbackrest-spool";fi
+    if [[ ! -e "/pgdata/pgbackrest-spool" ]];then rm -rf /pgdata/pgbackrest-spool;fi
+    results 'postgres path' "$(command -v postgres ||:)"
+    results 'postgres version' "${postgres_version:=$(postgres --version ||:)}"
     [[ "${postgres_version}" =~ ") ${expected_major_version}"($|[^0-9]) ]] ||
     halt Expected PostgreSQL version "${expected_major_version}"
     results 'config directory' "${PGDATA:?}"
-    postgres_data_directory=$([ -d "${PGDATA}" ] && postgres -C data_directory || echo "${PGDATA}")
+    postgres_data_directory=$([[ -d "${PGDATA}" ]] && postgres -C data_directory || echo "${PGDATA}")
     results 'data directory' "${postgres_data_directory}"
     [[ "${postgres_data_directory}" == "${PGDATA}" ]] ||
     halt Expected matching config and data directories
     bootstrap_dir="${postgres_data_directory}_bootstrap"
-    [ -d "${bootstrap_dir}" ] && results 'bootstrap directory' "${bootstrap_dir}"
-    [ -d "${bootstrap_dir}" ] && postgres_data_directory="${bootstrap_dir}"
+    [[ -d "${bootstrap_dir}" ]] && results 'bootstrap directory' "${bootstrap_dir}"
+    [[ -d "${bootstrap_dir}" ]] && postgres_data_directory="${bootstrap_dir}"
     if [[ ! -e "${postgres_data_directory}" || -O "${postgres_data_directory}" ]]; then
     install --directory --mode=0700 "${postgres_data_directory}"
     elif [[ -w "${postgres_data_directory}" && -g "${postgres_data_directory}" ]]; then
@@ -251,14 +280,15 @@ initContainers:
     halt "$(permissions "${pgbrLog_directory}" ||:)"
     install -D --mode=0600 -t "/tmp/replication" "/pgconf/tls/replication"/{tls.crt,tls.key,ca.crt}
 
-    [ -f "${postgres_data_directory}/PG_VERSION" ] || exit 0
+
+    [[ -f "${postgres_data_directory}/PG_VERSION" ]] || exit 0
     results 'data version' "${postgres_data_version:=$(< "${postgres_data_directory}/PG_VERSION")}"
     [[ "${postgres_data_version}" == "${expected_major_version}" ]] ||
     halt Expected PostgreSQL data version "${expected_major_version}"
     [[ ! -f "${postgres_data_directory}/postgresql.conf" ]] &&
     touch "${postgres_data_directory}/postgresql.conf"
     safelink "${pgwal_directory}" "${postgres_data_directory}/pg_wal"
-    results 'wal directory' "$(realpath "${postgres_data_directory}/pg_wal")"
+    results 'wal directory' "$(realpath "${postgres_data_directory}/pg_wal" ||:)"
     rm -f "${postgres_data_directory}/recovery.signal"
   - startup
   - "11"
@@ -288,6 +318,8 @@ initContainers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   volumeMounts:
   - mountPath: /pgconf/tls
     name: cert-volume
@@ -500,7 +532,6 @@ volumes:
 		}
 
 		t.Run("SidecarNotEnabled", func(t *testing.T) {
-			assert.NilError(t, util.AddAndSetFeatureGates(string(util.InstanceSidecars+"=false")))
 			InstancePod(ctx, cluster, sidecarInstance,
 				serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
 
@@ -508,7 +539,12 @@ volumes:
 		})
 
 		t.Run("SidecarEnabled", func(t *testing.T) {
-			assert.NilError(t, util.AddAndSetFeatureGates(string(util.InstanceSidecars+"=true")))
+			gate := feature.NewGate()
+			assert.NilError(t, gate.SetFromMap(map[string]bool{
+				feature.InstanceSidecars: true,
+			}))
+			ctx := feature.NewContext(ctx, gate)
+
 			InstancePod(ctx, cluster, sidecarInstance,
 				serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
 
@@ -526,7 +562,6 @@ volumes:
 	})
 
 	t.Run("WithTablespaces", func(t *testing.T) {
-
 		clusterWithTablespaces := cluster.DeepCopy()
 		clusterWithTablespaces.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
 			{
