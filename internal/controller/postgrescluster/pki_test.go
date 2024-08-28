@@ -91,16 +91,21 @@ func TestReconcileCerts(t *testing.T) {
 		initialRoot, err := r.reconcileRootCertificate(ctx, cluster1)
 		assert.NilError(t, err)
 
-		rootSecret := &corev1.Secret{
+		cluster1CASecret := &corev1.Secret{
 			ObjectMeta: naming.PostgresRootCASecret(cluster1),
 		}
-		rootSecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+		cluster1CASecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+
+		cluster2CASecret := &corev1.Secret{
+			ObjectMeta: naming.PostgresRootCASecret(cluster2),
+		}
+		cluster2CASecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 
 		t.Run("check root CA secret first owner reference", func(t *testing.T) {
-			err := tClient.Get(ctx, client.ObjectKeyFromObject(rootSecret), rootSecret)
+			err := tClient.Get(ctx, client.ObjectKeyFromObject(cluster1CASecret), cluster1CASecret)
 			assert.NilError(t, err)
 
-			assert.Check(t, len(rootSecret.ObjectMeta.OwnerReferences) == 1, "first owner reference not set")
+			assert.Check(t, len(cluster1CASecret.ObjectMeta.OwnerReferences) == 1, "first owner reference not set")
 
 			expectedOR := metav1.OwnerReference{
 				APIVersion: "postgres-operator.crunchydata.com/v1beta1",
@@ -109,8 +114,8 @@ func TestReconcileCerts(t *testing.T) {
 				UID:        cluster1.UID,
 			}
 
-			if len(rootSecret.ObjectMeta.OwnerReferences) > 0 {
-				assert.Equal(t, rootSecret.ObjectMeta.OwnerReferences[0], expectedOR)
+			if len(cluster1CASecret.ObjectMeta.OwnerReferences) > 0 {
+				assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0], expectedOR)
 			}
 		})
 
@@ -118,13 +123,13 @@ func TestReconcileCerts(t *testing.T) {
 			_, err := r.reconcileRootCertificate(ctx, cluster2)
 			assert.NilError(t, err)
 
-			err = tClient.Get(ctx, client.ObjectKeyFromObject(rootSecret), rootSecret)
+			err = tClient.Get(ctx, client.ObjectKeyFromObject(cluster2CASecret), cluster2CASecret)
 			assert.NilError(t, err)
 
 			clist := &v1beta1.PostgresClusterList{}
 			assert.NilError(t, tClient.List(ctx, clist))
 
-			assert.Check(t, len(rootSecret.ObjectMeta.OwnerReferences) == 2, "second owner reference not set")
+			assert.Check(t, len(cluster2CASecret.ObjectMeta.OwnerReferences) == 1, "should be single owner reference")
 
 			expectedOR := metav1.OwnerReference{
 				APIVersion: "postgres-operator.crunchydata.com/v1beta1",
@@ -133,9 +138,7 @@ func TestReconcileCerts(t *testing.T) {
 				UID:        cluster2.UID,
 			}
 
-			if len(rootSecret.ObjectMeta.OwnerReferences) > 1 {
-				assert.Equal(t, rootSecret.ObjectMeta.OwnerReferences[1], expectedOR)
-			}
+			assert.Equal(t, cluster2CASecret.ObjectMeta.OwnerReferences[0], expectedOR)
 		})
 
 		t.Run("root certificate is returned correctly", func(t *testing.T) {
@@ -287,18 +290,21 @@ func TestReconcileCerts(t *testing.T) {
 
 		cluster2.Spec.CustomTLSSecret = customSecretProjection
 
-		initialRoot, err := r.reconcileRootCertificate(ctx, cluster1)
+		cluster1Root, err := r.reconcileRootCertificate(ctx, cluster1)
+		assert.NilError(t, err)
+
+		cluster2Root, err := r.reconcileRootCertificate(ctx, cluster2)
 		assert.NilError(t, err)
 
 		t.Run("check standard secret projection", func(t *testing.T) {
-			secretCertProj, err := r.reconcileClusterCertificate(ctx, initialRoot, cluster1, primaryService, replicaService)
+			secretCertProj, err := r.reconcileClusterCertificate(ctx, cluster1Root, cluster1, primaryService, replicaService)
 			assert.NilError(t, err)
 
 			assert.DeepEqual(t, testSecretProjection, secretCertProj)
 		})
 
 		t.Run("check custom secret projection", func(t *testing.T) {
-			customSecretCertProj, err := r.reconcileClusterCertificate(ctx, initialRoot, cluster2, primaryService, replicaService)
+			customSecretCertProj, err := r.reconcileClusterCertificate(ctx, cluster2Root, cluster2, primaryService, replicaService)
 			assert.NilError(t, err)
 
 			assert.DeepEqual(t, customSecretProjection, customSecretCertProj)
@@ -315,7 +321,7 @@ func TestReconcileCerts(t *testing.T) {
 			testSecretProjection := clusterCertSecretProjection(testSecret)
 
 			// reconcile the secret project using the normal process
-			customSecretCertProj, err := r.reconcileClusterCertificate(ctx, initialRoot, cluster2, primaryService, replicaService)
+			customSecretCertProj, err := r.reconcileClusterCertificate(ctx, cluster2Root, cluster2, primaryService, replicaService)
 			assert.NilError(t, err)
 
 			// results should be the same
