@@ -35,6 +35,7 @@ rules:
   resources:
   - endpoints/restricted
   - pods/exec
+  - services
   verbs:
   - create
 - apiGroups:
