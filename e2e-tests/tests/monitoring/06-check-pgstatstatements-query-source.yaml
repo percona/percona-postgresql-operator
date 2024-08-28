@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=merge -p '{"spec":{"pmm":{"querySource":"pgstatstatements"}}}'
+
+      sleep 60
+
+      primary=$(get_pod_by_role ${test_name} master name)
+      res=$(kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT extname FROM pg_extension;"')
+      echo ${res} | grep -q pg_stat_statements
