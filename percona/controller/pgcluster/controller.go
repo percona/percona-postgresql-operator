@@ -453,6 +453,10 @@ func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGClus
 }
 
 func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if !*cr.Spec.Backups.TrackLatestRestorableTime {
+		return nil
+	}
+
 	log := logging.FromContext(ctx)
 
 	watcherName, watcherFunc := watcher.GetWALWatcher(cr)
@@ -478,10 +482,12 @@ func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.Perco
 		}
 	}
 
-	orig := cr.DeepCopy()
-	cr.Finalizers = append(cr.Finalizers, v2.FinalizerStopWatchers)
-	if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "patch finalizers")
+	if *cr.Spec.Backups.TrackLatestRestorableTime {
+		orig := cr.DeepCopy()
+		cr.Finalizers = append(cr.Finalizers, v2.FinalizerStopWatchers)
+		if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
+			return errors.Wrap(err, "patch finalizers")
+		}
 	}
 
 	return nil

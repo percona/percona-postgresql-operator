@@ -5601,6 +5601,9 @@ spec:
                     required:
                     - repos
                     type: object
+                  trackLatestRestorableTime:
+                    description: Enable tracking latest restorable time
+                    type: boolean
                 required:
                 - pgbackrest
                 type: object
