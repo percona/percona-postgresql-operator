@@ -72,6 +72,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+		"pg_stat_statements.track": "all",
 		"shared_preload_libraries": "pg_stat_statements",
 	})
 
