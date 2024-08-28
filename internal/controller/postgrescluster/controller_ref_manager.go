@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
@@ -36,8 +37,8 @@ import (
 // adoptObject adopts the provided Object by adding controller owner refs for the provided
 // PostgresCluster.
 func (r *Reconciler) adoptObject(ctx context.Context, postgresCluster *v1beta1.PostgresCluster,
-	obj client.Object) error {
-
+	obj client.Object,
+) error {
 	if err := controllerutil.SetControllerReference(postgresCluster, obj,
 		r.Client.Scheme()); err != nil {
 		return err
@@ -65,8 +66,8 @@ func (r *Reconciler) adoptObject(ctx context.Context, postgresCluster *v1beta1.P
 // race conditions with the garbage collector (see
 // https://github.com/kubernetes/kubernetes/issues/42639)
 func (r *Reconciler) claimObject(ctx context.Context, postgresCluster *v1beta1.PostgresCluster,
-	obj client.Object) error {
-
+	obj client.Object,
+) error {
 	controllerRef := metav1.GetControllerOfNoCopy(obj)
 	if controllerRef != nil {
 		// if not owned by this postgrescluster then ignore
@@ -122,8 +123,8 @@ func (r *Reconciler) claimObject(ctx context.Context, postgresCluster *v1beta1.P
 // getPostgresClusterForObject is responsible for obtaining the PostgresCluster associated
 // with an Object.
 func (r *Reconciler) getPostgresClusterForObject(ctx context.Context,
-	obj client.Object) (bool, *v1beta1.PostgresCluster, error) {
-
+	obj client.Object,
+) (bool, *v1beta1.PostgresCluster, error) {
 	clusterName := ""
 
 	// first see if it has a PostgresCluster ownership ref or a PostgresCluster label
@@ -156,8 +157,8 @@ func (r *Reconciler) getPostgresClusterForObject(ctx context.Context,
 // to adopt or release/orphan an Object.  This includes obtaining the PostgresCluster for
 // the Object and then calling the logic needed to either adopt or release it.
 func (r *Reconciler) manageControllerRefs(ctx context.Context,
-	obj client.Object) error {
-
+	obj client.Object,
+) error {
 	found, postgresCluster, err := r.getPostgresClusterForObject(ctx, obj)
 	if err != nil {
 		return err
@@ -173,8 +174,8 @@ func (r *Reconciler) manageControllerRefs(ctx context.Context,
 // PostgresCluster.  This is done by removing the PostgresCluster's controller owner
 // refs from the Object.
 func (r *Reconciler) releaseObject(ctx context.Context,
-	postgresCluster *v1beta1.PostgresCluster, obj client.Object) error {
-
+	postgresCluster *v1beta1.PostgresCluster, obj client.Object,
+) error {
 	// TODO create a strategic merge type in kubeapi instead of using Merge7386
 	patch, err := kubeapi.NewMergePatch().
 		Add("metadata", "ownerReferences")([]map[string]string{{
@@ -191,22 +192,21 @@ func (r *Reconciler) releaseObject(ctx context.Context,
 // controllerRefHandlerFuncs returns the handler funcs that should be utilized to watch
 // StatefulSets within the cluster as needed to manage controller ownership refs.
 func (r *Reconciler) controllerRefHandlerFuncs() *handler.Funcs {
-
 	log := logging.FromContext(context.Background())
 	errMsg := "managing StatefulSet controller refs"
 
 	return &handler.Funcs{
-		CreateFunc: func(ctx context.Context, updateEvent event.CreateEvent, workQueue workqueue.RateLimitingInterface) {
+		CreateFunc: func(ctx context.Context, updateEvent event.CreateEvent, workQueue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			if err := r.manageControllerRefs(ctx, updateEvent.Object); err != nil {
 				log.Error(err, errMsg)
 			}
 		},
-		UpdateFunc: func(ctx context.Context, updateEvent event.UpdateEvent, workQueue workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, updateEvent event.UpdateEvent, workQueue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			if err := r.manageControllerRefs(ctx, updateEvent.ObjectNew); err != nil {
 				log.Error(err, errMsg)
 			}
 		},
-		DeleteFunc: func(ctx context.Context, updateEvent event.DeleteEvent, workQueue workqueue.RateLimitingInterface) {
+		DeleteFunc: func(ctx context.Context, updateEvent event.DeleteEvent, workQueue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			if err := r.manageControllerRefs(ctx, updateEvent.Object); err != nil {
 				log.Error(err, errMsg)
 			}
