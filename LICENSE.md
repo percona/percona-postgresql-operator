@@ -177,7 +177,7 @@
    END OF TERMS AND CONDITIONS
 
    Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
-   Copyright 2021 Percona, LLC 
+   Copyright 2021 - 2024 Percona, LLC 
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

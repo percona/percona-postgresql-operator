@@ -130,6 +130,15 @@ func (r *Reconciler) observePersistentVolumeClaims(
 					resizing.LastTransitionTime = minNotZero(
 						resizing.LastTransitionTime, condition.LastTransitionTime)
 				}
+
+			case
+				// The "ModifyingVolume" and "ModifyVolumeError" conditions occur
+				// when the attribute class of a PVC is changing. These attributes
+				// do not affect the size of a volume, so there's nothing to do.
+				// See the "VolumeAttributesClass" feature gate.
+				// - https://git.k8s.io/enhancements/keps/sig-storage/3751-volume-attributes-class
+				corev1.PersistentVolumeClaimVolumeModifyingVolume,
+				corev1.PersistentVolumeClaimVolumeModifyVolumeError:
 			}
 		}
 	}
@@ -436,8 +445,7 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 
 	// at this point, the Job either wasn't found or it has failed, so the it
 	// should be created
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Annotations, cluster.Spec.Metadata.
-		GetAnnotationsOrNil())
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Annotations, cluster.Spec.Metadata.GetAnnotationsOrNil())
 	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
@@ -678,9 +686,9 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 		}
 	}
 
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGBackRestVolume.Annotations,
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
-	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGBackRestVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
+	labels := naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGBackRestRepoDir: "",

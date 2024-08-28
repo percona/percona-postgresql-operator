@@ -13240,7 +13240,7 @@ spec:
                       Patroni dynamic configuration settings. Changes to this value will be
                       automatically reloaded without validation. Changes to certain PostgreSQL
                       parameters cause PostgreSQL to restart.
-                      More info: https://patroni.readthedocs.io/en/latest/SETTINGS.html
+                      More info: https://patroni.readthedocs.io/en/latest/dynamic_configuration.html
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   leaderLeaseDurationSeconds:
@@ -17258,6 +17258,7 @@ spec:
                         ALTER ROLE options except for PASSWORD. This field is ignored for the
                         "postgres" user.
                         More info: https://www.postgresql.org/docs/current/role-attributes.html
+                      maxLength: 200
                       pattern: ^[^;]*$
                       type: string
                     password:

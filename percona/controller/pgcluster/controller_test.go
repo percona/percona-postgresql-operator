@@ -26,10 +26,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
+	"github.com/percona/percona-postgresql-operator/percona/runtime"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -141,7 +142,13 @@ var _ = Describe("Annotations", Ordered, func() {
 })
 
 var _ = Describe("PMM sidecar", Ordered, func() {
-	ctx := context.Background()
+	gate := feature.NewGate()
+	err := gate.SetFromMap(map[string]bool{
+		feature.InstanceSidecars: true,
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	ctx := feature.NewContext(context.Background(), gate)
 
 	const crName = "pmm-test"
 	const ns = crName
@@ -470,9 +477,14 @@ var _ = Describe("Watching secrets", Ordered, func() {
 	BeforeAll(func() {
 		By("Creating the Namespace to perform the tests")
 		err := k8sClient.Create(ctx, namespace)
+		Expect(err).NotTo(HaveOccurred())
+
+		gate := feature.NewGate()
+		err = gate.SetFromMap(map[string]bool{})
+		Expect(err).NotTo(HaveOccurred())
 
 		Expect(err).To(Not(HaveOccurred()))
-		mgr, err := runtime.CreateRuntimeManager(ns, cfg, true)
+		mgr, err := runtime.CreateRuntimeManager(namespace.Name, cfg, true, gate)
 		Expect(err).To(Succeed())
 		Expect(v2.AddToScheme(mgr.GetScheme())).To(Succeed())
 

@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	r "github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 )
 
 // default refresh interval in minutes
@@ -17,19 +19,18 @@ var refreshInterval = 60 * time.Minute
 
 // CreateRuntimeManager does the same thing as `internal/controller/runtime.CreateRuntimeManager`,
 // excet it configures the manager to watch multiple namespaces.
-func CreateRuntimeManager(namespaces string, config *rest.Config,
-	disableMetrics bool) (manager.Manager, error) {
-
-	pgoScheme, err := r.CreatePostgresOperatorScheme()
-	if err != nil {
-		return nil, err
-	}
+func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics bool, features feature.MutableGate) (manager.Manager, error) {
 
 	options := manager.Options{
 		Cache: cache.Options{
 			SyncPeriod: &refreshInterval,
 		},
-		Scheme: pgoScheme,
+		Scheme: r.Scheme,
+	}
+
+	options.BaseContext = func() context.Context {
+		ctx := context.Background()
+		return feature.NewContext(ctx, features)
 	}
 
 	nn := strings.Split(namespaces, ",")

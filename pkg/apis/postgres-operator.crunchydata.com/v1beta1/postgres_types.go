@@ -60,6 +60,7 @@ type PostgresUserSpec struct {
 	// ALTER ROLE options except for PASSWORD. This field is ignored for the
 	// "postgres" user.
 	// More info: https://www.postgresql.org/docs/current/role-attributes.html
+	// +kubebuilder:validation:MaxLength=200
 	// +kubebuilder:validation:Pattern=`^[^;]*$`
 	// +optional
 	Options string `json:"options,omitempty"`

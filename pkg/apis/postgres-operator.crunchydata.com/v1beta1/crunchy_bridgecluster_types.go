@@ -1,5 +1,5 @@
 /*
- Copyright 2021 - 2023 Crunchy Data Solutions, Inc.
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -32,6 +32,11 @@ type CrunchyBridgeClusterSpec struct {
 	// +kubebuilder:validation:Required
 	IsHA bool `json:"isHa"`
 
+	// Whether the cluster is protected. Protected clusters can't be destroyed until
+	// their protected flag is removed
+	// +optional
+	IsProtected bool `json:"isProtected,omitempty"`
+
 	// The name of the cluster
 	// ---
 	// According to Bridge API/GUI errors,
@@ -59,10 +64,12 @@ type CrunchyBridgeClusterSpec struct {
 	// Currently Bridge offers aws, azure, and gcp only
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={aws,azure,gcp}
+	// +kubebuilder:validation:XValidation:rule=`self == oldSelf`,message="immutable"
 	Provider string `json:"provider"`
 
 	// The provider region where the cluster is located.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule=`self == oldSelf`,message="immutable"
 	Region string `json:"region"`
 
 	// Roles for which to create Secrets that contain their credentials which
@@ -183,8 +190,6 @@ type UpgradeOperation struct {
 // CrunchyBridgeClusterStatus condition types.
 const (
 	ConditionUnknown   = ""
-	ConditionPending   = "Pending"
-	ConditionCreating  = "Creating"
 	ConditionUpgrading = "Upgrading"
 	ConditionReady     = "Ready"
 	ConditionDeleting  = "Deleting"
@@ -195,7 +200,6 @@ const (
 // +operator-sdk:csv:customresourcedefinitions:resources={{ConfigMap,v1},{Secret,v1},{Service,v1},{CronJob,v1beta1},{Deployment,v1},{Job,v1},{StatefulSet,v1},{PersistentVolumeClaim,v1}}
 
 // CrunchyBridgeCluster is the Schema for the crunchybridgeclusters API
-// This Custom Resource requires enabling CrunchyBridgeClusters feature gate
 type CrunchyBridgeCluster struct {
 	// ObjectMeta.Name is a DNS subdomain.
 	// - https://docs.k8s.io/concepts/overview/working-with-objects/names/#dns-subdomain-names

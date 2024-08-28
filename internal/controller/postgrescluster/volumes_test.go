@@ -1,6 +1,3 @@
-//go:build envtest
-// +build envtest
-
 /*
  Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,10 +41,7 @@ import (
 )
 
 func TestHandlePersistentVolumeClaimError(t *testing.T) {
-	scheme, err := runtime.CreatePostgresOperatorScheme()
-	assert.NilError(t, err)
-
-	recorder := events.NewRecorder(t, scheme)
+	recorder := events.NewRecorder(t, runtime.Scheme)
 	reconciler := &Reconciler{
 		Recorder: recorder,
 	}
@@ -414,8 +408,7 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 				Name: "instance1",
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteMany,
-					},
+						corev1.ReadWriteMany},
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -486,7 +479,7 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 		assert.Assert(t, len(clusterVolumes) == 1)
 
 		// observe again, but allow time for the change to be observed
-		err = wait.Poll(time.Second/2, Scale(time.Second*15), func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*15), false, func(ctx context.Context) (bool, error) {
 			clusterVolumes, err = r.observePersistentVolumeClaims(ctx, cluster)
 			return len(clusterVolumes) == 1, err
 		})
@@ -552,7 +545,7 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 		assert.Assert(t, len(clusterVolumes) == 2)
 
 		// observe again, but allow time for the change to be observed
-		err = wait.Poll(time.Second/2, Scale(time.Second*15), func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*15), false, func(ctx context.Context) (bool, error) {
 			clusterVolumes, err = r.observePersistentVolumeClaims(ctx, cluster)
 			return len(clusterVolumes) == 2, err
 		})
@@ -620,7 +613,7 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 		assert.Assert(t, len(clusterVolumes) == 3)
 
 		// observe again, but allow time for the change to be observed
-		err = wait.Poll(time.Second/2, Scale(time.Second*15), func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*15), false, func(ctx context.Context) (bool, error) {
 			clusterVolumes, err = r.observePersistentVolumeClaims(ctx, cluster)
 			return len(clusterVolumes) == 3, err
 		})
@@ -698,8 +691,7 @@ func TestReconcileMoveDirectories(t *testing.T) {
 				PriorityClassName: initialize.String("some-priority-class"),
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteMany,
-					},
+						corev1.ReadWriteMany},
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -787,6 +779,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   terminationMessagePath: /dev/termination-log
   terminationMessagePolicy: File
   volumeMounts:
@@ -845,6 +839,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   terminationMessagePath: /dev/termination-log
   terminationMessagePolicy: File
   volumeMounts:
@@ -905,6 +901,8 @@ containers:
     privileged: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   terminationMessagePath: /dev/termination-log
   terminationMessagePolicy: File
   volumeMounts:

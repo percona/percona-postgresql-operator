@@ -5,7 +5,7 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     app.kubernetes.io/name: pgo
-    app.kubernetes.io/version: 5.5.1
+    app.kubernetes.io/version: latest
   name: pgupgrades.postgres-operator.crunchydata.com
 spec:
   group: postgres-operator.crunchydata.com

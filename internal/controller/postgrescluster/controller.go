@@ -1,29 +1,27 @@
-package postgrescluster
-
 /*
-Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+ Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
 
-http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
 */
+
+package postgrescluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"os"
-	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -37,12 +35,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
@@ -52,7 +51,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/internal/util"
+	"github.com/percona/percona-postgresql-operator/internal/registration"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -66,20 +65,18 @@ type Reconciler struct {
 	Client      client.Client
 	IsOpenShift bool
 	Owner       client.FieldOwner
-	PGOVersion  string
 	PodExec     func(
-		namespace, pod, container string,
+		ctx context.Context, namespace, pod, container string,
 		stdin io.Reader, stdout, stderr io.Writer, command ...string,
 	) error
-	Recorder        record.EventRecorder
-	Registration    util.Registration
-	RegistrationURL string
-	Tracer          trace.Tracer
+	Recorder     record.EventRecorder
+	Registration registration.Registration
+	Tracer       trace.Tracer
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
 // +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get,list,watch}
-// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters/status",verbs={patch,update}
+// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters/status",verbs={patch}
 
 // Reconcile reconciles a ConfigMap in a namespace managed by the PostgreSQL Operator
 func (r *Reconciler) Reconcile(
@@ -88,15 +85,6 @@ func (r *Reconciler) Reconcile(
 	ctx, span := r.Tracer.Start(ctx, "Reconcile")
 	log := logging.FromContext(ctx)
 	defer span.End()
-
-	// create the result that will be updated following a call to each reconciler
-	result := reconcile.Result{}
-	updateResult := func(next reconcile.Result, err error) error {
-		if err == nil {
-			result = updateReconcileResult(result, next)
-		}
-		return err
-	}
 
 	// get the postgrescluster from the cache
 	cluster := &v1beta1.PostgresCluster{}
@@ -108,7 +96,7 @@ func (r *Reconciler) Reconcile(
 			log.Error(err, "unable to fetch PostgresCluster")
 			span.RecordError(err)
 		}
-		return result, err
+		return runtime.ErrorWithBackoff(err)
 	}
 
 	// Set any defaults that may not have been stored in the API. No DeepCopy
@@ -134,15 +122,10 @@ func (r *Reconciler) Reconcile(
 	if result, err := r.handleDelete(ctx, cluster); err != nil {
 		span.RecordError(err)
 		log.Error(err, "deleting")
-		return reconcile.Result{}, err
+		return runtime.ErrorWithBackoff(err)
 
 	} else if result != nil {
 		if log := log.V(1); log.Enabled() {
-			if result.RequeueAfter > 0 {
-				// RequeueAfter implies Requeue, but set both to make the next
-				// log message more clear.
-				result.Requeue = true
-			}
 			log.Info("deleting", "result", fmt.Sprintf("%+v", *result))
 		}
 		return *result, nil
@@ -159,9 +142,8 @@ func (r *Reconciler) Reconcile(
 			err.Error())
 		// specifically allow reconciliation if the cluster is shutdown to
 		// facilitate upgrades, otherwise return
-		if cluster.Spec.Shutdown == nil ||
-			(cluster.Spec.Shutdown != nil && !*cluster.Spec.Shutdown) {
-			return result, err
+		if !initialize.FromPointer(cluster.Spec.Shutdown) {
+			return runtime.ErrorWithBackoff(err)
 		}
 	}
 
@@ -174,9 +156,8 @@ func (r *Reconciler) Reconcile(
 		// this configuration and provide an event
 		path := field.NewPath("spec", "standby")
 		err := field.Invalid(path, cluster.Name, "Standby requires a host or repoName to be enabled")
-		r.Recorder.Event(cluster, corev1.EventTypeWarning, "InvalidStandbyConfiguration",
-			err.Error())
-		return result, err
+		r.Recorder.Event(cluster, corev1.EventTypeWarning, "InvalidStandbyConfiguration", err.Error())
+		return runtime.ErrorWithBackoff(err)
 	}
 
 	var (
@@ -197,52 +178,25 @@ func (r *Reconciler) Reconcile(
 		err                      error
 	)
 
-	// Define a function for updating PostgresCluster status. Returns any error that
-	// occurs while attempting to patch the status, while otherwise simply returning the
-	// Result and error variables that are populated while reconciling the PostgresCluster.
-	patchClusterStatus := func() (reconcile.Result, error) {
+	patchClusterStatus := func() error {
 		if !equality.Semantic.DeepEqual(before.Status, cluster.Status) {
 			// NOTE(cbandy): Kubernetes prior to v1.16.10 and v1.17.6 does not track
 			// managed fields on the status subresource: https://issue.k8s.io/88901
-			if err := errors.WithStack(r.Client.Status().Patch(
-				ctx, cluster, client.MergeFrom(before), r.Owner)); err != nil {
+			if err := r.Client.Status().Patch(
+				ctx, cluster, client.MergeFrom(before), r.Owner); err != nil {
 				log.Error(err, "patching cluster status")
-				return result, err
+				return err
 			}
 			log.V(1).Info("patched cluster status")
 		}
-		return result, err
+		return nil
 	}
 
-	if config.RegistrationRequired() && !r.registrationValid() {
-		if !registrationRequiredStatusFound(cluster) {
-			addRegistrationRequiredStatus(cluster, r.PGOVersion)
-			return patchClusterStatus()
-		}
-
-		if r.tokenAuthenticationFailed() {
-			r.Recorder.Event(cluster, corev1.EventTypeWarning, "Token Authentication Failed", "See "+r.RegistrationURL+" for details.")
-		}
-
-		if shouldEncumberReconciliation(r.Registration.Authenticated, cluster, r.PGOVersion) {
-			emitEncumbranceWarning(cluster, r)
-			// Encumbrance is just an early return from the reconciliation loop.
-			return patchClusterStatus()
-		} else {
-			emitAdvanceWarning(cluster, r)
-		}
+	if r.Registration != nil && r.Registration.Required(r.Recorder, cluster, &cluster.Status.Conditions) {
+		registration.SetAdvanceWarning(r.Recorder, cluster, &cluster.Status.Conditions)
 	}
-
-	if config.RegistrationRequired() && r.registrationValid() {
-		if tokenRequiredConditionFound(cluster) {
-			meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.TokenRequired)
-		}
-
-		if registrationRequiredStatusFound(cluster) {
-			cluster.Status.RegistrationRequired = nil
-			r.Recorder.Event(cluster, corev1.EventTypeNormal, "Token Verified", "Thank you for registering your installation of Crunchy Postgres for Kubernetes.")
-		}
-	}
+	cluster.Status.RegistrationRequired = nil
+	cluster.Status.TokenRequired = ""
 
 	// if the cluster is paused, set a condition and return
 	if cluster.Spec.Paused != nil && *cluster.Spec.Paused {
@@ -254,7 +208,7 @@ func (r *Reconciler) Reconcile(
 
 			ObservedGeneration: cluster.GetGeneration(),
 		})
-		return patchClusterStatus()
+		return runtime.ErrorWithBackoff(patchClusterStatus())
 	} else {
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
 	}
@@ -288,10 +242,9 @@ func (r *Reconciler) Reconcile(
 		// return a bool indicating that the controller should return early while any
 		// required Jobs are running, after which it will indicate that an early
 		// return is no longer needed, and reconciliation can proceed normally.
-		var returnEarly bool
-		returnEarly, err = r.reconcileDirMoveJobs(ctx, cluster)
+		returnEarly, err := r.reconcileDirMoveJobs(ctx, cluster)
 		if err != nil || returnEarly {
-			return patchClusterStatus()
+			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
 		}
 	}
 	if err == nil {
@@ -303,8 +256,14 @@ func (r *Reconciler) Reconcile(
 	if err == nil {
 		instances, err = r.observeInstances(ctx, cluster)
 	}
+
+	result := reconcile.Result{}
+
 	if err == nil {
-		err = updateResult(r.reconcilePatroniStatus(ctx, cluster, instances))
+		var requeue time.Duration
+		if requeue, err = r.reconcilePatroniStatus(ctx, cluster, instances); err == nil && requeue > 0 {
+			result.RequeueAfter = requeue
+		}
 	}
 	if err == nil {
 		err = r.reconcilePatroniSwitchover(ctx, cluster, instances)
@@ -333,10 +292,9 @@ func (r *Reconciler) Reconcile(
 		// the controller should return early while data initialization is in progress, after
 		// which it will indicate that an early return is no longer needed, and reconciliation
 		// can proceed normally.
-		var returnEarly bool
-		returnEarly, err = r.reconcileDataSource(ctx, cluster, instances, clusterVolumes, rootCA)
+		returnEarly, err := r.reconcileDataSource(ctx, cluster, instances, clusterVolumes, rootCA)
 		if err != nil || returnEarly {
-			return patchClusterStatus()
+			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
 		}
 	}
 	if err == nil {
@@ -387,7 +345,13 @@ func (r *Reconciler) Reconcile(
 	}
 
 	if err == nil {
-		err = updateResult(r.reconcilePGBackRest(ctx, cluster, instances, rootCA))
+		var next reconcile.Result
+		if next, err = r.reconcilePGBackRest(ctx, cluster, instances, rootCA); err == nil && !next.IsZero() {
+			result.Requeue = result.Requeue || next.Requeue
+			if next.RequeueAfter > 0 {
+				result.RequeueAfter = next.RequeueAfter
+			}
+		}
 	}
 	if err == nil {
 		err = r.reconcilePGBouncer(ctx, cluster, instances, primaryCertificate, rootCA)
@@ -413,21 +377,7 @@ func (r *Reconciler) Reconcile(
 
 	log.V(1).Info("reconciled cluster")
 
-	return patchClusterStatus()
-}
-
-func (r *Reconciler) tokenAuthenticationFailed() bool {
-	return r.Registration.TokenFileFound && r.Registration.Authenticated
-}
-
-func (r *Reconciler) registrationValid() bool {
-	expiry := r.Registration.Exp
-	authenticated := r.Registration.Authenticated
-	// Use epoch time in seconds, consistent with RFC 7519.
-	now := time.Now().Unix()
-	expired := expiry < now
-
-	return authenticated && !expired
+	return result, errors.Join(err, patchClusterStatus())
 }
 
 // deleteControlled safely deletes object when it is controlled by cluster.
@@ -499,30 +449,14 @@ func (r *Reconciler) setOwnerReference(
 func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 	if r.PodExec == nil {
 		var err error
-		r.PodExec, err = newPodExecutor(mgr.GetConfig())
+		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
 		if err != nil {
 			return err
 		}
 	}
 
-	var opts controller.Options
-
-	// TODO(cbandy): Move this to main with controller-runtime v0.9+
-	// - https://github.com/kubernetes-sigs/controller-runtime/commit/82fc2564cf
-	if s := os.Getenv("PGO_WORKERS"); s != "" {
-		if i, err := strconv.Atoi(s); err == nil && i > 0 {
-			opts.MaxConcurrentReconciles = i
-		} else {
-			mgr.GetLogger().Error(err, "PGO_WORKERS must be a positive number")
-		}
-	}
-	if opts.MaxConcurrentReconciles == 0 {
-		opts.MaxConcurrentReconciles = 2
-	}
-
 	return builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
-		WithOptions(opts).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Endpoints{}).
 		Owns(&corev1.PersistentVolumeClaim{}).

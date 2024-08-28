@@ -104,11 +104,13 @@ func ManagedInstallationReconciler(m manager.Manager, newClient func() *Client) 
 		// Wake periodically even when that Secret does not exist.
 		WatchesRawSource(
 			runtime.NewTickerImmediate(time.Hour, event.GenericEvent{},
-				handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
-					return []reconcile.Request{{NamespacedName: reconciler.SecretRef}}
-				})),
+				handler.EnqueueRequestsFromMapFunc(
+					func(context.Context, client.Object) []reconcile.Request {
+						return []reconcile.Request{{NamespacedName: reconciler.SecretRef}}
+					},
+				),
+			),
 		).
-		//
 		Complete(reconciler)
 }
 
@@ -128,13 +130,15 @@ func (r *InstallationReconciler) Reconcile(
 		result.RequeueAfter, err = r.reconcile(ctx, secret)
 	}
 
-	// TODO: Check for corev1.NamespaceTerminatingCause after
-	// k8s.io/apimachinery@v0.25; see https://issue.k8s.io/108528.
+	// Nothing can be written to a deleted namespace.
+	if err != nil && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+		return runtime.ErrorWithoutBackoff(err)
+	}
 
 	// Write conflicts are returned as errors; log and retry with backoff.
 	if err != nil && apierrors.IsConflict(err) {
 		logging.FromContext(ctx).Info("Requeue", "reason", err)
-		err, result.Requeue, result.RequeueAfter = nil, true, 0
+		return runtime.RequeueWithBackoff(), nil
 	}
 
 	return result, err
