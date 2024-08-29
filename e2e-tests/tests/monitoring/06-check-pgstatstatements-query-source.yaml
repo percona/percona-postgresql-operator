@@ -9,7 +9,7 @@ commands:
 
       kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=merge -p '{"spec":{"pmm":{"querySource":"pgstatstatements"}}}'
 
-      sleep 60
+      sleep 120
 
       primary=$(get_pod_by_role ${test_name} master name)
       res=$(kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT extname FROM pg_extension;"')
