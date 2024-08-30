@@ -31,7 +31,7 @@ import (
 // watchForRelatedSecret handles create/update/delete events for secrets,
 // passing the Secret ObjectKey to findCrunchyBridgeClustersForSecret
 func (r *CrunchyBridgeClusterReconciler) watchForRelatedSecret() handler.EventHandler {
-	handle := func(ctx context.Context, secret client.Object, q workqueue.RateLimitingInterface) {
+	handle := func(ctx context.Context, secret client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 		key := client.ObjectKeyFromObject(secret)
 
 		for _, cluster := range r.findCrunchyBridgeClustersForSecret(ctx, key) {
@@ -42,10 +42,10 @@ func (r *CrunchyBridgeClusterReconciler) watchForRelatedSecret() handler.EventHa
 	}
 
 	return handler.Funcs{
-		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.Object, q)
 		},
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.ObjectNew, q)
 		},
 		// If the secret is deleted, we want to reconcile
@@ -54,7 +54,7 @@ func (r *CrunchyBridgeClusterReconciler) watchForRelatedSecret() handler.EventHa
 		// when we reconcile the cluster and can't find the secret.
 		// That way, users will get two alerts: one when the secret is deleted
 		// and another when the cluster is being reconciled.
-		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.Object, q)
 		},
 	}
