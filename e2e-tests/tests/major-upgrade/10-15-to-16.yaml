@@ -17,5 +17,8 @@ commands:
           image: ${IMAGE_UPGRADE}
           fromPostgresVersion: 15
           toPostgresVersion: 16
+          toPostgresImage: $(get_container_image "postgres" 16)
+          toPgBouncerImage: $(get_container_image "pgbouncer" 16)
+          toPgBackRestImage: $(get_container_image "pgbackrest" 16)
       EOF
 
