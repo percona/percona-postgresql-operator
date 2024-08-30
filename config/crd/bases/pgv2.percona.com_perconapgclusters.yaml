@@ -20371,10 +20371,14 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              toPgBackRestImage:
+                description: The image to use for PgBackRest containers after upgrade.
+                type: string
+              toPgBouncerImage:
+                description: The image to use for PgBouncer containers after upgrade.
+                type: string
               toPostgresImage:
-                description: |-
-                  The image name to use for PostgreSQL containers after upgrade.
-                  When omitted, the value comes from an operator environment variable.
+                description: The image to use for PostgreSQL containers after upgrade.
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
@@ -20490,6 +20494,9 @@ spec:
             - fromPostgresVersion
             - image
             - postgresClusterName
+            - toPgBackRestImage
+            - toPgBouncerImage
+            - toPostgresImage
             - toPostgresVersion
             type: object
           status:
