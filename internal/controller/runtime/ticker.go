@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -34,13 +35,15 @@ type ticker struct {
 
 // NewTicker returns a Source that emits e every d.
 func NewTicker(d time.Duration, e event.GenericEvent,
-	h handler.EventHandler) source.Source {
+	h handler.EventHandler,
+) source.Source {
 	return &ticker{Duration: d, GenericEvent: e, Handler: h}
 }
 
 // NewTickerImmediate returns a Source that emits e at start and every d.
 func NewTickerImmediate(d time.Duration, e event.GenericEvent,
-	h handler.EventHandler) source.Source {
+	h handler.EventHandler,
+) source.Source {
 	return &ticker{Duration: d, GenericEvent: e, Handler: h, Immediate: true}
 }
 
@@ -49,7 +52,7 @@ func (t ticker) String() string { return "every " + t.Duration.String() }
 // Start is called by controller-runtime Controller and returns quickly.
 // It cleans up when ctx is cancelled.
 func (t ticker) Start(
-	ctx context.Context, q workqueue.RateLimitingInterface,
+	ctx context.Context, q workqueue.TypedRateLimitingInterface[reconcile.Request],
 ) error {
 	ticker := time.NewTicker(t.Duration)
 
