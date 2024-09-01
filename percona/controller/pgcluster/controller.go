@@ -2,8 +2,6 @@ package pgcluster
 
 import (
 	"context"
-
-	// #nosec G501
 	"crypto/md5"
 	"fmt"
 	"reflect"
@@ -80,16 +78,16 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
-		Watches(&corev1.Service{}, r.watchServices()).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Service{}, r.watchServices())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
 		Complete(r)
 }
 
-func (r *PGClusterReconciler) watchServices() handler.Funcs {
-	return handler.Funcs{
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (r *PGClusterReconciler) watchServices() handler.TypedFuncs[*corev1.Service, reconcile.Request] {
+	return handler.TypedFuncs[*corev1.Service, reconcile.Request]{
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Service], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 
@@ -103,9 +101,9 @@ func (r *PGClusterReconciler) watchServices() handler.Funcs {
 	}
 }
 
-func (r *PGClusterReconciler) watchBackupJobs() handler.TypedFuncs[*batchv1.Job] {
-	return handler.TypedFuncs[*batchv1.Job]{
-		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*batchv1.Job], q workqueue.RateLimitingInterface) {
+func (r *PGClusterReconciler) watchBackupJobs() handler.TypedFuncs[*batchv1.Job, reconcile.Request] {
+	return handler.TypedFuncs[*batchv1.Job, reconcile.Request]{
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*batchv1.Job], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 			repoName := labels[naming.LabelPGBackRestRepo]
@@ -121,16 +119,16 @@ func (r *PGClusterReconciler) watchBackupJobs() handler.TypedFuncs[*batchv1.Job]
 	}
 }
 
-func (r *PGClusterReconciler) watchPGBackups() handler.TypedFuncs[*v2.PerconaPGBackup] {
-	return handler.TypedFuncs[*v2.PerconaPGBackup]{
-		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*v2.PerconaPGBackup], q workqueue.RateLimitingInterface) {
+func (r *PGClusterReconciler) watchPGBackups() handler.TypedFuncs[*v2.PerconaPGBackup, reconcile.Request] {
+	return handler.TypedFuncs[*v2.PerconaPGBackup, reconcile.Request]{
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*v2.PerconaPGBackup], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			pgBackup := e.ObjectNew
 			q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 				Namespace: pgBackup.GetNamespace(),
 				Name:      pgBackup.Spec.PGCluster,
 			}})
 		},
-		DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[*v2.PerconaPGBackup], q workqueue.RateLimitingInterface) {
+		DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[*v2.PerconaPGBackup], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			pgBackup := e.Object
 			q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 				Namespace: pgBackup.GetNamespace(),
@@ -140,9 +138,9 @@ func (r *PGClusterReconciler) watchPGBackups() handler.TypedFuncs[*v2.PerconaPGB
 	}
 }
 
-func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret] {
-	return handler.TypedFuncs[*corev1.Secret]{
-		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Secret], q workqueue.RateLimitingInterface) {
+func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, reconcile.Request] {
+	return handler.TypedFuncs[*corev1.Secret, reconcile.Request]{
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Secret], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
 

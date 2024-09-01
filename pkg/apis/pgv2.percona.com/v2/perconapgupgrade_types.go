@@ -68,10 +68,17 @@ type PerconaPGUpgradeSpec struct {
 	// +kubebuilder:validation:Maximum=16
 	ToPostgresVersion int `json:"toPostgresVersion"`
 
-	// The image name to use for PostgreSQL containers after upgrade.
-	// When omitted, the value comes from an operator environment variable.
-	// +optional
-	ToPostgresImage string `json:"toPostgresImage,omitempty"`
+	// The image to use for PostgreSQL containers after upgrade.
+	// +required
+	ToPostgresImage string `json:"toPostgresImage"`
+
+	// The image to use for PgBouncer containers after upgrade.
+	// +required
+	ToPgBouncerImage string `json:"toPgBouncerImage"`
+
+	// The image to use for PgBackRest containers after upgrade.
+	// +required
+	ToPgBackRestImage string `json:"toPgBackRestImage"`
 
 	// Resource requirements for the PGUpgrade container.
 	// +optional

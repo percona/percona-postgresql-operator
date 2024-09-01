@@ -23,15 +23,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 // watchPostgresClusters returns a [handler.EventHandler] for PostgresClusters.
 func (r *PGAdminReconciler) watchPostgresClusters() handler.Funcs {
-	handle := func(ctx context.Context, cluster client.Object, q workqueue.RateLimitingInterface) {
+	handle := func(ctx context.Context, cluster client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 		for _, pgadmin := range r.findPGAdminsForPostgresCluster(ctx, cluster) {
-
 			q.Add(ctrl.Request{
 				NamespacedName: client.ObjectKeyFromObject(pgadmin),
 			})
@@ -39,13 +39,13 @@ func (r *PGAdminReconciler) watchPostgresClusters() handler.Funcs {
 	}
 
 	return handler.Funcs{
-		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.Object, q)
 		},
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.ObjectNew, q)
 		},
-		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.Object, q)
 		},
 	}
@@ -54,7 +54,7 @@ func (r *PGAdminReconciler) watchPostgresClusters() handler.Funcs {
 // watchForRelatedSecret handles create/update/delete events for secrets,
 // passing the Secret ObjectKey to findPGAdminsForSecret
 func (r *PGAdminReconciler) watchForRelatedSecret() handler.EventHandler {
-	handle := func(ctx context.Context, secret client.Object, q workqueue.RateLimitingInterface) {
+	handle := func(ctx context.Context, secret client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 		key := client.ObjectKeyFromObject(secret)
 
 		for _, pgadmin := range r.findPGAdminsForSecret(ctx, key) {
@@ -65,10 +65,10 @@ func (r *PGAdminReconciler) watchForRelatedSecret() handler.EventHandler {
 	}
 
 	return handler.Funcs{
-		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.Object, q)
 		},
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.ObjectNew, q)
 		},
 		// If the secret is deleted, we want to reconcile
@@ -77,7 +77,7 @@ func (r *PGAdminReconciler) watchForRelatedSecret() handler.EventHandler {
 		// when we reconcile the cluster and can't find the secret.
 		// That way, users will get two alerts: one when the secret is deleted
 		// and another when the cluster is being reconciled.
-		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.Object, q)
 		},
 	}
