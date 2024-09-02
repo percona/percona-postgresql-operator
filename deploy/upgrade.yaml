@@ -7,3 +7,6 @@ spec:
   image: perconalab/percona-postgresql-operator:main-upgrade
   fromPostgresVersion: 15
   toPostgresVersion: 16
+  toPostgresImage: perconalab/percona-postgresql-operator:main-ppg16-postgres
+  toPgBouncerImage: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
+  toPgBackRestImage: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
