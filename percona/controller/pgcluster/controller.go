@@ -455,9 +455,7 @@ func (r *PGClusterReconciler) reconcileExternalWatchers(ctx context.Context, cr 
 		return errors.Wrap(err, "start external watchers")
 	}
 
-	if err := r.stopExternalWatcher(ctx, cr); err != nil {
-		return errors.Wrap(err, "stop external watcher")
-	}
+	r.stopExternalWatcher(ctx, cr)
 
 	return nil
 }
@@ -485,15 +483,15 @@ func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.
 	return nil
 }
 
-func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.PerconaPGCluster) {
 	log := logging.FromContext(ctx)
 	if *cr.Spec.Backups.TrackLatestRestorableTime {
-		return nil
+		return
 	}
 
 	watcherName, _ := watcher.GetWALWatcher(cr)
 	if !r.Watchers.IsExist(watcherName) {
-		return nil
+		return
 	}
 
 	select {
@@ -504,8 +502,6 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 	}
 
 	r.Watchers.Remove(watcherName)
-
-	return nil
 }
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
