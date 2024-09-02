@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
@@ -92,7 +93,7 @@ func (r *PGUpgradeReconciler) findUpgradesForPostgresCluster(
 
 // watchPostgresClusters returns a [handler.EventHandler] for PostgresClusters.
 func (r *PGUpgradeReconciler) watchPostgresClusters() handler.Funcs {
-	handle := func(ctx context.Context, cluster client.Object, q workqueue.RateLimitingInterface) {
+	handle := func(ctx context.Context, cluster client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 		key := client.ObjectKeyFromObject(cluster)
 
 		for _, upgrade := range r.findUpgradesForPostgresCluster(ctx, key) {
@@ -103,13 +104,13 @@ func (r *PGUpgradeReconciler) watchPostgresClusters() handler.Funcs {
 	}
 
 	return handler.Funcs{
-		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.Object, q)
 		},
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.ObjectNew, q)
 		},
-		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			handle(ctx, e.Object, q)
 		},
 	}
