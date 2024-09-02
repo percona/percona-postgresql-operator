@@ -350,29 +350,29 @@ type PostgresInstanceSetStatus struct {
 	Name string `json:"name"`
 
 	// +kubebuilder:validation:Required
-	Size int32 `json:"size,omitempty"`
+	Size int32 `json:"size"`
 
 	// +kubebuilder:validation:Required
-	Ready int32 `json:"ready,omitempty"`
+	Ready int32 `json:"ready"`
 }
 
 type PostgresStatus struct {
 	// +kubebuilder:validation:Required
-	Size int32 `json:"size,omitempty"`
+	Size int32 `json:"size"`
 
 	// +kubebuilder:validation:Required
-	Ready int32 `json:"ready,omitempty"`
+	Ready int32 `json:"ready"`
 
 	// +kubebuilder:validation:Required
-	InstanceSets []PostgresInstanceSetStatus `json:"instances,omitempty"`
+	InstanceSets []PostgresInstanceSetStatus `json:"instances"`
 }
 
 type PGBouncerStatus struct {
 	// +kubebuilder:validation:Required
-	Size int32 `json:"size,omitempty"`
+	Size int32 `json:"size"`
 
 	// +kubebuilder:validation:Required
-	Ready int32 `json:"ready,omitempty"`
+	Ready int32 `json:"ready"`
 }
 
 type PerconaPGClusterStatus struct {
