@@ -225,7 +225,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile backups")
 	}
 
-	if err := r.reconcilePMM(ctx, cr, postgresCluster); err != nil {
+	if err := r.reconcilePMM(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
 	}
 
@@ -278,7 +278,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	return ctrl.Result{}, nil
 }
 
-func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPGCluster, postgresCluster *v1beta1.PostgresCluster) error {
+func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if !cr.PMMEnabled() {
 		return nil
 	}
