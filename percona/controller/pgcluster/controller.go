@@ -341,12 +341,6 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
 	}
 
-	if cr.Spec.PMM.QuerySource == v2.PgStatStatements {
-		postgresCluster.Spec.Extensions.PGStatStatements = true
-	} else {
-		postgresCluster.Spec.Extensions.PGStatStatements = false
-	}
-
 	return nil
 }
 
