@@ -14013,6 +14013,7 @@ spec:
                 required:
                 - enabled
                 - image
+                - querySource
                 - secret
                 - serverHost
                 type: object
