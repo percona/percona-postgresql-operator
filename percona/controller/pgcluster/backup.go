@@ -90,7 +90,10 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job); err != nil {
 				return errors.Wrap(err, "get backup job")
 			}
-			if err := r.Client.Delete(ctx, job); err != nil {
+			prop := metav1.DeletePropagationForeground
+			if err := r.Client.Delete(ctx, job, &client.DeleteOptions{
+				PropagationPolicy: &prop,
+			}); err != nil {
 				return errors.Wrapf(err, "delete job %s/%s", job.Name, job.Namespace)
 			}
 			if err := r.Client.Delete(ctx, &pgBackup); err != nil {
