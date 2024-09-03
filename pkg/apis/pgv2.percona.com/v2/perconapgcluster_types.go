@@ -200,6 +200,11 @@ func (cr *PerconaPGCluster) Default() {
 	}
 	cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	t := true
+
+	if cr.Spec.Backups.TrackLatestRestorableTime == nil {
+		cr.Spec.Backups.TrackLatestRestorableTime = &t
+	}
 	if cr.Spec.Backups.PGBackRest.Metadata == nil {
 		cr.Spec.Backups.PGBackRest.Metadata = new(crunchyv1beta1.Metadata)
 	}
@@ -208,7 +213,6 @@ func (cr *PerconaPGCluster) Default() {
 	}
 	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
-	t := true
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
 	}
@@ -393,6 +397,9 @@ type Backups struct {
 	// pgBackRest archive configuration
 	// +kubebuilder:validation:Required
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
+
+	// Enable tracking latest restorable time
+	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
 }
 
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
