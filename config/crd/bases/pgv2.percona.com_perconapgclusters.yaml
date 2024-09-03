@@ -13941,6 +13941,7 @@ spec:
                     - IfNotPresent
                     type: string
                   querySource:
+                    default: pgstatmonitor
                     enum:
                     - pgstatmonitor
                     - pgstatstatements

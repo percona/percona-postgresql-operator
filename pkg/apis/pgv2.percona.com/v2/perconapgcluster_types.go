@@ -519,6 +519,7 @@ type PMMSpec struct {
 	Secret string `json:"secret,omitempty"`
 
 	// +kubebuilder:validation:Enum={pgstatmonitor,pgstatstatements}
+	// +kubebuilder:default=pgstatmonitor
 	// +kubebuilder:validation:Required
 	QuerySource PMMQuerySource `json:"querySource,omitempty"`
 
