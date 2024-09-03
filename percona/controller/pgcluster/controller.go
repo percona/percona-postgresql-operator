@@ -213,7 +213,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
-	if err := r.startExternalWatchers(ctx, cr); err != nil {
+	if err := r.reconcileExternalWatchers(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "start external watchers")
 	}
 
@@ -450,7 +450,21 @@ func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGClus
 	return false, nil
 }
 
+func (r *PGClusterReconciler) reconcileExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if err := r.startExternalWatchers(ctx, cr); err != nil {
+		return errors.Wrap(err, "start external watchers")
+	}
+
+	r.stopExternalWatcher(ctx, cr)
+
+	return nil
+}
+
 func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if !*cr.Spec.Backups.TrackLatestRestorableTime {
+		return nil
+	}
+
 	log := logging.FromContext(ctx)
 
 	watcherName, watcherFunc := watcher.GetWALWatcher(cr)
@@ -469,6 +483,27 @@ func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.
 	return nil
 }
 
+func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.PerconaPGCluster) {
+	log := logging.FromContext(ctx)
+	if *cr.Spec.Backups.TrackLatestRestorableTime {
+		return
+	}
+
+	watcherName, _ := watcher.GetWALWatcher(cr)
+	if !r.Watchers.IsExist(watcherName) {
+		return
+	}
+
+	select {
+	case r.StopExternalWatchers <- event.DeleteEvent{Object: cr}:
+		log.Info("External watcher is stopped", "cluster", cr.Name, "namespace", cr.Namespace, "watcher", watcherName)
+	default:
+		log.Info("External watcher is already stopped", "cluster", cr.Name, "namespace", cr.Namespace, "watcher", watcherName)
+	}
+
+	r.Watchers.Remove(watcherName)
+}
+
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	for _, finalizer := range cr.Finalizers {
 		if finalizer == v2.FinalizerStopWatchers {
@@ -476,10 +511,12 @@ func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.Perco
 		}
 	}
 
-	orig := cr.DeepCopy()
-	cr.Finalizers = append(cr.Finalizers, v2.FinalizerStopWatchers)
-	if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "patch finalizers")
+	if *cr.Spec.Backups.TrackLatestRestorableTime {
+		orig := cr.DeepCopy()
+		cr.Finalizers = append(cr.Finalizers, v2.FinalizerStopWatchers)
+		if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
+			return errors.Wrap(err, "patch finalizers")
+		}
 	}
 
 	return nil
