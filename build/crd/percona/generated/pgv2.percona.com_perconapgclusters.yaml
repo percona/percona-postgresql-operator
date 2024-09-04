@@ -17346,14 +17346,10 @@ spec:
                   size:
                     format: int32
                     type: integer
-                  updated:
-                    format: int32
-                    type: integer
                 required:
                 - instances
                 - ready
                 - size
-                - updated
                 type: object
               state:
                 type: string

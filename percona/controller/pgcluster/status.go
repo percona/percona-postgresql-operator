@@ -57,7 +57,11 @@ func (r *PGClusterReconciler) getState(cr *v2.PerconaPGCluster, status *v2.Perco
 		return v2.AppStateInit
 	}
 
-	if status.Postgres.Updated != status.Postgres.Size {
+	var updatedPods int32
+	for _, is := range crunchyStatus.InstanceSets {
+		updatedPods += is.UpdatedReplicas
+	}
+	if updatedPods != status.Postgres.Size {
 		return v2.AppStateInit
 	}
 
@@ -74,27 +78,17 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		return errors.Wrap(err, "get app host")
 	}
 
-	pgStatusFromCrunchy := func() v2.PostgresStatus {
-		var size, ready, updated int32
-		ss := make([]v2.PostgresInstanceSetStatus, 0, len(status.InstanceSets))
-		for _, is := range status.InstanceSets {
-			ss = append(ss, v2.PostgresInstanceSetStatus{
-				Name:  is.Name,
-				Size:  is.Replicas,
-				Ready: is.ReadyReplicas,
-			})
+	var size, ready int32
+	ss := make([]v2.PostgresInstanceSetStatus, 0, len(status.InstanceSets))
+	for _, is := range status.InstanceSets {
+		ss = append(ss, v2.PostgresInstanceSetStatus{
+			Name:  is.Name,
+			Size:  is.Replicas,
+			Ready: is.ReadyReplicas,
+		})
 
-			size += is.Replicas
-			ready += is.ReadyReplicas
-			updated += is.UpdatedReplicas
-		}
-
-		return v2.PostgresStatus{
-			Size:         size,
-			Ready:        ready,
-			Updated:      updated,
-			InstanceSets: ss,
-		}
+		size += is.Replicas
+		ready += is.ReadyReplicas
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -107,7 +101,11 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		}
 
 		cluster.Status = v2.PerconaPGClusterStatus{
-			Postgres: pgStatusFromCrunchy(),
+			Postgres: v2.PostgresStatus{
+				Size:         size,
+				Ready:        ready,
+				InstanceSets: ss,
+			},
 			PGBouncer: v2.PGBouncerStatus{
 				Size:  status.Proxy.PGBouncer.Replicas,
 				Ready: status.Proxy.PGBouncer.ReadyReplicas,
