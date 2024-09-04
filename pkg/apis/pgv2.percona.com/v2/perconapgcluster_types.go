@@ -363,7 +363,7 @@ type PostgresStatus struct {
 	Ready int32 `json:"ready"`
 
 	// +kubebuilder:validation:Required
-	Updated int32 `json:"updated,omitempty"`
+	Updated int32 `json:"updated"`
 
 	// +kubebuilder:validation:Required
 	InstanceSets []PostgresInstanceSetStatus `json:"instances"`
