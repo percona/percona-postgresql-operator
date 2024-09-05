@@ -13,7 +13,3 @@ commands:
         | yq '.spec.dataSource.postgresCluster.clusterName="demand-backup"' \
         | yq '.spec.dataSource.postgresCluster.repoName="repo1"' \
         | kubectl -n "${NAMESPACE}" apply -f -
-
-
-
-      
