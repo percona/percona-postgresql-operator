@@ -107,3 +107,14 @@ status:
     ready: 3
     size: 3
   state: ready
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
+metadata:
+  name: start-from-backup-bootstrap
+spec:
+  pgCluster: start-from-backup
+  repoName: repo1
+status:
+  state: Succeeded
+
