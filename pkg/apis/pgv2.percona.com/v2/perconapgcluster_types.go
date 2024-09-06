@@ -319,11 +319,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			})
 		}
 
-		if cr.Spec.PMM.QuerySource == PgStatStatements {
-			postgresCluster.Spec.Extensions.PGStatStatements = true
-		} else {
-			postgresCluster.Spec.Extensions.PGStatStatements = false
-		}
+		postgresCluster.Spec.Extensions.PGStatStatements = cr.Spec.PMM.QuerySource == PgStatStatements
 	}
 
 	postgresCluster.Spec.Users = users
