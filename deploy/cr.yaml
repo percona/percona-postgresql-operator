@@ -8,6 +8,13 @@ metadata:
 spec:
   crVersion: 2.5.0
 #  secrets:
+#    customRootCATLSSecret:
+#      name: cluster1-ca-cert
+#      items:
+#        - key: "tls.crt"
+#          path: "root.crt"
+#        - key: "tls.key"
+#          path: "root.key"
 #    customTLSSecret:
 #      name: cluster1-cert
 #    customReplicationTLSSecret:

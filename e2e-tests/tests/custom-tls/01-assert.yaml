@@ -1,0 +1,45 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 100
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: custom-cert-tls-issue-pg-ca-issuer
+spec:
+  selfSigned: {}
+status:
+  conditions:
+  - observedGeneration: 1
+    reason: IsReady
+    status: "True"
+    type: Ready
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  generation: 1
+  name: custom-cert-tls-issue-ca-cert
+spec:
+  commonName: postgres-operator-ca
+  duration: 26280h0m0s
+  isCA: true
+  issuerRef:
+    kind: Issuer
+    name: custom-cert-tls-issue-pg-ca-issuer
+  renewBefore: 730h0m0s
+  secretName: custom-cert-tls-issue-ca-cert
+  privateKey:
+    algorithm: ECDSA
+    size: 384
+  usages:
+  - cert sign
+  - crl sign
+status:
+  conditions:
+  - message: Certificate is up to date and has not expired
+    observedGeneration: 1
+    reason: Ready
+    status: "True"
+    type: Ready
+  revision: 1

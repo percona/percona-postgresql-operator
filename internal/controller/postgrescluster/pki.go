@@ -50,8 +50,25 @@ func (r *Reconciler) reconcileRootCertificate(
 ) {
 	const keyCertificate, keyPrivateKey = "root.crt", "root.key"
 
-	existing := &corev1.Secret{}
-	existing.Namespace, existing.Name = cluster.Namespace, naming.RootCertSecret
+	existing := &corev1.Secret{
+		ObjectMeta: naming.PostgresRootCASecret(cluster),
+	}
+
+	privateKey := keyPrivateKey
+	certificateKey := keyCertificate
+	if cluster.Spec.CustomRootCATLSSecret != nil {
+		existing.Name = cluster.Spec.CustomRootCATLSSecret.Name
+
+		for _, i := range cluster.Spec.CustomRootCATLSSecret.Items {
+			switch i.Path {
+			case keyCertificate:
+				certificateKey = i.Key
+			case keyPrivateKey:
+				privateKey = i.Key
+			}
+		}
+	}
+
 	err := errors.WithStack(client.IgnoreNotFound(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
 
@@ -61,18 +78,22 @@ func (r *Reconciler) reconcileRootCertificate(
 		// Unmarshal and validate the stored root. These first errors can
 		// be ignored because they result in an invalid root which is then
 		// correctly regenerated.
-		_ = root.Certificate.UnmarshalText(existing.Data[keyCertificate])
-		_ = root.PrivateKey.UnmarshalText(existing.Data[keyPrivateKey])
+		_ = root.Certificate.UnmarshalText(existing.Data[certificateKey])
+		_ = root.PrivateKey.UnmarshalText(existing.Data[privateKey])
 
 		if !pki.RootIsValid(root) {
 			root, err = pki.NewRootCertificateAuthority()
 			err = errors.WithStack(err)
 		}
 	}
+	if cluster.Spec.CustomRootCATLSSecret != nil {
+		return root, err
+	}
 
-	intent := &corev1.Secret{}
+	intent := &corev1.Secret{
+		ObjectMeta: naming.PostgresRootCASecret(cluster),
+	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-	intent.Namespace, intent.Name = cluster.Namespace, naming.RootCertSecret
 	intent.Data = make(map[string][]byte)
 	intent.ObjectMeta.OwnerReferences = existing.ObjectMeta.OwnerReferences
 
