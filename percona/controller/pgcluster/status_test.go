@@ -151,7 +151,6 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 
 		When("PGBackRest RepoHost is not ready", func() {
 			It("state should be initializing", func() {
-
 				updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
 					pgc.Status.PGBackRest = &v1beta1.PGBackRestStatus{
 						RepoHost: &v1beta1.RepoHostStatus{Ready: false},
@@ -229,6 +228,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					pgc.Status.PGBackRest.RepoHost.Ready = true
 					pgc.Status.Proxy.PGBouncer.ReadyReplicas = 1
 					pgc.Status.InstanceSets[0].ReadyReplicas = 1
+					pgc.Status.InstanceSets[0].UpdatedReplicas = 1
 				})
 
 				reconcileAndAssertState(ctx, crNamespacedName, cr, v2.AppStateReady)
@@ -300,10 +300,9 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(pgBouncerSVC), pgBouncerSVC)
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-				pgBouncerSVC.Status.LoadBalancer.Ingress =
-					append(pgBouncerSVC.Status.LoadBalancer.Ingress, corev1.LoadBalancerIngress{
-						IP: "22.22.22.22",
-					})
+				pgBouncerSVC.Status.LoadBalancer.Ingress = append(pgBouncerSVC.Status.LoadBalancer.Ingress, corev1.LoadBalancerIngress{
+					IP: "22.22.22.22",
+				})
 				Expect(k8sClient.Status().Update(ctx, pgBouncerSVC)).Should(Succeed())
 
 				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})

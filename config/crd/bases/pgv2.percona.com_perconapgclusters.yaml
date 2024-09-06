@@ -13940,6 +13940,12 @@ spec:
                     - Never
                     - IfNotPresent
                     type: string
+                  querySource:
+                    default: pgstatmonitor
+                    enum:
+                    - pgstatmonitor
+                    - pgstatstatements
+                    type: string
                   resources:
                     description: Compute resources of a PMM container.
                     properties:
@@ -14008,6 +14014,7 @@ spec:
                 required:
                 - enabled
                 - image
+                - querySource
                 - secret
                 - serverHost
                 type: object
