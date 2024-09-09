@@ -206,7 +206,7 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: agentPrerunScript(),
+				Value: agentPrerunScript(pgc.Spec.PMM.QuerySource),
 			},
 		},
 	}
@@ -221,7 +221,7 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 	return container
 }
 
-func agentPrerunScript() string {
+func agentPrerunScript(querySource v2.PMMQuerySource) string {
 	wait := "pmm-admin status --wait=10s"
 	annotate := "pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'"
 
@@ -237,7 +237,7 @@ func agentPrerunScript() string {
 		"--skip-connection-check",
 		"--metrics-mode=push",
 		"--service-name=$(PMM_AGENT_SETUP_NODE_NAME)",
-		"--query-source=pgstatmonitor",
+		fmt.Sprintf("--query-source=%s", querySource),
 	}
 	addService := fmt.Sprintf("pmm-admin add postgresql %s", strings.Join(addServiceArgs, " "))
 

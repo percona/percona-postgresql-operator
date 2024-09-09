@@ -1,0 +1,26 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: custom-cert-tls-issue-pg-ca-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: custom-cert-tls-issue-ca-cert
+spec:
+  isCA: true
+  commonName: postgres-operator-ca
+  secretName: custom-cert-tls-issue-ca-cert
+  privateKey:
+    algorithm: ECDSA
+    size: 384
+  issuerRef:
+    name: custom-cert-tls-issue-pg-ca-issuer
+    kind: Issuer
+  duration: 26280h0m0s
+  renewBefore: 730h0m0s
+  usages:
+    - "cert sign"
+    - "crl sign"

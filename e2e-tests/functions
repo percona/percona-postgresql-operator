@@ -2,6 +2,7 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
+CERT_MANAGER_VER="1.14.2"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
@@ -704,6 +705,14 @@ wait_cluster_consistency() {
 	done
 }
 
+deploy_cert_manager() {
+	echo 'deploy cert manager'
+	kubectl create namespace cert-manager || :
+	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
+	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false || : 2>/dev/null
+	sleep 70
+}
+
 get_container_image() {
 	local component=$1
 	local pgVersion=$2
@@ -712,9 +721,8 @@ get_container_image() {
 	# if operator version is not a proper version (i.e. 2.5.0) use main
 	# to not force people to create bazillion number of images
 	if [[ ! ${operatorVersion} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-	    operatorVersion=main
+		operatorVersion=main
 	fi
 
 	echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
 }
-

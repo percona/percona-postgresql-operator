@@ -1732,6 +1732,11 @@ func (in *PostgresClusterSpec) DeepCopyInto(out *PostgresClusterSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.Backups.DeepCopyInto(&out.Backups)
+	if in.CustomRootCATLSSecret != nil {
+		in, out := &in.CustomRootCATLSSecret, &out.CustomRootCATLSSecret
+		*out = new(corev1.SecretProjection)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.CustomTLSSecret != nil {
 		in, out := &in.CustomTLSSecret, &out.CustomTLSSecret
 		*out = new(corev1.SecretProjection)

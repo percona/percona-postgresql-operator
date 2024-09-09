@@ -229,7 +229,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile restore")
 	}
 
-	if err := r.addPMMSidecar(ctx, cr); err != nil {
+	if err := r.reconcilePMM(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
 	}
 
@@ -282,7 +282,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	return ctrl.Result{}, nil
 }
 
-func (r *PGClusterReconciler) addPMMSidecar(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if !cr.PMMEnabled() {
 		return nil
 	}

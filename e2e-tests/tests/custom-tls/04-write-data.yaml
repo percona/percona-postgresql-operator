@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      run_psql_local \
+        'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
+        "postgres:$(get_psql_user_pass custom-tls-pguser-postgres)@$(get_psql_user_host custom-tls-pguser-postgres)"
+      
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
+        "postgres:$(get_psql_user_pass custom-tls-pguser-postgres)@$(get_psql_user_host custom-tls-pguser-postgres)"

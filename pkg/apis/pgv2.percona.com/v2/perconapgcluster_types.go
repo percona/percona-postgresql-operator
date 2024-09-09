@@ -271,6 +271,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
+	postgresCluster.Spec.CustomRootCATLSSecret = cr.Spec.Secrets.CustomRootCATLSSecret
 
 	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion)
 	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
@@ -318,6 +319,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 				},
 			})
 		}
+
+		postgresCluster.Spec.Extensions.PGStatStatements = cr.Spec.PMM.QuerySource == PgStatStatements
 	}
 
 	postgresCluster.Spec.Users = users
@@ -485,6 +488,13 @@ type PGBackRestArchive struct {
 	Containers *crunchyv1beta1.PGBackRestSidecars `json:"containers,omitempty"`
 }
 
+type PMMQuerySource string
+
+const (
+	PgStatMonitor    PMMQuerySource = "pgstatmonitor"
+	PgStatStatements PMMQuerySource = "pgstatstatements"
+)
+
 type PMMSpec struct {
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
@@ -504,6 +514,11 @@ type PMMSpec struct {
 
 	// +kubebuilder:validation:Required
 	Secret string `json:"secret,omitempty"`
+
+	// +kubebuilder:validation:Enum={pgstatmonitor,pgstatstatements}
+	// +kubebuilder:default=pgstatmonitor
+	// +kubebuilder:validation:Required
+	QuerySource PMMQuerySource `json:"querySource,omitempty"`
 
 	// Compute resources of a PMM container.
 	// +optional
@@ -570,6 +585,13 @@ type SecretsSpec struct {
 	// MUST be provided and the ca.crt provided must be the same.
 	// +optional
 	CustomReplicationClientTLSSecret *corev1.SecretProjection `json:"customReplicationTLSSecret,omitempty"`
+
+	// The secret containing the root CA certificate and key for
+	// secure connections to the PostgreSQL server. It will need to contain the
+	// CA TLS certificate and CA TLS key with the data keys set to
+	// root.crt and root.key, respectively.
+	// +optional
+	CustomRootCATLSSecret *corev1.SecretProjection `json:"customRootCATLSSecret,omitempty"`
 }
 
 // +listType=map
