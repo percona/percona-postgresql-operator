@@ -18,6 +18,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -82,11 +83,12 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, errors.Wrap(err, "update PGRestore status")
 		}
 
-		if err := startRestore(ctx, r.Client, pgCluster, pgRestore); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "start restore")
+		if _, ok := pgRestore.Annotations[pNaming.AnnotationClusterBootstrapRestore]; !ok {
+			if err := startRestore(ctx, r.Client, pgCluster, pgRestore); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "start restore")
+			}
 		}
 
-		log.Info("Restore is starting")
 		return reconcile.Result{}, nil
 	case v2.RestoreStarting:
 		job := &batchv1.Job{}
@@ -124,8 +126,10 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		if err := disableRestore(ctx, r.Client, pgCluster); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "disable restore")
+		if _, ok := pgRestore.Annotations[pNaming.AnnotationClusterBootstrapRestore]; !ok {
+			if err := disableRestore(ctx, r.Client, pgCluster); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "disable restore")
+			}
 		}
 
 		// Don't add code after the status update.
