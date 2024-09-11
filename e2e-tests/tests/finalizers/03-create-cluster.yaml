@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
+timeout: 10
 commands:
   - script: |-
       set -o errexit
