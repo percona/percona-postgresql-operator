@@ -13,9 +13,6 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  conditions:
-    - type: Complete
-      status: 'True'
   succeeded: 1
 ---
 apiVersion: pgv2.percona.com/v2
@@ -28,6 +25,7 @@ spec:
 status:
   backupType: full
   state: Succeeded
+  storageType: s3
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
