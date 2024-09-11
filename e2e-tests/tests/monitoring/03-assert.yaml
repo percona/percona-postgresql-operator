@@ -71,7 +71,29 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  conditions:
-    - type: Complete
-      status: 'True'
   succeeded: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  annotations:
+    pgv2.percona.com/pgbackrest-backup-job-type: replica-create
+  generation: 1
+spec:
+  pgCluster: monitoring
+  repoName: repo1
+status:
+  backupType: full
+  repo:
+    name: repo1
+    schedules:
+      full: 0 0 * * 6
+    volume:
+      volumeClaimSpec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  state: Succeeded
+  storageType: filesystem
