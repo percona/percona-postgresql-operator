@@ -1,6 +1,9 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 240
+---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
-timeout: 240
 metadata:
   labels:
     e2e: monitoring
