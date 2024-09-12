@@ -13,9 +13,6 @@ metadata:
     pgouser: admin
     vendor: crunchydata
 status:
-  conditions:
-    - type: Complete
-      status: 'True'
   succeeded: 1
 ---
 kind: Deployment

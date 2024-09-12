@@ -225,6 +225,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile backups")
 	}
 
+	if err := r.createBootstrapRestoreObject(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile restore")
+	}
+
 	if err := r.reconcilePMM(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
 	}

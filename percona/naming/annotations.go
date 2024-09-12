@@ -42,6 +42,10 @@ const (
 	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
 	// indicate that backup is in progress.
 	AnnotationBackupInProgress = AnnotationPrefix + "backup-in-progress"
+
+	// AnnotationClusterBootstrapRestore is the annotation that is added to PerconaPGRestore to
+	// indicate that it is a cluster bootstrap restore.
+	AnnotationClusterBootstrapRestore = AnnotationPrefix + "cluster-bootstrap-restore"
 )
 
 func ToCrunchyAnnotation(annotation string) string {

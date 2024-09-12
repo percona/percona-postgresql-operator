@@ -163,6 +163,7 @@ rules:
   resources:
   - perconapgrestores
   verbs:
+  - create
   - get
   - list
   - watch
