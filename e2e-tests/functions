@@ -96,6 +96,11 @@ deploy_s3_secrets() {
 		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
 		>"${TEMP_DIR}/pgbackrest-secret.ini"
 
+	printf "repo2-azure-account=%s\nrepo2-azure-key=%s\n" \
+		"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_NAME' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
+		"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
+			>>"${TEMP_DIR}/pgbackrest-secret.ini"
+	
 	case ${test_name} in
 		"scheduled-backup")
 			printf 'repo2-gcs-key=/etc/pgbackrest/conf.d/gcs-key.json\n' >>"${TEMP_DIR}/pgbackrest-secret.ini"
@@ -152,7 +157,9 @@ get_cr() {
 				.spec.backups.pgbackrest.manual.repoName = "repo1" |
 				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
 				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
-				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
+				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
+				.spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo2" |
+				.spec.backups.pgbackrest.repos += [{"name":"repo2","azure":{"container":"'operator-testing'"}}]
 				' $TEMP_DIR/cr.yaml
 
 			if [[ $test_name == "start-from-backup" ]]; then
