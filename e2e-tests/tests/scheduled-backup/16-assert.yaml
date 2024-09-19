@@ -6,9 +6,9 @@ apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: scheduled-backup
-  generation: 13
+  generation: 15
   annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: gcs-restore
+    postgres-operator.crunchydata.com/pgbackrest-restore: azure-restore
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
@@ -23,7 +23,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 13
+  observedGeneration: 15
   pgbackrest:
     repos:
       - name: repo1
@@ -35,7 +35,7 @@ status:
         stanzaCreated: true
     restore:
       finished: true
-      id: gcs-restore
+      id: azure-restore
       succeeded: 1
   proxy:
     pgBouncer:
@@ -45,6 +45,6 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: gcs-restore
+  name: azure-restore
 status:
   state: Succeeded

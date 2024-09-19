@@ -1,0 +1,9 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  name: demand-backup-azure-full-2
+spec:
+  pgCluster: demand-backup-azure
+  repoName: repo1
+  options:
+    - --type=full

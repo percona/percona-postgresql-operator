@@ -14,3 +14,8 @@ spec:
         - gcs:
             bucket: pg-operator-testing
           name: repo2
+        - azure:
+            container: pg-operator-testing
+          name: repo3
+          schedules:
+            full: "*/3 * * * *"

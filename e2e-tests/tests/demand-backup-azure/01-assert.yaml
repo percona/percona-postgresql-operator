@@ -1,18 +1,18 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 300
+timeout: 480
 ---
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: scheduled-backup
+    postgres-operator.crunchydata.com/cluster: demand-backup-azure
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
-      name: scheduled-backup
+      name: demand-backup-azure
       controller: true
       blockOwnerDeletion: true
 status:
@@ -26,16 +26,16 @@ status:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: scheduled-backup-pgbouncer
+  name: demand-backup-azure-pgbouncer
   labels:
-    postgres-operator.crunchydata.com/cluster: scheduled-backup
+    postgres-operator.crunchydata.com/cluster: demand-backup-azure
     postgres-operator.crunchydata.com/role: pgbouncer
   annotations:
     deployment.kubernetes.io/revision: '1'
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
-      name: scheduled-backup
+      name: demand-backup-azure
       controller: true
       blockOwnerDeletion: true
 status:
@@ -48,7 +48,7 @@ kind: Job
 apiVersion: batch/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: scheduled-backup
+    postgres-operator.crunchydata.com/cluster: demand-backup-azure
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
@@ -63,11 +63,11 @@ status:
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: scheduled-backup
+  name: demand-backup-azure
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: scheduled-backup
+      name: demand-backup-azure
       controller: true
       blockOwnerDeletion: true
   finalizers:
@@ -83,10 +83,6 @@ status:
     repos:
       - name: repo1
         stanzaCreated: true
-      - name: repo2
-        stanzaCreated: true
-      - name: repo3
-        stanzaCreated: true
   proxy:
     pgBouncer:
       readyReplicas: 3
@@ -95,7 +91,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: scheduled-backup
+  name: demand-backup-azure
 status:
   pgbouncer:
     ready: 3

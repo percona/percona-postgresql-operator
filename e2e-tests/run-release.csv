@@ -1,6 +1,7 @@
 custom-extensions
 custom-tls
 demand-backup
+demand-backup-azure
 finalizers
 init-deploy
 major-upgrade
