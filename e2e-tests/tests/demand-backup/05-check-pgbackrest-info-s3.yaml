@@ -36,7 +36,7 @@ commands:
           fi
       }
 
-      manual_backup_name="demand-backup-azure-full"
+      manual_backup_name="demand-backup-full-s3"
       check_backup "$manual_backup_name" "percona.com/backup-name" "$manual_backup_name"
 
       replica_backup_name=$(kubectl get -n "${NAMESPACE}" pg-backup -o jsonpath='{.items[?(@.metadata.annotations.pgv2\.percona\.com/pgbackrest-backup-job-type=="replica-create")].metadata.name}')

@@ -8,4 +8,5 @@ commands:
 
       source ../../functions
 
-      kubectl delete pg-backup -n "${NAMESPACE}" demand-backup-full
+      kubectl delete pg-backup -n "${NAMESPACE}" demand-backup-full-s3
+      kubectl delete pg-backup -n "${NAMESPACE}" demand-backup-full-azure-2

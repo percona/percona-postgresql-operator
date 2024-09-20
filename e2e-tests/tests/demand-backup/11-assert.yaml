@@ -1,15 +1,15 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 660
+timeout: 560
 ---
 kind: Job
 apiVersion: batch/v1
 metadata:
   annotations:
-    postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-azure-full
+    postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full-azure-3
   labels:
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo3
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGBackup
@@ -21,10 +21,10 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
-  name: demand-backup-azure-full
+  name: demand-backup-full-azure-3
 spec:
-  pgCluster: demand-backup-azure
-  repoName: repo1
+  pgCluster: demand-backup
+  repoName: repo3
   options:
     - --type=full
 status:
@@ -33,7 +33,7 @@ status:
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: demand-backup-azure
-  generation: 2
+  name: demand-backup
+  generation: 6
 status:
-  observedGeneration: 2
+  observedGeneration: 6

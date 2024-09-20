@@ -47,3 +47,10 @@ spec:
   repoName: repo1
 status:
   state: Succeeded
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 08-verify-restored-data
+data:
+  data: ' 100500'

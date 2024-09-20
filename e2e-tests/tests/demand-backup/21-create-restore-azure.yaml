@@ -1,0 +1,24 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role demand-backup master name)
+      latest_full_repo3_backup=$(kubectl -n ${NAMESPACE} exec ${primary} -- pgbackrest info --output json | jq '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 3) ][-1].label')
+
+      cat <<EOF | kubectl -n ${NAMESPACE} apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: demand-backup-restore-azure
+      spec:
+        pgCluster: demand-backup
+        repoName: repo3
+        options:
+        - --set=${latest_full_repo3_backup}
+        - --type=immediate
+      EOF

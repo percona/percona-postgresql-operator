@@ -9,4 +9,4 @@ commands:
 
       run_psql_local \
         '\c myapp \\\ TRUNCATE TABLE myApp' \
-        "postgres:$(get_psql_user_pass demand-backup-azure-pguser-postgres)@$(get_psql_user_host demand-backup-azure-pguser-postgres)"
+        "postgres:$(get_psql_user_pass demand-backup-pguser-postgres)@$(get_psql_user_host demand-backup-pguser-postgres)"

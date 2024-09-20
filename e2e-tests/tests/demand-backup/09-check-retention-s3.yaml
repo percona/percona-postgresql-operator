@@ -9,8 +9,8 @@ commands:
 
       retention_count=2
 
-      backups_count=$(kubectl -n "${NAMESPACE}" get pg-backup -o yaml | yq '.items | length')
-      jobs_count=$(kubectl -n "${NAMESPACE}" get jobs -o yaml | yq '.items | length')
+      backups_count=$(kubectl -n "${NAMESPACE}" get pg-backup -o yaml | yq '.items | map(select(.metadata.name != "demand-backup-full-azure*")) | length')
+      jobs_count=$(kubectl -n "${NAMESPACE}" get jobs -o yaml | yq '.items | map(select(.metadata.ownerReferences.[].name != "demand-backup-full-azure*")) | length')
 
       if [[ $backups_count != $retention_count ]]; then
           echo "There are $backups_count backups, but our retention is set to $retention_count" 
