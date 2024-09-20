@@ -34,4 +34,4 @@ commands:
         | yq eval '.spec.pause=false' - \
         | kubectl -n "${NAMESPACE}" apply -f -
 
-    timeout: 240
+    timeout: 200
