@@ -166,7 +166,7 @@ get_cr() {
 				.spec.backups.pgbackrest.global.repo3-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo3" |
 				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
-			fi 
+			fi
 			if [[ $test_name == "start-from-backup" ]]; then
 				yq eval -i '
 					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${cr_name}'-pgbackrest-secrets"}}] |
