@@ -18,4 +18,4 @@ spec:
             container: pg-operator-testing
           name: repo3
           schedules:
-            full: "*/3 * * * *"
+            full: "*/1 * * * *"
