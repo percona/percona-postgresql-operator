@@ -96,7 +96,7 @@ deploy_s3_secrets() {
 		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
 		>"${TEMP_DIR}/pgbackrest-secret.ini"
 
-	if [[ $test_name == "demand-backup" ||  $test_name == "scheduled-backup" ]]; then
+	if [[ $test_name == "demand-backup" || $test_name == "scheduled-backup" ]]; then
 		printf "repo3-azure-account=%s\nrepo3-azure-key=%s\n" \
 			"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_NAME' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
 			"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
