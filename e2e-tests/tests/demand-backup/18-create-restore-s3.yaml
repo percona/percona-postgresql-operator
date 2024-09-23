@@ -8,7 +8,7 @@ commands:
       source ../../functions
 
       primary=$(get_pod_by_role demand-backup master name)
-      latest_full_backup=$(kubectl -n ${NAMESPACE} exec ${primary} -- pgbackrest info --output json | jq '[.[] | .backup[] | select(.type == "full")][-1].label')
+      latest_full_repo1_backup=$(kubectl -n ${NAMESPACE} exec ${primary} -- pgbackrest info --output json | jq '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 1)][-1].label')
 
       cat <<EOF | kubectl -n ${NAMESPACE} apply -f -
       apiVersion: pgv2.percona.com/v2
@@ -19,6 +19,6 @@ commands:
         pgCluster: demand-backup
         repoName: repo1
         options:
-        - --set=${latest_full_backup}
+        - --set=${latest_full_repo1_backup}
         - --type=immediate
       EOF

@@ -83,6 +83,8 @@ status:
     repos:
       - name: repo1
         stanzaCreated: true
+      - name: repo3
+        stanzaCreated: true
   proxy:
     pgBouncer:
       readyReplicas: 3

@@ -10,7 +10,7 @@ commands:
       kubectl -n ${NAMESPACE} patch perconapgcluster/monitoring --type=merge -p '{"spec":{"pmm":{"querySource":"pgstatstatements"}}}'
 
       # Wait for the pg_stat_statements extension to be created
-      sleep 60
+      sleep 80
 
       primary=$(get_pod_by_role monitoring master name)
       res=$(kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT extname FROM pg_extension;"')

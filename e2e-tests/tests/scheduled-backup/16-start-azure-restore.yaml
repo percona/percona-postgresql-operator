@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cat << EOF > ${TEMP_DIR}/restore.yaml
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: azure-restore
+      spec:
+        pgCluster: scheduled-backup
+        repoName: repo3
+        options:
+        - --type=time
+        - --target="$(kubectl -n ${NAMESPACE} get configmap pitr-target --template={{.data.pitr}})"
+      EOF
+      kubectl -n ${NAMESPACE} apply -f ${TEMP_DIR}/restore.yaml

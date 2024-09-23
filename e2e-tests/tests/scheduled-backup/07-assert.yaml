@@ -2,6 +2,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
 ---
+---
 kind: Job
 apiVersion: batch/v1
 metadata:
@@ -21,7 +22,37 @@ metadata:
   generation: 1
 spec:
   pgCluster: scheduled-backup
+  repoName: repo3
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  generation: 1
+spec:
+  pgCluster: scheduled-backup
   repoName: repo2
+status:
+  backupType: full
+  state: Succeeded
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  generation: 1
+spec:
+  pgCluster: scheduled-backup
+  repoName: repo1
+status:
+  backupType: full
+  state: Succeeded
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  generation: 1
+spec:
+  pgCluster: scheduled-backup
+  repoName: repo1
 status:
   backupType: full
   state: Succeeded
@@ -30,6 +61,6 @@ apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: scheduled-backup
-  generation: 7
+  generation: 8
 status:
-  observedGeneration: 7
+  observedGeneration: 8

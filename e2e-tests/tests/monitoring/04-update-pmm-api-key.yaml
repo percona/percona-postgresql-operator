@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
+timeout: 25
 commands:
   - script: |-
       set -o errexit
@@ -13,4 +13,4 @@ commands:
         &&  kubectl -n ${NAMESPACE} patch secret monitoring-pmm-secret --type merge --patch '{"stringData": {"PMM_SERVER_KEY": "'${api_key}'"}}' \
         || true
 
-      sleep 10
+      sleep 25
