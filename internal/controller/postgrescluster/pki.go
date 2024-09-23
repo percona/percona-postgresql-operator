@@ -21,6 +21,8 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/internal/naming"
@@ -69,8 +71,22 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
-	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
+	err := errors.WithStack(
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
+	// K8SPG-555: we need to check ca certificate from old operator versions
+	// TODO: remove when 2.4.0 will become unsupported
+	if k8serrors.IsNotFound(err) {
+		nn := client.ObjectKeyFromObject(existing)
+		nn.Name = naming.RootCertSecret
+		err = errors.WithStack(
+			r.Client.Get(ctx, nn, existing))
+		if err == nil {
+			existing.Name = naming.RootCertSecret
+		}
+	}
+	if k8serrors.IsNotFound(err) {
+		err = nil
+	}
 
 	root := &pki.RootCertificateAuthority{}
 
@@ -91,7 +107,10 @@ func (r *Reconciler) reconcileRootCertificate(
 	}
 
 	intent := &corev1.Secret{
-		ObjectMeta: naming.PostgresRootCASecret(cluster),
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      existing.Name,
+			Namespace: existing.Namespace,
+		},
 	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Data = make(map[string][]byte)

@@ -93,6 +93,7 @@ const (
 	// Deprecated: K8SPG-555: use PostgresRootCASecret instead.
 	// Currently it's used to update certificates from older operator version
 	// RootCertSecret is the default root certificate secret name
+	// TODO: remove when 2.4.0 will become unsupported
 	RootCertSecret = "pgo-root-cacert" /* #nosec */
 
 	// ClusterCertSecret is the default cluster leaf certificate secret name
