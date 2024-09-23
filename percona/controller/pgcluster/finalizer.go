@@ -82,6 +82,7 @@ func (r *PGClusterReconciler) deleteTLSSecrets(ctx context.Context, cr *v2.Perco
 		naming.ClusterPGBouncer(crunchyCluster),
 	}
 	if cr.Spec.Secrets.CustomRootCATLSSecret == nil {
+		secretsMeta = append(secretsMeta, metav1.ObjectMeta{Namespace: crunchyCluster.Namespace, Name: naming.RootCertSecret})
 		secretsMeta = append(secretsMeta, naming.PostgresRootCASecret(crunchyCluster))
 	}
 	if cr.Spec.Secrets.CustomTLSSecret == nil {

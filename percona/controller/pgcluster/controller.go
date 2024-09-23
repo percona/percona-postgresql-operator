@@ -213,6 +213,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
+	if err := r.reconcileTLS(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile TLS")
+	}
+
 	if err := r.reconcileExternalWatchers(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "start external watchers")
 	}
@@ -280,6 +284,43 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if cr.CompareVersion("2.5.0") < 0 {
+		return nil
+	}
+
+	// K8SPG-555: Previously we used a single CA secret for all clusters in a namespace.
+	// We should copy the contents of the old CA secret, if it exists, to the new one, which is unique for each cluster.
+	oldCASecret := new(corev1.Secret)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: naming.RootCertSecret, Namespace: cr.Namespace}, oldCASecret)
+	if client.IgnoreNotFound(err) != nil {
+		return errors.Wrap(err, "failed to get old ca secret")
+	}
+	if k8serrors.IsNotFound(err) {
+		return nil
+	}
+
+	newCASecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            cr.Name,
+			Namespace:       cr.Namespace,
+			OwnerReferences: oldCASecret.OwnerReferences,
+		},
+		Data: oldCASecret.Data,
+	}
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(newCASecret), new(corev1.Secret)); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, "failed to get new ca secret")
+	}
+
+	if err := r.Client.Create(ctx, newCASecret); err != nil {
+		return errors.Wrap(err, "failed to create updated CA secret")
+	}
+	return nil
 }
 
 func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPGCluster) error {
