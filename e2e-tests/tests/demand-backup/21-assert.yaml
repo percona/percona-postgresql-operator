@@ -1,14 +1,14 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 180
+timeout: 240
 ---
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: demand-backup
-  generation: 6
+  generation: 12
   annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: demand-backup-restore
+    postgres-operator.crunchydata.com/pgbackrest-restore: demand-backup-restore-azure
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
@@ -23,15 +23,17 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 6
+  observedGeneration: 12
   pgbackrest:
     repos:
       - name: repo1
         replicaCreateBackupComplete: true
         stanzaCreated: true
+      - name: repo3
+        stanzaCreated: true
     restore:
       finished: true
-      id: demand-backup-restore
+      id: demand-backup-restore-azure
       succeeded: 1
   proxy:
     pgBouncer:
@@ -41,9 +43,9 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: demand-backup-restore
+  name: demand-backup-restore-azure
 spec:
   pgCluster: demand-backup
-  repoName: repo1
+  repoName: repo3
 status:
   state: Succeeded
