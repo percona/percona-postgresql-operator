@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 480
+timeout: 520
 ---
 apiVersion: apps/v1
 kind: StatefulSet

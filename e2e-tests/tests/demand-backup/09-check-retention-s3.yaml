@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      retention_count=2
+
+      backups_count=$(kubectl -n "${NAMESPACE}" get pg-backup -o yaml | yq '.items | map(select(.metadata.name != "demand-backup-full-azure*")) | length')
+      jobs_count=$(kubectl -n "${NAMESPACE}" get jobs -o yaml | yq '.items | map(select(.metadata.ownerReferences.[].name != "demand-backup-full-azure*")) | length')
+
+      if [[ $backups_count != $retention_count ]]; then
+          echo "There are $backups_count backups, but our retention is set to $retention_count" 
+          exit 1
+      fi
+
+      if [[ $jobs_count != $retention_count ]]; then
+          echo "There are $jobs_count jobs, but our retention is set to $retention_count" 
+          exit 1
+      fi
+
+
+

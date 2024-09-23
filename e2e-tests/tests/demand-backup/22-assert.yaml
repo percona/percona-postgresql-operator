@@ -5,14 +5,14 @@ timeout: 180
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: one-pod
-  generation: 4
+  name: demand-backup
+  generation: 12
   annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: one-pod-restore
+    postgres-operator.crunchydata.com/pgbackrest-restore: demand-backup-restore-azure
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: one-pod
+      name: demand-backup
       controller: true
       blockOwnerDeletion: true
   finalizers:
@@ -20,37 +20,43 @@ metadata:
 status:
   instances:
     - name: instance1
-      readyReplicas: 1
-      replicas: 1
-      updatedReplicas: 1
-  observedGeneration: 4
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  observedGeneration: 12
   pgbackrest:
     repos:
       - name: repo1
         replicaCreateBackupComplete: true
         stanzaCreated: true
+      - name: repo3
+        stanzaCreated: true
     restore:
       finished: true
-      id: one-pod-restore
+      id: demand-backup-restore-azure
       succeeded: 1
   proxy:
     pgBouncer:
-      readyReplicas: 1
-      replicas: 1
+      readyReplicas: 3
+      replicas: 3
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: one-pod-restore
+  name: demand-backup-restore-azure
 spec:
-  pgCluster: one-pod
-  repoName: repo1
+  pgCluster: demand-backup
+  repoName: repo3
 status:
   state: Succeeded
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: 08-verify-restored-data
+  name: 22-verify-restored-data
 data:
   data: ' 100500'

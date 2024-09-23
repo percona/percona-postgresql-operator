@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
+timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -11,4 +11,6 @@ commands:
       get_cr "demand-backup" ${RANDOM} \
         | yq '.spec.backups.pgbackrest.global.repo1-retention-full="2"' \
         | yq '.spec.backups.pgbackrest.global.repo1-retention-full-type="count"' \
+        | yq '.spec.backups.pgbackrest.global.repo3-retention-full="2"' \
+        | yq '.spec.backups.pgbackrest.global.repo3-retention-full-type="count"' \
         | kubectl -n "${NAMESPACE}" apply -f -

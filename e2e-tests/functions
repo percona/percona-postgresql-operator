@@ -96,6 +96,13 @@ deploy_s3_secrets() {
 		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
 		>"${TEMP_DIR}/pgbackrest-secret.ini"
 
+	if [[ $test_name == "demand-backup" || $test_name == "scheduled-backup" ]]; then
+		printf "repo3-azure-account=%s\nrepo3-azure-key=%s\n" \
+			"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_NAME' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
+			"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
+			>>"${TEMP_DIR}/pgbackrest-secret.ini"
+	fi
+
 	case ${test_name} in
 		"scheduled-backup")
 			printf 'repo2-gcs-key=/etc/pgbackrest/conf.d/gcs-key.json\n' >>"${TEMP_DIR}/pgbackrest-secret.ini"
@@ -154,7 +161,12 @@ get_cr() {
 				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
 				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
 				' $TEMP_DIR/cr.yaml
-
+			if [[ $test_name == "demand-backup" ]]; then
+				yq eval -i '
+				.spec.backups.pgbackrest.global.repo3-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo3" |
+				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
+				' $TEMP_DIR/cr.yaml
+			fi
 			if [[ $test_name == "start-from-backup" ]]; then
 				yq eval -i '
 					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${cr_name}'-pgbackrest-secrets"}}] |
@@ -171,8 +183,10 @@ get_cr() {
 				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
 				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
 				.spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo2" |
+				.spec.backups.pgbackrest.global.repo3-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo3" |
 				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
-				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}]
+				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}] |
+				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
 			;;
 		"custom-extensions" | "major-upgrade")
@@ -332,7 +346,7 @@ get_metric_values() {
 	local metric=$1
 	local instance=$2
 	local api_key=$3
-	local start=$($date -u "+%s" -d "-1 minute")
+	local start=$($date -u "+%s" -d "-5 minute")
 	local end=$($date -u "+%s")
 	local endpoint=$(get_service_ip monitoring-service)
 
