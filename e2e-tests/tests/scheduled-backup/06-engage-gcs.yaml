@@ -15,7 +15,7 @@ spec:
             bucket: pg-operator-testing
           name: repo2
           schedules:
-            full: "*/1 * * * *"
+            full: "*/5 * * * *"
         - azure:
             container: pg-operator-testing
           name: repo3
