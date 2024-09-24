@@ -15,6 +15,19 @@ metadata:
 status:
   succeeded: 1
 ---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo2
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
@@ -22,6 +35,17 @@ metadata:
 spec:
   pgCluster: scheduled-backup
   repoName: repo3
+status:
+  backupType: full
+  state: Succeeded
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  generation: 1
+spec:
+  pgCluster: scheduled-backup
+  repoName: repo2
 status:
   backupType: full
   state: Succeeded
