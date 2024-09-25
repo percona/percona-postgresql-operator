@@ -97,13 +97,14 @@ func (r *Reconciler) reconcileRootCertificate(
 		_ = root.Certificate.UnmarshalText(existing.Data[certificateKey])
 		_ = root.PrivateKey.UnmarshalText(existing.Data[privateKey])
 
+		if cluster.Spec.CustomRootCATLSSecret != nil {
+			return root, err
+		}
+
 		if !pki.RootIsValid(root) {
 			root, err = pki.NewRootCertificateAuthority()
 			err = errors.WithStack(err)
 		}
-	}
-	if cluster.Spec.CustomRootCATLSSecret != nil {
-		return root, err
 	}
 
 	intent := &corev1.Secret{

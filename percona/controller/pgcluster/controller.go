@@ -287,6 +287,39 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	checkSecretProjection := func(p *corev1.SecretProjection) error {
+		if p == nil {
+			return nil
+		}
+
+		if p.Name == "" {
+			return errors.New("secret name is not specified")
+		}
+
+		secret := new(corev1.Secret)
+		nn := types.NamespacedName{Name: p.Name, Namespace: cr.Namespace}
+		if err := r.Client.Get(ctx, nn, secret); err != nil {
+			return errors.Wrapf(err, "failed to get secret %s", nn.Name)
+		}
+
+		for _, item := range p.Items {
+			if _, ok := secret.Data[item.Key]; !ok {
+				return errors.Errorf("key %s doesn't exist in secret %s", item.Key, secret.Name)
+			}
+		}
+		return nil
+	}
+
+	if err := checkSecretProjection(cr.Spec.Secrets.CustomRootCATLSSecret); err != nil {
+		return errors.Wrap(err, "failed to validate .spec.customRootCATLSSecret")
+	}
+	if err := checkSecretProjection(cr.Spec.Secrets.CustomTLSSecret); err != nil {
+		return errors.Wrap(err, "failed to validate .spec.customTLSSecret")
+	}
+	if err := checkSecretProjection(cr.Spec.Secrets.CustomReplicationClientTLSSecret); err != nil {
+		return errors.Wrap(err, "failed to validate .spec.customReplicationTLSSecret")
+	}
+
 	oldCASecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.RootCertSecret,
