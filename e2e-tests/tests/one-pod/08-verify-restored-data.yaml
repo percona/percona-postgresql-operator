@@ -10,4 +10,4 @@ commands:
 
       data=$(run_psql_local '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass one-pod-pguser-postgres)@$(get_psql_user_host one-pod-pguser-postgres)")
 
-      kubectl create configmap -n "${NAMESPACE}" 07-verify-restored-data --from-literal=data="${data}"
+      kubectl create configmap -n "${NAMESPACE}" 08-verify-restored-data --from-literal=data="${data}"

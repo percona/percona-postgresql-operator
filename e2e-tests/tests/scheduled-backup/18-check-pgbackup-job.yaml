@@ -13,8 +13,8 @@ commands:
       succeeded_backups=$(kubectl get -n "$NAMESPACE" pg-backup -o yaml | yq '.items | map(select(.status.state == "Succeeded")) | length')
       succeeded_jobs=$(kubectl get -n "$NAMESPACE" job -o yaml | yq '.items | map(select(.status.succeeded == "1")) | length')
 
-      if [[ $succeeded_backups -lt 4 ]]; then
-        echo "ERROR: there are less than 4 succeeded pg-backups"
+      if [[ $succeeded_backups -lt 5 ]]; then
+        echo "ERROR: there are less than 5 succeeded pg-backups"
         exit 1
       fi
 

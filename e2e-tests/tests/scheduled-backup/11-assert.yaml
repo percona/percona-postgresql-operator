@@ -5,8 +5,6 @@ timeout: 30
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: 10-add-more-data
+  name: 11-verify-restored-data
 data:
-  data: |2-
-     100500
-     100501
+  data: ' 100500'
