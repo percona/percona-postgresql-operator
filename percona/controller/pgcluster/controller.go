@@ -364,7 +364,13 @@ func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPG
 	// We should copy the contents of the old CA secret, if it exists, to the new one, which is unique for each cluster.
 	// TODO: remove when 2.4.0 will become unsupported
 	newCASecret := &corev1.Secret{
-		ObjectMeta: naming.PostgresRootCASecret(&v1beta1.PostgresCluster{ObjectMeta: metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}}),
+		ObjectMeta: naming.PostgresRootCASecret(
+			&v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      cr.Name,
+					Namespace: cr.Namespace,
+				},
+			}),
 	}
 	err = r.Client.Get(ctx, client.ObjectKeyFromObject(newCASecret), new(corev1.Secret))
 	if client.IgnoreNotFound(err) != nil {
