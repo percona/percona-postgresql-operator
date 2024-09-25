@@ -287,7 +287,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	checkSecretProjection := func(p *corev1.SecretProjection) error {
+	checkSecretProjection := func(p *corev1.SecretProjection, requiredPaths ...string) error {
 		if p == nil {
 			return nil
 		}
@@ -302,21 +302,35 @@ func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPG
 			return errors.Wrapf(err, "failed to get secret %s", nn.Name)
 		}
 
+		pathMap := make(map[string]struct{})
 		for _, item := range p.Items {
 			if _, ok := secret.Data[item.Key]; !ok {
 				return errors.Errorf("key %s doesn't exist in secret %s", item.Key, secret.Name)
 			}
+			pathMap[item.Path] = struct{}{}
 		}
+
+		for _, path := range requiredPaths {
+			if _, ok := pathMap[path]; !ok {
+				return errors.Errorf("required path %s was not found", path)
+			}
+		}
+
 		return nil
 	}
 
-	if err := checkSecretProjection(cr.Spec.Secrets.CustomRootCATLSSecret); err != nil {
+	if err := checkSecretProjection(cr.Spec.Secrets.CustomRootCATLSSecret, "root.crt", "root.key"); err != nil {
 		return errors.Wrap(err, "failed to validate .spec.customRootCATLSSecret")
 	}
-	if err := checkSecretProjection(cr.Spec.Secrets.CustomTLSSecret); err != nil {
+
+	certPaths := []string{"tls.key", "tls.crt"}
+	if cr.Spec.Secrets.CustomRootCATLSSecret == nil {
+		certPaths = append(certPaths, "ca.crt")
+	}
+	if err := checkSecretProjection(cr.Spec.Secrets.CustomTLSSecret, certPaths...); err != nil {
 		return errors.Wrap(err, "failed to validate .spec.customTLSSecret")
 	}
-	if err := checkSecretProjection(cr.Spec.Secrets.CustomReplicationClientTLSSecret); err != nil {
+	if err := checkSecretProjection(cr.Spec.Secrets.CustomReplicationClientTLSSecret, certPaths...); err != nil {
 		return errors.Wrap(err, "failed to validate .spec.customReplicationTLSSecret")
 	}
 
