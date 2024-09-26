@@ -312,7 +312,9 @@ func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPG
 
 		for _, path := range requiredPaths {
 			if _, ok := pathMap[path]; !ok {
-				return errors.Errorf("required path %s was not found", path)
+				if _, ok := secret.Data[path]; !ok {
+					return errors.Errorf("required path %s was not found both in secret %s and in the .items section", path, secret.Name)
+				}
 			}
 		}
 
@@ -376,8 +378,20 @@ func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPG
 	if client.IgnoreNotFound(err) != nil {
 		return errors.Wrap(err, "failed to get new ca secret")
 	}
+
 	if k8serrors.IsNotFound(err) {
-		newCASecret.Data = oldCASecret.Data
+		err := r.Client.Get(ctx, types.NamespacedName{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+		}, new(v1beta1.PostgresCluster))
+		if client.IgnoreNotFound(err) != nil {
+			return errors.Wrap(err, "failed to get crunchy cluster")
+		}
+		// If the cluster is new, we should not copy the old CA secret.
+		// We should create an empty secret instead, so that crunchy part can populate it.
+		if !k8serrors.IsNotFound(err) {
+			newCASecret.Data = oldCASecret.Data
+		}
 		if err := r.Client.Create(ctx, newCASecret); err != nil {
 			return errors.Wrap(err, "failed to create updated CA secret")
 		}
