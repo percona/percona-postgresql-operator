@@ -761,7 +761,7 @@ func TestReconcileStanzaCreate(t *testing.T) {
 	}
 
 	configHashMismatch, err = r.reconcileStanzaCreate(ctx, postgresCluster, instances, "abcde12345")
-	assert.Error(t, err, "fake stanza create failed: ")
+	assert.Error(t, err, "fake stanza create failed:  ")
 	assert.Assert(t, !configHashMismatch)
 
 	assert.NilError(t, wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*2), false,
