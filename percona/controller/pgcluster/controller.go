@@ -336,6 +336,18 @@ func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPG
 		return errors.Wrap(err, "failed to validate .spec.customReplicationTLSSecret")
 	}
 
+	if cr.Spec.Secrets.CustomRootCATLSSecret != nil {
+		return nil
+	}
+
+	if err := r.reconcileOldCACert(ctx, cr); err != nil {
+		return errors.Wrap(err, "reconcile old CA")
+	}
+
+	return nil
+}
+
+func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	oldCASecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.RootCertSecret,
