@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -103,11 +104,14 @@ else
     pgbackrest "${cmd}" --stanza="${stanza}"
 fi
 `
+	log := logging.FromContext(ctx)
 	if err := exec(ctx, nil, &stdout, &stderr, "bash", "-ceu", "--",
 		script, "-", configHash, DefaultStanzaName, errMsgConfigHashMismatch, errMsgStaleReposWithVolumesConfig,
 		fmt.Sprintf("stanza-%s", stanzaCmd), checkRepoCmd); err != nil {
 
-		errReturn := stderr.String()
+		errReturn := stdout.String() + " " + stderr.String()
+
+		log.Error(err, "stanza command failed", "cmd", stanzaCmd, "err", errReturn)
 
 		// if the config hashes didn't match, return true and don't return an error since this is
 		// expected while waiting for config changes in ConfigMaps and Secrets to make it to the

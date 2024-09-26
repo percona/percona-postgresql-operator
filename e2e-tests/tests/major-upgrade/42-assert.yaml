@@ -1,13 +1,21 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 360
+timeout: 720
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
+metadata:
+  name: restore-after-15-to-16
+spec:
+  pgCluster: major-upgrade
+  repoName: repo1
+status:
+  state: Succeeded
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: major-upgrade
-spec:
-  postgresVersion: 13
 status:
   pgbouncer:
     ready: 3
