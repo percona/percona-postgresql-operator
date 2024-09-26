@@ -20,8 +20,10 @@ spec:
     spec:
       initContainers:
       - name: postgres-startup
-      - name: extension-relocator-16
-      - name: extension-installer-16
+      - command:
+        - /usr/local/bin/relocate-extensions.sh
+      - command:
+        - /usr/local/bin/install-extensions.sh
       - name: nss-wrapper-init
 status:
   observedGeneration: 3
