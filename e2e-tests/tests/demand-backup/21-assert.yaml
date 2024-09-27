@@ -7,7 +7,7 @@ commands:
       kubectl get pods -n "${NAMESPACE}"
 collectors:
   - type: pod
-    selector: "batch.kubernetes.io/job-name=demand-backup-pgbackrest-restore"
+    selector: "app.kubernetes.io/component=operator"
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster

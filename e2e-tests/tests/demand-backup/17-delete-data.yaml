@@ -6,6 +6,7 @@ commands:
       set -o xtrace
 
       source ../../functions
+      kubectl get pg -o yaml -n "${NAMESPACE}" | grep genera
 
       run_psql_local \
         '\c myapp \\\ TRUNCATE TABLE myApp' \
