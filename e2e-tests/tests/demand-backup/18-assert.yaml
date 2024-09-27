@@ -5,6 +5,7 @@ commands:
   - script: |-
       kubectl get pg-restore -n "${NAMESPACE}" && sleep 5
       kubectl get pods -n "${NAMESPACE}"
+      kubectl get pg -n "${NAMESPACE}"
 collectors:
   - type: pod
     selector: "batch.kubernetes.io/job-name=demand-backup-pgbackrest-restore"
