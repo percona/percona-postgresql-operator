@@ -13,4 +13,5 @@ commands:
         | yq '.spec.backups.pgbackrest.global.repo1-retention-full-type="count"' \
         | yq '.spec.backups.pgbackrest.global.repo3-retention-full="2"' \
         | yq '.spec.backups.pgbackrest.global.repo3-retention-full-type="count"' \
+        | yq eval 'del(.spec.backups.pgbackrest.repoHost)' \
         | kubectl -n "${NAMESPACE}" apply -f -

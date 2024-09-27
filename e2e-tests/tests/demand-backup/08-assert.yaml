@@ -1,6 +1,12 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 560
+commands:
+  - script: |-
+      kubectl get pg-backup -n "${NAMESPACE}" && sleep 5
+collectors:
+  - type: pod
+    selector: "postgres-operator.crunchydata.com/pgbackrest-repo=repo1"
 ---
 kind: Job
 apiVersion: batch/v1
@@ -30,10 +36,56 @@ spec:
 status:
   state: Succeeded
 ---
-apiVersion: postgres-operator.crunchydata.com/v1beta1
-kind: PostgresCluster
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
 metadata:
-  name: demand-backup
+  finalizers:
+    - percona.com/stop-watchers
   generation: 4
+spec:
+  backups:
+    pgbackrest:
+      configuration:
+      - secret:
+          name: demand-backup-pgbackrest-secrets
+      global:
+        repo1-retention-full: "2"
+        repo1-retention-full-type: count
+        repo3-retention-full: "2"
+        repo3-retention-full-type: count
+      manual:
+        options:
+          - --type=full
+          - --annotation="percona.com/backup-name"="demand-backup-full-s3-2"
+        repoName: repo1
+      repos:
+      - name: repo1
+        s3:
+          bucket: pg-operator-testing
+          endpoint: s3.amazonaws.com
+          region: us-east-1
+      - name: repo3
+        azure:
+          container: pg-operator-testing
+  proxy:
+    pgBouncer:
+      replicas: 3
+  users:
+    - name: postgres
+      password:
+        type: AlphaNumeric
+    - name: demand-backup
+      password:
+        type: AlphaNumeric
 status:
-  observedGeneration: 4
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready
