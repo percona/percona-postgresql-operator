@@ -1,11 +1,14 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+timeout: 320
 commands:
   - script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
+
+      sleep 240
 
       run_psql_local \
         '\c myapp \\\ TRUNCATE TABLE myApp' \

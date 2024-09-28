@@ -9,8 +9,6 @@ commands:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  finalizers:
-    - percona.com/stop-watchers
   generation: 12
 spec:
   backups:

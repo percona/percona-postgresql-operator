@@ -5,15 +5,16 @@ commands:
   - script: |-
       kubectl get pg-restore -n "${NAMESPACE}" && sleep 5
       kubectl get pods -n "${NAMESPACE}"
+      kubectl get pg -o yaml -n "${NAMESPACE}"
 collectors:
   - type: pod
     selector: "app.kubernetes.io/component=operator"
+    tail: 100
+  - type: events
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  finalizers:
-    - percona.com/stop-watchers
   generation: 12
 spec:
   backups:
