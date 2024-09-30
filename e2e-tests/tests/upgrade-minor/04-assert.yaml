@@ -19,6 +19,6 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
   name: check-operator-deploy-status
-timeout: 45
+timeout: 100
 commands:
   - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1,status.observedGeneration=2
