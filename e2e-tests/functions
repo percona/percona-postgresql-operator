@@ -58,6 +58,26 @@ deploy_operator() {
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
+
+update_operator() {
+	local cw_prefix=""
+
+	if [[ $OPERATOR_NS ]]; then
+		cw_prefix="cw-"
+	fi
+
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
+
+	local disable_telemetry=true
+	if [ "${test_name}" == "telemetry-transfer" ]; then
+		disable_telemetry=false
+	fi
+
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" patch deployment percona-postgresql-operator -p \
+	    '{"spec":{"template":{"spec":{"containers":[{"name":"operator","image":"'${IMAGE}'"}]}}}}'
+}
+
 deploy_operator_gh() {
 	local git_tag="$1"
 	local cw_prefix=""

@@ -8,5 +8,5 @@ commands:
 
       source ../../functions
 
-      deploy_operator
+      update_operator
       kubectl wait -n ${OPERATOR_NS:-$NAMESPACE} --timeout 30s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$IMAGE deployment/percona-postgresql-operator
