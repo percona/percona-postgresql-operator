@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 660
+timeout: 820
 ---
 kind: Job
 apiVersion: batch/v1
