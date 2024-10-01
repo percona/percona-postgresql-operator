@@ -2,7 +2,7 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-CERT_MANAGER_VER="1.14.2"
+CERT_MANAGER_VER="1.15.3"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
@@ -56,6 +56,25 @@ deploy_operator() {
 	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' "${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "'${disable_telemetry}'"' - \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
+}
+
+update_operator() {
+	local cw_prefix=""
+
+	if [[ $OPERATOR_NS ]]; then
+		cw_prefix="cw-"
+	fi
+
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
+
+	local disable_telemetry=true
+	if [ "${test_name}" == "telemetry-transfer" ]; then
+		disable_telemetry=false
+	fi
+
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" patch deployment percona-postgresql-operator -p \
+		'{"spec":{"template":{"spec":{"containers":[{"name":"operator","image":"'${IMAGE}'"}]}}}}'
 }
 
 deploy_operator_gh() {
