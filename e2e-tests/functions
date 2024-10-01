@@ -75,7 +75,7 @@ update_operator() {
 	fi
 
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" patch deployment percona-postgresql-operator -p \
-	    '{"spec":{"template":{"spec":{"containers":[{"name":"operator","image":"'${IMAGE}'"}]}}}}'
+		'{"spec":{"template":{"spec":{"containers":[{"name":"operator","image":"'${IMAGE}'"}]}}}}'
 }
 
 deploy_operator_gh() {
