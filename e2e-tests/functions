@@ -58,7 +58,6 @@ deploy_operator() {
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
-
 update_operator() {
 	local cw_prefix=""
 
