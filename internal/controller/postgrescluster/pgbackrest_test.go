@@ -2383,7 +2383,16 @@ func TestCopyConfigurationResources(t *testing.T) {
 func TestGenerateBackupJobIntent(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		spec := generateBackupJobSpecIntent(
-			&v1beta1.PostgresCluster{}, v1beta1.PGBackRestRepo{},
+			&v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "",
+					Namespace: "",
+					Labels: map[string]string{
+						naming.LabelVersion: "2.5.0",
+					},
+				},
+			},
+			v1beta1.PGBackRestRepo{},
 			"",
 			nil, nil,
 		)
@@ -2814,7 +2823,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 							})
 							t.Run("SecurityContext", func(t *testing.T) {
 								assert.DeepEqual(t, job.Spec.Template.Spec.Containers[0].SecurityContext,
-									initialize.RestrictedSecurityContext())
+									initialize.RestrictedSecurityContext(true))
 							})
 							t.Run("Resources", func(t *testing.T) {
 								assert.DeepEqual(t, job.Spec.Template.Spec.Containers[0].Resources,

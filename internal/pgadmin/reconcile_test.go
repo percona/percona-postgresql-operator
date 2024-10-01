@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -84,6 +85,10 @@ func TestPod(t *testing.T) {
 	config := new(corev1.ConfigMap)
 	pod := new(corev1.PodSpec)
 	pvc := new(corev1.PersistentVolumeClaim)
+
+	cluster.SetLabels(map[string]string{
+		naming.LabelVersion: "2.5.0",
+	})
 
 	call := func() { Pod(cluster, config, pod, pvc) }
 

@@ -1215,6 +1215,7 @@ func (r *Reconciler) reconcileInstance(
 	// containers
 	if err == nil {
 		addNSSWrapper(
+			cluster,
 			config.PostgresContainerImage(cluster),
 			cluster.Spec.ImagePullPolicy,
 			&instance.Spec.Template)

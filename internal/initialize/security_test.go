@@ -53,7 +53,7 @@ func TestPodSecurityContext(t *testing.T) {
 	// > lower-trust users.
 	t.Run("Restricted", func(t *testing.T) {
 		if assert.Check(t, psc.RunAsNonRoot == nil) {
-			assert.Assert(t, initialize.RestrictedSecurityContext().RunAsNonRoot != nil,
+			assert.Assert(t, initialize.RestrictedSecurityContext(true).RunAsNonRoot != nil,
 				`RunAsNonRoot should be delegated to the container-level v1.SecurityContext`)
 		}
 
@@ -61,14 +61,14 @@ func TestPodSecurityContext(t *testing.T) {
 			`Containers must not set runAsUser to 0`)
 
 		if assert.Check(t, psc.SeccompProfile == nil) {
-			assert.Assert(t, initialize.RestrictedSecurityContext().SeccompProfile != nil,
+			assert.Assert(t, initialize.RestrictedSecurityContext(true).SeccompProfile != nil,
 				`SeccompProfile should be delegated to the container-level v1.SecurityContext`)
 		}
 	})
 }
 
 func TestRestrictedSecurityContext(t *testing.T) {
-	sc := initialize.RestrictedSecurityContext()
+	sc := initialize.RestrictedSecurityContext(true)
 
 	// Kubernetes describes recommended security profiles:
 	// - https://docs.k8s.io/concepts/security/pod-security-standards/

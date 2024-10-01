@@ -18,6 +18,7 @@ package v1beta1
 import (
 	"fmt"
 
+	gover "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -732,4 +733,14 @@ func NewPostgresCluster() *PostgresCluster {
 	cluster := &PostgresCluster{}
 	cluster.SetGroupVersionKind(GroupVersion.WithKind("PostgresCluster"))
 	return cluster
+}
+
+const LabelVersion = "pgv2.percona.com/version"
+
+func (cr *PostgresCluster) CompareVersion(ver string) int {
+	crVersion, err := gover.NewVersion(cr.Labels[LabelVersion])
+	if err != nil {
+		return -2
+	}
+	return crVersion.Compare(gover.Must(gover.NewVersion(ver)))
 }
