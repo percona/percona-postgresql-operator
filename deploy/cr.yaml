@@ -214,6 +214,8 @@ spec:
       resources:
         requests:
           storage: 1Gi
+#      limits:
+#          storage: 5Gi
 #    tablespaceVolumes:
 #      - name: user
 #        dataVolumeClaimSpec:
