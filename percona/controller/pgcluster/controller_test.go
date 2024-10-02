@@ -5,7 +5,7 @@ package pgcluster
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"strconv"
 	"sync"
@@ -1529,13 +1529,13 @@ var _ = Describe("Validate TLS", Ordered, func() {
 	}
 	Context("check validation for cr.Spec.Secrets.CustomTLSSecret when cr.Spec.Secrets.CustomRootCATLSSecret is specified", func() {
 		cr := cr.DeepCopy()
-		secretName := "custom-tls-secret-with-ca"
+		secretName := "custom-tls-secret-with-ca" //nolint:gosec
 		cr.Spec.Secrets.CustomTLSSecret = new(corev1.SecretProjection)
 		checkSecretProjectionWithCA(cr, cr.Spec.Secrets.CustomTLSSecret, secretName)
 	})
 	Context("should check validation for cr.Spec.Secrets.CustomReplicationClientTLSSecret when cr.Spec.Secrets.CustomRootCATLSSecret is specified", func() {
 		cr := cr.DeepCopy()
-		secretName := "custom-replication-tls-secret-with-ca"
+		secretName := "custom-replication-tls-secret-with-ca" //nolint:gosec
 		cr.Spec.Secrets.CustomReplicationClientTLSSecret = new(corev1.SecretProjection)
 		checkSecretProjectionWithCA(cr, cr.Spec.Secrets.CustomReplicationClientTLSSecret, secretName)
 	})
