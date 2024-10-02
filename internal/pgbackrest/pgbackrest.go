@@ -20,11 +20,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/pkg/errors"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -36,10 +34,6 @@ const (
 	// errMsgStaleReposWithVolumesConfig is the error message displayed when a volume-backed repo has been
 	// configured, but the configuration has not yet propagated into the container.
 	errMsgStaleReposWithVolumesConfig = "postgres operator error: pgBackRest stale volume-backed repo configuration"
-
-	// errMsgBackupDbMismatch is the error message returned from pgBackRest when PG versions
-	// or PG system identifiers do not match between the PG instance and the existing stanza
-	errMsgBackupDbMismatch = "backup and archive info files exist but do not match the database"
 )
 
 // Executor calls "pgbackrest" commands
@@ -58,14 +52,9 @@ type Executor func(
 // from running (with a config mismatch indicating that the pgBackRest configuration as stored in
 // the cluster's pgBackRest ConfigMap has not yet propagated to the Pod).
 func (exec Executor) StanzaCreateOrUpgrade(ctx context.Context, configHash string,
-	upgrade bool, postgresCluster *v1beta1.PostgresCluster) (bool, error) {
+	postgresCluster *v1beta1.PostgresCluster) (bool, error) {
 
 	var stdout, stderr bytes.Buffer
-
-	stanzaCmd := "create"
-	if upgrade {
-		stanzaCmd = "upgrade"
-	}
 
 	var reposWithVolumes []v1beta1.PGBackRestRepo
 	for _, repo := range postgresCluster.Spec.Backups.PGBackRest.Repos {
@@ -95,23 +84,20 @@ func (exec Executor) StanzaCreateOrUpgrade(ctx context.Context, configHash strin
 	// Otherwise, it runs the pgbackrest command, which will either be "stanza-create" or
 	// "stanza-upgrade", depending on the value of the boolean "upgrade" parameter.
 	const script = `
-declare -r hash="$1" stanza="$2" hash_msg="$3" vol_msg="$4" cmd="$5" check_repo_cmd="$6"
+declare -r hash="$1" stanza="$2" hash_msg="$3" vol_msg="$4" check_repo_cmd="$5"
 if [[ "$(< /etc/pgbackrest/conf.d/config-hash)" != "${hash}" ]]; then
     printf >&2 "%s" "${hash_msg}"; exit 1;
 elif ! bash -c "${check_repo_cmd}"; then
  	 printf >&2 "%s" "${vol_msg}"; exit 1;
 else
-    pgbackrest "${cmd}" --stanza="${stanza}"
+    pgbackrest stanza-create --stanza="${stanza}" || pgbackrest stanza-upgrade --stanza="${stanza}"
 fi
 `
-	log := logging.FromContext(ctx)
 	if err := exec(ctx, nil, &stdout, &stderr, "bash", "-ceu", "--",
 		script, "-", configHash, DefaultStanzaName, errMsgConfigHashMismatch, errMsgStaleReposWithVolumesConfig,
-		fmt.Sprintf("stanza-%s", stanzaCmd), checkRepoCmd); err != nil {
+		checkRepoCmd); err != nil {
 
 		errReturn := stdout.String() + " " + stderr.String()
-
-		log.Error(err, "stanza command failed", "cmd", stanzaCmd, "err", errReturn)
 
 		// if the config hashes didn't match, return true and don't return an error since this is
 		// expected while waiting for config changes in ConfigMaps and Secrets to make it to the
@@ -124,12 +110,6 @@ fi
 		// is expected while waiting for config changes in ConfigMaps to make it to the container
 		if errReturn == errMsgStaleReposWithVolumesConfig {
 			return true, nil
-		}
-
-		// if the err returned from pgbackrest command is about a version mismatch
-		// then we should run upgrade rather than create
-		if strings.Contains(errReturn, errMsgBackupDbMismatch) {
-			return exec.StanzaCreateOrUpgrade(ctx, configHash, true, postgresCluster)
 		}
 
 		// if none of the above errors, return the err
