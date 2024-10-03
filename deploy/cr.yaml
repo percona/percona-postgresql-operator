@@ -46,6 +46,7 @@ spec:
 #  dataSource:
 #    postgresCluster:
 #      clusterName: cluster1
+#      clusterNamespace: cluster1-namespace
 #      repoName: repo1
 #      options:
 #      - --type=time
