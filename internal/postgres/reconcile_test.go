@@ -77,6 +77,9 @@ func TestInstancePod(t *testing.T) {
 	cluster.Default()
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 	cluster.Spec.PostgresVersion = 11
+	cluster.SetLabels(map[string]string{
+		naming.LabelVersion: "2.5.0",
+	})
 
 	dataVolume := new(corev1.PersistentVolumeClaim)
 	dataVolume.Name = "datavol"
@@ -279,7 +282,6 @@ initContainers:
     install --directory --mode=0775 "${pgbrLog_directory}" ||
     halt "$(permissions "${pgbrLog_directory}" ||:)"
     install -D --mode=0600 -t "/tmp/replication" "/pgconf/tls/replication"/{tls.crt,tls.key,ca.crt}
-
 
     [[ -f "${postgres_data_directory}/PG_VERSION" ]] || exit 0
     results 'data version' "${postgres_data_version:=$(< "${postgres_data_directory}/PG_VERSION")}"

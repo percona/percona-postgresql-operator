@@ -24,9 +24,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestSafeHash32(t *testing.T) {
@@ -119,6 +121,12 @@ func TestAddDevSHM(t *testing.T) {
 }
 
 func TestAddNSSWrapper(t *testing.T) {
+	cluster := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nss-wrapper-test",
+			Namespace: "nss-wrapper-test",
+		},
+	}
 
 	image := "test-image"
 	imagePullPolicy := corev1.PullAlways
@@ -226,7 +234,7 @@ func TestAddNSSWrapper(t *testing.T) {
 			template := tc.podTemplate
 			beforeAddNSS := template.DeepCopy().Spec.Containers
 
-			addNSSWrapper(image, imagePullPolicy, template)
+			addNSSWrapper(cluster, image, imagePullPolicy, template)
 
 			t.Run("container-updated", func(t *testing.T) {
 				// Each container that requires the nss_wrapper envs should be updated

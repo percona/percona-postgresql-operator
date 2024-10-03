@@ -361,6 +361,7 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 	// add nss_wrapper init container and add nss_wrapper env vars to the pgAdmin
 	// container
 	addNSSWrapper(
+		cluster,
 		config.PGAdminContainerImage(cluster),
 		cluster.Spec.ImagePullPolicy,
 		&sts.Spec.Template)

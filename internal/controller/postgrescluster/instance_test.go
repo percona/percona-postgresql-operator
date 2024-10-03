@@ -541,6 +541,9 @@ func TestAddPGBackRestToInstancePodSpec(t *testing.T) {
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
 	cluster.Default()
+	cluster.SetLabels(map[string]string{
+		naming.LabelVersion: "2.5.0",
+	})
 
 	certificates := corev1.Secret{}
 	certificates.Name = "some-secret"

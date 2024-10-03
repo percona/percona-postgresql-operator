@@ -31,8 +31,8 @@ func PodSecurityContext() *corev1.PodSecurityContext {
 
 // RestrictedSecurityContext returns a v1.SecurityContext with safe defaults.
 // See https://docs.k8s.io/concepts/security/pod-security-standards/
-func RestrictedSecurityContext() *corev1.SecurityContext {
-	return &corev1.SecurityContext{
+func RestrictedSecurityContext(enableSeccompProfile bool) *corev1.SecurityContext {
+	secContext := &corev1.SecurityContext{
 		// Prevent any container processes from gaining privileges.
 		AllowPrivilegeEscalation: Bool(false),
 
@@ -51,9 +51,13 @@ func RestrictedSecurityContext() *corev1.SecurityContext {
 
 		// Fail to start the container if its image runs as UID 0 (root).
 		RunAsNonRoot: Bool(true),
-
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
 	}
+
+	if enableSeccompProfile {
+		secContext.SeccompProfile = &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		}
+	}
+
+	return secContext
 }

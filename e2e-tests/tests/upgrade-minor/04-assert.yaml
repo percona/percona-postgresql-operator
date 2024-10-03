@@ -21,4 +21,4 @@ metadata:
   name: check-operator-deploy-status
 timeout: 45
 commands:
-  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1
+  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1,status.observedGeneration=2

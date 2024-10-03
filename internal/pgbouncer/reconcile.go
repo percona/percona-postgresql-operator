@@ -145,7 +145,7 @@ func Pod(
 		Image:           config.PGBouncerContainerImage(inCluster),
 		ImagePullPolicy: inCluster.Spec.ImagePullPolicy,
 		Resources:       inCluster.Spec.Proxy.PGBouncer.Resources,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(inCluster.CompareVersion("2.5.0") >= 0),
 
 		Ports: []corev1.ContainerPort{{
 			Name:          naming.PortPGBouncer,
@@ -162,10 +162,10 @@ func Pod(
 	reloader := corev1.Container{
 		Name: naming.ContainerPGBouncerConfig,
 
-		Command:         reloadCommand(naming.ContainerPGBouncerConfig),
+		Command:         reloadCommand(naming.ContainerPGBouncerConfig, inCluster.CompareVersion("2.5.0") >= 0),
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(inCluster.CompareVersion("2.5.0") >= 0),
 
 		VolumeMounts: []corev1.VolumeMount{configVolumeMount},
 	}
