@@ -1,10 +1,52 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 30
+timeout: 720
+commands:
+- script: |-
+      set -o errexit
+
+      kubectl -n ${NAMESPACE} get pod
+
+      for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
+              phase=$(kubectl -n ${NAMESPACE} get pod/${pod} -o jsonpath={".status.phase"})
+              if [[ "${phase}" != "Running" ]]; then
+                      echo "Waiting for ${pod} to start running"
+                      continue
+              fi
+              echo "PostgreSQL logs from ${pod}:"
+              echo "find /pgdata/pg14/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
+                      | kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
+      done
+
+      sleep 30
+collectors:
+- type: pod
+  selector: "postgres-operator.crunchydata.com/data=postgres"
+  tail: 30
 ---
-kind: ConfigMap
-apiVersion: v1
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
 metadata:
-  name: 07-read-from-primary
-data:
-  data: ' 100500'
+  name: restore-after-13-to-14
+spec:
+  pgCluster: major-upgrade
+  repoName: repo3
+status:
+  state: Succeeded
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: major-upgrade
+status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready

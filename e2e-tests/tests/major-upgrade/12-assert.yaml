@@ -1,30 +1,31 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 720
+timeout: 660
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  annotations:
+    postgres-operator.crunchydata.com/pgbackrest-backup: backup-after-12-to-13
+  labels:
+    postgres-operator.crunchydata.com/pgbackrest-backup: manual
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo2
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
 ---
 apiVersion: pgv2.percona.com/v2
-kind: PerconaPGRestore
+kind: PerconaPGBackup
 metadata:
-  name: restore-after-12-to-13
+  name: backup-after-12-to-13
 spec:
   pgCluster: major-upgrade
-  repoName: repo1
+  repoName: repo2
+  options:
+    - --type=full
 status:
   state: Succeeded
----
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
-metadata:
-  name: major-upgrade
-status:
-  pgbouncer:
-    ready: 3
-    size: 3
-  postgres:
-    instances:
-    - name: instance1
-      ready: 3
-      size: 3
-    ready: 3
-    size: 3
-  state: ready

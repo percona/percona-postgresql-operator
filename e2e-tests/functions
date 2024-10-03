@@ -759,3 +759,17 @@ get_container_image() {
 
 	echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
 }
+
+get_postgresql_logs() {
+	local pgVersion=$1
+
+	for pod in $(kubectl get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
+		local phase=$(kubectl -n ${NAMESPACE} get ${pod} -o jsonpath={".status.phase"})
+		if [[ "${phase}" != "Running" ]]; then
+			echo "Waiting for ${pod} to start running"
+			continue
+		fi
+		echo "find /pgdata/pg${pgVersion}/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
+			| kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
+	done
+}
