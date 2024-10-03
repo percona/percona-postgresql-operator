@@ -5,7 +5,6 @@ import (
 	"os"
 
 	gover "github.com/hashicorp/go-version"
-	v "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -334,12 +333,12 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	return postgresCluster, nil
 }
 
-func (cr *PerconaPGCluster) Version() *v.Version {
-	return v.Must(v.NewVersion(cr.Spec.CRVersion))
+func (cr *PerconaPGCluster) Version() *gover.Version {
+	return gover.Must(gover.NewVersion(cr.Spec.CRVersion))
 }
 
 func (cr *PerconaPGCluster) CompareVersion(ver string) int {
-	return cr.Version().Compare(v.Must(v.NewVersion(ver)))
+	return cr.Version().Compare(gover.Must(gover.NewVersion(ver)))
 }
 
 type AppState string

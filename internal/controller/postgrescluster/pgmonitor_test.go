@@ -100,6 +100,10 @@ func TestAddPGMonitorExporterToInstancePodSpec(t *testing.T) {
 	cluster.Spec.Port = initialize.Int32(5432)
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 
+	cluster.SetLabels(map[string]string{
+		naming.LabelVersion: "2.5.0",
+	})
+
 	resources := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU: resource.MustParse("100m"),

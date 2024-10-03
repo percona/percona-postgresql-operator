@@ -52,6 +52,15 @@ recreate() (
 
 	// bashSafeLink is a Bash function that moves an existing file or directory
 	// and replaces it with a symbolic link.
+	bashSafeLinkPre250 = `
+safelink() (
+  local desired="$1" name="$2" current
+  current=$(realpath "${name}")
+  if [ "${current}" = "${desired}" ]; then return; fi
+  set -x; mv --no-target-directory "${current}" "${desired}"
+  ln --no-dereference --force --symbolic "${desired}" "${name}"
+)
+`
 	bashSafeLink = `
 safelink() (
   local desired="$1" name="$2" current
@@ -154,7 +163,7 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 // reloadCommand returns an entrypoint that convinces PostgreSQL to reload
 // certificate files when they change. The process will appear as name in `ps`
 // and `top`.
-func reloadCommand(name string) []string {
+func reloadCommand(name string, post250 bool) []string {
 	// Use a Bash loop to periodically check the mtime of the mounted
 	// certificate volume. When it changes, copy the replication certificate,
 	// signal PostgreSQL, and print the observed timestamp.
@@ -178,6 +187,27 @@ func reloadCommand(name string) []string {
 	// mtimes.
 	// - https://unix.stackexchange.com/a/407383
 	script := fmt.Sprintf(`
+declare -r directory=%q
+exec {fd}<> <(:)
+while read -r -t 5 -u "${fd}" || true; do
+  if [ "${directory}" -nt "/proc/self/fd/${fd}" ] &&
+    install -D --mode=0600 -t %q "${directory}"/{%s,%s,%s} &&
+    pkill -HUP --exact --parent=1 postgres
+  then
+    exec {fd}>&- && exec {fd}<> <(:)
+    stat --format='Loaded certificates dated %%y' "${directory}"
+  fi
+done
+`,
+		naming.CertMountPath,
+		naming.ReplicationTmp,
+		naming.ReplicationCertPath,
+		naming.ReplicationPrivateKeyPath,
+		naming.ReplicationCACertPath,
+	)
+
+	if post250 {
+		script = fmt.Sprintf(`
 # Parameters for curl when managing autogrow annotation.
 APISERVER="https://kubernetes.default.svc"
 SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
@@ -213,12 +243,13 @@ while read -r -t 5 -u "${fd}" ||:; do
   fi
 done
 `,
-		naming.CertMountPath,
-		naming.ReplicationTmp,
-		naming.ReplicationCertPath,
-		naming.ReplicationPrivateKeyPath,
-		naming.ReplicationCACertPath,
-	)
+			naming.CertMountPath,
+			naming.ReplicationTmp,
+			naming.ReplicationCertPath,
+			naming.ReplicationPrivateKeyPath,
+			naming.ReplicationCACertPath,
+		)
+	}
 
 	// Elide the above script from `ps` and `top` by wrapping it in a function
 	// and calling that.
@@ -231,7 +262,9 @@ done
 // PostgreSQL.
 func startupCommand(
 	ctx context.Context,
-	cluster *v1beta1.PostgresCluster, instance *v1beta1.PostgresInstanceSetSpec,
+	cluster *v1beta1.PostgresCluster,
+	instance *v1beta1.PostgresInstanceSetSpec,
+	post250 bool,
 ) []string {
 	version := fmt.Sprint(cluster.Spec.PostgresVersion)
 	walDir := WALDirectory(cluster, instance)
@@ -290,7 +323,7 @@ chmod +x /tmp/pg_rewind_tde.sh
 	}
 
 	args := []string{version, walDir, naming.PGBackRestPGDataLogPath}
-	script := strings.Join([]string{
+	statements := []string{
 		`declare -r expected_major_version="$1" pgwal_directory="$2" pgbrLog_directory="$3"`,
 
 		// Function to print the permissions of a file or directory and its parents.
@@ -306,36 +339,94 @@ chmod +x /tmp/pg_rewind_tde.sh
 		strings.TrimSpace(bashRecreateDirectory),
 
 		// Function to change a directory symlink while keeping the directory contents.
-		strings.TrimSpace(bashSafeLink),
+		func() string {
+			if !post250 {
+				return strings.TrimSpace(bashSafeLinkPre250)
+			}
+			return strings.TrimSpace(bashSafeLink)
+		}(),
 
 		// Log the effective user ID and all the group IDs.
 		`echo Initializing ...`,
-		`results 'uid' "$(id -u ||:)" 'gid' "$(id -G ||:)"`,
+		func() string {
+			if !post250 {
+				return `results 'uid' "$(id -u)" 'gid' "$(id -G)"`
+			}
+			return `results 'uid' "$(id -u ||:)" 'gid' "$(id -G ||:)"`
+		}(),
 
-		// The pgbackrest spool path should be co-located with wal. If a wal volume exists, symlink the spool-path to it.
-		`if [[ "${pgwal_directory}" == *"pgwal/"* ]] && [[ ! -d "/pgwal/pgbackrest-spool" ]];then rm -rf "/pgdata/pgbackrest-spool" && mkdir -p "/pgwal/pgbackrest-spool" && ln --force --symbolic "/pgwal/pgbackrest-spool" "/pgdata/pgbackrest-spool";fi`,
-		// When a pgwal volume is removed, the symlink will be broken; force pgbackrest to recreate spool-path.
-		`if [[ ! -e "/pgdata/pgbackrest-spool" ]];then rm -rf /pgdata/pgbackrest-spool;fi`,
+		func() string {
+			if !post250 {
+				return "remove"
+			}
+
+			// The pgbackrest spool path should be co-located with wal. If a wal volume exists, symlink the spool-path to it.
+			return `if [[ "${pgwal_directory}" == *"pgwal/"* ]] && [[ ! -d "/pgwal/pgbackrest-spool" ]];then rm -rf "/pgdata/pgbackrest-spool" && mkdir -p "/pgwal/pgbackrest-spool" && ln --force --symbolic "/pgwal/pgbackrest-spool" "/pgdata/pgbackrest-spool";fi`
+		}(),
+
+		func() string {
+			if !post250 {
+				return "remove"
+			}
+
+			// When a pgwal volume is removed, the symlink will be broken; force pgbackrest to recreate spool-path.
+			return `if [[ ! -e "/pgdata/pgbackrest-spool" ]];then rm -rf /pgdata/pgbackrest-spool;fi`
+		}(),
+
+		func() string {
+			if !post250 {
+				return `results 'postgres path' "$(command -v postgres)"`
+			}
+
+			return `results 'postgres path' "$(command -v postgres ||:)"`
+		}(),
+
+		func() string {
+			if !post250 {
+				return `results 'postgres version' "${postgres_version:=$(postgres --version)}"`
+			}
+
+			return `results 'postgres version' "${postgres_version:=$(postgres --version ||:)}"`
+		}(),
 
 		// Abort when the PostgreSQL version installed in the image does not
 		// match the cluster spec.
-		`results 'postgres path' "$(command -v postgres ||:)"`,
-		`results 'postgres version' "${postgres_version:=$(postgres --version ||:)}"`,
 		`[[ "${postgres_version}" =~ ") ${expected_major_version}"($|[^0-9]) ]] ||`,
 		`halt Expected PostgreSQL version "${expected_major_version}"`,
 
+		`results 'config directory' "${PGDATA:?}"`,
+
+		func() string {
+			if !post250 {
+				return `postgres_data_directory=$([ -d "${PGDATA}" ] && postgres -C data_directory || echo "${PGDATA}")`
+			}
+
+			return `postgres_data_directory=$([[ -d "${PGDATA}" ]] && postgres -C data_directory || echo "${PGDATA}")`
+		}(),
+
+		`results 'data directory' "${postgres_data_directory}"`,
 		// Abort when the configured data directory is not $PGDATA.
 		// - https://www.postgresql.org/docs/current/runtime-config-file-locations.html
-		`results 'config directory' "${PGDATA:?}"`,
-		`postgres_data_directory=$([[ -d "${PGDATA}" ]] && postgres -C data_directory || echo "${PGDATA}")`,
-		`results 'data directory' "${postgres_data_directory}"`,
 		`[[ "${postgres_data_directory}" == "${PGDATA}" ]] ||`,
 		`halt Expected matching config and data directories`,
 
 		// Determine if the data directory has been prepared for bootstrapping the cluster
 		`bootstrap_dir="${postgres_data_directory}_bootstrap"`,
-		`[[ -d "${bootstrap_dir}" ]] && results 'bootstrap directory' "${bootstrap_dir}"`,
-		`[[ -d "${bootstrap_dir}" ]] && postgres_data_directory="${bootstrap_dir}"`,
+		func() string {
+			if !post250 {
+				return `[ -d "${bootstrap_dir}" ] && results 'bootstrap directory' "${bootstrap_dir}"`
+			}
+
+			return `[[ -d "${bootstrap_dir}" ]] && results 'bootstrap directory' "${bootstrap_dir}"`
+		}(),
+
+		func() string {
+			if !post250 {
+				return `[ -d "${bootstrap_dir}" ] && postgres_data_directory="${bootstrap_dir}"`
+			}
+
+			return `[[ -d "${bootstrap_dir}" ]] && postgres_data_directory="${bootstrap_dir}"`
+		}(),
 
 		// PostgreSQL requires its directory to be writable by only itself.
 		// Pod "securityContext.fsGroup" sets g+w on directories for *some*
@@ -381,11 +472,24 @@ chmod +x /tmp/pg_rewind_tde.sh
 			naming.ReplicationCACert),
 
 		// Add the pg_rewind wrapper script, if TDE is enabled.
-		pg_rewind_override,
+		func() string {
+			if len(pg_rewind_override) < 1 {
+				return "remove"
+			}
+
+			return pg_rewind_override
+		}(),
 
 		tablespaceCmd,
+
 		// When the data directory is empty, there's nothing more to do.
-		`[[ -f "${postgres_data_directory}/PG_VERSION" ]] || exit 0`,
+		func() string {
+			if !post250 {
+				return `[ -f "${postgres_data_directory}/PG_VERSION" ] || exit 0`
+			}
+
+			return `[[ -f "${postgres_data_directory}/PG_VERSION" ]] || exit 0`
+		}(),
 
 		// Abort when the data directory is not empty and its version does not
 		// match the cluster spec.
@@ -409,7 +513,13 @@ chmod +x /tmp/pg_rewind_tde.sh
 		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/bin/initdb/initdb.c;hb=REL_13_0#l2718
 		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/bin/pg_basebackup/pg_basebackup.c;hb=REL_13_0#l2621
 		`safelink "${pgwal_directory}" "${postgres_data_directory}/pg_wal"`,
-		`results 'wal directory' "$(realpath "${postgres_data_directory}/pg_wal" ||:)"`,
+		func() string {
+			if !post250 {
+				return `results 'wal directory' "$(realpath "${postgres_data_directory}/pg_wal")"`
+			}
+
+			return `results 'wal directory' "$(realpath "${postgres_data_directory}/pg_wal" ||:)"`
+		}(),
 
 		// Early versions of PGO create replicas with a recovery signal file.
 		// Patroni also creates a standby signal file before starting Postgres,
@@ -419,7 +529,17 @@ chmod +x /tmp/pg_rewind_tde.sh
 		// - https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/backend/access/transam/xlog.c;hb=REL_12_0#l5318
 		// TODO(cbandy): Remove this after 5.0 is EOL.
 		`rm -f "${postgres_data_directory}/recovery.signal"`,
-	}, "\n")
+	}
+	script := strings.Join(filter(statements, func(s string) bool { return s != "remove" }), "\n")
 
 	return append([]string{"bash", "-ceu", "--", script, "startup"}, args...)
+}
+
+func filter(ss []string, test func(string) bool) (ret []string) {
+	for _, s := range ss {
+		if test(s) {
+			ret = append(ret, s)
+		}
+	}
+	return ret
 }

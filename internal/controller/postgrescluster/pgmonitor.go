@@ -270,7 +270,7 @@ func addPGMonitorExporterToInstancePodSpec(
 	withBuiltInCollectors :=
 		!strings.EqualFold(cluster.Annotations[naming.PostgresExporterCollectorsAnnotation], "None")
 
-	securityContext := initialize.RestrictedSecurityContext()
+	securityContext := initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0)
 	exporterContainer := corev1.Container{
 		Name:            naming.ContainerPGMonitorExporter,
 		Image:           config.PGExporterContainerImage(cluster),

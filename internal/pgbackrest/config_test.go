@@ -320,7 +320,7 @@ func TestMakePGBackrestLogDir(t *testing.T) {
 func TestReloadCommand(t *testing.T) {
 	shellcheck := require.ShellCheck(t)
 
-	command := reloadCommand("some-name")
+	command := reloadCommand("some-name", true)
 
 	// Expect a bash command with an inline script.
 	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
@@ -338,7 +338,7 @@ func TestReloadCommand(t *testing.T) {
 }
 
 func TestReloadCommandPrettyYAML(t *testing.T) {
-	b, err := yaml.Marshal(reloadCommand("any"))
+	b, err := yaml.Marshal(reloadCommand("any", true))
 	assert.NilError(t, err)
 	assert.Assert(t, strings.Contains(string(b), "\n- |"),
 		"expected literal block scalar, got:\n%s", b)

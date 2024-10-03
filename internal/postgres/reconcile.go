@@ -185,20 +185,24 @@ func InstancePod(ctx context.Context,
 			Protocol:      corev1.ProtocolTCP,
 		}},
 
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(inCluster.CompareVersion("2.5.0") >= 0),
 		VolumeMounts:    dbContainerMounts,
 	}
 
 	reloader := corev1.Container{
 		Name: naming.ContainerClientCertCopy,
 
-		Command: reloadCommand(naming.ContainerClientCertCopy),
+		Command: reloadCommand(naming.ContainerClientCertCopy, inCluster.CompareVersion("2.5.0") >= 0),
 
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(inCluster.CompareVersion("2.5.0") >= 0),
 
-		VolumeMounts: []corev1.VolumeMount{certVolumeMount, dataVolumeMount},
+		VolumeMounts: []corev1.VolumeMount{certVolumeMount},
+	}
+
+	if inCluster.CompareVersion("2.5.0") >= 0 {
+		reloader.VolumeMounts = append(reloader.VolumeMounts, dataVolumeMount)
 	}
 
 	if inInstanceSpec.Sidecars != nil &&
@@ -210,13 +214,13 @@ func InstancePod(ctx context.Context,
 	startup := corev1.Container{
 		Name: naming.ContainerPostgresStartup,
 
-		Command: startupCommand(ctx, inCluster, inInstanceSpec),
+		Command: startupCommand(ctx, inCluster, inInstanceSpec, inCluster.CompareVersion("2.5.0") >= 0),
 		Env:     Environment(inCluster),
 
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
 		Resources:       container.Resources,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(inCluster.CompareVersion("2.5.0") >= 0),
 
 		VolumeMounts: []corev1.VolumeMount{certVolumeMount, dataVolumeMount},
 	}

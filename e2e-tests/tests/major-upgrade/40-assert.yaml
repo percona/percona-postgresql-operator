@@ -1,6 +1,10 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 360
+commands:
+- script: |-
+    kubectl -n ${NAMESPACE} get pg,pod,job
+    sleep 5
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
@@ -20,3 +24,19 @@ status:
     ready: 3
     size: 3
   state: ready
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: major-upgrade
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo4
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
