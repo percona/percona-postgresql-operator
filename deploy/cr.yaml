@@ -46,6 +46,7 @@ spec:
 #  dataSource:
 #    postgresCluster:
 #      clusterName: cluster1
+#      clusterNamespace: cluster1-namespace
 #      repoName: repo1
 #      options:
 #      - --type=time
@@ -112,7 +113,7 @@ spec:
 #          test-label: value
 
 
-  image: perconalab/percona-postgresql-operator:main-ppg16-postgres
+  image: percona/percona-postgresql-operator:2.5.0-ppg16.4-postgres
   imagePullPolicy: Always
   postgresVersion: 16
 #  port: 5432
@@ -214,6 +215,8 @@ spec:
       resources:
         requests:
           storage: 1Gi
+#      limits:
+#          storage: 5Gi
 #    tablespaceVolumes:
 #      - name: user
 #        dataVolumeClaimSpec:
@@ -226,7 +229,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
+      image: percona/percona-postgresql-operator:2.5.0-ppg16.4-pgbouncer1.23.1
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -308,7 +311,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
+      image: percona/percona-postgresql-operator:2.5.0-ppg16.4-pgbackrest2.53-1
 #
 #      containers:
 #        pgbackrest:
@@ -451,7 +454,7 @@ spec:
 
   pmm:
     enabled: false
-    image: perconalab/pmm-client:dev-latest
+    image: percona/pmm-client:2.43.1
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -472,7 +475,7 @@ spec:
 #          work_mem: 2MB
 
 #  extensions:
-#    image: perconalab/percona-postgresql-operator:main
+#    image: percona/percona-postgresql-operator:2.5.0
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3

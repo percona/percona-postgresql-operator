@@ -9,9 +9,6 @@ metadata:
 spec:
   pgCluster: scheduled-backup
   repoName: repo2
-status:
-  backupType: full
-  state: Succeeded
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
@@ -34,11 +31,3 @@ spec:
 status:
   backupType: full
   state: Succeeded
----
-apiVersion: postgres-operator.crunchydata.com/v1beta1
-kind: PostgresCluster
-metadata:
-  name: scheduled-backup
-  generation: 6
-status:
-  observedGeneration: 6
