@@ -49,6 +49,9 @@ func TestHandlePersistentVolumeClaimError(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
 	cluster.Namespace = "ns1"
 	cluster.Name = "pg2"
+	cluster.SetLabels(map[string]string{
+		naming.LabelVersion: "2.5.0",
+	})
 
 	reset := func() {
 		cluster.Status.Conditions = cluster.Status.Conditions[:0]
@@ -395,7 +398,7 @@ func TestReconcileConfigureExistingPVCs(t *testing.T) {
 			Name:      "testcluster",
 			Namespace: ns.GetName(),
 			Labels: map[string]string{
-				naming.LabelVersion: "2.3.0",
+				naming.LabelVersion: "2.5.0",
 			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
@@ -657,6 +660,9 @@ func TestReconcileMoveDirectories(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testcluster",
 			Namespace: ns.GetName(),
+			Labels: map[string]string{
+				naming.LabelVersion: "2.5.0",
+			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
 			PostgresVersion: 13,

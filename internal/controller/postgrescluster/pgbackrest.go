@@ -640,6 +640,7 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	// add nss_wrapper init container and add nss_wrapper env vars to the pgbackrest
 	// container
 	addNSSWrapper(
+		postgresCluster,
 		config.PGBackRestContainerImage(postgresCluster),
 		postgresCluster.Spec.ImagePullPolicy,
 		&repo.Spec.Template)
@@ -736,7 +737,7 @@ func generateBackupJobSpecIntent(postgresCluster *v1beta1.PostgresCluster,
 		Image:           config.PGBackRestContainerImage(postgresCluster),
 		ImagePullPolicy: postgresCluster.Spec.ImagePullPolicy,
 		Name:            naming.PGBackRestRepoContainerName,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(postgresCluster.CompareVersion("2.5.0") >= 0),
 	}
 
 	if postgresCluster.Spec.Backups.PGBackRest.Jobs != nil {
@@ -1193,6 +1194,7 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 	// add nss_wrapper init container and add nss_wrapper env vars to the pgbackrest restore
 	// container
 	addNSSWrapper(
+		cluster,
 		config.PGBackRestContainerImage(cluster),
 		cluster.Spec.ImagePullPolicy,
 		&restoreJob.Spec.Template)
@@ -1245,7 +1247,7 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 					Name:            naming.PGBackRestRestoreContainerName,
 					VolumeMounts:    volumeMounts,
 					Env:             []corev1.EnvVar{{Name: "PGHOST", Value: "/tmp"}},
-					SecurityContext: initialize.RestrictedSecurityContext(),
+					SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
 					Resources:       dataSource.Resources,
 				}},
 				RestartPolicy: corev1.RestartPolicyNever,
@@ -2647,8 +2649,7 @@ func (r *Reconciler) reconcileStanzaCreate(ctx context.Context,
 	}
 
 	// Always attempt to create pgBackRest stanza first
-	configHashMismatch, err := pgbackrest.Executor(exec).StanzaCreateOrUpgrade(ctx, configHash,
-		false, postgresCluster)
+	configHashMismatch, err := pgbackrest.Executor(exec).StanzaCreateOrUpgrade(ctx, configHash, postgresCluster)
 	if err != nil {
 		// record and log any errors resulting from running the stanza-create command
 		r.Recorder.Event(postgresCluster, corev1.EventTypeWarning, EventUnableToCreateStanzas,

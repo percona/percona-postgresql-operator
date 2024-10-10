@@ -212,7 +212,7 @@ func TestPodConfigFiles(t *testing.T) {
 
 func TestReloadCommand(t *testing.T) {
 	shellcheck := require.ShellCheck(t)
-	command := reloadCommand("some-name")
+	command := reloadCommand("some-name", true)
 
 	// Expect a bash command with an inline script.
 	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})

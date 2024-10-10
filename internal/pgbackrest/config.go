@@ -159,7 +159,7 @@ func MakePGBackrestLogDir(template *corev1.PodTemplateSpec,
 		Image:           config.PGBackRestContainerImage(cluster),
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Name:            naming.ContainerPGBackRestLogDirInit,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
 	}
 
 	// Set the container resources to the 'pgbackrest' container configuration.
@@ -444,7 +444,7 @@ func getExternalRepoConfigs(repo v1beta1.PGBackRestRepo) map[string]string {
 // reloadCommand returns an entrypoint that convinces the pgBackRest TLS server
 // to reload its options and certificate files when they change. The process
 // will appear as name in `ps` and `top`.
-func reloadCommand(name string) []string {
+func reloadCommand(name string, post250 bool) []string {
 	// Use a Bash loop to periodically check the mtime of the mounted server
 	// volume and configuration file. When either changes, signal pgBackRest
 	// and print the observed timestamp.
@@ -460,7 +460,29 @@ func reloadCommand(name string) []string {
 	// descriptor gets closed and reopened to use the builtin `[ -nt` to check
 	// mtimes.
 	// - https://unix.stackexchange.com/a/407383
-	const script = `
+	script := `
+exec {fd}<> <(:)
+until read -r -t 5 -u "${fd}"; do
+  if
+    [ "${filename}" -nt "/proc/self/fd/${fd}" ] &&
+    pkill -HUP --exact --parent=0 pgbackrest
+  then
+    exec {fd}>&- && exec {fd}<> <(:)
+    stat --dereference --format='Loaded configuration dated %y' "${filename}"
+  elif
+    { [ "${directory}" -nt "/proc/self/fd/${fd}" ] ||
+      [ "${authority}" -nt "/proc/self/fd/${fd}" ]
+    } &&
+    pkill -HUP --exact --parent=0 pgbackrest
+  then
+    exec {fd}>&- && exec {fd}<> <(:)
+    stat --format='Loaded certificates dated %y' "${directory}"
+  fi
+done
+`
+
+	if post250 {
+		script = `
 exec {fd}<> <(:||:)
 until read -r -t 5 -u "${fd}"; do
   if
@@ -480,6 +502,7 @@ until read -r -t 5 -u "${fd}"; do
   fi
 done
 `
+	}
 
 	// Elide the above script from `ps` and `top` by wrapping it in a function
 	// and calling that.

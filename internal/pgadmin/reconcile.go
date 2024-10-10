@@ -244,7 +244,7 @@ func Pod(
 		ImagePullPolicy: inCluster.Spec.ImagePullPolicy,
 		Resources:       inCluster.Spec.UserInterface.PGAdmin.Resources,
 
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(inCluster.CompareVersion("2.5.0") >= 0),
 
 		Ports: []corev1.ContainerPort{{
 			Name:          naming.PortPGAdmin,
@@ -294,7 +294,7 @@ func Pod(
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
 		Resources:       container.Resources,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(inCluster.CompareVersion("2.5.0") >= 0),
 		VolumeMounts: []corev1.VolumeMount{
 			startupVolumeMount,
 			configVolumeMount,
