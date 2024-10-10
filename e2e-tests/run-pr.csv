@@ -11,6 +11,7 @@ pitr
 scaling
 scheduled-backup
 self-healing
+standby
 start-from-backup
 tablespaces
 telemetry-transfer
