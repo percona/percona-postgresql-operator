@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      repo_path=$(kubectl get pg -n "${NAMESPACE}" "${test_name}-primary" -o yaml | yq ".spec.backups.pgbackrest.global.repo1-path")
+
+      get_cr \
+          | yq ".metadata.name=\"${test_name}-standby\"" \
+          | yq ".spec.standby.enabled=true" \
+          | yq ".spec.standby.repoName=\"repo1\"" \
+          | yq "del(.spec.backups.pgbackrest.repos[0].schedules)" \
+          | yq "del(.spec.backups.pgbackrest.repos[0].volume)" \
+          | yq ".spec.backups.pgbackrest.repos[0].gcs.bucket=\"pg-operator-testing\"" \
+          | yq ".spec.backups.pgbackrest.configuration[0].secret.name=\"standby-pgbackrest-secrets\"" \
+          | yq ".spec.backups.pgbackrest.global.repo1-path = \"$repo_path\"" \
+          | kubectl -n "${NAMESPACE}" apply -f -
