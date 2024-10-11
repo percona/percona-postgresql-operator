@@ -6,7 +6,7 @@ metadata:
 #  - percona.com/delete-pvc
 #  - percona.com/delete-ssl
 spec:
-  crVersion: 2.5.0
+  crVersion: 2.6.0
 #  secrets:
 #    customRootCATLSSecret:
 #      name: cluster1-ca-cert
@@ -46,6 +46,7 @@ spec:
 #  dataSource:
 #    postgresCluster:
 #      clusterName: cluster1
+#      clusterNamespace: cluster1-namespace
 #      repoName: repo1
 #      options:
 #      - --type=time
@@ -214,6 +215,8 @@ spec:
       resources:
         requests:
           storage: 1Gi
+#      limits:
+#          storage: 5Gi
 #    tablespaceVolumes:
 #      - name: user
 #        dataVolumeClaimSpec:
