@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/rest"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
@@ -128,7 +129,7 @@ func manageUpgradeCheckConfigMap(ctx context.Context, crClient crclient.Client,
 		}
 	}
 
-	err = applyConfigMap(ctx, crClient, cm, currentID)
+	err = applyConfigMap(ctx, crClient, cm, postgrescluster.ControllerName)
 	if err != nil {
 		log.V(1).Info("upgrade check issue: could not apply configmap",
 			"response", err.Error())
