@@ -40,7 +40,7 @@ func sqlAuthenticationQuery(sqlFunctionName string, exposeSuperusers bool) strin
 		// No replicators.
 		`NOT pg_authid.rolreplication`,
 		// Not the PgBouncer role itself.
-		`pg_authid.rolname <> ` + util.SQLQuoteLiteral(postgresqlUser),
+		`pg_authid.rolname <> ` + postgres.QuoteLiteral(postgresqlUser),
 		// Those without a password expiration or an expiration in the future.
 		`(pg_authid.rolvaliduntil IS NULL OR pg_authid.rolvaliduntil >= CURRENT_TIMESTAMP)`,
 	}
@@ -57,7 +57,7 @@ func sqlAuthenticationQuery(sqlFunctionName string, exposeSuperusers bool) strin
 
 	return strings.TrimSpace(`
 CREATE OR REPLACE FUNCTION ` + sqlFunctionName + `(username TEXT)
-RETURNS TABLE(username TEXT, password TEXT) AS ` + util.SQLQuoteLiteral(`
+RETURNS TABLE(username TEXT, password TEXT) AS ` + postgres.QuoteLiteral(`
   SELECT rolname::TEXT, rolpassword::TEXT
   FROM pg_catalog.pg_authid
   WHERE pg_authid.rolname = $1
