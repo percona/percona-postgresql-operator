@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -470,7 +469,7 @@ func (r *Reconciler) deleteInstances(
 
 	// stop schedules pod for deletion by scaling its controller to zero.
 	stop := func(pod *corev1.Pod) error {
-		instance := &unstructured.Unstructured{}
+		instance := &appsv1.StatefulSet{}
 		instance.SetNamespace(cluster.Namespace)
 
 		switch owner := metav1.GetControllerOfNoCopy(pod); {
@@ -478,8 +477,6 @@ func (r *Reconciler) deleteInstances(
 			return errors.Errorf("pod %q has no owner", client.ObjectKeyFromObject(pod))
 
 		case owner.Kind == "StatefulSet":
-			instance.SetAPIVersion(owner.APIVersion)
-			instance.SetKind(owner.Kind)
 			instance.SetName(owner.Name)
 
 		default:
@@ -539,7 +536,7 @@ func (r *Reconciler) deleteInstance(
 	cluster *v1beta1.PostgresCluster,
 	instanceName string,
 ) error {
-	gvks := []schema.GroupVersionKind{{
+	gvks := []runtime.GVK{{
 		Group:   corev1.SchemeGroupVersion.Group,
 		Version: corev1.SchemeGroupVersion.Version,
 		Kind:    "ConfigMapList",
