@@ -565,7 +565,7 @@ spec:
 metadata:
   name: old-postgres
 spec:
-  postgresVersion: 11
+  postgresVersion: 12
   image: postgres
   instances:
   - name: instance1
