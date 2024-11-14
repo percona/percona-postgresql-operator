@@ -17,12 +17,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
@@ -30,7 +29,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-var gvks = []schema.GroupVersionKind{{
+var gvks = []runtime.GVK{{
 	Group:   corev1.SchemeGroupVersion.Group,
 	Version: corev1.SchemeGroupVersion.Version,
 	Kind:    "ConfigMapList",
@@ -107,28 +106,25 @@ func TestCustomLabels(t *testing.T) {
 		assert.Assert(t, result.Requeue == false)
 	}
 
-	getUnstructuredLabels := func(cluster v1beta1.PostgresCluster, u unstructured.Unstructured) (map[string]map[string]string, error) {
-		var err error
+	getUnstructuredLabels := func(t *testing.T, cluster *v1beta1.PostgresCluster, u *unstructured.Unstructured) map[string]map[string]string {
+		t.Helper()
 		labels := map[string]map[string]string{}
 
-		if metav1.IsControlledBy(&u, &cluster) {
+		if metav1.IsControlledBy(u, cluster) {
 			switch u.GetKind() {
 			case "StatefulSet":
-				var resource appsv1.StatefulSet
-				err = runtime.DefaultUnstructuredConverter.
-					FromUnstructured(u.UnstructuredContent(), &resource)
+				resource, err := runtime.FromUnstructuredObject[appsv1.StatefulSet](u)
+				assert.NilError(t, err)
 				labels["resource"] = resource.GetLabels()
 				labels["podTemplate"] = resource.Spec.Template.GetLabels()
 			case "Deployment":
-				var resource appsv1.Deployment
-				err = runtime.DefaultUnstructuredConverter.
-					FromUnstructured(u.UnstructuredContent(), &resource)
+				resource, err := runtime.FromUnstructuredObject[appsv1.Deployment](u)
+				assert.NilError(t, err)
 				labels["resource"] = resource.GetLabels()
 				labels["podTemplate"] = resource.Spec.Template.GetLabels()
 			case "CronJob":
-				var resource batchv1.CronJob
-				err = runtime.DefaultUnstructuredConverter.
-					FromUnstructured(u.UnstructuredContent(), &resource)
+				resource, err := runtime.FromUnstructuredObject[batchv1.CronJob](u)
+				assert.NilError(t, err)
 				labels["resource"] = resource.GetLabels()
 				labels["jobTemplate"] = resource.Spec.JobTemplate.GetLabels()
 				labels["jobPodTemplate"] = resource.Spec.JobTemplate.Spec.Template.GetLabels()
@@ -136,7 +132,7 @@ func TestCustomLabels(t *testing.T) {
 				labels["resource"] = u.GetLabels()
 			}
 		}
-		return labels, err
+		return labels
 	}
 
 	t.Run("Cluster", func(t *testing.T) {
@@ -182,10 +178,8 @@ func TestCustomLabels(t *testing.T) {
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector}))
 
-			for i := range uList.Items {
-				u := uList.Items[i]
-				labels, err := getUnstructuredLabels(*cluster, u)
-				assert.NilError(t, err)
+			for _, u := range uList.Items {
+				labels := getUnstructuredLabels(t, cluster, &u)
 				for resourceType, resourceLabels := range labels {
 					t.Run(u.GetKind()+"/"+u.GetName()+"/"+resourceType, func(t *testing.T) {
 						assert.Equal(t, resourceLabels["my.cluster.label"], "daisy")
@@ -238,11 +232,8 @@ func TestCustomLabels(t *testing.T) {
 						client.InNamespace(cluster.Namespace),
 						client.MatchingLabelsSelector{Selector: selector}))
 
-					for i := range uList.Items {
-						u := uList.Items[i]
-
-						labels, err := getUnstructuredLabels(*cluster, u)
-						assert.NilError(t, err)
+					for _, u := range uList.Items {
+						labels := getUnstructuredLabels(t, cluster, &u)
 						for resourceType, resourceLabels := range labels {
 							t.Run(u.GetKind()+"/"+u.GetName()+"/"+resourceType, func(t *testing.T) {
 								assert.Equal(t, resourceLabels["my.instance.label"], set.Metadata.Labels["my.instance.label"])
@@ -287,11 +278,8 @@ func TestCustomLabels(t *testing.T) {
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector}))
 
-			for i := range uList.Items {
-				u := uList.Items[i]
-
-				labels, err := getUnstructuredLabels(*cluster, u)
-				assert.NilError(t, err)
+			for _, u := range uList.Items {
+				labels := getUnstructuredLabels(t, cluster, &u)
 				for resourceType, resourceLabels := range labels {
 					t.Run(u.GetKind()+"/"+u.GetName()+"/"+resourceType, func(t *testing.T) {
 						assert.Equal(t, resourceLabels["my.pgbackrest.label"], "lucy")
@@ -325,11 +313,8 @@ func TestCustomLabels(t *testing.T) {
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector}))
 
-			for i := range uList.Items {
-				u := uList.Items[i]
-
-				labels, err := getUnstructuredLabels(*cluster, u)
-				assert.NilError(t, err)
+			for _, u := range uList.Items {
+				labels := getUnstructuredLabels(t, cluster, &u)
 				for resourceType, resourceLabels := range labels {
 					t.Run(u.GetKind()+"/"+u.GetName()+"/"+resourceType, func(t *testing.T) {
 						assert.Equal(t, resourceLabels["my.pgbouncer.label"], "lucy")
@@ -371,28 +356,25 @@ func TestCustomAnnotations(t *testing.T) {
 		assert.Assert(t, result.Requeue == false)
 	}
 
-	getUnstructuredAnnotations := func(cluster v1beta1.PostgresCluster, u unstructured.Unstructured) (map[string]map[string]string, error) {
-		var err error
+	getUnstructuredAnnotations := func(t *testing.T, cluster *v1beta1.PostgresCluster, u *unstructured.Unstructured) map[string]map[string]string {
+		t.Helper()
 		annotations := map[string]map[string]string{}
 
-		if metav1.IsControlledBy(&u, &cluster) {
+		if metav1.IsControlledBy(u, cluster) {
 			switch u.GetKind() {
 			case "StatefulSet":
-				var resource appsv1.StatefulSet
-				err = runtime.DefaultUnstructuredConverter.
-					FromUnstructured(u.UnstructuredContent(), &resource)
+				resource, err := runtime.FromUnstructuredObject[appsv1.StatefulSet](u)
+				assert.NilError(t, err)
 				annotations["resource"] = resource.GetAnnotations()
 				annotations["podTemplate"] = resource.Spec.Template.GetAnnotations()
 			case "Deployment":
-				var resource appsv1.Deployment
-				err = runtime.DefaultUnstructuredConverter.
-					FromUnstructured(u.UnstructuredContent(), &resource)
+				resource, err := runtime.FromUnstructuredObject[appsv1.Deployment](u)
+				assert.NilError(t, err)
 				annotations["resource"] = resource.GetAnnotations()
 				annotations["podTemplate"] = resource.Spec.Template.GetAnnotations()
 			case "CronJob":
-				var resource batchv1.CronJob
-				err = runtime.DefaultUnstructuredConverter.
-					FromUnstructured(u.UnstructuredContent(), &resource)
+				resource, err := runtime.FromUnstructuredObject[batchv1.CronJob](u)
+				assert.NilError(t, err)
 				annotations["resource"] = resource.GetAnnotations()
 				annotations["jobTemplate"] = resource.Spec.JobTemplate.GetAnnotations()
 				annotations["jobPodTemplate"] = resource.Spec.JobTemplate.Spec.Template.GetAnnotations()
@@ -400,7 +382,7 @@ func TestCustomAnnotations(t *testing.T) {
 				annotations["resource"] = u.GetAnnotations()
 			}
 		}
-		return annotations, err
+		return annotations
 	}
 
 	t.Run("Cluster", func(t *testing.T) {
@@ -447,10 +429,8 @@ func TestCustomAnnotations(t *testing.T) {
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector}))
 
-			for i := range uList.Items {
-				u := uList.Items[i]
-				annotations, err := getUnstructuredAnnotations(*cluster, u)
-				assert.NilError(t, err)
+			for _, u := range uList.Items {
+				annotations := getUnstructuredAnnotations(t, cluster, &u)
 				for resourceType, resourceAnnotations := range annotations {
 					t.Run(u.GetKind()+"/"+u.GetName()+"/"+resourceType, func(t *testing.T) {
 						assert.Equal(t, resourceAnnotations["my.cluster.annotation"], "daisy")
@@ -503,11 +483,8 @@ func TestCustomAnnotations(t *testing.T) {
 						client.InNamespace(cluster.Namespace),
 						client.MatchingLabelsSelector{Selector: selector}))
 
-					for i := range uList.Items {
-						u := uList.Items[i]
-
-						annotations, err := getUnstructuredAnnotations(*cluster, u)
-						assert.NilError(t, err)
+					for _, u := range uList.Items {
+						annotations := getUnstructuredAnnotations(t, cluster, &u)
 						for resourceType, resourceAnnotations := range annotations {
 							t.Run(u.GetKind()+"/"+u.GetName()+"/"+resourceType, func(t *testing.T) {
 								assert.Equal(t, resourceAnnotations["my.instance.annotation"], set.Metadata.Annotations["my.instance.annotation"])
@@ -552,11 +529,8 @@ func TestCustomAnnotations(t *testing.T) {
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector}))
 
-			for i := range uList.Items {
-				u := uList.Items[i]
-
-				annotations, err := getUnstructuredAnnotations(*cluster, u)
-				assert.NilError(t, err)
+			for _, u := range uList.Items {
+				annotations := getUnstructuredAnnotations(t, cluster, &u)
 				for resourceType, resourceAnnotations := range annotations {
 					t.Run(u.GetKind()+"/"+u.GetName()+"/"+resourceType, func(t *testing.T) {
 						assert.Equal(t, resourceAnnotations["my.pgbackrest.annotation"], "lucy")
@@ -590,11 +564,8 @@ func TestCustomAnnotations(t *testing.T) {
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector}))
 
-			for i := range uList.Items {
-				u := uList.Items[i]
-
-				annotations, err := getUnstructuredAnnotations(*cluster, u)
-				assert.NilError(t, err)
+			for _, u := range uList.Items {
+				annotations := getUnstructuredAnnotations(t, cluster, &u)
 				for resourceType, resourceAnnotations := range annotations {
 					t.Run(u.GetKind()+"/"+u.GetName()+"/"+resourceType, func(t *testing.T) {
 						assert.Equal(t, resourceAnnotations["my.pgbouncer.annotation"], "lucy")
