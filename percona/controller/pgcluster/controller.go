@@ -639,14 +639,14 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	for _, finalizer := range cr.Finalizers {
-		if finalizer == v2.FinalizerStopWatchers {
+		if finalizer == pNaming.FinalizerStopWatchers {
 			return nil
 		}
 	}
 
 	if *cr.Spec.Backups.TrackLatestRestorableTime {
 		orig := cr.DeepCopy()
-		cr.Finalizers = append(cr.Finalizers, v2.FinalizerStopWatchers)
+		cr.Finalizers = append(cr.Finalizers, pNaming.FinalizerStopWatchers)
 		if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "patch finalizers")
 		}

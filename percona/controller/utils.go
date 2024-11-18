@@ -8,8 +8,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 )
 
@@ -76,4 +78,33 @@ func GetReadyInstancePod(ctx context.Context, c client.Client, clusterName, name
 		return &pod, nil
 	}
 	return nil, errors.New("no running instance found")
+}
+
+type FinalizerFunc[T client.Object] func(context.Context, T) error
+
+func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T, finalizer string, f FinalizerFunc[T]) error {
+	if !controllerutil.ContainsFinalizer(obj, finalizer) {
+		return nil
+	}
+
+	log := logging.FromContext(ctx)
+	log.Info("Running finalizer", "name", finalizer)
+
+	orig, ok := obj.DeepCopyObject().(client.Object)
+	if !ok {
+		return errors.Errorf("failed to convert runtime.Object to client.Object")
+	}
+
+	if err := f(ctx, obj); err != nil {
+		return errors.Wrapf(err, "run finalizer %s", finalizer)
+	}
+
+	if controllerutil.RemoveFinalizer(obj, finalizer) {
+		log.Info("Removing finalizer", "name", finalizer)
+		if err := cl.Patch(ctx, obj, client.MergeFrom(orig)); err != nil {
+			return errors.Wrap(err, "remove finalizers")
+		}
+	}
+
+	return nil
 }
