@@ -446,6 +446,8 @@ type PGBackRestDataSource struct {
 
 	// Defines a pgBackRest repository
 	// +kubebuilder:validation:Required
+	// K8SPG-511. Add default value to this field.
+	// +kubebuilder:default=repo1
 	Repo PGBackRestRepo `json:"repo"`
 
 	// The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.
