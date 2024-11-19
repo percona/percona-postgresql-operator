@@ -295,7 +295,7 @@ type PostgresClusterDataSource struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
 	// K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
-	// +kubebuilder:default=repo1
+	// +kubebuilder:default="repo1"
 	RepoName string `json:"repoName"`
 
 	// Command line options to include when running the pgBackRest restore command.
