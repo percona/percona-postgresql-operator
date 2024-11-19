@@ -322,6 +322,8 @@ type PGBackRestRepo struct {
 	// The name of the repository
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
+	// +kubebuilder:default="repo1"
 	Name string `json:"name"`
 
 	// Defines the schedules for the pgBackRest backups
@@ -446,8 +448,6 @@ type PGBackRestDataSource struct {
 
 	// Defines a pgBackRest repository
 	// +kubebuilder:validation:Required
-	// K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
-	// +kubebuilder:default="repo1"
 	Repo PGBackRestRepo `json:"repo"`
 
 	// The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.

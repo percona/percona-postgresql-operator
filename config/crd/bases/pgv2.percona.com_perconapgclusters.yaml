@@ -131,7 +131,10 @@ spec:
                     - bucket
                     type: object
                   name:
-                    description: The name of the repository
+                    default: "repo1"
+                    description: |-
+                      The name of the repository
+                      K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
                     pattern: ^repo[1-4]
                     type: string
                   s3:
@@ -3830,7 +3833,10 @@ spec:
                               - bucket
                               type: object
                             name:
-                              description: The name of the repository
+                              default: "repo1"
+                              description: |-
+                                The name of the repository
+                                K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
                               pattern: ^repo[1-4]
                               type: string
                             s3:
@@ -6631,10 +6637,7 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repo:
-                        default: "repo1"
-                        description: |-
-                          Defines a pgBackRest repository
-                          K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
+                        description: Defines a pgBackRest repository
                         properties:
                           azure:
                             description: Represents a pgBackRest repository that is
@@ -6658,7 +6661,10 @@ spec:
                             - bucket
                             type: object
                           name:
-                            description: The name of the repository
+                            default: "repo1"
+                            description: |-
+                              The name of the repository
+                              K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
                             pattern: ^repo[1-4]
                             type: string
                           s3:

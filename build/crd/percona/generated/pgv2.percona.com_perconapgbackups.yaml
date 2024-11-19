@@ -132,7 +132,10 @@ spec:
                     - bucket
                     type: object
                   name:
-                    description: The name of the repository
+                    default: "repo1"
+                    description: |-
+                      The name of the repository
+                      K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
                     pattern: ^repo[1-4]
                     type: string
                   s3:
