@@ -422,6 +422,11 @@ release: generate
 		-e "/extensions:/,/image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: percona/pmm-client:@@SET_TAG@@#}" deploy/cr.yaml
 	sed -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
+	sed -i \
+		-e "/^spec:/,/^  image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)#}" \
+		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-postgres#}" \
+		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbouncer#}" \
+		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbackres#}" deploy/upgrade.yaml
 
 # Prepare main branch after release
 MAJOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f1)
@@ -436,3 +441,8 @@ after-release: generate
 		-e "/extensions:/,/image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: perconalab/pmm-client:dev-latest#}" deploy/cr.yaml
 	sed -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
+	sed -i \
+		-e "/^spec:/,/^  image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main#}" \
+		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
+		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbouncer#}" \
+		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbackrest#}" deploy/upgrade.yaml

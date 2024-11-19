@@ -239,7 +239,7 @@ func podConfigFiles(
 
 // reloadCommand returns an entrypoint that convinces PgBouncer to reload
 // configuration files. The process will appear as name in `ps` and `top`.
-func reloadCommand(name string) []string {
+func reloadCommand(name string, post250 bool) []string {
 	// Use a Bash loop to periodically check the mtime of the mounted
 	// configuration volume. When it changes, signal PgBouncer and print the
 	// observed timestamp.
@@ -249,7 +249,18 @@ func reloadCommand(name string) []string {
 	// descriptor gets closed and reopened to use the builtin `[ -nt` to check
 	// mtimes.
 	// - https://unix.stackexchange.com/a/407383
-	const script = `
+	script := `
+exec {fd}<> <(:)
+while read -r -t 5 -u "${fd}" || true; do
+  if [ "${directory}" -nt "/proc/self/fd/${fd}" ] && pkill -HUP --exact pgbouncer
+  then
+    exec {fd}>&- && exec {fd}<> <(:)
+    stat --format='Loaded configuration dated %y' "${directory}"
+  fi
+done
+`
+	if post250 {
+		script = `
 exec {fd}<> <(:||:)
 while read -r -t 5 -u "${fd}" ||:; do
   if [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] && pkill -HUP --exact pgbouncer
@@ -259,6 +270,7 @@ while read -r -t 5 -u "${fd}" ||:; do
   fi
 done
 `
+	}
 
 	// Elide the above script from `ps` and `top` by wrapping it in a function
 	// and calling that.

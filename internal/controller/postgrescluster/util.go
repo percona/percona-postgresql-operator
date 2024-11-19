@@ -28,6 +28,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -219,7 +220,7 @@ func addTMPEmptyDir(template *corev1.PodTemplateSpec, sizeLimit resource.Quantit
 // containers in the Pod template.  Additionally, an init container is added to the Pod template
 // as needed to setup the nss_wrapper. Please note that the nss_wrapper is required for
 // compatibility with OpenShift: https://access.redhat.com/articles/4859371.
-func addNSSWrapper(image string, imagePullPolicy corev1.PullPolicy, template *corev1.PodTemplateSpec) {
+func addNSSWrapper(cluster *v1beta1.PostgresCluster, image string, imagePullPolicy corev1.PullPolicy, template *corev1.PodTemplateSpec) {
 
 	nssWrapperCmd := postgresNSSWrapperPrefix + nssWrapperScript
 	for i, c := range template.Spec.Containers {
@@ -250,7 +251,7 @@ func addNSSWrapper(image string, imagePullPolicy corev1.PullPolicy, template *co
 		Image:           image,
 		ImagePullPolicy: imagePullPolicy,
 		Name:            naming.ContainerNSSWrapperInit,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
 	}
 
 	// Here we set the NSS wrapper container resources to the 'database', 'pgadmin'

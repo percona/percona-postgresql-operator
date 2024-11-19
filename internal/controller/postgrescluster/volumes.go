@@ -477,7 +477,7 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 		Image:           config.PostgresContainerImage(cluster),
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Name:            naming.ContainerJobMovePGDataDir,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
 		VolumeMounts:    []corev1.VolumeMount{postgres.DataVolumeMount()},
 	}
 	if len(cluster.Spec.InstanceSets) > 0 {
@@ -596,7 +596,7 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		Image:           config.PostgresContainerImage(cluster),
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Name:            naming.ContainerJobMovePGWALDir,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
 		VolumeMounts:    []corev1.VolumeMount{postgres.WALVolumeMount()},
 	}
 	if len(cluster.Spec.InstanceSets) > 0 {
@@ -720,7 +720,7 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 		Image:           config.PGBackRestContainerImage(cluster),
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Name:            naming.ContainerJobMovePGBackRestRepoDir,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
 		VolumeMounts:    []corev1.VolumeMount{pgbackrest.RepoVolumeMount()},
 	}
 	if cluster.Spec.Backups.PGBackRest.RepoHost != nil {

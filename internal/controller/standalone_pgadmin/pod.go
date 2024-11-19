@@ -113,7 +113,7 @@ func pod(
 		Image:           config.StandalonePGAdminContainerImage(inPGAdmin),
 		ImagePullPolicy: inPGAdmin.Spec.ImagePullPolicy,
 		Resources:       inPGAdmin.Spec.Resources,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(true),
 		Ports: []corev1.ContainerPort{{
 			Name:          naming.PortPGAdmin,
 			ContainerPort: int32(pgAdminPort),
@@ -180,7 +180,7 @@ func pod(
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
 		Resources:       container.Resources,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(true),
 		VolumeMounts: []corev1.VolumeMount{
 			// Volume to write a custom `config_system.py` file to.
 			{

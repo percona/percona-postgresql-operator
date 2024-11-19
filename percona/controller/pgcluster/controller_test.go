@@ -5,9 +5,9 @@ package pgcluster
 
 import (
 	"context"
-	// #nosec G501
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -767,7 +767,6 @@ var _ = Describe("Users", Ordered, func() {
 
 				return errors.New("cluster not deleted")
 			}, time.Second*15, time.Millisecond*250).Should(BeNil())
-
 		})
 	})
 
@@ -1282,5 +1281,262 @@ var _ = Describe("Operator-created sidecar container resources", Ordered, func()
 				Expect(c.Resources.Limits.Memory()).Should(Equal(cr.Spec.Proxy.PGBouncer.Containers.PGBouncerConfig.Resources.Limits.Memory()))
 			}
 		}
+	})
+})
+
+var _ = Describe("Validate TLS", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "validate-tls"
+	const ns = crName
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read default cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	cr.Default()
+
+	It("should create PerconaPGCluster", func() {
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+	})
+
+	checkSecretProjection := func(cr *v2.PerconaPGCluster, projection *corev1.SecretProjection, secretName string, neededKeys []string) {
+		GinkgoHelper()
+		It("should fail if secret doesn't exist", func() {
+			projection.Name = secretName
+
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).To(HaveOccurred())
+		})
+		It("should fail if secret doesn't have needed data", func() {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: cr.Namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, secret)).NotTo(HaveOccurred())
+
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should not fail if needed keys specified in the secret", func() {
+			secret := new(corev1.Secret)
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      secretName,
+				Namespace: cr.Namespace,
+			}, secret)).NotTo(HaveOccurred())
+			secret.Data = make(map[string][]byte)
+			for _, v := range neededKeys {
+				secret.Data[v] = []byte("some-data")
+			}
+			Expect(k8sClient.Update(ctx, secret)).NotTo(HaveOccurred())
+
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should not fail if wrong items.path are specified but needed key exist in secrets", func() {
+			projection.Items = []corev1.KeyToPath{}
+			for i, v := range neededKeys {
+				projection.Items = append(projection.Items, corev1.KeyToPath{
+					Key:  v,
+					Path: "wrong-path" + "-" + strconv.Itoa(i),
+				})
+			}
+
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should fail if items.key are specified which don't exist in the secret", func() {
+			projection.Items = []corev1.KeyToPath{}
+			for i, v := range neededKeys {
+				projection.Items = append(projection.Items, corev1.KeyToPath{
+					Key:  "non-existent-key" + strconv.Itoa(i),
+					Path: v,
+				})
+			}
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should not fail if wrong items.path are specified but needed key exist in secrets", func() {
+			projection.Items = []corev1.KeyToPath{}
+			for _, v := range neededKeys {
+				projection.Items = append(projection.Items, corev1.KeyToPath{
+					Key:  v,
+					Path: v + "-wrong",
+				})
+			}
+
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should not fail with custom data keys in the secret", func() {
+			secret := new(corev1.Secret)
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      secretName,
+				Namespace: cr.Namespace,
+			}, secret)).NotTo(HaveOccurred())
+
+			secret.Data = map[string][]byte{}
+			for _, v := range neededKeys {
+				secret.Data[v+"-custom"] = []byte("some-data")
+			}
+			Expect(k8sClient.Update(ctx, secret)).NotTo(HaveOccurred())
+			projection.Items = []corev1.KeyToPath{}
+			for _, v := range neededKeys {
+				projection.Items = append(projection.Items, corev1.KeyToPath{
+					Key:  v + "-custom",
+					Path: v,
+				})
+			}
+
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should fail if items.key are specified but not paths", func() {
+			projection.Items = []corev1.KeyToPath{}
+			for _, v := range neededKeys {
+				projection.Items = append(projection.Items, corev1.KeyToPath{
+					Key: v,
+				})
+			}
+
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).To(HaveOccurred())
+		})
+	}
+
+	Context("checking validation", func() {
+		Describe("should check validation for cr.Spec.Secrets.CustomRootCATLSSecret", func() {
+			cr := cr.DeepCopy()
+			neededKeys := []string{
+				"root.crt",
+				"root.key",
+			}
+			cr.Spec.Secrets.CustomRootCATLSSecret = new(corev1.SecretProjection)
+			checkSecretProjection(cr, cr.Spec.Secrets.CustomRootCATLSSecret, "root-ca", neededKeys)
+			It("should not fail if the section was not specified", func() {
+				cr.Spec.Secrets.CustomRootCATLSSecret = nil
+				err := reconciler(cr).validateTLS(ctx, cr)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		Describe("should check validation for cr.Spec.Secrets.CustomTLSSecret", func() {
+			cr := cr.DeepCopy()
+			neededKeys := []string{
+				"ca.crt",
+				"tls.crt",
+				"tls.key",
+			}
+			cr.Spec.Secrets.CustomTLSSecret = new(corev1.SecretProjection)
+			checkSecretProjection(cr, cr.Spec.Secrets.CustomTLSSecret, "tls-secret", neededKeys)
+			It("should not fail if the section was not specified", func() {
+				cr.Spec.Secrets.CustomTLSSecret = nil
+				err := reconciler(cr).validateTLS(ctx, cr)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		Describe("should check validation for cr.Spec.Secrets.CustomReplicationClientTLSSecret", func() {
+			cr := cr.DeepCopy()
+			neededKeys := []string{
+				"ca.crt",
+				"tls.crt",
+				"tls.key",
+			}
+			cr.Spec.Secrets.CustomReplicationClientTLSSecret = new(corev1.SecretProjection)
+			checkSecretProjection(cr, cr.Spec.Secrets.CustomReplicationClientTLSSecret, "repl-tls-secret", neededKeys)
+			It("should not fail if the section was not specified", func() {
+				cr.Spec.Secrets.CustomReplicationClientTLSSecret = nil
+				err := reconciler(cr).validateTLS(ctx, cr)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+
+	checkSecretProjectionWithCA := func(cr *v2.PerconaPGCluster, projection *corev1.SecretProjection, secretName string) {
+		GinkgoHelper()
+		neededKeys := []string{
+			"tls.crt",
+			"tls.key",
+		}
+		projection.Name = secretName
+		It("should create secret", func() {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: cr.Namespace,
+				},
+			}
+			secret.Data = map[string][]byte{}
+			for _, v := range neededKeys {
+				secret.Data[v] = []byte("some-data")
+			}
+			Expect(k8sClient.Create(ctx, secret)).NotTo(HaveOccurred())
+		})
+		It("should fail when CA is not specified", func() {
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).To(HaveOccurred())
+		})
+		It("should not fail when CA is specified", func() {
+			secretName := secretName + "-ca"
+			neededKeys := []string{
+				"root.crt",
+				"root.key",
+			}
+			cr.Spec.Secrets.CustomRootCATLSSecret = new(corev1.SecretProjection)
+			projection := cr.Spec.Secrets.CustomRootCATLSSecret
+			projection.Name = secretName
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: cr.Namespace,
+				},
+			}
+			secret.Data = make(map[string][]byte)
+			for _, v := range neededKeys {
+				secret.Data[v] = []byte("some-data")
+			}
+			Expect(k8sClient.Create(ctx, secret)).NotTo(HaveOccurred())
+
+			err := reconciler(cr).validateTLS(ctx, cr)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	}
+	Context("check validation for cr.Spec.Secrets.CustomTLSSecret when cr.Spec.Secrets.CustomRootCATLSSecret is specified", func() {
+		cr := cr.DeepCopy()
+		secretName := "custom-tls-secret-with-ca" //nolint:gosec
+		cr.Spec.Secrets.CustomTLSSecret = new(corev1.SecretProjection)
+		checkSecretProjectionWithCA(cr, cr.Spec.Secrets.CustomTLSSecret, secretName)
+	})
+	Context("should check validation for cr.Spec.Secrets.CustomReplicationClientTLSSecret when cr.Spec.Secrets.CustomRootCATLSSecret is specified", func() {
+		cr := cr.DeepCopy()
+		secretName := "custom-replication-tls-secret-with-ca" //nolint:gosec
+		cr.Spec.Secrets.CustomReplicationClientTLSSecret = new(corev1.SecretProjection)
+		checkSecretProjectionWithCA(cr, cr.Spec.Secrets.CustomReplicationClientTLSSecret, secretName)
 	})
 })

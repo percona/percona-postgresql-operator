@@ -287,7 +287,17 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	checkSecretProjection := func(p *corev1.SecretProjection, requiredPaths ...string) error {
+	if err := r.validateTLS(ctx, cr); err != nil {
+		return errors.Wrap(err, "validate TLS")
+	}
+	if err := r.reconcileOldCACert(ctx, cr); err != nil {
+		return errors.Wrap(err, "reconcile old CA")
+	}
+	return nil
+}
+
+func (r *PGClusterReconciler) validateTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	validateSecretProjection := func(p *corev1.SecretProjection, requiredPaths ...string) error {
 		if p == nil {
 			return nil
 		}
@@ -321,7 +331,7 @@ func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPG
 		return nil
 	}
 
-	if err := checkSecretProjection(cr.Spec.Secrets.CustomRootCATLSSecret, "root.crt", "root.key"); err != nil {
+	if err := validateSecretProjection(cr.Spec.Secrets.CustomRootCATLSSecret, "root.crt", "root.key"); err != nil {
 		return errors.Wrap(err, "failed to validate .spec.customRootCATLSSecret")
 	}
 
@@ -329,25 +339,20 @@ func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPG
 	if cr.Spec.Secrets.CustomRootCATLSSecret == nil {
 		certPaths = append(certPaths, "ca.crt")
 	}
-	if err := checkSecretProjection(cr.Spec.Secrets.CustomTLSSecret, certPaths...); err != nil {
+	if err := validateSecretProjection(cr.Spec.Secrets.CustomTLSSecret, certPaths...); err != nil {
 		return errors.Wrap(err, "failed to validate .spec.customTLSSecret")
 	}
-	if err := checkSecretProjection(cr.Spec.Secrets.CustomReplicationClientTLSSecret, certPaths...); err != nil {
+	if err := validateSecretProjection(cr.Spec.Secrets.CustomReplicationClientTLSSecret, certPaths...); err != nil {
 		return errors.Wrap(err, "failed to validate .spec.customReplicationTLSSecret")
 	}
-
-	if cr.Spec.Secrets.CustomRootCATLSSecret != nil {
-		return nil
-	}
-
-	if err := r.reconcileOldCACert(ctx, cr); err != nil {
-		return errors.Wrap(err, "reconcile old CA")
-	}
-
 	return nil
 }
 
 func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if cr.Spec.Secrets.CustomRootCATLSSecret != nil {
+		return nil
+	}
+
 	oldCASecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.RootCertSecret,

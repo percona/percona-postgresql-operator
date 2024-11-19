@@ -473,7 +473,7 @@ func TestStartupCommand(t *testing.T) {
 	instance := new(v1beta1.PostgresInstanceSetSpec)
 
 	ctx := context.Background()
-	command := startupCommand(ctx, cluster, instance)
+	command := startupCommand(ctx, cluster, instance, true)
 
 	// Expect a bash command with an inline script.
 	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
@@ -508,7 +508,7 @@ func TestStartupCommand(t *testing.T) {
 				},
 			},
 		}
-		command := startupCommand(ctx, cluster, instance)
+		command := startupCommand(ctx, cluster, instance, true)
 		assert.Assert(t, len(command) > 3)
 		assert.Assert(t, strings.Contains(command[3], `cat << "EOF" > /tmp/pg_rewind_tde.sh
 #!/bin/sh

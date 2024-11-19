@@ -180,7 +180,13 @@ func TestAddRepoVolumesToPod(t *testing.T) {
 }
 
 func TestAddConfigToInstancePod(t *testing.T) {
-	cluster := v1beta1.PostgresCluster{}
+	cluster := v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				naming.LabelVersion: "2.5.0",
+			},
+		},
+	}
 	cluster.Name = "hippo"
 	cluster.Default()
 
@@ -580,6 +586,9 @@ func TestAddServerToInstancePod(t *testing.T) {
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
 	cluster.Default()
+	cluster.SetLabels(map[string]string{
+		naming.LabelVersion: "2.5.0",
+	})
 
 	pod := corev1.PodSpec{
 		Containers: []corev1.Container{
@@ -840,6 +849,9 @@ func TestAddServerToRepoPod(t *testing.T) {
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
 	cluster.Default()
+	cluster.SetLabels(map[string]string{
+		naming.LabelVersion: "2.5.0",
+	})
 
 	pod := corev1.PodSpec{
 		Containers: []corev1.Container{

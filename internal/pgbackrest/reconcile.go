@@ -125,6 +125,10 @@ func AddConfigToInstancePod(
 			Path: serverConfigProjectionPath,
 		})
 	secret.Secret.Items = append(secret.Secret.Items, clientCertificates()...)
+	if cluster.CompareVersion("2.5.0") < 0 {
+		t := true
+		secret.Secret.Optional = &t
+	}
 
 	// Start with a copy of projections specified in the cluster. Items later in
 	// the list take precedence over earlier items (that is, last write wins).
@@ -304,7 +308,7 @@ func addServerContainerAndVolume(
 		Command:         []string{"pgbackrest", "server"},
 		Image:           config.PGBackRestContainerImage(cluster),
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
 
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -342,10 +346,10 @@ func addServerContainerAndVolume(
 
 	reloader := corev1.Container{
 		Name:            naming.ContainerPGBackRestConfig,
-		Command:         reloadCommand(naming.ContainerPGBackRestConfig),
+		Command:         reloadCommand(naming.ContainerPGBackRestConfig, cluster.CompareVersion("2.5.0") >= 0),
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
-		SecurityContext: initialize.RestrictedSecurityContext(),
+		SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
 
 		// The configuration mount is appended by [addConfigVolumeAndMounts].
 		VolumeMounts: []corev1.VolumeMount{serverVolumeMount},

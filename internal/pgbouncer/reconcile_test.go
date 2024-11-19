@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/percona/percona-postgresql-operator/internal/feature"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -111,6 +112,10 @@ func TestPod(t *testing.T) {
 	primaryCertificate := new(corev1.SecretProjection)
 	secret := new(corev1.Secret)
 	pod := new(corev1.PodSpec)
+
+	cluster.SetLabels(map[string]string{
+		naming.LabelVersion: "2.5.0",
+	})
 
 	call := func() { Pod(ctx, cluster, configMap, primaryCertificate, secret, pod) }
 

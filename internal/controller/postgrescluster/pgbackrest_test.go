@@ -2383,7 +2383,16 @@ func TestCopyConfigurationResources(t *testing.T) {
 func TestGenerateBackupJobIntent(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		spec := generateBackupJobSpecIntent(
-			&v1beta1.PostgresCluster{}, v1beta1.PGBackRestRepo{},
+			&v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "",
+					Namespace: "",
+					Labels: map[string]string{
+						naming.LabelVersion: "2.5.0",
+					},
+				},
+			},
+			v1beta1.PGBackRestRepo{},
 			"",
 			nil, nil,
 		)
@@ -2674,7 +2683,13 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 	}
 
 	t.Run("empty", func(t *testing.T) {
-		err := r.generateRestoreJobIntent(&v1beta1.PostgresCluster{}, "", "",
+		err := r.generateRestoreJobIntent(&v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					naming.LabelVersion: "2.5.0",
+				},
+			},
+		}, "", "",
 			[]string{}, []corev1.VolumeMount{}, []corev1.Volume{},
 			&v1beta1.PostgresClusterDataSource{}, &batchv1.Job{})
 		assert.NilError(t, err)
@@ -2718,6 +2733,9 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
+			Labels: map[string]string{
+				naming.LabelVersion: "2.5.0",
+			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
 			Metadata: &v1beta1.Metadata{
@@ -2814,7 +2832,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 							})
 							t.Run("SecurityContext", func(t *testing.T) {
 								assert.DeepEqual(t, job.Spec.Template.Spec.Containers[0].SecurityContext,
-									initialize.RestrictedSecurityContext())
+									initialize.RestrictedSecurityContext(true))
 							})
 							t.Run("Resources", func(t *testing.T) {
 								assert.DeepEqual(t, job.Spec.Template.Spec.Containers[0].Resources,
@@ -2884,6 +2902,9 @@ func TestObserveRestoreEnv(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterName,
 				Namespace: namespace,
+				Labels: map[string]string{
+					naming.LabelVersion: "2.5.0",
+				},
 			},
 		}
 		meta := naming.PGBackRestRestoreJob(cluster)
@@ -3098,6 +3119,9 @@ func TestPrepareForRestore(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterName,
 				Namespace: namespace,
+				Labels: map[string]string{
+					naming.LabelVersion: "2.5.0",
+				},
 			},
 		}
 		meta := naming.PGBackRestRestoreJob(cluster)
