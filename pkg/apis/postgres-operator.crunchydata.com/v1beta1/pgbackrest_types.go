@@ -446,7 +446,7 @@ type PGBackRestDataSource struct {
 
 	// Defines a pgBackRest repository
 	// +kubebuilder:validation:Required
-	// K8SPG-511. Add default value to this field.
+	// K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
 	// +kubebuilder:default=repo1
 	Repo PGBackRestRepo `json:"repo"`
 

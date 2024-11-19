@@ -4666,10 +4666,12 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                             type: string
                           repoName:
+                            default: repo1
                             description: |-
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
                               for the new PostgresCluster.
+                              K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
                             pattern: ^repo[1-4]
                             type: string
                           resources:
@@ -6224,7 +6226,10 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repo:
-                        description: Defines a pgBackRest repository
+                        default: repo1
+                        description: |-
+                          Defines a pgBackRest repository
+                          K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
                         properties:
                           azure:
                             description: Represents a pgBackRest repository that is
@@ -7588,10 +7593,12 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repoName:
+                        default: repo1
                         description: |-
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
                           for the new PostgresCluster.
+                          K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
                         pattern: ^repo[1-4]
                         type: string
                       resources:
@@ -13282,8 +13289,10 @@ spec:
                       in a PostgresCluster.
                     properties:
                       enabled:
-                        description: Whether or not the operator should allow switchovers
-                          in a PostgresCluster
+                        default: false
+                        description: |-
+                          Whether or not the operator should allow switchovers in a PostgresCluster
+                          K8SPG-511. The default value should be added to this field to avoid the problem under openshift installation
                         type: boolean
                       targetInstance:
                         description: |-
