@@ -117,7 +117,7 @@ func WALStorage(instance *v1beta1.PostgresInstanceSetSpec) string {
 // Environment returns the environment variables required to invoke PostgreSQL
 // utilities.
 func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
-	return []corev1.EnvVar{
+	env := []corev1.EnvVar{
 		// - https://www.postgresql.org/docs/current/reference-server.html
 		{
 			Name:  "PGDATA",
@@ -146,6 +146,9 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 			Name:  "KRB5RCACHEDIR",
 			Value: "/tmp",
 		},
+	}
+
+	if cluster.CompareVersion("2.6.0") >= 0 {
 		// This allows a custom CA certificate to be mounted for Postgres LDAP
 		// authentication via spec.config.files.
 		// - https://wiki.postgresql.org/wiki/LDAP_Authentication_against_AD
@@ -155,11 +158,13 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 		// - https://www.openldap.org/software/man.cgi?query=ldap.conf
 		//
 		// Testing with LDAPTLS_CACERTDIR did not work as expected during testing.
-		{
+		env = append(env, corev1.EnvVar{
 			Name:  "LDAPTLS_CACERT",
 			Value: configMountPath + "/ldap/ca.crt",
-		},
+		})
 	}
+
+	return env
 }
 
 // reloadCommand returns an entrypoint that convinces PostgreSQL to reload
