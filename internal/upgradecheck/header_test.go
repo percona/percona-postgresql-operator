@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package upgradecheck
 
@@ -19,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -31,6 +21,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
@@ -50,6 +41,10 @@ func TestGenerateHeader(t *testing.T) {
 
 	reconciler := postgrescluster.Reconciler{Client: cc}
 
+	t.Setenv("PGO_INSTALLER", "test")
+	t.Setenv("PGO_INSTALLER_ORIGIN", "test-origin")
+	t.Setenv("BUILD_SOURCE", "developer")
+
 	t.Run("error ensuring ID", func(t *testing.T) {
 		fakeClientWithOptionalError := &fakeClientWithError{
 			cc, "patch error",
@@ -57,7 +52,7 @@ func TestGenerateHeader(t *testing.T) {
 		ctx, calls := setupLogCapture(ctx)
 
 		res := generateHeader(ctx, cfg, fakeClientWithOptionalError,
-			"1.2.3", reconciler.IsOpenShift)
+			"1.2.3", reconciler.IsOpenShift, "")
 		assert.Equal(t, len(*calls), 1)
 		assert.Assert(t, cmp.Contains((*calls)[0], `upgrade check issue: could not apply configmap`))
 		assert.Equal(t, res.IsOpenShift, reconciler.IsOpenShift)
@@ -66,8 +61,15 @@ func TestGenerateHeader(t *testing.T) {
 		err := cc.List(ctx, &pgoList)
 		assert.NilError(t, err)
 		assert.Equal(t, len(pgoList.Items), res.PGOClustersTotal)
+		bridgeList := v1beta1.CrunchyBridgeClusterList{}
+		err = cc.List(ctx, &bridgeList)
+		assert.NilError(t, err)
+		assert.Equal(t, len(bridgeList.Items), res.BridgeClustersTotal)
 		assert.Equal(t, "1.2.3", res.PGOVersion)
 		assert.Equal(t, server.String(), res.KubernetesEnv)
+		assert.Equal(t, "test", res.PGOInstaller)
+		assert.Equal(t, "test-origin", res.PGOInstallerOrigin)
+		assert.Equal(t, "developer", res.BuildSource)
 	})
 
 	t.Run("error getting cluster count", func(t *testing.T) {
@@ -77,14 +79,21 @@ func TestGenerateHeader(t *testing.T) {
 		ctx, calls := setupLogCapture(ctx)
 
 		res := generateHeader(ctx, cfg, fakeClientWithOptionalError,
-			"1.2.3", reconciler.IsOpenShift)
-		assert.Equal(t, len(*calls), 1)
-		assert.Assert(t, cmp.Contains((*calls)[0], `upgrade check issue: could not count postgres clusters`))
+			"1.2.3", reconciler.IsOpenShift, "")
+		assert.Equal(t, len(*calls), 2)
+		// Aggregating the logs since we cannot determine which call will be first
+		callsAggregate := strings.Join(*calls, " ")
+		assert.Assert(t, cmp.Contains(callsAggregate, `upgrade check issue: could not count postgres clusters`))
+		assert.Assert(t, cmp.Contains(callsAggregate, `upgrade check issue: could not count bridge clusters`))
 		assert.Equal(t, res.IsOpenShift, reconciler.IsOpenShift)
 		assert.Equal(t, deploymentID, res.DeploymentID)
 		assert.Equal(t, 0, res.PGOClustersTotal)
+		assert.Equal(t, 0, res.BridgeClustersTotal)
 		assert.Equal(t, "1.2.3", res.PGOVersion)
 		assert.Equal(t, server.String(), res.KubernetesEnv)
+		assert.Equal(t, "test", res.PGOInstaller)
+		assert.Equal(t, "test-origin", res.PGOInstallerOrigin)
+		assert.Equal(t, "developer", res.BuildSource)
 	})
 
 	t.Run("error getting server version info", func(t *testing.T) {
@@ -92,7 +101,7 @@ func TestGenerateHeader(t *testing.T) {
 		badcfg := &rest.Config{}
 
 		res := generateHeader(ctx, badcfg, cc,
-			"1.2.3", reconciler.IsOpenShift)
+			"1.2.3", reconciler.IsOpenShift, "")
 		assert.Equal(t, len(*calls), 1)
 		assert.Assert(t, cmp.Contains((*calls)[0], `upgrade check issue: could not retrieve server version`))
 		assert.Equal(t, res.IsOpenShift, reconciler.IsOpenShift)
@@ -103,13 +112,21 @@ func TestGenerateHeader(t *testing.T) {
 		assert.Equal(t, len(pgoList.Items), res.PGOClustersTotal)
 		assert.Equal(t, "1.2.3", res.PGOVersion)
 		assert.Equal(t, "", res.KubernetesEnv)
+		assert.Equal(t, "test", res.PGOInstaller)
+		assert.Equal(t, "test-origin", res.PGOInstallerOrigin)
+		assert.Equal(t, "developer", res.BuildSource)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		ctx, calls := setupLogCapture(ctx)
+		gate := feature.NewGate()
+		assert.NilError(t, gate.SetFromMap(map[string]bool{
+			feature.TablespaceVolumes: true,
+		}))
+		ctx = feature.NewContext(ctx, gate)
 
 		res := generateHeader(ctx, cfg, cc,
-			"1.2.3", reconciler.IsOpenShift)
+			"1.2.3", reconciler.IsOpenShift, "")
 		assert.Equal(t, len(*calls), 0)
 		assert.Equal(t, res.IsOpenShift, reconciler.IsOpenShift)
 		assert.Equal(t, deploymentID, res.DeploymentID)
@@ -119,6 +136,10 @@ func TestGenerateHeader(t *testing.T) {
 		assert.Equal(t, len(pgoList.Items), res.PGOClustersTotal)
 		assert.Equal(t, "1.2.3", res.PGOVersion)
 		assert.Equal(t, server.String(), res.KubernetesEnv)
+		assert.Equal(t, "TablespaceVolumes=true", res.FeatureGatesEnabled)
+		assert.Equal(t, "test", res.PGOInstaller)
+		assert.Equal(t, "test-origin", res.PGOInstallerOrigin)
+		assert.Equal(t, "developer", res.BuildSource)
 	})
 }
 
@@ -511,8 +532,31 @@ func TestGetManagedClusters(t *testing.T) {
 		}
 		ctx, calls := setupLogCapture(ctx)
 		count := getManagedClusters(ctx, fakeClientWithOptionalError)
-		assert.Equal(t, len(*calls), 1)
+		assert.Assert(t, len(*calls) > 0)
 		assert.Assert(t, cmp.Contains((*calls)[0], `upgrade check issue: could not count postgres clusters`))
+		assert.Assert(t, count == 0)
+	})
+}
+
+func TestGetBridgeClusters(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("success", func(t *testing.T) {
+		fakeClient := setupFakeClientWithPGOScheme(t, true)
+		ctx, calls := setupLogCapture(ctx)
+		count := getBridgeClusters(ctx, fakeClient)
+		assert.Equal(t, len(*calls), 0)
+		assert.Assert(t, count == 2)
+	})
+
+	t.Run("list throw error", func(t *testing.T) {
+		fakeClientWithOptionalError := &fakeClientWithError{
+			setupFakeClientWithPGOScheme(t, true), "list error",
+		}
+		ctx, calls := setupLogCapture(ctx)
+		count := getBridgeClusters(ctx, fakeClientWithOptionalError)
+		assert.Assert(t, len(*calls) > 0)
+		assert.Assert(t, cmp.Contains((*calls)[0], `upgrade check issue: could not count bridge clusters`))
 		assert.Assert(t, count == 0)
 	})
 }

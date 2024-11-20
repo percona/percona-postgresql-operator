@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # vim: set noexpandtab :
 set -eu
-set -o xtrace
 
 push_trap_exit() {
 	local -a array

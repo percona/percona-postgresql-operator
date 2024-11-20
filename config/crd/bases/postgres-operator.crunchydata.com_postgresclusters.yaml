@@ -4754,8 +4754,17 @@ spec:
                     required:
                     - repos
                     type: object
-                required:
-                - pgbackrest
+                  snapshots:
+                    description: VolumeSnapshot configuration
+                    properties:
+                      volumeSnapshotClassName:
+                        description: Name of the VolumeSnapshotClass that should be
+                          used by VolumeSnapshots
+                        minLength: 1
+                        type: string
+                    required:
+                    - volumeSnapshotClassName
+                    type: object
                 type: object
               config:
                 properties:
@@ -13941,8 +13950,8 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 16
-                minimum: 12
+                maximum: 17
+                minimum: 10
                 type: integer
               proxy:
                 description: The specification of a proxy that connects to PostgreSQL.

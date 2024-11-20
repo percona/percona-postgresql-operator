@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -160,7 +149,7 @@ func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
 	dcsService.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(map[string]string{
+		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
 			naming.LabelCluster: cluster.Name,
 			naming.LabelPatroni: naming.PatroniScope(cluster),
 		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
@@ -247,7 +236,7 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 
 	// add our labels last so they aren't overwritten
 	service.Labels = naming.Merge(service.Labels,
-		naming.WithPerconaLabels(map[string]string{
+		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
 			naming.LabelCluster: cluster.Name,
 			naming.LabelPatroni: naming.PatroniScope(cluster),
 		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
@@ -271,6 +260,7 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 	} else {
 		service.Spec.Type = corev1.ServiceType(spec.Type)
+		// K8SPG-389
 		service.Spec.LoadBalancerSourceRanges = spec.LoadBalancerSourceRanges
 
 		if spec.NodePort != nil {
@@ -287,6 +277,8 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 			}
 			servicePort.NodePort = *spec.NodePort
 		}
+		service.Spec.ExternalTrafficPolicy = initialize.FromPointer(spec.ExternalTrafficPolicy)
+		service.Spec.InternalTrafficPolicy = spec.InternalTrafficPolicy
 	}
 	service.Spec.Ports = []corev1.ServicePort{servicePort}
 

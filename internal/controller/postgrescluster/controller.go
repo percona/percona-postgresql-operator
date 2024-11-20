@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -29,9 +18,11 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,10 +54,11 @@ const (
 
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
-	Client      client.Client
-	IsOpenShift bool
-	Owner       client.FieldOwner
-	PodExec     func(
+	Client          client.Client
+	DiscoveryClient *discovery.DiscoveryClient
+	IsOpenShift     bool
+	Owner           client.FieldOwner
+	PodExec         func(
 		ctx context.Context, namespace, pod, container string,
 		stdin io.Reader, stdout, stderr io.Writer, command ...string,
 	) error
@@ -162,21 +154,24 @@ func (r *Reconciler) Reconcile(
 	}
 
 	var (
-		clusterConfigMap         *corev1.ConfigMap
-		clusterReplicationSecret *corev1.Secret
-		clusterPodService        *corev1.Service
-		clusterVolumes           []corev1.PersistentVolumeClaim
-		instanceServiceAccount   *corev1.ServiceAccount
-		instances                *observedInstances
-		patroniLeaderService     *corev1.Service
-		primaryCertificate       *corev1.SecretProjection
-		primaryService           *corev1.Service
-		replicaService           *corev1.Service
-		rootCA                   *pki.RootCertificateAuthority
-		monitoringSecret         *corev1.Secret
-		exporterQueriesConfig    *corev1.ConfigMap
-		exporterWebConfig        *corev1.ConfigMap
-		err                      error
+		clusterConfigMap             *corev1.ConfigMap
+		clusterReplicationSecret     *corev1.Secret
+		clusterPodService            *corev1.Service
+		clusterVolumes               []corev1.PersistentVolumeClaim
+		instanceServiceAccount       *corev1.ServiceAccount
+		instances                    *observedInstances
+		patroniLeaderService         *corev1.Service
+		primaryCertificate           *corev1.SecretProjection
+		primaryService               *corev1.Service
+		replicaService               *corev1.Service
+		rootCA                       *pki.RootCertificateAuthority
+		monitoringSecret             *corev1.Secret
+		exporterQueriesConfig        *corev1.ConfigMap
+		exporterWebConfig            *corev1.ConfigMap
+		err                          error
+		backupsSpecFound             bool
+		backupsReconciliationAllowed bool
+		dedicatedSnapshotPVC         *corev1.PersistentVolumeClaim
 	)
 
 	patchClusterStatus := func() error {
@@ -214,22 +209,45 @@ func (r *Reconciler) Reconcile(
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
 	}
 
+	if err == nil {
+		backupsSpecFound, backupsReconciliationAllowed, err = r.BackupsEnabled(ctx, cluster)
+
+		// If we cannot reconcile because the backup reconciliation is paused, set a condition and exit
+		if !backupsReconciliationAllowed {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:   v1beta1.PostgresClusterProgressing,
+				Status: metav1.ConditionFalse,
+				Reason: "Paused",
+				Message: "Reconciliation is paused: please fill in spec.backups " +
+					"or add the postgres-operator.crunchydata.com/authorizeBackupRemoval " +
+					"annotation to authorize backup removal.",
+
+				ObservedGeneration: cluster.GetGeneration(),
+			})
+			return runtime.ErrorWithBackoff(patchClusterStatus())
+		} else {
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
+		}
+	}
+
 	pgHBAs := postgres.NewHBAs()
 	pmm.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgbouncer.PostgreSQL(cluster, &pgHBAs)
 
 	pgParameters := postgres.NewParameters()
+	// K8SPG-375
 	if cluster.Spec.Extensions.PGStatMonitor {
 		pgstatmonitor.PostgreSQLParameters(&pgParameters)
 	}
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
 	}
+	// K8SPG-577
 	if cluster.Spec.Extensions.PGStatStatements {
 		pgstatstatements.PostgreSQLParameters(&pgParameters)
 	}
-	pgbackrest.PostgreSQL(cluster, &pgParameters)
+	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
 
 	// Set huge_pages = try if a hugepages resource limit > 0, otherwise set "off"
@@ -296,7 +314,7 @@ func (r *Reconciler) Reconcile(
 		// the controller should return early while data initialization is in progress, after
 		// which it will indicate that an early return is no longer needed, and reconciliation
 		// can proceed normally.
-		returnEarly, err := r.reconcileDataSource(ctx, cluster, instances, clusterVolumes, rootCA)
+		returnEarly, err := r.reconcileDataSource(ctx, cluster, instances, clusterVolumes, rootCA, backupsSpecFound)
 		if err != nil || returnEarly {
 			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
 		}
@@ -338,7 +356,9 @@ func (r *Reconciler) Reconcile(
 		err = r.reconcileInstanceSets(
 			ctx, cluster, clusterConfigMap, clusterReplicationSecret, rootCA,
 			clusterPodService, instanceServiceAccount, instances, patroniLeaderService,
-			primaryCertificate, clusterVolumes, exporterQueriesConfig, exporterWebConfig)
+			primaryCertificate, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
+			backupsSpecFound,
+		)
 	}
 
 	if err == nil {
@@ -350,12 +370,19 @@ func (r *Reconciler) Reconcile(
 
 	if err == nil {
 		var next reconcile.Result
-		if next, err = r.reconcilePGBackRest(ctx, cluster, instances, rootCA); err == nil && !next.IsZero() {
+		if next, err = r.reconcilePGBackRest(ctx, cluster,
+			instances, rootCA, backupsSpecFound); err == nil && !next.IsZero() {
 			result.Requeue = result.Requeue || next.Requeue
 			if next.RequeueAfter > 0 {
 				result.RequeueAfter = next.RequeueAfter
 			}
 		}
+	}
+	if err == nil {
+		dedicatedSnapshotPVC, err = r.reconcileDedicatedSnapshotVolume(ctx, cluster, clusterVolumes)
+	}
+	if err == nil {
+		err = r.reconcileVolumeSnapshots(ctx, cluster, dedicatedSnapshotPVC)
 	}
 	if err == nil {
 		err = r.reconcilePGBouncer(ctx, cluster, instances, primaryCertificate, rootCA)
@@ -459,6 +486,14 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		}
 	}
 
+	if r.DiscoveryClient == nil {
+		var err error
+		r.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
+		if err != nil {
+			return err
+		}
+	}
+
 	return builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
 		Owns(&corev1.ConfigMap{}).
@@ -478,4 +513,29 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Watches(&appsv1.StatefulSet{},
 			r.controllerRefHandlerFuncs()). // watch all StatefulSets
 		Complete(r)
+}
+
+// GroupVersionKindExists checks to see whether a given Kind for a given
+// GroupVersion exists in the Kubernetes API Server.
+func (r *Reconciler) GroupVersionKindExists(groupVersion, kind string) (*bool, error) {
+	if r.DiscoveryClient == nil {
+		return initialize.Bool(false), nil
+	}
+
+	resourceList, err := r.DiscoveryClient.ServerResourcesForGroupVersion(groupVersion)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return initialize.Bool(false), nil
+		}
+
+		return nil, err
+	}
+
+	for _, resource := range resourceList.APIResources {
+		if resource.Kind == kind {
+			return initialize.Bool(true), nil
+		}
+	}
+
+	return initialize.Bool(false), nil
 }

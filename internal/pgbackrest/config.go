@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package pgbackrest
 
@@ -100,7 +89,7 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 	}
 
 	// create an empty map for the config data
-	initialize.StringMap(&cm.Data)
+	initialize.Map(&cm.Data)
 
 	pgdataDir := postgres.DataDirectory(postgresCluster)
 	// Port will always be populated, since the API will set a default of 5432 if not provided
@@ -271,6 +260,42 @@ done
 
 pg_ctl stop --silent --wait --timeout=31536000
 mv "${pgdata}" "${pgdata}_bootstrap"`
+
+	return append([]string{"bash", "-ceu", "--", restoreScript, "-", pgdata}, args...)
+}
+
+// DedicatedSnapshotVolumeRestoreCommand returns the command for performing a pgBackRest delta restore
+// into a dedicated snapshot volume. In addition to calling the pgBackRest restore command with any
+// pgBackRest options provided, the script also removes the patroni.dynamic.json file if present. This
+// ensures the configuration from the cluster being restored from is not utilized when bootstrapping a
+// new cluster, and the configuration for the new cluster is utilized instead.
+func DedicatedSnapshotVolumeRestoreCommand(pgdata string, args ...string) []string {
+
+	// The postmaster.pid file is removed, if it exists, before attempting a restore.
+	// This allows the restore to be tried more than once without the causing an
+	// error due to the presence of the file in subsequent attempts.
+
+	// Wrap pgbackrest restore command in backup_label checks. If pre/post
+	// backup_labels are different, restore moved database forward, so return 0
+	// so that the Job is successful and we know to proceed with snapshot.
+	// Otherwise return 1, Job will fail, and we will not proceed with snapshot.
+	restoreScript := `declare -r pgdata="$1" opts="$2"
+BACKUP_LABEL=$([[ ! -e "${pgdata}/backup_label" ]] || md5sum "${pgdata}/backup_label")
+echo "Starting pgBackRest delta restore"
+
+install --directory --mode=0700 "${pgdata}"
+rm -f "${pgdata}/postmaster.pid"
+bash -xc "pgbackrest restore ${opts}"
+rm -f "${pgdata}/patroni.dynamic.json"
+
+BACKUP_LABEL_POST=$([[ ! -e "${pgdata}/backup_label" ]] || md5sum "${pgdata}/backup_label")
+if [[ "${BACKUP_LABEL}" != "${BACKUP_LABEL_POST}" ]]
+then
+  exit 0
+fi
+echo Database was not advanced by restore. No snapshot will be taken.
+echo Check that your last backup was successful.
+exit 1`
 
 	return append([]string{"bash", "-ceu", "--", restoreScript, "-", pgdata}, args...)
 }

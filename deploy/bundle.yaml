@@ -64,8 +64,8 @@ spec:
               majorVersion:
                 description: |-
                   The ID of the cluster's major Postgres version.
-                  Currently Bridge offers 13-16
-                maximum: 16
+                  Currently Bridge offers 13-17
+                maximum: 17
                 minimum: 13
                 type: integer
               metadata:
@@ -23812,7 +23812,7 @@ spec:
                 type: object
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
-                maximum: 16
+                maximum: 17
                 minimum: 10
                 type: integer
               image:
@@ -25352,7 +25352,7 @@ spec:
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
-                maximum: 16
+                maximum: 17
                 minimum: 10
                 type: integer
               tolerations:
@@ -30298,8 +30298,17 @@ spec:
                     required:
                     - repos
                     type: object
-                required:
-                - pgbackrest
+                  snapshots:
+                    description: VolumeSnapshot configuration
+                    properties:
+                      volumeSnapshotClassName:
+                        description: Name of the VolumeSnapshotClass that should be
+                          used by VolumeSnapshots
+                        minLength: 1
+                        type: string
+                    required:
+                    - volumeSnapshotClassName
+                    type: object
                 type: object
               config:
                 properties:
@@ -39485,8 +39494,8 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 16
-                minimum: 12
+                maximum: 17
+                minimum: 10
                 type: integer
               proxy:
                 description: The specification of a proxy that connects to PostgreSQL.
@@ -45428,6 +45437,7 @@ rules:
   - configmaps
   - persistentvolumeclaims
   - secrets
+  - serviceaccounts
   - services
   verbs:
   - create
@@ -45469,16 +45479,6 @@ rules:
   - pods
   verbs:
   - delete
-  - get
-  - list
-  - patch
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  verbs:
-  - create
   - get
   - list
   - patch
@@ -45665,6 +45665,18 @@ rules:
   - roles
   verbs:
   - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - create
+  - delete
   - get
   - list
   - patch
