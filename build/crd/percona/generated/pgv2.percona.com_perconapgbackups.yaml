@@ -133,9 +133,7 @@ spec:
                     type: object
                   name:
                     default: repo1
-                    description: |-
-                      The name of the repository
-                      The default value should be added to this field to avoid the problem under openshift installation
+                    description: The name of the repository
                     pattern: ^repo[1-4]
                     type: string
                   s3:

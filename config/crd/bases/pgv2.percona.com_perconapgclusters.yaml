@@ -132,9 +132,7 @@ spec:
                     type: object
                   name:
                     default: repo1
-                    description: |-
-                      The name of the repository
-                      The default value should be added to this field to avoid the problem under openshift installation
+                    description: The name of the repository
                     pattern: ^repo[1-4]
                     type: string
                   s3:
@@ -3834,9 +3832,7 @@ spec:
                               type: object
                             name:
                               default: repo1
-                              description: |-
-                                The name of the repository
-                                The default value should be added to this field to avoid the problem under openshift installation
+                              description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
                             s3:
@@ -5082,7 +5078,6 @@ spec:
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
                               for the new PostgresCluster.
-                              The default value should be added to this field to avoid the problem under openshift installation
                             pattern: ^repo[1-4]
                             type: string
                           resources:
@@ -6662,9 +6657,7 @@ spec:
                             type: object
                           name:
                             default: repo1
-                            description: |-
-                              The name of the repository
-                              The default value should be added to this field to avoid the problem under openshift installation
+                            description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
                           s3:
@@ -8009,7 +8002,6 @@ spec:
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
                           for the new PostgresCluster.
-                          The default value should be added to this field to avoid the problem under openshift installation
                         pattern: ^repo[1-4]
                         type: string
                       resources:
@@ -13701,9 +13693,8 @@ spec:
                     properties:
                       enabled:
                         default: false
-                        description: |-
-                          Whether or not the operator should allow switchovers in a PostgresCluster
-                          The default value should be added to this field to avoid the problem under openshift installation
+                        description: Whether or not the operator should allow switchovers
+                          in a PostgresCluster
                         type: boolean
                       targetInstance:
                         description: |-

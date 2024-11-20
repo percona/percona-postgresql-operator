@@ -62,7 +62,6 @@ type PatroniSpec struct {
 type PatroniSwitchover struct {
 
 	// Whether or not the operator should allow switchovers in a PostgresCluster
-	// The default value should be added to this field to avoid the problem under openshift installation
 	// +required
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`

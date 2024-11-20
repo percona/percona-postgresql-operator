@@ -294,7 +294,6 @@ type PostgresClusterDataSource struct {
 	// for the new PostgresCluster.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
-	// The default value should be added to this field to avoid the problem under openshift installation
 	// +kubebuilder:default="repo1"
 	RepoName string `json:"repoName"`
 
