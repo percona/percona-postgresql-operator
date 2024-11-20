@@ -520,6 +520,8 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 		template.Spec.Volumes = nil
 
 		assert.Assert(t, cmp.MarshalMatches(template.ObjectMeta, `
+annotations:
+  kubectl.kubernetes.io/default-container: pgadmin
 creationTimestamp: null
 labels:
   app.kubernetes.io/instance: test-cluster
@@ -640,6 +642,7 @@ terminationGracePeriodSeconds: 30
 		assert.Assert(t, cmp.MarshalMatches(template.ObjectMeta, `
 annotations:
   annotation1: annotationvalue
+  kubectl.kubernetes.io/default-container: pgadmin
 creationTimestamp: null
 labels:
   app.kubernetes.io/instance: custom-cluster

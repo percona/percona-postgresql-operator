@@ -577,7 +577,11 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 
 	annotations := naming.Merge(
 		postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
-		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil())
+		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
+		map[string]string{
+			naming.DefaultContainerAnnotation: naming.PGBackRestRepoContainerName,
+		},
+	)
 	labels := naming.Merge(
 		postgresCluster.Spec.Metadata.GetLabelsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
@@ -847,6 +851,14 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
 			},
+		}
+	}
+
+	if annotations != nil {
+		annotations[naming.DefaultContainerAnnotation] = naming.PGBackRestRepoContainerName
+	} else {
+		annotations = map[string]string{
+			naming.DefaultContainerAnnotation: naming.PGBackRestRepoContainerName,
 		}
 	}
 
@@ -1337,7 +1349,10 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	annotations := naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
-		map[string]string{naming.PGBackRestConfigHash: configHash})
+		map[string]string{
+			naming.PGBackRestConfigHash:       configHash,
+			naming.DefaultContainerAnnotation: naming.PGBackRestRestoreContainerName,
+		})
 	labels := naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
