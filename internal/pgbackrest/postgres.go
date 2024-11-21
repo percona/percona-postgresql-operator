@@ -72,6 +72,18 @@ func PostgreSQL(
 	// - https://pgbackrest.org/command.html#command-archive-get
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
 	restore := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"`
+	if inCluster.Spec.Patroni != nil && inCluster.Spec.Patroni.DynamicConfiguration != nil {
+		postgresql, ok := inCluster.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
+		if ok {
+			params, ok := postgresql["parameters"].(map[string]any)
+			if ok {
+				restore_command, ok := params["restore_command"].(string)
+				if ok {
+					restore = restore_command
+				}
+			}
+		}
+	}
 	outParameters.Mandatory.Add("restore_command", restore)
 
 	if inCluster.Spec.Standby != nil && inCluster.Spec.Standby.Enabled && inCluster.Spec.Standby.RepoName != "" {
