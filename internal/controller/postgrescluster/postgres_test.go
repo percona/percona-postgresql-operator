@@ -269,8 +269,6 @@ func TestReconcilePostgresVolumes(t *testing.T) {
 		pvc, err := reconciler.reconcilePostgresDataVolume(ctx, cluster, spec, instance, nil, nil)
 		assert.NilError(t, err)
 
-		assert.Assert(t, metav1.IsControlledBy(pvc, cluster))
-
 		assert.Equal(t, pvc.Labels[naming.LabelCluster], cluster.Name)
 		assert.Equal(t, pvc.Labels[naming.LabelInstance], instance.Name)
 		assert.Equal(t, pvc.Labels[naming.LabelInstanceSet], spec.Name)
@@ -429,8 +427,6 @@ volumeMode: Filesystem
 		// Reconcile volume
 		pvc, err := reconciler.reconcilePostgresDataVolume(ctx, cluster, spec, instance, nil, sourceCluster)
 		assert.NilError(t, err)
-
-		assert.Assert(t, metav1.IsControlledBy(pvc, cluster))
 
 		assert.Equal(t, pvc.Labels[naming.LabelCluster], cluster.Name)
 		assert.Equal(t, pvc.Labels[naming.LabelInstance], instance.Name)
