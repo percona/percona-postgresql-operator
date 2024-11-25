@@ -6,6 +6,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
@@ -40,6 +41,10 @@ func (r *PGClusterReconciler) createBootstrapRestoreObject(ctx context.Context, 
 			PGCluster: cr.Name,
 			RepoName:  repoName,
 		},
+	}
+	if cr.CompareVersion("2.6.0") >= 0 {
+		pgr.Annotations = naming.Merge(cr.Spec.Metadata.Annotations, pgr.Annotations)
+		pgr.Labels = cr.Spec.Metadata.Labels
 	}
 
 	err := r.Client.Create(ctx, pgr)
