@@ -3256,6 +3256,7 @@ spec:
                               - bucket
                               type: object
                             name:
+                              default: repo1
                               description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
@@ -4505,6 +4506,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                             type: string
                           repoName:
+                            default: repo1
                             description: |-
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -6558,6 +6560,7 @@ spec:
                             - bucket
                             type: object
                           name:
+                            default: repo1
                             description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
@@ -7898,6 +7901,7 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repoName:
+                        default: repo1
                         description: |-
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -13888,6 +13892,7 @@ spec:
                       in a PostgresCluster.
                     properties:
                       enabled:
+                        default: false
                         description: Whether or not the operator should allow switchovers
                           in a PostgresCluster
                         type: boolean
