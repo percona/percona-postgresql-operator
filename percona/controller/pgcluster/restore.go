@@ -42,7 +42,7 @@ func (r *PGClusterReconciler) createBootstrapRestoreObject(ctx context.Context, 
 			RepoName:  repoName,
 		},
 	}
-	if cr.CompareVersion("2.6.0") >= 0 {
+	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
 		pgr.Annotations = naming.Merge(cr.Spec.Metadata.Annotations, pgr.Annotations)
 		pgr.Labels = cr.Spec.Metadata.Labels
 	}

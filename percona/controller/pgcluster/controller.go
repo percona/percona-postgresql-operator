@@ -411,9 +411,7 @@ func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.Per
 			newCASecret.Data = oldCASecret.Data
 		}
 
-		println("TEST 1")
-		if cr.CompareVersion("2.6.0") >= 0 {
-			println("TEST 2")
+		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
 			newCASecret.Annotations = cr.Spec.Metadata.Annotations
 			newCASecret.Labels = cr.Spec.Metadata.Labels
 		}

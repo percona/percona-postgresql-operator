@@ -119,7 +119,7 @@ func (r *Reconciler) reconcileRootCertificate(
 	intent.ObjectMeta.OwnerReferences = existing.ObjectMeta.OwnerReferences
 
 	currVersion, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
-	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.6.0"))) {
+	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.6.0"))) && cluster.Spec.Metadata != nil {
 		intent.Labels = cluster.Spec.Metadata.Labels
 		intent.Annotations = cluster.Spec.Metadata.Annotations
 	}

@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
@@ -186,12 +185,10 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 				RepoName:  repoName,
 			},
 		}
-		if cr.CompareVersion("2.6.0") >= 0 {
+		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
 			pb.Annotations = naming.Merge(cr.Spec.Metadata.Annotations, pb.Annotations)
 			pb.Labels = cr.Spec.Metadata.Labels
 		}
-		fmt.Println("TEST 1 a", pb.Annotations)
-		fmt.Println("TEST 1 l", pb.Labels)
 
 		err = cl.Create(ctx, pb)
 		if err != nil {
