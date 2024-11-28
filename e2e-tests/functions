@@ -97,6 +97,18 @@ deploy_operator_gh() {
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
+remove_all_finalizers() {
+	resource_types=("pg-restore" "pg")
+
+	for resource in "${resource_types[@]}"; do
+		echo "removing all finalizers for $resource resources"
+
+		kubectl -n "${OPERATOR_NS:-$NAMESPACE}" get "$resource" -o json | jq '.items[] | .metadata.name' -r | while IFS= read -r name; do
+			kubectl -n "${OPERATOR_NS:-$NAMESPACE}" patch "$resource" "$name" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+		done
+	done
+}
+
 destroy_operator() {
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" delete deployment percona-postgresql-operator --force --grace-period=0 || true
 	if [[ $OPERATOR_NS ]]; then
@@ -765,7 +777,7 @@ get_postgresql_logs() {
 
 	for pod in $(kubectl get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
 		local phase=$(kubectl -n ${NAMESPACE} get ${pod} -o jsonpath={".status.phase"})
-		if [[ "${phase}" != "Running" ]]; then
+		if [[ ${phase} != "Running" ]]; then
 			echo "Waiting for ${pod} to start running"
 			continue
 		fi
