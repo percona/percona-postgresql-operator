@@ -557,17 +557,6 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster,
 			annotationExtensionsMap[ext] = struct{}{}
 		}
 
-		// Populate crExtensionsMap and simultaneously check for missing entries in extensionsKeysAnnotations
-		for _, ext := range extensionKeys {
-			crExtensionsMap[ext] = struct{}{}
-
-			// If an object exists in crExtensions but not in extensionsKeysAnnotations
-			if _, exists := annotationExtensionsMap[ext]; !exists {
-				extensionsKeysAnnotations = append(extensionsKeysAnnotations, ext)
-			}
-		}
-		cr.Spec.Metadata.Annotations["custom_extensions_list"] = strings.Join(extensionsKeysAnnotations, ", ")
-
 		// Check for missing entries in crExtensions
 		for _, ext := range extensionsKeysAnnotations {
 			// If an object exists in extensionsKeysAnnotations but not in crExtensions, the extension should be deleted.
@@ -575,6 +564,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster,
 				extensionKeysForDeletion = append(extensionKeysForDeletion, ext)
 			}
 		}
+
 		if len(extensionKeysForDeletion) > 0 {
 			var exec postgres.Executor
 			err := extensions.DisableCustomExtensionsInPostgreSQL(ctx, extensionKeysForDeletion, exec)
@@ -582,6 +572,9 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster,
 				return errors.Wrap(err, "custom extension deletion")
 			}
 		}
+
+		cr.Spec.Metadata.Annotations["custom_extensions_list"] = strings.Join(extensionKeys, ", ")
+
 	}
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
