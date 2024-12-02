@@ -5,12 +5,14 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/pkg/errors"
 	"io"
 	"log"
 	"os"
+
+	"github.com/pkg/errors"
+
+	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/postgres"
 )
 
 func Uninstall(archivePath string) error {
@@ -63,7 +65,7 @@ func DisableCustomExtensionsInPostgreSQL(ctx context.Context, customExtensionsFo
 				"QUIET":         "on", // Do not print successful commands to stdout.
 			},
 		)
-		log.V(1).Info("disabled %s", extensionName, "stdout", stdout, "stderr", stderr)
+		log.V(1).Info("disabled", "extensionName", extensionName, "stdout", stdout, "stderr", stderr)
 
 		return errors.Wrap(err, "custom extension deletion")
 
