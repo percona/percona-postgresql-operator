@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	"reflect"
 	"strings"
 	"time"
@@ -241,7 +242,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
-	r.reconcileCustomExtensions(cr)
+	r.reconcileCustomExtensions(cr, ctx)
 
 	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
@@ -524,15 +525,63 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
-func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster) {
+func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster, ctx context.Context) error {
 	if cr.Spec.Extensions.Storage.Secret == nil {
-		return
+		return nil
 	}
 
 	extensionKeys := make([]string, 0)
 	for _, extension := range cr.Spec.Extensions.Custom {
 		key := extensions.GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
 		extensionKeys = append(extensionKeys, key)
+	}
+
+	if cr.CompareVersion("2.6.0") >= 0 {
+		var extensionKeysForDeletion []string
+		var extensionsKeysAnnotations []string
+
+		if cr.Spec.Metadata.Annotations != nil {
+			if val, ok := cr.Spec.Metadata.Annotations["custom_extensions_list"]; ok && val != "" {
+				extensionsKeysAnnotations = strings.Split(val, ",")
+			}
+		}
+
+		for i := range extensionsKeysAnnotations {
+			extensionsKeysAnnotations[i] = strings.TrimSpace(extensionsKeysAnnotations[i])
+		}
+		annotationExtensionsMap := make(map[string]struct{})
+
+		crExtensionsMap := make(map[string]struct{})
+		// extensions added to annotations
+		for _, ext := range extensionsKeysAnnotations {
+			annotationExtensionsMap[ext] = struct{}{}
+		}
+
+		// Populate crExtensionsMap and simultaneously check for missing entries in extensionsKeysAnnotations
+		for _, ext := range extensionKeys {
+			crExtensionsMap[ext] = struct{}{}
+
+			// If an object exists in crExtensions but not in extensionsKeysAnnotations
+			if _, exists := annotationExtensionsMap[ext]; !exists {
+				extensionsKeysAnnotations = append(extensionsKeysAnnotations, ext)
+			}
+		}
+		cr.Spec.Metadata.Annotations["custom_extensions_list"] = strings.Join(extensionsKeysAnnotations, ", ")
+
+		// Check for missing entries in crExtensions
+		for _, ext := range extensionsKeysAnnotations {
+			// If an object exists in extensionsKeysAnnotations but not in crExtensions, the extension should be deleted.
+			if _, exists := crExtensionsMap[ext]; !exists {
+				extensionKeysForDeletion = append(extensionKeysForDeletion, ext)
+			}
+		}
+		if len(extensionKeysForDeletion) > 0 {
+			var exec postgres.Executor
+			err := extensions.DisableCustomExtensionsInPostgreSQL(ctx, extensionKeysForDeletion, exec)
+			if err != nil {
+				return errors.Wrap(err, "custom extension deletion")
+			}
+		}
 	}
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
@@ -549,6 +598,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster)
 		))
 		set.VolumeMounts = append(set.VolumeMounts, extensions.ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
 	}
+	return nil
 }
 
 func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
@@ -659,3 +709,47 @@ func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.Perco
 
 	return nil
 }
+
+//func DisableCustomExtentionsInPostgreSQL(ctx context.Context, crExtensions []string, exec postgres.Executor) error {
+//	log := logging.FromContext(ctx)
+//
+//	stdout, stderr, err := exec.ExecInAllDatabases(ctx,
+//		`SELECT extname FROM pg_extension;`,
+//		map[string]string{
+//			"ON_ERROR_STOP": "on", // Abort if any command fails.
+//			"QUIET":         "on", // Do not print successful commands to stdout.
+//		})
+//	if err != nil {
+//		log.Error(err, "Error executing query: %v, stderr: %s", stderr)
+//		return err
+//	}
+//
+//	pgExtensions := strings.Split(strings.TrimSpace(stdout), "\n")
+//	fmt.Printf("Installed extensions: %v\n", pgExtensions)
+//
+//	crExtensionMap := make(map[string]bool)
+//	for _, ext := range crExtensions {
+//		crExtensionMap[ext] = true
+//	}
+//
+//	for _, extensionName := range pgExtensions {
+//		if !crExtensionMap[extensionName] {
+//			sqlCommand := fmt.Sprintf(
+//				`SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS %s;`,
+//				extensionName,
+//			)
+//
+//			stdout, stderr, err := exec.ExecInAllDatabases(ctx,
+//				sqlCommand,
+//				map[string]string{
+//					"ON_ERROR_STOP": "on", // Abort when any one command fails.
+//					"QUIET":         "on", // Do not print successful commands to stdout.
+//				},
+//			)
+//			log.V(1).Info("disabled %s", extensionName, "stdout", stdout, "stderr", stderr)
+//
+//			return err
+//		}
+//	}
+//	return nil
+//}
