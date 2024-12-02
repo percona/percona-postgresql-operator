@@ -4,10 +4,11 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/percona/percona-postgresql-operator/internal/postgres"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
@@ -242,7 +243,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
-	r.reconcileCustomExtensions(cr, ctx)
+	if err := r.reconcileCustomExtensions(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
+	}
 
 	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
@@ -525,7 +528,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
-func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster, ctx context.Context) error {
+func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if cr.Spec.Extensions.Storage.Secret == nil {
 		return nil
 	}
