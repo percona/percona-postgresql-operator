@@ -254,7 +254,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		}
 	}
 
-	if *cr.Spec.AutoCreateUserSchema {
+	if cr.Spec.AutoCreateUserSchema != nil && *cr.Spec.AutoCreateUserSchema {
 		annotations[naming.AutoCreateUserSchemaAnnotation] = "true"
 	}
 
