@@ -90,6 +90,7 @@ func main() {
 	features := feature.NewGate()
 	err = features.SetFromMap(map[string]bool{
 		string(feature.InstanceSidecars):  true, // needed for PMM
+		string(feature.PGBouncerSidecars): true,
 		string(feature.TablespaceVolumes): true,
 	})
 	assertNoError(err)
