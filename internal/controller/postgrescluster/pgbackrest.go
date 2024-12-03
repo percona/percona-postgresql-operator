@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -759,7 +760,10 @@ func generateBackupJobSpecIntent(postgresCluster *v1beta1.PostgresCluster,
 				// controller when there is a failure (instead of the container simply restarting).
 				// This will ensure the Job always has the latest configs mounted following a
 				// failure as needed to successfully verify config hashes and run the Job.
-				RestartPolicy:      corev1.RestartPolicyNever,
+				// RestartPolicy:      corev1.RestartPolicyNever,
+				// K8SPG-619: Set RestartPolicy to "OnFailure" to handle potential delays in establishing communication with the Kubernetes API.
+				//            The container will be restarted until the BackoffLimit is reached to handle these delays.
+				RestartPolicy:      corev1.RestartPolicyOnFailure,
 				SecurityContext:    initialize.PodSecurityContext(),
 				ServiceAccountName: serviceAccountName,
 			},
@@ -788,6 +792,9 @@ func generateBackupJobSpecIntent(postgresCluster *v1beta1.PostgresCluster,
 
 	// add pgBackRest configs to template
 	pgbackrest.AddConfigToRepoPod(postgresCluster, &jobSpec.Template.Spec)
+
+	// K8SPG-619: The job container will try to restart with increasing delays (10s, 20s) before failing.
+	jobSpec.BackoffLimit = ptr.To(int32(2))
 
 	return jobSpec
 }
