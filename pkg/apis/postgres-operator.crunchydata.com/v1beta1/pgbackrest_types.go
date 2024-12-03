@@ -322,6 +322,7 @@ type PGBackRestRepo struct {
 	// The name of the repository
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:default="repo1"
 	Name string `json:"name"`
 
 	// Defines the schedules for the pgBackRest backups
