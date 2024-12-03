@@ -43,7 +43,7 @@ Below is one of the ways to deploy the Operator using `kubectl`.
 
 ### kubectl
 
-1. Deploy the operator from `deploy/bundle.yam`
+1. Deploy the operator from `deploy/bundle.yaml`
 
 ```sh
 kubectl apply --server-side -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/main/deploy/bundle.yaml
@@ -87,7 +87,7 @@ You can get early access to new product features, invite-only ”ask me anything
 
 ## Roadmap
 
-We have an experimental public roadmap which can be found [here](https://github.com/percona/roadmap/projects/1). Please feel free to contribute and propose new features by following the roadmap [guidelines](https://github.com/percona/roadmap).
+We have a public roadmap which can be found [here](https://github.com/orgs/percona/projects/10). Please feel free to contribute and propose new features by following the roadmap [guidelines](https://github.com/percona/roadmap).
 
 ## Submitting Bug Reports
 
