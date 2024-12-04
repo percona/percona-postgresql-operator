@@ -132,6 +132,7 @@ spec:
                     - bucket
                     type: object
                   name:
+                    default: repo1
                     description: The name of the repository
                     pattern: ^repo[1-4]
                     type: string

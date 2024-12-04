@@ -52,6 +52,7 @@ type PatroniSwitchover struct {
 
 	// Whether or not the operator should allow switchovers in a PostgresCluster
 	// +required
+	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`
 
 	// The instance that should become primary during a switchover. This field is
