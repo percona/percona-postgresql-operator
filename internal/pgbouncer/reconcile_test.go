@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package pgbouncer
 
@@ -19,7 +8,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	gocmp "github.com/google/go-cmp/cmp"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,6 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -134,7 +124,7 @@ func TestPod(t *testing.T) {
 
 		call()
 
-		assert.Assert(t, marshalMatches(pod, `
+		assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
 - command:
   - pgbouncer
@@ -244,7 +234,7 @@ volumes:
 
 		call()
 
-		assert.Assert(t, marshalMatches(pod, `
+		assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
 - command:
   - pgbouncer
@@ -354,7 +344,7 @@ volumes:
 
 		call()
 
-		assert.Assert(t, marshalMatches(pod, `
+		assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
 - command:
   - pgbouncer
@@ -506,6 +496,6 @@ func TestPostgreSQL(t *testing.T) {
 				Mandatory: postgresqlHBAs(),
 			},
 			// postgres.HostBasedAuthentication has unexported fields. Call String() to compare.
-			cmp.Transformer("", postgres.HostBasedAuthentication.String))
+			gocmp.Transformer("", postgres.HostBasedAuthentication.String))
 	})
 }

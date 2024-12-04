@@ -1,17 +1,6 @@
-/*
- Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package upgradecheck
 
@@ -22,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,7 +67,7 @@ func init() {
 
 func checkForUpgrades(ctx context.Context, url, versionString string, backoff wait.Backoff,
 	crclient crclient.Client, cfg *rest.Config,
-	isOpenShift bool) (message string, header string, err error) {
+	isOpenShift bool, registrationToken string) (message string, header string, err error) {
 	var headerPayloadStruct *clientUpgradeData
 
 	// Prep request
@@ -86,7 +76,7 @@ func checkForUpgrades(ctx context.Context, url, versionString string, backoff wa
 		// generateHeader always returns some sort of struct, using defaults/nil values
 		// in case some of the checks return errors
 		headerPayloadStruct = generateHeader(ctx, cfg, crclient,
-			versionString, isOpenShift)
+			versionString, isOpenShift, registrationToken)
 		req, err = addHeader(req, headerPayloadStruct)
 	}
 
@@ -136,24 +126,37 @@ type CheckForUpgradesScheduler struct {
 	Client crclient.Client
 	Config *rest.Config
 
-	OpenShift    bool
-	Refresh      time.Duration
-	URL, Version string
+	OpenShift         bool
+	Refresh           time.Duration
+	RegistrationToken string
+	URL, Version      string
 }
 
 // ManagedScheduler creates a [CheckForUpgradesScheduler] and adds it to m.
-func ManagedScheduler(m manager.Manager, openshift bool, url, version string) error {
+// NOTE(registration): This takes a token/nil parameter when the operator is started.
+// Currently the operator restarts when the token is updated,
+// so this token is always current; but if that restart behavior is changed,
+// we will want the upgrade mechanism to instantiate its own registration runner
+// or otherwise get the most recent token.
+func ManagedScheduler(m manager.Manager, openshift bool,
+	url, version string, registrationToken *jwt.Token) error {
 	if url == "" {
 		url = upgradeCheckURL
 	}
 
+	var token string
+	if registrationToken != nil {
+		token = registrationToken.Raw
+	}
+
 	return m.Add(&CheckForUpgradesScheduler{
-		Client:    m.GetClient(),
-		Config:    m.GetConfig(),
-		OpenShift: openshift,
-		Refresh:   24 * time.Hour,
-		URL:       url,
-		Version:   version,
+		Client:            m.GetClient(),
+		Config:            m.GetConfig(),
+		OpenShift:         openshift,
+		Refresh:           24 * time.Hour,
+		RegistrationToken: token,
+		URL:               url,
+		Version:           version,
 	})
 }
 
@@ -188,7 +191,7 @@ func (s *CheckForUpgradesScheduler) check(ctx context.Context) {
 	}()
 
 	info, header, err := checkForUpgrades(ctx,
-		s.URL, s.Version, backoff, s.Client, s.Config, s.OpenShift)
+		s.URL, s.Version, backoff, s.Client, s.Config, s.OpenShift, s.RegistrationToken)
 
 	if err != nil {
 		log.V(1).Info("could not complete upgrade check", "response", err.Error())

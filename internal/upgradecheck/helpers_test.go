@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package upgradecheck
 
@@ -43,6 +32,7 @@ type fakeClientWithError struct {
 	errorType string
 }
 
+// Get returns the client.get OR an Error (`get error`) if the fakeClientWithError is set to error that way
 func (f *fakeClientWithError) Get(ctx context.Context, key types.NamespacedName, obj crclient.Object, opts ...crclient.GetOption) error {
 	switch f.errorType {
 	case "get error":
@@ -52,6 +42,7 @@ func (f *fakeClientWithError) Get(ctx context.Context, key types.NamespacedName,
 	}
 }
 
+// Patch returns the client.get OR an Error (`patch error`) if the fakeClientWithError is set to error that way
 // TODO: PatchType is not supported currently by fake
 // - https://github.com/kubernetes/client-go/issues/970
 // Once that gets fixed, we can test without envtest
@@ -65,6 +56,7 @@ func (f *fakeClientWithError) Patch(ctx context.Context, obj crclient.Object,
 	}
 }
 
+// List returns the client.get OR an Error (`list error`) if the fakeClientWithError is set to error that way
 func (f *fakeClientWithError) List(ctx context.Context, objList crclient.ObjectList,
 	opts ...crclient.ListOption) error {
 	switch f.errorType {
@@ -75,12 +67,16 @@ func (f *fakeClientWithError) List(ctx context.Context, objList crclient.ObjectL
 	}
 }
 
+// setupDeploymentID returns a UUID
 func setupDeploymentID(t *testing.T) string {
 	t.Helper()
 	deploymentID = string(uuid.NewUUID())
 	return deploymentID
 }
 
+// setupFakeClientWithPGOScheme returns a fake client with the PGO scheme added;
+// if `includeCluster` is true, also adds some empty PostgresCluster and CrunchyBridgeCluster
+// items to the client
 func setupFakeClientWithPGOScheme(t *testing.T, includeCluster bool) crclient.Client {
 	t.Helper()
 	if includeCluster {
@@ -98,11 +94,31 @@ func setupFakeClientWithPGOScheme(t *testing.T, includeCluster bool) crclient.Cl
 				},
 			},
 		}
-		return fake.NewClientBuilder().WithScheme(runtime.Scheme).WithLists(pc).Build()
+
+		bcl := &v1beta1.CrunchyBridgeClusterList{
+			Items: []v1beta1.CrunchyBridgeCluster{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hippo",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "elephant",
+					},
+				},
+			},
+		}
+
+		return fake.NewClientBuilder().
+			WithScheme(runtime.Scheme).
+			WithLists(pc, bcl).
+			Build()
 	}
 	return fake.NewClientBuilder().WithScheme(runtime.Scheme).Build()
 }
 
+// setupVersionServer sets up and tears down a server and version info for testing
 func setupVersionServer(t *testing.T, works bool) (version.Info, *httptest.Server) {
 	t.Helper()
 	expect := version.Info{
@@ -127,6 +143,7 @@ func setupVersionServer(t *testing.T, works bool) (version.Info, *httptest.Serve
 	return expect, server
 }
 
+// setupLogCapture captures the logs and keeps count of the logs captured
 func setupLogCapture(ctx context.Context) (context.Context, *[]string) {
 	calls := []string{}
 	testlog := funcr.NewJSON(func(object string) {

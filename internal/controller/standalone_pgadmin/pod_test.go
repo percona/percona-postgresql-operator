@@ -1,16 +1,6 @@
 // Copyright 2023 - 2024 Crunchy Data Solutions, Inc.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package standalone_pgadmin
 
@@ -104,8 +94,10 @@ containers:
   env:
   - name: PGADMIN_SETUP_EMAIL
     value: admin@pgadmin.postgres-operator.svc
-  - name: PGADMIN_LISTEN_PORT
-    value: "5050"
+  - name: KRB5_CONFIG
+    value: /etc/pgadmin/conf.d/krb5.conf
+  - name: KRB5RCACHEDIR
+    value: /tmp
   name: pgadmin
   ports:
   - containerPort: 5050
@@ -147,8 +139,8 @@ initContainers:
   - --
   - |-
     mkdir -p /etc/pgadmin/conf.d
-    (umask a-w && echo "$1" > /etc/pgadmin/config_system.py)
-    (umask a-w && echo "$2" > /etc/pgadmin/gunicorn_config.py)
+    echo "$1" > /etc/pgadmin/config_system.py
+    echo "$2" > /etc/pgadmin/gunicorn_config.py
   - startup
   - |
     import glob, json, re, os
@@ -287,8 +279,10 @@ containers:
   env:
   - name: PGADMIN_SETUP_EMAIL
     value: admin@pgadmin.postgres-operator.svc
-  - name: PGADMIN_LISTEN_PORT
-    value: "5050"
+  - name: KRB5_CONFIG
+    value: /etc/pgadmin/conf.d/krb5.conf
+  - name: KRB5RCACHEDIR
+    value: /tmp
   image: new-image
   imagePullPolicy: Always
   name: pgadmin
@@ -334,8 +328,8 @@ initContainers:
   - --
   - |-
     mkdir -p /etc/pgadmin/conf.d
-    (umask a-w && echo "$1" > /etc/pgadmin/config_system.py)
-    (umask a-w && echo "$2" > /etc/pgadmin/gunicorn_config.py)
+    echo "$1" > /etc/pgadmin/config_system.py
+    echo "$2" > /etc/pgadmin/gunicorn_config.py
   - startup
   - |
     import glob, json, re, os
