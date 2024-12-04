@@ -3,7 +3,6 @@ custom-tls
 demand-backup
 finalizers
 init-deploy
-major-upgrade
 monitoring
 one-pod
 operator-self-healing
