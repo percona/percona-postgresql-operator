@@ -1,10 +1,10 @@
 module github.com/percona/percona-postgresql-operator
 
 go 1.22.6
+toolchain go1.22.10
 
 require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
-	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/go-logr/logr v1.4.2
 	github.com/go-openapi/errors v0.22.0
 	github.com/go-openapi/runtime v0.28.0
@@ -14,6 +14,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.7.0
+	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.0.0
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.34.2
 	github.com/pganalyze/pg_query_go/v5 v5.1.0
@@ -30,7 +31,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.32.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.29.0
-	google.golang.org/grpc v1.67.1
+	google.golang.org/grpc v1.68.0
 	gotest.tools/v3 v3.5.1
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
@@ -41,11 +42,10 @@ require (
 )
 
 require (
-	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
+	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
-	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.0.0 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
