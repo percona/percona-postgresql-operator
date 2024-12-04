@@ -540,43 +540,37 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 {
-		var extensionKeysForDeletion []string
-		var extensionsKeysAnnotations []string
+		// custom extensions to be removed
+		var removedExtension []string
+		// list of installed custom extensions
+		var installedExtensions []string
 
-		if cr.Spec.Metadata.Annotations != nil {
-			if val, ok := cr.Spec.Metadata.Annotations["custom_extensions_list"]; ok && val != "" {
-				extensionsKeysAnnotations = strings.Split(val, ",")
-			}
+		if val, ok := cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions]; ok && val != "" {
+			installedExtensions = strings.Split(val, ",")
 		}
 
-		for i := range extensionsKeysAnnotations {
-			extensionsKeysAnnotations[i] = strings.TrimSpace(extensionsKeysAnnotations[i])
-		}
-		annotationExtensionsMap := make(map[string]struct{})
-
-		crExtensionsMap := make(map[string]struct{})
-		// extensions added to annotations
-		for _, ext := range extensionsKeysAnnotations {
-			annotationExtensionsMap[ext] = struct{}{}
+		crExtensions := make(map[string]struct{})
+		for _, ext := range installedExtensions {
+			crExtensions[ext] = struct{}{}
 		}
 
 		// Check for missing entries in crExtensions
-		for _, ext := range extensionsKeysAnnotations {
-			// If an object exists in extensionsKeysAnnotations but not in crExtensions, the extension should be deleted.
-			if _, exists := crExtensionsMap[ext]; !exists {
-				extensionKeysForDeletion = append(extensionKeysForDeletion, ext)
+		for _, ext := range installedExtensions {
+			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
+			if _, exists := crExtensions[ext]; !exists {
+				removedExtension = append(removedExtension, ext)
 			}
 		}
 
-		if len(extensionKeysForDeletion) > 0 {
+		if len(removedExtension) > 0 {
 			var exec postgres.Executor
-			err := extensions.DisableCustomExtensionsInPostgreSQL(ctx, extensionKeysForDeletion, exec)
+			err := extensions.DisableCustomExtensionsInPostgreSQL(ctx, removedExtension, exec)
 			if err != nil {
 				return errors.Wrap(err, "custom extension deletion")
 			}
 		}
 
-		cr.Spec.Metadata.Annotations["custom_extensions_list"] = strings.Join(extensionKeys, ", ")
+		cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions] = strings.Join(extensionKeys, ",")
 
 	}
 

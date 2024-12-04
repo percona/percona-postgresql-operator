@@ -46,6 +46,9 @@ const (
 	// AnnotationClusterBootstrapRestore is the annotation that is added to PerconaPGRestore to
 	// indicate that it is a cluster bootstrap restore.
 	AnnotationClusterBootstrapRestore = AnnotationPrefix + "cluster-bootstrap-restore"
+
+	//AnnotationClusterCustomExtension is annotation that added to pg cluster to handle the list of custom extensions.
+	AnnotationClusterCustomExtensions = AnnotationPrefix + "custom_extensions"
 )
 
 func ToCrunchyAnnotation(annotation string) string {
