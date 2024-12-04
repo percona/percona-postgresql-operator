@@ -64,8 +64,8 @@ spec:
               majorVersion:
                 description: |-
                   The ID of the cluster's major Postgres version.
-                  Currently Bridge offers 13-16
-                maximum: 16
+                  Currently Bridge offers 13-17
+                maximum: 17
                 minimum: 13
                 type: integer
               metadata:
@@ -23818,7 +23818,7 @@ spec:
                 type: object
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
-                maximum: 16
+                maximum: 17
                 minimum: 12
                 type: integer
               image:
@@ -30306,8 +30306,17 @@ spec:
                     required:
                     - repos
                     type: object
-                required:
-                - pgbackrest
+                  snapshots:
+                    description: VolumeSnapshot configuration
+                    properties:
+                      volumeSnapshotClassName:
+                        description: Name of the VolumeSnapshotClass that should be
+                          used by VolumeSnapshots
+                        minLength: 1
+                        type: string
+                    required:
+                    - volumeSnapshotClassName
+                    type: object
                 type: object
               config:
                 properties:

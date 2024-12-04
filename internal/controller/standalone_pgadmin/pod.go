@@ -1,16 +1,6 @@
 // Copyright 2023 - 2024 Crunchy Data Solutions, Inc.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package standalone_pgadmin
 
@@ -20,6 +10,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
@@ -124,9 +115,18 @@ func pod(
 				Name:  "PGADMIN_SETUP_EMAIL",
 				Value: fmt.Sprintf("admin@%s.%s.svc", inPGAdmin.Name, inPGAdmin.Namespace),
 			},
+			// Setting the KRB5_CONFIG for kerberos
+			// - https://web.mit.edu/kerberos/krb5-current/doc/admin/conf_files/krb5_conf.html
 			{
-				Name:  "PGADMIN_LISTEN_PORT",
-				Value: fmt.Sprintf("%d", pgAdminPort),
+				Name:  "KRB5_CONFIG",
+				Value: configMountPath + "/krb5.conf",
+			},
+			// In testing it was determined that we need to set this env var for the replay cache
+			// otherwise it defaults to the read-only location `/var/tmp/`
+			// - https://web.mit.edu/kerberos/krb5-current/doc/basic/rcache_def.html#replay-cache-types
+			{
+				Name:  "KRB5RCACHEDIR",
+				Value: "/tmp",
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
@@ -160,7 +160,7 @@ func pod(
 	readinessProbe := &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
-				Port:   *initialize.IntOrStringInt32(pgAdminPort),
+				Port:   intstr.FromInt32(pgAdminPort),
 				Path:   "/login",
 				Scheme: corev1.URISchemeHTTP,
 			},
@@ -431,12 +431,11 @@ with open('` + configMountPath + `/` + gunicornConfigFilePath + `') as _f:
 
 	script := strings.Join([]string{
 		// Use the initContainer to create this path to avoid the error noted here:
-		// - https://github.com/kubernetes/kubernetes/issues/121294
-		`mkdir -p /etc/pgadmin/conf.d`,
-		// Write the system configuration into a read-only file.
-		`(umask a-w && echo "$1" > ` + scriptMountPath + `/config_system.py` + `)`,
-		// Write the server configuration into a read-only file.
-		`(umask a-w && echo "$2" > ` + scriptMountPath + `/gunicorn_config.py` + `)`,
+		// - https://issue.k8s.io/121294
+		`mkdir -p ` + configMountPath,
+		// Write the system and server configurations.
+		`echo "$1" > ` + scriptMountPath + `/config_system.py`,
+		`echo "$2" > ` + scriptMountPath + `/gunicorn_config.py`,
 	}, "\n")
 
 	return append([]string{"bash", "-ceu", "--", script, "startup"}, args...)

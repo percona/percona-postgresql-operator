@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -91,6 +80,7 @@ func TestReconcileCerts(t *testing.T) {
 		initialRoot, err := r.reconcileRootCertificate(ctx, cluster1)
 		assert.NilError(t, err)
 
+		// K8SPG-553
 		cluster1CASecret := &corev1.Secret{
 			ObjectMeta: naming.PostgresRootCASecret(cluster1),
 		}
@@ -114,6 +104,7 @@ func TestReconcileCerts(t *testing.T) {
 				UID:        cluster1.UID,
 			}
 
+			// K8SPG-553
 			if len(cluster1CASecret.ObjectMeta.OwnerReferences) > 0 {
 				assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0], expectedOR)
 			}
@@ -242,7 +233,9 @@ func TestReconcileCerts(t *testing.T) {
 
 			// check that the leaf cert did not change after another reconciliation
 			assert.DeepEqual(t, newLeaf2, newLeaf)
+
 		})
+
 	})
 
 	t.Run("check cluster certificate secret reconciliation", func(t *testing.T) {
