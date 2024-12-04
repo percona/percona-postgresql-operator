@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package v1beta1
 
@@ -131,8 +120,8 @@ type PostgresClusterSpec struct {
 
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=16
+	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Maximum=17
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -351,8 +340,12 @@ func (s *PostgresClusterSpec) Default() {
 // Backups defines a PostgreSQL archive configuration
 type Backups struct {
 	// pgBackRest archive configuration
-	// +kubebuilder:validation:Required
+	// +optional
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
+
+	// VolumeSnapshot configuration
+	// +optional
+	Snapshots *VolumeSnapshots `json:"snapshots,omitempty"`
 }
 
 // PostgresClusterStatus defines the observed state of PostgresCluster
@@ -728,6 +721,14 @@ type MonitoringSpec struct {
 type MonitoringStatus struct {
 	// +optional
 	ExporterConfiguration string `json:"exporterConfiguration,omitempty"`
+}
+
+// VolumeSnapshots defines the configuration for VolumeSnapshots
+type VolumeSnapshots struct {
+	// Name of the VolumeSnapshotClass that should be used by VolumeSnapshots
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	VolumeSnapshotClassName string `json:"volumeSnapshotClassName"`
 }
 
 func NewPostgresCluster() *PostgresCluster {

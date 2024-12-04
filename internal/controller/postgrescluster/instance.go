@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -346,7 +335,7 @@ func (r *Reconciler) observeInstances(
 		status.DesiredPGDataVolume = make(map[string]string)
 
 		for _, instance := range observed.bySet[name] {
-			status.Replicas += int32(len(instance.Pods)) // nolint:gosec
+			status.Replicas += int32(len(instance.Pods)) //nolint:gosec
 
 			if ready, known := instance.IsReady(); known && ready {
 				status.ReadyReplicas++
@@ -604,6 +593,7 @@ func (r *Reconciler) reconcileInstanceSets(
 	primaryCertificate *corev1.SecretProjection,
 	clusterVolumes []corev1.PersistentVolumeClaim,
 	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
+	backupsSpecFound bool,
 ) error {
 
 	// Go through the observed instances and check if a primary has been determined.
@@ -640,7 +630,9 @@ func (r *Reconciler) reconcileInstanceSets(
 			rootCA, clusterPodService, instanceServiceAccount,
 			patroniLeaderService, primaryCertificate,
 			findAvailableInstanceNames(*set, instances, clusterVolumes),
-			numInstancePods, clusterVolumes, exporterQueriesConfig, exporterWebConfig)
+			numInstancePods, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
+			backupsSpecFound,
+		)
 
 		if err == nil {
 			err = r.reconcileInstanceSetPodDisruptionBudget(ctx, cluster, set)
@@ -1079,6 +1071,7 @@ func (r *Reconciler) scaleUpInstances(
 	numInstancePods int,
 	clusterVolumes []corev1.PersistentVolumeClaim,
 	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
+	backupsSpecFound bool,
 ) ([]*appsv1.StatefulSet, error) {
 	log := logging.FromContext(ctx)
 
@@ -1123,6 +1116,7 @@ func (r *Reconciler) scaleUpInstances(
 			rootCA, clusterPodService, instanceServiceAccount,
 			patroniLeaderService, primaryCertificate, instances[i],
 			numInstancePods, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
+			backupsSpecFound,
 		)
 	}
 	if err == nil {
@@ -1152,6 +1146,7 @@ func (r *Reconciler) reconcileInstance(
 	numInstancePods int,
 	clusterVolumes []corev1.PersistentVolumeClaim,
 	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
+	backupsSpecFound bool,
 ) error {
 	log := logging.FromContext(ctx).WithValues("instance", instance.Name)
 	ctx = logging.NewContext(ctx, log)
@@ -1183,7 +1178,7 @@ func (r *Reconciler) reconcileInstance(
 			ctx, cluster, spec, instance, rootCA)
 	}
 	if err == nil {
-		postgresDataVolume, err = r.reconcilePostgresDataVolume(ctx, cluster, spec, instance, clusterVolumes)
+		postgresDataVolume, err = r.reconcilePostgresDataVolume(ctx, cluster, spec, instance, clusterVolumes, nil)
 	}
 	if err == nil {
 		postgresWALVolume, err = r.reconcilePostgresWALVolume(ctx, cluster, spec, instance, observed, clusterVolumes)
@@ -1198,8 +1193,10 @@ func (r *Reconciler) reconcileInstance(
 			postgresDataVolume, postgresWALVolume, tablespaceVolumes,
 			&instance.Spec.Template.Spec)
 
-		addPGBackRestToInstancePodSpec(
-			ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)
+		if backupsSpecFound {
+			addPGBackRestToInstancePodSpec(
+				ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)
+		}
 
 		err = patroni.InstancePod(
 			ctx, cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
@@ -1215,12 +1212,13 @@ func (r *Reconciler) reconcileInstance(
 	// containers
 	if err == nil {
 		addNSSWrapper(
-			cluster,
+			cluster, // K8SPG-260
 			config.PostgresContainerImage(cluster),
 			cluster.Spec.ImagePullPolicy,
 			&instance.Spec.Template)
 
 	}
+	// K8SPG-435
 	sizeLimit := getTMPSizeLimit(instance.Labels[naming.LabelVersion], spec.Resources)
 
 	// add an emptyDir volume to the PodTemplateSpec and an associated '/tmp' volume mount to
@@ -1258,7 +1256,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	sts.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(map[string]string{
+		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    sts.Name,
@@ -1278,7 +1276,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(map[string]string{
+		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    sts.Name,
@@ -1304,15 +1302,11 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	sts.Spec.Template.Spec.Affinity = spec.Affinity
 	sts.Spec.Template.Spec.Tolerations = spec.Tolerations
 	sts.Spec.Template.Spec.TopologySpreadConstraints = spec.TopologySpreadConstraints
-	if spec.PriorityClassName != nil {
-		sts.Spec.Template.Spec.PriorityClassName = *spec.PriorityClassName
-	}
+	sts.Spec.Template.Spec.PriorityClassName = initialize.FromPointer(spec.PriorityClassName)
 
 	// if default pod scheduling is not explicitly disabled, add the default
 	// pod topology spread constraints
-	if cluster.Spec.DisableDefaultPodScheduling == nil ||
-		(cluster.Spec.DisableDefaultPodScheduling != nil &&
-			!*cluster.Spec.DisableDefaultPodScheduling) {
+	if !initialize.FromPointer(cluster.Spec.DisableDefaultPodScheduling) {
 		sts.Spec.Template.Spec.TopologySpreadConstraints = append(
 			sts.Spec.Template.Spec.TopologySpreadConstraints,
 			defaultTopologySpreadConstraints(
@@ -1364,6 +1358,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
 	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
+	// K8SPG-514
 	if spec.SecurityContext != nil {
 		sts.Spec.Template.Spec.SecurityContext = spec.SecurityContext
 	} else {
@@ -1409,7 +1404,7 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 	instanceConfigMap.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(map[string]string{
+		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    instance.Name,
@@ -1455,7 +1450,7 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	instanceCerts.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
-		naming.WithPerconaLabels(map[string]string{
+		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: spec.Name,
 			naming.LabelInstance:    instance.Name,
