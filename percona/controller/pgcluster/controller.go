@@ -550,7 +550,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		}
 
 		crExtensions := make(map[string]struct{})
-		for _, ext := range installedExtensions {
+		for _, ext := range extensionKeys {
 			crExtensions[ext] = struct{}{}
 		}
 
