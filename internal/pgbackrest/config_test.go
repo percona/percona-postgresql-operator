@@ -13,13 +13,12 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
-	"gotest.tools/v3/assert/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.compercona/percona-postgresql-operator/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -217,13 +216,13 @@ pg1-socket-path = /tmp/postgres
 			[]string{"some-instance"})
 
 		assert.Assert(t,
-			strings.Contains(configmap.Data["pgbackrest_instance.conf"],
+			cmp.Contains(configmap.Data["pgbackrest_instance.conf"],
 				"archive-header-check = n"))
 		assert.Assert(t,
-			strings.Contains(configmap.Data["pgbackrest_instance.conf"],
+			cmp.Contains(configmap.Data["pgbackrest_instance.conf"],
 				"page-header-check = n"))
 		assert.Assert(t,
-			strings.Contains(configmap.Data["pgbackrest_instance.conf"],
+			cmp.Contains(configmap.Data["pgbackrest_instance.conf"],
 				"pg-version-force"))
 
 		cluster.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
@@ -238,13 +237,13 @@ pg1-socket-path = /tmp/postgres
 			[]string{"some-instance"})
 
 		assert.Assert(t,
-			strings.Contains(configmap.Data["pgbackrest_repo.conf"],
+			cmp.Contains(configmap.Data["pgbackrest_repo.conf"],
 				"archive-header-check = n"))
 		assert.Assert(t,
-			strings.Contains(configmap.Data["pgbackrest_repo.conf"],
+			cmp.Contains(configmap.Data["pgbackrest_repo.conf"],
 				"page-header-check = n"))
 		assert.Assert(t,
-			strings.Contains(configmap.Data["pgbackrest_repo.conf"],
+			cmp.Contains(configmap.Data["pgbackrest_repo.conf"],
 				"pg-version-force"))
 	})
 }
@@ -327,10 +326,8 @@ func TestReloadCommand(t *testing.T) {
 }
 
 func TestReloadCommandPrettyYAML(t *testing.T) {
-	b, err := yaml.Marshal(reloadCommand("any", true))
-	assert.NilError(t, err)
-	assert.Assert(t, strings.Contains(string(b), "\n- |"),
-		"expected literal block scalar, got:\n%s", b)
+	assert.Assert(t, cmp.MarshalContains(reloadCommand("any"), "\n- |"),
+		"expected literal block scalar")
 }
 
 func TestRestoreCommand(t *testing.T) {
@@ -355,19 +352,21 @@ func TestRestoreCommand(t *testing.T) {
 }
 
 func TestRestoreCommandPrettyYAML(t *testing.T) {
-	b, err := yaml.Marshal(RestoreCommand("/dir", "try", "", nil, "--options"))
-
-	assert.NilError(t, err)
-	assert.Assert(t, strings.Contains(string(b), "\n- |"),
-		"expected literal block scalar, got:\n%s", b)
+	assert.Assert(t,
+		cmp.MarshalContains(
+			RestoreCommand("/dir", "try", "", nil, "--options"),
+			"\n- |",
+		),
+		"expected literal block scalar")
 }
 
 func TestRestoreCommandTDE(t *testing.T) {
-	b, err := yaml.Marshal(RestoreCommand("/dir", "try", "echo testValue", nil, "--options"))
-
-	assert.NilError(t, err)
-	assert.Assert(t, strings.Contains(string(b), "encryption_key_command = 'echo testValue'"),
-		"expected encryption_key_command setting, got:\n%s", b)
+	assert.Assert(t,
+		cmp.MarshalContains(
+			RestoreCommand("/dir", "try", "echo testValue", nil, "--options"),
+			"encryption_key_command = 'echo testValue'",
+		),
+		"expected encryption_key_command setting")
 }
 
 func TestDedicatedSnapshotVolumeRestoreCommand(t *testing.T) {
@@ -392,11 +391,12 @@ func TestDedicatedSnapshotVolumeRestoreCommand(t *testing.T) {
 }
 
 func TestDedicatedSnapshotVolumeRestoreCommandPrettyYAML(t *testing.T) {
-	b, err := yaml.Marshal(DedicatedSnapshotVolumeRestoreCommand("/dir", "--options"))
-
-	assert.NilError(t, err)
-	assert.Assert(t, strings.Contains(string(b), "\n- |"),
-		"expected literal block scalar, got:\n%s", b)
+	assert.Assert(t,
+		cmp.MarshalContains(
+			DedicatedSnapshotVolumeRestoreCommand("/dir", "--options"),
+			"\n- |",
+		),
+		"expected literal block scalar")
 }
 
 func TestServerConfig(t *testing.T) {
