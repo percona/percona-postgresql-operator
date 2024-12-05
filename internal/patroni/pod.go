@@ -14,7 +14,7 @@ func GetVersionFromPod(pod *corev1.Pod) (*gover.Version, error) {
 		return nil, errors.New("pod doesn't have status annotation")
 	}
 	patroniStatus := make(map[string]any)
-	if err := json.Unmarshal([]byte(patroniJson), patroniStatus); err != nil {
+	if err := json.Unmarshal([]byte(patroniJson), &patroniStatus); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal patroni status")
 	}
 	versionI, ok := patroniStatus["version"]
