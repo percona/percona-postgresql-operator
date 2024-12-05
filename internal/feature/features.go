@@ -1,17 +1,6 @@
-/*
- Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 /*
 Package feature provides types and functions to enable and disable features
@@ -94,6 +83,9 @@ const (
 
 	// Support tablespace volumes
 	TablespaceVolumes = "TablespaceVolumes"
+
+	// Support VolumeSnapshots
+	VolumeSnapshots = "VolumeSnapshots"
 )
 
 // NewGate returns a MutableGate with the Features defined in this package.
@@ -102,12 +94,13 @@ func NewGate() MutableGate {
 
 	if err := gate.Add(map[Feature]featuregate.FeatureSpec{
 		AppendCustomQueries:  {Default: false, PreRelease: featuregate.Alpha},
-		AutoCreateUserSchema: {Default: false, PreRelease: featuregate.Alpha},
+		AutoCreateUserSchema: {Default: true, PreRelease: featuregate.Beta},
 		AutoGrowVolumes:      {Default: false, PreRelease: featuregate.Alpha},
 		BridgeIdentifiers:    {Default: false, PreRelease: featuregate.Alpha},
 		InstanceSidecars:     {Default: false, PreRelease: featuregate.Alpha},
 		PGBouncerSidecars:    {Default: false, PreRelease: featuregate.Alpha},
 		TablespaceVolumes:    {Default: false, PreRelease: featuregate.Alpha},
+		VolumeSnapshots:      {Default: false, PreRelease: featuregate.Alpha},
 	}); err != nil {
 		panic(err)
 	}
@@ -127,4 +120,13 @@ func Enabled(ctx context.Context, f Feature) bool {
 // NewContext returns a copy of ctx containing gate. Check it using [Enabled].
 func NewContext(ctx context.Context, gate Gate) context.Context {
 	return context.WithValue(ctx, contextKey{}, gate)
+}
+
+func ShowGates(ctx context.Context) string {
+	featuresEnabled := ""
+	gate, ok := ctx.Value(contextKey{}).(Gate)
+	if ok {
+		featuresEnabled = gate.String()
+	}
+	return featuresEnabled
 }

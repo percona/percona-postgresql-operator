@@ -1,17 +1,6 @@
-/*
-Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -37,8 +26,8 @@ import (
 // adoptObject adopts the provided Object by adding controller owner refs for the provided
 // PostgresCluster.
 func (r *Reconciler) adoptObject(ctx context.Context, postgresCluster *v1beta1.PostgresCluster,
-	obj client.Object,
-) error {
+	obj client.Object) error {
+
 	if err := controllerutil.SetControllerReference(postgresCluster, obj,
 		r.Client.Scheme()); err != nil {
 		return err
@@ -66,8 +55,8 @@ func (r *Reconciler) adoptObject(ctx context.Context, postgresCluster *v1beta1.P
 // race conditions with the garbage collector (see
 // https://github.com/kubernetes/kubernetes/issues/42639)
 func (r *Reconciler) claimObject(ctx context.Context, postgresCluster *v1beta1.PostgresCluster,
-	obj client.Object,
-) error {
+	obj client.Object) error {
+
 	controllerRef := metav1.GetControllerOfNoCopy(obj)
 	if controllerRef != nil {
 		// if not owned by this postgrescluster then ignore
@@ -123,8 +112,8 @@ func (r *Reconciler) claimObject(ctx context.Context, postgresCluster *v1beta1.P
 // getPostgresClusterForObject is responsible for obtaining the PostgresCluster associated
 // with an Object.
 func (r *Reconciler) getPostgresClusterForObject(ctx context.Context,
-	obj client.Object,
-) (bool, *v1beta1.PostgresCluster, error) {
+	obj client.Object) (bool, *v1beta1.PostgresCluster, error) {
+
 	clusterName := ""
 
 	// first see if it has a PostgresCluster ownership ref or a PostgresCluster label
@@ -157,8 +146,8 @@ func (r *Reconciler) getPostgresClusterForObject(ctx context.Context,
 // to adopt or release/orphan an Object.  This includes obtaining the PostgresCluster for
 // the Object and then calling the logic needed to either adopt or release it.
 func (r *Reconciler) manageControllerRefs(ctx context.Context,
-	obj client.Object,
-) error {
+	obj client.Object) error {
+
 	found, postgresCluster, err := r.getPostgresClusterForObject(ctx, obj)
 	if err != nil {
 		return err
@@ -174,8 +163,8 @@ func (r *Reconciler) manageControllerRefs(ctx context.Context,
 // PostgresCluster.  This is done by removing the PostgresCluster's controller owner
 // refs from the Object.
 func (r *Reconciler) releaseObject(ctx context.Context,
-	postgresCluster *v1beta1.PostgresCluster, obj client.Object,
-) error {
+	postgresCluster *v1beta1.PostgresCluster, obj client.Object) error {
+
 	// TODO create a strategic merge type in kubeapi instead of using Merge7386
 	patch, err := kubeapi.NewMergePatch().
 		Add("metadata", "ownerReferences")([]map[string]string{{
@@ -192,6 +181,7 @@ func (r *Reconciler) releaseObject(ctx context.Context,
 // controllerRefHandlerFuncs returns the handler funcs that should be utilized to watch
 // StatefulSets within the cluster as needed to manage controller ownership refs.
 func (r *Reconciler) controllerRefHandlerFuncs() *handler.Funcs {
+
 	log := logging.FromContext(context.Background())
 	errMsg := "managing StatefulSet controller refs"
 

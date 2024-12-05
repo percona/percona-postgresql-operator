@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -141,6 +130,7 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 	// PostgreSQL is available for writes. Prepare to either add or remove
 	// PgBouncer objects.
 
+	// K8SPG-345
 	var exposeSuperusers bool
 	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
 		exposeSuperusers = cluster.Spec.Proxy.PGBouncer.ExposeSuperusers
@@ -313,7 +303,7 @@ func (r *Reconciler) generatePGBouncerService(
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 	} else {
 		service.Spec.Type = corev1.ServiceType(spec.Type)
-		service.Spec.LoadBalancerSourceRanges = spec.LoadBalancerSourceRanges
+		service.Spec.LoadBalancerSourceRanges = spec.LoadBalancerSourceRanges // K8SPG-389
 		if spec.NodePort != nil {
 			if service.Spec.Type == corev1.ServiceTypeClusterIP {
 				// The NodePort can only be set when the Service type is NodePort or
@@ -328,12 +318,8 @@ func (r *Reconciler) generatePGBouncerService(
 			}
 			servicePort.NodePort = *spec.NodePort
 		}
-		if spec.ExternalTrafficPolicy != nil {
-			service.Spec.ExternalTrafficPolicy = *spec.ExternalTrafficPolicy
-		}
-		if spec.InternalTrafficPolicy != nil {
-			service.Spec.InternalTrafficPolicy = spec.InternalTrafficPolicy
-		}
+		service.Spec.ExternalTrafficPolicy = initialize.FromPointer(spec.ExternalTrafficPolicy)
+		service.Spec.InternalTrafficPolicy = spec.InternalTrafficPolicy
 	}
 	service.Spec.Ports = []corev1.ServicePort{servicePort}
 
@@ -429,19 +415,14 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	// Use scheduling constraints from the cluster spec.
 	deploy.Spec.Template.Spec.Affinity = cluster.Spec.Proxy.PGBouncer.Affinity
 	deploy.Spec.Template.Spec.Tolerations = cluster.Spec.Proxy.PGBouncer.Tolerations
-
-	if cluster.Spec.Proxy.PGBouncer.PriorityClassName != nil {
-		deploy.Spec.Template.Spec.PriorityClassName = *cluster.Spec.Proxy.PGBouncer.PriorityClassName
-	}
-
+	deploy.Spec.Template.Spec.PriorityClassName =
+		initialize.FromPointer(cluster.Spec.Proxy.PGBouncer.PriorityClassName)
 	deploy.Spec.Template.Spec.TopologySpreadConstraints =
 		cluster.Spec.Proxy.PGBouncer.TopologySpreadConstraints
 
 	// if default pod scheduling is not explicitly disabled, add the default
 	// pod topology spread constraints
-	if cluster.Spec.DisableDefaultPodScheduling == nil ||
-		(cluster.Spec.DisableDefaultPodScheduling != nil &&
-			!*cluster.Spec.DisableDefaultPodScheduling) {
+	if !initialize.FromPointer(cluster.Spec.DisableDefaultPodScheduling) {
 		deploy.Spec.Template.Spec.TopologySpreadConstraints = append(
 			deploy.Spec.Template.Spec.TopologySpreadConstraints,
 			defaultTopologySpreadConstraints(*deploy.Spec.Selector)...)
@@ -466,6 +447,7 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	// Do not add environment variables describing services in this namespace.
 	deploy.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
 
+	// K8SPG-514
 	if cluster.Spec.Proxy.PGBouncer.SecurityContext != nil {
 		deploy.Spec.Template.Spec.SecurityContext = cluster.Spec.Proxy.PGBouncer.SecurityContext
 	} else {
