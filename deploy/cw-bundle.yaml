@@ -45595,6 +45595,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - watch
 - apiGroups:
   - policy
