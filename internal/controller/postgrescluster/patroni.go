@@ -10,6 +10,7 @@ import (
 	"io"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,14 +88,27 @@ func (r *Reconciler) handlePatroniRestarts(
 	// replicas here, replicas will typically restart first because we see them
 	// first.
 	if primaryNeedsRestart != nil {
+		pod := primaryNeedsRestart.Pods[0]
 		exec := patroni.Executor(func(
 			ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
-			pod := primaryNeedsRestart.Pods[0]
 			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
 		})
 
-		return errors.WithStack(exec.RestartPendingMembers(ctx, "master", naming.PatroniScope(cluster)))
+		patroniVersion, err := patroni.GetVersionFromPod(pod)
+		if err != nil {
+			return errors.Wrap(err, "failed to get patroni version")
+		}
+		ver4 := patroniVersion.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+
+		// K8SPG-648: patroni v4.0.0 deprecated "master" role.
+		//            We should use "primary" instead
+		role := "primary"
+		if !ver4 {
+			role = "master"
+		}
+
+		return errors.WithStack(exec.RestartPendingMembers(ctx, role, naming.PatroniScope(cluster)))
 	}
 
 	// When the primary does not need to restart but a replica does, restart all

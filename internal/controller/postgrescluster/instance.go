@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -67,7 +68,7 @@ func (i Instance) IsPrimary() (primary bool, known bool) {
 		return false, false
 	}
 
-	return i.Pods[0].Labels[naming.LabelRole] == naming.RolePatroniLeader, true
+	return i.Pods[0].Labels[naming.LabelRole] == naming.RolePatroniLeader || i.Pods[0].Labels[naming.LabelRole] == naming.RolePatroniLeaderDeprecated, true
 }
 
 // IsReady returns whether or not this instance is ready to receive PostgreSQL
@@ -134,7 +135,9 @@ func (i Instance) IsWritable() (writable, known bool) {
 
 	// TODO(cbandy): Update this to consider when Patroni is paused.
 
-	return strings.HasPrefix(member[role:], `"role":"master"`), true
+	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
+	//            We should use "primary" instead
+	return strings.HasPrefix(member[role:], `"role":"master"`) || strings.HasPrefix(member[role:], `"role":"primary"`), true
 }
 
 // PodMatchesPodTemplate returns whether or not the Pod for this instance
@@ -807,7 +810,14 @@ func (r *Reconciler) rolloutInstance(
 		ctx, span = r.Tracer.Start(ctx, "patroni-change-primary")
 		defer span.End()
 
-		success, err := patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "")
+		patroniVer, err := patroni.GetVersionFromPod(pod)
+		if err != nil {
+			span.RecordError(err)
+			return errors.Wrap(err, "failed to get patroni version from pod")
+		}
+		ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+
+		success, err := patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "", ver4)
 		if err = errors.WithStack(err); err == nil && !success {
 			err = errors.New("unable to switchover")
 		}
@@ -1021,14 +1031,18 @@ func podsToKeep(instances []corev1.Pod, want map[string]int) []corev1.Pod {
 
 		if want > 0 {
 			for _, instance := range instances {
-				if instance.Labels[naming.LabelRole] == "master" {
+				// K8SPG-648: patroni v4.0.0 deprecated "master" role.
+				//            We should use "primary" instead
+				if instance.Labels[naming.LabelRole] == "master" || instance.Labels[naming.LabelRole] == "primary" {
 					keep = append(keep, instance)
 				}
 			}
 		}
 
 		for _, instance := range instances {
-			if instance.Labels[naming.LabelRole] != "master" && len(keep) < want {
+			// K8SPG-648: patroni v4.0.0 deprecated master role
+			//            we should use primary instead
+			if instance.Labels[naming.LabelRole] != "master" && instance.Labels[naming.LabelRole] != "primary" && len(keep) < want {
 				keep = append(keep, instance)
 			}
 		}
