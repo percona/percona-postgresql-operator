@@ -59,7 +59,7 @@ kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-op
 
 **Commercial Support**  | **Community Support** |
 :-: | :-: |
-| <br/>Enterprise-grade assistance for your mission-critical MongoDB deployments with the Percona Operator for MongoDB. Get expert guidance for complex tasks like multi-cloud replication, database migration and building platforms.<br/><br/>  | <br/>Connect with our engineers and fellow users for general questions, troubleshooting, and sharing feedback and ideas.<br/><br/>  | 
+| <br/>Enterprise-grade assistance for your mission-critical PostgreSQL deployments with the Percona Operator for PostgreSQL. Get expert guidance for complex tasks like multi-cloud replication, database migration and building platforms.<br/><br/>  | <br/>Connect with our engineers and fellow users for general questions, troubleshooting, and sharing feedback and ideas.<br/><br/>  | 
 | **[Get Percona Support](https://hubs.ly/Q02ZTH9s0)** | **[Visit our Forum](https://forums.percona.com/c/postgresql/percona-kubernetes-operator-for-postgresql/68)** |
 
 # Contributing
