@@ -544,10 +544,14 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		var removedExtension []string
 		// list of installed custom extensions
 		var installedExtensions []string
-
-		if val, ok := cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions]; ok && val != "" {
-			installedExtensions = strings.Split(val, ",")
+		if cr.Spec.Metadata != nil && cr.Spec.Metadata.Annotations != nil {
+			if val, ok := cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions]; ok && val != "" {
+				installedExtensions = strings.Split(val, ",")
+			}
+		} else {
+			return errors.Wrap(nil, "custom extension don't use")
 		}
+
 		crExtensions := make(map[string]struct{})
 		for _, ext := range extensionKeys {
 			crExtensions[ext] = struct{}{}
@@ -563,6 +567,9 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 
 		if len(removedExtension) > 0 {
 			var exec postgres.Executor
+			if exec == nil {
+				return errors.New("executor is nil")
+			}
 			err := DisableCustomExtensionsInPostgreSQL(ctx, removedExtension, exec)
 			if err != nil {
 				return errors.Wrap(err, "custom extension deletion")
