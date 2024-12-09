@@ -8,4 +8,7 @@ commands:
 
       source ../../functions
 
-      get_cr | kubectl -n "${NAMESPACE}" apply -f -
+      get_cr \
+        | yq '.spec.metadata.labels.test-label = "test"' \
+        | yq '.spec.metadata.annotations.test-annotation = "test"' \
+        | kubectl -n "${NAMESPACE}" apply -f -
