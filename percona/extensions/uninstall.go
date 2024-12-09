@@ -3,16 +3,11 @@ package extensions
 import (
 	"archive/tar"
 	"compress/gzip"
-	"context"
-	"fmt"
 	"io"
 	"log"
 	"os"
 
 	"github.com/pkg/errors"
-
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
 )
 
 func Uninstall(archivePath string) error {
@@ -45,30 +40,5 @@ func Uninstall(archivePath string) error {
 		}
 	}
 
-	return nil
-}
-
-func DisableCustomExtensionsInPostgreSQL(ctx context.Context, customExtensionsForDeletion []string, exec postgres.Executor) error {
-	log := logging.FromContext(ctx)
-
-	for _, extensionName := range customExtensionsForDeletion {
-
-		sqlCommand := fmt.Sprintf(
-			`SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS %s;`,
-			extensionName,
-		)
-
-		stdout, stderr, err := exec.ExecInAllDatabases(ctx,
-			sqlCommand,
-			map[string]string{
-				"ON_ERROR_STOP": "on", // Abort when any one command fails.
-				"QUIET":         "on", // Do not print successful commands to stdout.
-			},
-		)
-		log.V(1).Info("disabled", "extensionName", extensionName, "stdout", stdout, "stderr", stderr)
-
-		return errors.Wrap(err, "custom extension deletion")
-
-	}
 	return nil
 }

@@ -549,10 +549,14 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 			installedExtensions = strings.Split(val, ",")
 		}
 
+		fmt.Sprintf("Before getting crExtensions")
+
 		crExtensions := make(map[string]struct{})
 		for _, ext := range extensionKeys {
 			crExtensions[ext] = struct{}{}
 		}
+
+		fmt.Sprintf("After getting crExtensions")
 
 		// Check for missing entries in crExtensions
 		for _, ext := range installedExtensions {
@@ -561,16 +565,21 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 				removedExtension = append(removedExtension, ext)
 			}
 		}
+		fmt.Sprintf("After getting crExtensions %v", removedExtension)
 
 		if len(removedExtension) > 0 {
+			fmt.Sprintf("Before remove extension check")
 			var exec postgres.Executor
-			err := extensions.DisableCustomExtensionsInPostgreSQL(ctx, removedExtension, exec)
+			fmt.Sprintf("After executor")
+			err := DisableCustomExtensionsInPostgreSQL(ctx, removedExtension, exec)
 			if err != nil {
 				return errors.Wrap(err, "custom extension deletion")
 			}
 		}
-
+		fmt.Sprintf("After remove extension check")
 		cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions] = strings.Join(extensionKeys, ",")
+
+		fmt.Sprintf("After annotations update")
 
 	}
 
@@ -587,6 +596,31 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 			cr.Spec.OpenShift,
 		))
 		set.VolumeMounts = append(set.VolumeMounts, extensions.ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
+	}
+	return nil
+}
+
+func DisableCustomExtensionsInPostgreSQL(ctx context.Context, customExtensionsForDeletion []string, exec postgres.Executor) error {
+	log := logging.FromContext(ctx)
+
+	for _, extensionName := range customExtensionsForDeletion {
+
+		sqlCommand := fmt.Sprintf(
+			`SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS %s;`,
+			extensionName,
+		)
+
+		stdout, stderr, err := exec.ExecInAllDatabases(ctx,
+			sqlCommand,
+			map[string]string{
+				"ON_ERROR_STOP": "on", // Abort when any one command fails.
+				"QUIET":         "on", // Do not print successful commands to stdout.
+			},
+		)
+		log.V(1).Info("disabled", "extensionName", extensionName, "stdout", stdout, "stderr", stderr)
+
+		return errors.Wrap(err, "custom extension deletion")
+
 	}
 	return nil
 }
