@@ -548,15 +548,10 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		if val, ok := cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions]; ok && val != "" {
 			installedExtensions = strings.Split(val, ",")
 		}
-
-		fmt.Sprintf("Before getting crExtensions")
-
 		crExtensions := make(map[string]struct{})
 		for _, ext := range extensionKeys {
 			crExtensions[ext] = struct{}{}
 		}
-
-		fmt.Sprintf("After getting crExtensions")
 
 		// Check for missing entries in crExtensions
 		for _, ext := range installedExtensions {
@@ -565,21 +560,15 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 				removedExtension = append(removedExtension, ext)
 			}
 		}
-		fmt.Sprintf("After getting crExtensions %v", removedExtension)
 
 		if len(removedExtension) > 0 {
-			fmt.Sprintf("Before remove extension check")
 			var exec postgres.Executor
-			fmt.Sprintf("After executor")
 			err := DisableCustomExtensionsInPostgreSQL(ctx, removedExtension, exec)
 			if err != nil {
 				return errors.Wrap(err, "custom extension deletion")
 			}
 		}
-		fmt.Sprintf("After remove extension check")
 		cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions] = strings.Join(extensionKeys, ",")
-
-		fmt.Sprintf("After annotations update")
 
 	}
 
