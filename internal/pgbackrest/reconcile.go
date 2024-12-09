@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package pgbackrest
 
@@ -421,7 +410,7 @@ func InstanceCertificates(ctx context.Context,
 ) error {
 	var err error
 
-	initialize.ByteMap(&outInstanceCertificates.Data)
+	initialize.Map(&outInstanceCertificates.Data)
 
 	if err == nil {
 		outInstanceCertificates.Data[certInstanceSecretKey], err = certFile(inDNS)
@@ -488,7 +477,7 @@ func RestoreConfig(
 	sourceConfigMap, targetConfigMap *corev1.ConfigMap,
 	sourceSecret, targetSecret *corev1.Secret,
 ) {
-	initialize.StringMap(&targetConfigMap.Data)
+	initialize.Map(&targetConfigMap.Data)
 
 	// Use the repository definitions from the source cluster.
 	//
@@ -500,7 +489,7 @@ func RestoreConfig(
 	targetConfigMap.Data[CMInstanceKey] = sourceConfigMap.Data[CMInstanceKey]
 
 	if sourceSecret != nil && targetSecret != nil {
-		initialize.ByteMap(&targetSecret.Data)
+		initialize.Map(&targetSecret.Data)
 
 		// - https://golang.org/issue/45038
 		bytesClone := func(b []byte) []byte { return append([]byte(nil), b...) }
@@ -524,7 +513,7 @@ func Secret(ctx context.Context,
 
 	// Save the CA and generate a TLS client certificate for the entire cluster.
 	if inRepoHost != nil {
-		initialize.ByteMap(&outSecret.Data)
+		initialize.Map(&outSecret.Data)
 
 		// The server verifies its "tls-server-auth" option contains the common
 		// name (CN) of the certificate presented by a client. The entire

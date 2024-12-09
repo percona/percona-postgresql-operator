@@ -1,17 +1,6 @@
-/*
- Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2017 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package upgradecheck
 
@@ -19,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 
 	googleuuid "github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +18,7 @@ import (
 	"k8s.io/client-go/rest"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -44,24 +35,36 @@ var (
 
 // Extensible struct for client upgrade data
 type clientUpgradeData struct {
-	DeploymentID     string `json:"deployment_id"`
-	KubernetesEnv    string `json:"kubernetes_env"`
-	PGOClustersTotal int    `json:"pgo_clusters_total"`
-	PGOVersion       string `json:"pgo_version"`
-	IsOpenShift      bool   `json:"is_open_shift"`
+	BridgeClustersTotal int    `json:"bridge_clusters_total"`
+	BuildSource         string `json:"build_source"`
+	DeploymentID        string `json:"deployment_id"`
+	FeatureGatesEnabled string `json:"feature_gates_enabled"`
+	IsOpenShift         bool   `json:"is_open_shift"`
+	KubernetesEnv       string `json:"kubernetes_env"`
+	PGOClustersTotal    int    `json:"pgo_clusters_total"`
+	PGOInstaller        string `json:"pgo_installer"`
+	PGOInstallerOrigin  string `json:"pgo_installer_origin"`
+	PGOVersion          string `json:"pgo_version"`
+	RegistrationToken   string `json:"registration_token"`
 }
 
 // generateHeader aggregates data and returns a struct of that data
 // If any errors are encountered, it logs those errors and uses the default values
 func generateHeader(ctx context.Context, cfg *rest.Config, crClient crclient.Client,
-	pgoVersion string, isOpenShift bool) *clientUpgradeData {
+	pgoVersion string, isOpenShift bool, registrationToken string) *clientUpgradeData {
 
 	return &clientUpgradeData{
-		PGOVersion:       pgoVersion,
-		IsOpenShift:      isOpenShift,
-		DeploymentID:     ensureDeploymentID(ctx, crClient),
-		PGOClustersTotal: getManagedClusters(ctx, crClient),
-		KubernetesEnv:    getServerVersion(ctx, cfg),
+		BridgeClustersTotal: getBridgeClusters(ctx, crClient),
+		BuildSource:         os.Getenv("BUILD_SOURCE"),
+		DeploymentID:        ensureDeploymentID(ctx, crClient),
+		FeatureGatesEnabled: feature.ShowGates(ctx),
+		IsOpenShift:         isOpenShift,
+		KubernetesEnv:       getServerVersion(ctx, cfg),
+		PGOClustersTotal:    getManagedClusters(ctx, crClient),
+		PGOInstaller:        os.Getenv("PGO_INSTALLER"),
+		PGOInstallerOrigin:  os.Getenv("PGO_INSTALLER_ORIGIN"),
+		PGOVersion:          pgoVersion,
+		RegistrationToken:   registrationToken,
 	}
 }
 
@@ -162,6 +165,22 @@ func getManagedClusters(ctx context.Context, crClient crclient.Client) int {
 	if err != nil {
 		log := logging.FromContext(ctx)
 		log.V(1).Info("upgrade check issue: could not count postgres clusters",
+			"response", err.Error())
+	} else {
+		count = len(clusters.Items)
+	}
+	return count
+}
+
+// getBridgeClusters returns a count of Bridge clusters managed by this PGO instance
+// Any errors encountered will be logged and the count result will be 0
+func getBridgeClusters(ctx context.Context, crClient crclient.Client) int {
+	var count int
+	clusters := &v1beta1.CrunchyBridgeClusterList{}
+	err := crClient.List(ctx, clusters)
+	if err != nil {
+		log := logging.FromContext(ctx)
+		log.V(1).Info("upgrade check issue: could not count bridge clusters",
 			"response", err.Error())
 	} else {
 		count = len(clusters.Items)

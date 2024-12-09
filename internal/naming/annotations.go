@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package naming
 
@@ -31,6 +20,12 @@ const (
 	// of the Job.  Also used to annotate the backup Job itself as needed to identify the backup
 	// ID associated with a specific manual backup Job.
 	PGBackRestBackup = annotationPrefix + "pgbackrest-backup"
+
+	// PGBackRestBackupJobCompletion is the annotation that is added to restore jobs, pvcs, and
+	// VolumeSnapshots that are involved in the volume snapshot creation process. The annotation
+	// holds a RFC3339 formatted timestamp that corresponds to the completion time of the associated
+	// backup job.
+	PGBackRestBackupJobCompletion = annotationPrefix + "pgbackrest-backup-job-completion"
 
 	// PGBackRestConfigHash is an annotation used to specify the hash value associated with a
 	// repo configuration as needed to detect configuration changes that invalidate running Jobs
@@ -67,4 +62,10 @@ const (
 	// has schemas automatically created for the users defined in `spec.users` for all of the databases
 	// listed for that user.
 	AutoCreateUserSchemaAnnotation = annotationPrefix + "autoCreateUserSchema"
+
+	// AuthorizeBackupRemovalAnnotation is an annotation used to allow users
+	// to delete PVC-based backups when changing from a cluster with backups
+	// to a cluster without backups. As usual with the operator, we do not
+	// touch cloud-based backups.
+	AuthorizeBackupRemovalAnnotation = annotationPrefix + "authorizeBackupRemoval"
 )
