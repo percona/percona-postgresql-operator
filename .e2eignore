@@ -1,0 +1,9 @@
+docs/**
+examples/**
+licenses/**
+code-of-conduct.md
+CONTRIBUTING.md
+LICENSE.md
+README.md
+.e2eignore
+.gitignore

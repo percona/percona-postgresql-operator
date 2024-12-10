@@ -5,6 +5,7 @@ tests=[]
 void createCluster(String CLUSTER_SUFFIX) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
+            NODES_NUM=3
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
@@ -12,7 +13,7 @@ void createCluster(String CLUSTER_SUFFIX) {
                 gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                 gcloud config set project $GCP_PROJECT
                 gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $region --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $region --quiet || true
-                gcloud container clusters create --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.28 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=3 --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 --enable-ip-alias --workload-pool=cloud-dev-112233.svc.id.goog && \
+                gcloud container clusters create --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.28 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=\$NODES_NUM --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 --enable-ip-alias&& \
                 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
                 if [ \${ret_val} -eq 0 ]; then break; fi
                 ret_num=\$((ret_num + 1))
@@ -71,19 +72,6 @@ void deleteOldClusters(String FILTER) {
    }
 }
 
-void pushArtifactFile(String FILE_NAME) {
-    echo "Push $FILE_NAME file to S3!"
-
-    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'AMI/OVF', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
-        sh """
-            touch ${FILE_NAME}
-            S3_PATH=s3://percona-jenkins-artifactory/\$JOB_NAME/\$(git rev-parse --short HEAD)
-            aws s3 ls \$S3_PATH/${FILE_NAME} || :
-            aws s3 cp --quiet ${FILE_NAME} \$S3_PATH/${FILE_NAME} || :
-        """
-    }
-}
-
 void pushLogFile(String FILE_NAME) {
     def LOG_FILE_PATH="e2e-tests/logs/${FILE_NAME}.log"
     def LOG_FILE_NAME="${FILE_NAME}.log"
@@ -93,6 +81,19 @@ void pushLogFile(String FILE_NAME) {
             S3_PATH=s3://percona-jenkins-artifactory-public/\$JOB_NAME/\$(git rev-parse --short HEAD)
             aws s3 ls \$S3_PATH/${LOG_FILE_NAME} || :
             aws s3 cp --content-type text/plain --quiet ${LOG_FILE_PATH} \$S3_PATH/${LOG_FILE_NAME} || :
+        """
+    }
+}
+
+void pushArtifactFile(String FILE_NAME) {
+    echo "Push $FILE_NAME file to S3!"
+
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'AMI/OVF', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+        sh """
+            touch ${FILE_NAME}
+            S3_PATH=s3://percona-jenkins-artifactory/\$JOB_NAME/\$(git rev-parse --short HEAD)
+            aws s3 ls \$S3_PATH/${FILE_NAME} || :
+            aws s3 cp --quiet ${FILE_NAME} \$S3_PATH/${FILE_NAME} || :
         """
     }
 }
@@ -129,6 +130,25 @@ void markPassedTests() {
     }
 }
 
+void printKubernetesStatus(String LOCATION, String CLUSTER_SUFFIX) {
+    sh """
+        export KUBECONFIG=/tmp/$CLUSTER_NAME-$CLUSTER_SUFFIX
+        echo "========== KUBERNETES STATUS $LOCATION TEST =========="
+        gcloud container clusters list|grep -E "NAME|$CLUSTER_NAME-$CLUSTER_SUFFIX "
+        echo
+        kubectl get nodes
+        echo
+        kubectl top nodes
+        echo
+        kubectl get pods --all-namespaces
+        echo
+        kubectl top pod --all-namespaces
+        echo
+        kubectl get events --field-selector type!=Normal --all-namespaces
+        echo "======================================================"
+    """
+}
+
 TestsReport = '| Test name | Status |\r\n| ------------- | ------------- |'
 TestsReportXML = '<testsuite name=\\"PG\\">\n'
 
@@ -150,6 +170,10 @@ void makeReport() {
     }
     TestsReport = TestsReport + "\r\n| We run $startedTestAmount out of $wholeTestAmount|"
     TestsReportXML = TestsReportXML + '</testsuite>\n'
+
+    sh """
+        echo "${TestsReportXML}" > TestsReport.xml
+    """
 }
 
 void clusterRunner(String cluster) {
@@ -199,6 +223,7 @@ void runTest(Integer TEST_ID) {
             return true
         }
         catch (exc) {
+            printKubernetesStatus("AFTER","$clusterSuffix")
             echo "The $testName test was failed!"
             if (retryCount >= 1 || currentBuild.nextBuild != null) {
                 currentBuild.result = 'FAILURE'
@@ -250,9 +275,62 @@ EOF
     """
 }
 
-def skipBranchBuilds = true
+needToRunTests = true
+void checkE2EIgnoreFiles() {
+    def e2eignoreFile = ".e2eignore"
+    if (fileExists(e2eignoreFile)) {
+        def excludedFiles = readFile(e2eignoreFile).split('\n').collect{it.trim()}
+        def lastProcessedCommitFile="last-processed-commit.txt"
+        def lastProcessedCommitHash = ""
+
+        def build = currentBuild.previousBuild
+        while (build != null) {
+            if (build.result == 'SUCCESS') {
+                try {
+                    echo "Found a previous successful build: $build.number"
+                    copyArtifacts(projectName: env.JOB_NAME, selector: specific("$build.number"), filter: "$lastProcessedCommitFile")
+                    lastProcessedCommitHash = readFile("$lastProcessedCommitFile").trim()
+                    echo "lastProcessedCommitHash: $lastProcessedCommitHash"
+                    break
+                } catch (Exception e) {
+                    echo "No $lastProcessedCommitFile found in build $build.number. Checking earlier builds."
+                }
+            } else {
+                echo "Build $build.number was not successful. Checking earlier builds."
+            }
+            build = build.previousBuild
+        }
+
+        if (lastProcessedCommitHash == "") {
+            echo "This is the first run. Using merge base as the starting point for the diff."
+            changedFiles = sh(script: "git diff --name-only \$(git merge-base HEAD origin/$CHANGE_TARGET)", returnStdout: true).trim().split('\n').findAll{it}
+        } else {
+            echo "Processing changes since last processed commit: $lastProcessedCommitHash"
+            changedFiles = sh(script: "git diff --name-only $lastProcessedCommitHash HEAD", returnStdout: true).trim().split('\n').findAll{it}
+        }
+
+        echo "Excluded files: $excludedFiles"
+        echo "Changed files: $changedFiles"
+
+        def excludedFilesRegex = excludedFiles.collect{it.replace("**", ".*").replace("*", "[^/]*")}
+        needToRunTests = !changedFiles.every{changed -> excludedFilesRegex.any{regex -> changed ==~ regex}}
+
+        if (needToRunTests) {
+            echo "Some changed files are outside of the e2eignore list. Proceeding with execution."
+        } else {
+            echo "All changed files are e2eignore files. Aborting pipeline execution."
+        }
+
+        sh """
+            echo \$(git rev-parse HEAD) > $lastProcessedCommitFile
+        """
+        archiveArtifacts "$lastProcessedCommitFile"
+    }
+}
+
+def isPRJob = false
 if (env.CHANGE_URL) {
-    skipBranchBuilds = false
+    isPRJob = true
 }
 
 pipeline {
@@ -263,19 +341,30 @@ pipeline {
         GIT_SHORT_COMMIT = sh(script: 'git rev-parse --short HEAD', , returnStdout: true).trim()
         VERSION = "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}"
         CLUSTER_NAME = sh(script: "echo jen-pg-${env.CHANGE_ID}-${GIT_SHORT_COMMIT}-${env.BUILD_NUMBER} | tr '[:upper:]' '[:lower:]'", , returnStdout: true).trim()
-        AUTHOR_NAME  = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
+        AUTHOR_NAME = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
     }
     agent {
         label 'docker'
     }
     options {
         disableConcurrentBuilds(abortPrevious: true)
+        copyArtifactPermission("$JOB_NAME/PR-*")
     }
     stages {
+        stage('Check Ignore Files') {
+            when {
+                expression {
+                    isPRJob
+                }
+            }
+            steps {
+                checkE2EIgnoreFiles()
+            }
+        }
         stage('Prepare') {
             when {
                 expression {
-                    !skipBranchBuilds
+                    isPRJob && needToRunTests
                 }
             }
             steps {
@@ -306,7 +395,7 @@ pipeline {
         stage('Build docker image') {
             when {
                 expression {
-                    !skipBranchBuilds
+                    isPRJob && needToRunTests
                 }
             }
             steps {
@@ -332,48 +421,48 @@ pipeline {
             }
         }
         stage('Check licenses') {
-             when {
-                 expression {
-                     !skipBranchBuilds
+            when {
+                expression {
+                    isPRJob && needToRunTests
+                }
+            }
+            parallel {
+             stage('GoLicenseDetector test') {
+                 steps {
+                     sh """
+                         mkdir -p $WORKSPACE/src/github.com/percona
+                         ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
+                         sg docker -c "
+                             docker run \
+                                 --rm \
+                                 -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
+                                 -w /go/src/github.com/percona/percona-postgresql-operator \
+                                 -e GO111MODULE=on \
+                                 golang:1.22 sh -c '
+                                     go install github.com/google/go-licenses@latest;
+                                     /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
+                                         | cut -d , -f 3 \
+                                         | sort -u \
+                                         > go-licenses-new || :
+                                 '
+                         "
+                         diff -u ./e2e-tests/license/compare/go-licenses go-licenses-new
+                     """
                  }
              }
-             parallel {
-                 stage('GoLicenseDetector test') {
-                     steps {
-                         sh """
-                             mkdir -p $WORKSPACE/src/github.com/percona
-                             ln -s $WORKSPACE $WORKSPACE/src/github.com/percona/percona-postgresql-operator
-                             sg docker -c "
-                                 docker run \
-                                     --rm \
-                                     -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
-                                     -w /go/src/github.com/percona/percona-postgresql-operator \
-                                     -e GO111MODULE=on \
-                                     golang:1.22 sh -c '
-                                         go install github.com/google/go-licenses@latest;
-                                         /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
-                                             | cut -d , -f 3 \
-                                             | sort -u \
-                                             > go-licenses-new || :
-                                     '
-                             "
-                             diff -u ./e2e-tests/license/compare/go-licenses go-licenses-new
-                         """
-                     }
-                 }
-             }
+            }
         }
         stage('Run E2E tests') {
+            when {
+                expression {
+                    isPRJob && needToRunTests
+                }
+            }
             options {
                 timeout(time: 3, unit: 'HOURS')
             }
             parallel {
                 stage('cluster1') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
                     agent {
                         label 'docker'
                     }
@@ -384,11 +473,6 @@ pipeline {
                     }
                 }
                 stage('cluster2') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
                     agent {
                         label 'docker'
                     }
@@ -399,11 +483,6 @@ pipeline {
                     }
                 }
                 stage('cluster3') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
                     agent {
                         label 'docker'
                     }
@@ -414,11 +493,6 @@ pipeline {
                     }
                 }
                 stage('cluster4') {
-                    when {
-                        expression {
-                            !skipBranchBuilds
-                        }
-                    }
                     agent {
                         label 'docker'
                     }
@@ -444,34 +518,31 @@ pipeline {
                         slackSend channel: '#cloud-dev-ci', color: '#FF0000', message: "[${JOB_NAME}]: build ${currentBuild.result}, ${BUILD_URL} owner: @${AUTHOR_NAME}"
                     }
                 }
-
-                if (env.CHANGE_URL && currentBuild.nextBuild == null) {
-                    for (comment in pullRequest.comments) {
-                        println("Author: ${comment.user}, Comment: ${comment.body}")
-                        if (comment.user.equals('JNKPercona')) {
-                            println("delete comment")
-                            comment.delete()
+                if (needToRunTests) {
+                    if (isPRJob && currentBuild.nextBuild == null) {
+                        for (comment in pullRequest.comments) {
+                            println("Author: ${comment.user}, Comment: ${comment.body}")
+                            if (comment.user.equals('JNKPercona')) {
+                                println("delete comment")
+                                comment.delete()
+                            }
                         }
-                    }
-                    makeReport()
-                    sh """
-                        echo "${TestsReportXML}" > TestsReport.xml
-                    """
-                    step([$class: 'JUnitResultArchiver', testResults: '*.xml', healthScaleFactor: 1.0])
-                    archiveArtifacts '*.xml'
+                        makeReport()
+                        step([$class: 'JUnitResultArchiver', testResults: '*.xml', healthScaleFactor: 1.0])
+                        archiveArtifacts '*.xml'
 
-                    unstash 'IMAGE'
-                    def IMAGE = sh(returnStdout: true, script: "cat results/docker/TAG").trim()
-                    TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${IMAGE}`\r\n"
-                    pullRequest.comment(TestsReport)
+                        unstash 'IMAGE'
+                        def IMAGE = sh(returnStdout: true, script: "cat results/docker/TAG").trim()
+                        TestsReport = TestsReport + "\r\n\r\ncommit: ${env.CHANGE_URL}/commits/${env.GIT_COMMIT}\r\nimage: `${IMAGE}`\r\n"
+                        pullRequest.comment(TestsReport)
+                    }
+                    deleteOldClusters("$CLUSTER_NAME")
+                    sh """
+                        sudo docker system prune --volumes -af
+                    """
                 }
+                deleteDir()
             }
-            deleteOldClusters("$CLUSTER_NAME")
-            sh """
-                sudo docker system prune --volumes -af
-                sudo rm -rf *
-            """
-            deleteDir()
         }
     }
 }
