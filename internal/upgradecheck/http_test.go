@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package upgradecheck
 
@@ -32,6 +21,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 )
@@ -58,9 +48,15 @@ func (m *MockClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestCheckForUpgrades(t *testing.T) {
-	fakeClient := setupFakeClientWithPGOScheme(t, false)
-	ctx := logging.NewContext(context.Background(), logging.Discard())
+	fakeClient := setupFakeClientWithPGOScheme(t, true)
 	cfg := &rest.Config{}
+
+	ctx := logging.NewContext(context.Background(), logging.Discard())
+	gate := feature.NewGate()
+	assert.NilError(t, gate.SetFromMap(map[string]bool{
+		feature.TablespaceVolumes: true,
+	}))
+	ctx = feature.NewContext(ctx, gate)
 
 	// Pass *testing.T to allows the correct messages from the assert package
 	// in the event of certain failures.
@@ -70,6 +66,10 @@ func TestCheckForUpgrades(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Assert(t, data.DeploymentID != "")
 		assert.Equal(t, data.PGOVersion, "4.7.3")
+		assert.Equal(t, data.RegistrationToken, "speakFriend")
+		assert.Equal(t, data.BridgeClustersTotal, 2)
+		assert.Equal(t, data.PGOClustersTotal, 2)
+		assert.Equal(t, data.FeatureGatesEnabled, "TablespaceVolumes=true")
 	}
 
 	t.Run("success", func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestCheckForUpgrades(t *testing.T) {
 		}
 
 		res, header, err := checkForUpgrades(ctx, "", "4.7.3", backoff,
-			fakeClient, cfg, false)
+			fakeClient, cfg, false, "speakFriend")
 		assert.NilError(t, err)
 		assert.Equal(t, res, `{"pgo_versions":[{"tag":"v5.0.4"},{"tag":"v5.0.3"},{"tag":"v5.0.2"},{"tag":"v5.0.1"},{"tag":"v5.0.0"}]}`)
 		checkData(t, header)
@@ -98,7 +98,7 @@ func TestCheckForUpgrades(t *testing.T) {
 		}
 
 		res, header, err := checkForUpgrades(ctx, "", "4.7.3", backoff,
-			fakeClient, cfg, false)
+			fakeClient, cfg, false, "speakFriend")
 		// Two failed calls because of env var
 		assert.Equal(t, counter, 2)
 		assert.Equal(t, res, "")
@@ -118,7 +118,7 @@ func TestCheckForUpgrades(t *testing.T) {
 		}
 
 		res, header, err := checkForUpgrades(ctx, "", "4.7.3", backoff,
-			fakeClient, cfg, false)
+			fakeClient, cfg, false, "speakFriend")
 		assert.Equal(t, res, "")
 		// Two failed calls because of env var
 		assert.Equal(t, counter, 2)
@@ -147,7 +147,7 @@ func TestCheckForUpgrades(t *testing.T) {
 		}
 
 		res, header, err := checkForUpgrades(ctx, "", "4.7.3", backoff,
-			fakeClient, cfg, false)
+			fakeClient, cfg, false, "speakFriend")
 		assert.Equal(t, counter, 2)
 		assert.NilError(t, err)
 		assert.Equal(t, res, `{"pgo_versions":[{"tag":"v5.0.4"},{"tag":"v5.0.3"},{"tag":"v5.0.2"},{"tag":"v5.0.1"},{"tag":"v5.0.0"}]}`)

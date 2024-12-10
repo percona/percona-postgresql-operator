@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -52,6 +41,7 @@ func (r *Reconciler) reconcileRootCertificate(
 ) {
 	const keyCertificate, keyPrivateKey = "root.crt", "root.key"
 
+	// K8SPG-553
 	existing := &corev1.Secret{
 		ObjectMeta: naming.PostgresRootCASecret(cluster),
 	}
@@ -94,6 +84,7 @@ func (r *Reconciler) reconcileRootCertificate(
 		// Unmarshal and validate the stored root. These first errors can
 		// be ignored because they result in an invalid root which is then
 		// correctly regenerated.
+		// K8SPG-553
 		_ = root.Certificate.UnmarshalText(existing.Data[certificateKey])
 		_ = root.PrivateKey.UnmarshalText(existing.Data[privateKey])
 
@@ -107,6 +98,7 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
+	// K8SPG-555
 	intent := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      existing.Name,
