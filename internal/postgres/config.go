@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgres
 
@@ -128,7 +117,7 @@ func WALStorage(instance *v1beta1.PostgresInstanceSetSpec) string {
 // Environment returns the environment variables required to invoke PostgreSQL
 // utilities.
 func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
-	return []corev1.EnvVar{
+	env := []corev1.EnvVar{
 		// - https://www.postgresql.org/docs/current/reference-server.html
 		{
 			Name:  "PGDATA",
@@ -158,6 +147,24 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 			Value: "/tmp",
 		},
 	}
+
+	if cluster.CompareVersion("2.6.0") >= 0 {
+		// This allows a custom CA certificate to be mounted for Postgres LDAP
+		// authentication via spec.config.files.
+		// - https://wiki.postgresql.org/wiki/LDAP_Authentication_against_AD
+		//
+		// When setting the TLS_CACERT for LDAP as an environment variable, 'LDAP'
+		// must be appended as a prefix.
+		// - https://www.openldap.org/software/man.cgi?query=ldap.conf
+		//
+		// Testing with LDAPTLS_CACERTDIR did not work as expected during testing.
+		env = append(env, corev1.EnvVar{
+			Name:  "LDAPTLS_CACERT",
+			Value: configMountPath + "/ldap/ca.crt",
+		})
+	}
+
+	return env
 }
 
 // reloadCommand returns an entrypoint that convinces PostgreSQL to reload

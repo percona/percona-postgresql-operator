@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package naming
 
@@ -264,6 +253,24 @@ func ClusterReplicaService(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	}
 }
 
+// ClusterDedicatedSnapshotVolume returns the ObjectMeta for the dedicated Snapshot
+// volume for a cluster.
+func ClusterDedicatedSnapshotVolume(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.GetNamespace(),
+		Name:      cluster.GetName() + "-snapshot",
+	}
+}
+
+// ClusterVolumeSnapshot returns the ObjectMeta, including a random name, for a
+// new pgdata VolumeSnapshot.
+func ClusterVolumeSnapshot(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-pgdata-snapshot-" + rand.String(4),
+	}
+}
+
 // GenerateInstance returns a random name for a member of cluster and set.
 func GenerateInstance(
 	cluster *v1beta1.PostgresCluster, set *v1beta1.PostgresInstanceSetSpec,
@@ -313,8 +320,7 @@ func InstanceCertificates(instance metav1.Object) metav1.ObjectMeta {
 // InstanceSet returns the ObjectMeta necessary to lookup the objects
 // associated with a single instance set. Includes PodDisruptionBudgets
 func InstanceSet(cluster *v1beta1.PostgresCluster,
-	set *v1beta1.PostgresInstanceSetSpec,
-) metav1.ObjectMeta {
+	set *v1beta1.PostgresInstanceSetSpec) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      cluster.Name + "-set-" + set.Name,
 		Namespace: cluster.Namespace,
@@ -486,8 +492,7 @@ func PGBackRestRBAC(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 
 // PGBackRestRepoVolume returns the ObjectMeta for a pgBackRest repository volume
 func PGBackRestRepoVolume(cluster *v1beta1.PostgresCluster,
-	repoName string,
-) metav1.ObjectMeta {
+	repoName string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      fmt.Sprintf("%s-%s", cluster.GetName(), repoName),
 		Namespace: cluster.GetNamespace(),
