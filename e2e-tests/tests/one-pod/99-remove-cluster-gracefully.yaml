@@ -17,4 +17,5 @@ commands:
       source ../../functions
 
       destroy_operator
+      remove_all_finalizers
     timeout: 60

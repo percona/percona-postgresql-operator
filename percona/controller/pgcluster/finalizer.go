@@ -8,11 +8,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/percona/controller"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -151,39 +152,15 @@ func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.P
 }
 
 func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeletePVC, r.deletePVCAndSecrets); err != nil {
-		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeletePVC)
+	finalizers := map[string]controller.FinalizerFunc[*v2.PerconaPGCluster]{
+		pNaming.FinalizerDeletePVC:    r.deletePVCAndSecrets,
+		pNaming.FinalizerDeleteSSL:    r.deleteTLSSecrets,
+		pNaming.FinalizerStopWatchers: r.stopExternalWatchers,
 	}
 
-	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeleteSSL, r.deleteTLSSecrets); err != nil {
-		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeleteSSL)
-	}
-
-	if err := r.runFinalizer(ctx, cr, v2.FinalizerStopWatchers, r.stopExternalWatchers); err != nil {
-		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerStopWatchers)
-	}
-
-	return nil
-}
-
-func (r *PGClusterReconciler) runFinalizer(ctx context.Context, cr *v2.PerconaPGCluster, finalizer string, f finalizerFunc) error {
-	if !controllerutil.ContainsFinalizer(cr, finalizer) {
-		return nil
-	}
-
-	log := logging.FromContext(ctx)
-	log.Info("Running finalizer", "name", finalizer)
-
-	orig := cr.DeepCopy()
-
-	if err := f(ctx, cr); err != nil {
-		return errors.Wrapf(err, "run finalizer %s", finalizer)
-	}
-
-	if controllerutil.RemoveFinalizer(cr, finalizer) {
-		log.Info("Removing finalizer", "name", finalizer)
-		if err := r.Client.Patch(ctx, cr, client.MergeFrom(orig)); err != nil {
-			return errors.Wrap(err, "remove finalizers")
+	for finalizer, f := range finalizers {
+		if err := controller.RunFinalizer(ctx, r.Client, cr, finalizer, f); err != nil {
+			return errors.Wrapf(err, "run finalizer %s", finalizer)
 		}
 	}
 
