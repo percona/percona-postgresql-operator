@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -22,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +22,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -61,11 +51,6 @@ func init() {
 			return time.Duration(factor * float64(d))
 		}
 	}
-}
-
-// marshalMatches converts actual to YAML and compares that to expected.
-func marshalMatches(actual interface{}, expected string) cmp.Comparison {
-	return cmp.MarshalMatches(actual, expected)
 }
 
 // setupKubernetes starts or connects to a Kubernetes API and returns a client
@@ -116,6 +101,7 @@ func testVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
 		},
 	}
 }
+
 func testCluster() *v1beta1.PostgresCluster {
 	// Defines a base cluster spec that can be used by tests to generate a
 	// cluster with an expected number of instances
@@ -153,6 +139,58 @@ func testCluster() *v1beta1.PostgresCluster {
 		},
 	}
 	return cluster.DeepCopy()
+}
+
+func testBackupJob(cluster *v1beta1.PostgresCluster) *batchv1.Job {
+	job := batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: batchv1.SchemeGroupVersion.String(),
+			Kind:       "Job",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backup-job-1",
+			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				naming.LabelCluster:          cluster.Name,
+				naming.LabelPGBackRestBackup: "",
+				naming.LabelPGBackRestRepo:   "repo1",
+			},
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers:    []corev1.Container{{Name: "test", Image: "test"}},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+
+	return job.DeepCopy()
+}
+
+func testRestoreJob(cluster *v1beta1.PostgresCluster) *batchv1.Job {
+	job := batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: batchv1.SchemeGroupVersion.String(),
+			Kind:       "Job",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restore-job-1",
+			Namespace: cluster.Namespace,
+			Labels:    naming.PGBackRestRestoreJobLabels(cluster.Name),
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers:    []corev1.Container{{Name: "test", Image: "test"}},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+
+	return job.DeepCopy()
 }
 
 // setupManager creates the runtime manager used during controller testing
