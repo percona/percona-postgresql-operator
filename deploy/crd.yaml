@@ -755,6 +755,11 @@ spec:
             type: object
           spec:
             properties:
+              autoCreateUserSchema:
+                description: |-
+                  Whether or not the cluster has schemas automatically created for the user
+                  defined in `spec.users` for all of the databases listed for that user.
+                type: boolean
               backups:
                 description: PostgreSQL backup configuration
                 properties:
