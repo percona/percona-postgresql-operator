@@ -10,6 +10,7 @@ pitr
 scaling
 scheduled-backup
 self-healing
+sidecars
 start-from-backup
 tablespaces
 telemetry-transfer
