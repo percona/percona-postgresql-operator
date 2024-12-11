@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -56,6 +45,7 @@ func (r *Reconciler) generatePostgresUserSecret(
 	cluster *v1beta1.PostgresCluster, spec *v1beta1.PostgresUserSpec, existing *corev1.Secret,
 ) (*corev1.Secret, error) {
 	username := string(spec.Name)
+	// K8SPG-359
 	intent := &corev1.Secret{}
 	if spec.SecretName != "" {
 		intent = &corev1.Secret{ObjectMeta: naming.PostgresCustomUserSecretName(cluster, string(spec.SecretName))}
@@ -63,7 +53,7 @@ func (r *Reconciler) generatePostgresUserSecret(
 		intent = &corev1.Secret{ObjectMeta: naming.PostgresUserSecret(cluster, username)}
 	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-	initialize.ByteMap(&intent.Data)
+	initialize.Map(&intent.Data)
 
 	// Populate the Secret with libpq keywords for connecting through
 	// the primary Service.
@@ -243,6 +233,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
 
+	// K8SPG-375, K8SPG-577
 	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		if cluster.Spec.Extensions.PGStatMonitor {
@@ -333,6 +324,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		log := logging.FromContext(ctx).WithValues("revision", revision)
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
 	}
+	// K8SPG-472
 	if err == nil && pgStatMonitorOK && pgAuditOK && postgisInstallOK {
 		cluster.Status.DatabaseRevision = revision
 	}
@@ -626,7 +618,7 @@ func (r *Reconciler) reconcilePostgresUsersInPostgreSQL(
 func (r *Reconciler) reconcilePostgresDataVolume(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	instanceSpec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
-	clusterVolumes []corev1.PersistentVolumeClaim,
+	clusterVolumes []corev1.PersistentVolumeClaim, sourceCluster *v1beta1.PostgresCluster,
 ) (*corev1.PersistentVolumeClaim, error) {
 
 	labelMap := map[string]string{
@@ -668,6 +660,32 @@ func (r *Reconciler) reconcilePostgresDataVolume(
 	)
 
 	pvc.Spec = instanceSpec.DataVolumeClaimSpec
+
+	// If a source cluster was provided and VolumeSnapshots are turned on in the source cluster and
+	// there is a VolumeSnapshot available for the source cluster that is ReadyToUse, use it as the
+	// source for the PVC. If there is an error when retrieving VolumeSnapshots, or no ReadyToUse
+	// snapshots were found, create a warning event, but continue creating PVC in the usual fashion.
+	if sourceCluster != nil && sourceCluster.Spec.Backups.Snapshots != nil && feature.Enabled(ctx, feature.VolumeSnapshots) {
+		snapshots, err := r.getSnapshotsForCluster(ctx, sourceCluster)
+		if err == nil {
+			snapshot := getLatestReadySnapshot(snapshots)
+			if snapshot != nil {
+				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BootstrappingWithSnapshot",
+					"Snapshot found for %v; bootstrapping cluster with snapshot.", sourceCluster.Name)
+				pvc.Spec.DataSource = &corev1.TypedLocalObjectReference{
+					APIGroup: initialize.String("snapshot.storage.k8s.io"),
+					Kind:     snapshot.Kind,
+					Name:     snapshot.Name,
+				}
+			} else {
+				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "SnapshotNotFound",
+					"No ReadyToUse snapshots were found for %v; proceeding with typical restore process.", sourceCluster.Name)
+			}
+		} else {
+			r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "SnapshotNotFound",
+				"Could not get snapshots for %v, proceeding with typical restore process.", sourceCluster.Name)
+		}
+	}
 
 	r.setVolumeSize(ctx, cluster, pvc, instanceSpec.Name)
 

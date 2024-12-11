@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -37,6 +26,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -60,11 +50,11 @@ func TestGeneratePatroniLeaderLeaseService(t *testing.T) {
 	}
 
 	alwaysExpect := func(t testing.TB, service *corev1.Service) {
-		assert.Assert(t, marshalMatches(service.TypeMeta, `
+		assert.Assert(t, cmp.MarshalMatches(service.TypeMeta, `
 apiVersion: v1
 kind: Service
 		`))
-		assert.Assert(t, marshalMatches(service.ObjectMeta, `
+		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
 creationTimestamp: null
 labels:
   app.kubernetes.io/instance: pg2
@@ -96,7 +86,7 @@ ownerReferences:
 		alwaysExpect(t, service)
 		// Defaults to ClusterIP.
 		assert.Equal(t, service.Spec.Type, corev1.ServiceTypeClusterIP)
-		assert.Assert(t, marshalMatches(service.Spec.Ports, `
+		assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
 - name: postgres
   port: 9876
   protocol: TCP
@@ -188,7 +178,7 @@ ownerReferences:
 			assert.NilError(t, err)
 			alwaysExpect(t, service)
 			test.Expect(t, service)
-			assert.Assert(t, marshalMatches(service.Spec.Ports, `
+			assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
 - name: postgres
   port: 9876
   protocol: TCP
@@ -213,7 +203,7 @@ ownerReferences:
 				assert.NilError(t, err)
 				alwaysExpect(t, service)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
-				assert.Assert(t, marshalMatches(service.Spec.Ports, `
+				assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
 - name: postgres
   nodePort: 32001
   port: 9876
@@ -226,7 +216,7 @@ ownerReferences:
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
 				assert.NilError(t, err)
 				alwaysExpect(t, service)
-				assert.Assert(t, marshalMatches(service.Spec.Ports, `
+				assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
 - name: postgres
   nodePort: 32002
   port: 9876

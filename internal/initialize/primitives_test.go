@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package initialize_test
 
@@ -33,27 +22,6 @@ func TestBool(t *testing.T) {
 	if assert.Check(t, y != nil) {
 		assert.Equal(t, *y, true)
 	}
-}
-
-func TestByteMap(t *testing.T) {
-	// Ignores nil pointer.
-	initialize.ByteMap(nil)
-
-	var m map[string][]byte
-
-	// Starts nil.
-	assert.Assert(t, m == nil)
-
-	// Gets initialized.
-	initialize.ByteMap(&m)
-	assert.DeepEqual(t, m, map[string][]byte{})
-
-	// Now writable.
-	m["x"] = []byte("y")
-
-	// Doesn't overwrite.
-	initialize.ByteMap(&m)
-	assert.DeepEqual(t, m, map[string][]byte{"x": []byte("y")})
 }
 
 func TestFromPointer(t *testing.T) {
@@ -116,6 +84,50 @@ func TestInt64(t *testing.T) {
 	if assert.Check(t, p != nil) {
 		assert.Equal(t, *p, int64(42))
 	}
+}
+
+func TestMap(t *testing.T) {
+	t.Run("map[string][]byte", func(t *testing.T) {
+		// Ignores nil pointer.
+		initialize.Map((*map[string][]byte)(nil))
+
+		var m map[string][]byte
+
+		// Starts nil.
+		assert.Assert(t, m == nil)
+
+		// Gets initialized.
+		initialize.Map(&m)
+		assert.DeepEqual(t, m, map[string][]byte{})
+
+		// Now writable.
+		m["x"] = []byte("y")
+
+		// Doesn't overwrite.
+		initialize.Map(&m)
+		assert.DeepEqual(t, m, map[string][]byte{"x": []byte("y")})
+	})
+
+	t.Run("map[string]string", func(t *testing.T) {
+		// Ignores nil pointer.
+		initialize.Map((*map[string]string)(nil))
+
+		var m map[string]string
+
+		// Starts nil.
+		assert.Assert(t, m == nil)
+
+		// Gets initialized.
+		initialize.Map(&m)
+		assert.DeepEqual(t, m, map[string]string{})
+
+		// Now writable.
+		m["x"] = "y"
+
+		// Doesn't overwrite.
+		initialize.Map(&m)
+		assert.DeepEqual(t, m, map[string]string{"x": "y"})
+	})
 }
 
 func TestPointer(t *testing.T) {
@@ -188,25 +200,4 @@ func TestString(t *testing.T) {
 	if assert.Check(t, n != nil) {
 		assert.Equal(t, *n, "sup")
 	}
-}
-
-func TestStringMap(t *testing.T) {
-	// Ignores nil pointer.
-	initialize.StringMap(nil)
-
-	var m map[string]string
-
-	// Starts nil.
-	assert.Assert(t, m == nil)
-
-	// Gets initialized.
-	initialize.StringMap(&m)
-	assert.DeepEqual(t, m, map[string]string{})
-
-	// Now writable.
-	m["x"] = "y"
-
-	// Doesn't overwrite.
-	initialize.StringMap(&m)
-	assert.DeepEqual(t, m, map[string]string{"x": "y"})
 }
