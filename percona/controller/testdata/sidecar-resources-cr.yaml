@@ -4,13 +4,11 @@ kind: PerconaPGCluster
 metadata:
   name: cluster1
 spec:
-  crVersion: 2.5.0
+  crVersion: 2.6.0
 
   image: perconalab/percona-postgresql-operator:main-ppg16-postgres
   imagePullPolicy: Always
   postgresVersion: 16
-
-  autoCreateUserSchema: true
 
   instances:
   - name: instance1

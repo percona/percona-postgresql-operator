@@ -107,8 +107,6 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 
 	cr.Name = name
 	cr.Namespace = namespace
-	t := true
-	cr.Spec.AutoCreateUserSchema = &t
 	return cr, nil
 }
 
