@@ -28,7 +28,7 @@ spec:
 
 #  openshift: true
 
-# autoCreateUserSchema: true
+#  autoCreateUserSchema: true
 
 #  users:
 #    - name: rhino
