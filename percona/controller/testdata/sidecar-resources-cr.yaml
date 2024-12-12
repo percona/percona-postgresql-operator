@@ -10,6 +10,8 @@ spec:
   imagePullPolicy: Always
   postgresVersion: 16
 
+  autoCreateUserSchema: true
+
   instances:
   - name: instance1
     replicas: 3
