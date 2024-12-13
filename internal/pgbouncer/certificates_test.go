@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package pgbouncer
 
@@ -20,6 +9,8 @@ import (
 
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 )
 
 func TestBackendAuthority(t *testing.T) {
@@ -27,7 +18,7 @@ func TestBackendAuthority(t *testing.T) {
 	projection := &corev1.SecretProjection{
 		LocalObjectReference: corev1.LocalObjectReference{Name: "some-name"},
 	}
-	assert.Assert(t, marshalMatches(backendAuthority(projection), `
+	assert.Assert(t, cmp.MarshalMatches(backendAuthority(projection), `
 secret:
   items:
   - key: ca.crt
@@ -40,7 +31,7 @@ secret:
 		{Key: "some-crt-key", Path: "tls.crt"},
 		{Key: "some-ca-key", Path: "ca.crt"},
 	}
-	assert.Assert(t, marshalMatches(backendAuthority(projection), `
+	assert.Assert(t, cmp.MarshalMatches(backendAuthority(projection), `
 secret:
   items:
   - key: some-ca-key
@@ -54,7 +45,7 @@ func TestFrontendCertificate(t *testing.T) {
 	secret.Name = "op-secret"
 
 	t.Run("Generated", func(t *testing.T) {
-		assert.Assert(t, marshalMatches(frontendCertificate(nil, secret), `
+		assert.Assert(t, cmp.MarshalMatches(frontendCertificate(nil, secret), `
 secret:
   items:
   - key: pgbouncer-frontend.ca-roots
@@ -72,7 +63,7 @@ secret:
 		custom.Name = "some-other"
 
 		// No items; assume Key matches Path.
-		assert.Assert(t, marshalMatches(frontendCertificate(custom, secret), `
+		assert.Assert(t, cmp.MarshalMatches(frontendCertificate(custom, secret), `
 secret:
   items:
   - key: ca.crt
@@ -91,7 +82,7 @@ secret:
 			{Key: "some-cert-key", Path: "tls.crt"},
 			{Key: "some-key-key", Path: "tls.key"},
 		}
-		assert.Assert(t, marshalMatches(frontendCertificate(custom, secret), `
+		assert.Assert(t, cmp.MarshalMatches(frontendCertificate(custom, secret), `
 secret:
   items:
   - key: some-ca-key

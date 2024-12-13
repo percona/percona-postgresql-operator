@@ -64,8 +64,8 @@ spec:
               majorVersion:
                 description: |-
                   The ID of the cluster's major Postgres version.
-                  Currently Bridge offers 13-16
-                maximum: 16
+                  Currently Bridge offers 13-17
+                maximum: 17
                 minimum: 13
                 type: integer
               metadata:
@@ -424,6 +424,7 @@ spec:
                     - bucket
                     type: object
                   name:
+                    default: repo1
                     description: The name of the repository
                     pattern: ^repo[1-4]
                     type: string
@@ -4123,6 +4124,7 @@ spec:
                               - bucket
                               type: object
                             name:
+                              default: repo1
                               description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
@@ -5364,6 +5366,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                             type: string
                           repoName:
+                            default: repo1
                             description: |-
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -6946,6 +6949,7 @@ spec:
                             - bucket
                             type: object
                           name:
+                            default: repo1
                             description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
@@ -8286,6 +8290,7 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repoName:
+                        default: repo1
                         description: |-
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -13980,6 +13985,7 @@ spec:
                       in a PostgresCluster.
                     properties:
                       enabled:
+                        default: false
                         description: Whether or not the operator should allow switchovers
                           in a PostgresCluster
                         type: boolean
@@ -23812,7 +23818,7 @@ spec:
                 type: object
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
-                maximum: 16
+                maximum: 17
                 minimum: 10
                 type: integer
               image:
@@ -25352,7 +25358,7 @@ spec:
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
-                maximum: 16
+                maximum: 17
                 minimum: 10
                 type: integer
               tolerations:
@@ -28800,6 +28806,7 @@ spec:
                               - bucket
                               type: object
                             name:
+                              default: repo1
                               description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
@@ -30049,6 +30056,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                             type: string
                           repoName:
+                            default: repo1
                             description: |-
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -30298,8 +30306,17 @@ spec:
                     required:
                     - repos
                     type: object
-                required:
-                - pgbackrest
+                  snapshots:
+                    description: VolumeSnapshot configuration
+                    properties:
+                      volumeSnapshotClassName:
+                        description: Name of the VolumeSnapshotClass that should be
+                          used by VolumeSnapshots
+                        minLength: 1
+                        type: string
+                    required:
+                    - volumeSnapshotClassName
+                    type: object
                 type: object
               config:
                 properties:
@@ -32102,6 +32119,7 @@ spec:
                             - bucket
                             type: object
                           name:
+                            default: repo1
                             description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
@@ -33442,6 +33460,7 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repoName:
+                        default: repo1
                         description: |-
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -39432,6 +39451,7 @@ spec:
                       in a PostgresCluster.
                     properties:
                       enabled:
+                        default: false
                         description: Whether or not the operator should allow switchovers
                           in a PostgresCluster
                         type: boolean
@@ -39485,8 +39505,8 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 16
-                minimum: 12
+                maximum: 17
+                minimum: 10
                 type: integer
               proxy:
                 description: The specification of a proxy that connects to PostgreSQL.
