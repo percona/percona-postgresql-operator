@@ -36,7 +36,14 @@ func PostgreSQL(
 	archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
 
 	outParameters.Mandatory.Add("archive_mode", "on")
-	outParameters.Mandatory.Add("archive_command", archive)
+
+	if backupsEnabled {
+		outParameters.Mandatory.Add("archive_command", archive)
+	} else {
+		// If backups are disabled, keep archive_mode on (to avoid a Postgres restart)
+		// and throw away WAL.
+		outParameters.Mandatory.Add("archive_command", `true`)
+	}
 
 	// K8SPG-518: This parameter is required to ensure that the commit timestamp is
 	// included in the WAL file. This is necessary for the WAL watcher to

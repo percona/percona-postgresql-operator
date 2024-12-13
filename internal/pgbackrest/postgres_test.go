@@ -51,7 +51,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 	}
 	cluster.Spec.Patroni.DynamicConfiguration = dynamic
 
-	PostgreSQL(cluster, parameters)
+	PostgreSQL(cluster, parameters, true)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 		"archive_mode": "on",
 		"archive_command": strings.Join([]string{
