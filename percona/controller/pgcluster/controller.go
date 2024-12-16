@@ -356,7 +356,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		}
 	}
 
-	if p.Status.Phase == corev1.PodRunning {
+	if p.Status.Phase != corev1.PodRunning {
 		return errPatroniVersionCheckWait
 	}
 
