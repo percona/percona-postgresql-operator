@@ -844,10 +844,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 				// controller when there is a failure (instead of the container simply restarting).
 				// This will ensure the Job always has the latest configs mounted following a
 				// failure as needed to successfully verify config hashes and run the Job.
-				// RestartPolicy:      corev1.RestartPolicyNever,
-				// K8SPG-619: Set RestartPolicy to "OnFailure" to handle potential delays in establishing communication with the Kubernetes API.
-				//            The container will be restarted until the BackoffLimit is reached to handle these delays.
-				RestartPolicy:      postgresCluster.Spec.Backups.PGBackRest.Jobs.RestartPolicy,
+				RestartPolicy:      corev1.RestartPolicyNever,
 				SecurityContext:    initialize.PodSecurityContext(),
 				ServiceAccountName: serviceAccountName,
 			},
@@ -862,8 +859,13 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 	if postgresCluster.Spec.Backups.PGBackRest.Jobs != nil {
 		jobSpec.Template.Spec.Tolerations = postgresCluster.Spec.Backups.PGBackRest.Jobs.Tolerations
 		jobSpec.Template.Spec.Affinity = postgresCluster.Spec.Backups.PGBackRest.Jobs.Affinity
-		jobSpec.Template.Spec.PriorityClassName =
-			initialize.FromPointer(postgresCluster.Spec.Backups.PGBackRest.Jobs.PriorityClassName)
+		jobSpec.Template.Spec.PriorityClassName = initialize.FromPointer(postgresCluster.Spec.Backups.PGBackRest.Jobs.PriorityClassName)
+
+		// K8SPG-619: Set RestartPolicy to "OnFailure" (by default) to handle potential delays in establishing communication with the Kubernetes API.
+		//            The container will be restarted until the BackoffLimit is reached to handle these delays.
+		jobSpec.Template.Spec.RestartPolicy = postgresCluster.Spec.Backups.PGBackRest.Jobs.RestartPolicy
+		// K8SPG-619: The job container will try to restart with increasing delays (10s, 20s) before failing.
+		jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
 	}
 
 	// Set the image pull secrets, if any exist.
@@ -874,9 +876,6 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 
 	// add pgBackRest configs to template
 	pgbackrest.AddConfigToRepoPod(postgresCluster, &jobSpec.Template.Spec)
-
-	// K8SPG-619: The job container will try to restart with increasing delays (10s, 20s) before failing.
-	jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
 
 	return jobSpec
 }

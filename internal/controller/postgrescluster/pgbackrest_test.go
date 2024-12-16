@@ -2495,7 +2495,7 @@ containers:
     name: pgbackrest-config
     readOnly: true
 enableServiceLinks: false
-restartPolicy: OnFailure
+restartPolicy: Never
 securityContext:
   fsGroupChangePolicy: OnRootMismatch
 volumes:
