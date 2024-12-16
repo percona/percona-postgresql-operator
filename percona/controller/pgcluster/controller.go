@@ -529,61 +529,49 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 }
 
 func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	log := logging.FromContext(ctx).WithValues("cluster", cr.Name, "namespace", cr.Namespace)
 	if cr.Spec.Extensions.Storage.Secret == nil {
 		return nil
 	}
 
 	extensionKeys := make([]string, 0)
+	extensionNames := make([]string, 0)
+
 	for _, extension := range cr.Spec.Extensions.Custom {
 		key := extensions.GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
 		extensionKeys = append(extensionKeys, key)
+		extensionNames = append(extensionNames, extension.Name)
 	}
-	log.Info("List of extension keys", "extensionKeys", extensionKeys)
+
 	if cr.CompareVersion("2.6.0") >= 0 {
 		// custom extensions to be removed
 		var removedExtension []string
 		// list of installed custom extensions
 		var installedExtensions []string
-		if cr.Spec.Metadata != nil && cr.Spec.Metadata.Annotations != nil {
-			if val, ok := cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions]; ok && val != "" {
-				installedExtensions = strings.Split(val, ",")
-			}
-			crExtensions := make(map[string]struct{})
-			for _, ext := range extensionKeys {
-				crExtensions[ext] = struct{}{}
-			}
-
-			// Check for missing entries in crExtensions
-			for _, ext := range installedExtensions {
-				log.Info("Test extensions installedExt")
-				// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
-				if _, exists := crExtensions[ext]; !exists {
-					removedExtension = append(removedExtension, strings.Split(ext, "-")[0])
-				}
-			}
-			log.Info("Test extensions installedExt", "removedExtension", removedExtension)
-
-			if len(removedExtension) > 0 {
-				var exec postgres.Executor
-				if exec == nil {
-					return errors.New("executor is nil")
-				}
-				err := DisableCustomExtensionsInPostgreSQL(ctx, removedExtension, exec)
-				if err != nil {
-					return errors.Wrap(err, "custom extension deletion")
-				}
+		installedExtensions = cr.Status.InstalledCustomExtensions
+		crExtensions := make(map[string]struct{})
+		for _, ext := range extensionNames {
+			crExtensions[ext] = struct{}{}
+		}
+		// Check for missing entries in crExtensions
+		for _, ext := range installedExtensions {
+			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
+			if _, exists := crExtensions[ext]; !exists {
+				removedExtension = append(removedExtension, ext)
 			}
 		}
-		if cr.Spec.Metadata == nil {
-			cr.Spec.Metadata = new(v1beta1.Metadata)
-		}
 
-		if cr.Spec.Metadata.Annotations == nil {
-			cr.Spec.Metadata.Annotations = make(map[string]string)
+		if len(removedExtension) > 0 {
+			var exec postgres.Executor
+			if exec == nil {
+				return errors.New("executor is nil")
+			}
+			err := DisableCustomExtensionsInPostgreSQL(ctx, removedExtension, exec)
+			if err != nil {
+				return errors.Wrap(err, "custom extension deletion")
+			}
 		}
-		cr.Spec.Metadata.Annotations[pNaming.AnnotationClusterCustomExtensions] = strings.Join(extensionKeys, ",")
 	}
+
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
 		set.InitContainers = append(set.InitContainers, extensions.ExtensionRelocatorContainer(

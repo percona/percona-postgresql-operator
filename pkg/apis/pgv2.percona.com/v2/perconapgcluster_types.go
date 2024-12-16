@@ -393,6 +393,10 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Host string `json:"host"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	InstalledCustomExtensions []string `json:"installedCustomExtensions"`
 }
 
 type Backups struct {

@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,6 +77,11 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		return errors.Wrap(err, "get app host")
 	}
 
+	installedCustomExtensions := make([]string, 0)
+	for _, extension := range cr.Spec.Extensions.Custom {
+		installedCustomExtensions = append(installedCustomExtensions, extension.Name)
+	}
+
 	var size, ready int32
 	ss := make([]v2.PostgresInstanceSetStatus, 0, len(status.InstanceSets))
 	for _, is := range status.InstanceSets {
@@ -111,6 +115,8 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 				Ready: status.Proxy.PGBouncer.ReadyReplicas,
 			},
 			Host: host,
+
+			InstalledCustomExtensions: installedCustomExtensions,
 		}
 
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
