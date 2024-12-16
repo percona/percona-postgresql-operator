@@ -18083,6 +18083,8 @@ spec:
             properties:
               host:
                 type: string
+              patroniVersion:
+                type: string
               pgbouncer:
                 properties:
                   ready:
@@ -18120,17 +18122,11 @@ spec:
                   size:
                     format: int32
                     type: integer
-                required:
-                - instances
-                - ready
-                - size
+                  version:
+                    type: integer
                 type: object
               state:
                 type: string
-            required:
-            - pgbouncer
-            - postgres
-            - state
             type: object
         required:
         - metadata
@@ -45447,6 +45443,7 @@ rules:
   resources:
   - configmaps
   - persistentvolumeclaims
+  - pods
   - secrets
   - serviceaccounts
   - services
@@ -45484,16 +45481,6 @@ rules:
   verbs:
   - create
   - patch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - delete
-  - get
-  - list
-  - patch
-  - watch
 - apiGroups:
   - apps
   resources:
@@ -45596,6 +45583,13 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - pgv2.percona.com
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
 - apiGroups:
   - policy
   resources:

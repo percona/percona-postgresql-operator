@@ -38,6 +38,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -167,9 +168,11 @@ type instanceSorter struct {
 func (s *instanceSorter) Len() int {
 	return len(s.instances)
 }
+
 func (s *instanceSorter) Less(i, j int) bool {
 	return s.less(s.instances[i], s.instances[j])
 }
+
 func (s *instanceSorter) Swap(i, j int) {
 	s.instances[i], s.instances[j] = s.instances[j], s.instances[i]
 }
@@ -489,7 +492,6 @@ func (r *Reconciler) deleteInstances(
 		// have a "spec.replicas" field with the same meaning.
 		patch := client.RawPatch(client.Merge.Type(), []byte(`{"spec":{"replicas":0}}`))
 		err := errors.WithStack(r.patch(ctx, instance, patch))
-
 		// When the pod controller is missing, requeue rather than return an
 		// error. The garbage collector will stop the pod, and it is not our
 		// mistake that something else is deleting objects. Use RequeueAfter to
@@ -598,7 +600,6 @@ func (r *Reconciler) reconcileInstanceSets(
 	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
 	backupsSpecFound bool,
 ) error {
-
 	// Go through the observed instances and check if a primary has been determined.
 	// If the cluster is being shutdown and this instance is the primary, store
 	// the instance name as the startup instance. If the primary can be determined
@@ -712,8 +713,8 @@ func (r *Reconciler) cleanupPodDisruptionBudgets(
 // for the instance set specified that are not currently associated with an instance, and then
 // returning the instance names associated with those PVC's.
 func findAvailableInstanceNames(set v1beta1.PostgresInstanceSetSpec,
-	observedInstances *observedInstances, clusterVolumes []corev1.PersistentVolumeClaim) []string {
-
+	observedInstances *observedInstances, clusterVolumes []corev1.PersistentVolumeClaim,
+) []string {
 	availableInstanceNames := []string{}
 
 	// first identify any PGDATA volumes for the instance set specified
@@ -810,10 +811,13 @@ func (r *Reconciler) rolloutInstance(
 		ctx, span = r.Tracer.Start(ctx, "patroni-change-primary")
 		defer span.End()
 
-		patroniVer, err := patroni.GetVersionFromPod(pod)
+		patroniVerStr, ok := cluster.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
+		if !ok {
+			return errors.New("patroni version annoation was not found")
+		}
+		patroniVer, err := gover.NewVersion(patroniVerStr)
 		if err != nil {
-			span.RecordError(err)
-			return errors.Wrap(err, "failed to get patroni version from pod")
+			return errors.Wrap(err, "failed to get patroni ver")
 		}
 		ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
 
@@ -986,7 +990,6 @@ func (r *Reconciler) scaleDownInstances(
 	cluster *v1beta1.PostgresCluster,
 	observedInstances *observedInstances,
 ) error {
-
 	// want defines the number of replicas we want for each instance set
 	want := map[string]int{}
 	for _, set := range cluster.Spec.InstanceSets {
@@ -1025,7 +1028,6 @@ func (r *Reconciler) scaleDownInstances(
 // the number of replicas we want for each instance set
 // then returns a list of the pods that we want to keep
 func podsToKeep(instances []corev1.Pod, want map[string]int) []corev1.Pod {
-
 	f := func(instances []corev1.Pod, want int) []corev1.Pod {
 		keep := []corev1.Pod{}
 
@@ -1062,7 +1064,6 @@ func podsToKeep(instances []corev1.Pod, want map[string]int) []corev1.Pod {
 	}
 
 	return keepPodList
-
 }
 
 // +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={list}
@@ -1230,7 +1231,6 @@ func (r *Reconciler) reconcileInstance(
 			config.PostgresContainerImage(cluster),
 			cluster.Spec.ImagePullPolicy,
 			&instance.Spec.Template)
-
 	}
 	// K8SPG-435
 	sizeLimit := getTMPSizeLimit(instance.Labels[naming.LabelVersion], spec.Resources)

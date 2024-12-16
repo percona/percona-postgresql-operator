@@ -354,41 +354,47 @@ const (
 type PostgresInstanceSetStatus struct {
 	Name string `json:"name"`
 
-	// +kubebuilder:validation:Required
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
 	Ready int32 `json:"ready"`
 }
 
 type PostgresStatus struct {
-	// +kubebuilder:validation:Required
+	// +optional
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
+	// +optional
 	Ready int32 `json:"ready"`
 
-	// +kubebuilder:validation:Required
+	// +optional
 	InstanceSets []PostgresInstanceSetStatus `json:"instances"`
+
+	// +optional
+	Version int `json:"version"`
 }
 
 type PGBouncerStatus struct {
-	// +kubebuilder:validation:Required
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
 	Ready int32 `json:"ready"`
 }
 
 type PerconaPGClusterStatus struct {
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Postgres PostgresStatus `json:"postgres"`
 
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	PGBouncer PGBouncerStatus `json:"pgbouncer"`
 
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	State AppState `json:"state"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	PatroniVersion string `json:"patroniVersion"`
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status

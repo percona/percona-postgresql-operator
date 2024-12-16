@@ -18083,6 +18083,8 @@ spec:
             properties:
               host:
                 type: string
+              patroniVersion:
+                type: string
               pgbouncer:
                 properties:
                   ready:
@@ -18120,17 +18122,11 @@ spec:
                   size:
                     format: int32
                     type: integer
-                required:
-                - instances
-                - ready
-                - size
+                  version:
+                    type: integer
                 type: object
               state:
                 type: string
-            required:
-            - pgbouncer
-            - postgres
-            - state
             type: object
         required:
         - metadata

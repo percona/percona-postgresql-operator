@@ -100,18 +100,15 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 			return errors.Wrap(err, "get PerconaPGCluster")
 		}
 
-		cluster.Status = v2.PerconaPGClusterStatus{
-			Postgres: v2.PostgresStatus{
-				Size:         size,
-				Ready:        ready,
-				InstanceSets: ss,
-			},
-			PGBouncer: v2.PGBouncerStatus{
-				Size:  status.Proxy.PGBouncer.Replicas,
-				Ready: status.Proxy.PGBouncer.ReadyReplicas,
-			},
-			Host: host,
+		cluster.Status.Postgres.Size = size
+		cluster.Status.Postgres.Ready = ready
+		cluster.Status.Postgres.InstanceSets = ss
+
+		cluster.Status.PGBouncer = v2.PGBouncerStatus{
+			Size:  status.Proxy.PGBouncer.Replicas,
+			Ready: status.Proxy.PGBouncer.ReadyReplicas,
 		}
+		cluster.Status.Host = host
 
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 

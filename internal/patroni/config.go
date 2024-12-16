@@ -5,16 +5,19 @@
 package patroni
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"strings"
 
+	gover "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -570,7 +573,14 @@ func instanceYAML(
 		}
 		// K8SPG-648: patroni v4.0.0 deprecated "no_master".
 		//            We should use "no_leader" instead
-		if cluster.Spec.PostgresVersion < 17 {
+
+		patroniVerStr, ok := cluster.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
+		if !ok {
+			return "", errors.New("patroni version annoation was not found")
+		}
+		patroniVer := gover.Must(gover.NewVersion(patroniVerStr))
+		ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+		if !ver4 {
 			postgresql[pgBackRestCreateReplicaMethod] = map[string]any{
 				"command":   strings.Join(quoted, " "),
 				"keep_data": true,

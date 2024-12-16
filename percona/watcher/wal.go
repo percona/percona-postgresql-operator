@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -175,7 +176,9 @@ func getPrimaryPod(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGClu
 	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
 	//            We should use "primary" instead
 	role := "primary"
-	if cr.Spec.PostgresVersion < 17 {
+	patroniVer := gover.Must(gover.NewVersion(cr.Status.PatroniVersion))
+	ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+	if !ver4 {
 		role = "master"
 	}
 	err := cli.List(ctx, podList, &client.ListOptions{
