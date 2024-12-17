@@ -576,7 +576,7 @@ func instanceYAML(
 
 		patroniVerStr, ok := cluster.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
 		if !ok {
-			return "", errors.New("patroni version annoation was not found")
+			return "", errors.New("patroni version annotation was not found")
 		}
 		patroniVer := gover.Must(gover.NewVersion(patroniVerStr))
 		ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0

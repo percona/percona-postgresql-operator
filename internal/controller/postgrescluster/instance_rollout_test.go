@@ -25,12 +25,16 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestReconcilerRolloutInstance(t *testing.T) {
 	ctx := context.Background()
 	cluster := new(v1beta1.PostgresCluster)
+	cluster.Annotations = map[string]string{
+		pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion): "4.0.1",
+	}
 
 	t.Run("Singleton", func(t *testing.T) {
 		instances := []*Instance{

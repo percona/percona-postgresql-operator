@@ -98,7 +98,7 @@ func (r *Reconciler) handlePatroniRestarts(
 
 		patroniVerStr, ok := cluster.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
 		if !ok {
-			return errors.New("patroni version annoation was not found")
+			return errors.New("patroni version annotation was not found")
 		}
 		patroniVer, err := gover.NewVersion(patroniVerStr)
 		if err != nil {

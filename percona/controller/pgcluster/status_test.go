@@ -52,7 +52,10 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		cr, err := readDefaultCR(crName, ns)
 		It("should read defautl cr.yaml and create PerconaPGCluster", func() {
 			Expect(err).NotTo(HaveOccurred())
+			status := cr.Status
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			cr.Status = status
+			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 		})
 
 		It("should reconcile and create Crunchy PostgreCluster", func() {
@@ -107,7 +110,10 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		cr, err := readDefaultCR(crName, ns)
 		It("should read defautl cr.yaml and create PerconaPGCluster", func() {
 			Expect(err).NotTo(HaveOccurred())
+			status := cr.Status
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			cr.Status = status
+			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 		})
 
 		It("should reconcile and create Crunchy PostgreCluster", func() {
@@ -141,7 +147,10 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		cr, err := readDefaultCR(crName, ns)
 		It("should read defautl cr.yaml and create PerconaPGCluster", func() {
 			Expect(err).NotTo(HaveOccurred())
+			status := cr.Status
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			cr.Status = status
+			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 		})
 
 		It("should reconcile and create Crunchy PostgreCluster", func() {
@@ -243,7 +252,10 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 		cr, err := readDefaultCR(crName, ns)
 		It("should read defautl cr.yaml and create PerconaPGCluster", func() {
 			Expect(err).NotTo(HaveOccurred())
+			status := cr.Status
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			cr.Status = status
+			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 		})
 
 		It("should reconcile and create Crunchy PostgreCluster", func() {

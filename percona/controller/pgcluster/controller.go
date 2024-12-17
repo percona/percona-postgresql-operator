@@ -305,6 +305,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 var errPatroniVersionCheckWait = errors.New("waiting for pod to initialize")
 
 func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if cr.Annotations == nil {
+		cr.Annotations = make(map[string]string)
+	}
+
+	if cr.Status.Postgres.Version == cr.Spec.PostgresVersion && cr.Status.PatroniVersion != "" {
+		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
+		return nil
+	}
+
 	meta := metav1.ObjectMeta{
 		Name:      cr.Name + "-patroni-version-check",
 		Namespace: cr.Namespace,
@@ -319,10 +328,6 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		return errors.Wrap(err, "failed to get patroni version check pod")
 	}
 	if k8serrors.IsNotFound(err) {
-		if cr.Status.Postgres.Version == cr.Spec.PostgresVersion && cr.Status.PatroniVersion != "" {
-			cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
-			return nil
-		}
 		p = &corev1.Pod{
 			ObjectMeta: meta,
 			Spec: corev1.PodSpec{
@@ -346,14 +351,6 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		}
 
 		return errPatroniVersionCheckWait
-	} else {
-		if cr.Status.Postgres.Version == cr.Spec.PostgresVersion && cr.Status.PatroniVersion != "" {
-			cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
-			if err := r.Client.Delete(ctx, p); err != nil {
-				return errors.Wrap(err, "failed to delete patroni version check pod")
-			}
-			return nil
-		}
 	}
 
 	if p.Status.Phase != corev1.PodRunning {
