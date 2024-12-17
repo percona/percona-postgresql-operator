@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"io"
 	"reflect"
 	"strings"
 	"time"
@@ -51,8 +53,12 @@ const (
 
 // Reconciler holds resources for the PerconaPGCluster reconciler
 type PGClusterReconciler struct {
-	Client               client.Client
-	Owner                client.FieldOwner
+	Client  client.Client
+	Owner   client.FieldOwner
+	PodExec func(
+		ctx context.Context, namespace, pod, container string,
+		stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error
 	Recorder             record.EventRecorder
 	Tracer               trace.Tracer
 	Platform             string
@@ -67,6 +73,13 @@ type PGClusterReconciler struct {
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
+	if r.PodExec == nil {
+		var err error
+		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
+		if err != nil {
+			return err
+		}
+	}
 	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
@@ -243,7 +256,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
-	if err := r.reconcileCustomExtensions(ctx, cr); err != nil {
+	if err := r.reconcileCustomExtensions(ctx, cr, postgresCluster); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
 	}
 
@@ -528,7 +541,13 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
-func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster, postgresCluster *v1beta1.PostgresCluster) error {
+	log := logging.FromContext(ctx).WithValues("cluster", cr.Name, "namespace", cr.Namespace)
+
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
+		return errors.Wrap(err, "get PostgresCluster")
+	}
+
 	if cr.Spec.Extensions.Storage.Secret == nil {
 		return nil
 	}
@@ -559,15 +578,27 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 				removedExtension = append(removedExtension, ext)
 			}
 		}
+		log.Info("Extension to delete", "removedExtension", removedExtension)
 
 		if len(removedExtension) > 0 {
-			var exec postgres.Executor
-			if exec == nil {
-				return errors.New("executor is nil")
+
+			log.Info("Try to delete extension")
+			action := func(ctx context.Context, exec postgres.Executor) error {
+				return errors.WithStack(DisableCustomExtensionsInPostgreSQL(ctx, exec, removedExtension))
 			}
-			err := DisableCustomExtensionsInPostgreSQL(ctx, removedExtension, exec)
+			//pod := getWritableInstance(ctx, postgresCluster)
+
+			primary, err := getPrimaryPod(ctx, r.Client, cr)
+
+			if primary == nil {
+				return errors.New("Pod is nil")
+			}
+
+			err = action(ctx, func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+				return r.PodExec(ctx, primary.Namespace, primary.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
+			})
 			if err != nil {
-				return errors.Wrap(err, "custom extension deletion")
+				return errors.Wrap(err, "deletion extension from installed")
 			}
 		}
 	}
@@ -589,7 +620,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	return nil
 }
 
-func DisableCustomExtensionsInPostgreSQL(ctx context.Context, customExtensionsForDeletion []string, exec postgres.Executor) error {
+func DisableCustomExtensionsInPostgreSQL(ctx context.Context, exec postgres.Executor, customExtensionsForDeletion []string) error {
 	log := logging.FromContext(ctx)
 
 	for _, extensionName := range customExtensionsForDeletion {
@@ -599,6 +630,8 @@ func DisableCustomExtensionsInPostgreSQL(ctx context.Context, customExtensionsFo
 			extensionName,
 		)
 
+		log.Info("sqlCommand", "command", sqlCommand)
+
 		stdout, stderr, err := exec.ExecInAllDatabases(ctx,
 			sqlCommand,
 			map[string]string{
@@ -606,6 +639,7 @@ func DisableCustomExtensionsInPostgreSQL(ctx context.Context, customExtensionsFo
 				"QUIET":         "on", // Do not print successful commands to stdout.
 			},
 		)
+
 		log.V(1).Info("disabled", "extensionName", extensionName, "stdout", stdout, "stderr", stderr)
 
 		return errors.Wrap(err, "custom extension deletion")
@@ -721,4 +755,28 @@ func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.Perco
 	}
 
 	return nil
+}
+
+func getPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGCluster) (*corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	err := cli.List(ctx, podList, &client.ListOptions{
+		Namespace: cr.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"app.kubernetes.io/instance":             cr.Name,
+			"postgres-operator.crunchydata.com/role": "master",
+		}),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(podList.Items) == 0 {
+		return nil, errors.New("no primary pod found")
+	}
+
+	if len(podList.Items) > 1 {
+		return nil, errors.New("multiple primary pods found")
+	}
+
+	return &podList.Items[0], nil
 }
