@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package pgbackrest
 
@@ -26,6 +15,7 @@ import (
 func PostgreSQL(
 	inCluster *v1beta1.PostgresCluster,
 	outParameters *postgres.Parameters,
+	backupsEnabled bool,
 ) {
 	if outParameters.Mandatory == nil {
 		outParameters.Mandatory = postgres.NewParameterSet()
@@ -38,11 +28,12 @@ func PostgreSQL(
 	// - https://pgbackrest.org/user-guide.html#quickstart/configure-archiving
 	// - https://pgbackrest.org/command.html#command-archive-push
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
-	fixTimezone := `sed -E 's/([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\+\-][0-9]{2})/\1\2/' | sed 's/UTC/Z/'`
-	extractCommitTime := `awk '{print $(NF-2) "T" $(NF-1) " " $(NF)}' | ` + fixTimezone + ``
-	validateCommitTime := `grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2}`
+
+	fixTimezone := `sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | sed "s/UTC/Z/"`
+	extractCommitTime := `grep -oP "COMMIT \K[^;]+" | ` + fixTimezone + ``
+	validateCommitTime := `grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"`
 	archive := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-push "%p"`
-	archive += ` && timestamp=$(pg_waldump "%p" | grep COMMIT | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `)$');`
+	archive += ` && timestamp=$(pg_waldump "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
 	archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
 
 	outParameters.Mandatory.Add("archive_mode", "on")

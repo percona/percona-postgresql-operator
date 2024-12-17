@@ -3,7 +3,6 @@ custom-tls
 demand-backup
 finalizers
 init-deploy
-major-upgrade
 monitoring
 one-pod
 operator-self-healing
@@ -11,6 +10,7 @@ pitr
 scaling
 scheduled-backup
 self-healing
+sidecars
 start-from-backup
 tablespaces
 telemetry-transfer
