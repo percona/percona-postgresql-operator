@@ -582,11 +582,9 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 
 		if len(removedExtension) > 0 {
 
-			log.Info("Try to delete extension")
 			action := func(ctx context.Context, exec postgres.Executor) error {
 				return errors.WithStack(DisableCustomExtensionsInPostgreSQL(ctx, exec, removedExtension))
 			}
-			//pod := getWritableInstance(ctx, postgresCluster)
 
 			primary, err := getPrimaryPod(ctx, r.Client, cr)
 
@@ -629,8 +627,6 @@ func DisableCustomExtensionsInPostgreSQL(ctx context.Context, exec postgres.Exec
 			`SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS %s;`,
 			extensionName,
 		)
-
-		log.Info("sqlCommand", "command", sqlCommand)
 
 		stdout, stderr, err := exec.ExecInAllDatabases(ctx,
 			sqlCommand,
