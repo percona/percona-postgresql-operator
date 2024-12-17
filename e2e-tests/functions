@@ -103,8 +103,8 @@ remove_all_finalizers() {
 	for resource in "${resource_types[@]}"; do
 		echo "removing all finalizers for $resource resources"
 
-		kubectl -n "${OPERATOR_NS:-$NAMESPACE}" get "$resource" -o json | jq '.items[] | .metadata.name' -r | while IFS= read -r name; do
-			kubectl -n "${OPERATOR_NS:-$NAMESPACE}" patch "$resource" "$name" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+		kubectl -n "${NAMESPACE}" get "$resource" -o json | jq '.items[] | .metadata.name' -r | while IFS= read -r name; do
+			kubectl -n "${NAMESPACE}" patch "$resource" "$name" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
 		done
 	done
 }
