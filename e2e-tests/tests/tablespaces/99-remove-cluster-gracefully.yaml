@@ -18,4 +18,4 @@ commands:
 
       remove_all_finalizers
       destroy_operator
-    timeout: 60
+    timeout: 240
