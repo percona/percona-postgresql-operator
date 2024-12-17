@@ -9,6 +9,9 @@ PGMONITOR_DIR ?= hack/tools/pgmonitor
 PGMONITOR_VERSION ?= v4.11.0
 QUERIES_CONFIG_DIR ?= hack/tools/queries
 
+EXTERNAL_SNAPSHOTTER_DIR ?= hack/tools/external-snapshotter
+EXTERNAL_SNAPSHOTTER_VERSION ?= v8.0.1
+
 # Buildah's "build" used to be "bud". Use the alias to be compatible for a while.
 BUILDAH_BUILD ?= buildah bud
 
@@ -52,6 +55,12 @@ get-pgmonitor:
 	cp -r '$(PGMONITOR_DIR)/postgres_exporter/common/.' '${QUERIES_CONFIG_DIR}'
 	cp '$(PGMONITOR_DIR)/postgres_exporter/linux/queries_backrest.yml' '${QUERIES_CONFIG_DIR}'
 
+.PHONY: get-external-snapshotter
+get-external-snapshotter:
+	git -C '$(dir $(EXTERNAL_SNAPSHOTTER_DIR))' clone https://github.com/kubernetes-csi/external-snapshotter.git || git -C '$(EXTERNAL_SNAPSHOTTER_DIR)' fetch origin
+	@git -C '$(EXTERNAL_SNAPSHOTTER_DIR)' checkout '$(EXTERNAL_SNAPSHOTTER_VERSION)'
+	@git -C '$(EXTERNAL_SNAPSHOTTER_DIR)' config pull.ff only
+
 .PHONY: clean
 clean: ## Clean resources
 clean: clean-deprecated
@@ -64,6 +73,7 @@ clean: clean-deprecated
 	[ ! -f hack/tools/setup-envtest ] || rm hack/tools/setup-envtest
 	[ ! -d hack/tools/envtest ] || { chmod -R u+w hack/tools/envtest && rm -r hack/tools/envtest; }
 	[ ! -d hack/tools/pgmonitor ] || rm -rf hack/tools/pgmonitor
+	[ ! -d hack/tools/external-snapshotter ] || rm -rf hack/tools/external-snapshotter
 	[ ! -n "$$(ls hack/tools)" ] || rm -r hack/tools/*
 	[ ! -d hack/.kube ] || rm -r hack/.kube
 
@@ -130,7 +140,10 @@ deploy-dev: createnamespaces
 		CHECK_FOR_UPGRADES='$(if $(CHECK_FOR_UPGRADES),$(CHECK_FOR_UPGRADES),false)' \
 		KUBECONFIG=hack/.kube/postgres-operator/pgo \
 		PGO_NAMESPACE='postgres-operator' \
-		$(shell $(KUSTOMIZE) build ./config/dev | \
+		PGO_INSTALLER='deploy-dev' \
+		PGO_INSTALLER_ORIGIN='postgres-operator-repo' \
+		BUILD_SOURCE='build-postgres-operator' \
+		$(shell kubectl kustomize ./config/dev | \
 			sed -ne '/^kind: Deployment/,/^---/ { \
 				/RELATED_IMAGE_/ { N; s,.*\(RELATED_[^[:space:]]*\).*value:[[:space:]]*\([^[:space:]]*\),\1="\2",; p; }; \
 			}') \
@@ -140,8 +153,9 @@ deploy-dev: createnamespaces
 ##@ Build - Binary
 .PHONY: build-postgres-operator
 build-postgres-operator: ## Build the postgres-operator binary
-	$(GO_BUILD) -ldflags '-X "main.versionString=$(PGO_VERSION)"' \
-		-o bin/postgres-operator ./cmd/postgres-operator
+	$(GO_BUILD) $(\
+		) --ldflags '-X "main.versionString=$(PGO_VERSION)"' $(\
+		) --trimpath -o bin/postgres-operator ./cmd/postgres-operator
 
 ##@ Build - Images
 .PHONY: build-postgres-operator-image
@@ -193,7 +207,7 @@ check: get-pgmonitor
 check-envtest: ## Run check using envtest and a mock kube api
 check-envtest: ENVTEST_USE = hack/tools/setup-envtest --bin-dir=$(CURDIR)/hack/tools/envtest use $(ENVTEST_K8S_VERSION)
 check-envtest: SHELL = bash
-check-envtest: get-pgmonitor
+check-envtest: get-pgmonitor get-external-snapshotter
 	GOBIN='$(CURDIR)/hack/tools' $(GO) install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 	@$(ENVTEST_USE) --print=overview && echo
 	source <($(ENVTEST_USE) --print=env) && PGO_NAMESPACE="postgres-operator" QUERIES_CONFIG_DIR="$(CURDIR)/${QUERIES_CONFIG_DIR}" \
@@ -205,7 +219,7 @@ check-envtest: get-pgmonitor
 # make check-envtest-existing PGO_TEST_TIMEOUT_SCALE=1.2
 .PHONY: check-envtest-existing
 check-envtest-existing: ## Run check using envtest and an existing kube api
-check-envtest-existing: get-pgmonitor
+check-envtest-existing: get-pgmonitor get-external-snapshotter
 check-envtest-existing: createnamespaces
 	kubectl apply --server-side -k ./config/dev
 	USE_EXISTING_CLUSTER=true PGO_NAMESPACE="postgres-operator" QUERIES_CONFIG_DIR="$(CURDIR)/${QUERIES_CONFIG_DIR}" \

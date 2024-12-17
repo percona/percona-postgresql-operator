@@ -1,17 +1,6 @@
-/*
- Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
+// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 package postgrescluster
 
@@ -445,7 +434,8 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 
 	// at this point, the Job either wasn't found or it has failed, so the it
 	// should be created
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Annotations, cluster.Spec.Metadata.GetAnnotationsOrNil())
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.Metadata.
+		GetAnnotationsOrNil())
 	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
@@ -488,7 +478,7 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
-				Tolerations: cluster.Spec.DataSource.Volumes.PGDataVolume.Tolerations,
+				Tolerations: cluster.Spec.DataSource.Volumes.PGDataVolume.Tolerations, // K8SPG-479
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
@@ -517,10 +507,9 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 		},
 	}
 	// set the priority class name, if it exists
-	if len(cluster.Spec.InstanceSets) > 0 &&
-		cluster.Spec.InstanceSets[0].PriorityClassName != nil {
+	if len(cluster.Spec.InstanceSets) > 0 {
 		jobSpec.Template.Spec.PriorityClassName =
-			*cluster.Spec.InstanceSets[0].PriorityClassName
+			initialize.FromPointer(cluster.Spec.InstanceSets[0].PriorityClassName)
 	}
 	moveDirJob.Spec = *jobSpec
 
@@ -567,7 +556,7 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		}
 	}
 
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.DataSource.Volumes.PGWALVolume.Annotations, cluster.Spec.Metadata.
+	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.Metadata.
 		GetAnnotationsOrNil())
 	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGWALVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
@@ -607,7 +596,7 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
-				Tolerations: cluster.Spec.DataSource.Volumes.PGWALVolume.Tolerations,
+				Tolerations: cluster.Spec.DataSource.Volumes.PGWALVolume.Tolerations, // K8SPG-479
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
@@ -636,10 +625,9 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		},
 	}
 	// set the priority class name, if it exists
-	if len(cluster.Spec.InstanceSets) > 0 &&
-		cluster.Spec.InstanceSets[0].PriorityClassName != nil {
+	if len(cluster.Spec.InstanceSets) > 0 {
 		jobSpec.Template.Spec.PriorityClassName =
-			*cluster.Spec.InstanceSets[0].PriorityClassName
+			initialize.FromPointer(cluster.Spec.InstanceSets[0].PriorityClassName)
 	}
 	moveDirJob.Spec = *jobSpec
 
@@ -731,7 +719,7 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels},
 			Spec: corev1.PodSpec{
-				Tolerations: cluster.Spec.DataSource.Volumes.PGBackRestVolume.Tolerations,
+				Tolerations: cluster.Spec.DataSource.Volumes.PGBackRestVolume.Tolerations, // K8SPG-479
 				// Set the image pull secrets, if any exist.
 				// This is set here rather than using the service account due to the lack
 				// of propagation to existing pods when the CRD is updated:
@@ -760,9 +748,7 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 	}
 	// set the priority class name, if it exists
 	if repoHost := cluster.Spec.Backups.PGBackRest.RepoHost; repoHost != nil {
-		if repoHost.PriorityClassName != nil {
-			jobSpec.Template.Spec.PriorityClassName = *repoHost.PriorityClassName
-		}
+		jobSpec.Template.Spec.PriorityClassName = initialize.FromPointer(repoHost.PriorityClassName)
 	}
 	moveDirJob.Spec = *jobSpec
 
