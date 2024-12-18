@@ -474,6 +474,7 @@ spec:
 #    dynamicConfiguration:
 #      postgresql:
 #        parameters:
+#          restore_command: "pgbackrest --stanza=db archive-get %f \"%p\""
 #          max_parallel_workers: 2
 #          max_worker_processes: 2
 #          shared_buffers: 1GB

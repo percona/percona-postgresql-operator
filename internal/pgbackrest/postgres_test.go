@@ -39,10 +39,40 @@ func TestPostgreSQLParameters(t *testing.T) {
 		"archive_timeout": "60s",
 	})
 
+	dynamic := map[string]any{
+		"postgresql": map[string]any{
+			"parameters": map[string]any{
+				"restore_command": "/bin/true",
+			},
+		},
+	}
+	if cluster.Spec.Patroni == nil {
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
+	}
+	cluster.Spec.Patroni.DynamicConfiguration = dynamic
+
+	PostgreSQL(cluster, parameters, true)
+	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+		"archive_mode": "on",
+		"archive_command": strings.Join([]string{
+			`pgbackrest --stanza=db archive-push "%p" `,
+			`&& timestamp=$(pg_waldump "%p" | `,
+			`grep -oP "COMMIT \K[^;]+" | `,
+			`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
+			`sed "s/UTC/Z/" | `,
+			"tail -n 1 | ",
+			`grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"); `,
+			"if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi",
+		}, ""),
+		"restore_command":        "/bin/true",
+		"track_commit_timestamp": "true",
+	})
+
 	cluster.Spec.Standby = &v1beta1.PostgresStandbySpec{
 		Enabled:  true,
 		RepoName: "repo99",
 	}
+	cluster.Spec.Patroni.DynamicConfiguration = nil
 
 	PostgreSQL(cluster, parameters, true)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
