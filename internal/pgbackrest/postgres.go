@@ -37,7 +37,14 @@ func PostgreSQL(
 	archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
 
 	outParameters.Mandatory.Add("archive_mode", "on")
-	outParameters.Mandatory.Add("archive_command", archive)
+
+	if backupsEnabled {
+		outParameters.Mandatory.Add("archive_command", archive)
+	} else {
+		// If backups are disabled, keep archive_mode on (to avoid a Postgres restart)
+		// and throw away WAL.
+		outParameters.Mandatory.Add("archive_command", `true`)
+	}
 
 	// K8SPG-518: This parameter is required to ensure that the commit timestamp is
 	// included in the WAL file. This is necessary for the WAL watcher to
@@ -63,6 +70,18 @@ func PostgreSQL(
 	// - https://pgbackrest.org/command.html#command-archive-get
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
 	restore := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"`
+	if inCluster.Spec.Patroni != nil && inCluster.Spec.Patroni.DynamicConfiguration != nil {
+		postgresql, ok := inCluster.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
+		if ok {
+			params, ok := postgresql["parameters"].(map[string]any)
+			if ok {
+				restore_command, ok := params["restore_command"].(string)
+				if ok {
+					restore = restore_command
+				}
+			}
+		}
+	}
 	outParameters.Mandatory.Add("restore_command", restore)
 
 	if inCluster.Spec.Standby != nil && inCluster.Spec.Standby.Enabled && inCluster.Spec.Standby.RepoName != "" {
