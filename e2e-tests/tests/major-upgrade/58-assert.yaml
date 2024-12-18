@@ -14,7 +14,7 @@ commands:
                       continue
               fi
               echo "PostgreSQL logs from ${pod}:"
-              echo "find /pgdata/pg13/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
+              echo "find /pgdata/pg16/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
                       | kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
       done
 
@@ -27,10 +27,10 @@ collectors:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: restore-after-12-to-13
+  name: restore-after-16-to-17
 spec:
   pgCluster: major-upgrade
-  repoName: repo2
+  repoName: repo1
 status:
   state: Succeeded
 ---

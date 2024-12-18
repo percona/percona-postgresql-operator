@@ -9,4 +9,4 @@ commands:
       source ../../functions
       data=$(run_psql_local '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass major-upgrade-pguser-postgres)@$(get_psql_user_host major-upgrade-pguser-postgres)")
 
-      kubectl create configmap -n "${NAMESPACE}" 07-read-from-primary --from-literal=data="${data}"
+      kubectl create configmap -n "${NAMESPACE}" 19-read-from-primary --from-literal=data="${data}"

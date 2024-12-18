@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 600
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      sleep 30
+
+      for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
+              echo "Checking the status of ${pod}:"
+              kubectl -n ${NAMESPACE} exec -it ${pod} -- psql -c "SELECT version()"
+              kubectl -n ${NAMESPACE} exec -it ${pod} -- psql -c "SELECT timeline_id FROM pg_control_checkpoint()"
+              kubectl -n ${NAMESPACE} exec -it ${pod} -- pgbackrest --stanza=db --log-level-console=detail check
+      done
