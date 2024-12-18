@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -864,8 +865,14 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		// K8SPG-619: Set RestartPolicy to "OnFailure" (by default) to handle potential delays in establishing communication with the Kubernetes API.
 		//            The container will be restarted until the BackoffLimit is reached to handle these delays.
 		jobSpec.Template.Spec.RestartPolicy = postgresCluster.Spec.Backups.PGBackRest.Jobs.RestartPolicy
+		if jobSpec.Template.Spec.RestartPolicy == "" {
+			jobSpec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+		}
 		// K8SPG-619: The job container will try to restart with increasing delays (10s, 20s) before failing.
 		jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
+		if jobSpec.BackoffLimit == nil {
+			jobSpec.BackoffLimit = ptr.To(int32(2))
+		}
 	}
 
 	// Set the image pull secrets, if any exist.
