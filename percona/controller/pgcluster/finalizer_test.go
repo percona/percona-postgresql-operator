@@ -60,7 +60,10 @@ var _ = Describe("Finalizers", Ordered, func() {
 			controllerutil.AddFinalizer(cr, v2.FinalizerDeletePVC)
 
 			It("should create PerconaPGCluster", func() {
+				status := cr.Status
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+				cr.Status = status
+				Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 			})
 
 			It("should create PVCs", func() {
@@ -156,7 +159,10 @@ var _ = Describe("Finalizers", Ordered, func() {
 			})
 
 			It("should create PerconaPGCluster", func() {
+				status := cr.Status
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+				cr.Status = status
+				Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
@@ -236,7 +242,10 @@ var _ = Describe("Finalizers", Ordered, func() {
 			controllerutil.AddFinalizer(cr, v2.FinalizerDeleteSSL)
 
 			It("should create PerconaPGCluster", func() {
+				status := cr.Status
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+				cr.Status = status
+				Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
@@ -304,7 +313,10 @@ var _ = Describe("Finalizers", Ordered, func() {
 			controllerutil.RemoveFinalizer(cr, v2.FinalizerDeleteSSL)
 
 			It("should create PerconaPGCluster", func() {
+				status := cr.Status
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+				cr.Status = status
+				Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 			})
 
 			It("should reconcile PerconaPGCluster", func() {
@@ -354,7 +366,10 @@ var _ = Describe("Finalizers", Ordered, func() {
 			controllerutil.RemoveFinalizer(cr, v2.FinalizerStopWatchers)
 
 			It("should create PerconaPGCluster", func() {
+				status := cr.Status
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+				cr.Status = status
+				Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 			})
 
 			It("should reconcile PerconaPGCluster", func() {

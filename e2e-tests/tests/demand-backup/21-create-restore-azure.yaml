@@ -7,7 +7,7 @@ commands:
 
       source ../../functions
 
-      primary=$(get_pod_by_role demand-backup master name)
+      primary=$(get_pod_by_role demand-backup primary name)
       latest_full_repo3_backup=$(kubectl -n ${NAMESPACE} exec ${primary} -- pgbackrest info --output json | jq '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 3) ][-1].label')
 
       cat <<EOF | kubectl -n ${NAMESPACE} apply -f -

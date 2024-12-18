@@ -36,7 +36,7 @@ func TestExecutorChangePrimaryAndWait(t *testing.T) {
 		) error {
 			called = true
 			assert.DeepEqual(t, command, strings.Fields(
-				`patronictl switchover --scheduled=now --force --master=old --candidate=new`,
+				`patronictl switchover --scheduled=now --force --primary=old --candidate=new`,
 			))
 			assert.Assert(t, stdin == nil, "expected no stdin, got %T", stdin)
 			assert.Assert(t, stderr != nil, "should capture stderr")
@@ -44,7 +44,7 @@ func TestExecutorChangePrimaryAndWait(t *testing.T) {
 			return nil
 		}
 
-		_, _ = Executor(exec).ChangePrimaryAndWait(context.Background(), "old", "new")
+		_, _ = Executor(exec).ChangePrimaryAndWait(context.Background(), "old", "new", true)
 		assert.Assert(t, called)
 	})
 
@@ -54,7 +54,7 @@ func TestExecutorChangePrimaryAndWait(t *testing.T) {
 			context.Context, io.Reader, io.Writer, io.Writer, ...string,
 		) error {
 			return expected
-		}).ChangePrimaryAndWait(context.Background(), "any", "thing")
+		}).ChangePrimaryAndWait(context.Background(), "any", "thing", true)
 
 		assert.Equal(t, expected, actual)
 	})
@@ -65,7 +65,7 @@ func TestExecutorChangePrimaryAndWait(t *testing.T) {
 		) error {
 			_, _ = stdout.Write([]byte(`no luck`))
 			return nil
-		}).ChangePrimaryAndWait(context.Background(), "any", "thing")
+		}).ChangePrimaryAndWait(context.Background(), "any", "thing", true)
 
 		assert.Assert(t, !success, "expected failure message to become false")
 
@@ -74,7 +74,7 @@ func TestExecutorChangePrimaryAndWait(t *testing.T) {
 		) error {
 			_, _ = stdout.Write([]byte(`Successfully switched over to something`))
 			return nil
-		}).ChangePrimaryAndWait(context.Background(), "any", "thing")
+		}).ChangePrimaryAndWait(context.Background(), "any", "thing", true)
 
 		assert.Assert(t, success, "expected success message to become true")
 	})

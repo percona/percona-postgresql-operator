@@ -8,6 +8,6 @@ commands:
 
       source ../../functions
 
-      network_loss "${NAMESPACE}" "$(get_pod_by_role self-healing master name)"
+      network_loss "${NAMESPACE}" "$(get_pod_by_role self-healing primary name)"
       sleep 40 # wait for new master to get elected
     timeout: 90
