@@ -7,6 +7,11 @@ metadata:
 #  - percona.com/delete-ssl
 spec:
   crVersion: 2.6.0
+#  metadata:
+#    annotations:
+#      test-annotation: value
+#    labels:
+#      test-label: value
 #  secrets:
 #    customRootCATLSSecret:
 #      name: cluster1-ca-cert
