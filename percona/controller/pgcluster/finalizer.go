@@ -1,6 +1,7 @@
 package pgcluster
 
 import (
+	"bytes"
 	"context"
 
 	"github.com/pkg/errors"
@@ -150,6 +151,42 @@ func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.P
 	return nil
 }
 
+func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+	log.Info("Deleting backups", "cluster", cr.Name, "namespace", cr.Namespace)
+
+	podList := &corev1.PodList{}
+	err := r.Client.List(ctx, podList, &client.ListOptions{
+		Namespace: cr.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"app.kubernetes.io/instance":             cr.Name,
+			"postgres-operator.crunchydata.com/role": "master",
+		}),
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(podList.Items) == 0 {
+		return errors.New("no primary pod found")
+	}
+
+	if len(podList.Items) > 1 {
+		return errors.New("multiple primary pods found")
+	}
+
+	primaryPod := podList.Items[0]
+
+	var stdout, stderr bytes.Buffer
+	cmd := "pgbackrest --stanza=db stanza-delete"
+
+	if err := r.PodExec(ctx, cr.Namespace, primaryPod.Name, "pgbackrest", nil, &stdout, &stderr, cmd); err != nil {
+		return errors.Wrapf(err, "delete backups, stderr: %s", stderr.String())
+	}
+
+	return nil
+}
+
 func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeletePVC, r.deletePVCAndSecrets); err != nil {
 		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeletePVC)
@@ -160,6 +197,10 @@ func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaP
 	}
 
 	if err := r.runFinalizer(ctx, cr, v2.FinalizerStopWatchers, r.stopExternalWatchers); err != nil {
+		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerStopWatchers)
+	}
+
+	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeleteBackups, r.deleteBackups); err != nil {
 		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerStopWatchers)
 	}
 
