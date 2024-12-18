@@ -104,6 +104,9 @@ remove_all_finalizers() {
 		echo "removing all finalizers for $resource resources"
 
 		kubectl -n "${NAMESPACE}" get "$resource" -o json | jq '.items[] | .metadata.name' -r | while IFS= read -r name; do
+			if [[ $(kubectl -n "${NAMESPACE}" get "$resource" "$name" -o yaml | yq '.metadata.finalizers | length') == "0" ]]; then
+				continue
+			fi
 			kubectl -n "${NAMESPACE}" patch "$resource" "$name" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
 		done
 	done
