@@ -4,13 +4,10 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"io"
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
 
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
@@ -33,13 +30,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
+	common "github.com/percona/percona-postgresql-operator/percona/postgres"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -542,8 +542,6 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 }
 
 func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	log := logging.FromContext(ctx).WithValues("cluster", cr.Name, "namespace", cr.Namespace)
-
 	if cr.Spec.Extensions.Storage.Secret == nil {
 		return nil
 	}
@@ -558,15 +556,13 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 {
-		// custom extensions to be removed
 		var removedExtension []string
-		// list of installed custom extensions
-		var installedExtensions []string
-		installedExtensions = cr.Status.InstalledCustomExtensions
+		installedExtensions := cr.Status.InstalledCustomExtensions
 		crExtensions := make(map[string]struct{})
 		for _, ext := range extensionNames {
 			crExtensions[ext] = struct{}{}
 		}
+
 		// Check for missing entries in crExtensions
 		for _, ext := range installedExtensions {
 			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
@@ -574,21 +570,19 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 				removedExtension = append(removedExtension, ext)
 			}
 		}
-		log.Info("Extension to delete", "removedExtension", removedExtension)
 
 		if len(removedExtension) > 0 {
 
-			action := func(ctx context.Context, exec postgres.Executor) error {
-				return errors.WithStack(DisableCustomExtensionsInDb(ctx, exec, removedExtension))
+			disabled := func(ctx context.Context, exec postgres.Executor) error {
+				return errors.WithStack(disableCustomExtensionsInDB(ctx, exec, removedExtension))
 			}
 
-			primary, err := getPrimaryPod(ctx, r.Client, cr)
-
-			if primary == nil {
-				return errors.New("Pod is nil")
+			primary, err := common.GetPrimaryPod(ctx, r.Client, cr)
+			if err != nil {
+				return errors.New("primary pod not found")
 			}
 
-			err = action(ctx, func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+			err = disabled(ctx, func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
 				return r.PodExec(ctx, primary.Namespace, primary.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 			})
 			if err != nil {
@@ -614,16 +608,14 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	return nil
 }
 
-func DisableCustomExtensionsInDb(ctx context.Context, exec postgres.Executor, customExtensionsForDeletion []string) error {
+func disableCustomExtensionsInDB(ctx context.Context, exec postgres.Executor, customExtensionsForDeletion []string) error {
 	log := logging.FromContext(ctx)
 
 	for _, extensionName := range customExtensionsForDeletion {
-
 		sqlCommand := fmt.Sprintf(
 			`SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS %s;`,
 			extensionName,
 		)
-
 		stdout, stderr, err := exec.ExecInAllDatabases(ctx,
 			sqlCommand,
 			map[string]string{
@@ -632,11 +624,11 @@ func DisableCustomExtensionsInDb(ctx context.Context, exec postgres.Executor, cu
 			},
 		)
 
-		log.V(1).Info("disabled", "extensionName", extensionName, "stdout", stdout, "stderr", stderr)
+		log.V(1).Info("extension was disabled ", "extensionName", extensionName)
 
 		return errors.Wrap(err, "custom extension deletion")
-
 	}
+
 	return nil
 }
 
@@ -747,28 +739,4 @@ func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.Perco
 	}
 
 	return nil
-}
-
-func getPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGCluster) (*corev1.Pod, error) {
-	podList := &corev1.PodList{}
-	err := cli.List(ctx, podList, &client.ListOptions{
-		Namespace: cr.Namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"app.kubernetes.io/instance":             cr.Name,
-			"postgres-operator.crunchydata.com/role": "master",
-		}),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(podList.Items) == 0 {
-		return nil, errors.New("no primary pod found")
-	}
-
-	if len(podList.Items) > 1 {
-		return nil, errors.New("multiple primary pods found")
-	}
-
-	return &podList.Items[0], nil
 }

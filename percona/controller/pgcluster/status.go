@@ -114,8 +114,7 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 				Size:  status.Proxy.PGBouncer.Replicas,
 				Ready: status.Proxy.PGBouncer.ReadyReplicas,
 			},
-			Host: host,
-
+			Host:                      host,
 			InstalledCustomExtensions: installedCustomExtensions,
 		}
 
