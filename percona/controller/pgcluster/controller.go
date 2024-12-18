@@ -256,7 +256,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
-	if err := r.reconcileCustomExtensions(ctx, cr, postgresCluster); err != nil {
+	if err := r.reconcileCustomExtensions(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
 	}
 
@@ -541,12 +541,8 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
-func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster, postgresCluster *v1beta1.PostgresCluster) error {
+func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx).WithValues("cluster", cr.Name, "namespace", cr.Namespace)
-
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
-		return errors.Wrap(err, "get PostgresCluster")
-	}
 
 	if cr.Spec.Extensions.Storage.Secret == nil {
 		return nil
@@ -574,7 +570,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		// Check for missing entries in crExtensions
 		for _, ext := range installedExtensions {
 			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
-			if _, exists := crExtensions[ext]; !exists {
+			if _, ok := crExtensions[ext]; !ok {
 				removedExtension = append(removedExtension, ext)
 			}
 		}
@@ -583,7 +579,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		if len(removedExtension) > 0 {
 
 			action := func(ctx context.Context, exec postgres.Executor) error {
-				return errors.WithStack(DisableCustomExtensionsInPostgreSQL(ctx, exec, removedExtension))
+				return errors.WithStack(DisableCustomExtensionsInDb(ctx, exec, removedExtension))
 			}
 
 			primary, err := getPrimaryPod(ctx, r.Client, cr)
@@ -618,7 +614,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	return nil
 }
 
-func DisableCustomExtensionsInPostgreSQL(ctx context.Context, exec postgres.Executor, customExtensionsForDeletion []string) error {
+func DisableCustomExtensionsInDb(ctx context.Context, exec postgres.Executor, customExtensionsForDeletion []string) error {
 	log := logging.FromContext(ctx)
 
 	for _, extensionName := range customExtensionsForDeletion {
