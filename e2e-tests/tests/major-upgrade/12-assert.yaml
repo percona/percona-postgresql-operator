@@ -9,7 +9,7 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest-backup: backup-after-12-to-13
   labels:
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo2
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGBackup
@@ -24,7 +24,7 @@ metadata:
   name: backup-after-12-to-13
 spec:
   pgCluster: major-upgrade
-  repoName: repo2
+  repoName: repo1
   options:
     - --type=full
 status:
