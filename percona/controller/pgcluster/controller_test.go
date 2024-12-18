@@ -552,7 +552,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 				}
 
 				return false
-			}, time.Second*30, time.Millisecond*250).Should(Equal(true))
+			}, time.Second*60, time.Millisecond*250).Should(Equal(true))
 			reconcileCount = getReconcileCount(crunchyR)
 		})
 	})

@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: latest
@@ -295,7 +295,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -702,7 +702,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -2181,6 +2181,9 @@ spec:
                                     x-kubernetes-list-type: atomic
                                 type: object
                             type: object
+                          backoffLimit:
+                            format: int32
+                            type: integer
                           priorityClassName:
                             description: |-
                               Priority class name for the pgBackRest backup Job pods.
@@ -2248,6 +2251,13 @@ spec:
                                   More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                                 type: object
                             type: object
+                          restartPolicy:
+                            description: |-
+                              RestartPolicy describes how the container should be restarted.
+                              Only one of the following restart policies may be specified.
+                              If none of the following policies is specified, the default one
+                              is RestartPolicyAlways.
+                            type: string
                           securityContext:
                             description: SecurityContext defines the security settings
                               for PGBackRest pod.
@@ -18255,7 +18265,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -18353,7 +18363,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgupgrades.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -21065,7 +21075,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: latest
@@ -22969,7 +22979,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: latest
@@ -25670,7 +25680,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: 5.4.2
@@ -26991,6 +27001,9 @@ spec:
                                     x-kubernetes-list-type: atomic
                                 type: object
                             type: object
+                          backoffLimit:
+                            format: int32
+                            type: integer
                           priorityClassName:
                             description: |-
                               Priority class name for the pgBackRest backup Job pods.
@@ -27058,6 +27071,13 @@ spec:
                                   More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                                 type: object
                             type: object
+                          restartPolicy:
+                            description: |-
+                              RestartPolicy describes how the container should be restarted.
+                              Only one of the following restart policies may be specified.
+                              If none of the following policies is specified, the default one
+                              is RestartPolicyAlways.
+                            type: string
                           securityContext:
                             description: SecurityContext defines the security settings
                               for PGBackRest pod.
