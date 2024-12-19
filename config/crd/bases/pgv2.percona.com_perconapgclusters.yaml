@@ -17900,6 +17900,10 @@ spec:
             properties:
               host:
                 type: string
+              installedCustomExtensions:
+                items:
+                  type: string
+                type: array
               pgbouncer:
                 properties:
                   ready:
