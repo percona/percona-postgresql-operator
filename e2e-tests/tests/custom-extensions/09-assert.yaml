@@ -5,7 +5,7 @@ timeout: 30
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: 10-check-extensions
+  name: 11-check-extensions
 data:
   data: |2-
      pg_stat_monitor

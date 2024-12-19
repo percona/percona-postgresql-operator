@@ -616,7 +616,7 @@ func disableCustomExtensionsInDB(ctx context.Context, exec postgres.Executor, cu
 			`SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS %s;`,
 			extensionName,
 		)
-		_, _, err := exec.ExecInAllDatabases(ctx,
+		_, stderr, err := exec.ExecInAllDatabases(ctx,
 			sqlCommand,
 			map[string]string{
 				"ON_ERROR_STOP": "on", // Abort when any one command fails.
@@ -626,7 +626,7 @@ func disableCustomExtensionsInDB(ctx context.Context, exec postgres.Executor, cu
 
 		log.V(1).Info("extension was disabled ", "extensionName", extensionName)
 
-		return errors.Wrap(err, "custom extension deletion")
+		return errors.Wrapf(err, "custom extension deletion", "stderr: %s", stderr)
 	}
 
 	return nil
