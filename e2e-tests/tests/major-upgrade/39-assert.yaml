@@ -7,4 +7,8 @@ apiVersion: v1
 metadata:
   name: 39-read-from-primary
 data:
-  data: ' 100500'
+  data: |2-
+     100500
+     100501
+     100502
+     100503

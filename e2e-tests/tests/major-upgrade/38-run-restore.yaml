@@ -1,8 +1,21 @@
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGRestore
-metadata:
-  name: restore-after-14-to-15
-spec:
-  pgCluster: major-upgrade
-  repoName: repo1
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 600
+    script: |-
+      set -o errexit
+      set -o xtrace
 
+      backup_name=$(kubectl -n ${NAMESPACE} get pg-backup backup-after-14-to-15 -o jsonpath={.status.backupName})
+
+      cat <<-EOF | kubectl -n ${NAMESPACE} apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: restore-after-14-to-15
+      spec:
+        pgCluster: major-upgrade
+        repoName: repo1
+        options:
+        - --set=${backup_name}
+      EOF

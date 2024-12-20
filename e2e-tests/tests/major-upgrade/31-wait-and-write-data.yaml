@@ -6,11 +6,23 @@ commands:
       set -o errexit
       set -o xtrace
 
+<<<<<<< HEAD:e2e-tests/tests/major-upgrade/11-wait.yaml
       sleep 30
+=======
+      source ../../functions
+
+      sleep 90
+>>>>>>> 99139337e (fixes):e2e-tests/tests/major-upgrade/31-wait-and-write-data.yaml
 
       for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
               echo "Checking the status of ${pod}:"
               kubectl -n ${NAMESPACE} exec -it ${pod} -- psql -c "SELECT version()"
               kubectl -n ${NAMESPACE} exec -it ${pod} -- psql -c "SELECT timeline_id FROM pg_control_checkpoint()"
               kubectl -n ${NAMESPACE} exec -it ${pod} -- pgbackrest --stanza=db --log-level-console=detail check
+              kubectl -n ${NAMESPACE} exec -it ${pod} -- ls -l /pgdata/pg15_wal
       done
+
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100503)' \
+        "postgres:$(get_psql_user_pass major-upgrade-pguser-postgres)@$(get_psql_user_host major-upgrade-pguser-postgres)"
+
