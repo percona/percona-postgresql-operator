@@ -3,6 +3,8 @@ package pgcluster
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -153,14 +155,13 @@ func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.P
 
 func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
-	log.Info("Deleting backups", "cluster", cr.Name, "namespace", cr.Namespace)
+	log.Info("Deleting backups from all the repos configured", "cluster", cr.Name, "namespace", cr.Namespace)
 
 	podList := &corev1.PodList{}
 	err := r.Client.List(ctx, podList, &client.ListOptions{
 		Namespace: cr.Namespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"app.kubernetes.io/instance":             cr.Name,
-			"postgres-operator.crunchydata.com/role": "master",
+			"app.kubernetes.io/instance": cr.Name,
 		}),
 	})
 	if err != nil {
@@ -168,20 +169,20 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 	}
 
 	if len(podList.Items) == 0 {
-		return errors.New("no primary pod found")
+		return errors.New("no pods found")
 	}
 
-	if len(podList.Items) > 1 {
-		return errors.New("multiple primary pods found")
-	}
-
-	primaryPod := podList.Items[0]
+	pod := podList.Items[0]
 
 	var stdout, stderr bytes.Buffer
-	cmd := "pgbackrest --stanza=db stanza-delete"
+	cmd := "pgbackrest --stanza=db --log-level-console=info stop; pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete"
 
-	if err := r.PodExec(ctx, cr.Namespace, primaryPod.Name, "pgbackrest", nil, &stdout, &stderr, cmd); err != nil {
-		return errors.Wrapf(err, "delete backups, stderr: %s", stderr.String())
+	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
+		c := fmt.Sprintf(cmd, strings.TrimPrefix(repo.Name, "repo"))
+		if err := r.PodExec(ctx, cr.Namespace, pod.Name, "database", nil, &stdout, &stderr, c); err != nil {
+			return errors.Wrapf(err, "delete backups, stderr: %s", stderr.String())
+		}
+		log.Info("Backups deleted for repo", "repo", repo.Name)
 	}
 
 	return nil

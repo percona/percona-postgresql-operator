@@ -210,6 +210,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	if cr.DeletionTimestamp != nil {
 		log.Info("Deleting PerconaPGCluster", "deletionTimestamp", cr.DeletionTimestamp)
 
+		if err := r.runFinalizers(ctx, cr); err != nil {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run finalizers")
+		}
+
 		// We're deleting PostgresCluster explicitly to let Crunchy controller run its finalizers and not mess with us.
 		if err := r.Client.Delete(ctx, postgresCluster); client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "delete postgres cluster")
@@ -218,10 +222,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err == nil {
 			log.Info("Waiting for PostgresCluster to be deleted")
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-		}
-
-		if err := r.runFinalizers(ctx, cr); err != nil {
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run finalizers")
 		}
 
 		return reconcile.Result{}, nil
