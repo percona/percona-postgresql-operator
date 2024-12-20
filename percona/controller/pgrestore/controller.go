@@ -245,7 +245,22 @@ func disableRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluste
 	fvar := false
 	pg.Spec.Backups.PGBackRest.Restore.Enabled = &fvar
 
+	delete(pg.Annotations, naming.LabelPGBackRestRestore)
+
 	if err := c.Patch(ctx, pg, client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "patch PGCluster")
+	}
+
+	postgresCluster := new(v1beta1.PostgresCluster)
+	if err := c.Get(ctx, client.ObjectKeyFromObject(pg), postgresCluster); err != nil {
+		return errors.Wrap(err, "get PostgresCluster")
+	}
+
+	origPostgres := postgresCluster.DeepCopy()
+
+	postgresCluster.Status.PGBackRest.Restore = new(v1beta1.PGBackRestJobStatus)
+
+	if err := c.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")
 	}
 
