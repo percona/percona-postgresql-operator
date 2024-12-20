@@ -10,6 +10,7 @@ import (
 	"io"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +23,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/patroni"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -87,14 +89,31 @@ func (r *Reconciler) handlePatroniRestarts(
 	// replicas here, replicas will typically restart first because we see them
 	// first.
 	if primaryNeedsRestart != nil {
+		pod := primaryNeedsRestart.Pods[0]
 		exec := patroni.Executor(func(
 			ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
-			pod := primaryNeedsRestart.Pods[0]
 			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
 		})
 
-		return errors.WithStack(exec.RestartPendingMembers(ctx, "master", naming.PatroniScope(cluster)))
+		patroniVerStr, ok := cluster.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
+		if !ok {
+			return errors.New("patroni version annotation was not found")
+		}
+		patroniVer, err := gover.NewVersion(patroniVerStr)
+		if err != nil {
+			return errors.Wrap(err, "failed to get patroni ver")
+		}
+		ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+
+		// K8SPG-648: patroni v4.0.0 deprecated "master" role.
+		//            We should use "primary" instead
+		role := "primary"
+		if !ver4 {
+			role = "master"
+		}
+
+		return errors.WithStack(exec.RestartPendingMembers(ctx, role, naming.PatroniScope(cluster)))
 	}
 
 	// When the primary does not need to restart but a replica does, restart all
@@ -355,7 +374,6 @@ func (r *Reconciler) reconcileReplicationSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
-
 	// if a custom postgrescluster secret is provided, just return it
 	if cluster.Spec.CustomReplicationClientTLSSecret != nil {
 		custom := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
@@ -449,7 +467,8 @@ func replicationCertSecretProjection(certificate *corev1.Secret) *corev1.SecretP
 }
 
 func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
-	cluster *v1beta1.PostgresCluster, instances *observedInstances) error {
+	cluster *v1beta1.PostgresCluster, instances *observedInstances,
+) error {
 	log := logging.FromContext(ctx)
 
 	// If switchover is not enabled, clear out the Patroni switchover status fields
@@ -529,7 +548,8 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 		return errors.New("Could not find a running pod when attempting switchover.")
 	}
 	exec := func(_ context.Context, stdin io.Reader, stdout, stderr io.Writer,
-		command ...string) error {
+		command ...string,
+	) error {
 		return r.PodExec(ctx, runningPod.Namespace, runningPod.Name, naming.ContainerDatabase, stdin,
 			stdout, stderr, command...)
 	}
@@ -540,7 +560,6 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 	// have shown that the annotation on the Leader pod is up to date during a switchover, but
 	// missing from the Replica pods.
 	timeline, err := patroni.Executor(exec).GetTimeline(ctx)
-
 	if err != nil {
 		return err
 	}

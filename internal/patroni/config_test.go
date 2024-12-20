@@ -20,6 +20,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -876,7 +877,14 @@ func TestInstanceEnvironment(t *testing.T) {
 func TestInstanceYAML(t *testing.T) {
 	t.Parallel()
 
-	cluster := &v1beta1.PostgresCluster{Spec: v1beta1.PostgresClusterSpec{PostgresVersion: 12}}
+	cluster := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion): "4.0.1",
+			},
+		},
+		Spec: v1beta1.PostgresClusterSpec{PostgresVersion: 12},
+	}
 	instance := new(v1beta1.PostgresInstanceSetSpec)
 
 	data, err := instanceYAML(cluster, instance, nil)
@@ -924,7 +932,7 @@ postgresql:
     command: '''bash'' ''-ceu'' ''--'' ''install --directory --mode=0700 "${PGDATA?}"
       && exec "$@"'' ''-'' ''some'' ''backrest'' ''cmd'''
     keep_data: true
-    no_master: true
+    no_leader: true
     no_params: true
   pgpass: /tmp/.pgpass
   use_unix_socket: true
@@ -965,14 +973,19 @@ postgresql:
 restapi: {}
 tags: {}
 	`, "\t\n")+"\n")
-
 }
 
 func TestPGBackRestCreateReplicaCommand(t *testing.T) {
 	t.Parallel()
 
 	shellcheck := require.ShellCheck(t)
-	cluster := new(v1beta1.PostgresCluster)
+	cluster := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion): "4.0.1",
+			},
+		},
+	}
 	instance := new(v1beta1.PostgresInstanceSetSpec)
 
 	data, err := instanceYAML(cluster, instance, []string{"some", "backrest", "cmd"})

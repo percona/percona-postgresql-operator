@@ -1,4 +1,4 @@
-package util
+package naming
 
 import (
 	"strings"
@@ -46,6 +46,8 @@ const (
 	// AnnotationClusterBootstrapRestore is the annotation that is added to PerconaPGRestore to
 	// indicate that it is a cluster bootstrap restore.
 	AnnotationClusterBootstrapRestore = AnnotationPrefix + "cluster-bootstrap-restore"
+
+	AnnotationPatroniVersion = AnnotationPrefix + "patroni-version"
 )
 
 func ToCrunchyAnnotation(annotation string) string {

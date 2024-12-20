@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -190,11 +191,19 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 
 func getPrimaryPod(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGCluster) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
+	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
+	//            We should use "primary" instead
+	role := "primary"
+	patroniVer := gover.Must(gover.NewVersion(cr.Status.PatroniVersion))
+	ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+	if !ver4 {
+		role = "master"
+	}
 	err := cli.List(ctx, podList, &client.ListOptions{
 		Namespace: cr.Namespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"app.kubernetes.io/instance":             cr.Name,
-			"postgres-operator.crunchydata.com/role": "master",
+			"postgres-operator.crunchydata.com/role": role,
 		}),
 	})
 	if err != nil {

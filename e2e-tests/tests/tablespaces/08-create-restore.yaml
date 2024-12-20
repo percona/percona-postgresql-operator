@@ -7,7 +7,7 @@ commands:
 
       source ../../functions
 
-      primary=$(get_pod_by_role tablespaces master name)
+      primary=$(get_pod_by_role tablespaces primary name)
       latest_full_backup=$(kubectl -n ${NAMESPACE} exec ${primary} -- pgbackrest info --output json | jq '[.[] | .backup[] | select(.type == "full")][-1].label')
 
       cat <<EOF | kubectl -n ${NAMESPACE} apply -f -
