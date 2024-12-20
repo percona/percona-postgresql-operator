@@ -155,7 +155,6 @@ func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.P
 
 func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
-	log.Info("Deleting backups from all the repos configured", "cluster", cr.Name, "namespace", cr.Namespace)
 
 	podList := &corev1.PodList{}
 	err := r.Client.List(ctx, podList, &client.ListOptions{
@@ -172,6 +171,8 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 		return errors.New("no pods found")
 	}
 
+	log.Info("Deleting backups from all the repos configured")
+
 	pod := podList.Items[0]
 
 	var stdout, stderr bytes.Buffer
@@ -182,7 +183,23 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 		if err := r.PodExec(ctx, cr.Namespace, pod.Name, "database", nil, &stdout, &stderr, c); err != nil {
 			return errors.Wrapf(err, "delete backups, stderr: %s", stderr.String())
 		}
-		log.Info("Backups deleted for repo", "repo", repo.Name)
+		log.Info("Deleted backups from repo", "repo", repo.Name)
+	}
+
+	pbList := new(v2.PerconaPGBackupList)
+	err = r.Client.List(ctx, pbList, &client.ListOptions{
+		Namespace: cr.Namespace,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to list backup jobs")
+	}
+
+	log.Info("Deleting all PGBackup objects")
+	for _, pgBackup := range pbList.Items {
+		if err := r.Client.Delete(ctx, &pgBackup); err != nil {
+			return errors.Wrapf(err, "delete backup %s/%s", pgBackup.Name, pgBackup.Namespace)
+		}
+		log.Info("Deleted PGBackup", "name", pgBackup.Name)
 	}
 
 	return nil
