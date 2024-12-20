@@ -179,6 +179,12 @@ type BackupJobs struct {
 	// SecurityContext defines the security settings for PGBackRest pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// +optional
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"` // K8SPG-619
+
+	// +optional
+	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"` // K8SPG-619
 }
 
 // PGBackRestManualBackup contains information that is used for creating a
