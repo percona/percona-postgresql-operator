@@ -10,5 +10,5 @@ commands:
 
       get_cr \
         | yq eval '
-            .spec.crVersion="2.1.0"' - \
+            .spec.crVersion="2.4.0"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
