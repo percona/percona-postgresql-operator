@@ -3,4 +3,4 @@ kind: TestStep
 commands:
   - timeout: 600
     script: |-
-      sleep 30
+      sleep 60

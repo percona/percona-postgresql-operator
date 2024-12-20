@@ -3,7 +3,4 @@ kind: TestStep
 commands:
   - timeout: 600
     script: |-
-      set -o errexit
-      set -o xtrace
-
-      sleep 30
+      sleep 60
