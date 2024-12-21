@@ -10,3 +10,4 @@ data:
   data: |2-
      pg_stat_monitor
      pgaudit
+     plpgsql

@@ -572,8 +572,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		}
 
 		if len(removedExtension) > 0 {
-
-			disabled := func(ctx context.Context, exec postgres.Executor) error {
+			disable := func(ctx context.Context, exec postgres.Executor) error {
 				return errors.WithStack(disableCustomExtensionsInDB(ctx, exec, removedExtension))
 			}
 
@@ -582,7 +581,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 				return errors.New("primary pod not found")
 			}
 
-			err = disabled(ctx, func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+			err = disable(ctx, func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
 				return r.PodExec(ctx, primary.Namespace, primary.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 			})
 			if err != nil {
