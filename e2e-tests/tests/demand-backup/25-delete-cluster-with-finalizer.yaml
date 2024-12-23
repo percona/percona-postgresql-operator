@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      kubectl delete postgrescluster -n "${NAMESPACE}" demand-backup
+      sleep 15
+
+      data=1
+
+      res=$(kubectl -n "${NAMESPACE}" get pg-backup 2>&1)
+
+      if [[ $res == *$(echo "No resources found in ${NAMESPACE} namespace.")* ]]; then
+          data=0
+      fi
+
+      kubectl create configmap -n "${NAMESPACE}" 25-pg-backup-objects --from-literal=data="${data}"
