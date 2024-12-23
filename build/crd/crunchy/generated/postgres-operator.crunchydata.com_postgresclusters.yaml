@@ -8352,6 +8352,8 @@ spec:
                     type: boolean
                   pgStatStatements:
                     type: boolean
+                  pgvector:
+                    type: boolean
                 type: object
               image:
                 description: |-
