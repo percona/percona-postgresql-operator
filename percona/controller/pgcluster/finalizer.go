@@ -160,9 +160,11 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 	err := r.Client.List(ctx, podList, &client.ListOptions{
 		Namespace: cr.Namespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"app.kubernetes.io/instance": cr.Name,
+			naming.LabelPerconaInstance:  cr.Name,
+			naming.LabelPerconaComponent: "pg",
 		}),
 	})
+
 	if err != nil {
 		return err
 	}
@@ -176,7 +178,7 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 	pod := podList.Items[0]
 
 	var stdout, stderr bytes.Buffer
-	cmd := "pgbackrest --stanza=db --log-level-console=info stop; pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete"
+	cmd := "pgbackrest --stanza=db --log-level-console=info stop; pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete --force"
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
 		c := fmt.Sprintf(cmd, strings.TrimPrefix(repo.Name, "repo"))
@@ -214,11 +216,11 @@ func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaP
 		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeleteSSL)
 	}
 
-	if err := r.runFinalizer(ctx, cr, v2.FinalizerStopWatchers, r.stopExternalWatchers); err != nil {
-		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerStopWatchers)
+	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeleteBackups, r.deleteBackups); err != nil {
+		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeleteBackups)
 	}
 
-	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeleteBackups, r.deleteBackups); err != nil {
+	if err := r.runFinalizer(ctx, cr, v2.FinalizerStopWatchers, r.stopExternalWatchers); err != nil {
 		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerStopWatchers)
 	}
 
