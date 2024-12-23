@@ -33,6 +33,8 @@ spec:
 
 #  openshift: true
 
+#  autoCreateUserSchema: true
+
 #  users:
 #    - name: rhino
 #      databases:
