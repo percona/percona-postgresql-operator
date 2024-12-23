@@ -7,6 +7,7 @@ package postgrescluster
 import (
 	"context"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -108,6 +109,14 @@ func (r *Reconciler) reconcileRootCertificate(
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Data = make(map[string][]byte)
 	intent.ObjectMeta.OwnerReferences = existing.ObjectMeta.OwnerReferences
+
+	if cluster.Labels != nil {
+		currVersion, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
+		if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.6.0"))) && cluster.Spec.Metadata != nil {
+			intent.Labels = cluster.Spec.Metadata.Labels
+			intent.Annotations = cluster.Spec.Metadata.Annotations
+		}
+	}
 
 	// A root secret is scoped to the namespace where postgrescluster(s)
 	// are deployed. For operator deployments with postgresclusters in more than
