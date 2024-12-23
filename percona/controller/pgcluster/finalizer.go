@@ -178,7 +178,8 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 	pod := podList.Items[0]
 
 	var stdout, stderr bytes.Buffer
-	cmd := "pgbackrest --stanza=db --log-level-console=info stop; pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete --force"
+	cmd := "pgbackrest --stanza=db --log-level-console=info stop; " +
+		"pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete --force"
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
 		c := fmt.Sprintf(cmd, strings.TrimPrefix(repo.Name, "repo"))
