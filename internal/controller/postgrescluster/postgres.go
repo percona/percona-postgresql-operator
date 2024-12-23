@@ -31,6 +31,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/internal/pgvector"
 	"github.com/percona/percona-postgresql-operator/internal/postgis"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	pgpassword "github.com/percona/percona-postgresql-operator/internal/postgres/password"
@@ -234,7 +235,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
 
 	// K8SPG-375, K8SPG-577
-	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, postgisInstallOK bool
+	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		if cluster.Spec.Extensions.PGStatMonitor {
 			if pgStatMonitorOK = pgstatmonitor.EnableInPostgreSQL(ctx, exec) == nil; !pgStatMonitorOK {
@@ -277,6 +278,18 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			if pgStatStatementsOK = pgstatstatements.DisableInPostgreSQL(ctx, exec) == nil; !pgStatStatementsOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgStatStatementsEnabled",
 					"Unable to disable pgStatStatements")
+			}
+		}
+
+		if cluster.Spec.Extensions.PGVector {
+			if pgvectorOK = pgvector.EnableInPostgreSQL(ctx, exec) == nil; !pgvectorOK {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgvectorDisabled",
+					"Unable to install pgvector")
+			}
+		} else {
+			if pgvectorOK = pgvector.DisableInPostgreSQL(ctx, exec) == nil; !pgvectorOK {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgvectorEnabled",
+					"Unable to disable pgvector")
 			}
 		}
 
