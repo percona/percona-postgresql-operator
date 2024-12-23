@@ -9,7 +9,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
@@ -215,14 +214,6 @@ func (cr *PerconaPGCluster) Default() {
 
 	if cr.Spec.Backups.PGBackRest.Jobs == nil {
 		cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
-	}
-
-	if cr.Spec.Backups.PGBackRest.Jobs.BackoffLimit == nil {
-		cr.Spec.Backups.PGBackRest.Jobs.BackoffLimit = ptr.To(int32(2))
-	}
-
-	if cr.Spec.Backups.PGBackRest.Jobs.RestartPolicy == "" {
-		cr.Spec.Backups.PGBackRest.Jobs.RestartPolicy = corev1.RestartPolicyOnFailure
 	}
 
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
