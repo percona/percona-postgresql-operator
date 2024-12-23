@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -166,6 +167,11 @@ type PerconaPGClusterSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
+
+	// Whether or not the cluster has schemas automatically created for the user
+	// defined in `spec.users` for all of the databases listed for that user.
+	// +optional
+	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -222,6 +228,10 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
 		cr.Spec.Extensions.BuiltIn.PGAudit = &t
 	}
+
+	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
+		cr.Spec.AutoCreateUserSchema = &t
+	}
 }
 
 func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crunchyv1beta1.PostgresCluster, scheme *runtime.Scheme) (*crunchyv1beta1.PostgresCluster, error) {
@@ -251,6 +261,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			annotations[pNaming.ToCrunchyAnnotation(k)] = v
 		}
 	}
+
+	if cr.Spec.AutoCreateUserSchema != nil && *cr.Spec.AutoCreateUserSchema {
+		annotations[naming.AutoCreateUserSchemaAnnotation] = "true"
+	}
+
 	postgresCluster.Annotations = annotations
 	postgresCluster.Labels = cr.Labels
 	if postgresCluster.Labels == nil {

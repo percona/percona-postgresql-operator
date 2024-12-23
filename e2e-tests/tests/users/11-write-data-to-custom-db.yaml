@@ -10,8 +10,9 @@ commands:
       password=$(get_psql_user_pass rhino-credentials)
       user='rhino'
       db_name='zoo'
+      schema='rhino'
       hostname=$(get_pgbouncer_host rhino-credentials)
 
       run_psql \
-        'INSERT INTO app.customApp (id) VALUES (100501)' \
+        "INSERT INTO $schema.customApp (id) VALUES (100501)" \
         "-h $hostname -U $user -d $db_name" "$password"
