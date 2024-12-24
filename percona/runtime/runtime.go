@@ -19,14 +19,14 @@ var refreshInterval = 60 * time.Minute
 
 // CreateRuntimeManager does the same thing as `internal/controller/runtime.CreateRuntimeManager`,
 // excet it configures the manager to watch multiple namespaces.
-func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics bool, features feature.MutableGate) (manager.Manager, error) {
+func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics, disableLeaderElection bool, features feature.MutableGate) (manager.Manager, error) {
 
 	options := manager.Options{
 		Cache: cache.Options{
 			SyncPeriod: &refreshInterval,
 		},
 		Scheme:           r.Scheme,
-		LeaderElection:   true,
+		LeaderElection:   disableLeaderElection,
 		LeaderElectionID: "08db3feb.percona.com",
 	}
 
