@@ -5,7 +5,7 @@ commands:
       set -o errexit
       set -o xtrace
 
-      kubectl delete postgrescluster -n "${NAMESPACE}" scheduled-backup
+      kubectl delete pg -n "${NAMESPACE}" scheduled-backup
       sleep 15
 
       data=1
