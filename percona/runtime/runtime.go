@@ -25,7 +25,9 @@ func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics
 		Cache: cache.Options{
 			SyncPeriod: &refreshInterval,
 		},
-		Scheme: r.Scheme,
+		Scheme:           r.Scheme,
+		LeaderElection:   true,
+		LeaderElectionID: "08db3feb.percona.com",
 	}
 
 	options.BaseContext = func() context.Context {
