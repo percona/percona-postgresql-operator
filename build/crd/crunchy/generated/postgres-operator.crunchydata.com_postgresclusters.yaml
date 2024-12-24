@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: postgresclusters.postgres-operator.crunchydata.com
 spec:
   group: postgres-operator.crunchydata.com
@@ -17744,6 +17744,8 @@ spec:
                   format: int64
                   type: integer
                 type: array
+              tlsOnly:
+                type: boolean
               userInterface:
                 description: The specification of a user interface that connects to
                   PostgreSQL.

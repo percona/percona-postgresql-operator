@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -409,7 +409,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -17818,6 +17818,8 @@ spec:
                     pattern: ^repo[1-4]
                     type: string
                 type: object
+              tlsOnly:
+                type: boolean
               unmanaged:
                 description: |-
                   Suspends the rollout and reconciliation of changes made to the
@@ -17962,7 +17964,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -18060,7 +18062,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgupgrades.pgv2.percona.com
 spec:
   group: pgv2.percona.com

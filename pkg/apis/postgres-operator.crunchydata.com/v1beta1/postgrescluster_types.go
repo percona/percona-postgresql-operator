@@ -46,6 +46,8 @@ type PostgresClusterSpec struct {
 	// +optional
 	CustomTLSSecret *corev1.SecretProjection `json:"customTLSSecret,omitempty"`
 
+	TLSOnly bool `json:"tlsOnly,omitempty"`
+
 	// The secret containing the replication client certificates and keys for
 	// secure connections to the PostgreSQL server. It will need to contain the
 	// client TLS certificate, TLS key and the Certificate Authority certificate
