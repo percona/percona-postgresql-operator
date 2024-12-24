@@ -30,6 +30,11 @@ func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics
 		LeaderElectionID: "08db3feb.percona.com",
 	}
 
+	if disableLeaderElection {
+		options.LeaderElection = false
+		options.LeaderElectionID = ""
+	}
+
 	options.BaseContext = func() context.Context {
 		ctx := context.Background()
 		return feature.NewContext(ctx, features)
