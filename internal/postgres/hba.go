@@ -135,6 +135,13 @@ func (hba *HostBasedAuthentication) TLS() *HostBasedAuthentication {
 	return hba
 }
 
+func (hba *HostBasedAuthentication) TLSOnly() *HostBasedAuthentication {
+	if hba.origin == "host" || hba.origin == "hostnossl" {
+		hba.origin = "hostssl"
+	}
+	return hba
+}
+
 // TCP makes hba match connection attempts made using TCP/IP, with or without SSL.
 func (hba *HostBasedAuthentication) TCP() *HostBasedAuthentication {
 	hba.origin = "host"
