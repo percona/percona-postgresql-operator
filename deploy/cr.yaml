@@ -9,9 +9,9 @@ spec:
   crVersion: 2.6.0
 #  metadata:
 #    annotations:
-#      test-annotation: value
+#      example-annotation: value
 #    labels:
-#      test-label: value
+#      example-label: value
 #  secrets:
 #    customRootCATLSSecret:
 #      name: cluster1-ca-cert
