@@ -25,12 +25,16 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestReconcilerRolloutInstance(t *testing.T) {
 	ctx := context.Background()
 	cluster := new(v1beta1.PostgresCluster)
+	cluster.Annotations = map[string]string{
+		pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion): "4.0.1",
+	}
 
 	t.Run("Singleton", func(t *testing.T) {
 		instances := []*Instance{
@@ -42,7 +46,7 @@ func TestReconcilerRolloutInstance(t *testing.T) {
 						Name:      "one-pod-bruh",
 						Labels: map[string]string{
 							"controller-revision-hash":               "gamma",
-							"postgres-operator.crunchydata.com/role": "master",
+							"postgres-operator.crunchydata.com/role": "primary",
 						},
 					},
 					Status: corev1.PodStatus{
@@ -104,7 +108,10 @@ func TestReconcilerRolloutInstance(t *testing.T) {
 						Name:      "the-pod",
 						Labels: map[string]string{
 							"controller-revision-hash":               "gamma",
-							"postgres-operator.crunchydata.com/role": "master",
+							"postgres-operator.crunchydata.com/role": "primary",
+						},
+						Annotations: map[string]string{
+							"status": `{"version":"4.0.0"}`,
 						},
 					},
 				}},
@@ -134,7 +141,7 @@ func TestReconcilerRolloutInstance(t *testing.T) {
 
 				// A switchover to any viable candidate.
 				assert.DeepEqual(t, command[:2], []string{"patronictl", "switchover"})
-				assert.Assert(t, sets.NewString(command...).Has("--master=the-pod"))
+				assert.Assert(t, sets.NewString(command...).Has("--primary=the-pod"))
 				assert.Assert(t, sets.NewString(command...).Has("--candidate="))
 
 				// Indicate success through stdout.
@@ -214,7 +221,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"controller-revision-hash":               "gamma",
-							"postgres-operator.crunchydata.com/role": "master",
+							"postgres-operator.crunchydata.com/role": "primary",
 						},
 					},
 					Status: corev1.PodStatus{
@@ -259,7 +266,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"controller-revision-hash":               "beta",
-							"postgres-operator.crunchydata.com/role": "master",
+							"postgres-operator.crunchydata.com/role": "primary",
 						},
 					},
 					Status: corev1.PodStatus{
@@ -374,7 +381,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"controller-revision-hash":               "beta",
-							"postgres-operator.crunchydata.com/role": "master",
+							"postgres-operator.crunchydata.com/role": "primary",
 						},
 					},
 					Status: corev1.PodStatus{

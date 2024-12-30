@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -90,6 +91,11 @@ func readTestCR(name, namespace, testFile string) (*v2.PerconaPGCluster, error) 
 
 	cr.Name = name
 	cr.Namespace = namespace
+	if cr.Spec.PostgresVersion == 0 {
+		return nil, errors.New("postgresVersion should be specified")
+	}
+	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
+	cr.Status.PatroniVersion = "4.0.0"
 	return cr, nil
 }
 
@@ -107,6 +113,8 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 
 	cr.Name = name
 	cr.Namespace = namespace
+	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
+	cr.Status.PatroniVersion = "4.0.0"
 	return cr, nil
 }
 
