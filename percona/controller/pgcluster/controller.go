@@ -241,7 +241,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
-	r.reconcileCustomExtensions(cr)
+	if err := r.reconcileCustomExtensions(cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
+	}
 
 	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
@@ -531,9 +533,13 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
-func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster) {
+func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster) error {
 	if cr.Spec.Extensions.Storage.Secret == nil {
-		return
+		return nil
+	}
+
+	if len(cr.Spec.Extensions.Image) == 0 && len(cr.Spec.Extensions.Custom) > 0 {
+		return errors.New("you need to set spec.extensions.image to install custom extensions")
 	}
 
 	extensionKeys := make([]string, 0)
@@ -556,6 +562,8 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster)
 		))
 		set.VolumeMounts = append(set.VolumeMounts, extensions.ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
 	}
+
+	return nil
 }
 
 func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
