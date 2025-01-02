@@ -206,6 +206,7 @@ func (cr *PerconaPGCluster) Default() {
 	cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
 	t := true
+	f := false
 
 	if cr.Spec.Backups.TrackLatestRestorableTime == nil {
 		cr.Spec.Backups.TrackLatestRestorableTime = &t
@@ -218,11 +219,18 @@ func (cr *PerconaPGCluster) Default() {
 	}
 	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	if cr.Spec.Backups.PGBackRest.Jobs == nil {
+		cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+	}
+
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
 	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
 		cr.Spec.Extensions.BuiltIn.PGAudit = &t
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
+		cr.Spec.Extensions.BuiltIn.PGVector = &f
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
@@ -344,6 +352,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
+	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
 
 	return postgresCluster, nil
 }
@@ -567,6 +576,7 @@ type CustomExtensionsStorageSpec struct {
 type BuiltInExtensionsSpec struct {
 	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
 	PGAudit       *bool `json:"pg_audit,omitempty"`
+	PGVector      *bool `json:"pgvector,omitempty"`
 }
 
 type ExtensionsSpec struct {
