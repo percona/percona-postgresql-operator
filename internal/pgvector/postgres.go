@@ -45,6 +45,4 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 }
 
 // PostgreSQLParameters sets the parameters required by pgAudit.
-func PostgreSQLParameters(outParameters *postgres.Parameters) {
-	return
-}
+func PostgreSQLParameters(outParameters *postgres.Parameters) {}
