@@ -219,6 +219,10 @@ func (cr *PerconaPGCluster) Default() {
 	}
 	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	if cr.Spec.Backups.PGBackRest.Jobs == nil {
+		cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+	}
+
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
 	}
