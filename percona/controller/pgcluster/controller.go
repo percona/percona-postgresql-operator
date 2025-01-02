@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
@@ -61,10 +63,22 @@ type PGClusterReconciler struct {
 	Watchers             *registry.Registry
 	ExternalChan         chan event.GenericEvent
 	StopExternalWatchers chan event.DeleteEvent
+	PodExec              func(
+		ctx context.Context, namespace, pod, container string,
+		stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
 func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
+	if r.PodExec == nil {
+		var err error
+		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
+		if err != nil {
+			return err
+		}
+	}
+
 	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
@@ -196,6 +210,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	if cr.DeletionTimestamp != nil {
 		log.Info("Deleting PerconaPGCluster", "deletionTimestamp", cr.DeletionTimestamp)
 
+		if err := r.runFinalizers(ctx, cr); err != nil {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run finalizers")
+		}
+
 		// We're deleting PostgresCluster explicitly to let Crunchy controller run its finalizers and not mess with us.
 		if err := r.Client.Delete(ctx, postgresCluster); client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "delete postgres cluster")
@@ -204,10 +222,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err == nil {
 			log.Info("Waiting for PostgresCluster to be deleted")
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-		}
-
-		if err := r.runFinalizers(ctx, cr); err != nil {
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run finalizers")
 		}
 
 		return reconcile.Result{}, nil
