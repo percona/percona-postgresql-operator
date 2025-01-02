@@ -369,6 +369,7 @@ func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.Per
 			// K8SPG-555: We should create an empty secret with old name, so that crunchy part can populate it
 			// instead of creating secrets unique to the cluster
 			// TODO: remove when 2.4.0 will become unsupported
+
 			if err := r.Client.Create(ctx, oldCASecret); err != nil {
 				return errors.Wrap(err, "failed to create ca secret")
 			}
@@ -409,6 +410,12 @@ func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.Per
 		if !k8serrors.IsNotFound(err) {
 			newCASecret.Data = oldCASecret.Data
 		}
+
+		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
+			newCASecret.Annotations = cr.Spec.Metadata.Annotations
+			newCASecret.Labels = cr.Spec.Metadata.Labels
+		}
+
 		if err := r.Client.Create(ctx, newCASecret); err != nil {
 			return errors.Wrap(err, "failed to create updated CA secret")
 		}

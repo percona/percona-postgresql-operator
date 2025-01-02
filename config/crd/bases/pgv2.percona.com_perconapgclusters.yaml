@@ -8480,6 +8480,8 @@ spec:
                         type: boolean
                       pg_stat_monitor:
                         type: boolean
+                      pgvector:
+                        type: boolean
                     type: object
                   custom:
                     items:
