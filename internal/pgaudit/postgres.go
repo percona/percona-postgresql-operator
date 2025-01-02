@@ -37,7 +37,7 @@ func EnableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 		// Quiet the NOTICE from IF EXISTS, and install the pgAudit event triggers.
 		// - https://www.postgresql.org/docs/current/runtime-config-client.html
 		// - https://github.com/pgaudit/pgaudit#settings
-		`SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS pgaudit;`,
+		`SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS pgaudit; ALTER EXTENSION pgaudit UPDATE;`,
 		map[string]string{
 			"ON_ERROR_STOP": "on", // Abort when any one command fails.
 			"QUIET":         "on", // Do not print successful commands to stdout.
