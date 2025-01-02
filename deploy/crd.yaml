@@ -8763,6 +8763,8 @@ spec:
                         type: boolean
                       pg_stat_monitor:
                         type: boolean
+                      pgvector:
+                        type: boolean
                     type: object
                   custom:
                     items:
@@ -33982,6 +33984,8 @@ spec:
                   pgStatMonitor:
                     type: boolean
                   pgStatStatements:
+                    type: boolean
+                  pgvector:
                     type: boolean
                 type: object
               image:
