@@ -7,6 +7,11 @@ metadata:
 #  - percona.com/delete-ssl
 spec:
   crVersion: 2.6.0
+#  metadata:
+#    annotations:
+#      example-annotation: value
+#    labels:
+#      example-label: value
 #  secrets:
 #    customRootCATLSSecret:
 #      name: cluster1-ca-cert
@@ -27,6 +32,8 @@ spec:
 #    repoName: repo1
 
 #  openshift: true
+
+#  autoCreateUserSchema: true
 
 #  users:
 #    - name: rhino

@@ -1,0 +1,231 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    pgv2.percona.com/version: 2.6.0
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/pgbackrest: ""
+    postgres-operator.crunchydata.com/pgbackrest-config: ""
+    test-label: test
+  name: init-deploy-pgbackrest
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/cluster-certificate: replication-client-tls
+    test-label: test
+  name: init-deploy-replication-cert
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/pguser: postgres
+    postgres-operator.crunchydata.com/role: pguser
+    test-label: test
+  name: init-deploy-pguser-postgres
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/pguser: init-deploy
+    postgres-operator.crunchydata.com/role: pguser
+    test-label: test
+  name: init-deploy-pguser-init-deploy
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    app.kubernetes.io/component: pgbouncer
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    pgv2.percona.com/version: 2.6.0
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/role: pgbouncer
+    test-label: test
+  name: init-deploy-pgbouncer
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/cluster-certificate: postgres-tls
+    test-label: test
+  name: init-deploy-cluster-cert
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    test-label: test
+  name: init-deploy-cluster-ca-cert
+  ownerReferences:
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    name: init-deploy
+type: Opaque
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    test-label: test
+  name: init-deploy-config
+  ownerReferences:
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: init-deploy
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    pgv2.percona.com/version: 2.6.0
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/pgbackrest: ""
+    postgres-operator.crunchydata.com/pgbackrest-config: ""
+    test-label: test
+  name: init-deploy-pgbackrest-config
+  ownerReferences:
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: init-deploy
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    test-annotation: test
+  labels:
+    app.kubernetes.io/component: pgbouncer
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    pgv2.percona.com/version: 2.6.0
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/role: pgbouncer
+    test-label: test
+  name: init-deploy-pgbouncer
+  ownerReferences:
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: init-deploy
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    test-annotation: test
+  generation: 1
+  labels:
+    app.kubernetes.io/instance: init-deploy
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    pgv2.percona.com/version: 2.6.0
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/data: pgbackrest
+    postgres-operator.crunchydata.com/pgbackrest: ""
+    postgres-operator.crunchydata.com/pgbackrest-dedicated: ""
+    test-label: test
+  name: init-deploy-repo-host
+  ownerReferences:
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: init-deploy
+spec:
+  template:
+    metadata:
+      annotations:
+        test-annotation: test
+      labels:
+        app.kubernetes.io/instance: init-deploy
+        app.kubernetes.io/managed-by: percona-postgresql-operator
+        app.kubernetes.io/name: percona-postgresql
+        app.kubernetes.io/part-of: percona-postgresql
+        pgv2.percona.com/version: 2.6.0
+        postgres-operator.crunchydata.com/cluster: init-deploy
+        postgres-operator.crunchydata.com/data: pgbackrest
+        postgres-operator.crunchydata.com/pgbackrest: ""
+        postgres-operator.crunchydata.com/pgbackrest-dedicated: ""
+        test-label: test
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  currentReplicas: 1
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+
