@@ -495,6 +495,7 @@ spec:
 #    builtin:
 #      pg_stat_monitor: true
 #      pg_audit: true
+#      pgvector: false
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1
