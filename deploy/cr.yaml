@@ -336,6 +336,8 @@ spec:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
 #      jobs:
+#        restartPolicy: OnFailure
+#        backoffLimit: 2
 #        priorityClassName: high-priority
 #        resources:
 #          limits:
@@ -495,6 +497,7 @@ spec:
 #    builtin:
 #      pg_stat_monitor: true
 #      pg_audit: true
+#      pgvector: false
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1
