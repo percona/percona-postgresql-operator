@@ -1,4 +1,4 @@
-package postgres
+package perconaPG
 
 import (
 	"context"

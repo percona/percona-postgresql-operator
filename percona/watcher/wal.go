@@ -15,7 +15,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
-	common "github.com/percona/percona-postgresql-operator/percona/postgres"
+	"github.com/percona/percona-postgresql-operator/percona/postgres"
 	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -152,7 +152,7 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *clientcmd.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (*metav1.Time, error) {
 	log := logging.FromContext(ctx)
 
-	primary, err := common.GetPrimaryPod(ctx, cli, cr)
+	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
 	if err != nil {
 		return nil, PrimaryPodNotFound
 	}
@@ -188,7 +188,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 }
 
 func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (time.Time, error) {
-	primary, err := common.GetPrimaryPod(ctx, cli, cr)
+	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
 	if err != nil {
 		return time.Time{}, PrimaryPodNotFound
 	}

@@ -39,7 +39,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	common "github.com/percona/percona-postgresql-operator/percona/postgres"
+	"github.com/percona/percona-postgresql-operator/percona/postgres"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -576,7 +576,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 				return errors.WithStack(disableCustomExtensionsInDB(ctx, exec, removedExtension))
 			}
 
-			primary, err := common.GetPrimaryPod(ctx, r.Client, cr)
+			primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, cr)
 			if err != nil {
 				return errors.New("primary pod not found")
 			}
