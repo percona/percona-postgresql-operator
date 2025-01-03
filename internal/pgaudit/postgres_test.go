@@ -31,7 +31,7 @@ func TestEnableInPostgreSQL(t *testing.T) {
 		b, err := io.ReadAll(stdin)
 		assert.NilError(t, err)
 		assert.Equal(t, string(b), strings.Trim(`
-SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS pgaudit;
+SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS pgaudit; ALTER EXTENSION pgaudit UPDATE;
 		`, "\t\n"))
 
 		return expected
