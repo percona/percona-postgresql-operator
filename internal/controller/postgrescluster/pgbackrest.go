@@ -859,8 +859,16 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 	if postgresCluster.Spec.Backups.PGBackRest.Jobs != nil {
 		jobSpec.Template.Spec.Tolerations = postgresCluster.Spec.Backups.PGBackRest.Jobs.Tolerations
 		jobSpec.Template.Spec.Affinity = postgresCluster.Spec.Backups.PGBackRest.Jobs.Affinity
-		jobSpec.Template.Spec.PriorityClassName =
-			initialize.FromPointer(postgresCluster.Spec.Backups.PGBackRest.Jobs.PriorityClassName)
+		jobSpec.Template.Spec.PriorityClassName = initialize.FromPointer(postgresCluster.Spec.Backups.PGBackRest.Jobs.PriorityClassName)
+
+		// K8SPG-619
+		if postgresCluster.Spec.Backups.PGBackRest.Jobs.RestartPolicy != "" {
+			jobSpec.Template.Spec.RestartPolicy = postgresCluster.Spec.Backups.PGBackRest.Jobs.RestartPolicy
+		}
+		// K8SPG-619
+		if jobSpec.BackoffLimit != nil {
+			jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
+		}
 	}
 
 	// Set the image pull secrets, if any exist.

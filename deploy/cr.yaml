@@ -7,6 +7,11 @@ metadata:
 #  - percona.com/delete-ssl
 spec:
   crVersion: 2.6.0
+#  metadata:
+#    annotations:
+#      example-annotation: value
+#    labels:
+#      example-label: value
 #  secrets:
 #    customRootCATLSSecret:
 #      name: cluster1-ca-cert
@@ -331,6 +336,8 @@ spec:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
 #      jobs:
+#        restartPolicy: OnFailure
+#        backoffLimit: 2
 #        priorityClassName: high-priority
 #        resources:
 #          limits:
@@ -490,6 +497,7 @@ spec:
 #    builtin:
 #      pg_stat_monitor: true
 #      pg_audit: true
+#      pgvector: false
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1

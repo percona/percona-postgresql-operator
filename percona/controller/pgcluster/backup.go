@@ -185,6 +185,10 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 				RepoName:  repoName,
 			},
 		}
+		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
+			pb.Annotations = naming.Merge(cr.Spec.Metadata.Annotations, pb.Annotations)
+			pb.Labels = cr.Spec.Metadata.Labels
+		}
 
 		err = cl.Create(ctx, pb)
 		if err != nil {

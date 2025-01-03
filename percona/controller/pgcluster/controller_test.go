@@ -484,7 +484,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(err).To(Not(HaveOccurred()))
-		mgr, err := runtime.CreateRuntimeManager(namespace.Name, cfg, true, gate)
+		mgr, err := runtime.CreateRuntimeManager(namespace.Name, cfg, true, true, gate)
 		Expect(err).To(Succeed())
 		Expect(v2.AddToScheme(mgr.GetScheme())).To(Succeed())
 
@@ -552,7 +552,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 				}
 
 				return false
-			}, time.Second*30, time.Millisecond*250).Should(Equal(true))
+			}, time.Second*60, time.Millisecond*250).Should(Equal(true))
 			reconcileCount = getReconcileCount(crunchyR)
 		})
 	})

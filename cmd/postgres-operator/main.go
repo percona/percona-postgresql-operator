@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	//"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
-
 	"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
@@ -105,6 +104,7 @@ func main() {
 	mgr, err := perconaRuntime.CreateRuntimeManager(
 		namespaces,
 		cfg,
+		false,
 		false,
 		features,
 	)
