@@ -39,7 +39,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	"github.com/percona/percona-postgresql-operator/percona/postgres"
+	perconaPG "github.com/percona/percona-postgresql-operator/percona/postgres"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
