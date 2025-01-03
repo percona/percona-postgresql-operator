@@ -17835,6 +17835,8 @@ spec:
                     pattern: ^repo[1-4]
                     type: string
                 type: object
+              tlsOnly:
+                type: boolean
               unmanaged:
                 description: |-
                   Suspends the rollout and reconciliation of changes made to the

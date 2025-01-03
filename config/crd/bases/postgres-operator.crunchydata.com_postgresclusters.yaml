@@ -17667,6 +17667,8 @@ spec:
                   minimum: 1
                   type: integer
                 type: array
+              tlsOnly:
+                type: boolean
               userInterface:
                 description: The specification of a user interface that connects to
                   PostgreSQL.
