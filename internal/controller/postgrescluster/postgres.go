@@ -238,7 +238,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
-		_, err := gover.NewVersion(naming.LabelVersion)
+		_, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
 		if err != nil {
 			return err
 		}
