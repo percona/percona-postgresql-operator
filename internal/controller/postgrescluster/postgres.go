@@ -192,6 +192,15 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	const container = naming.ContainerDatabase
 	var podExecutor postgres.Executor
 
+	log := logging.FromContext(ctx)
+
+	for _, inst := range instances.forCluster {
+		if matches, known := inst.PodMatchesPodTemplate(); !matches || !known {
+			log.V(1).Info("Waiting for instance to be updated", "instance", inst.Name)
+			return nil
+		}
+	}
+
 	// Find the PostgreSQL instance that can execute SQL that writes system
 	// catalogs. When there is none, return early.
 	pod, _ := instances.writablePod(container)
