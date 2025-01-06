@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -258,13 +259,17 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	opRes, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	var opRes controllerutil.OperationResult
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
-		postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
+		opRes, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+			var err error
+			postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
 
+			return err
+		})
 		return err
-	})
-	if err != nil {
+	}); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update/create PostgresCluster")
 	}
 
@@ -278,8 +283,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
-	err = r.updateStatus(ctx, cr, &postgresCluster.Status)
-	if err != nil {
+	if err := r.updateStatus(ctx, cr, &postgresCluster.Status); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update status")
 	}
 

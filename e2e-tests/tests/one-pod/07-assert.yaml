@@ -7,8 +7,6 @@ kind: PostgresCluster
 metadata:
   name: one-pod
   generation: 4
-  annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: one-pod-restore
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster

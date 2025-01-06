@@ -7,8 +7,6 @@ kind: PostgresCluster
 metadata:
   name: tablespaces
   generation: 4
-  annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: tablespaces-restore
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster

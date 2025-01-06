@@ -7,8 +7,6 @@ kind: PostgresCluster
 metadata:
   name: scheduled-backup
   generation: 15
-  annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: azure-restore
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster

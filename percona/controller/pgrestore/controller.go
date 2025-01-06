@@ -207,6 +207,19 @@ func startRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster,
 	}
 	pg.Annotations[naming.PGBackRestRestore] = pr.Name
 
+	postgresCluster := new(v1beta1.PostgresCluster)
+	if err := c.Get(ctx, client.ObjectKeyFromObject(pg), postgresCluster); err != nil {
+		return errors.Wrap(err, "get PostgresCluster")
+	}
+
+	origPostgres := postgresCluster.DeepCopy()
+
+	postgresCluster.Status.PGBackRest.Restore = new(v1beta1.PGBackRestJobStatus)
+
+	if err := c.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
+		return errors.Wrap(err, "patch PGCluster")
+	}
+
 	if pg.Spec.Backups.PGBackRest.Restore == nil {
 		pg.Spec.Backups.PGBackRest.Restore = &v1beta1.PGBackRestRestore{
 			PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{},
@@ -248,19 +261,6 @@ func disableRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluste
 	delete(pg.Annotations, naming.LabelPGBackRestRestore)
 
 	if err := c.Patch(ctx, pg, client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "patch PGCluster")
-	}
-
-	postgresCluster := new(v1beta1.PostgresCluster)
-	if err := c.Get(ctx, client.ObjectKeyFromObject(pg), postgresCluster); err != nil {
-		return errors.Wrap(err, "get PostgresCluster")
-	}
-
-	origPostgres := postgresCluster.DeepCopy()
-
-	postgresCluster.Status.PGBackRest.Restore = new(v1beta1.PGBackRestJobStatus)
-
-	if err := c.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")
 	}
 
