@@ -10,13 +10,14 @@ commands:
       password=$(get_psql_user_pass rhino-credentials)
       user='rhino'
       db_name='zoo'
+      schema='rhino'
       hostname=$(get_pgbouncer_host rhino-credentials)
 
 
       run_psql \
-        'CREATE SCHEMA app  CREATE TABLE IF NOT EXISTS customApp (id int PRIMARY KEY);' \
+        'CREATE TABLE IF NOT EXISTS customApp (id int PRIMARY KEY);' \
         "-h $hostname -U $user -d $db_name" "$password"
       run_psql \
-        'INSERT INTO app.customApp (id) VALUES (100500)' \
+        "INSERT INTO $schema.customApp (id) VALUES (100500)" \
         "-h $hostname -U $user -d $db_name" "$password"
         

@@ -186,6 +186,7 @@ type ExtensionsSpec struct {
 	PGStatMonitor    bool `json:"pgStatMonitor,omitempty"`
 	PGAudit          bool `json:"pgAudit,omitempty"`
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
+	PGVector         bool `json:"pgvector,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.

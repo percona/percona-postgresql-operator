@@ -104,6 +104,7 @@ func main() {
 		namespaces,
 		cfg,
 		false,
+		false,
 		features,
 	)
 	assertNoError(err)

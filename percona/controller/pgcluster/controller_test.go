@@ -496,7 +496,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(err).To(Not(HaveOccurred()))
-		mgr, err := runtime.CreateRuntimeManager(namespace.Name, cfg, true, gate)
+		mgr, err := runtime.CreateRuntimeManager(namespace.Name, cfg, true, true, gate)
 		Expect(err).To(Succeed())
 		Expect(v2.AddToScheme(mgr.GetScheme())).To(Succeed())
 
