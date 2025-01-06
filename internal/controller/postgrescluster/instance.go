@@ -819,9 +819,9 @@ func (r *Reconciler) rolloutInstance(
 		if err != nil {
 			return errors.Wrap(err, "failed to get patroni ver")
 		}
-		ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+		patroniVer4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
 
-		success, err := patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "", ver4)
+		success, err := patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "", patroniVer4)
 		if err = errors.WithStack(err); err == nil && !success {
 			err = errors.New("unable to switchover")
 		}

@@ -166,7 +166,6 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=pods,verbs=create;delete
 // +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -347,7 +346,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		}
 
 		if err := r.Client.Create(ctx, p); err != nil {
-			return errors.Wrap(err, "failed to create pod to check patrni version")
+			return errors.Wrap(err, "failed to create pod to check patroni version")
 		}
 
 		return errPatroniVersionCheckWait

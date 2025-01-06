@@ -104,12 +104,12 @@ func (r *Reconciler) handlePatroniRestarts(
 		if err != nil {
 			return errors.Wrap(err, "failed to get patroni ver")
 		}
-		ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+		patroniVer4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
 
 		// K8SPG-648: patroni v4.0.0 deprecated "master" role.
 		//            We should use "primary" instead
 		role := "primary"
-		if !ver4 {
+		if !patroniVer4 {
 			role = "master"
 		}
 

@@ -579,8 +579,8 @@ func instanceYAML(
 			return "", errors.New("patroni version annotation was not found")
 		}
 		patroniVer := gover.Must(gover.NewVersion(patroniVerStr))
-		ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
-		if !ver4 {
+		patroniVer4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+		if !patroniVer4 {
 			postgresql[pgBackRestCreateReplicaMethod] = map[string]any{
 				"command":   strings.Join(quoted, " "),
 				"keep_data": true,

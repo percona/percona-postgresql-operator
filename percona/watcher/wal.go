@@ -195,8 +195,8 @@ func getPrimaryPod(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGClu
 	//            We should use "primary" instead
 	role := "primary"
 	patroniVer := gover.Must(gover.NewVersion(cr.Status.PatroniVersion))
-	ver4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
-	if !ver4 {
+	patroniVer4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
+	if !patroniVer4 {
 		role = "master"
 	}
 	err := cli.List(ctx, podList, &client.ListOptions{

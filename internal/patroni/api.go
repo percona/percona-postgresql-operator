@@ -20,7 +20,7 @@ type API interface {
 	// ChangePrimaryAndWait tries to demote the current Patroni leader. It
 	// returns true when an election completes successfully. When Patroni is
 	// paused, next cannot be blank.
-	ChangePrimaryAndWait(ctx context.Context, current, next string, ver4 bool) (bool, error)
+	ChangePrimaryAndWait(ctx context.Context, current, next string, patroniVer4 bool) (bool, error)
 
 	// ReplaceConfiguration replaces Patroni's entire dynamic configuration.
 	ReplaceConfiguration(ctx context.Context, configuration map[string]any) error
@@ -39,14 +39,14 @@ var _ API = Executor(nil)
 // waits up to two "loop_wait" or until an error occurs. When Patroni is paused,
 // next cannot be blank. Similar to the "POST /switchover" REST endpoint.
 func (exec Executor) ChangePrimaryAndWait(
-	ctx context.Context, current, next string, ver4 bool,
+	ctx context.Context, current, next string, patroniVer4 bool,
 ) (bool, error) {
 	var stdout, stderr bytes.Buffer
 
 	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
 	//            We should use "primary" instead
 	cmd := []string{"patronictl", "switchover", "--scheduled=now", "--force", "--primary=" + current, "--candidate=" + next}
-	if !ver4 {
+	if !patroniVer4 {
 		cmd = []string{"patronictl", "switchover", "--scheduled=now", "--force", "--master=" + current, "--candidate=" + next}
 	}
 	err := exec(ctx, nil, &stdout, &stderr, cmd...)

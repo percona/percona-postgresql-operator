@@ -45812,13 +45812,6 @@ rules:
   - list
   - watch
 - apiGroups:
-  - pgv2.percona.com
-  resources:
-  - pods
-  verbs:
-  - create
-  - delete
-- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets
