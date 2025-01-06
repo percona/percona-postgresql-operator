@@ -336,6 +336,8 @@ spec:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
 #      jobs:
+#        restartPolicy: OnFailure
+#        backoffLimit: 2
 #        priorityClassName: high-priority
 #        resources:
 #          limits:
