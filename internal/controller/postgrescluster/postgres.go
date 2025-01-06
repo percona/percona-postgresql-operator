@@ -194,6 +194,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	log := logging.FromContext(ctx)
 
+	// K8SPG-377
 	for _, inst := range instances.forCluster {
 		if matches, known := inst.PodMatchesPodTemplate(); !matches || !known {
 			log.V(1).Info("Waiting for instance to be updated", "instance", inst.Name)
@@ -243,7 +244,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
-	// K8SPG-375, K8SPG-577
+	// K8SPG-375, K8SPG-577, K8SPG-699
 	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
@@ -305,6 +306,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
+		// K8SPG-699
 		if cluster.Spec.Extensions.PGVector {
 			if pgvectorOK = pgvector.EnableInPostgreSQL(ctx, exec) == nil; !pgvectorOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgvectorDisabled",
