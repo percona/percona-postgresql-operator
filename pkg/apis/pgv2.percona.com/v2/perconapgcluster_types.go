@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -168,6 +169,11 @@ type PerconaPGClusterSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
+
+	// Whether or not the cluster has schemas automatically created for the user
+	// defined in `spec.users` for all of the databases listed for that user.
+	// +optional
+	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -202,6 +208,7 @@ func (cr *PerconaPGCluster) Default() {
 	cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
 	t := true
+	f := false
 
 	if cr.Spec.Backups.TrackLatestRestorableTime == nil {
 		cr.Spec.Backups.TrackLatestRestorableTime = &t
@@ -214,11 +221,22 @@ func (cr *PerconaPGCluster) Default() {
 	}
 	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	if cr.Spec.Backups.PGBackRest.Jobs == nil {
+		cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+	}
+
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
 	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
 		cr.Spec.Extensions.BuiltIn.PGAudit = &t
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
+		cr.Spec.Extensions.BuiltIn.PGVector = &f
+	}
+
+	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
+		cr.Spec.AutoCreateUserSchema = &t
 	}
 }
 
@@ -249,6 +267,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			annotations[pNaming.ToCrunchyAnnotation(k)] = v
 		}
 	}
+
+	if cr.Spec.AutoCreateUserSchema != nil && *cr.Spec.AutoCreateUserSchema {
+		annotations[naming.AutoCreateUserSchemaAnnotation] = "true"
+	}
+
 	postgresCluster.Annotations = annotations
 	postgresCluster.Labels = cr.Labels
 	if postgresCluster.Labels == nil {
@@ -331,6 +354,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
+	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
@@ -397,6 +421,10 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Host string `json:"host"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	InstalledCustomExtensions []string `json:"installedCustomExtensions"`
 }
 
 type Backups struct {
@@ -556,6 +584,7 @@ type CustomExtensionsStorageSpec struct {
 type BuiltInExtensionsSpec struct {
 	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
 	PGAudit       *bool `json:"pg_audit,omitempty"`
+	PGVector      *bool `json:"pgvector,omitempty"`
 }
 
 type ExtensionsSpec struct {
