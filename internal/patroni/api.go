@@ -45,10 +45,13 @@ func (exec Executor) ChangePrimaryAndWait(
 
 	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
 	//            We should use "primary" instead
-	cmd := []string{"patronictl", "switchover", "--scheduled=now", "--force", "--primary=" + current, "--candidate=" + next}
-	if !patroniVer4 {
-		cmd = []string{"patronictl", "switchover", "--scheduled=now", "--force", "--master=" + current, "--candidate=" + next}
+	cmd := []string{"patronictl", "switchover", "--scheduled=now", "--force", "--candidate=" + next}
+	if patroniVer4 {
+		cmd = append(cmd, "--primary="+current)
+	} else {
+		cmd = append(cmd, "--master="+current)
 	}
+
 	err := exec(ctx, nil, &stdout, &stderr, cmd...)
 
 	log := logging.FromContext(ctx)

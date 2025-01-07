@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -38,7 +37,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -811,15 +809,10 @@ func (r *Reconciler) rolloutInstance(
 		ctx, span = r.Tracer.Start(ctx, "patroni-change-primary")
 		defer span.End()
 
-		patroniVerStr, ok := cluster.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
-		if !ok {
-			return errors.New("patroni version annotation was not found")
-		}
-		patroniVer, err := gover.NewVersion(patroniVerStr)
+		patroniVer4, err := cluster.IsPatroniVer4()
 		if err != nil {
-			return errors.Wrap(err, "failed to get patroni ver")
+			return errors.Wrap(err, "failed to check if patroni v4 is used")
 		}
-		patroniVer4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
 
 		success, err := patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "", patroniVer4)
 		if err = errors.WithStack(err); err == nil && !success {

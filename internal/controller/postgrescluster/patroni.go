@@ -10,7 +10,6 @@ import (
 	"io"
 	"time"
 
-	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +22,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/patroni"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -96,15 +94,10 @@ func (r *Reconciler) handlePatroniRestarts(
 			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
 		})
 
-		patroniVerStr, ok := cluster.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
-		if !ok {
-			return errors.New("patroni version annotation was not found")
-		}
-		patroniVer, err := gover.NewVersion(patroniVerStr)
+		patroniVer4, err := cluster.IsPatroniVer4()
 		if err != nil {
-			return errors.Wrap(err, "failed to get patroni ver")
+			return errors.Wrap(err, "failed to check if patroni v4 is used")
 		}
-		patroniVer4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
 
 		// K8SPG-648: patroni v4.0.0 deprecated "master" role.
 		//            We should use "primary" instead
