@@ -13,7 +13,7 @@ void createCluster(String CLUSTER_SUFFIX) {
                 gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                 gcloud config set project $GCP_PROJECT
                 gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $region --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $region --quiet || true
-                gcloud container clusters create --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.28 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=\$NODES_NUM --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 --enable-ip-alias&& \
+                gcloud container clusters create --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.28 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=\$NODES_NUM --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 --enable-ip-alias && \
                 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
                 if [ \${ret_val} -eq 0 ]; then break; fi
                 ret_num=\$((ret_num + 1))
@@ -144,7 +144,7 @@ void printKubernetesStatus(String LOCATION, String CLUSTER_SUFFIX) {
         echo
         kubectl top pod --all-namespaces
         echo
-        kubectl get events --field-selector type!=Normal --all-namespaces
+        kubectl get events --field-selector type!=Normal --all-namespaces --sort-by=".lastTimestamp"
         echo "======================================================"
     """
 }
@@ -224,7 +224,7 @@ void runTest(Integer TEST_ID) {
         }
         catch (exc) {
             printKubernetesStatus("AFTER","$clusterSuffix")
-            echo "The $testName test was failed!"
+            echo "Test $testName has failed!"
             if (retryCount >= 1 || currentBuild.nextBuild != null) {
                 currentBuild.result = 'FAILURE'
                 return true
@@ -275,8 +275,18 @@ EOF
     """
 }
 
+boolean isManualBuild() {
+    def causes = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')
+    return !causes.isEmpty()
+}
+
 needToRunTests = true
 void checkE2EIgnoreFiles() {
+    if (isManualBuild()) {
+        echo "This is a manual rebuild. Forcing pipeline execution."
+        return
+    }
+
     def e2eignoreFile = ".e2eignore"
     if (fileExists(e2eignoreFile)) {
         def excludedFiles = readFile(e2eignoreFile).split('\n').collect{it.trim()}
@@ -285,18 +295,14 @@ void checkE2EIgnoreFiles() {
 
         def build = currentBuild.previousBuild
         while (build != null) {
-            if (build.result == 'SUCCESS') {
-                try {
-                    echo "Found a previous successful build: $build.number"
-                    copyArtifacts(projectName: env.JOB_NAME, selector: specific("$build.number"), filter: "$lastProcessedCommitFile")
-                    lastProcessedCommitHash = readFile("$lastProcessedCommitFile").trim()
-                    echo "lastProcessedCommitHash: $lastProcessedCommitHash"
-                    break
-                } catch (Exception e) {
-                    echo "No $lastProcessedCommitFile found in build $build.number. Checking earlier builds."
-                }
-            } else {
-                echo "Build $build.number was not successful. Checking earlier builds."
+            try {
+                echo "Checking previous build: #$build.number"
+                copyArtifacts(projectName: env.JOB_NAME, selector: specific("$build.number"), filter: lastProcessedCommitFile)
+                lastProcessedCommitHash = readFile(lastProcessedCommitFile).trim()
+                echo "Last processed commit hash: $lastProcessedCommitHash"
+                break
+            } catch (Exception e) {
+                echo "No $lastProcessedCommitFile found in build $build.number. Checking earlier builds."
             }
             build = build.previousBuild
         }
@@ -318,13 +324,21 @@ void checkE2EIgnoreFiles() {
         if (needToRunTests) {
             echo "Some changed files are outside of the e2eignore list. Proceeding with execution."
         } else {
-            echo "All changed files are e2eignore files. Aborting pipeline execution."
+            if (currentBuild.previousBuild?.result in ['FAILURE', 'ABORTED', 'UNSTABLE']) {
+                echo "All changed files are e2eignore files, and previous build was unsuccessful. Propagating previous state."
+                currentBuild.result = currentBuild.previousBuild?.result
+                error "Skipping execution as non-significant changes detected and previous build was unsuccessful."
+            } else {
+                echo "All changed files are e2eignore files. Aborting pipeline execution."
+            }
         }
 
         sh """
             echo \$(git rev-parse HEAD) > $lastProcessedCommitFile
         """
         archiveArtifacts "$lastProcessedCommitFile"
+    } else {
+        echo "No $e2eignoreFile file found. Proceeding with execution."
     }
 }
 
@@ -384,8 +398,8 @@ pipeline {
                 }
                 withCredentials([file(credentialsId: 'cloud-secret-file', variable: 'CLOUD_SECRET_FILE'), file(credentialsId: 'cloud-minio-secret-file', variable: 'CLOUD_MINIO_SECRET_FILE')]) {
                     sh '''
-                        cp $CLOUD_SECRET_FILE ./e2e-tests/conf/cloud-secret.yml
-                        cp $CLOUD_MINIO_SECRET_FILE ./e2e-tests/conf/cloud-secret-minio-gw.yml
+                        cp $CLOUD_SECRET_FILE e2e-tests/conf/cloud-secret.yml
+                        cp $CLOUD_MINIO_SECRET_FILE e2e-tests/conf/cloud-secret-minio-gw.yml
                     '''
                 }
                 stash includes: "**", name: "sourceFILES"
