@@ -10,4 +10,5 @@ const (
 // PerconaPGRestore finalizers
 const (
 	FinalizerDeleteRestore = PrefixPercona + "delete-restore" //nolint:gosec
+	FinalizerDeleteBackup  = PrefixPercona + "delete-backup"  //nolint:gosec
 )
