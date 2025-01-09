@@ -417,6 +417,10 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Host string `json:"host"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	InstalledCustomExtensions []string `json:"installedCustomExtensions"`
 }
 
 type Backups struct {
@@ -580,8 +584,7 @@ type BuiltInExtensionsSpec struct {
 }
 
 type ExtensionsSpec struct {
-	// +kubebuilder:validation:Required
-	Image           string                      `json:"image"`
+	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
 	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
 	BuiltIn         BuiltInExtensionsSpec       `json:"builtin,omitempty"`
