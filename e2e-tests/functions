@@ -98,7 +98,7 @@ deploy_operator_gh() {
 }
 
 remove_all_finalizers() {
-	resource_types=("pg-restore" "pg")
+	resource_types=("pg-restore" "pg-backup" "pg")
 
 	for resource in "${resource_types[@]}"; do
 		echo "removing all finalizers for $resource resources"
