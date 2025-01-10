@@ -663,6 +663,10 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		return nil
 	}
 
+	if len(cr.Spec.Extensions.Image) == 0 && len(cr.Spec.Extensions.Custom) > 0 {
+		return errors.New("you need to set spec.extensions.image to install custom extensions")
+	}
+
 	extensionKeys := make([]string, 0)
 	extensionNames := make([]string, 0)
 
