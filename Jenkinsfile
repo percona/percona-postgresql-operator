@@ -215,7 +215,7 @@ void runTest(Integer TEST_ID) {
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
                     set -o pipefail
-                    kubectl kuttl test --config ./e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
+                    kubectl kuttl test --config e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
             }
             pushArtifactFile("${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$testName")
@@ -417,7 +417,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'hub.docker.com', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
                     sh '''
                         DOCKER_TAG=perconalab/percona-postgresql-operator:$VERSION
-                        docker_tag_file='./results/docker/TAG'
+                        docker_tag_file='results/docker/TAG'
                         mkdir -p $(dirname ${docker_tag_file})
                         echo ${DOCKER_TAG} > "${docker_tag_file}"
                             sg docker -c "
@@ -428,7 +428,7 @@ pipeline {
                                 make build-docker-image
                                 docker logout
                             "
-                        sudo rm -rf ./build
+                        sudo rm -rf build
                     '''
                 }
                 stash includes: 'results/docker/TAG', name: 'IMAGE'
@@ -461,7 +461,7 @@ pipeline {
                                          > go-licenses-new || :
                                  '
                          "
-                         diff -u ./e2e-tests/license/compare/go-licenses go-licenses-new
+                         diff -u e2e-tests/license/compare/go-licenses go-licenses-new
                      """
                  }
              }
