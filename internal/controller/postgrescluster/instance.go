@@ -67,7 +67,7 @@ func (i Instance) IsPrimary() (primary bool, known bool) {
 		return false, false
 	}
 
-	return i.Pods[0].Labels[naming.LabelRole] == naming.RolePatroniLeader, true
+	return i.Pods[0].Labels[naming.LabelRole] == naming.RolePatroniLeader || i.Pods[0].Labels[naming.LabelRole] == naming.RolePatroniLeaderDeprecated, true
 }
 
 // IsReady returns whether or not this instance is ready to receive PostgreSQL
@@ -134,7 +134,9 @@ func (i Instance) IsWritable() (writable, known bool) {
 
 	// TODO(cbandy): Update this to consider when Patroni is paused.
 
-	return strings.HasPrefix(member[role:], `"role":"master"`), true
+	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
+	//            We should use "primary" instead
+	return strings.HasPrefix(member[role:], `"role":"master"`) || strings.HasPrefix(member[role:], `"role":"primary"`), true
 }
 
 // PodMatchesPodTemplate returns whether or not the Pod for this instance
@@ -164,9 +166,11 @@ type instanceSorter struct {
 func (s *instanceSorter) Len() int {
 	return len(s.instances)
 }
+
 func (s *instanceSorter) Less(i, j int) bool {
 	return s.less(s.instances[i], s.instances[j])
 }
+
 func (s *instanceSorter) Swap(i, j int) {
 	s.instances[i], s.instances[j] = s.instances[j], s.instances[i]
 }
@@ -486,7 +490,6 @@ func (r *Reconciler) deleteInstances(
 		// have a "spec.replicas" field with the same meaning.
 		patch := client.RawPatch(client.Merge.Type(), []byte(`{"spec":{"replicas":0}}`))
 		err := errors.WithStack(r.patch(ctx, instance, patch))
-
 		// When the pod controller is missing, requeue rather than return an
 		// error. The garbage collector will stop the pod, and it is not our
 		// mistake that something else is deleting objects. Use RequeueAfter to
@@ -595,7 +598,6 @@ func (r *Reconciler) reconcileInstanceSets(
 	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
 	backupsSpecFound bool,
 ) error {
-
 	// Go through the observed instances and check if a primary has been determined.
 	// If the cluster is being shutdown and this instance is the primary, store
 	// the instance name as the startup instance. If the primary can be determined
@@ -709,8 +711,8 @@ func (r *Reconciler) cleanupPodDisruptionBudgets(
 // for the instance set specified that are not currently associated with an instance, and then
 // returning the instance names associated with those PVC's.
 func findAvailableInstanceNames(set v1beta1.PostgresInstanceSetSpec,
-	observedInstances *observedInstances, clusterVolumes []corev1.PersistentVolumeClaim) []string {
-
+	observedInstances *observedInstances, clusterVolumes []corev1.PersistentVolumeClaim,
+) []string {
 	availableInstanceNames := []string{}
 
 	// first identify any PGDATA volumes for the instance set specified
@@ -807,7 +809,12 @@ func (r *Reconciler) rolloutInstance(
 		ctx, span = r.Tracer.Start(ctx, "patroni-change-primary")
 		defer span.End()
 
-		success, err := patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "")
+		patroniVer4, err := cluster.IsPatroniVer4()
+		if err != nil {
+			return errors.Wrap(err, "failed to check if patroni v4 is used")
+		}
+
+		success, err := patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "", patroniVer4)
 		if err = errors.WithStack(err); err == nil && !success {
 			err = errors.New("unable to switchover")
 		}
@@ -976,7 +983,6 @@ func (r *Reconciler) scaleDownInstances(
 	cluster *v1beta1.PostgresCluster,
 	observedInstances *observedInstances,
 ) error {
-
 	// want defines the number of replicas we want for each instance set
 	want := map[string]int{}
 	for _, set := range cluster.Spec.InstanceSets {
@@ -1015,20 +1021,23 @@ func (r *Reconciler) scaleDownInstances(
 // the number of replicas we want for each instance set
 // then returns a list of the pods that we want to keep
 func podsToKeep(instances []corev1.Pod, want map[string]int) []corev1.Pod {
-
 	f := func(instances []corev1.Pod, want int) []corev1.Pod {
 		keep := []corev1.Pod{}
 
 		if want > 0 {
 			for _, instance := range instances {
-				if instance.Labels[naming.LabelRole] == "master" {
+				// K8SPG-648: patroni v4.0.0 deprecated "master" role.
+				//            We should use "primary" instead
+				if instance.Labels[naming.LabelRole] == "master" || instance.Labels[naming.LabelRole] == "primary" {
 					keep = append(keep, instance)
 				}
 			}
 		}
 
 		for _, instance := range instances {
-			if instance.Labels[naming.LabelRole] != "master" && len(keep) < want {
+			// K8SPG-648: patroni v4.0.0 deprecated master role
+			//            we should use primary instead
+			if instance.Labels[naming.LabelRole] != "master" && instance.Labels[naming.LabelRole] != "primary" && len(keep) < want {
 				keep = append(keep, instance)
 			}
 		}
@@ -1048,7 +1057,6 @@ func podsToKeep(instances []corev1.Pod, want map[string]int) []corev1.Pod {
 	}
 
 	return keepPodList
-
 }
 
 // +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={list}
@@ -1216,7 +1224,6 @@ func (r *Reconciler) reconcileInstance(
 			config.PostgresContainerImage(cluster),
 			cluster.Spec.ImagePullPolicy,
 			&instance.Spec.Template)
-
 	}
 	// K8SPG-435
 	sizeLimit := getTMPSizeLimit(instance.Labels[naming.LabelVersion], spec.Resources)

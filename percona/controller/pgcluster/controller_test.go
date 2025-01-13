@@ -68,7 +68,10 @@ var _ = Describe("PG Cluster", Ordered, func() {
 	})
 
 	It("should create PerconaPGCluster", func() {
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	Context("Reconcile controller", func() {
@@ -114,7 +117,10 @@ var _ = Describe("Annotations", Ordered, func() {
 		cr.Annotations["pgv2.percona.com/trigger-switchover"] = "true"
 		cr.Annotations["egedemo.com/test"] = "true"
 
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	Context("Reconcile controller", func() {
@@ -179,7 +185,10 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 	It("should create PerconaPGCluster with pmm enabled", func() {
 		cr.Spec.PMM.Enabled = true
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	Context("Reconcile controller", func() {
@@ -346,7 +355,10 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 
 	It("should create PerconaPGCluster with pmm enabled", func() {
 		cr.Spec.PMM.Enabled = true
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	It("controller should reconcile", func() {
@@ -526,7 +538,10 @@ var _ = Describe("Watching secrets", Ordered, func() {
 	reconcileCount := 0
 	Context("Create cluster and wait until Reconcile stops", func() {
 		It("should create PerconaPGCluster and PostgresCluster", func() {
+			status := cr.Status
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			cr.Status = status
+			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 
 			Eventually(func() error {
 				return k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v2.PerconaPGCluster))
@@ -683,7 +698,10 @@ var _ = Describe("Users", Ordered, func() {
 		It("should read defautl cr.yaml and create PerconaPGCluster without PMM", func() {
 			Expect(err).NotTo(HaveOccurred())
 
+			status := cr.Status
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			cr.Status = status
+			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 		})
 
 		It("should add default user", func() {
@@ -776,7 +794,10 @@ var _ = Describe("Users", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			cr.Spec.PMM.Enabled = true
+			status := cr.Status
 			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			cr.Status = status
+			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 		})
 
 		It("should create defaul and monitor user", func() {
@@ -841,7 +862,10 @@ var _ = Describe("Version labels", Ordered, func() {
 	})
 
 	It("should create PerconaPGCluster", func() {
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	It("should reconcile", func() {
@@ -939,7 +963,10 @@ var _ = Describe("Services with LoadBalancerSourceRanges", Ordered, func() {
 			Type:                     "LoadBalancer",
 			LoadBalancerSourceRanges: []string{"10.10.10.10/16"},
 		}
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	It("should reconcile", func() {
@@ -992,7 +1019,10 @@ var _ = Describe("Pause with backup", Ordered, func() {
 	cr.Spec.Backups.PGBackRest.Manual = nil
 
 	It("should create PerconaPGCluster", func() {
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	pgBackup := &v2.PerconaPGBackup{
@@ -1146,7 +1176,10 @@ var _ = Describe("Security context", Ordered, func() {
 		cr.Spec.Backups.PGBackRest.RepoHost = &v1beta1.PGBackRestRepoHost{
 			SecurityContext: podSecContext,
 		}
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	It("should reconcile", func() {
@@ -1227,7 +1260,10 @@ var _ = Describe("Operator-created sidecar container resources", Ordered, func()
 	})
 
 	It("should create PerconaPGCluster", func() {
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	It("should reconcile", func() {
@@ -1316,7 +1352,10 @@ var _ = Describe("Validate TLS", Ordered, func() {
 	cr.Default()
 
 	It("should create PerconaPGCluster", func() {
+		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
 	checkSecretProjection := func(cr *v2.PerconaPGCluster, projection *corev1.SecretProjection, secretName string, neededKeys []string) {

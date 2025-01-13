@@ -1,6 +1,7 @@
 package pgcluster
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	batchv1 "k8s.io/api/batch/v1"
@@ -17,7 +19,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -33,11 +37,14 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	"github.com/percona/percona-postgresql-operator/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
+	perconaPG "github.com/percona/percona-postgresql-operator/percona/postgres"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -51,8 +58,12 @@ const (
 
 // Reconciler holds resources for the PerconaPGCluster reconciler
 type PGClusterReconciler struct {
-	Client               client.Client
-	Owner                client.FieldOwner
+	Client  client.Client
+	Owner   client.FieldOwner
+	PodExec func(
+		ctx context.Context, namespace, pod, container string,
+		stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error
 	Recorder             record.EventRecorder
 	Tracer               trace.Tracer
 	Platform             string
@@ -175,6 +186,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
+// +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("cluster", request.Name, "namespace", request.Namespace)
@@ -227,6 +239,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
+	if err := r.reconcilePatroniVersionCheck(ctx, cr); err != nil {
+		if errors.Is(err, errPatroniVersionCheckWait) {
+			return reconcile.Result{
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		return reconcile.Result{}, errors.Wrap(err, "check patroni version")
+	}
+
 	if err := r.reconcileTLS(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile TLS")
 	}
@@ -255,7 +276,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
-	r.reconcileCustomExtensions(cr)
+	if err := r.reconcileCustomExtensions(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
+	}
 
 	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
@@ -298,6 +321,101 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return ctrl.Result{}, nil
+}
+
+var errPatroniVersionCheckWait = errors.New("waiting for pod to initialize")
+
+func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if cr.Annotations == nil {
+		cr.Annotations = make(map[string]string)
+	}
+
+	if cr.Status.Postgres.Version == cr.Spec.PostgresVersion && cr.Status.PatroniVersion != "" {
+		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
+		return nil
+	}
+
+	meta := metav1.ObjectMeta{
+		Name:      cr.Name + "-patroni-version-check",
+		Namespace: cr.Namespace,
+	}
+
+	p := &corev1.Pod{
+		ObjectMeta: meta,
+	}
+
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(p), p)
+	if client.IgnoreNotFound(err) != nil {
+		return errors.Wrap(err, "failed to get patroni version check pod")
+	}
+	if k8serrors.IsNotFound(err) {
+		p = &corev1.Pod{
+			ObjectMeta: meta,
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  pNaming.ContainerPatroniVersionCheck,
+						Image: cr.Spec.Image,
+						Command: []string{
+							"bash",
+						},
+						Args: []string{
+							"-c", "sleep 300",
+						},
+					},
+				},
+			},
+		}
+
+		if err := r.Client.Create(ctx, p); err != nil {
+			return errors.Wrap(err, "failed to create pod to check patroni version")
+		}
+
+		return errPatroniVersionCheckWait
+	}
+
+	if p.Status.Phase != corev1.PodRunning {
+		return errPatroniVersionCheckWait
+	}
+
+	var stdout, stderr bytes.Buffer
+	execCli, err := clientcmd.NewClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to create exec client")
+	}
+	b := wait.Backoff{
+		Duration: 5 * time.Second,
+		Factor:   1.0,
+		Steps:    12,
+		Cap:      time.Minute,
+	}
+	if err := retry.OnError(b, func(err error) bool { return err != nil && strings.Contains(err.Error(), "container not found") }, func() error {
+		return execCli.Exec(ctx, p, pNaming.ContainerPatroniVersionCheck, nil, &stdout, &stderr, "patronictl", "version")
+	}); err != nil {
+		return errors.Wrap(err, "exec")
+	}
+
+	patroniVersion := strings.TrimSpace(strings.TrimPrefix(stdout.String(), "patronictl version "))
+
+	if _, err := gover.NewVersion(patroniVersion); err != nil {
+		return errors.Wrap(err, "failed to validate patroni version")
+	}
+
+	orig := cr.DeepCopy()
+
+	cr.Status.PatroniVersion = patroniVersion
+	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
+
+	if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "failed to patch patroni version")
+	}
+
+	if err := r.Client.Delete(ctx, p); err != nil {
+		return errors.Wrap(err, "failed to delete patroni version check pod")
+	}
+	cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
+
+	return nil
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {
@@ -545,15 +663,57 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
-func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster) {
+func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if cr.Spec.Extensions.Storage.Secret == nil {
-		return
+		return nil
+	}
+
+	if len(cr.Spec.Extensions.Image) == 0 && len(cr.Spec.Extensions.Custom) > 0 {
+		return errors.New("you need to set spec.extensions.image to install custom extensions")
 	}
 
 	extensionKeys := make([]string, 0)
+	extensionNames := make([]string, 0)
+
 	for _, extension := range cr.Spec.Extensions.Custom {
 		key := extensions.GetExtensionKey(cr.Spec.PostgresVersion, extension.Name, extension.Version)
 		extensionKeys = append(extensionKeys, key)
+		extensionNames = append(extensionNames, extension.Name)
+	}
+
+	if cr.CompareVersion("2.6.0") >= 0 {
+		var removedExtension []string
+		installedExtensions := cr.Status.InstalledCustomExtensions
+		crExtensions := make(map[string]struct{})
+		for _, ext := range extensionNames {
+			crExtensions[ext] = struct{}{}
+		}
+
+		// Check for missing entries in crExtensions
+		for _, ext := range installedExtensions {
+			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
+			if _, ok := crExtensions[ext]; !ok {
+				removedExtension = append(removedExtension, ext)
+			}
+		}
+
+		if len(removedExtension) > 0 {
+			disable := func(ctx context.Context, exec postgres.Executor) error {
+				return errors.WithStack(disableCustomExtensionsInDB(ctx, exec, removedExtension))
+			}
+
+			primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, cr)
+			if err != nil {
+				return errors.New("primary pod not found")
+			}
+
+			err = disable(ctx, func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+				return r.PodExec(ctx, primary.Namespace, primary.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
+			})
+			if err != nil {
+				return errors.Wrap(err, "deletion extension from installed")
+			}
+		}
 	}
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
@@ -570,6 +730,31 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(cr *v2.PerconaPGCluster)
 		))
 		set.VolumeMounts = append(set.VolumeMounts, extensions.ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
 	}
+	return nil
+}
+
+func disableCustomExtensionsInDB(ctx context.Context, exec postgres.Executor, customExtensionsForDeletion []string) error {
+	log := logging.FromContext(ctx)
+
+	for _, extensionName := range customExtensionsForDeletion {
+		sqlCommand := fmt.Sprintf(
+			`SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS %s;`,
+			extensionName,
+		)
+		_, _, err := exec.ExecInAllDatabases(ctx,
+			sqlCommand,
+			map[string]string{
+				"ON_ERROR_STOP": "on", // Abort when any one command fails.
+				"QUIET":         "on", // Do not print successful commands to stdout.
+			},
+		)
+
+		log.V(1).Info("extension was disabled ", "extensionName", extensionName)
+
+		return errors.Wrap(err, "custom extension deletion")
+	}
+
+	return nil
 }
 
 func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster) (bool, error) {
