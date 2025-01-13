@@ -14423,7 +14423,7 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 16
+                maximum: 17
                 minimum: 12
                 type: integer
               proxy:
@@ -18212,6 +18212,8 @@ spec:
                 items:
                   type: string
                 type: array
+              patroniVersion:
+                type: string
               pgbouncer:
                 properties:
                   ready:
@@ -18249,17 +18251,11 @@ spec:
                   size:
                     format: int32
                     type: integer
-                required:
-                - instances
-                - ready
-                - size
+                  version:
+                    type: integer
                 type: object
               state:
                 type: string
-            required:
-            - pgbouncer
-            - postgres
-            - state
             type: object
         required:
         - metadata
@@ -20884,7 +20880,7 @@ spec:
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
-                maximum: 16
+                maximum: 17
                 minimum: 13
                 type: integer
               tolerations:
@@ -23952,7 +23948,7 @@ spec:
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
                 maximum: 17
-                minimum: 10
+                minimum: 12
                 type: integer
               image:
                 description: The image name to use for major PostgreSQL upgrades.
@@ -25496,7 +25492,7 @@ spec:
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
                 maximum: 17
-                minimum: 10
+                minimum: 13
                 type: integer
               tolerations:
                 description: |-
@@ -39737,7 +39733,7 @@ spec:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
                 maximum: 17
-                minimum: 10
+                minimum: 12
                 type: integer
               proxy:
                 description: The specification of a proxy that connects to PostgreSQL.
@@ -45706,6 +45702,7 @@ rules:
   resources:
   - configmaps
   - persistentvolumeclaims
+  - pods
   - secrets
   - serviceaccounts
   - services
@@ -45743,16 +45740,6 @@ rules:
   verbs:
   - create
   - patch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - delete
-  - get
-  - list
-  - patch
-  - watch
 - apiGroups:
   - apps
   resources:

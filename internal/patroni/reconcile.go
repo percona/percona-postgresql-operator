@@ -185,7 +185,9 @@ func PodIsPrimary(pod metav1.Object) bool {
 	// - https://github.com/zalando/patroni/blob/v3.1.1/patroni/ha.py#L782
 	// - https://github.com/zalando/patroni/blob/v3.1.1/patroni/ha.py#L1574
 	status := pod.GetAnnotations()["status"]
-	return strings.Contains(status, `"role":"master"`)
+	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
+	//            We should use "primary" instead
+	return strings.Contains(status, `"role":"master"`) || strings.Contains(status, `"role":"primary"`)
 }
 
 // PodIsStandbyLeader returns whether or not pod is currently acting as a "standby_leader".
