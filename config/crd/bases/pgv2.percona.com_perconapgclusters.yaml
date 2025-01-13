@@ -8577,8 +8577,6 @@ spec:
                         - azure
                         type: string
                     type: object
-                required:
-                - image
                 type: object
               image:
                 description: The image name to use for PostgreSQL containers.
@@ -14132,7 +14130,7 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 16
+                maximum: 17
                 minimum: 12
                 type: integer
               proxy:
@@ -17923,6 +17921,8 @@ spec:
                 items:
                   type: string
                 type: array
+              patroniVersion:
+                type: string
               pgbouncer:
                 properties:
                   ready:
@@ -17960,17 +17960,11 @@ spec:
                   size:
                     format: int32
                     type: integer
-                required:
-                - instances
-                - ready
-                - size
+                  version:
+                    type: integer
                 type: object
               state:
                 type: string
-            required:
-            - pgbouncer
-            - postgres
-            - state
             type: object
         required:
         - metadata
@@ -20595,7 +20589,7 @@ spec:
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
-                maximum: 16
+                maximum: 17
                 minimum: 13
                 type: integer
               tolerations:

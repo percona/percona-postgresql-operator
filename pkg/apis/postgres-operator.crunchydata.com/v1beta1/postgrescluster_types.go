@@ -8,9 +8,12 @@ import (
 	"fmt"
 
 	gover "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 )
 
 // PostgresClusterSpec defines the desired state of PostgresCluster
@@ -122,7 +125,7 @@ type PostgresClusterSpec struct {
 
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Minimum=12
 	// +kubebuilder:validation:Maximum=17
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	PostgresVersion int `json:"postgresVersion"`
@@ -748,4 +751,17 @@ func (cr *PostgresCluster) CompareVersion(ver string) int {
 		return -2
 	}
 	return crVersion.Compare(gover.Must(gover.NewVersion(ver)))
+}
+
+// K8SPG-692
+func (cr *PostgresCluster) IsPatroniVer4() (bool, error) {
+	patroniVerStr, ok := cr.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
+	if !ok {
+		return false, errors.New("patroni version annotation was not found")
+	}
+	patroniVer, err := gover.NewVersion(patroniVerStr)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get patroni ver")
+	}
+	return patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0, nil
 }
