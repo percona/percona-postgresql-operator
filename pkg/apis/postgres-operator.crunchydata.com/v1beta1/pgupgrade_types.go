@@ -11,7 +11,6 @@ import (
 
 // PGUpgradeSpec defines the desired state of PGUpgrade
 type PGUpgradeSpec struct {
-
 	// +optional
 	Metadata *Metadata `json:"metadata,omitempty"`
 
@@ -48,7 +47,7 @@ type PGUpgradeSpec struct {
 
 	// The major version of PostgreSQL before the upgrade.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Minimum=12
 	// +kubebuilder:validation:Maximum=17
 	FromPostgresVersion int `json:"fromPostgresVersion"`
 
@@ -59,7 +58,7 @@ type PGUpgradeSpec struct {
 
 	// The major version of PostgreSQL to be upgraded to.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Minimum=13
 	// +kubebuilder:validation:Maximum=17
 	ToPostgresVersion int `json:"toPostgresVersion"`
 

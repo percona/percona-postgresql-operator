@@ -8,11 +8,11 @@ commands:
 
       source ../../functions
 
-      init_pod=$(get_pod_by_role self-healing master name)
-      failure_pod "${NAMESPACE}" "$(get_pod_by_role self-healing master name)"
+      init_pod=$(get_pod_by_role self-healing primary name)
+      failure_pod "${NAMESPACE}" "$(get_pod_by_role self-healing primary name)"
       sleep 30 # wait a bit for pod to be killed and new master elected
 
-      if [ "$init_pod" == "$(get_pod_by_role self-healing master name)" ]; then
+      if [ "$init_pod" == "$(get_pod_by_role self-healing primary name)" ]; then
         echo "master pod was not killed! something went wrong."
         exit 1
       fi
