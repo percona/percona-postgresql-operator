@@ -86,7 +86,7 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 			}
 
 			latestRestorableTime := latestBackup.Status.LatestRestorableTime
-			log.Info("Latest commit timestamp", "timestamp", ts, "latestRestorableTime", latestRestorableTime.Time)
+			log.V(1).Info("Latest commit timestamp", "timestamp", ts, "latestRestorableTime", latestRestorableTime.Time)
 			if latestRestorableTime.Time == nil || latestRestorableTime.UTC().Before(ts.Time) {
 				log.Info("Triggering PGBackup reconcile",
 					"latestBackup", latestBackup.Name,
