@@ -12,7 +12,7 @@ func EnableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	log := logging.FromContext(ctx)
 
 	stdout, stderr, err := exec.ExecInAllDatabases(ctx,
-		`SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS pg_stat_monitor;`,
+		`SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS pg_stat_monitor; ALTER EXTENSION pg_stat_monitor UPDATE;`,
 		map[string]string{
 			"ON_ERROR_STOP": "on", // Abort when any one command fails.
 			"QUIET":         "on", // Do not print successful commands to stdout.

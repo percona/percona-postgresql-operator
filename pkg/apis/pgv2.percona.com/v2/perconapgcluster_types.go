@@ -93,7 +93,7 @@ type PerconaPGClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=16
+	// +kubebuilder:validation:Maximum=17
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -206,6 +206,7 @@ func (cr *PerconaPGCluster) Default() {
 	cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
 	t := true
+	f := false
 
 	if cr.Spec.Backups.TrackLatestRestorableTime == nil {
 		cr.Spec.Backups.TrackLatestRestorableTime = &t
@@ -218,11 +219,18 @@ func (cr *PerconaPGCluster) Default() {
 	}
 	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	if cr.Spec.Backups.PGBackRest.Jobs == nil {
+		cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+	}
+
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
 	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
 		cr.Spec.Extensions.BuiltIn.PGAudit = &t
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
+		cr.Spec.Extensions.BuiltIn.PGVector = &f
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
@@ -344,6 +352,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
+	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
 
 	return postgresCluster, nil
 }
@@ -369,45 +378,55 @@ const (
 type PostgresInstanceSetStatus struct {
 	Name string `json:"name"`
 
-	// +kubebuilder:validation:Required
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
 	Ready int32 `json:"ready"`
 }
 
 type PostgresStatus struct {
-	// +kubebuilder:validation:Required
+	// +optional
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
+	// +optional
 	Ready int32 `json:"ready"`
 
-	// +kubebuilder:validation:Required
+	// +optional
 	InstanceSets []PostgresInstanceSetStatus `json:"instances"`
+
+	// +optional
+	Version int `json:"version"`
 }
 
 type PGBouncerStatus struct {
-	// +kubebuilder:validation:Required
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
 	Ready int32 `json:"ready"`
 }
 
 type PerconaPGClusterStatus struct {
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Postgres PostgresStatus `json:"postgres"`
 
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	PGBouncer PGBouncerStatus `json:"pgbouncer"`
 
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	State AppState `json:"state"`
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
+	PatroniVersion string `json:"patroniVersion"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Host string `json:"host"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	InstalledCustomExtensions []string `json:"installedCustomExtensions"`
 }
 
 type Backups struct {
@@ -567,11 +586,11 @@ type CustomExtensionsStorageSpec struct {
 type BuiltInExtensionsSpec struct {
 	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
 	PGAudit       *bool `json:"pg_audit,omitempty"`
+	PGVector      *bool `json:"pgvector,omitempty"`
 }
 
 type ExtensionsSpec struct {
-	// +kubebuilder:validation:Required
-	Image           string                      `json:"image"`
+	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
 	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
 	BuiltIn         BuiltInExtensionsSpec       `json:"builtin,omitempty"`

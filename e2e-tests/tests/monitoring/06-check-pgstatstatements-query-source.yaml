@@ -12,6 +12,6 @@ commands:
       # Wait for the pg_stat_statements extension to be created
       sleep 80
 
-      primary=$(get_pod_by_role monitoring master name)
+      primary=$(get_pod_by_role monitoring primary name)
       res=$(kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT extname FROM pg_extension;"')
       echo ${res} | grep -q pg_stat_statements

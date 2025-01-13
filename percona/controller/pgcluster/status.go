@@ -78,6 +78,11 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		return errors.Wrap(err, "get app host")
 	}
 
+	installedCustomExtensions := make([]string, 0)
+	for _, extension := range cr.Spec.Extensions.Custom {
+		installedCustomExtensions = append(installedCustomExtensions, extension.Name)
+	}
+
 	var size, ready int32
 	ss := make([]v2.PostgresInstanceSetStatus, 0, len(status.InstanceSets))
 	for _, is := range status.InstanceSets {
@@ -100,18 +105,16 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 			return errors.Wrap(err, "get PerconaPGCluster")
 		}
 
-		cluster.Status = v2.PerconaPGClusterStatus{
-			Postgres: v2.PostgresStatus{
-				Size:         size,
-				Ready:        ready,
-				InstanceSets: ss,
-			},
-			PGBouncer: v2.PGBouncerStatus{
-				Size:  status.Proxy.PGBouncer.Replicas,
-				Ready: status.Proxy.PGBouncer.ReadyReplicas,
-			},
-			Host: host,
+		cluster.Status.Postgres.Size = size
+		cluster.Status.Postgres.Ready = ready
+		cluster.Status.Postgres.InstanceSets = ss
+
+		cluster.Status.PGBouncer = v2.PGBouncerStatus{
+			Size:  status.Proxy.PGBouncer.Replicas,
+			Ready: status.Proxy.PGBouncer.ReadyReplicas,
 		}
+		cluster.Status.Host = host
+		cluster.Status.InstalledCustomExtensions = installedCustomExtensions
 
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 

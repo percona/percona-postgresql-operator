@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -1487,6 +1487,9 @@ spec:
                                     x-kubernetes-list-type: atomic
                                 type: object
                             type: object
+                          backoffLimit:
+                            format: int32
+                            type: integer
                           priorityClassName:
                             description: |-
                               Priority class name for the pgBackRest backup Job pods.
@@ -1554,6 +1557,13 @@ spec:
                                   More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                                 type: object
                             type: object
+                          restartPolicy:
+                            description: |-
+                              RestartPolicy describes how the container should be restarted.
+                              Only one of the following restart policies may be specified.
+                              If none of the following policies is specified, the default one
+                              is RestartPolicyAlways.
+                            type: string
                           securityContext:
                             description: SecurityContext defines the security settings
                               for PGBackRest pod.
@@ -8064,6 +8074,8 @@ spec:
                         type: boolean
                       pg_stat_monitor:
                         type: boolean
+                      pgvector:
+                        type: boolean
                     type: object
                   custom:
                     items:
@@ -8159,8 +8171,6 @@ spec:
                         - azure
                         type: string
                     type: object
-                required:
-                - image
                 type: object
               image:
                 description: The image name to use for PostgreSQL containers.
@@ -13714,7 +13724,7 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 16
+                maximum: 17
                 minimum: 12
                 type: integer
               proxy:
@@ -17499,6 +17509,12 @@ spec:
             properties:
               host:
                 type: string
+              installedCustomExtensions:
+                items:
+                  type: string
+                type: array
+              patroniVersion:
+                type: string
               pgbouncer:
                 properties:
                   ready:
@@ -17536,17 +17552,11 @@ spec:
                   size:
                     format: int32
                     type: integer
-                required:
-                - instances
-                - ready
-                - size
+                  version:
+                    type: integer
                 type: object
               state:
                 type: string
-            required:
-            - pgbouncer
-            - postgres
-            - state
             type: object
         required:
         - metadata

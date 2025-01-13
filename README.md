@@ -11,7 +11,7 @@
 
 ## Introduction
 
-[Percona Operator for PostgreSQL](https://docs.percona.com/percona-operator-for-postgresql/2.0/index.html) automates and simplifies deploying and managing open source PostgreSQL clusters on Kubernetes. It is based on [Postgres Operator](https://crunchydata.github.io/postgres-operator/latest/) developed by Crunchy Data.
+[Percona Operator for PostgreSQL](https://docs.percona.com/percona-operator-for-postgresql/2.0/index.html) automates and simplifies deploying and managing open source PostgreSQL clusters on Kubernetes. It is based on [Postgres Operator](https://github.com/CrunchyData/postgres-operator) developed by Crunchy Data.
 
 Whether you need to get a simple PostgreSQL cluster up and running, need to deploy a high availability, fault tolerant cluster in production, or are running your own database-as-a-service, the Operator provides the essential features you need to keep your clusters healthy:
 
