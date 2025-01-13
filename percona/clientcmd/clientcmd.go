@@ -4,12 +4,14 @@ import (
 	"context"
 	"io"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/util/retry"
 )
 
 type Client struct {
@@ -64,16 +66,26 @@ func (c *Client) Exec(ctx context.Context, pod *corev1.Pod, containerName string
 
 	exec, err := remotecommand.NewSPDYExecutor(c.restconfig, "POST", req.URL())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create executor")
 	}
 
-	// Connect this process' std{in,out,err} to the remote shell process.
-	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    tty,
+	retryErr := retry.OnError(retry.DefaultRetry, func(err error) bool {
+		return true // Retry on all errors
+	}, func() error {
+		// Connect this process' std{in,out,err} to the remote shell process.
+		return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+			Stdin:  stdin,
+			Stdout: stdout,
+			Stderr: stderr,
+			Tty:    tty,
+		})
 	})
+
+	if retryErr != nil {
+		return errors.Wrap(retryErr, "failed to execute command in pod")
+	}
+
+	return nil
 }
 
 func (c *Client) REST() restclient.Interface {
