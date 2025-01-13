@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 
+	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -191,6 +192,16 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	const container = naming.ContainerDatabase
 	var podExecutor postgres.Executor
 
+	log := logging.FromContext(ctx)
+
+	// K8SPG-377
+	for _, inst := range instances.forCluster {
+		if matches, known := inst.PodMatchesPodTemplate(); !matches || !known {
+			log.V(1).Info("Waiting for instance to be updated", "instance", inst.Name)
+			return nil
+		}
+	}
+
 	// Find the PostgreSQL instance that can execute SQL that writes system
 	// catalogs. When there is none, return early.
 	pod, _ := instances.writablePod(container)
@@ -233,10 +244,24 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
-
-	// K8SPG-375, K8SPG-577
+	// K8SPG-375, K8SPG-577, K8SPG-699
 	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
+		// validate version string before running it in database
+		_, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
+		if err != nil {
+			return err
+		}
+
+		_, _, err = exec.ExecInAllDatabases(ctx,
+			fmt.Sprintf("SELECT '%s';", cluster.Labels[naming.LabelVersion]),
+			map[string]string{
+				"QUIET": "on", // Do not print successful commands to stdout.
+			})
+		if err != nil {
+			return err
+		}
+
 		if cluster.Spec.Extensions.PGStatMonitor {
 			if pgStatMonitorOK = pgstatmonitor.EnableInPostgreSQL(ctx, exec) == nil; !pgStatMonitorOK {
 				// pg_stat_monitor can only be enabled after its shared library is loaded,
@@ -281,6 +306,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
+		// K8SPG-699
 		if cluster.Spec.Extensions.PGVector {
 			if pgvectorOK = pgvector.EnableInPostgreSQL(ctx, exec) == nil; !pgvectorOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgvectorDisabled",
@@ -338,7 +364,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
 	}
 	// K8SPG-472
-	if err == nil && pgStatMonitorOK && pgAuditOK && postgisInstallOK {
+	if err == nil && pgStatMonitorOK && pgAuditOK && pgvectorOK && postgisInstallOK {
 		cluster.Status.DatabaseRevision = revision
 	}
 
