@@ -37,4 +37,6 @@ const (
 	// AnnotationClusterBootstrapRestore is the annotation that is added to PerconaPGRestore to
 	// indicate that it is a cluster bootstrap restore.
 	AnnotationClusterBootstrapRestore = PrefixPerconaPGV2 + "cluster-bootstrap-restore"
+
+	AnnotationPatroniVersion = PrefixPerconaPGV2 + "patroni-version"
 )

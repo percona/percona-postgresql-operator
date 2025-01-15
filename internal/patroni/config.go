@@ -565,8 +565,22 @@ func instanceYAML(
 		postgresql[pgBackRestCreateReplicaMethod] = map[string]any{
 			"command":   strings.Join(quoted, " "),
 			"keep_data": true,
-			"no_master": true,
+			"no_leader": true,
 			"no_params": true,
+		}
+		// K8SPG-648: patroni v4.0.0 deprecated "no_master".
+		//            We should use "no_leader" instead
+		patroniVer4, err := cluster.IsPatroniVer4()
+		if err != nil {
+			return "", fmt.Errorf("failed to check if patroni v4 is used: %w", err)
+		}
+		if !patroniVer4 {
+			postgresql[pgBackRestCreateReplicaMethod] = map[string]any{
+				"command":   strings.Join(quoted, " "),
+				"keep_data": true,
+				"no_master": true,
+				"no_params": true,
+			}
 		}
 		methods = append([]string{pgBackRestCreateReplicaMethod}, methods...)
 	}

@@ -1,0 +1,10 @@
+.github/**
+docs/**
+examples/**
+licenses/**
+code-of-conduct.md
+CONTRIBUTING.md
+LICENSE.md
+README.md
+.gitignore
+release_versions

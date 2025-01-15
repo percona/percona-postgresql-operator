@@ -120,9 +120,9 @@ spec:
 #          test-label: value
 
 
-  image: perconalab/percona-postgresql-operator:main-ppg16-postgres
+  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
   imagePullPolicy: Always
-  postgresVersion: 16
+  postgresVersion: 17
 #  port: 5432
 
 #  expose:
@@ -236,7 +236,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
+      image: perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -318,7 +318,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
 #
 #      containers:
 #        pgbackrest:
