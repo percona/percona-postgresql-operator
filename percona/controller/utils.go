@@ -84,9 +84,9 @@ type FinalizerFunc[T client.Object] func(context.Context, T) error
 
 var ErrKeepFinalizer = errors.New("should keep finalizer")
 
-func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T, finalizer string, f FinalizerFunc[T]) error {
+func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T, finalizer string, f FinalizerFunc[T]) (bool, error) {
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {
-		return nil
+		return true, nil
 	}
 
 	log := logging.FromContext(ctx)
@@ -94,22 +94,22 @@ func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T,
 
 	orig, ok := obj.DeepCopyObject().(client.Object)
 	if !ok {
-		return errors.Errorf("failed to convert runtime.Object to client.Object")
+		return false, errors.Errorf("failed to convert runtime.Object to client.Object")
 	}
 
 	if err := f(ctx, obj); err != nil {
 		if errors.Is(err, ErrKeepFinalizer) {
-			return nil
+			return false, nil
 		}
-		return errors.Wrapf(err, "run finalizer %s", finalizer)
+		return false, errors.Wrapf(err, "run finalizer %s", finalizer)
 	}
 
 	if controllerutil.RemoveFinalizer(obj, finalizer) {
 		log.Info("Removing finalizer", "name", finalizer)
 		if err := cl.Patch(ctx, obj, client.MergeFrom(orig)); err != nil {
-			return errors.Wrap(err, "remove finalizers")
+			return false, errors.Wrap(err, "remove finalizers")
 		}
 	}
 
-	return nil
+	return true, nil
 }

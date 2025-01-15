@@ -172,7 +172,7 @@ func runFinalizers(ctx context.Context, c client.Client, pr *v2.PerconaPGRestore
 	}
 
 	for finalizer, f := range finalizers {
-		if err := controller.RunFinalizer(ctx, c, pr, finalizer, f); err != nil {
+		if _, err := controller.RunFinalizer(ctx, c, pr, finalizer, f); err != nil {
 			return errors.Wrapf(err, "run finalizer %s", finalizer)
 		}
 	}

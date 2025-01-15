@@ -78,7 +78,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	pgBackup.Default()
 
 	if pgBackup.DeletionTimestamp != nil {
-		if err := runFinalizers(ctx, r.Client, pgBackup); err != nil {
+		if _, err := runFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
 		}
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
@@ -213,14 +213,13 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			log.Info("Waiting for backup to complete")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
-
-		rr, err := finishBackup(ctx, r.Client, pgBackup, job)
+		finished, err := runFinalizers(ctx, r.Client, pgBackup)
 		if err != nil {
-			return reconcile.Result{}, err
+			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
 		}
-		if rr != nil {
+		if !finished {
 			log.Info("Waiting for crunchy reconciler to finish")
-			return *rr, nil
+			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
 		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -274,17 +273,17 @@ func ensureFinalizers(ctx context.Context, cl client.Client, pgBackup *v2.Percon
 		return nil
 	}
 
-	if err := cl.Patch(ctx, pgBackup, client.MergeFrom(orig)); err != nil {
+	if err := cl.Patch(ctx, pgBackup.DeepCopy(), client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "remove finalizers")
 	}
 	return nil
 }
 
-func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) error {
+func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (bool, error) {
 	pg := new(v2.PerconaPGCluster)
 	if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pg); err != nil {
 		if !k8serrors.IsNotFound(err) {
-			return errors.Wrap(err, "get PostgresCluster")
+			return false, errors.Wrap(err, "get PostgresCluster")
 		}
 
 		pg = nil
@@ -312,12 +311,17 @@ func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGB
 		},
 	}
 
+	finished := true
 	for finalizer, f := range finalizers {
-		if err := controller.RunFinalizer(ctx, c, pgBackup, finalizer, f); err != nil {
-			return errors.Wrapf(err, "run finalizer %s", finalizer)
+		done, err := controller.RunFinalizer(ctx, c, pgBackup, finalizer, f)
+		if err != nil {
+			return false, errors.Wrapf(err, "run finalizer %s", finalizer)
+		}
+		if !done {
+			finished = false
 		}
 	}
-	return nil
+	return finished, nil
 }
 
 func getBackupInProgress(ctx context.Context, c client.Client, clusterName, ns string) (string, error) {
@@ -531,12 +535,9 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return nil, errors.Wrap(err, "update postgrescluster")
 	}
 
-	deleted, err = deleteAnnotation(pNaming.AnnotationBackupInProgress)
+	_, err = deleteAnnotation(pNaming.AnnotationBackupInProgress)
 	if err != nil {
 		return nil, errors.Wrapf(err, "delete %s annotation", pNaming.AnnotationBackupInProgress)
-	}
-	if !deleted {
-		return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
 	return nil, nil

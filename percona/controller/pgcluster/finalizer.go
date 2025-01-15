@@ -159,7 +159,7 @@ func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaP
 	}
 
 	for finalizer, f := range finalizers {
-		if err := controller.RunFinalizer(ctx, r.Client, cr, finalizer, f); err != nil {
+		if _, err := controller.RunFinalizer(ctx, r.Client, cr, finalizer, f); err != nil {
 			return errors.Wrapf(err, "run finalizer %s", finalizer)
 		}
 	}
