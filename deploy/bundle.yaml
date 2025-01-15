@@ -18126,6 +18126,8 @@ spec:
                     pattern: ^repo[1-4]
                     type: string
                 type: object
+              tlsOnly:
+                type: boolean
               unmanaged:
                 description: |-
                   Suspends the rollout and reconciliation of changes made to the
@@ -43350,6 +43352,8 @@ spec:
                   minimum: 1
                   type: integer
                 type: array
+              tlsOnly:
+                type: boolean
               userInterface:
                 description: The specification of a user interface that connects to
                   PostgreSQL.

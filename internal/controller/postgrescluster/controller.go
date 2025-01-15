@@ -235,6 +235,16 @@ func (r *Reconciler) Reconcile(
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgbouncer.PostgreSQL(cluster, &pgHBAs)
 
+	// K8SPG-554
+	if cluster.Spec.TLSOnly {
+		for i := range pgHBAs.Mandatory {
+			pgHBAs.Mandatory[i].TLSOnly()
+		}
+		for i := range pgHBAs.Default {
+			pgHBAs.Default[i].TLSOnly()
+		}
+	}
+
 	pgParameters := postgres.NewParameters()
 	// K8SPG-375
 	if cluster.Spec.Extensions.PGStatMonitor {
