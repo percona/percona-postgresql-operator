@@ -117,33 +117,41 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			}
 		}
 
-		pgBackup.Status.Destination = getDestination(pgCluster, pgBackup)
-		pgBackup.Status.Image = pgCluster.Spec.Backups.PGBackRest.Image
-
 		repo := getRepo(pgCluster, pgBackup)
 		if repo == nil {
 			return reconcile.Result{}, errors.Errorf("%s repo not defined", pgBackup.Spec.RepoName)
-		}
-
-		pgBackup.Status.Repo = repo
-		pgBackup.Status.CRVersion = pgCluster.Spec.CRVersion
-		switch {
-		case repo.S3 != nil:
-			pgBackup.Status.StorageType = v2.PGBackupStorageTypeS3
-		case repo.Azure != nil:
-			pgBackup.Status.StorageType = v2.PGBackupStorageTypeAzure
-		case repo.GCS != nil:
-			pgBackup.Status.StorageType = v2.PGBackupStorageTypeGCS
-		default:
-			pgBackup.Status.StorageType = v2.PGBackupStorageTypeFilesystem
 		}
 
 		if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 		}
 
-		pgBackup.Status.State = v2.BackupStarting
-		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			bcp := new(v2.PerconaPGBackup)
+			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
+				return errors.Wrap(err, "get PGBackup")
+			}
+
+			bcp.Status.Destination = getDestination(pgCluster, pgBackup)
+			bcp.Status.Image = pgCluster.Spec.Backups.PGBackRest.Image
+			bcp.Status.Repo = repo
+			bcp.Status.CRVersion = pgCluster.Spec.CRVersion
+
+			switch {
+			case repo.S3 != nil:
+				bcp.Status.StorageType = v2.PGBackupStorageTypeS3
+			case repo.Azure != nil:
+				bcp.Status.StorageType = v2.PGBackupStorageTypeAzure
+			case repo.GCS != nil:
+				bcp.Status.StorageType = v2.PGBackupStorageTypeGCS
+			default:
+				bcp.Status.StorageType = v2.PGBackupStorageTypeFilesystem
+			}
+
+			bcp.Status.State = v2.BackupStarting
+
+			return r.Client.Status().Update(ctx, bcp)
+		}); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 
