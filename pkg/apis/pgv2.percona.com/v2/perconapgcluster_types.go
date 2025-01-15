@@ -76,6 +76,8 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
+	TLSOnly bool `json:"tlsOnly,omitempty"`
+
 	// The port on which PostgreSQL should listen.
 	// +optional
 	// +kubebuilder:default=5432
@@ -353,6 +355,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
 	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
+
+	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
 	return postgresCluster, nil
 }
