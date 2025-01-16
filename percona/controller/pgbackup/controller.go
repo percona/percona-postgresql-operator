@@ -77,7 +77,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 	pgBackup.Default()
 
-	if pgBackup.DeletionTimestamp != nil {
+	if pgBackup.DeletionTimestamp.IsZero() {
 		if _, err := runFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
 		}
