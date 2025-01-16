@@ -210,10 +210,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		},
 	}
 
-	if err := r.ensureFinalizers(ctx, cr); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
-	}
-
 	if cr.DeletionTimestamp != nil {
 		log.Info("Deleting PerconaPGCluster", "deletionTimestamp", cr.DeletionTimestamp)
 
@@ -232,6 +228,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		return reconcile.Result{}, nil
+	}
+
+	if err := r.ensureFinalizers(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 	}
 
 	if err := r.reconcilePatroniVersionCheck(ctx, cr); err != nil {
