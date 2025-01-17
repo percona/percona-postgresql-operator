@@ -8,4 +8,6 @@ commands:
 
       source ../../functions
 
-      get_cr "scheduled-backup" ${RANDOM} | kubectl -n "${NAMESPACE}" apply -f -
+      get_cr "scheduled-backup" ${RANDOM} \
+      | yq '.metadata.finalizers=["percona.com/delete-backups"]' \
+      | kubectl -n "${NAMESPACE}" apply -f -
