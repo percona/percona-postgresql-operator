@@ -74,10 +74,6 @@ type PGClusterReconciler struct {
 	Watchers             *registry.Registry
 	ExternalChan         chan event.GenericEvent
 	StopExternalWatchers chan event.DeleteEvent
-	PodExec              func(
-		ctx context.Context, namespace, pod, container string,
-		stdin io.Reader, stdout, stderr io.Writer, command ...string,
-	) error
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
