@@ -548,8 +548,10 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return nil, errors.Wrapf(err, "delete %s annotation", pNaming.AnnotationBackupInProgress)
 	}
 
-	if err := c.Delete(ctx, job); err != nil {
-		return nil, errors.Wrap(err, "delete pg-backup job")
+	if checkBackupJob(job) != v2.BackupSucceeded {
+		if err := c.Delete(ctx, job); err != nil {
+			return nil, errors.Wrap(err, "delete pg-backup job")
+		}
 	}
 
 	return nil, nil
