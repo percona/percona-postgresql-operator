@@ -5,6 +5,7 @@ metadata:
 #  finalizers:
 #  - percona.com/delete-pvc
 #  - percona.com/delete-ssl
+#  - percona.com/delete-backups
 spec:
   crVersion: 2.6.0
 #  metadata:
