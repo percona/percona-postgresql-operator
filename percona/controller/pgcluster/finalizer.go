@@ -1,7 +1,10 @@
 package pgcluster
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -150,6 +153,61 @@ func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.P
 	return nil
 }
 
+func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+
+	podList := &corev1.PodList{}
+	err := r.Client.List(ctx, podList, &client.ListOptions{
+		Namespace: cr.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelPerconaInstance:  cr.Name,
+			naming.LabelPerconaComponent: "pg",
+		}),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if len(podList.Items) == 0 {
+		return errors.New("no pods found")
+	}
+
+	log.Info("Deleting backups from all the repos configured")
+
+	pod := podList.Items[0]
+
+	var stdout, stderr bytes.Buffer
+	pgBackrestCmd := "pgbackrest --stanza=db --log-level-console=info stop && " +
+		"pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete --force"
+
+	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
+		cmd := []string{"bash", "-ceu", "--", fmt.Sprintf(pgBackrestCmd, strings.TrimPrefix(repo.Name, "repo"))}
+		if err := r.PodExec(ctx, cr.Namespace, pod.Name, "database", nil, &stdout, &stderr, cmd...); err != nil {
+			return errors.Wrapf(err, "delete backups, stderr: %s", stdout.String()+" "+stderr.String())
+		}
+		log.Info("Deleted backups from repo", "repo", repo.Name)
+	}
+
+	pbList := new(v2.PerconaPGBackupList)
+	err = r.Client.List(ctx, pbList, &client.ListOptions{
+		Namespace: cr.Namespace,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to list backup jobs")
+	}
+
+	log.Info("Deleting all PGBackup objects")
+	for _, pgBackup := range pbList.Items {
+		if err := r.Client.Delete(ctx, &pgBackup); err != nil {
+			return errors.Wrapf(err, "delete backup %s/%s", pgBackup.Name, pgBackup.Namespace)
+		}
+		log.Info("Deleted PGBackup", "name", pgBackup.Name)
+	}
+
+	return nil
+}
+
 func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeletePVC, r.deletePVCAndSecrets); err != nil {
 		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeletePVC)
@@ -157,6 +215,10 @@ func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaP
 
 	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeleteSSL, r.deleteTLSSecrets); err != nil {
 		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeleteSSL)
+	}
+
+	if err := r.runFinalizer(ctx, cr, v2.FinalizerDeleteBackups, r.deleteBackups); err != nil {
+		return errors.Wrapf(err, "run finalizer %s", v2.FinalizerDeleteBackups)
 	}
 
 	if err := r.runFinalizer(ctx, cr, v2.FinalizerStopWatchers, r.stopExternalWatchers); err != nil {
