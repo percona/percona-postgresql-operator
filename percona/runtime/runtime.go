@@ -17,22 +17,24 @@ import (
 // default refresh interval in minutes
 var refreshInterval = 60 * time.Minute
 
+const electionID string = "08db3feb.percona.com"
+
 // CreateRuntimeManager does the same thing as `internal/controller/runtime.CreateRuntimeManager`,
 // excet it configures the manager to watch multiple namespaces.
 func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics, disableLeaderElection bool, features feature.MutableGate) (manager.Manager, error) {
+
+	var leaderElectionID string
+	if !disableLeaderElection {
+		leaderElectionID = electionID
+	}
 
 	options := manager.Options{
 		Cache: cache.Options{
 			SyncPeriod: &refreshInterval,
 		},
 		Scheme:           r.Scheme,
-		LeaderElection:   disableLeaderElection,
-		LeaderElectionID: "08db3feb.percona.com",
-	}
-
-	if disableLeaderElection {
-		options.LeaderElection = false
-		options.LeaderElectionID = ""
+		LeaderElection:   !disableLeaderElection,
+		LeaderElectionID: leaderElectionID,
 	}
 
 	options.BaseContext = func() context.Context {
