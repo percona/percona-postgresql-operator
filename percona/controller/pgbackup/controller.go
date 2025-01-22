@@ -3,6 +3,7 @@ package pgbackup
 import (
 	"context"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -84,6 +85,10 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
+	if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
+	}
+
 	pgCluster := &v2.PerconaPGCluster{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
 	if err != nil {
@@ -120,10 +125,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		repo := getRepo(pgCluster, pgBackup)
 		if repo == nil {
 			return reconcile.Result{}, errors.Errorf("%s repo not defined", pgBackup.Spec.RepoName)
-		}
-
-		if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 		}
 
 		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -511,9 +512,8 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	// Remove PGBackRest labels to prevent the job from being included in
-	// repoResources.manualBackupJobs and deleted by the cleanupRepoResources
-	// or reconcileManualBackup methods.
+	// Remove PGBackRest labels to prevent the job from being
+	// deleted by the cleanupRepoResources method.
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		j := new(batchv1.Job)
 		if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
@@ -543,14 +543,35 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return nil, errors.Wrap(err, "update postgrescluster")
 	}
 
-	_, err = deleteAnnotation(pNaming.AnnotationBackupInProgress)
+	deleted, err = deleteAnnotation(pNaming.AnnotationBackupInProgress)
 	if err != nil {
 		return nil, errors.Wrapf(err, "delete %s annotation", pNaming.AnnotationBackupInProgress)
 	}
+	if !deleted {
+		return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
 
 	if checkBackupJob(job) != v2.BackupSucceeded {
-		if err := c.Delete(ctx, job); err != nil {
-			return nil, errors.Wrap(err, "delete pg-backup job")
+		// Remove all crunchy labels to prevent the job from being included in
+		// repoResources.manualBackupJobs used in reconcileManualBackup method.
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			j := new(batchv1.Job)
+			if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+				if k8serrors.IsNotFound(err) {
+					return nil
+				}
+				return errors.Wrap(err, "get job")
+			}
+
+			for k := range j.Labels {
+				if strings.HasPrefix(k, pNaming.PrefixCrunchy) {
+					delete(j.Labels, k)
+				}
+			}
+
+			return c.Update(ctx, j)
+		}); err != nil {
+			return nil, errors.Wrap(err, "delete backup job labels")
 		}
 	}
 
