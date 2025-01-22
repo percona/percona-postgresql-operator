@@ -348,6 +348,9 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		return errors.Wrap(err, "failed to get patroni version check pod")
 	}
 	if k8serrors.IsNotFound(err) {
+		if len(cr.Spec.InstanceSets) == 0 {
+			return errors.New(".spec.instances is a required value") // shouldn't happen as the value is required in the crd.yaml
+		}
 		p = &corev1.Pod{
 			ObjectMeta: meta,
 			Spec: corev1.PodSpec{
@@ -363,6 +366,8 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 						},
 					},
 				},
+				Resources:       &cr.Spec.InstanceSets[0].Resources,
+				SecurityContext: cr.Spec.InstanceSets[0].SecurityContext,
 			},
 		}
 
