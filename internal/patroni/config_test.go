@@ -5,6 +5,7 @@
 package patroni
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,7 +30,8 @@ func TestClusterYAML(t *testing.T) {
 
 	t.Run("PG version defaulted", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
-		cluster.Default()
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
 		cluster.Namespace = "some-namespace"
 		cluster.Name = "cluster-name"
 
@@ -86,7 +88,8 @@ watchdog:
 
 	t.Run(">PG10", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
-		cluster.Default()
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
 		cluster.Namespace = "some-namespace"
 		cluster.Name = "cluster-name"
 		cluster.Spec.PostgresVersion = 14
@@ -759,7 +762,8 @@ func TestDynamicConfiguration(t *testing.T) {
 			if cluster.Spec.PostgresVersion == 0 {
 				cluster.Spec.PostgresVersion = 14
 			}
-			cluster.Default()
+			err := cluster.Default(context.Background(), nil)
+			assert.NilError(t, err)
 			actual := DynamicConfiguration(cluster, tt.input, tt.hbas, tt.params)
 			assert.DeepEqual(t, tt.expected, actual)
 		})
@@ -792,7 +796,8 @@ func TestInstanceEnvironment(t *testing.T) {
 	t.Parallel()
 
 	cluster := new(v1beta1.PostgresCluster)
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 	cluster.Spec.PostgresVersion = 12
 	leaderService := new(corev1.Service)
 	podService := new(corev1.Service)

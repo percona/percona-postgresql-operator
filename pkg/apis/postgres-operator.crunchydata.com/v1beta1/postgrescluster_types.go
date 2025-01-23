@@ -5,12 +5,14 @@
 package v1beta1
 
 import (
+	"context"
 	"fmt"
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
@@ -690,10 +692,10 @@ type PostgresCluster struct {
 	Status PostgresClusterStatus `json:"status,omitempty"`
 }
 
-// Default implements "sigs.k8s.io/controller-runtime/pkg/webhook.Defaulter" so
+// Default implements webhook.CustomDefaulter so
 // a webhook can be registered for the type.
 // - https://book.kubebuilder.io/reference/webhook-overview.html
-func (c *PostgresCluster) Default() {
+func (c *PostgresCluster) Default(_ context.Context, _ runtime.Object) error {
 	if len(c.APIVersion) == 0 {
 		c.APIVersion = GroupVersion.String()
 	}
@@ -701,6 +703,8 @@ func (c *PostgresCluster) Default() {
 		c.Kind = "PostgresCluster"
 	}
 	c.Spec.Default()
+
+	return nil
 }
 
 // +kubebuilder:object:root=true

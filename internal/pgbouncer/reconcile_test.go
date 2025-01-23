@@ -36,7 +36,8 @@ func TestConfigMap(t *testing.T) {
 
 	cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
 	cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	ConfigMap(cluster, config)
 
@@ -71,7 +72,8 @@ func TestSecret(t *testing.T) {
 
 	cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
 	cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
-	cluster.Default()
+	err = cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	constant := existing.DeepCopy()
 	assert.NilError(t, Secret(ctx, cluster, root, existing, service, intent))
@@ -120,7 +122,8 @@ func TestPod(t *testing.T) {
 	t.Run("Defaults", func(t *testing.T) {
 		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
 		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
-		cluster.Default()
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
 
 		call()
 
@@ -487,7 +490,8 @@ func TestPostgreSQL(t *testing.T) {
 	t.Run("Enabled", func(t *testing.T) {
 		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
 		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
-		cluster.Default()
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
 
 		PostgreSQL(cluster, hbas)
 

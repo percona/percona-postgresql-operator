@@ -256,7 +256,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		return nil, err
 	}
 
-	postgresCluster.Default()
+	// omitting error because it is always nil
+	_ = postgresCluster.Default(ctx, postgresCluster)
 
 	annotations := make(map[string]string)
 	for k, v := range cr.Annotations {

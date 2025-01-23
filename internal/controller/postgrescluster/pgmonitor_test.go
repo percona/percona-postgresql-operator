@@ -713,7 +713,8 @@ func TestReconcileMonitoringSecret(t *testing.T) {
 	reconciler := &Reconciler{Client: cc, Owner: client.FieldOwner(t.Name())}
 
 	cluster := testCluster()
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 	cluster.UID = types.UID("hippouid")
 	cluster.Namespace = setupNamespace(t, cc).Name
 
@@ -787,7 +788,8 @@ func TestReconcileExporterQueriesConfig(t *testing.T) {
 	reconciler := &Reconciler{Client: cc, Owner: client.FieldOwner(t.Name())}
 
 	cluster := testCluster()
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 	cluster.UID = types.UID("hippouid")
 	cluster.Namespace = setupNamespace(t, cc).Name
 
