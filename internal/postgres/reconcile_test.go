@@ -64,7 +64,8 @@ func TestInstancePod(t *testing.T) {
 
 	ctx := context.Background()
 	cluster := new(v1beta1.PostgresCluster)
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 	cluster.Spec.PostgresVersion = 11
 	cluster.SetLabels(map[string]string{
@@ -711,7 +712,8 @@ volumes:
 
 func TestPodSecurityContext(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	assert.Assert(t, cmp.MarshalMatches(PodSecurityContext(cluster), `
 fsGroup: 26

@@ -178,7 +178,8 @@ func TestAddConfigToInstancePod(t *testing.T) {
 		},
 	}
 	cluster.Name = "hippo"
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	pod := corev1.PodSpec{
 		Containers: []corev1.Container{
@@ -332,7 +333,8 @@ func TestAddConfigToInstancePod(t *testing.T) {
 func TestAddConfigToRepoPod(t *testing.T) {
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	pod := corev1.PodSpec{
 		Containers: []corev1.Container{
@@ -405,7 +407,8 @@ func TestAddConfigToRepoPod(t *testing.T) {
 func TestAddConfigToRestorePod(t *testing.T) {
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "source"
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	pod := corev1.PodSpec{
 		Containers: []corev1.Container{
@@ -575,7 +578,8 @@ func TestAddServerToInstancePod(t *testing.T) {
 	ctx := context.Background()
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 	cluster.SetLabels(map[string]string{
 		naming.LabelVersion: "2.5.0",
 	})
@@ -838,7 +842,8 @@ func TestAddServerToRepoPod(t *testing.T) {
 	ctx := context.Background()
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 	cluster.SetLabels(map[string]string{
 		naming.LabelVersion: "2.5.0",
 	})

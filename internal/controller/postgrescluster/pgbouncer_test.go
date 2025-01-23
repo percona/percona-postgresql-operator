@@ -409,7 +409,8 @@ namespace: ns3
 	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
 		PGBouncer: &v1beta1.PGBouncerPodSpec{},
 	}
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	configmap := &corev1.ConfigMap{}
 	configmap.Name = "some-cm2"

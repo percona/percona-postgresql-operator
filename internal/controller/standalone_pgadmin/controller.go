@@ -105,7 +105,7 @@ func (r *PGAdminReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log.V(1).Info("Reconciling pgAdmin")
 
 	// Set defaults if unset
-	pgAdmin.Default()
+	_ = pgAdmin.Default(ctx, nil)
 
 	var (
 		configmap  *corev1.ConfigMap

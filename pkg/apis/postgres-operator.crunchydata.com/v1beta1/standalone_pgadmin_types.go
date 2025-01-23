@@ -5,8 +5,11 @@
 package v1beta1
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // PGAdminConfiguration represents pgAdmin configuration files.
@@ -193,16 +196,17 @@ type PGAdmin struct {
 	Status PGAdminStatus `json:"status,omitempty"`
 }
 
-// Default implements "sigs.k8s.io/controller-runtime/pkg/webhook.Defaulter" so
+// Default implements webhook.CustomDefaulter so
 // a webhook can be registered for the type.
 // - https://book.kubebuilder.io/reference/webhook-overview.html
-func (p *PGAdmin) Default() {
+func (p *PGAdmin) Default(_ context.Context, _ runtime.Object) error {
 	if len(p.APIVersion) == 0 {
 		p.APIVersion = GroupVersion.String()
 	}
 	if len(p.Kind) == 0 {
 		p.Kind = "PGAdmin"
 	}
+	return nil
 }
 
 //+kubebuilder:object:root=true

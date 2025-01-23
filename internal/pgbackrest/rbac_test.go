@@ -5,6 +5,7 @@
 package pgbackrest
 
 import (
+	"context"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -28,7 +29,8 @@ func isUniqueAndSorted(slice []string) bool {
 
 func TestPermissions(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	permissions := Permissions(cluster)
 	for _, rule := range permissions {

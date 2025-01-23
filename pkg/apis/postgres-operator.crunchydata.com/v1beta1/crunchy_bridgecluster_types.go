@@ -5,8 +5,11 @@
 package v1beta1
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // CrunchyBridgeClusterSpec defines the desired state of CrunchyBridgeCluster
@@ -205,16 +208,17 @@ type CrunchyBridgeCluster struct {
 	Status CrunchyBridgeClusterStatus `json:"status,omitempty"`
 }
 
-// Default implements "sigs.k8s.io/controller-runtime/pkg/webhook.Defaulter" so
+// Default implements webhook.CustomDefaulter so
 // a webhook can be registered for the type.
 // - https://book.kubebuilder.io/reference/webhook-overview.html
-func (c *CrunchyBridgeCluster) Default() {
+func (c *CrunchyBridgeCluster) Default(_ context.Context, _ runtime.Object) error {
 	if len(c.APIVersion) == 0 {
 		c.APIVersion = GroupVersion.String()
 	}
 	if len(c.Kind) == 0 {
 		c.Kind = "CrunchyBridgeCluster"
 	}
+	return nil
 }
 
 // +kubebuilder:object:root=true
