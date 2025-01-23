@@ -10,8 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"gotest.tools/v3/assert"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/yaml"
@@ -110,7 +108,7 @@ status:
 		var cluster PostgresCluster
 		cluster.Spec.Proxy = new(PostgresProxySpec)
 		err := cluster.Default(ctx, nil)
-		require.NoError(t, err)
+		assert.NilError(t, err)
 
 		b, err := yaml.Marshal(cluster.Spec.Proxy)
 		assert.NilError(t, err)
@@ -121,7 +119,7 @@ status:
 		var cluster PostgresCluster
 		cluster.Spec.Proxy = &PostgresProxySpec{PGBouncer: &PGBouncerPodSpec{}}
 		err := cluster.Default(ctx, nil)
-		require.NoError(t, err)
+		assert.NilError(t, err)
 
 		b, err := yaml.Marshal(cluster.Spec.Proxy)
 		assert.NilError(t, err)
