@@ -5,6 +5,7 @@
 package pgbouncer
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,7 +44,8 @@ func TestClusterINI(t *testing.T) {
 	t.Parallel()
 
 	cluster := new(v1beta1.PostgresCluster)
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 
 	cluster.Name = "foo-baz"
 	*cluster.Spec.Port = 9999

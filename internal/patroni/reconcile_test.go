@@ -27,7 +27,8 @@ func TestClusterConfigMap(t *testing.T) {
 	pgHBAs := postgres.HBAs{}
 	pgParameters := postgres.Parameters{}
 
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 	config := new(corev1.ConfigMap)
 	assert.NilError(t, ClusterConfigMap(ctx, cluster, pgHBAs, pgParameters, config))
 
@@ -114,7 +115,8 @@ func TestInstancePod(t *testing.T) {
 	t.Parallel()
 
 	cluster := new(v1beta1.PostgresCluster)
-	cluster.Default()
+	err := cluster.Default(context.Background(), nil)
+	assert.NilError(t, err)
 	cluster.Name = "some-such"
 	cluster.Spec.PostgresVersion = 11
 	cluster.Spec.Image = "image"

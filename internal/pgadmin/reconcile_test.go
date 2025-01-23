@@ -5,6 +5,7 @@
 package pgadmin
 
 import (
+	"context"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -33,7 +34,8 @@ func TestConfigMap(t *testing.T) {
 	t.Run("Defaults", func(t *testing.T) {
 		cluster.Spec.UserInterface = new(v1beta1.UserInterfaceSpec)
 		cluster.Spec.UserInterface.PGAdmin = new(v1beta1.PGAdminPodSpec)
-		cluster.Default()
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
 
 		assert.NilError(t, ConfigMap(cluster, config))
 
@@ -52,7 +54,8 @@ pgadmin-settings.json: |
 			"some":       "thing",
 			"UPPER_CASE": false,
 		}
-		cluster.Default()
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
 
 		assert.NilError(t, ConfigMap(cluster, config))
 
@@ -92,7 +95,8 @@ func TestPod(t *testing.T) {
 	t.Run("Defaults", func(t *testing.T) {
 		cluster.Spec.UserInterface = new(v1beta1.UserInterfaceSpec)
 		cluster.Spec.UserInterface.PGAdmin = new(v1beta1.PGAdminPodSpec)
-		cluster.Default()
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
 
 		call()
 
