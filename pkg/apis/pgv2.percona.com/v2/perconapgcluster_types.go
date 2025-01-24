@@ -436,7 +436,7 @@ type PerconaPGClusterStatus struct {
 
 type Backups struct {
 	// pgBackRest archive configuration
-	// +kubebuilder:validation:Required
+	// +optional
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
 
 	// Enable tracking latest restorable time
