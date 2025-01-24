@@ -124,7 +124,7 @@ func VerifyImageValues(cluster *v1beta1.PostgresCluster) error {
 
 	var images []string
 
-	if PGBackRestContainerImage(cluster) == "" {
+	if cluster.BackupSpecFound() && PGBackRestContainerImage(cluster) == "" {
 		images = append(images, "crunchy-pgbackrest")
 	}
 	if PGAdminContainerImage(cluster) == "" &&

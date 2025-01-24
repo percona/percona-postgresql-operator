@@ -7,6 +7,7 @@ package v1beta1
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -28,8 +29,8 @@ type PostgresClusterSpec struct {
 	DataSource *DataSource `json:"dataSource,omitempty"`
 
 	// PostgreSQL backup configuration
-	// +kubebuilder:validation:Required
-	Backups Backups `json:"backups"`
+	// +optional
+	Backups Backups `json:"backups,omitempty"`
 
 	// The secret containing the root CA certificate and key for
 	// secure connections to the PostgreSQL server. It will need to contain the
@@ -767,4 +768,8 @@ func (cr *PostgresCluster) IsPatroniVer4() (bool, error) {
 		return false, errors.Wrap(err, "failed to get patroni ver")
 	}
 	return patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0, nil
+}
+
+func (cr *PostgresCluster) BackupSpecFound() bool {
+	return !reflect.DeepEqual(cr.Spec.Backups, Backups{PGBackRest: PGBackRestArchive{}})
 }

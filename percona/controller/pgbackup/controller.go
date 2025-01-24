@@ -99,6 +99,24 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 		}
 
+		if !pgCluster.Spec.BackupsEnabled() {
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				bcp := new(v2.PerconaPGBackup)
+				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
+					return errors.Wrap(err, "get PGBackup")
+				}
+
+				bcp.Status.State = v2.BackupFailed
+				bcp.Status.Error = "Backups are not enabled in the PerconaPGCluster configuration"
+
+				return r.Client.Status().Update(ctx, bcp)
+			}); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+			}
+
+			return reconcile.Result{}, nil
+		}
+
 		if pgCluster.Spec.Pause != nil && *pgCluster.Spec.Pause {
 			log.Info("Can't start backup. PostgresCluster is paused", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil

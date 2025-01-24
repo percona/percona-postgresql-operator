@@ -867,6 +867,10 @@ func (r *PGClusterReconciler) reconcileExternalWatchers(ctx context.Context, cr 
 }
 
 func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if !cr.Spec.BackupsEnabled() {
+		return nil
+	}
+
 	if !*cr.Spec.Backups.TrackLatestRestorableTime {
 		return nil
 	}
@@ -890,6 +894,10 @@ func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.
 }
 
 func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.PerconaPGCluster) {
+	if !cr.Spec.BackupsEnabled() {
+		return
+	}
+
 	log := logging.FromContext(ctx)
 	if *cr.Spec.Backups.TrackLatestRestorableTime {
 		return
@@ -915,7 +923,7 @@ func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.Perco
 		return nil
 	}
 
-	if *cr.Spec.Backups.TrackLatestRestorableTime {
+	if cr.Spec.Backups.TrackLatestRestorableTime != nil && *cr.Spec.Backups.TrackLatestRestorableTime {
 		orig := cr.DeepCopy()
 		cr.Finalizers = slices.DeleteFunc(cr.Finalizers, func(f string) bool {
 			return f == pNaming.FinalizerStopWatchersDeprecated

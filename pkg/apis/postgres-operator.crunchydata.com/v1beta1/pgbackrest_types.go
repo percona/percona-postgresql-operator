@@ -117,7 +117,7 @@ type PGBackRestArchive struct {
 	// +kubebuilder:validation:MinItems=1
 	// +listType=map
 	// +listMapKey=name
-	Repos []PGBackRestRepo `json:"repos"`
+	Repos []PGBackRestRepo `json:"repos,omitempty"`
 
 	// Defines configuration for a pgBackRest dedicated repository host.  This section is only
 	// applicable if at least one "volume" (i.e. PVC-based) repository is defined in the "repos"
