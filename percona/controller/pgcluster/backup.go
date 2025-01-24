@@ -106,9 +106,6 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 }
 
 func (r *PGClusterReconciler) reconcileBackupJobs(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if err := checkBackupAnnotations(ctx, r.Client, cr); err != nil {
-		return errors.Wrap(err, "check backup annotation")
-	}
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
 		backupJobs, err := listBackupJobs(ctx, r.Client, cr, repo.Name)
 		if err != nil {
@@ -120,38 +117,6 @@ func (r *PGClusterReconciler) reconcileBackupJobs(ctx context.Context, cr *v2.Pe
 				return errors.Wrap(err, "failed to reconcile backup job")
 			}
 		}
-	}
-	return nil
-}
-
-func checkBackupAnnotations(ctx context.Context, cl client.Client, cr *v2.PerconaPGCluster) error {
-	backupName := cr.Annotations[pNaming.AnnotationBackupInProgress]
-	if backupName == "" {
-		return nil
-	}
-
-	err := cl.Get(ctx, types.NamespacedName{Name: backupName, Namespace: cr.Namespace}, new(v2.PerconaPGBackup))
-	if err == nil {
-		return nil
-	}
-	if client.IgnoreNotFound(err) != nil {
-		return errors.Wrapf(err, "failed to get backup %s", backupName)
-	}
-
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		pgCluster := new(v2.PerconaPGCluster)
-		err := cl.Get(ctx, client.ObjectKeyFromObject(cr), pgCluster)
-		if err != nil {
-			return err
-		}
-
-		delete(cr.Annotations, pNaming.AnnotationBackupInProgress)
-		delete(cr.Annotations, naming.PGBackRestBackup)
-
-		return cl.Update(ctx, cr)
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to update cluster annotation")
 	}
 	return nil
 }

@@ -7,8 +7,6 @@ kind: PostgresCluster
 metadata:
   name: pitr
   generation: 4
-  annotations:
-    postgres-operator.crunchydata.com/pgbackrest-restore: pitr-restore
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster

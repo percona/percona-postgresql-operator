@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -41,7 +42,7 @@ func (r *PGRestoreReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGRestore{}).Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores,verbs=get;list;watch;create;patch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores/status,verbs=patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
@@ -61,6 +62,13 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	if pgRestore.DeletionTimestamp != nil {
+		if err := runFinalizers(ctx, r.Client, pgRestore); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
+		}
+		return reconcile.Result{}, nil
+	}
+
 	if pgRestore.Status.State == v2.RestoreSucceeded || pgRestore.Status.State == v2.RestoreFailed {
 		return reconcile.Result{}, nil
 	}
@@ -78,15 +86,15 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		pgRestore.Status.State = v2.RestoreStarting
-		if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "update PGRestore status")
-		}
-
 		if _, ok := pgRestore.Annotations[pNaming.AnnotationClusterBootstrapRestore]; !ok {
 			if err := startRestore(ctx, r.Client, pgCluster, pgRestore); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "start restore")
 			}
+		}
+
+		pgRestore.Status.State = v2.RestoreStarting
+		if err := r.Client.Status().Update(ctx, pgRestore); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "update PGRestore status")
 		}
 
 		return reconcile.Result{}, nil
@@ -127,7 +135,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		if _, ok := pgRestore.Annotations[pNaming.AnnotationClusterBootstrapRestore]; !ok {
-			if err := disableRestore(ctx, r.Client, pgCluster); err != nil {
+			if err := disableRestore(ctx, r.Client, pgCluster, pgRestore); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "disable restore")
 			}
 		}
@@ -144,6 +152,53 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 }
 
+func runFinalizers(ctx context.Context, c client.Client, pr *v2.PerconaPGRestore) error {
+	pg := new(v2.PerconaPGCluster)
+	if err := c.Get(ctx, types.NamespacedName{Name: pr.Spec.PGCluster, Namespace: pr.Namespace}, pg); err != nil {
+		if k8serrors.IsNotFound(err) {
+			pg = nil
+		} else {
+			return errors.Wrap(err, "get PostgresCluster")
+		}
+	}
+
+	finalizers := map[string]controller.FinalizerFunc[*v2.PerconaPGRestore]{
+		pNaming.FinalizerDeleteRestore: func(ctx context.Context, pr *v2.PerconaPGRestore) error {
+			if pg == nil {
+				return nil
+			}
+			return disableRestore(ctx, c, pg, pr)
+		},
+	}
+
+	for finalizer, f := range finalizers {
+		if _, err := controller.RunFinalizer(ctx, c, pr, finalizer, f); err != nil {
+			return errors.Wrapf(err, "run finalizer %s", finalizer)
+		}
+	}
+	return nil
+}
+
+func ensureFinalizers(ctx context.Context, cl client.Client, pr *v2.PerconaPGRestore) error {
+	orig := pr.DeepCopy()
+
+	finalizers := []string{pNaming.FinalizerDeleteRestore}
+	finalizersChanged := false
+	for _, f := range finalizers {
+		if controllerutil.AddFinalizer(pr, f) {
+			finalizersChanged = true
+		}
+	}
+	if !finalizersChanged {
+		return nil
+	}
+
+	if err := cl.Patch(ctx, pr, client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "remove finalizers")
+	}
+	return nil
+}
+
 func startRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pr *v2.PerconaPGRestore) error {
 	orig := pg.DeepCopy()
 
@@ -151,6 +206,19 @@ func startRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster,
 		pg.Annotations = make(map[string]string)
 	}
 	pg.Annotations[naming.PGBackRestRestore] = pr.Name
+
+	postgresCluster := new(v1beta1.PostgresCluster)
+	if err := c.Get(ctx, client.ObjectKeyFromObject(pg), postgresCluster); err != nil {
+		return errors.Wrap(err, "get PostgresCluster")
+	}
+
+	origPostgres := postgresCluster.DeepCopy()
+
+	postgresCluster.Status.PGBackRest.Restore = new(v1beta1.PGBackRestJobStatus)
+
+	if err := c.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
+		return errors.Wrap(err, "patch PGCluster")
+	}
 
 	if pg.Spec.Backups.PGBackRest.Restore == nil {
 		pg.Spec.Backups.PGBackRest.Restore = &v1beta1.PGBackRestRestore{
@@ -167,10 +235,18 @@ func startRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster,
 		return errors.Wrap(err, "patch PGCluster")
 	}
 
+	if err := ensureFinalizers(ctx, c, pr); err != nil {
+		return errors.Wrap(err, "ensure restore finalizers")
+	}
+
 	return nil
 }
 
-func disableRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster) error {
+func disableRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pr *v2.PerconaPGRestore) error {
+	if pr.Status.State == v2.RestoreSucceeded || pr.Status.State == v2.RestoreFailed {
+		return nil
+	}
+
 	orig := pg.DeepCopy()
 
 	if pg.Spec.Backups.PGBackRest.Restore == nil {
@@ -181,6 +257,8 @@ func disableRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluste
 
 	fvar := false
 	pg.Spec.Backups.PGBackRest.Restore.Enabled = &fvar
+
+	delete(pg.Annotations, naming.LabelPGBackRestRestore)
 
 	if err := c.Patch(ctx, pg, client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")

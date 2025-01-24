@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -48,7 +49,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 		_ = k8sClient.Delete(ctx, namespace)
 	})
 
-	Context(v2.FinalizerDeletePVC, Ordered, func() {
+	Context(pNaming.FinalizerDeletePVC, Ordered, func() {
 		crName := ns + "-with-delete-pvc"
 		crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
 		When("with finalizer", func() {
@@ -57,7 +58,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			controllerutil.AddFinalizer(cr, v2.FinalizerDeletePVC)
+			controllerutil.AddFinalizer(cr, pNaming.FinalizerDeletePVC)
 
 			It("should create PerconaPGCluster", func() {
 				status := cr.Status
@@ -229,7 +230,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 		})
 	})
 
-	Context(v2.FinalizerDeleteSSL, Ordered, func() {
+	Context(pNaming.FinalizerDeleteSSL, Ordered, func() {
 		When("with finalizer", func() {
 			crName := ns + "-with-delete-tls"
 			crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
@@ -239,7 +240,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			controllerutil.AddFinalizer(cr, v2.FinalizerDeleteSSL)
+			controllerutil.AddFinalizer(cr, pNaming.FinalizerDeleteSSL)
 
 			It("should create PerconaPGCluster", func() {
 				status := cr.Status
@@ -310,7 +311,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			controllerutil.RemoveFinalizer(cr, v2.FinalizerDeleteSSL)
+			controllerutil.RemoveFinalizer(cr, pNaming.FinalizerDeleteSSL)
 
 			It("should create PerconaPGCluster", func() {
 				status := cr.Status
@@ -353,7 +354,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 		})
 	})
 
-	Context(v2.FinalizerStopWatchers, Ordered, func() {
+	Context(pNaming.FinalizerStopWatchers, Ordered, func() {
 		When("without finalizer", func() {
 			crName := ns + "-without-stop-watchers"
 			crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
@@ -363,7 +364,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			controllerutil.RemoveFinalizer(cr, v2.FinalizerStopWatchers)
+			controllerutil.RemoveFinalizer(cr, pNaming.FinalizerStopWatchers)
 
 			It("should create PerconaPGCluster", func() {
 				status := cr.Status
@@ -386,7 +387,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 
-				Expect(cr.Finalizers).Should(ContainElement(v2.FinalizerStopWatchers))
+				Expect(cr.Finalizers).Should(ContainElement(pNaming.FinalizerStopWatchers))
 			})
 		})
 	})

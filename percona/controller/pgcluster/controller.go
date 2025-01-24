@@ -211,10 +211,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		},
 	}
 
-	if err := r.ensureFinalizers(ctx, cr); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
-	}
-
 	if cr.DeletionTimestamp != nil {
 		log.Info("Deleting PerconaPGCluster", "deletionTimestamp", cr.DeletionTimestamp)
 
@@ -233,6 +229,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		return reconcile.Result{}, nil
+	}
+
+	if err := r.ensureFinalizers(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 	}
 
 	if err := r.reconcilePatroniVersionCheck(ctx, cr); err != nil {
@@ -291,13 +291,17 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	opRes, err := controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+	var opRes controllerutil.OperationResult
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
-		postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
+		opRes, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
+			var err error
+			postgresCluster, err = cr.ToCrunchy(ctx, postgresCluster, r.Client.Scheme())
 
+			return err
+		})
 		return err
-	})
-	if err != nil {
+	}); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update/create PostgresCluster")
 	}
 
@@ -311,8 +315,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
-	err = r.updateStatus(ctx, cr, &postgresCluster.Status)
-	if err != nil {
+	if err := r.updateStatus(ctx, cr, &postgresCluster.Status); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update status")
 	}
 
@@ -851,14 +854,14 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	for _, finalizer := range cr.Finalizers {
-		if finalizer == v2.FinalizerStopWatchers {
+		if finalizer == pNaming.FinalizerStopWatchers {
 			return nil
 		}
 	}
 
 	if *cr.Spec.Backups.TrackLatestRestorableTime {
 		orig := cr.DeepCopy()
-		cr.Finalizers = append(cr.Finalizers, v2.FinalizerStopWatchers)
+		cr.Finalizers = append(cr.Finalizers, pNaming.FinalizerStopWatchers)
 		if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "patch finalizers")
 		}
