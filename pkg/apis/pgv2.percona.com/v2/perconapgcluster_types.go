@@ -156,8 +156,8 @@ type PerconaPGClusterSpec struct {
 	Proxy *PGProxySpec `json:"proxy,omitempty"`
 
 	// PostgreSQL backup configuration
-	// +kubebuilder:validation:Required
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// +optional
 	Backups Backups `json:"backups"`
 
 	// The specification of PMM sidecars.
