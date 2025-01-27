@@ -312,6 +312,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 		return ctrl.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
@@ -371,6 +374,9 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 			},
 		}
 
+		if err := controllerutil.SetControllerReference(cr, p, r.Client.Scheme()); err != nil {
+			return errors.Wrap(err, "set controller reference")
+		}
 		if err := r.Client.Create(ctx, p); err != nil {
 			return errors.Wrap(err, "failed to create pod to check patroni version")
 		}

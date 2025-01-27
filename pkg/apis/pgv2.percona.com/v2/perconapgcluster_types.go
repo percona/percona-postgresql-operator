@@ -246,8 +246,9 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if postgresCluster == nil {
 		postgresCluster = &crunchyv1beta1.PostgresCluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Name,
-				Namespace: cr.Namespace,
+				Name:       cr.Name,
+				Namespace:  cr.Namespace,
+				Finalizers: []string{naming.Finalizer},
 			},
 		}
 	}

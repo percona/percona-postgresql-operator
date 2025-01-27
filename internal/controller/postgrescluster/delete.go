@@ -100,5 +100,10 @@ func (r *Reconciler) handleDelete(
 		client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{})))
 
 	// The caller should wait for further events or requeue upon error.
-	return &reconcile.Result{}, err
+
+	// K8SPG-713: For some reason we get a "not found" error when we try to remove finalizer.
+	//            This is unexpected because finalizers are designed to prevent objects from being deleted
+	//            until all finalizers have been deleted.
+
+	return &reconcile.Result{}, client.IgnoreNotFound(err)
 }

@@ -89,14 +89,14 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 	}
 
-	pgCluster := &v2.PerconaPGCluster{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
-	}
-
 	switch pgBackup.Status.State {
 	case v2.BackupNew:
+		pgCluster := &v2.PerconaPGCluster{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+		}
+
 		if pgCluster.Spec.Pause != nil && *pgCluster.Spec.Pause {
 			log.Info("Can't start backup. PostgresCluster is paused", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
@@ -159,6 +159,12 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		log.Info("Backup is starting", "backup", pgBackup.Name, "cluster", pgCluster.Name)
 		return reconcile.Result{}, nil
 	case v2.BackupStarting:
+		pgCluster := &v2.PerconaPGCluster{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+		}
+
 		job, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
 		if err != nil {
 			if errors.Is(err, ErrBackupJobNotFound) {
@@ -247,6 +253,15 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		return reconcile.Result{}, nil
 	case v2.BackupSucceeded:
+		pgCluster := &v2.PerconaPGCluster{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				return reconcile.Result{}, nil
+			}
+			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+		}
+
 		execCli, err := clientcmd.NewClient()
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to create exec client")
