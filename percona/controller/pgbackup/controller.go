@@ -270,11 +270,19 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		latestRestorableTime, err := watcher.GetLatestCommitTimestamp(ctx, r.Client, execCli, pgCluster, pgBackup)
 		if err == nil {
 			log.Info("Got latest restorable timestamp", "timestamp", latestRestorableTime)
-			pgBackup.Status.LatestRestorableTime.Time = latestRestorableTime
-		}
 
-		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				bcp := new(v2.PerconaPGBackup)
+				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
+					return errors.Wrap(err, "get PGBackup")
+				}
+
+				bcp.Status.LatestRestorableTime.Time = latestRestorableTime
+
+				return r.Client.Status().Update(ctx, bcp)
+			}); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+			}
 		}
 
 		return reconcile.Result{}, nil

@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -367,17 +368,18 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 						Args: []string{
 							"-c", "sleep 300",
 						},
+						Resources: cr.Spec.InstanceSets[0].Resources,
 					},
 				},
-				Resources:       &cr.Spec.InstanceSets[0].Resources,
-				SecurityContext: cr.Spec.InstanceSets[0].SecurityContext,
+				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
+				TerminationGracePeriodSeconds: ptr.To(int64(5)),
 			},
 		}
 
 		if err := controllerutil.SetControllerReference(cr, p, r.Client.Scheme()); err != nil {
 			return errors.Wrap(err, "set controller reference")
 		}
-		if err := r.Client.Create(ctx, p); err != nil {
+		if err := r.Client.Create(ctx, p); client.IgnoreAlreadyExists(err) != nil {
 			return errors.Wrap(err, "failed to create pod to check patroni version")
 		}
 
