@@ -63,7 +63,7 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 
 			latestBackup, err := getLatestBackup(ctx, cli, cr)
 			if err != nil {
-				if localCr.Status.State != pgv2.AppStateInit || (!errors.Is(err, errRunningBackup) && !errors.Is(err, errNoBackups)) {
+				if !errors.Is(err, errRunningBackup) && !errors.Is(err, errNoBackups) {
 					log.Error(err, "get latest backup")
 				}
 
@@ -117,7 +117,6 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 		Namespace: cr.Namespace,
 		FieldSelector: fields.SelectorFromSet(map[string]string{
 			"spec.pgCluster": cr.Name,
-			"status.state":   string(pgv2.BackupSucceeded),
 		}),
 	})
 	if err != nil {
@@ -132,9 +131,13 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 	runningBackupExists := false
 	for _, backup := range backupList.Items {
 		backup := backup
-		if latest.Status.CompletedAt == nil || backup.Status.CompletedAt.After(latest.Status.CompletedAt.Time) {
-			latest = &backup
-		} else if backup.Status.State == pgv2.BackupStarting || backup.Status.State == pgv2.BackupRunning {
+		switch backup.Status.State {
+		case pgv2.BackupSucceeded:
+			if latest.Status.CompletedAt == nil || backup.Status.CompletedAt.After(latest.Status.CompletedAt.Time) {
+				latest = &backup
+			}
+		case pgv2.BackupFailed:
+		default:
 			runningBackupExists = true
 		}
 	}
