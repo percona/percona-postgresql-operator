@@ -199,6 +199,10 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 
 	log.Info("Deleting all PGBackup objects")
 	for _, pgBackup := range pbList.Items {
+		if pgBackup.Spec.PGCluster != cr.Name {
+			continue
+		}
+
 		if err := r.Client.Delete(ctx, &pgBackup); err != nil {
 			return errors.Wrapf(err, "delete backup %s/%s", pgBackup.Name, pgBackup.Namespace)
 		}
