@@ -14,4 +14,6 @@ commands:
         | yq '.spec.backups.pgbackrest.global.repo1-retention-full-type="count"' \
         | yq '.spec.backups.pgbackrest.global.repo3-retention-full="2"' \
         | yq '.spec.backups.pgbackrest.global.repo3-retention-full-type="count"' \
+        | yq '.spec.backups.pgbackrest.jobs.backoffLimit=20' \
+        | yq '.spec.backups.pgbackrest.jobs.restartPolicy="OnFailure"' \
         | kubectl -n "${NAMESPACE}" apply -f -
