@@ -85,8 +85,10 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
+	if pgBackup.Status.State != v2.BackupFailed && pgBackup.Status.State != v2.BackupSucceeded {
+		if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
+		}
 	}
 
 	switch pgBackup.Status.State {
