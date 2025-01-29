@@ -228,11 +228,22 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			log.Info("Waiting for backup to complete")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
-		finished, err := runFinalizers(ctx, r.Client, pgBackup)
-		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
+
+		pgCluster := &v2.PerconaPGCluster{}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster); err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+			}
+			pgCluster = nil
 		}
-		if !finished {
+
+		// We need to perform the same steps as in the delete-backup finalizer once the backup has finished or failed.
+		// After that, the finalizer is no longer needed, that's why the RunFinalizer function is used here.
+		done, err := controller.RunFinalizer(ctx, r.Client, pgBackup, pNaming.FinalizerDeleteBackup, deleteBackupFinalizer(ctx, r.Client, pgCluster, pgBackup))
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "failed to run delete-backup finalizer")
+		}
+		if !done {
 			log.Info("Waiting for crunchy reconciler to finish")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
@@ -311,6 +322,30 @@ func ensureFinalizers(ctx context.Context, cl client.Client, pgBackup *v2.Percon
 	return nil
 }
 
+func deleteBackupFinalizer(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pgBackup *v2.PerconaPGBackup) func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
+	return func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
+		if pg == nil {
+			return nil
+		}
+
+		job := new(batchv1.Job)
+		err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job)
+		if client.IgnoreNotFound(err) != nil {
+			return errors.Wrap(err, "get backup job")
+		}
+
+		rr, err := finishBackup(ctx, c, pgBackup, job)
+		if err != nil {
+			return errors.Wrap(err, "failed to finish backup")
+		}
+
+		if rr != nil && rr.RequeueAfter != 0 {
+			return controller.ErrFinalizerPending
+		}
+		return nil
+	}
+}
+
 func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (bool, error) {
 	pg := new(v2.PerconaPGCluster)
 	if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pg); err != nil {
@@ -322,25 +357,7 @@ func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGB
 	}
 
 	finalizers := map[string]controller.FinalizerFunc[*v2.PerconaPGBackup]{
-		pNaming.FinalizerDeleteBackup: func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
-			if pg == nil {
-				return nil
-			}
-			job := new(batchv1.Job)
-			err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job)
-			if client.IgnoreNotFound(err) != nil {
-				return errors.Wrap(err, "get backup job")
-			}
-			rr, err := finishBackup(ctx, c, pgBackup, job)
-			if err != nil {
-				return errors.Wrap(err, "failed to finish backup")
-			}
-
-			if rr != nil && rr.RequeueAfter != 0 {
-				return controller.ErrKeepFinalizer
-			}
-			return nil
-		},
+		pNaming.FinalizerDeleteBackup: deleteBackupFinalizer(ctx, c, pg, pgBackup),
 	}
 
 	finished := true
