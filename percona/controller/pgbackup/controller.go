@@ -239,7 +239,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		// We need to perform the same steps as in the delete-backup finalizer once the backup has finished or failed.
 		// After that, the finalizer is no longer needed, that's why the RunFinalizer function is used here.
-		done, err := controller.RunFinalizer(ctx, r.Client, pgBackup, pNaming.FinalizerDeleteBackup, deleteBackupFinalizer(r.Client, pgCluster, pgBackup))
+		done, err := controller.RunFinalizer(ctx, r.Client, pgBackup, pNaming.FinalizerDeleteBackup, deleteBackupFinalizer(r.Client, pgCluster))
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run delete-backup finalizer")
 		}
@@ -322,7 +322,7 @@ func ensureFinalizers(ctx context.Context, cl client.Client, pgBackup *v2.Percon
 	return nil
 }
 
-func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster, pgBackup *v2.PerconaPGBackup) func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
+func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster) func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
 	return func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
 		if pg == nil {
 			return nil
@@ -357,7 +357,7 @@ func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGB
 	}
 
 	finalizers := map[string]controller.FinalizerFunc[*v2.PerconaPGBackup]{
-		pNaming.FinalizerDeleteBackup: deleteBackupFinalizer(c, pg, pgBackup),
+		pNaming.FinalizerDeleteBackup: deleteBackupFinalizer(c, pg),
 	}
 
 	finished := true
