@@ -2,6 +2,8 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: restore1
+  finalizers:
+  - percona.com/delete-restore
 spec:
   pgCluster: cluster1
   repoName: repo1
