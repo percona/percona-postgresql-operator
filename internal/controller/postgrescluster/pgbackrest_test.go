@@ -2993,7 +2993,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 					},
 				},
 			},
-            // K8SPG-714: ENVTEST_K8S_VERSION=1.32 
+			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
 			Status: batchv1.JobStatus{
 				StartTime: ptr.To(metav1.NewTime(time.Now().Add(-time.Minute))),
 			},
@@ -3001,7 +3001,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 
 		if completed != nil {
 			if *completed {
-                // K8SPG-714: ENVTEST_K8S_VERSION=1.32 
+				// K8SPG-714: ENVTEST_K8S_VERSION=1.32
 				restoreJob.Status.CompletionTime = ptr.To(metav1.Now())
 				restoreJob.Status.Succeeded = 1
 				restoreJob.Status.Conditions = append(restoreJob.Status.Conditions, batchv1.JobCondition{
@@ -3026,7 +3026,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 			}
 		} else if failed != nil {
 			if *failed {
-                // K8SPG-714: ENVTEST_K8S_VERSION=1.32 
+				// K8SPG-714: ENVTEST_K8S_VERSION=1.32
 				restoreJob.Status.Conditions = append(restoreJob.Status.Conditions, batchv1.JobCondition{
 					Type:    batchv1.JobFailureTarget,
 					Status:  corev1.ConditionTrue,
