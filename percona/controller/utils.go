@@ -82,7 +82,7 @@ func GetReadyInstancePod(ctx context.Context, c client.Client, clusterName, name
 
 type FinalizerFunc[T client.Object] func(context.Context, T) error
 
-var ErrKeepFinalizer = errors.New("should keep finalizer")
+var ErrFinalizerPending = errors.New("finalizer pending")
 
 func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T, finalizer string, f FinalizerFunc[T]) (bool, error) {
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {
@@ -98,7 +98,7 @@ func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T,
 	}
 
 	if err := f(ctx, obj); err != nil {
-		if errors.Is(err, ErrKeepFinalizer) {
+		if errors.Is(err, ErrFinalizerPending) {
 			return false, nil
 		}
 		return false, errors.Wrapf(err, "run finalizer %s", finalizer)

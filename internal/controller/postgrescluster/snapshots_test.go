@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
+	"k8s.io/utils/ptr" // K8SPG-714
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
@@ -500,9 +501,23 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 		currentTime := metav1.Now()
 		backupJob.Status = batchv1.JobStatus{
+			StartTime:      ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
 			Succeeded:      1,
 			CompletionTime: &currentTime,
 		}
+		// K8SPG-714: ENVTEST_K8S_VERSION=1.32
+		backupJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
+			Type:    batchv1.JobSuccessCriteriaMet,
+			Status:  corev1.ConditionTrue,
+			Reason:  "test",
+			Message: "test",
+		})
+		backupJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
+			Type:    batchv1.JobComplete,
+			Status:  corev1.ConditionTrue,
+			Reason:  "test",
+			Message: "test",
+		})
 		err = r.Client.Status().Update(ctx, backupJob)
 		assert.NilError(t, err)
 
@@ -555,8 +570,22 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 		backupJob.Status = batchv1.JobStatus{
 			Succeeded:      1,
+			StartTime:      ptr.To(metav1.NewTime(earlierTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
 			CompletionTime: &earlierTime,
 		}
+		// K8SPG-714: ENVTEST_K8S_VERSION=1.32
+		backupJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
+			Type:    batchv1.JobSuccessCriteriaMet,
+			Status:  corev1.ConditionTrue,
+			Reason:  "test",
+			Message: "test",
+		})
+		backupJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
+			Type:    batchv1.JobComplete,
+			Status:  corev1.ConditionTrue,
+			Reason:  "test",
+			Message: "test",
+		})
 		err = r.Client.Status().Update(ctx, backupJob)
 		assert.NilError(t, err)
 
@@ -573,6 +602,22 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		restoreJob.Status = batchv1.JobStatus{
 			Succeeded:      1,
 			CompletionTime: &currentTime,
+			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
+			StartTime: ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))),
+			Conditions: []batchv1.JobCondition{
+				{
+					Type:    batchv1.JobSuccessCriteriaMet,
+					Status:  corev1.ConditionTrue,
+					Reason:  "test",
+					Message: "test",
+				},
+				{
+					Type:    batchv1.JobComplete,
+					Status:  corev1.ConditionTrue,
+					Reason:  "test",
+					Message: "test",
+				},
+			},
 		}
 		err = r.Client.Status().Update(ctx, restoreJob)
 		assert.NilError(t, err)
@@ -629,7 +674,21 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		backupJob.Status = batchv1.JobStatus{
 			Succeeded:      1,
 			CompletionTime: &earlierTime,
+			StartTime:      ptr.To(metav1.NewTime(earlierTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
 		}
+		// K8SPG-714: ENVTEST_K8S_VERSION=1.32
+		backupJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
+			Type:    batchv1.JobSuccessCriteriaMet,
+			Status:  corev1.ConditionTrue,
+			Reason:  "test",
+			Message: "test",
+		})
+		backupJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
+			Type:    batchv1.JobComplete,
+			Status:  corev1.ConditionTrue,
+			Reason:  "test",
+			Message: "test",
+		})
 		err = r.Client.Status().Update(ctx, backupJob)
 		assert.NilError(t, err)
 
@@ -647,7 +706,21 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 			Succeeded:      0,
 			Failed:         1,
 			CompletionTime: &currentTime,
+			StartTime:      ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
 		}
+		// K8SPG-714: ENVTEST_K8S_VERSION=1.32
+		restoreJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
+			Type:    batchv1.JobSuccessCriteriaMet,
+			Status:  corev1.ConditionTrue,
+			Reason:  "test",
+			Message: "test",
+		})
+		restoreJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
+			Type:    batchv1.JobComplete,
+			Status:  corev1.ConditionTrue,
+			Reason:  "test",
+			Message: "test",
+		})
 		err = r.Client.Status().Update(ctx, restoreJob)
 		assert.NilError(t, err)
 
@@ -915,6 +988,22 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 		job1.Status = batchv1.JobStatus{
 			Succeeded:      1,
 			CompletionTime: &currentTime,
+			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
+			StartTime: ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))),
+			Conditions: []batchv1.JobCondition{
+				{
+					Type:    batchv1.JobSuccessCriteriaMet,
+					Status:  corev1.ConditionTrue,
+					Reason:  "test",
+					Message: "test",
+				},
+				{
+					Type:    batchv1.JobComplete,
+					Status:  corev1.ConditionTrue,
+					Reason:  "test",
+					Message: "test",
+				},
+			},
 		}
 		err = r.Client.Status().Update(ctx, job1)
 		assert.NilError(t, err)
@@ -949,6 +1038,22 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 		job1.Status = batchv1.JobStatus{
 			Succeeded:      1,
 			CompletionTime: &currentTime,
+			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
+			StartTime: ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))),
+			Conditions: []batchv1.JobCondition{
+				{
+					Type:    batchv1.JobSuccessCriteriaMet,
+					Status:  corev1.ConditionTrue,
+					Reason:  "test",
+					Message: "test",
+				},
+				{
+					Type:    batchv1.JobComplete,
+					Status:  corev1.ConditionTrue,
+					Reason:  "test",
+					Message: "test",
+				},
+			},
 		}
 		err = r.Client.Status().Update(ctx, job1)
 		assert.NilError(t, err)
@@ -960,6 +1065,22 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 		job2.Status = batchv1.JobStatus{
 			Succeeded:      1,
 			CompletionTime: &earlierTime,
+			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
+			StartTime: ptr.To(metav1.NewTime(earlierTime.Add(-time.Minute))),
+			Conditions: []batchv1.JobCondition{
+				{
+					Type:    batchv1.JobSuccessCriteriaMet,
+					Status:  corev1.ConditionTrue,
+					Reason:  "test",
+					Message: "test",
+				},
+				{
+					Type:    batchv1.JobComplete,
+					Status:  corev1.ConditionTrue,
+					Reason:  "test",
+					Message: "test",
+				},
+			},
 		}
 		err = r.Client.Status().Update(ctx, job2)
 		assert.NilError(t, err)

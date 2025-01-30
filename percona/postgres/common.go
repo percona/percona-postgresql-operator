@@ -17,12 +17,15 @@ func GetPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGClust
 	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
 	//            We should use "primary" instead
 	role := "primary"
-	patroniVer := gover.Must(gover.NewVersion(cr.Status.PatroniVersion))
+	patroniVer, err := gover.NewVersion(cr.Status.PatroniVersion)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get patroni version")
+	}
 	patroniVer4 := patroniVer.Compare(gover.Must(gover.NewVersion("4.0.0"))) >= 0
 	if !patroniVer4 {
 		role = "master"
 	}
-	err := cli.List(ctx, podList, &client.ListOptions{
+	err = cli.List(ctx, podList, &client.ListOptions{
 		Namespace: cr.Namespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"app.kubernetes.io/instance":             cr.Name,
