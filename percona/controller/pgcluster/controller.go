@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -861,15 +862,18 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 }
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	for _, finalizer := range cr.Finalizers {
-		if finalizer == pNaming.FinalizerStopWatchers {
-			return nil
-		}
+	if !slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchersDeprecated) && slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchers) {
+		return nil
 	}
 
 	if *cr.Spec.Backups.TrackLatestRestorableTime {
 		orig := cr.DeepCopy()
-		cr.Finalizers = append(cr.Finalizers, pNaming.FinalizerStopWatchers)
+		cr.Finalizers = slices.DeleteFunc(cr.Finalizers, func(f string) bool {
+			return f == pNaming.FinalizerStopWatchersDeprecated
+		})
+		if !slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchers) {
+			cr.Finalizers = append(cr.Finalizers, pNaming.FinalizerStopWatchers)
+		}
 		if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "patch finalizers")
 		}
