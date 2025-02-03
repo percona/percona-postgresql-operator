@@ -3,9 +3,10 @@ package naming
 import "strings"
 
 const (
-	PrefixPercona     = "percona.com/"
-	PrefixPerconaPGV2 = "pgv2.percona.com/"
-	PrefixCrunchy     = "postgres-operator.crunchydata.com/"
+	PrefixPercona         = "percona.com/"
+	PrefixPerconaInternal = "internal." + PrefixPercona
+	PrefixPerconaPGV2     = "pgv2.percona.com/"
+	PrefixCrunchy         = "postgres-operator.crunchydata.com/"
 )
 
 func ToCrunchyAnnotation(annotation string) string {
