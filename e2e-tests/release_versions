@@ -1,9 +1,9 @@
 # Images versions
-IMAGE_OPERATOR=percona/percona-postgresql-operator:2.6.0
+IMAGE_OPERATOR=perconalab/percona-postgresql-operator:main
 
-IMAGE_POSTGRESQL17=percona/percona-postgresql-operator:2.6.0-ppg17-postgres
-IMAGE_PGBOUNCER17=percona/percona-postgresql-operator:2.6.0-ppg17-pgbouncer
-IMAGE_BACKREST17=percona/percona-postgresql-operator:2.6.0-ppg17-pgbackrest
+IMAGE_POSTGRESQL17=perconalab/percona-postgresql-operator:main-ppg17-postgres
+IMAGE_PGBOUNCER17=perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
+IMAGE_BACKREST17=perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
 
 IMAGE_POSTGRESQL16=percona/percona-postgresql-operator:2.6.0-ppg17-postgres
 IMAGE_PGBOUNCER16=percona/percona-postgresql-operator:2.6.0-ppg17-pgbouncer
