@@ -5,21 +5,25 @@ IMAGE_POSTGRESQL17=perconalab/percona-postgresql-operator:main-ppg17-postgres
 IMAGE_PGBOUNCER17=perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
 IMAGE_BACKREST17=perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
 
-IMAGE_POSTGRESQL16=percona/percona-postgresql-operator:2.6.0-ppg17-postgres
-IMAGE_PGBOUNCER16=percona/percona-postgresql-operator:2.6.0-ppg17-pgbouncer
-IMAGE_BACKREST16=percona/percona-postgresql-operator:2.6.0-ppg17-pgbackrest
+IMAGE_POSTGRESQL16=
+IMAGE_PGBOUNCER16=
+IMAGE_BACKREST16=
 
-IMAGE_POSTGRESQL15=percona/percona-postgresql-operator:2.6.0-ppg17-postgres
-IMAGE_PGBOUNCER15=percona/percona-postgresql-operator:2.6.0-ppg17-pgbouncer
-IMAGE_BACKREST15=percona/percona-postgresql-operator:2.6.0-ppg17-pgbackrest
+IMAGE_POSTGRESQL15=
+IMAGE_PGBOUNCER15=
+IMAGE_BACKREST15=
 
-IMAGE_POSTGRESQL14=percona/percona-postgresql-operator:2.6.0-ppg17-postgres
-IMAGE_PGBOUNCER14=percona/percona-postgresql-operator:2.6.0-ppg17-pgbouncer
-IMAGE_BACKREST14=percona/percona-postgresql-operator:2.6.0-ppg17-pgbackrest
+IMAGE_POSTGRESQL14=
+IMAGE_PGBOUNCER14=
+IMAGE_BACKREST14=
 
-IMAGE_POSTGRESQL13=percona/percona-postgresql-operator:2.6.0-ppg17-postgres
-IMAGE_PGBOUNCER13=percona/percona-postgresql-operator:2.6.0-ppg17-pgbouncer
-IMAGE_BACKREST13=percona/percona-postgresql-operator:2.6.0-ppg17-pgbackrest
+IMAGE_POSTGRESQL13=
+IMAGE_PGBOUNCER13=
+IMAGE_BACKREST13=
+
+IMAGE_POSTGRESQL13=
+IMAGE_PGBOUNCER13=
+IMAGE_BACKREST13=
 
 IMAGE_PMM_CLIENT=percona/pmm-client:2.44.0
 IMAGE_PMM_SERVER=percona/pmm-server:2.44.0
