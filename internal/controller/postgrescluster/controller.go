@@ -95,7 +95,7 @@ func (r *Reconciler) Reconcile(
 	// Set any defaults that may not have been stored in the API. No DeepCopy
 	// is necessary because controller-runtime makes a copy before returning
 	// from its cache.
-	cluster.Default()
+	_ = cluster.Default(ctx, nil)
 
 	if cluster.Spec.OpenShift == nil {
 		cluster.Spec.OpenShift = &r.IsOpenShift

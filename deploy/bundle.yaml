@@ -45798,14 +45798,19 @@ rules:
   - delete
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
   - pgv2.percona.com
   resources:
   - perconapgbackups/finalizers
-  - perconapgclusters/finalizers
+  - perconapgclusters/status
+  - perconapgrestores/status
+  - perconapgupgrades/finalizers
+  - perconapgupgrades/status
   verbs:
+  - patch
   - update
 - apiGroups:
   - pgv2.percona.com
@@ -45830,12 +45835,8 @@ rules:
 - apiGroups:
   - pgv2.percona.com
   resources:
-  - perconapgclusters/status
-  - perconapgrestores/status
-  - perconapgupgrades/finalizers
-  - perconapgupgrades/status
+  - perconapgclusters/finalizers
   verbs:
-  - patch
   - update
 - apiGroups:
   - pgv2.percona.com
@@ -45845,6 +45846,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - watch
 - apiGroups:
   - policy

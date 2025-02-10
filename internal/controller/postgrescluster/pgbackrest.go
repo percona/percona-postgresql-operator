@@ -866,7 +866,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 			jobSpec.Template.Spec.RestartPolicy = postgresCluster.Spec.Backups.PGBackRest.Jobs.RestartPolicy
 		}
 		// K8SPG-619
-		if jobSpec.BackoffLimit != nil {
+		if postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit != nil {
 			jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
 		}
 	}

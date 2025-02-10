@@ -3,15 +3,18 @@ package pgbackup
 import (
 	"context"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -51,10 +54,10 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 		Complete(r))
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete;patch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/finalizers,verbs=update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/finalizers,verbs=update;patch
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters/status,verbs=create;update;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
@@ -75,13 +78,27 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 	pgBackup.Default()
 
-	pgCluster := &v2.PerconaPGCluster{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+	if !pgBackup.DeletionTimestamp.IsZero() {
+		if _, err := runFinalizers(ctx, r.Client, pgBackup); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
+		}
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
+
+	if pgBackup.Status.State != v2.BackupFailed && pgBackup.Status.State != v2.BackupSucceeded {
+		if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
+		}
+	}
+
 	switch pgBackup.Status.State {
 	case v2.BackupNew:
+		pgCluster := &v2.PerconaPGCluster{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+		}
+
 		if pgCluster.Spec.Pause != nil && *pgCluster.Spec.Pause {
 			log.Info("Can't start backup. PostgresCluster is paused", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
@@ -107,35 +124,49 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			}
 		}
 
-		pgBackup.Status.Destination = getDestination(pgCluster, pgBackup)
-		pgBackup.Status.Image = pgCluster.Spec.Backups.PGBackRest.Image
-
 		repo := getRepo(pgCluster, pgBackup)
 		if repo == nil {
 			return reconcile.Result{}, errors.Errorf("%s repo not defined", pgBackup.Spec.RepoName)
 		}
 
-		pgBackup.Status.Repo = repo
-		pgBackup.Status.CRVersion = pgCluster.Spec.CRVersion
-		switch {
-		case repo.S3 != nil:
-			pgBackup.Status.StorageType = v2.PGBackupStorageTypeS3
-		case repo.Azure != nil:
-			pgBackup.Status.StorageType = v2.PGBackupStorageTypeAzure
-		case repo.GCS != nil:
-			pgBackup.Status.StorageType = v2.PGBackupStorageTypeGCS
-		default:
-			pgBackup.Status.StorageType = v2.PGBackupStorageTypeFilesystem
-		}
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			bcp := new(v2.PerconaPGBackup)
+			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
+				return errors.Wrap(err, "get PGBackup")
+			}
 
-		pgBackup.Status.State = v2.BackupStarting
-		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
+			bcp.Status.Destination = getDestination(pgCluster, pgBackup)
+			bcp.Status.Image = pgCluster.Spec.Backups.PGBackRest.Image
+			bcp.Status.Repo = repo
+			bcp.Status.CRVersion = pgCluster.Spec.CRVersion
+
+			switch {
+			case repo.S3 != nil:
+				bcp.Status.StorageType = v2.PGBackupStorageTypeS3
+			case repo.Azure != nil:
+				bcp.Status.StorageType = v2.PGBackupStorageTypeAzure
+			case repo.GCS != nil:
+				bcp.Status.StorageType = v2.PGBackupStorageTypeGCS
+			default:
+				bcp.Status.StorageType = v2.PGBackupStorageTypeFilesystem
+			}
+
+			bcp.Status.State = v2.BackupStarting
+
+			return r.Client.Status().Update(ctx, bcp)
+		}); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 		}
 
 		log.Info("Backup is starting", "backup", pgBackup.Name, "cluster", pgCluster.Name)
 		return reconcile.Result{}, nil
 	case v2.BackupStarting:
+		pgCluster := &v2.PerconaPGCluster{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+		}
+
 		job, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
 		if err != nil {
 			if errors.Is(err, ErrBackupJobNotFound) {
@@ -200,13 +231,23 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		rr, err := finishBackup(ctx, r.Client, pgBackup, job)
-		if err != nil {
-			return reconcile.Result{}, err
+		pgCluster := &v2.PerconaPGCluster{}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster); err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+			}
+			pgCluster = nil
 		}
-		if rr != nil {
+
+		// We need to perform the same steps as in the delete-backup finalizer once the backup has finished or failed.
+		// After that, the finalizer is no longer needed, that's why the RunFinalizer function is used here.
+		done, err := controller.RunFinalizer(ctx, r.Client, pgBackup, pNaming.FinalizerDeleteBackup, deleteBackupFinalizer(r.Client, pgCluster))
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "failed to run delete-backup finalizer")
+		}
+		if !done {
 			log.Info("Waiting for crunchy reconciler to finish")
-			return *rr, nil
+			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
 		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -225,6 +266,15 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		return reconcile.Result{}, nil
 	case v2.BackupSucceeded:
+		pgCluster := &v2.PerconaPGCluster{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				return reconcile.Result{}, nil
+			}
+			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+		}
+
 		execCli, err := clientcmd.NewClient()
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to create exec client")
@@ -233,17 +283,96 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		latestRestorableTime, err := watcher.GetLatestCommitTimestamp(ctx, r.Client, execCli, pgCluster, pgBackup)
 		if err == nil {
 			log.Info("Got latest restorable timestamp", "timestamp", latestRestorableTime)
-			pgBackup.Status.LatestRestorableTime.Time = latestRestorableTime
-		}
 
-		if err := r.Client.Status().Update(ctx, pgBackup); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				bcp := new(v2.PerconaPGBackup)
+				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
+					return errors.Wrap(err, "get PGBackup")
+				}
+
+				bcp.Status.LatestRestorableTime.Time = latestRestorableTime
+
+				return r.Client.Status().Update(ctx, bcp)
+			}); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+			}
 		}
 
 		return reconcile.Result{}, nil
 	default:
 		return reconcile.Result{}, nil
 	}
+}
+
+func ensureFinalizers(ctx context.Context, cl client.Client, pgBackup *v2.PerconaPGBackup) error {
+	orig := pgBackup.DeepCopy()
+
+	finalizers := []string{pNaming.FinalizerDeleteBackup}
+	finalizersChanged := false
+	for _, f := range finalizers {
+		if controllerutil.AddFinalizer(pgBackup, f) {
+			finalizersChanged = true
+		}
+	}
+	if !finalizersChanged {
+		return nil
+	}
+
+	if err := cl.Patch(ctx, pgBackup.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "remove finalizers")
+	}
+	return nil
+}
+
+func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster) func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
+	return func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
+		if pg == nil {
+			return nil
+		}
+
+		job := new(batchv1.Job)
+		err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job)
+		if client.IgnoreNotFound(err) != nil {
+			return errors.Wrap(err, "get backup job")
+		}
+
+		rr, err := finishBackup(ctx, c, pgBackup, job)
+		if err != nil {
+			return errors.Wrap(err, "failed to finish backup")
+		}
+
+		if rr != nil && rr.RequeueAfter != 0 {
+			return controller.ErrFinalizerPending
+		}
+		return nil
+	}
+}
+
+func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (bool, error) {
+	pg := new(v2.PerconaPGCluster)
+	if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pg); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return false, errors.Wrap(err, "get PostgresCluster")
+		}
+
+		pg = nil
+	}
+
+	finalizers := map[string]controller.FinalizerFunc[*v2.PerconaPGBackup]{
+		pNaming.FinalizerDeleteBackup: deleteBackupFinalizer(c, pg),
+	}
+
+	finished := true
+	for finalizer, f := range finalizers {
+		done, err := controller.RunFinalizer(ctx, c, pgBackup, finalizer, f)
+		if err != nil {
+			return false, errors.Wrapf(err, "run finalizer %s", finalizer)
+		}
+		if !done {
+			finished = false
+		}
+	}
+	return finished, nil
 }
 
 func getBackupInProgress(ctx context.Context, c client.Client, clusterName, ns string) (string, error) {
@@ -372,6 +501,7 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 	if job.Labels[naming.LabelPGBackRestBackup] != string(naming.BackupManual) {
 		return nil, nil
 	}
+
 	runningBackup, err := getBackupInProgress(ctx, c, pgBackup.Spec.PGCluster, pgBackup.Namespace)
 	if err != nil {
 		return nil, errors.Wrap(err, "get backup in progress")
@@ -424,12 +554,14 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	// Remove PGBackRest labels to prevent the job from being included in
-	// repoResources.manualBackupJobs and deleted by the cleanupRepoResources
-	// or reconcileManualBackup methods.
+	// Remove PGBackRest labels to prevent the job from being
+	// deleted by the cleanupRepoResources method.
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		j := new(batchv1.Job)
 		if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil
+			}
 			return errors.Wrap(err, "get job")
 		}
 		for k := range naming.PGBackRestLabels(pgBackup.Spec.PGCluster) {
@@ -459,6 +591,30 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 	}
 	if !deleted {
 		return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
+	if checkBackupJob(job) != v2.BackupSucceeded {
+		// Remove all crunchy labels to prevent the job from being included in
+		// repoResources.manualBackupJobs used in reconcileManualBackup method.
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			j := new(batchv1.Job)
+			if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+				if k8serrors.IsNotFound(err) {
+					return nil
+				}
+				return errors.Wrap(err, "get job")
+			}
+
+			for k := range j.Labels {
+				if strings.HasPrefix(k, pNaming.PrefixCrunchy) {
+					delete(j.Labels, k)
+				}
+			}
+
+			return c.Update(ctx, j)
+		}); err != nil {
+			return nil, errors.Wrap(err, "delete backup job labels")
+		}
 	}
 
 	return nil, nil

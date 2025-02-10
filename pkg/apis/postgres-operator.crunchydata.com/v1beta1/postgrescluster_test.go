@@ -5,6 +5,7 @@
 package v1beta1
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"testing"
@@ -15,13 +16,15 @@ import (
 )
 
 func TestPostgresClusterWebhooks(t *testing.T) {
-	var _ webhook.Defaulter = new(PostgresCluster)
+	var _ webhook.CustomDefaulter = &PostgresCluster{}
 }
 
 func TestPostgresClusterDefault(t *testing.T) {
+	ctx := context.Background()
 	t.Run("TypeMeta", func(t *testing.T) {
 		var cluster PostgresCluster
-		cluster.Default()
+		err := cluster.Default(ctx, nil)
+		assert.NilError(t, err)
 
 		assert.Equal(t, cluster.APIVersion, GroupVersion.String())
 		assert.Equal(t, cluster.Kind, reflect.TypeOf(cluster).Name())
@@ -29,7 +32,8 @@ func TestPostgresClusterDefault(t *testing.T) {
 
 	t.Run("no instance sets", func(t *testing.T) {
 		var cluster PostgresCluster
-		cluster.Default()
+		err := cluster.Default(ctx, nil)
+		assert.NilError(t, err)
 
 		b, err := yaml.Marshal(cluster)
 		assert.NilError(t, err)
@@ -63,7 +67,8 @@ status:
 	t.Run("one instance set", func(t *testing.T) {
 		var cluster PostgresCluster
 		cluster.Spec.InstanceSets = []PostgresInstanceSetSpec{{}}
-		cluster.Default()
+		err := cluster.Default(ctx, nil)
+		assert.NilError(t, err)
 
 		b, err := yaml.Marshal(cluster)
 		assert.NilError(t, err)
@@ -102,7 +107,8 @@ status:
 	t.Run("empty proxy", func(t *testing.T) {
 		var cluster PostgresCluster
 		cluster.Spec.Proxy = new(PostgresProxySpec)
-		cluster.Default()
+		err := cluster.Default(ctx, nil)
+		assert.NilError(t, err)
 
 		b, err := yaml.Marshal(cluster.Spec.Proxy)
 		assert.NilError(t, err)
@@ -112,7 +118,8 @@ status:
 	t.Run("PgBouncer proxy", func(t *testing.T) {
 		var cluster PostgresCluster
 		cluster.Spec.Proxy = &PostgresProxySpec{PGBouncer: &PGBouncerPodSpec{}}
-		cluster.Default()
+		err := cluster.Default(ctx, nil)
+		assert.NilError(t, err)
 
 		b, err := yaml.Marshal(cluster.Spec.Proxy)
 		assert.NilError(t, err)

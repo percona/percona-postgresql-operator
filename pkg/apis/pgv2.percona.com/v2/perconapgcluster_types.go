@@ -246,8 +246,9 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if postgresCluster == nil {
 		postgresCluster = &crunchyv1beta1.PostgresCluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Name,
-				Namespace: cr.Namespace,
+				Name:       cr.Name,
+				Namespace:  cr.Namespace,
+				Finalizers: []string{naming.Finalizer},
 			},
 		}
 	}
@@ -256,7 +257,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		return nil, err
 	}
 
-	postgresCluster.Default()
+	// omitting error because it is always nil
+	_ = postgresCluster.Default(ctx, postgresCluster)
 
 	annotations := make(map[string]string)
 	for k, v := range cr.Annotations {
@@ -980,13 +982,6 @@ func GetDefaultVersionServiceEndpoint() string {
 
 	return DefaultVersionServiceEndpoint
 }
-
-const (
-	FinalizerDeletePVC     = "percona.com/delete-pvc"
-	FinalizerDeleteSSL     = "percona.com/delete-ssl"
-	FinalizerStopWatchers  = "percona.com/stop-watchers" //nolint:gosec
-	FinalizerDeleteBackups = "percona.com/delete-backups"
-)
 
 const (
 	UserMonitoring = "monitor"

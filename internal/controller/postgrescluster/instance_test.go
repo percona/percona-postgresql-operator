@@ -529,7 +529,8 @@ func TestAddPGBackRestToInstancePodSpec(t *testing.T) {
 	ctx := context.Background()
 	cluster := v1beta1.PostgresCluster{}
 	cluster.Name = "hippo"
-	cluster.Default()
+	err := cluster.Default(ctx, nil)
+	assert.NilError(t, err)
 	cluster.SetLabels(map[string]string{
 		naming.LabelVersion: "2.5.0",
 	})
@@ -1725,7 +1726,8 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 				cluster = testCluster()
 			}
 
-			cluster.Default()
+			err := cluster.Default(context.Background(), nil)
+			assert.NilError(t, err)
 			cluster.UID = types.UID("hippouid")
 			cluster.Namespace = test.name + "-ns"
 			cluster.Spec.Shutdown = &test.ip.shutdown

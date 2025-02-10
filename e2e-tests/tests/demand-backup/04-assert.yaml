@@ -15,6 +15,70 @@ metadata:
       kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
+spec:
+  backoffLimit: 20
+  template:
+    metadata:
+      annotations:
+        postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full-s3
+    spec:
+      containers:
+      - command:
+        - /opt/crunchy/bin/pgbackrest
+        imagePullPolicy: Always
+        name: pgbackrest
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/pgbackrest/conf.d
+          name: pgbackrest-config
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+      serviceAccount: demand-backup-pgbackrest
+      serviceAccountName: demand-backup-pgbackrest
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: pgbackrest-config
+        projected:
+          defaultMode: 420
+          sources:
+          - secret:
+              name: demand-backup-pgbackrest-secrets
+          - configMap:
+              items:
+              - key: pgbackrest_repo.conf
+                path: pgbackrest_repo.conf
+              - key: config-hash
+                path: config-hash
+              - key: pgbackrest-server.conf
+                path: ~postgres-operator_server.conf
+              name: demand-backup-pgbackrest-config
+          - secret:
+              items:
+              - key: pgbackrest.ca-roots
+                path: ~postgres-operator/tls-ca.crt
+              - key: pgbackrest-client.crt
+                path: ~postgres-operator/client-tls.crt
+              - key: pgbackrest-client.key
+                mode: 384
+                path: ~postgres-operator/client-tls.key
+              name: demand-backup-pgbackrest
 status:
   succeeded: 1
 ---
