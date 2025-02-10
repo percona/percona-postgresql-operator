@@ -32,7 +32,7 @@ IMAGE_PMM_SERVER=percona/pmm-server:2.44.0
 
 # Supported k8s versions
 GKE_MIN=1.29
-GKE_MAX=1.31
+GKE_MAX=1.30
 EKS_MIN=1.29
 EKS_MAX=1.31
 AKS_MIN=1.29
