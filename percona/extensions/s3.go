@@ -11,13 +11,19 @@ import (
 type S3 struct {
 	Region string
 	Bucket string
-
+	uriStyle string
+	verifyTLS bool
 	svc *s3.S3
 }
 
-func NewS3(endpoint, region, bucket string) *S3 {
+func NewS3(endpoint, region, bucket string, uriStyle string, verifyTLS bool) *S3 {
 	cfg := aws.NewConfig().WithRegion(region)
-
+	if(uriStyle == "path") {
+		cfg = cfg.WithS3ForcePathStyle(true)
+	}
+	if !verifyTLS {
+		cfg = cfg.WithDisableSSL(true)
+	}
 	if endpoint != "" {
 		cfg = cfg.WithEndpoint(endpoint)
 	}
@@ -28,6 +34,8 @@ func NewS3(endpoint, region, bucket string) *S3 {
 	return &S3{
 		Region: region,
 		Bucket: bucket,
+		uriStyle: uriStyle,
+		verifyTLS: verifyTLS,
 		svc:    svc,
 	}
 }
