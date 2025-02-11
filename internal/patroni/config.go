@@ -190,6 +190,11 @@ func DynamicConfiguration(
 	root["ttl"] = *cluster.Spec.Patroni.LeaderLeaseDurationSeconds
 	root["loop_wait"] = *cluster.Spec.Patroni.SyncPeriodSeconds
 
+	// Set failsafe_mode if enabled
+	if cluster.Spec.Patroni.FailsafeMode != nil && *cluster.Spec.Patroni.FailsafeMode {
+		root["failsafe_mode"] = true
+	}
+
 	// Copy the "postgresql" section before making any changes.
 	postgresql := map[string]any{
 		// TODO(cbandy): explain this. requires an archive, perhaps.

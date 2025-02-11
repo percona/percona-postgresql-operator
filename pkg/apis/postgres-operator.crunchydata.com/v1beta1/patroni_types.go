@@ -15,6 +15,13 @@ type PatroniSpec struct {
 	// +kubebuilder:validation:Type=object
 	DynamicConfiguration SchemalessObject `json:"dynamicConfiguration,omitempty"`
 
+	// FailsafeMode enables Patroni's failsafe mode which prevents any automated failovers.
+	// This is useful when performing dangerous operations like major version upgrades.
+	// More info: https://patroni.readthedocs.io/en/latest/dcs_failsafe_mode.html
+	// +optional
+	// +kubebuilder:default=false
+	FailsafeMode *bool `json:"failsafeMode,omitempty"`
+
 	// TTL of the cluster leader lock. "Think of it as the
 	// length of time before initiation of the automatic failover process."
 	// Changing this value causes PostgreSQL to restart.
