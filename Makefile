@@ -215,7 +215,7 @@ check-envtest: get-pgmonitor get-external-snapshotter
 		$(GO_TEST) -count=1 -cover -tags=envtest ./...
 
 # The "PGO_TEST_TIMEOUT_SCALE" environment variable (default: 1) can be set to a
-# positive number that extends test timeouts. The following runs tests with 
+# positive number that extends test timeouts. The following runs tests with
 # timeouts that are 20% longer than normal:
 # make check-envtest-existing PGO_TEST_TIMEOUT_SCALE=1.2
 .PHONY: check-envtest-existing
@@ -377,9 +377,8 @@ release-postgres-operator-image-labels:
 
 # Default values if not already set
 NAME ?= percona-postgresql-operator
-VERSION ?= $(shell git rev-parse --abbrev-ref HEAD | sed -e 's^/^-^g; s^[.]^-^g;' | tr '[:upper:]' '[:lower:]')
-ROOT_REPO ?= ${PWD}
-IMAGE_TAG_BASE ?= perconalab/$(NAME)
+VERSION ?= $(shell git describe --dirty --always | sed -e 's^/^-^g; s^[.]^-^g;' | tr '[:upper:]' '[:lower:]')ROOT_REPO ?= ${PWD}
+IMAGE_TAG_BASE ?= flyio/$(NAME)
 IMAGE ?= $(IMAGE_TAG_BASE):$(VERSION)
 PGO_VERSION ?= $(shell git describe --tags)
 
