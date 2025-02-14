@@ -1,30 +1,31 @@
-#Image versions
+# Images versions
+IMAGE_OPERATOR=percona/percona-postgresql-operator:2.6.0
+
 IMAGE_POSTGRESQL17=percona/percona-postgresql-operator:2.6.0-ppg17.2-postgres
 IMAGE_PGBOUNCER17=percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbouncer1.23.1
 IMAGE_POSTGIS17=percona/percona-postgresql-operator:2.6.0-ppg17.2-postgres-gis3.3.7
-IMAGE_PGBACKREST17=percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbackrest2.54.0
+IMAGE_BACKREST17=percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbackrest2.54.0
 
 IMAGE_POSTGRESQL16=percona/percona-postgresql-operator:2.6.0-ppg16.6-postgres
 IMAGE_PGBOUNCER16=percona/percona-postgresql-operator:2.6.0-ppg16.6-pgbouncer1.23.1
 IMAGE_POSTGIS16=percona/percona-postgresql-operator:2.6.0-ppg16.6-postgres-gis3.3.7
-IMAGE_PGBACKREST16=percona/percona-postgresql-operator:2.6.0-ppg16.6-pgbackrest2.54.0
+IMAGE_BACKREST16=percona/percona-postgresql-operator:2.6.0-ppg16.6-pgbackrest2.54.0
 
 IMAGE_POSTGRESQL15=percona/percona-postgresql-operator:2.6.0-ppg15.10-postgres
 IMAGE_PGBOUNCER15=percona/percona-postgresql-operator:2.6.0-ppg15.10-pgbouncer1.23.1
 IMAGE_POSTGIS15=percona/percona-postgresql-operator:2.6.0-ppg15.10-postgres-gis3.3.7
-IMAGE_PGBACKREST15=percona/percona-postgresql-operator:2.6.0-ppg15.10-pgbackrest2.54.0
+IMAGE_BACKREST15=percona/percona-postgresql-operator:2.6.0-ppg15.10-pgbackrest2.54.0
 
 IMAGE_POSTGRESQL14=percona/percona-postgresql-operator:2.6.0-ppg14.15-postgres
 IMAGE_PGBOUNCER14=percona/percona-postgresql-operator:2.6.0-ppg14.15-pgbouncer1.23.1
 IMAGE_POSTGIS14=percona/percona-postgresql-operator:2.6.0-ppg14.15-postgres-gis3.3.7
-IMAGE_PGBACKREST14=percona/percona-postgresql-operator:2.6.0-ppg14.15-pgbackrest2.54.0
+IMAGE_BACKREST14=percona/percona-postgresql-operator:2.6.0-ppg14.15-pgbackrest2.54.0
 
 IMAGE_POSTGRESQL13=percona/percona-postgresql-operator:2.6.0-ppg13.18-postgres
 IMAGE_PGBOUNCER13=percona/percona-postgresql-operator:2.6.0-ppg13.18-pgbouncer1.23.1
 IMAGE_POSTGIS13=percona/percona-postgresql-operator:2.6.0-ppg13.18-postgres-gis3.3.7
-IMAGE_PGBACKREST13=percona/percona-postgresql-operator:2.6.0-ppg13.18-pgbackrest2.54.0
+IMAGE_BACKREST13=percona/percona-postgresql-operator:2.6.0-ppg13.18-pgbackrest2.54.0
 
-IMAGE_OPERATOR=percona/percona-postgresql-operator:2.6.0
 IMAGE_UPGRADE=percona/percona-postgresql-operator:2.6.0-upgrade
 
 IMAGE_PMM_CLIENT=percona/pmm-client:2.44.0
@@ -39,4 +40,4 @@ AKS_MIN=1.29
 AKS_MAX=1.31
 OPENSHIFT_MIN=4.14.46
 OPENSHIFT_MAX=4.17.16
-MINIKUBE_REL=1.32.0
+MINIKUBE_MAX=1.32.0
