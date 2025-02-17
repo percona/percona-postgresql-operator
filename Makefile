@@ -20,6 +20,7 @@ GO_BUILD = $(GO) build -trimpath
 GO_TEST ?= $(GO) test
 KUTTL ?= kubectl-kuttl
 KUTTL_TEST ?= $(KUTTL) test
+SED := $(shell which gsed || which sed)
 
 ##@ General
 
@@ -427,35 +428,36 @@ endef
 
 # Prepare release
 PG_VER ?= $(shell grep -o "postgresVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+")
+include e2e-tests/release_versions
 release: generate
-	sed -i \
-		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
-		-e "/^spec:/,/^  image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-postgres#}" \
-		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbouncer#}" \
-		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbackrest#}" \
-		-e "/extensions:/,/image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: percona/pmm-client:@@SET_TAG@@#}" deploy/cr.yaml
-	sed -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
-	sed -i \
-		-e "/^spec:/,/^  image:/{s#image: .*#image: percona/percona-postgresql-operator:$(VERSION)#}" \
-		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-postgres#}" \
-		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbouncer#}" \
-		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: percona/percona-postgresql-operator:$(VERSION)-ppg$(PG_VER)-pgbackres#}" deploy/upgrade.yaml
+	$(SED) -i \
+    	-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
+        -e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_POSTGRESQL17)#}" \
+        -e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(IMAGE_PGBOUNCER17)#}" \
+        -e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(IMAGE_PGBACKREST17)#}" \
+        -e "/extensions:/,/image:/{s#image: .*#image: $(IMAGE_OPERATOR)#}" \
+        -e "/^  pmm:/,/^    image:/{s#image: .*#image: $(IMAGE_PMM_CLIENT)#}" deploy/cr.yaml
+	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
+	$(SED) -i \
+       -e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_OPERATOR)#}" \
+       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(IMAGE_POSTGRESQL17)#}" \
+       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(IMAGE_PGBOUNCER17)#}" \
+       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(IMAGE_PGBACKREST17)#}" deploy/upgrade.yaml
 
 # Prepare main branch after release
 MAJOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f1)
 MINOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f2)
 NEXT_VER ?= $(MAJOR_VER).$$(($(MINOR_VER) + 1)).0
 after-release: generate
-	sed -i \
+	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbouncer#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbackrest#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: perconalab/pmm-client:dev-latest#}" deploy/cr.yaml
-	sed -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
-	sed -i \
+	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
+	$(SED) -i \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: perconalab/percona-postgresql-operator:main#}" \
 		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
 		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbouncer#}" \
