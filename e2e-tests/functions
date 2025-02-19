@@ -386,9 +386,19 @@ get_metric_values() {
 	local end=$($date -u "+%s")
 	local endpoint=$(get_service_ip monitoring-service)
 
-	curl -s -k -H "Authorization: Bearer ${api_key}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
+	local wait_count=20
+	local retry=0
+	until [[ $(curl -s -k -H "Authorization: Bearer ${api_key}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
 		| jq '.data.result[0].values[][1]' \
-		| grep '^"[0-9]'
+		| grep '^"[0-9]') ]]; do
+	sleep 2
+	local start=$($date -u "+%s" -d "-5 minute")
+	local end=$($date -u "+%s")
+	let retry+=1
+	if [[ $retry -ge $wait_count ]]; then
+		exit 1
+	fi
+	done
 }
 
 get_qan20_values() {
