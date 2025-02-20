@@ -630,7 +630,7 @@ type PostgresStandbySpec struct {
 	// true, WAL files are applied from a pgBackRest repository or another
 	// PostgreSQL server.
 	// +optional
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`
 
 	// The name of the pgBackRest repository to follow for WAL files.

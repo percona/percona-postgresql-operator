@@ -446,7 +446,7 @@ type PGBackRestDataSource struct {
 
 	// The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.
 	// Defaults to `db` if not provided.
-	// +kubebuilder:default="db"
+	// +kubebuilder:validation:Required
 	Stanza string `json:"stanza"`
 
 	// Command line options to include when running the pgBackRest restore command.
