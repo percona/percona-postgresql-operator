@@ -7342,7 +7342,6 @@ spec:
                             type: object
                         type: object
                       stanza:
-                        default: db
                         description: |-
                           The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.
                           Defaults to `db` if not provided.
@@ -18104,7 +18103,7 @@ spec:
                   or archive.
                 properties:
                   enabled:
-                    default: true
+                    default: false
                     description: |-
                       Whether or not the PostgreSQL cluster should be read-only. When this is
                       true, WAL files are applied from a pgBackRest repository or another
@@ -32642,7 +32641,6 @@ spec:
                             type: object
                         type: object
                       stanza:
-                        default: db
                         description: |-
                           The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.
                           Defaults to `db` if not provided.
@@ -43319,7 +43317,7 @@ spec:
                   or archive.
                 properties:
                   enabled:
-                    default: true
+                    default: false
                     description: |-
                       Whether or not the PostgreSQL cluster should be read-only. When this is
                       true, WAL files are applied from a pgBackRest repository or another
