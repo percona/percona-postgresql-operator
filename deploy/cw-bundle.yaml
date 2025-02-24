@@ -5433,7 +5433,6 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                             type: string
                           repoName:
-                            default: repo1
                             description: |-
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -8356,7 +8355,6 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repoName:
-                        default: repo1
                         description: |-
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -30252,7 +30250,6 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                             type: string
                           repoName:
-                            default: repo1
                             description: |-
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -33655,7 +33652,6 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repoName:
-                        default: repo1
                         description: |-
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source

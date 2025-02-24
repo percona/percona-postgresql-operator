@@ -291,7 +291,6 @@ type PostgresClusterDataSource struct {
 	// for the new PostgresCluster.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
-	// +kubebuilder:default="repo1"
 	RepoName string `json:"repoName"`
 
 	// Command line options to include when running the pgBackRest restore command.
