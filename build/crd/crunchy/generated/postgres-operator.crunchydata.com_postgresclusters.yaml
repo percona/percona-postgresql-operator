@@ -3336,7 +3336,6 @@ spec:
                               - bucket
                               type: object
                             name:
-                              default: repo1
                               description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
@@ -6670,7 +6669,6 @@ spec:
                             - bucket
                             type: object
                           name:
-                            default: repo1
                             description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
@@ -6996,9 +6994,8 @@ spec:
                             type: object
                         type: object
                       stanza:
-                        description: |-
-                          The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.
-                          Defaults to `db` if not provided.
+                        description: The name of an existing pgBackRest stanza to
+                          use as the data source for the new PostgresCluster.
                         type: string
                       tolerations:
                         description: |-
