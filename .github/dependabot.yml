@@ -34,7 +34,7 @@ updates:
     reviewers:
       - hors
       - egegunes
-      - inelpandzic
+      - gkech
     labels:
       - "dependencies"
     schedule:
