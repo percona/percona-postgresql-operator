@@ -58,8 +58,14 @@ func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics
 		}
 	}
 
+	// Create a copy of the config to avoid modifying the original
+	configCopy := rest.CopyConfig(config)
+
+	// Set unlimited QPS
+	configCopy.QPS = -1
+
 	// create controller runtime manager
-	mgr, err := manager.New(config, options)
+	mgr, err := manager.New(configCopy, options)
 	if err != nil {
 		return nil, err
 	}

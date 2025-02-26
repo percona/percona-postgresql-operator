@@ -62,7 +62,13 @@ func NewManager(config *rest.Config, options manager.Options) (manager.Manager, 
 	}
 
 	if err == nil {
-		m, err = manager.New(config, options)
+		// Create a copy of the config to avoid modifying the original
+		configCopy := rest.CopyConfig(config)
+
+		// Set unlimited QPS
+		configCopy.QPS = -1
+
+		m, err = manager.New(configCopy, options)
 	}
 
 	return m, err

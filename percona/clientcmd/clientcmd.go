@@ -33,6 +33,9 @@ func NewClient() (*Client, error) {
 		return nil, err
 	}
 
+	// Set unlimited QPS
+	restconfig.QPS = -1
+
 	// Create a Kubernetes core/v1 client.
 	cl, err := corev1client.NewForConfig(restconfig)
 	if err != nil {
