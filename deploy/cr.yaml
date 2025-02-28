@@ -6,7 +6,7 @@ metadata:
 #  - percona.com/delete-pvc
 #  - percona.com/delete-ssl
 spec:
-  crVersion: 2.5.0
+  crVersion: 2.5.1
 #  secrets:
 #    customRootCATLSSecret:
 #      name: cluster1-ca-cert
@@ -113,7 +113,7 @@ spec:
 #          test-label: value
 
 
-  image: percona/percona-postgresql-operator:2.5.0-ppg16.4-postgres
+  image: percona/percona-postgresql-operator:2.5.1-ppg16.8-postgres
   imagePullPolicy: Always
   postgresVersion: 16
 #  port: 5432
@@ -229,7 +229,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: percona/percona-postgresql-operator:2.5.0-ppg16.4-pgbouncer1.23.1
+      image: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbouncer1.24.0
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -311,7 +311,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: percona/percona-postgresql-operator:2.5.0-ppg16.4-pgbackrest2.53-1
+      image: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbackrest2.54.0
 #
 #      containers:
 #        pgbackrest:
@@ -454,7 +454,7 @@ spec:
 
   pmm:
     enabled: false
-    image: percona/pmm-client:2.43.1
+    image: percona/pmm-client:2.44.0
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -475,7 +475,7 @@ spec:
 #          work_mem: 2MB
 
 #  extensions:
-#    image: percona/percona-postgresql-operator:2.5.0
+#    image: percona/percona-postgresql-operator:2.5.1
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
