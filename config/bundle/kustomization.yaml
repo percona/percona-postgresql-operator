@@ -7,4 +7,4 @@ resources:
 images:
 - name: postgres-operator
   newName: percona/percona-postgresql-operator
-  newTag: 2.5.0
+  newTag: 2.5.1
