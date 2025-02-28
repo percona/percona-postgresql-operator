@@ -9,4 +9,4 @@ spec:
   toPostgresVersion: 16
   toPostgresImage: percona/percona-postgresql-operator:2.5.1-ppg16.8-postgres
   toPgBouncerImage: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbouncer1.24.0
-  toPgBackRestImage: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbackrest2.54-2
+  toPgBackRestImage: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbackrest2.54.2

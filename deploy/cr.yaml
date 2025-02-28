@@ -311,7 +311,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbackrest2.54.0
+      image: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbackrest2.54.2
 #
 #      containers:
 #        pgbackrest:
