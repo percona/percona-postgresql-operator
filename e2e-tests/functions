@@ -318,7 +318,7 @@ wait_for_delete() {
 		sleep 1
 		echo -n .
 		let retry+=1
-		if [ $retry -ge 120 ]; then
+		if [ $retry -ge 200 ]; then
 			echo max retry count $retry reached. something went wrong with operator or kubernetes cluster
 			exit 1
 		fi
