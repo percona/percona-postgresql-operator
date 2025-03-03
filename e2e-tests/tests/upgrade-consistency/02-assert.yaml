@@ -120,7 +120,7 @@ kind: PerconaPGCluster
 metadata:
   name: upgrade-consistency
 spec:
-  crVersion: 2.5.0
+  crVersion: 2.5.1
 status:
   pgbouncer:
     ready: 3
