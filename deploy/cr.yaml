@@ -5,8 +5,14 @@ metadata:
 #  finalizers:
 #  - percona.com/delete-pvc
 #  - percona.com/delete-ssl
+#  - percona.com/delete-backups
 spec:
-  crVersion: 2.5.1
+  crVersion: 2.6.0
+#  metadata:
+#    annotations:
+#      example-annotation: value
+#    labels:
+#      example-label: value
 #  secrets:
 #    customRootCATLSSecret:
 #      name: cluster1-ca-cert
@@ -19,6 +25,7 @@ spec:
 #      name: cluster1-cert
 #    customReplicationTLSSecret:
 #      name: replication1-cert
+#  tlsOnly: false
 
 #  standby:
 #    enabled: true
@@ -27,6 +34,8 @@ spec:
 #    repoName: repo1
 
 #  openshift: true
+
+#  autoCreateUserSchema: true
 
 #  users:
 #    - name: rhino
@@ -113,9 +122,9 @@ spec:
 #          test-label: value
 
 
-  image: percona/percona-postgresql-operator:2.5.1-ppg16.8-postgres
+  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
   imagePullPolicy: Always
-  postgresVersion: 16
+  postgresVersion: 17
 #  port: 5432
 
 #  expose:
@@ -229,7 +238,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbouncer1.24.0
+      image: perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -311,7 +320,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: percona/percona-postgresql-operator:2.5.1-ppg16.8-pgbackrest2.54.2
+      image: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
 #
 #      containers:
 #        pgbackrest:
@@ -329,6 +338,8 @@ spec:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
 #      jobs:
+#        restartPolicy: OnFailure
+#        backoffLimit: 2
 #        priorityClassName: high-priority
 #        resources:
 #          limits:
@@ -454,7 +465,7 @@ spec:
 
   pmm:
     enabled: false
-    image: percona/pmm-client:2.44.0
+    image: perconalab/pmm-client:dev-latest
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -469,13 +480,14 @@ spec:
 #    dynamicConfiguration:
 #      postgresql:
 #        parameters:
+#          restore_command: "pgbackrest --stanza=db archive-get %f \"%p\""
 #          max_parallel_workers: 2
 #          max_worker_processes: 2
 #          shared_buffers: 1GB
 #          work_mem: 2MB
 
 #  extensions:
-#    image: percona/percona-postgresql-operator:2.5.1
+#    image: perconalab/percona-postgresql-operator:main
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
@@ -487,6 +499,7 @@ spec:
 #    builtin:
 #      pg_stat_monitor: true
 #      pg_audit: true
+#      pgvector: false
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1

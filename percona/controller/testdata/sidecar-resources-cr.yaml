@@ -4,11 +4,11 @@ kind: PerconaPGCluster
 metadata:
   name: cluster1
 spec:
-  crVersion: 2.5.1
+  crVersion: 2.6.0
 
-  image: perconalab/percona-postgresql-operator:main-ppg16-postgres
+  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
   imagePullPolicy: Always
-  postgresVersion: 16
+  postgresVersion: 17
 
   instances:
   - name: instance1
@@ -39,7 +39,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
+      image: perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
       containers:
         pgbouncerConfig:
           resources:
@@ -58,7 +58,7 @@ spec:
 
   backups:
     pgbackrest:
-      image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
 #      
       containers:
         pgbackrest:

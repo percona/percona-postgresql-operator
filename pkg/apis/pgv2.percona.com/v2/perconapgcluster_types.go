@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -21,7 +22,7 @@ func init() {
 }
 
 const (
-	Version     = "2.5.1"
+	Version     = "2.6.0"
 	ProductName = "pg-operator"
 )
 
@@ -75,6 +76,8 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
+	TLSOnly bool `json:"tlsOnly,omitempty"`
+
 	// The port on which PostgreSQL should listen.
 	// +optional
 	// +kubebuilder:default=5432
@@ -92,7 +95,7 @@ type PerconaPGClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=16
+	// +kubebuilder:validation:Maximum=17
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -166,6 +169,11 @@ type PerconaPGClusterSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
+
+	// Whether or not the cluster has schemas automatically created for the user
+	// defined in `spec.users` for all of the databases listed for that user.
+	// +optional
+	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -200,6 +208,7 @@ func (cr *PerconaPGCluster) Default() {
 	cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
 	t := true
+	f := false
 
 	if cr.Spec.Backups.TrackLatestRestorableTime == nil {
 		cr.Spec.Backups.TrackLatestRestorableTime = &t
@@ -212,11 +221,22 @@ func (cr *PerconaPGCluster) Default() {
 	}
 	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
+	if cr.Spec.Backups.PGBackRest.Jobs == nil {
+		cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+	}
+
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
 	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
 		cr.Spec.Extensions.BuiltIn.PGAudit = &t
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
+		cr.Spec.Extensions.BuiltIn.PGVector = &f
+	}
+
+	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
+		cr.Spec.AutoCreateUserSchema = &t
 	}
 }
 
@@ -226,8 +246,9 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if postgresCluster == nil {
 		postgresCluster = &crunchyv1beta1.PostgresCluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Name,
-				Namespace: cr.Namespace,
+				Name:       cr.Name,
+				Namespace:  cr.Namespace,
+				Finalizers: []string{naming.Finalizer},
 			},
 		}
 	}
@@ -236,7 +257,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		return nil, err
 	}
 
-	postgresCluster.Default()
+	// omitting error because it is always nil
+	_ = postgresCluster.Default(ctx, postgresCluster)
 
 	annotations := make(map[string]string)
 	for k, v := range cr.Annotations {
@@ -247,6 +269,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			annotations[pNaming.ToCrunchyAnnotation(k)] = v
 		}
 	}
+
+	if cr.Spec.AutoCreateUserSchema != nil && *cr.Spec.AutoCreateUserSchema {
+		annotations[naming.AutoCreateUserSchemaAnnotation] = "true"
+	}
+
 	postgresCluster.Annotations = annotations
 	postgresCluster.Labels = cr.Labels
 	if postgresCluster.Labels == nil {
@@ -329,6 +356,9 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
+	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
+
+	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
 	return postgresCluster, nil
 }
@@ -354,45 +384,55 @@ const (
 type PostgresInstanceSetStatus struct {
 	Name string `json:"name"`
 
-	// +kubebuilder:validation:Required
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
 	Ready int32 `json:"ready"`
 }
 
 type PostgresStatus struct {
-	// +kubebuilder:validation:Required
+	// +optional
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
+	// +optional
 	Ready int32 `json:"ready"`
 
-	// +kubebuilder:validation:Required
+	// +optional
 	InstanceSets []PostgresInstanceSetStatus `json:"instances"`
+
+	// +optional
+	Version int `json:"version"`
 }
 
 type PGBouncerStatus struct {
-	// +kubebuilder:validation:Required
 	Size int32 `json:"size"`
 
-	// +kubebuilder:validation:Required
 	Ready int32 `json:"ready"`
 }
 
 type PerconaPGClusterStatus struct {
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Postgres PostgresStatus `json:"postgres"`
 
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	PGBouncer PGBouncerStatus `json:"pgbouncer"`
 
+	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	State AppState `json:"state"`
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
+	PatroniVersion string `json:"patroniVersion"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Host string `json:"host"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	InstalledCustomExtensions []string `json:"installedCustomExtensions"`
 }
 
 type Backups struct {
@@ -552,11 +592,11 @@ type CustomExtensionsStorageSpec struct {
 type BuiltInExtensionsSpec struct {
 	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
 	PGAudit       *bool `json:"pg_audit,omitempty"`
+	PGVector      *bool `json:"pgvector,omitempty"`
 }
 
 type ExtensionsSpec struct {
-	// +kubebuilder:validation:Required
-	Image           string                      `json:"image"`
+	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
 	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
 	BuiltIn         BuiltInExtensionsSpec       `json:"builtin,omitempty"`
@@ -942,12 +982,6 @@ func GetDefaultVersionServiceEndpoint() string {
 
 	return DefaultVersionServiceEndpoint
 }
-
-const (
-	FinalizerDeletePVC    = "percona.com/delete-pvc"
-	FinalizerDeleteSSL    = "percona.com/delete-ssl"
-	FinalizerStopWatchers = "percona.com/stop-watchers" //nolint:gosec
-)
 
 const (
 	UserMonitoring = "monitor"
