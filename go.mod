@@ -29,7 +29,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.34.0
 	go.opentelemetry.io/otel/trace v1.34.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.35.0
 	google.golang.org/grpc v1.70.0
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.32.2
