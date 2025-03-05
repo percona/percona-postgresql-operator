@@ -191,7 +191,7 @@ get_cr() {
 	case $test_name in
 		"demand-backup" | "start-from-backup")
 			yq eval -i '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${cr_name}'-pgbackrest-secrets"}}] |
+				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
 				.spec.backups.pgbackrest.manual.repoName = "repo1" |
 				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
 				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
@@ -203,18 +203,18 @@ get_cr() {
 				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
 			fi
-			if [[ $test_name == "start-from-backup" ]]; then
+			if [[ $test_name == "start-from-backup" && ! $cr_name =~ "source" ]]; then
 				yq eval -i '
-					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${cr_name}'-pgbackrest-secrets"}}] |
+					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
 					.spec.dataSource.pgbackrest.stanza = "db" |
-					.spec.dataSource.pgbackrest.global.repo1-path = "/cluster-source/demand-backup-ppg'$PG_VER'/repo1" |
+					.spec.dataSource.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/demand-backup-ppg'$PG_VER'/repo1" |
 					.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
 					' $TEMP_DIR/cr.yaml
 			fi
 			;;
 		"scheduled-backup")
 			yq eval -i '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${cr_name}'-pgbackrest-secrets"}}] |
+				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
 				.spec.backups.pgbackrest.manual.repoName = "repo1" |
 				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
 				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
