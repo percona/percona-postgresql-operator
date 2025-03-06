@@ -61,7 +61,7 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 				return
 			}
 
-			latestBackup, err := getLatestBackup(ctx, cli, cr)
+			latestBackup, err := getLatestBackup(ctx, cli, localCr)
 			if err != nil {
 				if !errors.Is(err, errRunningBackup) && !errors.Is(err, errNoBackups) {
 					log.Error(err, "get latest backup")
@@ -70,7 +70,7 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 				continue
 			}
 
-			ts, err := GetLatestCommitTimestamp(ctx, cli, execCli, cr, latestBackup)
+			ts, err := GetLatestCommitTimestamp(ctx, cli, execCli, localCr, latestBackup)
 			if err != nil {
 				switch {
 				case errors.Is(err, PrimaryPodNotFound) && localCr.Status.State != pgv2.AppStateReady:

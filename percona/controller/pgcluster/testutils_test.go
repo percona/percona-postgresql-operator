@@ -21,6 +21,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -94,6 +95,10 @@ func readTestCR(name, namespace, testFile string) (*v2.PerconaPGCluster, error) 
 	if cr.Spec.PostgresVersion == 0 {
 		return nil, errors.New("postgresVersion should be specified")
 	}
+	if cr.Annotations == nil {
+		cr.Annotations = make(map[string]string)
+	}
+	cr.Annotations[pNaming.InternalAnnotationDisablePatroniVersionCheck] = "true"
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
 	cr.Status.PatroniVersion = "4.0.0"
 	return cr, nil
@@ -112,6 +117,10 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	}
 
 	cr.Name = name
+	if cr.Annotations == nil {
+		cr.Annotations = make(map[string]string)
+	}
+	cr.Annotations[pNaming.InternalAnnotationDisablePatroniVersionCheck] = "true"
 	cr.Namespace = namespace
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
 	cr.Status.PatroniVersion = "4.0.0"

@@ -17525,6 +17525,8 @@ spec:
                 type: object
               postgres:
                 properties:
+                  imageID:
+                    type: string
                   instances:
                     items:
                       properties:
