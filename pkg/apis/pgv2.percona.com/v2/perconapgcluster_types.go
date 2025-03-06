@@ -401,6 +401,9 @@ type PostgresStatus struct {
 
 	// +optional
 	Version int `json:"version"`
+
+	// +optional
+	ImageID string `json:"imageID"`
 }
 
 type PGBouncerStatus struct {

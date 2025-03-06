@@ -294,7 +294,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	var opRes controllerutil.OperationResult
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	if err := retry.OnError(retry.DefaultRetry, func(err error) bool { return err != nil }, func() error {
 		var err error
 		opRes, err = controllerutil.CreateOrUpdate(ctx, r.Client, postgresCluster, func() error {
 			var err error
@@ -334,7 +334,38 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		cr.Annotations = make(map[string]string)
 	}
 
-	if cr.Status.Postgres.Version == cr.Spec.PostgresVersion && cr.Status.PatroniVersion != "" {
+	getImageIDFromPod := func(pod *corev1.Pod, containerName string) string {
+		idx := slices.IndexFunc(pod.Status.ContainerStatuses, func(s corev1.ContainerStatus) bool {
+			return s.Name == containerName
+		})
+		if idx == -1 {
+			return ""
+		}
+		return pod.Status.ContainerStatuses[idx].ImageID
+	}
+
+	pods := new(corev1.PodList)
+	instances, err := naming.AsSelector(naming.ClusterInstances(cr.Name))
+	if err != nil {
+		return err
+	}
+	if err = r.Client.List(ctx, pods, client.InNamespace(cr.Namespace), client.MatchingLabelsSelector{Selector: instances}); err != nil {
+		return err
+	}
+
+	// Collecting all image IDs from instance pods. Under normal conditions, this slice will contain a single image ID, as all pods typically use the same image.
+	// During an image update, it may contain multiple different image IDs as the update progresses.
+	imageIDs := []string{}
+	for _, pod := range pods.Items {
+		imageID := getImageIDFromPod(&pod, naming.ContainerDatabase)
+		if imageID != "" && !slices.Contains(imageIDs, imageID) {
+			imageIDs = append(imageIDs, imageID)
+		}
+	}
+
+	// If the imageIDs slice contains the imageID from the status, we skip checking the Patroni version.
+	// This ensures that the Patroni version is only checked after all pods have been updated.
+	if slices.Contains(imageIDs, cr.Status.Postgres.ImageID) && cr.Status.PatroniVersion != "" {
 		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
 		return nil
 	}
@@ -348,7 +379,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		ObjectMeta: meta,
 	}
 
-	err := r.Client.Get(ctx, client.ObjectKeyFromObject(p), p)
+	err = r.Client.Get(ctx, client.ObjectKeyFromObject(p), p)
 	if client.IgnoreNotFound(err) != nil {
 		return errors.Wrap(err, "failed to get patroni version check pod")
 	}
@@ -418,6 +449,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	cr.Status.PatroniVersion = patroniVersion
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
+	cr.Status.Postgres.ImageID = getImageIDFromPod(p, pNaming.ContainerPatroniVersionCheck)
 
 	if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "failed to patch patroni version")
