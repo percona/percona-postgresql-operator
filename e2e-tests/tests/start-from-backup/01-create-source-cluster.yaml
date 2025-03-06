@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr "start-from-backup-source" "demand-backup-ppg$PG_VER" \
+        | kubectl -n "${NAMESPACE}" apply -f -

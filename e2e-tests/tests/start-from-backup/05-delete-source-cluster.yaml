@@ -1,0 +1,10 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+- apiVersion: pgv2.percona.com/v2
+  kind: PerconaPGCluster
+  name: start-from-backup-source
+- apiVersion: postgres-operator.crunchydata.com/v1beta1
+  kind: PostgresCluster
+  name: start-from-backup-source
+timeout: 300
