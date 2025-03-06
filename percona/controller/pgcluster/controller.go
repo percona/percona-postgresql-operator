@@ -334,6 +334,12 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		cr.Annotations = make(map[string]string)
 	}
 
+	// This annotation is used for unit-tests only. Allows to skip the patroni version check
+	if _, ok := cr.Annotations[pNaming.InternalAnnotationDisablePatroniVersionCheck]; ok {
+		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
+		return nil
+	}
+
 	getImageIDFromPod := func(pod *corev1.Pod, containerName string) string {
 		idx := slices.IndexFunc(pod.Status.ContainerStatuses, func(s corev1.ContainerStatus) bool {
 			return s.Name == containerName
