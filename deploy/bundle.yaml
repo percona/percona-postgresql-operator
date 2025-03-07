@@ -424,7 +424,6 @@ spec:
                     - bucket
                     type: object
                   name:
-                    default: repo1
                     description: The name of the repository
                     pattern: ^repo[1-4]
                     type: string
@@ -4191,7 +4190,6 @@ spec:
                               - bucket
                               type: object
                             name:
-                              default: repo1
                               description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
@@ -5433,7 +5431,6 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                             type: string
                           repoName:
-                            default: repo1
                             description: |-
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -7016,7 +7013,6 @@ spec:
                             - bucket
                             type: object
                           name:
-                            default: repo1
                             description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
@@ -7342,10 +7338,8 @@ spec:
                             type: object
                         type: object
                       stanza:
-                        default: db
-                        description: |-
-                          The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.
-                          Defaults to `db` if not provided.
+                        description: The name of an existing pgBackRest stanza to
+                          use as the data source for the new PostgresCluster.
                         type: string
                       tolerations:
                         description: |-
@@ -8357,7 +8351,6 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repoName:
-                        default: repo1
                         description: |-
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -18104,7 +18097,7 @@ spec:
                   or archive.
                 properties:
                   enabled:
-                    default: true
+                    default: false
                     description: |-
                       Whether or not the PostgreSQL cluster should be read-only. When this is
                       true, WAL files are applied from a pgBackRest repository or another
@@ -29005,7 +28998,6 @@ spec:
                               - bucket
                               type: object
                             name:
-                              default: repo1
                               description: The name of the repository
                               pattern: ^repo[1-4]
                               type: string
@@ -30255,7 +30247,6 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                             type: string
                           repoName:
-                            default: repo1
                             description: |-
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -32318,7 +32309,6 @@ spec:
                             - bucket
                             type: object
                           name:
-                            default: repo1
                             description: The name of the repository
                             pattern: ^repo[1-4]
                             type: string
@@ -32644,10 +32634,8 @@ spec:
                             type: object
                         type: object
                       stanza:
-                        default: db
-                        description: |-
-                          The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.
-                          Defaults to `db` if not provided.
+                        description: The name of an existing pgBackRest stanza to
+                          use as the data source for the new PostgresCluster.
                         type: string
                       tolerations:
                         description: |-
@@ -33659,7 +33647,6 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
                         type: string
                       repoName:
-                        default: repo1
                         description: |-
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
@@ -43321,7 +43308,7 @@ spec:
                   or archive.
                 properties:
                   enabled:
-                    default: true
+                    default: false
                     description: |-
                       Whether or not the PostgreSQL cluster should be read-only. When this is
                       true, WAL files are applied from a pgBackRest repository or another

@@ -291,7 +291,6 @@ type PostgresClusterDataSource struct {
 	// for the new PostgresCluster.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
-	// +kubebuilder:default="repo1"
 	RepoName string `json:"repoName"`
 
 	// Command line options to include when running the pgBackRest restore command.
@@ -630,7 +629,7 @@ type PostgresStandbySpec struct {
 	// true, WAL files are applied from a pgBackRest repository or another
 	// PostgreSQL server.
 	// +optional
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`
 
 	// The name of the pgBackRest repository to follow for WAL files.
