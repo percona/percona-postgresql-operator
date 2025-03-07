@@ -6,25 +6,25 @@ IMAGE_PGBOUNCER17=percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbouncer1.2
 IMAGE_POSTGIS17=percona/percona-postgresql-operator:2.6.0-ppg17.2-postgres-gis3.3.7
 IMAGE_BACKREST17=percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbackrest2.54.0
 
-IMAGE_POSTGRESQL16=percona/percona-postgresql-operator:2.6.0-ppg16.6-postgres
-IMAGE_PGBOUNCER16=percona/percona-postgresql-operator:2.6.0-ppg16.6-pgbouncer1.23.1
-IMAGE_POSTGIS16=percona/percona-postgresql-operator:2.6.0-ppg16.6-postgres-gis3.3.7
-IMAGE_BACKREST16=percona/percona-postgresql-operator:2.6.0-ppg16.6-pgbackrest2.54.0
+IMAGE_POSTGRESQL16=percona/percona-postgresql-operator:2.6.0-ppg16.8-postgres
+IMAGE_PGBOUNCER16=percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbouncer1.24.0
+IMAGE_POSTGIS16=percona/percona-postgresql-operator:2.6.0-ppg16.8-postgres-gis3.3.8
+IMAGE_BACKREST16=percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbackrest2.54.2
 
-IMAGE_POSTGRESQL15=percona/percona-postgresql-operator:2.6.0-ppg15.10-postgres
-IMAGE_PGBOUNCER15=percona/percona-postgresql-operator:2.6.0-ppg15.10-pgbouncer1.23.1
-IMAGE_POSTGIS15=percona/percona-postgresql-operator:2.6.0-ppg15.10-postgres-gis3.3.7
-IMAGE_BACKREST15=percona/percona-postgresql-operator:2.6.0-ppg15.10-pgbackrest2.54.0
+IMAGE_POSTGRESQL15=percona/percona-postgresql-operator:2.6.0-ppg15.12-postgres
+IMAGE_PGBOUNCER15=percona/percona-postgresql-operator:2.6.0-ppg15.12-pgbouncer1.24.0
+IMAGE_POSTGIS15=percona/percona-postgresql-operator:2.6.0-ppg15.12-postgres-gis3.3.8
+IMAGE_BACKREST15=percona/percona-postgresql-operator:2.6.0-ppg15.12-pgbackrest2.54.2
 
-IMAGE_POSTGRESQL14=percona/percona-postgresql-operator:2.6.0-ppg14.15-postgres
-IMAGE_PGBOUNCER14=percona/percona-postgresql-operator:2.6.0-ppg14.15-pgbouncer1.23.1
-IMAGE_POSTGIS14=percona/percona-postgresql-operator:2.6.0-ppg14.15-postgres-gis3.3.7
-IMAGE_BACKREST14=percona/percona-postgresql-operator:2.6.0-ppg14.15-pgbackrest2.54.0
+IMAGE_POSTGRESQL14=percona/percona-postgresql-operator:2.6.0-ppg14.17-postgres
+IMAGE_PGBOUNCER14=percona/percona-postgresql-operator:2.6.0-ppg14.17-pgbouncer1.24.0
+IMAGE_POSTGIS14=percona/percona-postgresql-operator:2.6.0-ppg14.17-postgres-gis3.3.8
+IMAGE_BACKREST14=percona/percona-postgresql-operator:2.6.0-ppg14.17-pgbackrest2.54.2
 
-IMAGE_POSTGRESQL13=percona/percona-postgresql-operator:2.6.0-ppg13.18-postgres
-IMAGE_PGBOUNCER13=percona/percona-postgresql-operator:2.6.0-ppg13.18-pgbouncer1.23.1
-IMAGE_POSTGIS13=percona/percona-postgresql-operator:2.6.0-ppg13.18-postgres-gis3.3.7
-IMAGE_BACKREST13=percona/percona-postgresql-operator:2.6.0-ppg13.18-pgbackrest2.54.0
+IMAGE_POSTGRESQL13=percona/percona-postgresql-operator:2.6.0-ppg13.20-postgres
+IMAGE_PGBOUNCER13=percona/percona-postgresql-operator:2.6.0-ppg13.20-pgbouncer1.24.0
+IMAGE_POSTGIS13=percona/percona-postgresql-operator:2.6.0-ppg13.20-postgres-gis3.3.8
+IMAGE_BACKREST13=percona/percona-postgresql-operator:2.6.0-ppg13.20-pgbackrest2.54.2
 
 IMAGE_UPGRADE=percona/percona-postgresql-operator:2.6.0-upgrade
 
@@ -38,6 +38,6 @@ EKS_MIN=1.29
 EKS_MAX=1.32
 AKS_MIN=1.29
 AKS_MAX=1.31
-OPENSHIFT_MIN=4.14.46
-OPENSHIFT_MAX=4.17.16
+OPENSHIFT_MIN=4.14.48
+OPENSHIFT_MAX=4.17.19
 MINIKUBE_MAX=1.32.0
