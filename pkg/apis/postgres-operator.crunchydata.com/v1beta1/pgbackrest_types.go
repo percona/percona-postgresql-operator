@@ -317,7 +317,6 @@ type PGBackRestRepo struct {
 	// The name of the repository
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
-	// +kubebuilder:default="repo1"
 	Name string `json:"name"`
 
 	// Defines the schedules for the pgBackRest backups
@@ -445,8 +444,7 @@ type PGBackRestDataSource struct {
 	Repo PGBackRestRepo `json:"repo"`
 
 	// The name of an existing pgBackRest stanza to use as the data source for the new PostgresCluster.
-	// Defaults to `db` if not provided.
-	// +kubebuilder:default="db"
+	// +kubebuilder:validation:Required
 	Stanza string `json:"stanza"`
 
 	// Command line options to include when running the pgBackRest restore command.
