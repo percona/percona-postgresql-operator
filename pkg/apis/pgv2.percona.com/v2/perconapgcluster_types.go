@@ -156,8 +156,8 @@ type PerconaPGClusterSpec struct {
 	Proxy *PGProxySpec `json:"proxy,omitempty"`
 
 	// PostgreSQL backup configuration
-	// +kubebuilder:validation:Required
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// +optional
 	Backups Backups `json:"backups"`
 
 	// The specification of PMM sidecars.
@@ -440,7 +440,7 @@ type PerconaPGClusterStatus struct {
 
 type Backups struct {
 	// pgBackRest archive configuration
-	// +kubebuilder:validation:Required
+	// +optional
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
 
 	// Enable tracking latest restorable time

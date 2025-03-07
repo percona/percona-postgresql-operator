@@ -19703,7 +19703,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             required:
-            - backups
             - instances
             - postgresVersion
             type: object
