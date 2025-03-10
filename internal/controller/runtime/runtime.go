@@ -66,8 +66,6 @@ func NewManager(config *rest.Config, options manager.Options) (manager.Manager, 
 		// Create a copy of the config to avoid modifying the original
 		configCopy := rest.CopyConfig(config)
 
-		// Set unlimited QPS
-		configCopy.QPS = -1
 		// Ensure throttling is disabled by setting a fake rate limiter
 		configCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 

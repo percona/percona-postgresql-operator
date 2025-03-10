@@ -34,8 +34,6 @@ func NewClient() (*Client, error) {
 		return nil, err
 	}
 
-	// Set unlimited QPS
-	restconfig.QPS = -1
 	// Ensure throttling is disabled by setting a fake rate limiter
 	restconfig.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 
