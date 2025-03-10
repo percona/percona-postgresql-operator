@@ -39,4 +39,7 @@ const (
 	AnnotationClusterBootstrapRestore = PrefixPerconaPGV2 + "cluster-bootstrap-restore"
 
 	AnnotationPatroniVersion = PrefixPerconaPGV2 + "patroni-version"
+
+	// Should be used only for unit-testing
+	InternalAnnotationDisablePatroniVersionCheck = PrefixPerconaInternal + "patroni-version-check-disable"
 )

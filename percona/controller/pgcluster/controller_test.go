@@ -113,7 +113,6 @@ var _ = Describe("Annotations", Ordered, func() {
 	})
 
 	It("should create PerconaPGCluster with annotations", func() {
-		cr.Annotations = make(map[string]string)
 		cr.Annotations["pgv2.percona.com/trigger-switchover"] = "true"
 		cr.Annotations["egedemo.com/test"] = "true"
 
