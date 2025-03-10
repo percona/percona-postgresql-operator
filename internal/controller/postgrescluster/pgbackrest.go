@@ -732,6 +732,25 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	}
 	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
 
+	// Apply custom environment variables to the pgBackRest repo host container if specified
+	if repoHost := postgresCluster.Spec.Backups.PGBackRest.RepoHost; repoHost != nil && len(repoHost.Env) > 0 {
+		for i, container := range repo.Spec.Template.Spec.Containers {
+			if container.Name == naming.PGBackRestRepoContainerName {
+				repo.Spec.Template.Spec.Containers[i].Env = append(
+					repo.Spec.Template.Spec.Containers[i].Env,
+					repoHost.Env...)
+				break
+			}
+		}
+	}
+
+	// Add any custom sidecar containers to the repo host pod if specified
+	if repoHost := postgresCluster.Spec.Backups.PGBackRest.RepoHost; repoHost != nil && len(repoHost.Containers) > 0 {
+		repo.Spec.Template.Spec.Containers = append(
+			repo.Spec.Template.Spec.Containers,
+			repoHost.Containers...)
+	}
+
 	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
 
 	// set ownership references

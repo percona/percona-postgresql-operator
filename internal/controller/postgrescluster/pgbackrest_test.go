@@ -2739,6 +2739,84 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Equal(t, *sts.Spec.Replicas, int32(0))
 	})
+
+	t.Run("With custom environment variables", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "testcluster",
+				Labels: map[string]string{
+					naming.LabelVersion: "2.4.0",
+				},
+			},
+			Spec: v1beta1.PostgresClusterSpec{
+				Backups: v1beta1.Backups{
+					PGBackRest: v1beta1.PGBackRestArchive{
+						RepoHost: &v1beta1.PGBackRestRepoHost{
+							Env: []corev1.EnvVar{
+								{
+									Name:  "TEST_ENV_VAR",
+									Value: "test-value",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, &observedInstances{})
+		assert.NilError(t, err)
+
+		// Find pgbackrest container and check for env var
+		var found bool
+		for _, container := range sts.Spec.Template.Spec.Containers {
+			if container.Name == naming.PGBackRestRepoContainerName {
+				for _, env := range container.Env {
+					if env.Name == "TEST_ENV_VAR" && env.Value == "test-value" {
+						found = true
+						break
+					}
+				}
+			}
+		}
+		assert.Assert(t, found, "expected environment variable TEST_ENV_VAR not found")
+	})
+
+	t.Run("With custom sidecar containers", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "testcluster",
+				Labels: map[string]string{
+					naming.LabelVersion: "2.4.0",
+				},
+			},
+			Spec: v1beta1.PostgresClusterSpec{
+				Backups: v1beta1.Backups{
+					PGBackRest: v1beta1.PGBackRestArchive{
+						RepoHost: &v1beta1.PGBackRestRepoHost{
+							Containers: []corev1.Container{
+								{
+									Name:  "sidecar-test",
+									Image: "test-image:latest",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, &observedInstances{})
+		assert.NilError(t, err)
+
+		// Check sidecar container is added
+		var found bool
+		for _, container := range sts.Spec.Template.Spec.Containers {
+			if container.Name == "sidecar-test" {
+				found = true
+				break
+			}
+		}
+		assert.Assert(t, found, "expected sidecar container 'sidecar-test' not found")
+	})
 }
 
 func TestGenerateRestoreJobIntent(t *testing.T) {

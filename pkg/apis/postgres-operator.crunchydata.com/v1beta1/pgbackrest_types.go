@@ -231,6 +231,15 @@ type PGBackRestRepoHost struct {
 	// +optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 
+	// Custom sidecar containers for the pgBackRest repo host pod. Changing this
+	// value causes the repo host to restart.
+	// +optional
+	Containers []corev1.Container `json:"containers,omitempty"`
+
+	// Environment variables to be set in the pgBackRest repo host container.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
 	// ConfigMap containing custom SSH configuration.
 	// Deprecated: Repository hosts use mTLS for encryption, authentication, and authorization.
 	// +optional
