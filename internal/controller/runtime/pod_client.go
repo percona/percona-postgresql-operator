@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
@@ -41,6 +42,8 @@ func NewPodExecutor(config *rest.Config) (podExecutor, error) {
 
 	// Set unlimited QPS
 	configCopy.QPS = -1
+	// Ensure throttling is disabled by setting a fake rate limiter
+	configCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 
 	client, err := newPodClient(configCopy)
 

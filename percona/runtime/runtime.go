@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -63,6 +64,8 @@ func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics
 
 	// Set unlimited QPS
 	configCopy.QPS = -1
+	// Ensure throttling is disabled by setting a fake rate limiter
+	configCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 
 	// create controller runtime manager
 	mgr, err := manager.New(configCopy, options)
