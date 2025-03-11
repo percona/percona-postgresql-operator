@@ -11,6 +11,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -32,6 +33,9 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Ensure throttling is disabled by setting a fake rate limiter
+	restconfig.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 
 	// Create a Kubernetes core/v1 client.
 	cl, err := corev1client.NewForConfig(restconfig)
