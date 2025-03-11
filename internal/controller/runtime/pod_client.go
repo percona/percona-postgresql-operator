@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
@@ -36,7 +37,13 @@ func newPodClient(config *rest.Config) (rest.Interface, error) {
 // +kubebuilder:rbac:groups="",resources="pods/exec",verbs={create}
 
 func NewPodExecutor(config *rest.Config) (podExecutor, error) {
-	client, err := newPodClient(config)
+	// Create a copy of the config to avoid modifying the original
+	configCopy := rest.CopyConfig(config)
+
+	// Ensure throttling is disabled by setting a fake rate limiter
+	configCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+
+	client, err := newPodClient(configCopy)
 
 	return func(
 		ctx context.Context, namespace, pod, container string,
@@ -53,7 +60,7 @@ func NewPodExecutor(config *rest.Config) (podExecutor, error) {
 				Stderr:    stderr != nil,
 			}, scheme.ParameterCodec)
 
-		exec, err := remotecommand.NewSPDYExecutor(config, "POST", request.URL())
+		exec, err := remotecommand.NewSPDYExecutor(configCopy, "POST", request.URL())
 
 		if err == nil {
 			err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{

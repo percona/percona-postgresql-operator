@@ -1,0 +1,496 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: start-from-backup-source
+  labels:
+    e2e: start-from-backup-source
+#  finalizers:
+#  - percona.com/delete-pvc
+#  - percona.com/delete-ssl
+spec:
+  crVersion: 2.5.1
+  #  secrets:
+  #    customRootCATLSSecret:
+  #      name: cluster1-ca-cert
+  #      items:
+  #        - key: "tls.crt"
+  #          path: "root.crt"
+  #        - key: "tls.key"
+  #          path: "root.key"
+  #    customTLSSecret:
+  #      name: cluster1-cert
+  #    customReplicationTLSSecret:
+  #      name: replication1-cert
+
+  #  standby:
+  #    enabled: true
+  #    host: "<primary-ip>"
+  #    port: "<primary-port>"
+  #    repoName: repo1
+
+  #  openshift: true
+
+  #  users:
+  #    - name: rhino
+  #      databases:
+  #        - zoo
+  #      options: "SUPERUSER"
+  #      password:
+  #        type: ASCII
+  #      secretName: "rhino-credentials"
+
+  #  databaseInitSQL:
+  #    key: init.sql
+  #    name: cluster1-init-sql
+
+  #  pause: true
+  #  unmanaged: true
+  #  dataSource:
+  #    postgresCluster:
+  #      clusterName: cluster1
+  #      clusterNamespace: cluster1-namespace
+  #      repoName: repo1
+  #      options:
+  #      - --type=time
+  #      - --target="2021-06-09 14:15:11-04"
+  #      tolerations:
+  #      - effect: NoSchedule
+  #        key: role
+  #        operator: Equal
+  #        value: connection-poolers
+  #    pgbackrest:
+  #      stanza: db
+  #      configuration:
+  #      - secret:
+  #          name: pgo-s3-creds
+  #      global:
+  #        repo1-path: /pgbackrest/postgres-operator/hippo/repo1
+  #      repo:
+  #        name: repo1
+  #        s3:
+  #          bucket: "my-bucket"
+  #          endpoint: "s3.ca-central-1.amazonaws.com"
+  #          region: "ca-central-1"
+  #      tolerations:
+  #      - effect: NoSchedule
+  #        key: role
+  #        operator: Equal
+  #        value: connection-poolers
+  #    volumes:
+  #      pgDataVolume:
+  #        pvcName: cluster1
+  #        directory: cluster1
+  #        tolerations:
+  #        - effect: NoSchedule
+  #          key: role
+  #          operator: Equal
+  #          value: connection-poolers
+  #        annotations:
+  #          test-annotation: value
+  #        labels:
+  #          test-label: value
+  #      pgWALVolume:
+  #        pvcName: cluster1-pvc-name
+  #        directory: some-dir
+  #        tolerations:
+  #        - effect: NoSchedule
+  #          key: role
+  #          operator: Equal
+  #          value: connection-poolers
+  #        annotations:
+  #          test-annotation: value
+  #        labels:
+  #          test-label: value
+  #      pgBackRestVolume:
+  #        pvcName: cluster1-pgbr-repo
+  #        directory: cluster1-backrest-shared-repo
+  #        tolerations:
+  #        - effect: NoSchedule
+  #          key: role
+  #          operator: Equal
+  #          value: connection-poolers
+  #        annotations:
+  #          test-annotation: value
+  #        labels:
+  #          test-label: value
+  image: perconalab/percona-postgresql-operator:main-ppg16-postgres
+  imagePullPolicy: Always
+  postgresVersion: 16
+  #  port: 5432
+
+  #  expose:
+  #    annotations:
+  #      my-annotation: value1
+  #    labels:
+  #      my-label: value2
+  #    type: LoadBalancer
+  #    loadBalancerSourceRanges:
+  #      - 10.0.0.0/8
+  #  exposeReplicas:
+  #    annotations:
+  #      my-annotation: value1
+  #    labels:
+  #      my-label: value2
+  #    type: LoadBalancer
+  #    loadBalancerSourceRanges:
+  #      - 10.0.0.0/8
+  instances:
+    - name: instance1
+      replicas: 3
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    postgres-operator.crunchydata.com/data: postgres
+                topologyKey: kubernetes.io/hostname
+                #    resources:
+                #      limits:
+                #        cpu: 2.0
+                #        memory: 4Gi
+                #    containers:
+                #      replicaCertCopy:
+                #        resources:
+                #          limits:
+                #            cpu: 200m
+                #            memory: 128Mi
+                #    sidecars:
+                #    - name: testcontainer
+                #      image: mycontainer1:latest
+                #    - name: testcontainer2
+                #      image: mycontainer1:latest
+                #
+                #    topologySpreadConstraints:
+                #      - maxSkew: 1
+                #        topologyKey: my-node-label
+                #        whenUnsatisfiable: DoNotSchedule
+                #        labelSelector:
+                #          matchLabels:
+                #            postgres-operator.crunchydata.com/instance-set: instance1
+                #
+                #    tolerations:
+                #    - effect: NoSchedule
+                #      key: role
+                #      operator: Equal
+                #      value: connection-poolers
+                #
+                #    priorityClassName: high-priority
+                #
+                #    securityContext:
+                #      fsGroup: 1001
+                #      runAsUser: 1001
+                #      runAsNonRoot: true
+                #      fsGroupChangePolicy: "OnRootMismatch"
+                #      runAsGroup: 1001
+                #      seLinuxOptions:
+                #        type: spc_t
+                #        level: s0:c123,c456
+                #      seccompProfile:
+                #        type: Localhost
+                #        localhostProfile: localhost/profile.json
+                #      supplementalGroups:
+                #      - 1001
+                #      sysctls:
+                #      - name: net.ipv4.tcp_keepalive_time
+                #        value: "600"
+                #      - name: net.ipv4.tcp_keepalive_intvl
+                #        value: "60"
+                #
+                #    walVolumeClaimSpec:
+                #       storageClassName: standard
+                #       accessModes:
+                #       - ReadWriteOnce
+                #       resources:
+                #         requests:
+                #           storage: 1Gi
+                #
+      dataVolumeClaimSpec:
+        #      storageClassName: standard
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  #      limits:
+  #          storage: 5Gi
+  #    tablespaceVolumes:
+  #      - name: user
+  #        dataVolumeClaimSpec:
+  #          accessModes:
+  #            - 'ReadWriteOnce'
+  #          resources:
+  #            requests:
+  #              storage: 1Gi
+
+  proxy:
+    pgBouncer:
+      replicas: 3
+      image: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
+      #      exposeSuperusers: true
+      #      resources:
+      #        limits:
+      #          cpu: 200m
+      #          memory: 128Mi
+      #      containers:
+      #        pgbouncerConfig:
+      #          resources:
+      #            limits:
+      #              cpu: 200m
+      #              memory: 128Mi
+      #
+      #      expose:
+      #        annotations:
+      #          my-annotation: value1
+      #        labels:
+      #          my-label: value2
+      #        type: LoadBalancer
+      #        loadBalancerSourceRanges:
+      #          - 10.0.0.0/8
+      #
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    postgres-operator.crunchydata.com/role: pgbouncer
+                topologyKey: kubernetes.io/hostname
+  #
+  #      tolerations:
+  #      - effect: NoSchedule
+  #        key: role
+  #        operator: Equal
+  #        value: connection-poolers
+  #
+  #      securityContext:
+  #        fsGroup: 1001
+  #        runAsUser: 1001
+  #        runAsNonRoot: true
+  #        fsGroupChangePolicy: "OnRootMismatch"
+  #        runAsGroup: 1001
+  #        seLinuxOptions:
+  #          type: spc_t
+  #          level: s0:c123,c456
+  #        seccompProfile:
+  #          type: Localhost
+  #          localhostProfile: localhost/profile.json
+  #        supplementalGroups:
+  #        - 1001
+  #        sysctls:
+  #        - name: net.ipv4.tcp_keepalive_time
+  #          value: "600"
+  #        - name: net.ipv4.tcp_keepalive_intvl
+  #          value: "60"
+  #
+  #      topologySpreadConstraints:
+  #        - maxSkew: 1
+  #          topologyKey: my-node-label
+  #          whenUnsatisfiable: ScheduleAnyway
+  #          labelSelector:
+  #            matchLabels:
+  #              postgres-operator.crunchydata.com/role: pgbouncer
+  #
+  #      sidecars:
+  #      - name: bouncertestcontainer1
+  #        image: mycontainer1:latest
+  #
+  #      customTLSSecret:
+  #        name: keycloakdb-pgbouncer.tls
+  #
+  #      config:
+  #        global:
+  #          pool_mode: transaction
+
+  backups:
+    #    trackLatestRestorableTime: true
+    pgbackrest:
+      #      metadata:
+      #        labels:
+      image: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
+      #
+      #      containers:
+      #        pgbackrest:
+      #          resources:
+      #            limits:
+      #              cpu: 200m
+      #              memory: 128Mi
+      #        pgbackrestConfig:
+      #          resources:
+      #            limits:
+      #              cpu: 200m
+      #              memory: 128Mi
+      #
+      #      configuration:
+      #        - secret:
+      #            name: cluster1-pgbackrest-secrets
+      #      jobs:
+      #        priorityClassName: high-priority
+      #        resources:
+      #          limits:
+      #            cpu: 200m
+      #            memory: 128Mi
+      #        tolerations:
+      #        - effect: NoSchedule
+      #          key: role
+      #          operator: Equal
+      #          value: connection-poolers
+      #
+      #        securityContext:
+      #          fsGroup: 1001
+      #          runAsUser: 1001
+      #          runAsNonRoot: true
+      #          fsGroupChangePolicy: "OnRootMismatch"
+      #          runAsGroup: 1001
+      #          seLinuxOptions:
+      #            type: spc_t
+      #            level: s0:c123,c456
+      #          seccompProfile:
+      #            type: Localhost
+      #            localhostProfile: localhost/profile.json
+      #          supplementalGroups:
+      #          - 1001
+      #          sysctls:
+      #          - name: net.ipv4.tcp_keepalive_time
+      #            value: "600"
+      #          - name: net.ipv4.tcp_keepalive_intvl
+      #            value: "60"
+      #
+      #      global:
+      #        repo1-retention-full: "14"
+      #        repo1-retention-full-type: time
+      #        repo1-path: /pgbackrest/postgres-operator/cluster1/repo1
+      #        repo1-cipher-type: aes-256-cbc
+      #        repo1-s3-uri-style: path
+      #        repo2-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo2
+      #        repo3-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo3
+      #        repo4-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo4
+      repoHost:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 1
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      postgres-operator.crunchydata.com/data: pgbackrest
+                  topologyKey: kubernetes.io/hostname
+                  #        tolerations:
+                  #        - effect: NoSchedule
+                  #          key: role
+                  #          operator: Equal
+                  #          value: connection-poolers
+                  #        priorityClassName: high-priority
+                  #
+                  #        topologySpreadConstraints:
+                  #        - maxSkew: 1
+                  #          topologyKey: my-node-label
+                  #          whenUnsatisfiable: ScheduleAnyway
+                  #          labelSelector:
+                  #            matchLabels:
+                  #              postgres-operator.crunchydata.com/pgbackrest: ""
+                  #
+                  #        securityContext:
+                  #          fsGroup: 1001
+                  #          runAsUser: 1001
+                  #          runAsNonRoot: true
+                  #          fsGroupChangePolicy: "OnRootMismatch"
+                  #          runAsGroup: 1001
+                  #          seLinuxOptions:
+                  #            type: spc_t
+                  #            level: s0:c123,c456
+                  #          seccompProfile:
+                  #            type: Localhost
+                  #            localhostProfile: localhost/profile.json
+                  #          supplementalGroups:
+                  #          - 1001
+                  #          sysctls:
+                  #          - name: net.ipv4.tcp_keepalive_time
+                  #            value: "600"
+                  #          - name: net.ipv4.tcp_keepalive_intvl
+                  #            value: "60"
+                  #
+      manual:
+        repoName: repo1
+        options:
+          - --type=full
+      repos:
+        - name: repo1
+          schedules:
+            full: "0 0 * * 6"
+            #          differential: "0 1 * * 1-6"
+            #          incremental: "0 1 * * 1-6"
+          volume:
+            volumeClaimSpec:
+              #            storageClassName: standard
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+  #      - name: repo2
+  #        s3:
+  #          bucket: "<YOUR_AWS_S3_BUCKET_NAME>"
+  #          endpoint: "<YOUR_AWS_S3_ENDPOINT>"
+  #          region: "<YOUR_AWS_S3_REGION>"
+  #      - name: repo3
+  #        gcs:
+  #          bucket: "<YOUR_GCS_BUCKET_NAME>"
+  #      - name: repo4
+  #        azure:
+  #          container: "<YOUR_AZURE_CONTAINER>"
+  #
+  #      restore:
+  #        repoName: repo1
+  #        tolerations:
+  #        - effect: NoSchedule
+  #          key: role
+  #          operator: Equal
+  #          value: connection-poolers
+
+  pmm:
+    enabled: false
+    image: perconalab/pmm-client:dev-latest
+    #    imagePullPolicy: IfNotPresent
+    secret: start-from-backup-source-pmm-secret
+    serverHost: monitoring-service
+  users:
+    - name: postgres
+      password:
+        type: AlphaNumeric
+    - name: start-from-backup-source
+      password:
+        type: AlphaNumeric
+#    querySource: pgstatmonitor
+#  patroni:
+#    # Some values of the Liveness/Readiness probes of the patroni container are calulated using syncPeriodSeconds by the following formulas:
+#    # - timeoutSeconds:   syncPeriodSeconds / 2;
+#    # - periodSeconds:    syncPeriodSeconds;
+#    # - failureThreshold: leaderLeaseDurationSeconds / syncPeriodSeconds.
+#    syncPeriodSeconds: 10 # default: 10
+#    leaderLeaseDurationSeconds: 30 # default: 30
+#    dynamicConfiguration:
+#      postgresql:
+#        parameters:
+#          max_parallel_workers: 2
+#          max_worker_processes: 2
+#          shared_buffers: 1GB
+#          work_mem: 2MB
+#  extensions:
+#    image: percona/percona-postgresql-operator:2.5.1
+#    imagePullPolicy: Always
+#    storage:
+#      type: s3
+#      bucket: pg-extensions
+#      region: eu-central-1
+#      endpoint: s3.eu-central-1.amazonaws.com
+#      secret:
+#        name: cluster1-extensions-secret
+#    builtin:
+#      pg_stat_monitor: true
+#      pg_audit: true
+#    custom:
+#    - name: pg_cron
+#      version: 1.6.1
