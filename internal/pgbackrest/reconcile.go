@@ -398,7 +398,30 @@ func AddServerToRepoPod(
 		resources = &cluster.Spec.Backups.PGBackRest.RepoHost.Resources
 	}
 
+	// Add the server container and volume
 	addServerContainerAndVolume(ctx, cluster, pod, certificates, resources)
+
+	// Add environment variables from the specified secret if provided
+	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&
+		cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret != nil {
+
+		secretName := *cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret
+
+		// Find the pgbackrest container and add the envFrom reference
+		for i := range pod.Containers {
+			if pod.Containers[i].Name == naming.PGBackRestRepoContainerName {
+				pod.Containers[i].EnvFrom = append(pod.Containers[i].EnvFrom,
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: secretName,
+							},
+						},
+					})
+				break
+			}
+		}
+	}
 }
 
 // InstanceCertificates populates the shared Secret with certificates needed to run pgBackRest.
