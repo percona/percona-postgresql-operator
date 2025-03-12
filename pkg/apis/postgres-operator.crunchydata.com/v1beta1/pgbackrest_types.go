@@ -109,6 +109,13 @@ type PGBackRestArchive struct {
 	// +optional
 	Image string `json:"image,omitempty"`
 
+	// InitialBackupDelaySeconds introduces a grace period before performing the first backup
+	// after PostgreSQL initialization. This helps prevent backup failures when attempting backup
+	// on a newly initialized cluster. If not specified, no delay is introduced.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	InitialBackupDelaySeconds *int32 `json:"initialBackupDelaySeconds,omitempty"`
+
 	// Jobs field allows configuration for all backup jobs
 	// +optional
 	Jobs *BackupJobs `json:"jobs,omitempty"`

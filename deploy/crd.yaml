@@ -1243,6 +1243,14 @@ spec:
                           pgBackRest repository hosts and backups. The image may also be set using
                           the RELATED_IMAGE_PGBACKREST environment variable
                         type: string
+                      initialBackupDelaySeconds:
+                        description: |-
+                          InitialBackupDelaySeconds introduces a grace period before performing the first backup
+                          after PostgreSQL initialization. This helps prevent backup failures when attempting backup
+                          on a newly initialized cluster. If not specified, no delay is introduced.
+                        format: int32
+                        minimum: 0
+                        type: integer
                       jobs:
                         description: Jobs field allows configuration for all backup
                           jobs
@@ -27523,6 +27531,14 @@ spec:
                           pgBackRest repository hosts and backups. The image may also be set using
                           the RELATED_IMAGE_PGBACKREST environment variable
                         type: string
+                      initialBackupDelaySeconds:
+                        description: |-
+                          InitialBackupDelaySeconds introduces a grace period before performing the first backup
+                          after PostgreSQL initialization. This helps prevent backup failures when attempting backup
+                          on a newly initialized cluster. If not specified, no delay is introduced.
+                        format: int32
+                        minimum: 0
+                        type: integer
                       jobs:
                         description: Jobs field allows configuration for all backup
                           jobs

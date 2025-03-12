@@ -2520,6 +2520,46 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 		return nil
 	}
 
+	// If InitialBackupDelaySeconds is set, check if enough time has passed since the cluster became ready
+	// before proceeding with the initial backup
+	if postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds != nil &&
+		*postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds > 0 {
+		
+		// Check when the first instance became ready
+		var oldestReadyTime *metav1.Time
+		for _, instance := range instances.forCluster {
+			if len(instance.Pods) > 0 {
+				for _, pod := range instance.Pods {
+					for _, containerStatus := range pod.Status.ContainerStatuses {
+						if containerStatus.Name == naming.ContainerDatabase && containerStatus.Ready {
+							if oldestReadyTime == nil || containerStatus.State.Running.StartedAt.Before(oldestReadyTime) {
+								oldestReadyTime = &containerStatus.State.Running.StartedAt
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// If we found a ready time, check if enough time has passed
+		if oldestReadyTime != nil {
+			delaySeconds := *postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds
+			gracePeriod := time.Duration(delaySeconds) * time.Second
+			readyDuration := time.Since(oldestReadyTime.Time)
+			
+			// If the grace period hasn't passed yet, log and return
+			if readyDuration < gracePeriod {
+				log := logging.FromContext(ctx)
+				waitingFor := gracePeriod - readyDuration
+				log.Info("Waiting for initial backup grace period to pass", 
+					"waitingFor", waitingFor.String(),
+					"gracePeriod", gracePeriod.String(),
+					"readySince", oldestReadyTime.String())
+				return nil
+			}
+		}
+	}
+
 	// determine if the replica create repo is ready using the "PGBackRestReplicaRepoReady" condition
 	var replicaRepoReady bool
 	condition := meta.FindStatusCondition(postgresCluster.Status.Conditions, ConditionReplicaRepoReady)

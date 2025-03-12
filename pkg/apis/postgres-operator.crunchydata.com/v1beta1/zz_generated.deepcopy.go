@@ -808,6 +808,11 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 			(*out)[key] = val
 		}
 	}
+	if in.InitialBackupDelaySeconds != nil {
+		in, out := &in.InitialBackupDelaySeconds, &out.InitialBackupDelaySeconds
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Jobs != nil {
 		in, out := &in.Jobs, &out.Jobs
 		*out = new(BackupJobs)
