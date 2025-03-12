@@ -17,6 +17,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -371,7 +372,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	// If the imageIDs slice contains the imageID from the status, we skip checking the Patroni version.
 	// This ensures that the Patroni version is only checked after all pods have been updated.
-	if slices.Contains(imageIDs, cr.Status.Postgres.ImageID) && cr.Status.PatroniVersion != "" {
+	if len(imageIDs) == 0 || (slices.Contains(imageIDs, cr.Status.Postgres.ImageID) && cr.Status.PatroniVersion != "") {
 		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
 		return nil
 	}
@@ -404,13 +405,23 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 							"bash",
 						},
 						Args: []string{
-							"-c", "sleep 300",
+							"-c", "sleep 60",
 						},
 						Resources: cr.Spec.InstanceSets[0].Resources,
 					},
 				},
 				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
 				TerminationGracePeriodSeconds: ptr.To(int64(5)),
+				Resources: &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("64Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("50m"),
+						corev1.ResourceMemory: resource.MustParse("32Mi"),
+					},
+				},
 			},
 		}
 
