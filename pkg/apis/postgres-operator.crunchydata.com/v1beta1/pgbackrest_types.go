@@ -210,6 +210,16 @@ type PGBackRestRepoHost struct {
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
+	// Custom sidecars for the pgBackRest repository host. Changing this value causes 
+	// the pgBackRest repository host to restart.
+	// +optional
+	Containers []corev1.Container `json:"containers,omitempty"`
+
+	// Name of a Secret containing environment variables to be set in the pgBackRest
+	// repository host container. The secret must exist in the same namespace as the cluster.
+	// +optional
+	EnvFromSecret *string `json:"envFromSecret,omitempty"`
+
 	// Priority class name for the pgBackRest repo host pod. Changing this value
 	// causes PostgreSQL to restart.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/

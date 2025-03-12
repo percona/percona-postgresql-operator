@@ -473,6 +473,11 @@ type PostgresInstanceSetSpec struct {
 	// +optional
 	Containers []corev1.Container `json:"containers,omitempty"`
 
+	// Name of a Secret containing environment variables to be set in the PostgreSQL
+	// database container. The secret must exist in the same namespace as the cluster.
+	// +optional
+	EnvFromSecret *string `json:"envFromSecret,omitempty"`
+
 	// Additional init containers for PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
 	// +optional

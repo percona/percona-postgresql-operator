@@ -179,6 +179,17 @@ func InstancePod(ctx context.Context,
 		VolumeMounts:    dbContainerMounts,
 	}
 
+	// Add environment variables from the specified secret if provided
+	if inInstanceSpec.EnvFromSecret != nil {
+		container.EnvFrom = append(container.EnvFrom, corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: *inInstanceSpec.EnvFromSecret,
+				},
+			},
+		})
+	}
+
 	reloader := corev1.Container{
 		Name: naming.ContainerClientCertCopy,
 

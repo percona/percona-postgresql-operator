@@ -734,6 +734,11 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 
 	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
 
+	// Add custom containers if defined in the RepoHost spec
+	if repoHost := postgresCluster.Spec.Backups.PGBackRest.RepoHost; repoHost != nil && len(repoHost.Containers) > 0 {
+		repo.Spec.Template.Spec.Containers = append(repo.Spec.Template.Spec.Containers, repoHost.Containers...)
+	}
+
 	// set ownership references
 	if err := controllerutil.SetControllerReference(postgresCluster, repo,
 		r.Client.Scheme()); err != nil {
