@@ -698,6 +698,11 @@ type PGInstanceSetSpec struct {
 	// +optional
 	InitContainers []corev1.Container `json:"initContainers,omitempty"`
 
+	// Name of a Secret containing environment variables to be set in the PostgreSQL
+	// database container. The secret must exist in the same namespace as the cluster.
+	// +optional
+	EnvFromSecret *string `json:"envFromSecret,omitempty"`
+
 	// Priority class name for the PostgreSQL pod. Changing this value causes
 	// PostgreSQL to restart.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
@@ -764,6 +769,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Affinity:                  p.Affinity,
 		Containers:                p.Sidecars,
 		Sidecars:                  p.Containers,
+		EnvFromSecret:             p.EnvFromSecret,
 		InitContainers:            p.InitContainers,
 		PriorityClassName:         p.PriorityClassName,
 		Replicas:                  p.Replicas,
