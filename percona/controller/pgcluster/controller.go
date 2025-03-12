@@ -372,7 +372,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	// If the imageIDs slice contains the imageID from the status, we skip checking the Patroni version.
 	// This ensures that the Patroni version is only checked after all pods have been updated.
-	if len(imageIDs) == 0 || (slices.Contains(imageIDs, cr.Status.Postgres.ImageID) && cr.Status.PatroniVersion != "") {
+	if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.PatroniVersion != "" {
 		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
 		return nil
 	}
