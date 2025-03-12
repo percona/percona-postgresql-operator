@@ -2739,6 +2739,39 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Equal(t, *sts.Spec.Replicas, int32(0))
 	})
+
+	t.Run("Custom Sidecars", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{
+			Spec: v1beta1.PostgresClusterSpec{
+				Backups: v1beta1.Backups{
+					PGBackRest: v1beta1.PGBackRestArchive{
+						RepoHost: &v1beta1.PGBackRestRepoHost{
+							Containers: []corev1.Container{
+								{Name: "custom-sidecar1"},
+								{Name: "custom-sidecar2"},
+							},
+						},
+					},
+				},
+			},
+		}
+		observed := &observedInstances{forCluster: []*Instance{{}}}
+		sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, observed)
+		assert.NilError(t, err)
+
+		// Check if our custom sidecars are in the pod spec
+		var sidecar1Found, sidecar2Found bool
+		for _, container := range sts.Spec.Template.Spec.Containers {
+			if container.Name == "custom-sidecar1" {
+				sidecar1Found = true
+			}
+			if container.Name == "custom-sidecar2" {
+				sidecar2Found = true
+			}
+		}
+		assert.Assert(t, sidecar1Found, "expected custom sidecar 'custom-sidecar1', but container not found")
+		assert.Assert(t, sidecar2Found, "expected custom sidecar 'custom-sidecar2', but container not found")
+	})
 }
 
 func TestGenerateRestoreJobIntent(t *testing.T) {
