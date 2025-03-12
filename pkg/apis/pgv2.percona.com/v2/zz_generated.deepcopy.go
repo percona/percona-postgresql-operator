@@ -329,6 +329,11 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.EnvFromSecret != nil {
+		in, out := &in.EnvFromSecret, &out.EnvFromSecret
+		*out = new(string)
+		**out = **in
+	}
 	if in.PriorityClassName != nil {
 		in, out := &in.PriorityClassName, &out.PriorityClassName
 		*out = new(string)
