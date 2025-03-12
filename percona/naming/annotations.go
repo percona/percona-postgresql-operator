@@ -40,6 +40,6 @@ const (
 
 	AnnotationPatroniVersion = PrefixPerconaPGV2 + "patroni-version"
 
-	// Should be used only for unit-testing
-	InternalAnnotationDisablePatroniVersionCheck = PrefixPerconaInternal + "patroni-version-check-disable"
+	// Special annotation to disable `patroni-version-check` by overriding the patroni version with a custom value.
+	AnnotationCustomPatroniVersion = PrefixPerconaPGV2 + "custom-patroni-version"
 )

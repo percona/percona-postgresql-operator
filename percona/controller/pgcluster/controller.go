@@ -335,9 +335,8 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		cr.Annotations = make(map[string]string)
 	}
 
-	// This annotation is used for unit-tests only. Allows to skip the patroni version check
-	if _, ok := cr.Annotations[pNaming.InternalAnnotationDisablePatroniVersionCheck]; ok {
-		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
+	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
+		cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
 		return nil
 	}
 
