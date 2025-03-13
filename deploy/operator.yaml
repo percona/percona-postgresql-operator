@@ -45,7 +45,7 @@ spec:
           value: INFO
         - name: DISABLE_TELEMETRY
           value: "false"
-        image: percona/percona-postgresql-operator:2.6.0
+        image: perconalab/percona-postgresql-operator:flyio-2-6-0-sidecars
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

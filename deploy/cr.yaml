@@ -318,8 +318,10 @@ spec:
   backups:
 #    trackLatestRestorableTime: true
     pgbackrest:
-#      metadata:
-#        labels:
+      # Optional: Sets a grace period in seconds before the first backup is performed
+      # after PostgreSQL initialization. This helps prevent backup failures that can
+      # occur when the backup starts before PostgreSQL is fully ready.
+      # initialBackupDelaySeconds: 120
       image: percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbackrest2.54.0
 #
 #      containers:

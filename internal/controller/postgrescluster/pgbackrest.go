@@ -2532,8 +2532,10 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 				for _, pod := range instance.Pods {
 					for _, containerStatus := range pod.Status.ContainerStatuses {
 						if containerStatus.Name == naming.ContainerDatabase && containerStatus.Ready {
-							if oldestReadyTime == nil || containerStatus.State.Running.StartedAt.Before(oldestReadyTime) {
-								oldestReadyTime = &containerStatus.State.Running.StartedAt
+							if containerStatus.State.Running != nil {
+								if oldestReadyTime == nil || containerStatus.State.Running.StartedAt.Before(oldestReadyTime) {
+									oldestReadyTime = &containerStatus.State.Running.StartedAt
+								}
 							}
 						}
 					}
