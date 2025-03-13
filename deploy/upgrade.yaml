@@ -7,6 +7,6 @@ spec:
   image: percona/percona-postgresql-operator:2.6.0
   fromPostgresVersion: 15
   toPostgresVersion: 16
-  toPostgresImage: percona/percona-postgresql-operator:2.6.0-ppg17.2-postgres
-  toPgBouncerImage: percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbouncer1.23.1
-  toPgBackRestImage: percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbackrest2.54.0
+  toPostgresImage: percona/percona-postgresql-operator:2.6.0-ppg16.8-postgres
+  toPgBouncerImage: percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbouncer1.24.0
+  toPgBackRestImage: percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbackrest2.54.2
