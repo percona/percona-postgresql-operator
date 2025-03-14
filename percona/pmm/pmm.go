@@ -95,6 +95,10 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 				Value: pmmSpec.ServerHost,
 			},
 			{
+				Name:  "PMM_POSTGRES_PARAMS",
+				Value: pmmSpec.PostgresParams,
+			},
+			{
 				Name:  "PMM_AGENT_SERVER_USERNAME",
 				Value: "api_key",
 			},
@@ -234,6 +238,7 @@ func agentPrerunScript(querySource v2.PMMQuerySource) string {
 		"--tls-key-file=/pgconf/tls/tls.key",
 		"--tls-ca-file=/pgconf/tls/ca.crt",
 		"--tls-skip-verify",
+		"$(PMM_POSTGRES_PARAMS)",
 		"--skip-connection-check",
 		"--metrics-mode=push",
 		"--service-name=$(PMM_AGENT_SETUP_NODE_NAME)",
