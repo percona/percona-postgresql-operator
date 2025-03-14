@@ -1391,6 +1391,14 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 		}
 	}
 
+	// Add sidecars from RepoHost.Containers to the restore job
+	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&
+		cluster.Spec.Backups.PGBackRest.RepoHost.Containers != nil {
+		job.Spec.Template.Spec.Containers = append(
+			job.Spec.Template.Spec.Containers,
+			cluster.Spec.Backups.PGBackRest.RepoHost.Containers...)
+	}
+
 	// Set the image pull secrets, if any exist.
 	// This is set here rather than using the service account due to the lack
 	// of propagation to existing pods when the CRD is updated:
