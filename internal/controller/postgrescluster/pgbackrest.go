@@ -1394,9 +1394,32 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	// Add sidecars from RepoHost.Containers to the restore job
 	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&
 		cluster.Spec.Backups.PGBackRest.RepoHost.Containers != nil {
+
+		// Get the sidecars from RepoHost
+		sidecars := cluster.Spec.Backups.PGBackRest.RepoHost.Containers
+
+		// If EnvFromSecret is specified, add the reference to each sidecar container
+		if cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret != nil {
+			secretName := *cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret
+
+			// Add the envFrom reference to each sidecar container
+			for i := range sidecars {
+				sidecars[i].EnvFrom = append(
+					sidecars[i].EnvFrom,
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: secretName,
+							},
+						},
+					})
+			}
+		}
+
+		// Add the sidecars to the job's containers
 		job.Spec.Template.Spec.Containers = append(
 			job.Spec.Template.Spec.Containers,
-			cluster.Spec.Backups.PGBackRest.RepoHost.Containers...)
+			sidecars...)
 	}
 
 	// Set the image pull secrets, if any exist.
