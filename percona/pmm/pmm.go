@@ -194,6 +194,10 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 				Value: v2.UserMonitoring,
 			},
 			{
+				Name:  "CLUSTER_NAME",
+				Value: pgc.Name,
+			},
+			{
 				Name: "DB_PASS",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
@@ -230,6 +234,7 @@ func agentPrerunScript(querySource v2.PMMQuerySource) string {
 		"--password='$(DB_PASS)'",
 		"--host=127.0.0.1",
 		"--port=5432",
+		"--cluster=$(CLUSTER_NAME)",
 		"--tls-cert-file=/pgconf/tls/tls.crt",
 		"--tls-key-file=/pgconf/tls/tls.key",
 		"--tls-ca-file=/pgconf/tls/ca.crt",
