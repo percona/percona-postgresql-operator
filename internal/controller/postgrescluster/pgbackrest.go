@@ -1355,6 +1355,30 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 		},
 	}
 
+	// Add environment variables from the pgBackRest.RepoHost.EnvFromSecret if provided
+	// This allows for environment variables to be set on the restore job from a Secret
+	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&
+		cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret != nil {
+
+		secretName := *cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret
+
+		// Find the pgbackrest-restore container and add the envFrom reference
+		for i := range job.Spec.Template.Spec.Containers {
+			if job.Spec.Template.Spec.Containers[i].Name == naming.PGBackRestRestoreContainerName {
+				job.Spec.Template.Spec.Containers[i].EnvFrom = append(
+					job.Spec.Template.Spec.Containers[i].EnvFrom,
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: secretName,
+							},
+						},
+					})
+				break
+			}
+		}
+	}
+
 	// Set the image pull secrets, if any exist.
 	// This is set here rather than using the service account due to the lack
 	// of propagation to existing pods when the CRD is updated:
@@ -2524,7 +2548,7 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	// before proceeding with the initial backup
 	if postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds != nil &&
 		*postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds > 0 {
-		
+
 		// Check when the first instance became ready
 		var oldestReadyTime *metav1.Time
 		for _, instance := range instances.forCluster {
@@ -2548,12 +2572,12 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 			delaySeconds := *postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds
 			gracePeriod := time.Duration(delaySeconds) * time.Second
 			readyDuration := time.Since(oldestReadyTime.Time)
-			
+
 			// If the grace period hasn't passed yet, log and return
 			if readyDuration < gracePeriod {
 				log := logging.FromContext(ctx)
 				waitingFor := gracePeriod - readyDuration
-				log.Info("Waiting for initial backup grace period to pass", 
+				log.Info("Waiting for initial backup grace period to pass",
 					"waitingFor", waitingFor.String(),
 					"gracePeriod", gracePeriod.String(),
 					"readySince", oldestReadyTime.String())
