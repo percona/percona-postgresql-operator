@@ -95,12 +95,12 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 				Value: pmmSpec.ServerHost,
 			},
 			{
-				Name:  "PMM_POSTGRES_PARAMS",
-				Value: pmmSpec.PostgresParams,
-			},
-			{
 				Name:  "PMM_AGENT_SERVER_USERNAME",
 				Value: "api_key",
+			},
+			{
+				Name:  "PMM_AGENT_PATHS_TEMPDIR",
+				Value: "/tmp",
 			},
 			{
 				Name: "PMM_AGENT_SERVER_PASSWORD",
@@ -215,10 +215,10 @@ func SidecarContainer(pgc *v2.PerconaPGCluster) corev1.Container {
 		},
 	}
 
-	if pgc.CompareVersion("2.3.0") >= 0 {
+	if pgc.CompareVersion("2.7.0") >= 0 {
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "PMM_AGENT_PATHS_TEMPDIR",
-			Value: "/tmp",
+			Name:  "PMM_POSTGRES_PARAMS",
+			Value: pmmSpec.PostgresParams,
 		})
 	}
 
