@@ -11,21 +11,24 @@ import (
 )
 
 const (
-	SecretKey   = "PMM_SERVER_KEY"   // nolint:gosec
-	SecretToken = "PMM_SERVER_TOKEN" // nolint:gosec
+	secretKey   = "PMM_SERVER_KEY"   // nolint:gosec
+	secretToken = "PMM_SERVER_TOKEN" // nolint:gosec
 )
 
 // Container evaluates the pmm secret and according to the existence of the pmm token, determines
 // if the PMM2 or the PMM3 container should be configured.
 func Container(secret *corev1.Secret, pgc *v2.PerconaPGCluster) (corev1.Container, error) {
-	if v, ok := secret.Data[SecretToken]; ok && len(v) != 0 {
+	if secret == nil {
+		return corev1.Container{}, fmt.Errorf("secret is nil")
+	}
+	if v, exists := secret.Data[secretToken]; exists && len(v) != 0 {
 		return sidecarContainerV3(pgc), nil
 	}
-	if v, ok := secret.Data[SecretKey]; ok && len(v) != 0 {
+	if v, exists := secret.Data[secretKey]; exists && len(v) != 0 {
 		return sidecarContainerV2(pgc), nil
 	}
 
-	return corev1.Container{}, fmt.Errorf("can't enable PMM: neither %s nor %s keys exist in the provided secret or they are empty", SecretToken, SecretKey)
+	return corev1.Container{}, fmt.Errorf("can't enable PMM: neither %s nor %s keys exist in the provided secret or they are empty", secretToken, secretKey)
 }
 
 // sidecarContainerV2 refers to the construction of the PMM2 container.
@@ -120,7 +123,7 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: pmmSpec.Secret,
 						},
-						Key: SecretKey,
+						Key: secretKey,
 					},
 				},
 			},
@@ -320,7 +323,7 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: pmmSpec.Secret,
 						},
-						Key: SecretToken,
+						Key: secretToken,
 					},
 				},
 			},

@@ -105,7 +105,7 @@ func TestContainer(t *testing.T) {
 			},
 			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN nor PMM_SERVER_KEY keys exist in the provided secret or they are empty"),
 		},
-		"error": {
+		"error due to missing secret": {
 			secret: func() *corev1.Secret {
 				secret := &corev1.Secret{}
 				secret.Data = map[string][]byte{
@@ -114,6 +114,12 @@ func TestContainer(t *testing.T) {
 				return secret
 			},
 			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN nor PMM_SERVER_KEY keys exist in the provided secret or they are empty"),
+		},
+		"error due to nil secret": {
+			secret: func() *corev1.Secret {
+				return nil
+			},
+			err: errors.New("secret is nil"),
 		},
 	}
 
