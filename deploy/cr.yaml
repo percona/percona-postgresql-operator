@@ -124,9 +124,9 @@ spec:
 #          test-label: value
 
 
-  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
+  image: percona/percona-postgresql-operator:2.6.0-ppg16.8-postgres
   imagePullPolicy: Always
-  postgresVersion: 17
+  postgresVersion: 16
 #  port: 5432
 
 #  expose:
@@ -240,7 +240,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
+      image: percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbouncer1.24.0
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -322,7 +322,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
+      image: percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbackrest2.54.2
 #
 #      containers:
 #        pgbackrest:
@@ -467,13 +467,13 @@ spec:
 
   pmm:
     enabled: false
-    image: perconalab/pmm-client:dev-latest
+    image: percona/pmm-client:2.44.0
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
 #    querySource: pgstatmonitor
 #  patroni:
-#    # Some values of the Liveness/Readiness probes of the patroni container are calulated using syncPeriodSeconds by the following formulas:
+#    # Some values of the Liveness/Readiness probes of the patroni container are calculated using syncPeriodSeconds by the following formulas:
 #    # - timeoutSeconds:   syncPeriodSeconds / 2;
 #    # - periodSeconds:    syncPeriodSeconds;
 #    # - failureThreshold: leaderLeaseDurationSeconds / syncPeriodSeconds.
@@ -489,7 +489,7 @@ spec:
 #          work_mem: 2MB
 
 #  extensions:
-#    image: perconalab/percona-postgresql-operator:main
+#    image: percona/percona-postgresql-operator:2.6.0
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
