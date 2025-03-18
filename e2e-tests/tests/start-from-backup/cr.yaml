@@ -465,7 +465,7 @@ spec:
         type: AlphaNumeric
 #    querySource: pgstatmonitor
 #  patroni:
-#    # Some values of the Liveness/Readiness probes of the patroni container are calulated using syncPeriodSeconds by the following formulas:
+#    # Some values of the Liveness/Readiness probes of the patroni container are calculated using syncPeriodSeconds by the following formulas:
 #    # - timeoutSeconds:   syncPeriodSeconds / 2;
 #    # - periodSeconds:    syncPeriodSeconds;
 #    # - failureThreshold: leaderLeaseDurationSeconds / syncPeriodSeconds.
