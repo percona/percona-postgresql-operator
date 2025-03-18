@@ -15,22 +15,22 @@
 
 set -eu
 
-directory=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+directory=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 declare -r namespace="$1" account="$2"
 declare -r directory="${directory}/.kube"
 
-[[ -z "${KUBECONFIG:-}" ]] && KUBECONFIG="${HOME}/.kube/config"
-if [[ ! -f "${KUBECONFIG}" ]]; then
-    echo "unable to find kubeconfig"
-    exit 1
+[[ -z ${KUBECONFIG:-} ]] && KUBECONFIG="${HOME}/.kube/config"
+if [[ ! -f ${KUBECONFIG} ]]; then
+	echo "unable to find kubeconfig"
+	exit 1
 fi
 echo "using KUBECONFIG=${KUBECONFIG} as base for ${namespace}/${account}"
 
 # copy the current KUBECONFIG
 kubeconfig="${directory}/${namespace}/${account}"
 mkdir -p "${directory}/${namespace}"
-kubectl config view --minify --raw > "${kubeconfig}"
+kubectl config view --minify --raw >"${kubeconfig}"
 
 # Grab the service account token. If one has not already been generated,
 # create a secret to do so. See the LegacyServiceAccountTokenNoAutoGeneration
@@ -47,9 +47,9 @@ for i in 1 2 3 4; do
 	{{- end }}
 {{- end }}')
 
-	[[ -n "${token}" ]] && break
+	[[ -n ${token} ]] && break
 
-	kubectl apply -n "${namespace}" --server-side --filename=- <<< "
+	kubectl apply -n "${namespace}" --server-side --filename=- <<<"
 apiVersion: v1
 kind: Secret
 type: kubernetes.io/service-account-token
@@ -59,7 +59,7 @@ metadata: {
 }"
 	# If we are on our third or fourth loop, try sleeping to give kube time to create the token
 	if [ $i -gt 2 ]; then
-		sleep $(($i-2))
+		sleep $((i - 2))
 	fi
 done
 kubectl config --kubeconfig="${kubeconfig}" set-credentials "${account}" --token="${token}"
@@ -67,4 +67,4 @@ kubectl config --kubeconfig="${kubeconfig}" set-credentials "${account}" --token
 # remove any namespace setting, replace the username, and minify once more
 kubectl config --kubeconfig="${kubeconfig}" set-context --current --namespace= --user="${account}"
 minimal=$(kubectl config --kubeconfig="${kubeconfig}" view --minify --raw)
-cat <<< "${minimal}" > "${kubeconfig}"
+cat <<<"${minimal}" >"${kubeconfig}"
