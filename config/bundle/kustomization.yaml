@@ -6,5 +6,5 @@ resources:
 - ../manager/namespace
 images:
 - name: postgres-operator
-  newName: percona/percona-postgresql-operator
-  newTag: 2.6.0
+  newName: perconalab/percona-postgresql-operator
+  newTag: main
