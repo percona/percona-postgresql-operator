@@ -9,7 +9,7 @@ metadata:
 #  - percona.com/delete-ssl
 #  - percona.com/delete-backups
 spec:
-  crVersion: 2.6.0
+  crVersion: 2.7.0
 #  metadata:
 #    annotations:
 #      example-annotation: value
@@ -124,9 +124,9 @@ spec:
 #          test-label: value
 
 
-  image: percona/percona-postgresql-operator:2.6.0-ppg16.8-postgres
+  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
   imagePullPolicy: Always
-  postgresVersion: 16
+  postgresVersion: 17
 #  port: 5432
 
 #  expose:
@@ -240,7 +240,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbouncer1.24.0
+      image: perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -322,7 +322,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbackrest2.54.2
+      image: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
 #
 #      containers:
 #        pgbackrest:
@@ -467,7 +467,7 @@ spec:
 
   pmm:
     enabled: false
-    image: percona/pmm-client:2.44.0
+    image: perconalab/pmm-client:dev-latest
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -489,7 +489,7 @@ spec:
 #          work_mem: 2MB
 
 #  extensions:
-#    image: percona/percona-postgresql-operator:2.6.0
+#    image: perconalab/percona-postgresql-operator:main
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
