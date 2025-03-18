@@ -5,8 +5,8 @@ metadata:
 spec:
   postgresClusterName: cluster1
   image: perconalab/percona-postgresql-operator:main
-  fromPostgresVersion: 15
-  toPostgresVersion: 16
-  toPostgresImage: perconalab/percona-postgresql-operator:main-ppg16-postgres
-  toPgBouncerImage: perconalab/percona-postgresql-operator:main-ppg16-pgbouncer
-  toPgBackRestImage: perconalab/percona-postgresql-operator:main-ppg16-pgbackrest
+  fromPostgresVersion: 16
+  toPostgresVersion: 17
+  toPostgresImage: perconalab/percona-postgresql-operator:main-ppg17-postgres
+  toPgBouncerImage: perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
+  toPgBackRestImage: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
