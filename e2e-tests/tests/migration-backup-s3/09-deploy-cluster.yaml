@@ -22,6 +22,14 @@ commands:
         ' - |
       kubectl -n $NAMESPACE apply -f -
 
-      sleep 5
+      wait_time=20
+      retry=0
+      until [[ $(kubectl get job -n $NAMESPACE | grep 'migration-backup-s3-pgbackrest-restore') ]]; do
+        sleep 1
+        let retry+=1
+        if [[ $retry -ge $wait_time ]]; then
+          exit 1
+        fi
+      done
       kubectl -n $NAMESPACE wait --for=condition=Complete job/migration-backup-s3-pgbackrest-restore --timeout=360s
     timeout: 300

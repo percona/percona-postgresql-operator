@@ -112,7 +112,7 @@ status:
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  generation: 3 # K8SPG-619
+  generation: 2
   labels:
     e2e: upgrade-minor
   name: upgrade-minor
@@ -130,7 +130,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 3
+  observedGeneration: 2
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
