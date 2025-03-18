@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -62,7 +63,13 @@ func NewManager(config *rest.Config, options manager.Options) (manager.Manager, 
 	}
 
 	if err == nil {
-		m, err = manager.New(config, options)
+		// Create a copy of the config to avoid modifying the original
+		configCopy := rest.CopyConfig(config)
+
+		// Ensure throttling is disabled by setting a fake rate limiter
+		configCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+
+		m, err = manager.New(configCopy, options)
 	}
 
 	return m, err
