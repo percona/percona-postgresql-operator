@@ -4,6 +4,7 @@ demand-backup
 finalizers
 init-deploy
 monitoring
+monitoring-pmm3
 one-pod
 operator-self-healing
 pitr

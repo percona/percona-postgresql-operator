@@ -655,8 +655,9 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 		}
 	}
 
-	if v, ok := pmmSecret.Data[pmm.SecretKey]; !ok || len(v) == 0 {
-		log.Info(fmt.Sprintf("Can't enable PMM: %s key doesn't exist in %s secret or empty", pmm.SecretKey, cr.Spec.PMM.Secret))
+	pmmContainer, err := pmm.Container(pmmSecret, cr)
+	if err != nil {
+		log.Info(fmt.Sprintf("Can't enable PMM: %s", err.Error()))
 		return nil
 	}
 
@@ -676,7 +677,7 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 		}
 		set.Metadata.Annotations[pNaming.AnnotationPMMSecretHash] = pmmSecretHash
 
-		set.Sidecars = append(set.Sidecars, pmm.SidecarContainer(cr))
+		set.Sidecars = append(set.Sidecars, pmmContainer)
 	}
 
 	return nil
@@ -690,7 +691,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	log := logging.FromContext(ctx)
 
 	secret := new(corev1.Secret)
-	n := cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring
+	n := cr.UserMonitoring()
 
 	if err := r.Client.Get(ctx, types.NamespacedName{
 		Name:      n,
