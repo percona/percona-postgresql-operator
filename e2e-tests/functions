@@ -366,6 +366,41 @@ deploy_pmm_server() {
 	fi
 }
 
+deploy_pmm3_server() {
+	helm uninstall -n "${NAMESPACE}" pmm || :
+	if [[ $OPENSHIFT ]]; then
+		platform=openshift
+		oc create sa pmm-server -n "$NAMESPACE"
+		oc adm policy add-scc-to-user privileged -z pmm-server -n "$NAMESPACE"
+
+		if [[ $OPERATOR_NS ]]; then
+			timeout 30 oc delete clusterrolebinding $(kubectl get clusterrolebinding | grep 'pmm-pg-operator-' | awk '{print $1}') || :
+			oc create clusterrolebinding pmm-pg-operator-cluster-wide --clusterrole=percona-postgresql-operator --serviceaccount=$NAMESPACE:pmm-server -n "$NAMESPACE"
+			oc patch clusterrole/percona-postgresql-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' ${OPERATOR_NS:+-n $OPERATOR_NS}
+		else
+			oc create rolebinding pmm-pg-operator-namespace-only --role percona-postgresql-operator --serviceaccount=$NAMESPACE:pmm-server -n "${NAMESPACE}"
+			oc patch role/percona-postgresql-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' -n "$NAMESPACE"
+		fi
+		helm install monitoring --set imageTag=${IMAGE_PMM3_SERVER#*:} --set imageRepo=${IMAGE_PMM3_SERVER%:*} --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-${PMM3_SERVER_VERSION}.tgz -n "$NAMESPACE"
+	else
+		platform=kubernetes
+
+		helm uninstall -n "${NAMESPACE}" monitoring || :
+		helm repo remove percona || :
+		kubectl delete clusterrole monitoring --ignore-not-found
+		kubectl delete clusterrolebinding monitoring --ignore-not-found
+
+		helm repo add percona https://percona.github.io/percona-helm-charts/
+		helm install monitoring percona/pmm -n "${NAMESPACE}" \
+			--set fullnameOverride=monitoring \
+			--set imageTag=3-dev-latest \
+			--set imageRepo=perconalab/pmm-server \
+			--set service.type=LoadBalancer \
+			--set platform="$platform" \
+			--force
+	fi
+}
+
 generate_pmm_api_key() {
 	local ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" exec monitoring-0 -- bash -c "printenv | grep ADMIN_PASSWORD | cut -d '=' -f2")
 	local PMM_SERVICE_IP=$(get_service_ip monitoring-service)
@@ -379,17 +414,71 @@ generate_pmm_api_key() {
 		| jq -r .key
 }
 
+generate_pmm3_server_token() {
+	local key_name=$RANDOM
+
+	local ADMIN_PASSWORD
+	ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" get secret pmm-secret -o jsonpath="{.data.PMM_ADMIN_PASSWORD}" | base64 --decode)
+
+	if [[ -z $ADMIN_PASSWORD ]]; then
+		echo "Error: ADMIN_PASSWORD is empty or not found!" >&2
+		return 1
+	fi
+
+	local create_response create_status_code create_json_response
+	create_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' \
+		-d "{\"name\":\"${key_name}\", \"role\":\"Admin\", \"isDisabled\":false}" \
+		--user "admin:${ADMIN_PASSWORD}" \
+		"https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts" \
+		-w "\n%{http_code}")
+
+	create_status_code=$(echo "$create_response" | tail -n1)
+	create_json_response=$(echo "$create_response" | sed '$ d')
+
+	if [[ $create_status_code -ne 201 ]]; then
+		echo "Error: Failed to create PMM service account. HTTP Status: $create_status_code" >&2
+		echo "Response: $create_json_response" >&2
+		return 1
+	fi
+
+	local service_account_id
+	service_account_id=$(echo "$create_json_response" | jq -r '.id')
+
+	if [[ -z $service_account_id || $service_account_id == "null" ]]; then
+		echo "Error: Failed to extract service account ID!" >&2
+		return 1
+	fi
+
+	local token_response token_status_code token_json_response
+	token_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' \
+		-d "{\"name\":\"${key_name}\"}" \
+		--user "admin:${ADMIN_PASSWORD}" \
+		"https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts/${service_account_id}/tokens" \
+		-w "\n%{http_code}")
+
+	token_status_code=$(echo "$token_response" | tail -n1)
+	token_json_response=$(echo "$token_response" | sed '$ d')
+
+	if [[ $token_status_code -ne 200 ]]; then
+		echo "Error: Failed to create token. HTTP Status: $token_status_code" >&2
+		echo "Response: $token_json_response" >&2
+		return 1
+	fi
+
+	echo "$token_json_response" | jq -r '.key'
+}
+
 get_metric_values() {
 	local metric=$1
 	local instance=$2
-	local api_key=$3
+	local token=$3
 	local start=$($date -u "+%s" -d "-5 minute")
 	local end=$($date -u "+%s")
 	local endpoint=$(get_service_ip monitoring-service)
 
 	local wait_count=20
 	local retry=0
-	until [[ $(curl -s -k -H "Authorization: Bearer ${api_key}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
+	until [[ $(curl -s -k -H "Authorization: Bearer ${token}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
 		| jq '.data.result[0].values[][1]' \
 		| grep '^"[0-9]') ]]; do
 		sleep 2
@@ -435,6 +524,43 @@ get_qan20_values() {
 EOF
 
 	curl -s -k -H "Authorization: Bearer ${api_key}" -XPOST -d @payload.json "https://$endpoint/v0/qan/GetReport" \
+		| jq '.rows[].sparkline'
+	rm -f payload.json
+}
+
+get_qan20_values_pmm3() {
+	local instance=$1
+	local token=$2
+	local start=$($date -u "+%Y-%m-%dT%H:%M:%S" -d "-30 minute")
+	local end=$($date -u "+%Y-%m-%dT%H:%M:%S")
+	local endpoint=$(get_service_ip monitoring-service)
+
+	cat >payload.json <<EOF
+{
+   "columns":[
+	  "load",
+	  "num_queries",
+	  "query_time"
+   ],
+   "first_seen": false,
+   "group_by": "queryid",
+   "include_only_fields": [],
+   "keyword": "",
+   "labels": [
+	   {
+		   "key": "cluster",
+		   "value": ["postgresql"]
+   }],
+   "limit": 10,
+   "offset": 0,
+   "order_by": "-load",
+   "main_metric": "load",
+   "period_start_from": "$($date -u -d '-12 hour' '+%Y-%m-%dT%H:%M:%S%:z')",
+   "period_start_to": "$($date -u '+%Y-%m-%dT%H:%M:%S%:z')"
+}
+EOF
+
+	curl -s -k -H "Authorization: Bearer ${token}" -XPOST -d @payload.json "https://$endpoint/v1/qan/metrics:getReport" \
 		| jq '.rows[].sparkline'
 	rm -f payload.json
 }

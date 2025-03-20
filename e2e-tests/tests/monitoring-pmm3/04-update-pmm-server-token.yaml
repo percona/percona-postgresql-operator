@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 25
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      token=$(generate_pmm3_server_token)
+      [[ -n ${token} && ${token} != null ]] \
+        &&  kubectl -n ${NAMESPACE} patch secret monitoring-pmm3-pmm-secret --type merge --patch '{"stringData": {"PMM_SERVER_TOKEN": "'${token}'"}}' \
+        || true
+
+      sleep 25
