@@ -62,7 +62,7 @@ func TestContainer(t *testing.T) {
 				}
 				return secret
 			},
-			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN nor PMM_SERVER_KEY keys exist in the provided secret or they are empty"),
+			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN for PMM3 nor PMM_SERVER_KEY for PMM2 exist in the provided secret or they are empty"),
 		},
 		"pmm3 when both server key and token exist": {
 			secret: func() *corev1.Secret {
@@ -103,7 +103,7 @@ func TestContainer(t *testing.T) {
 				}
 				return secret
 			},
-			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN nor PMM_SERVER_KEY keys exist in the provided secret or they are empty"),
+			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN for PMM3 nor PMM_SERVER_KEY for PMM2 exist in the provided secret or they are empty"),
 		},
 		"error due to missing secret": {
 			secret: func() *corev1.Secret {
@@ -113,7 +113,7 @@ func TestContainer(t *testing.T) {
 				}
 				return secret
 			},
-			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN nor PMM_SERVER_KEY keys exist in the provided secret or they are empty"),
+			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN for PMM3 nor PMM_SERVER_KEY for PMM2 exist in the provided secret or they are empty"),
 		},
 		"error due to nil secret": {
 			secret: func() *corev1.Secret {

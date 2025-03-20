@@ -28,7 +28,7 @@ func Container(secret *corev1.Secret, pgc *v2.PerconaPGCluster) (corev1.Containe
 		return sidecarContainerV2(pgc), nil
 	}
 
-	return corev1.Container{}, fmt.Errorf("can't enable PMM: neither %s nor %s keys exist in the provided secret or they are empty", secretToken, secretKey)
+	return corev1.Container{}, fmt.Errorf("can't enable PMM: neither %s for PMM3 nor %s for PMM2 exist in the provided secret or they are empty", secretToken, secretKey)
 }
 
 // sidecarContainerV2 refers to the construction of the PMM2 container.
