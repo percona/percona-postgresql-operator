@@ -28,7 +28,7 @@ type PostgresClusterSpec struct {
 	DataSource *DataSource `json:"dataSource,omitempty"`
 
 	// PostgreSQL backup configuration
-	// +kubebuilder:validation:Required
+	// +optional
 	Backups Backups `json:"backups"`
 
 	// The secret containing the root CA certificate and key for
