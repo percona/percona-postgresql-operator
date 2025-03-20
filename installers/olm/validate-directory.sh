@@ -2,7 +2,7 @@
 # vim: set noexpandtab :
 set -eu
 
-if command -v oc >/dev/null; then
+if command -v oc > /dev/null; then
 	kubectl() { oc "$@"; }
 	kubectl version
 else
@@ -20,7 +20,7 @@ validate_bundle_directory() {
 	local directory="$1"
 	local namespace
 
-	namespace=$(kubectl create --filename=- --output='go-template={{.metadata.name}}' <<<'{
+	namespace=$(kubectl create --filename=- --output='go-template={{.metadata.name}}' <<< '{
 		"apiVersion": "v1", "kind": "Namespace",
 		"metadata": {
 			"generateName": "olm-test-",

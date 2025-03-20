@@ -18,24 +18,24 @@ validate_bundle_image() {
 	local container="$1" directory="$2"
 	directory=$(cd "${directory}" && pwd)
 
-	cat >"${TMPDIR}/registry.config" <<-SSL
-		[req]
-		distinguished_name = req_distinguished_name
-		x509_extensions = v3_ext
-		prompt = no
-		[req_distinguished_name]
-		commonName = localhost
-		[v3_ext]
-		subjectAltName = @alt_names
-		[alt_names]
-		DNS.1 = localhost
+	cat > "${TMPDIR}/registry.config" <<-SSL
+	[req]
+	distinguished_name = req_distinguished_name
+	x509_extensions = v3_ext
+	prompt = no
+	[req_distinguished_name]
+	commonName = localhost
+	[v3_ext]
+	subjectAltName = @alt_names
+	[alt_names]
+	DNS.1 = localhost
 	SSL
 
 	openssl ecparam -name prime256v1 -genkey -out "${TMPDIR}/registry.key"
 	openssl req -new -x509 -days 1 \
 		-config "${TMPDIR}/registry.config" \
-		-key "${TMPDIR}/registry.key" \
-		-out "${TMPDIR}/registry.crt"
+		-key    "${TMPDIR}/registry.key" \
+		-out    "${TMPDIR}/registry.crt"
 
 	# Start a local image registry.
 	local image port registry
@@ -52,10 +52,10 @@ validate_bundle_image() {
 		--format='{{ (index .NetworkSettings.Ports "5000/tcp" 0).HostPort }}')
 	image="localhost:${port}/postgres-operator-bundle:latest"
 
-	cat >"${TMPDIR}/registries.conf" <<-TOML
-		[[registry]]
-		location = "localhost:${port}"
-		insecure = true
+	cat > "${TMPDIR}/registries.conf" <<-TOML
+	[[registry]]
+	location = "localhost:${port}"
+	insecure = true
 	TOML
 
 	# Build the bundle image and push it to the local registry.
@@ -65,13 +65,13 @@ validate_bundle_image() {
 		--volume="${directory}:/mnt:delegated" \
 		--workdir='/mnt' \
 		quay.io/buildah/stable:latest \
-		buildah build-using-dockerfile \
-		--format='docker' --layers --tag="docker://${image}"
+			buildah build-using-dockerfile \
+				--format='docker' --layers --tag="docker://${image}"
 
 	local -a opm
 	local opm_version
 	opm_version=$(opm version)
-	opm_version=$(sed -n 's#.*OpmVersion:"\([^"]*\)".*#\1# p' <<<"${opm_version}")
+	opm_version=$(sed -n 's#.*OpmVersion:"\([^"]*\)".*#\1# p' <<< "${opm_version}")
 	# shellcheck disable=SC2206
 	opm=(${container} run --rm
 		--network='host'
@@ -79,7 +79,7 @@ validate_bundle_image() {
 		--volume="${TMPDIR}:/mnt:delegated"
 		--workdir='/mnt'
 		quay.io/operator-framework/upstream-opm-builder:"${opm_version}"
-		sh -ceu 'update-ca-certificates && exec "$@"' - opm)
+			sh -ceu 'update-ca-certificates && exec "$@"' - opm)
 
 	# Validate the bundle image in the local registry.
 	# https://olm.operatorframework.io/docs/tasks/creating-operator-bundle/#validating-your-bundle

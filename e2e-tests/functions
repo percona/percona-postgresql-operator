@@ -384,10 +384,10 @@ deploy_pmm3_server() {
 	else
 		platform=kubernetes
 
-		helm uninstall -n "${NAMESPACE}" monitoring || :
-		helm repo remove percona || :
-		kubectl delete clusterrole monitoring --ignore-not-found
-		kubectl delete clusterrolebinding monitoring --ignore-not-found
+    helm uninstall -n "${NAMESPACE}" monitoring || :
+    helm repo remove percona || :
+    kubectl delete clusterrole monitoring --ignore-not-found
+    kubectl delete clusterrolebinding monitoring --ignore-not-found
 
 		helm repo add percona https://percona.github.io/percona-helm-charts/
 		helm install monitoring percona/pmm -n "${NAMESPACE}" \
@@ -414,57 +414,57 @@ generate_pmm_api_key() {
 }
 
 generate_pmm3_server_token() {
-	local key_name=$RANDOM
+  local key_name=$RANDOM
 
-	local ADMIN_PASSWORD
-	ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" get secret pmm-secret -o jsonpath="{.data.PMM_ADMIN_PASSWORD}" | base64 --decode)
+  local ADMIN_PASSWORD
+  ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" get secret pmm-secret -o jsonpath="{.data.PMM_ADMIN_PASSWORD}" | base64 --decode)
 
-	if [[ -z $ADMIN_PASSWORD ]]; then
-		echo "Error: ADMIN_PASSWORD is empty or not found!" >&2
-		return 1
-	fi
+  if [[ -z $ADMIN_PASSWORD ]]; then
+    echo "Error: ADMIN_PASSWORD is empty or not found!" >&2
+    return 1
+  fi
 
-	local create_response create_status_code create_json_response
-	create_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' \
-		-d "{\"name\":\"${key_name}\", \"role\":\"Admin\", \"isDisabled\":false}" \
-		--user "admin:${ADMIN_PASSWORD}" \
-		"https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts" \
-		-w "\n%{http_code}")
+  local create_response create_status_code create_json_response
+  create_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' \
+    -d "{\"name\":\"${key_name}\", \"role\":\"Admin\", \"isDisabled\":false}" \
+    --user "admin:${ADMIN_PASSWORD}" \
+    "https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts" \
+    -w "\n%{http_code}")
 
-	create_status_code=$(echo "$create_response" | tail -n1)
-	create_json_response=$(echo "$create_response" | sed '$ d')
+  create_status_code=$(echo "$create_response" | tail -n1)
+  create_json_response=$(echo "$create_response" | sed '$ d')
 
-	if [[ $create_status_code -ne 201 ]]; then
-		echo "Error: Failed to create PMM service account. HTTP Status: $create_status_code" >&2
-		echo "Response: $create_json_response" >&2
-		return 1
-	fi
+  if [[ $create_status_code -ne 201 ]]; then
+    echo "Error: Failed to create PMM service account. HTTP Status: $create_status_code" >&2
+    echo "Response: $create_json_response" >&2
+    return 1
+  fi
 
-	local service_account_id
-	service_account_id=$(echo "$create_json_response" | jq -r '.id')
+  local service_account_id
+  service_account_id=$(echo "$create_json_response" | jq -r '.id')
 
-	if [[ -z $service_account_id || $service_account_id == "null" ]]; then
-		echo "Error: Failed to extract service account ID!" >&2
-		return 1
-	fi
+  if [[ -z $service_account_id || $service_account_id == "null" ]]; then
+    echo "Error: Failed to extract service account ID!" >&2
+    return 1
+  fi
 
-	local token_response token_status_code token_json_response
-	token_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' \
-		-d "{\"name\":\"${key_name}\"}" \
-		--user "admin:${ADMIN_PASSWORD}" \
-		"https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts/${service_account_id}/tokens" \
-		-w "\n%{http_code}")
+  local token_response token_status_code token_json_response
+  token_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' \
+    -d "{\"name\":\"${key_name}\"}" \
+    --user "admin:${ADMIN_PASSWORD}" \
+    "https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts/${service_account_id}/tokens" \
+    -w "\n%{http_code}")
 
-	token_status_code=$(echo "$token_response" | tail -n1)
-	token_json_response=$(echo "$token_response" | sed '$ d')
+  token_status_code=$(echo "$token_response" | tail -n1)
+  token_json_response=$(echo "$token_response" | sed '$ d')
 
-	if [[ $token_status_code -ne 200 ]]; then
-		echo "Error: Failed to create token. HTTP Status: $token_status_code" >&2
-		echo "Response: $token_json_response" >&2
-		return 1
-	fi
+  if [[ $token_status_code -ne 200 ]]; then
+    echo "Error: Failed to create token. HTTP Status: $token_status_code" >&2
+    echo "Response: $token_json_response" >&2
+    return 1
+  fi
 
-	echo "$token_json_response" | jq -r '.key'
+  echo "$token_json_response" | jq -r '.key'
 }
 
 get_metric_values() {

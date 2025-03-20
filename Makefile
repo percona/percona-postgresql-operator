@@ -462,6 +462,3 @@ after-release: generate
 		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
 		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbouncer#}" \
 		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbackrest#}" deploy/upgrade.yaml
-
-shfmt: # matching the command reviewdog is running on the CI pipeline
-	shfmt -bn -ci -s -w .
