@@ -117,6 +117,10 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 				Value: "api_key",
 			},
 			{
+				Name:  "PMM_AGENT_PATHS_TEMPDIR",
+				Value: "/tmp",
+			},
+			{
 				Name: "PMM_AGENT_SERVER_PASSWORD",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
@@ -229,10 +233,10 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 		},
 	}
 
-	if pgc.CompareVersion("2.3.0") >= 0 {
+	if pgc.CompareVersion("2.7.0") >= 0 {
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "PMM_AGENT_PATHS_TEMPDIR",
-			Value: "/tmp",
+			Name:  "PMM_POSTGRES_PARAMS",
+			Value: pmmSpec.PostgresParams,
 		})
 	}
 
@@ -435,6 +439,7 @@ func agentPrerunScript(querySource v2.PMMQuerySource) string {
 		"--tls-key-file=/pgconf/tls/tls.key",
 		"--tls-ca-file=/pgconf/tls/ca.crt",
 		"--tls-skip-verify",
+		"$(PMM_POSTGRES_PARAMS)",
 		"--skip-connection-check",
 		"--metrics-mode=push",
 		"--service-name=$(PMM_AGENT_SETUP_NODE_NAME)",
