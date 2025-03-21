@@ -61,4 +61,8 @@ type PostgresUserSpec struct {
 	// The secret name to generate user, password, connection info this PostgreSQL user.
 	// +optional
 	SecretName PostgresIdentifier `json:"secretName,omitempty"`
+
+	// Grant a specific user access to the public schema in every database where they already have permissions.
+	// +optional
+	GrantPublicSchemaAccess *bool `json:"grantPublicSchemaAccess,omitempty"`
 }

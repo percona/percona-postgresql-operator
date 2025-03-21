@@ -170,6 +170,14 @@ SELECT pg_catalog.format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I',
 		}
 	}
 
+	for i := range users {
+		user := users[i]
+		if *user.GrantPublicSchemaAccess {
+			log.V(1).Info("Granting access to public schema for user.", "user", user.Name)
+			err = grantUsersSchemasInPostgreSQL(ctx, exec, user)
+		}
+	}
+
 	return err
 }
 
@@ -237,5 +245,60 @@ func WriteUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
 
 		log.V(1).Info("wrote PostgreSQL schemas", "stdout", stdout, "stderr", stderr)
 	}
+	return err
+}
+
+// GrantUsersSchemasInPostgreSQL will create a schema for each user in each database that user has access to
+func grantUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
+	user v1beta1.PostgresUserSpec) error {
+
+	log := logging.FromContext(ctx)
+
+	var err error
+	var stdout string
+	var stderr string
+	// We skip if the user has no databases
+	if len(user.Databases) == 0 {
+		return nil
+	}
+
+	var sql bytes.Buffer
+
+	// Prevent unexpected dereferences by emptying "search_path". The "pg_catalog"
+	// schema is still searched, and only temporary objects can be created.
+	// - https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-SEARCH-PATH
+	_, _ = sql.WriteString(`SET search_path TO '';`)
+
+	_, _ = sql.WriteString(`SELECT * FROM json_array_elements_text(:'databases');`)
+
+	databases, _ := json.Marshal(user.Databases)
+
+	stdout, stderr, err = exec.ExecInDatabasesFromQuery(ctx,
+		sql.String(),
+		strings.Join([]string{
+			// Quiet NOTICE messages from IF EXISTS statements.
+			`SET client_min_messages = WARNING;`,
+
+			// Grant all privileges on the public schema to the user
+			`GRANT ALL PRIVILEGES ON SCHEMA public TO :"username";`,
+
+			// Grant all privileges on existing tables and sequences in the public schema
+			`GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO :"username";`,
+			`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO :"username";`,
+
+			// Set default privileges for future objects created in the public schema
+			`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO :"username";`,
+			`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO :"username";`,
+		}, "\n"),
+		map[string]string{
+			"databases":     string(databases),
+			"username":      string(user.Name),
+			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
+			"QUIET":         "on", // Do not print successful commands to stdout.
+		},
+	)
+
+	log.V(1).Info("grant access to public PostgreSQL schemas", "stdout", stdout, "stderr", stderr)
+
 	return err
 }
