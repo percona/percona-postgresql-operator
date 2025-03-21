@@ -166,7 +166,7 @@ SELECT pg_catalog.format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I',
 		autoCreateUserSchemaAnnotationValue, annotationExists := cluster.Annotations[naming.AutoCreateUserSchemaAnnotation]
 		if annotationExists && strings.EqualFold(autoCreateUserSchemaAnnotationValue, "true") {
 			log.V(1).Info("Writing schemas for users.")
-			err = WriteUsersSchemasInPostgreSQL(ctx, exec, users)
+			err = writeUsersSchemasInPostgreSQL(ctx, exec, users)
 		}
 	}
 
@@ -179,15 +179,15 @@ SELECT pg_catalog.format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I',
 		}
 		if cluster.CompareVersion("2.7.0") >= 0 && user.GrantPublicSchemaAccess != nil && *user.GrantPublicSchemaAccess {
 			log.V(1).Info("Granting access to public schema for user.", "name", string(user.Name))
-			err = grantUsersSchemasInPostgreSQL(ctx, exec, user)
+			err = grantUserAccessToPublicSchemaInPostgreSQL(ctx, exec, user)
 		}
 	}
 
 	return err
 }
 
-// WriteUsersSchemasInPostgreSQL will create a schema for each user in each database that user has access to
-func WriteUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
+// writeUsersSchemasInPostgreSQL will create a schema for each user in each database that user has access to
+func writeUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
 	users []v1beta1.PostgresUserSpec) error {
 
 	log := logging.FromContext(ctx)
@@ -253,8 +253,8 @@ func WriteUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
 	return err
 }
 
-// GrantUsersSchemasInPostgreSQL will create a schema for each user in each database that user has access to
-func grantUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
+// grantUserAccessToPublicSchemaInPostgreSQL grant the specified user access to the public schema within the specified database.
+func grantUserAccessToPublicSchemaInPostgreSQL(ctx context.Context, exec Executor,
 	user v1beta1.PostgresUserSpec) error {
 
 	log := logging.FromContext(ctx)
