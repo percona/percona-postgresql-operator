@@ -22,7 +22,7 @@ func init() {
 }
 
 const (
-	Version     = "2.6.0"
+	Version     = "2.7.0"
 	ProductName = "pg-operator"
 )
 
@@ -533,7 +533,6 @@ type PGBackRestArchive struct {
 type PMMQuerySource string
 
 const (
-	PgStatMonitor    PMMQuerySource = "pgstatmonitor"
 	PgStatStatements PMMQuerySource = "pgstatstatements"
 )
 
@@ -989,3 +988,8 @@ func GetDefaultVersionServiceEndpoint() string {
 const (
 	UserMonitoring = "monitor"
 )
+
+// UserMonitoring constructs the monitoring user.
+func (pgc PerconaPGCluster) UserMonitoring() string {
+	return pgc.Name + "-" + naming.RolePostgresUser + "-" + UserMonitoring
+}

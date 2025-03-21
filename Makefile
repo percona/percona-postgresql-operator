@@ -432,17 +432,17 @@ include e2e-tests/release_versions
 release: generate
 	$(SED) -i \
     	-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
-        -e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_POSTGRESQL17)#}" \
-        -e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(IMAGE_PGBOUNCER17)#}" \
-        -e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(IMAGE_PGBACKREST17)#}" \
+        -e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_POSTGRESQL16)#}" \
+        -e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(IMAGE_PGBOUNCER16)#}" \
+        -e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(IMAGE_PGBACKREST16)#}" \
         -e "/extensions:/,/image:/{s#image: .*#image: $(IMAGE_OPERATOR)#}" \
         -e "/^  pmm:/,/^    image:/{s#image: .*#image: $(IMAGE_PMM_CLIENT)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_OPERATOR)#}" \
-       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(IMAGE_POSTGRESQL17)#}" \
-       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(IMAGE_PGBOUNCER17)#}" \
-       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(IMAGE_PGBACKREST17)#}" deploy/upgrade.yaml
+       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(IMAGE_POSTGRESQL16)#}" \
+       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(IMAGE_PGBOUNCER16)#}" \
+       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(IMAGE_PGBACKREST16)#}" deploy/upgrade.yaml
 
 # Prepare main branch after release
 MAJOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f1)

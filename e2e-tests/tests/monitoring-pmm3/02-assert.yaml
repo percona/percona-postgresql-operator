@@ -1,0 +1,8 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: monitoring-pmm3-pmm-secret
