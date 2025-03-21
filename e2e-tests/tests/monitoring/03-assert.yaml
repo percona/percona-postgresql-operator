@@ -39,6 +39,7 @@ spec:
     enabled: true
     secret: monitoring-pmm-secret
     serverHost: monitoring-service
+    clusterName: monitoring-pmm-custom-name
   port: 5432
   proxy:
     pgBouncer:

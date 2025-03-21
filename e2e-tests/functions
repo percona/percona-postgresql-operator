@@ -181,7 +181,8 @@ get_cr() {
 		.spec.backups.pgbackrest.image = "'$IMAGE_BACKREST'" |
 		.spec.proxy.pgBouncer.image = "'$IMAGE_PGBOUNCER'" |
 		.spec.pmm.image = "'$IMAGE_PMM_CLIENT'" |
-		.spec.pmm.secret = "'${cr_name}'-pmm-secret"
+		.spec.pmm.secret = "'${cr_name}'-pmm-secret" |
+		.spec.pmm.clusterName = "'${cr_name}'-pmm-custom-name"
 		' $DEPLOY_DIR/cr.yaml >$TEMP_DIR/cr.yaml
 
 	if [[ $OPENSHIFT ]]; then
