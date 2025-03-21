@@ -62,7 +62,7 @@ type PostgresUserSpec struct {
 	// +optional
 	SecretName PostgresIdentifier `json:"secretName,omitempty"`
 
-	// Grant a specific user access to the public schema in every database where they already have permissions.
+	// Grant the user access to the public schema in each database listed under `databases`.
 	// +optional
 	GrantPublicSchemaAccess *bool `json:"grantPublicSchemaAccess,omitempty"`
 }

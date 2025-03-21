@@ -170,8 +170,7 @@ SELECT pg_catalog.format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I',
 		}
 	}
 
-	for i := range users {
-		user := users[i]
+	for _, user := range users {
 
 		// We skip if the user has no databases
 		if len(user.Databases) == 0 {
@@ -259,9 +258,6 @@ func grantUserAccessToPublicSchemaInPostgreSQL(ctx context.Context, exec Executo
 
 	log := logging.FromContext(ctx)
 
-	var err error
-	var stdout string
-	var stderr string
 	// We skip if the user has no databases
 	if len(user.Databases) == 0 {
 		return nil
@@ -278,7 +274,7 @@ func grantUserAccessToPublicSchemaInPostgreSQL(ctx context.Context, exec Executo
 
 	databases, _ := json.Marshal(user.Databases)
 
-	stdout, stderr, err = exec.ExecInDatabasesFromQuery(ctx,
+	stdout, stderr, err := exec.ExecInDatabasesFromQuery(ctx,
 		sql.String(),
 		strings.Join([]string{
 			// Quiet NOTICE messages from IF EXISTS statements.

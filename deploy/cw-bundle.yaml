@@ -18149,8 +18149,8 @@ spec:
                       type: array
                       x-kubernetes-list-type: set
                     grantPublicSchemaAccess:
-                      description: Grant a specific user access to the public schema
-                        in every database where they already have permissions.
+                      description: Grant the user access to the public schema in each
+                        database listed under `databases`.
                       type: boolean
                     name:
                       description: |-
@@ -45238,8 +45238,8 @@ spec:
                       type: array
                       x-kubernetes-list-type: set
                     grantPublicSchemaAccess:
-                      description: Grant a specific user access to the public schema
-                        in every database where they already have permissions.
+                      description: Grant the user access to the public schema in each
+                        database listed under `databases`.
                       type: boolean
                     name:
                       description: |-
