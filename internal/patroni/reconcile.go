@@ -8,16 +8,14 @@ import (
 	"context"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ClusterBootstrapped returns a bool indicating whether or not Patroni has successfully
@@ -150,10 +148,8 @@ func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Containe
 	// TODO(cbandy): Consider if a PreStop hook is necessary.
 	container.LivenessProbe = probeTiming(cluster.Spec.Patroni)
 	container.LivenessProbe.InitialDelaySeconds = 3
-	container.LivenessProbe.HTTPGet = &corev1.HTTPGetAction{
-		Path:   "/liveness",
-		Port:   intstr.FromInt(int(*cluster.Spec.Patroni.Port)),
-		Scheme: corev1.URISchemeHTTPS,
+	container.LivenessProbe.Exec = &corev1.ExecAction{
+		Command: []string{"/usr/local/bin/postgres-liveness-check.sh"},
 	}
 
 	// Readiness is reflected in the controlling object's status (e.g. ReadyReplicas)
@@ -163,10 +159,8 @@ func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Containe
 	// of the leader Pod in the leader Service.
 	container.ReadinessProbe = probeTiming(cluster.Spec.Patroni)
 	container.ReadinessProbe.InitialDelaySeconds = 3
-	container.ReadinessProbe.HTTPGet = &corev1.HTTPGetAction{
-		Path:   "/readiness",
-		Port:   intstr.FromInt(int(*cluster.Spec.Patroni.Port)),
-		Scheme: corev1.URISchemeHTTPS,
+	container.ReadinessProbe.Exec = &corev1.ExecAction{
+		Command: []string{"/usr/local/bin/postgres-readiness-check.sh"},
 	}
 }
 
