@@ -321,10 +321,6 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			log.Info(UserMonitoring + " user is reserved, it'll be ignored.")
 			continue
 		}
-		if cr.CompareVersion("2.7.0") >= 0 && user.GrantPublicSchemaAccess == nil {
-			f := false
-			user.GrantPublicSchemaAccess = &f
-		}
 		users = append(users, user)
 	}
 
