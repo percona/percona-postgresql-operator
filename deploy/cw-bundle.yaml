@@ -8899,6 +8899,8 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              initImage:
+                type: string
               instances:
                 description: |-
                   Specifies one or more sets of PostgreSQL pods that replicate data for
@@ -34035,6 +34037,9 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              initImage:
+                description: K8SPG-613
+                type: string
               instances:
                 description: |-
                   Specifies one or more sets of PostgreSQL pods that replicate data for
@@ -45991,7 +45996,7 @@ spec:
           value: INFO
         - name: DISABLE_TELEMETRY
           value: "false"
-        image: perconalab/percona-postgresql-operator:main
+        image: ademajazzserve/percona-postgresql-operator:dev_K8SPG-613-6
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

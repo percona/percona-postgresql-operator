@@ -9,5 +9,5 @@ patchesStrategicMerge:
 
 images:
 - name: postgres-operator
-  newName: perconalab/percona-postgresql-operator
-  newTag: main
+  newName: ademajazzserve/percona-postgresql-operator
+  newTag: dev_K8SPG-613-6

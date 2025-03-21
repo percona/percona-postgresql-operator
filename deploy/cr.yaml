@@ -10,6 +10,7 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.6.0
+#  initImage: perconalab/percona-postgresql-operator:main
 #  metadata:
 #    annotations:
 #      example-annotation: value

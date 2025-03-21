@@ -187,6 +187,9 @@ type PostgresClusterSpec struct {
 	Config PostgresAdditionalConfig `json:"config,omitempty"`
 
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
+
+    // K8SPG-613
+    InitImage string `json:"initImage,omitempty"`
 }
 
 type ExtensionsSpec struct {

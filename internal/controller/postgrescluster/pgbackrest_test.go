@@ -65,6 +65,7 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 			ImagePullSecrets: []corev1.LocalObjectReference{{
 				Name: "myImagePullSecret"},
 			},
+			InitImage: "some-init-image",
 			Image: "example.com/crunchy-postgres-ha:test",
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 				Name: "instance1",
@@ -970,10 +971,10 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 		}
 	}
 	// verify mounted configuration is present
-	assert.Assert(t, len(container.VolumeMounts) == 1)
+	assert.Assert(t, len(container.VolumeMounts) == 2)
 
 	// verify volume for configuration is present
-	assert.Assert(t, len(backupJob.Spec.Template.Spec.Volumes) == 1)
+	assert.Assert(t, len(backupJob.Spec.Template.Spec.Volumes) == 2)
 
 	// verify the image pull secret
 	assert.Assert(t, backupJob.Spec.Template.Spec.ImagePullSecrets != nil)
@@ -2460,7 +2461,7 @@ func TestGenerateBackupJobIntent(t *testing.T) {
 				},
 			},
 			v1beta1.PGBackRestRepo{},
-			"",
+			"", "",
 			nil, nil,
 		)
 		assert.Assert(t, cmp.MarshalMatches(spec.Template.Spec, `
@@ -2492,14 +2493,38 @@ containers:
     seccompProfile:
       type: RuntimeDefault
   volumeMounts:
+  - mountPath: /opt/crunchy
+    name: crunchy-bin
   - mountPath: /etc/pgbackrest/conf.d
     name: pgbackrest-config
     readOnly: true
 enableServiceLinks: false
+initContainers:
+- command:
+  - /usr/local/bin/init-entrypoint.sh
+  name: pgbackrest-init
+  resources: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    privileged: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  terminationMessagePath: /dev/termination-log
+  terminationMessagePolicy: File
+  volumeMounts:
+  - mountPath: /opt/crunchy
+    name: crunchy-bin
 restartPolicy: Never
 securityContext:
   fsGroupChangePolicy: OnRootMismatch
 volumes:
+- emptyDir: {}
+  name: crunchy-bin
 - name: pgbackrest-config
   projected:
     sources:
@@ -2533,7 +2558,7 @@ volumes:
 		}
 		job := generateBackupJobSpecIntent(ctx,
 			cluster, v1beta1.PGBackRestRepo{},
-			"",
+			"", "",
 			nil, nil,
 		)
 		assert.Equal(t, job.Template.Spec.Containers[0].ImagePullPolicy, corev1.PullAlways)
@@ -2548,7 +2573,7 @@ volumes:
 			}
 			job := generateBackupJobSpecIntent(ctx,
 				cluster, v1beta1.PGBackRestRepo{},
-				"",
+				"", "",
 				nil, nil,
 			)
 			assert.DeepEqual(t, job.Template.Spec.Containers[0].Resources,
@@ -2565,7 +2590,7 @@ volumes:
 			}
 			job := generateBackupJobSpecIntent(ctx,
 				cluster, v1beta1.PGBackRestRepo{},
-				"",
+				"", "",
 				nil, nil,
 			)
 			assert.DeepEqual(t, job.Template.Spec.Containers[0].Resources,
@@ -2604,7 +2629,7 @@ volumes:
 		}
 		job := generateBackupJobSpecIntent(ctx,
 			cluster, v1beta1.PGBackRestRepo{},
-			"",
+			"", "",
 			nil, nil,
 		)
 		assert.Equal(t, job.Template.Spec.Affinity, affinity)
@@ -2617,7 +2642,7 @@ volumes:
 		}
 		job := generateBackupJobSpecIntent(ctx,
 			cluster, v1beta1.PGBackRestRepo{},
-			"",
+			"", "",
 			nil, nil,
 		)
 		assert.Equal(t, job.Template.Spec.PriorityClassName, "some-priority-class")
@@ -2635,7 +2660,7 @@ volumes:
 		}
 		job := generateBackupJobSpecIntent(ctx,
 			cluster, v1beta1.PGBackRestRepo{},
-			"",
+			"", "",
 			nil, nil,
 		)
 		assert.DeepEqual(t, job.Template.Spec.Tolerations, tolerations)
@@ -2648,14 +2673,14 @@ volumes:
 			cluster.Spec.Backups.PGBackRest.Jobs = nil
 
 			spec := generateBackupJobSpecIntent(ctx,
-				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
+				cluster, v1beta1.PGBackRestRepo{}, "", "", nil, nil,
 			)
 			assert.Assert(t, spec.TTLSecondsAfterFinished == nil)
 
 			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{}
 
 			spec = generateBackupJobSpecIntent(ctx,
-				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
+				cluster, v1beta1.PGBackRestRepo{}, "", "", nil, nil,
 			)
 			assert.Assert(t, spec.TTLSecondsAfterFinished == nil)
 		})
@@ -2666,7 +2691,7 @@ volumes:
 			}
 
 			spec := generateBackupJobSpecIntent(ctx,
-				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
+				cluster, v1beta1.PGBackRestRepo{}, "", "", nil, nil,
 			)
 			if assert.Check(t, spec.TTLSecondsAfterFinished != nil) {
 				assert.Equal(t, *spec.TTLSecondsAfterFinished, int32(0))
@@ -2679,7 +2704,7 @@ volumes:
 			}
 
 			spec := generateBackupJobSpecIntent(ctx,
-				cluster, v1beta1.PGBackRestRepo{}, "", nil, nil,
+				cluster, v1beta1.PGBackRestRepo{}, "", "", nil, nil,
 			)
 			if assert.Check(t, spec.TTLSecondsAfterFinished != nil) {
 				assert.Equal(t, *spec.TTLSecondsAfterFinished, int32(100))

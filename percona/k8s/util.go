@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/percona/naming"
+	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const WatchNamespaceEnvVar = "WATCH_NAMESPACE"
@@ -63,11 +64,10 @@ func InitContainer(component, image string,
 	}
 }
 
-func InitImage(ctx context.Context, cl client.Reader) (string, error) {
-	// TODO:
-	//if image := cr.Spec.InitImage; len(image) > 0 {
-	//	return image, nil
-	//}
+func InitImage(ctx context.Context, cl client.Reader, cluster *v1beta1.PostgresCluster) (string, error) {
+    if cluster != nil && len(cluster.Spec.InitImage) > 0 {
+		return cluster.Spec.InitImage, nil
+    }
 	return OperatorImage(ctx, cl)
 }
 
