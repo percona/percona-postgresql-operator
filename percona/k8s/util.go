@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -8,9 +9,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/percona/percona-postgresql-operator/percona/naming"
 )
 
 const WatchNamespaceEnvVar = "WATCH_NAMESPACE"
@@ -30,6 +36,72 @@ func GetWatchNamespace() (string, error) {
 	}
 
 	return ns, nil
+}
+
+func InitContainer(component, image string,
+	pullPolicy corev1.PullPolicy,
+	secCtx *corev1.SecurityContext,
+	resources corev1.ResourceRequirements,
+) corev1.Container {
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      naming.CrunchyBinVolumeName,
+			MountPath: naming.CrunchyBinVolumePath,
+		},
+	}
+
+	return corev1.Container{
+		Name:                     component + "-init",
+		Image:                    image,
+		ImagePullPolicy:          pullPolicy,
+		VolumeMounts:             volumeMounts,
+		Command:                  []string{"/usr/local/bin/init-entrypoint.sh"},
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+		SecurityContext:          secCtx,
+		Resources:                resources,
+	}
+}
+
+func InitImage(ctx context.Context, cl client.Reader) (string, error) {
+	// TODO:
+	//if image := cr.Spec.InitImage; len(image) > 0 {
+	//	return image, nil
+	//}
+	return OperatorImage(ctx, cl)
+}
+
+func OperatorImage(ctx context.Context, cl client.Reader) (string, error) {
+	pod, err := operatorPod(ctx, cl)
+	if err != nil {
+		return "", errors.Wrap(err, "get operator pod")
+	}
+
+	for _, container := range pod.Spec.Containers {
+		if container.Name == "operator" {
+			return container.Image, nil
+		}
+	}
+
+	return "", errors.New("manager container not found")
+}
+
+func operatorPod(ctx context.Context, cl client.Reader) (*corev1.Pod, error) {
+	ns, err := GetOperatorNamespace()
+	if err != nil {
+		return nil, errors.Wrap(err, "get namespace")
+	}
+
+	pod := new(corev1.Pod)
+	nn := types.NamespacedName{
+		Namespace: ns,
+		Name:      os.Getenv("HOSTNAME"),
+	}
+	if err := cl.Get(ctx, nn, pod); err != nil {
+		return nil, err
+	}
+
+	return pod, nil
 }
 
 // GetOperatorNamespace returns the namespace of the operator pod
