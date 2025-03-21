@@ -172,6 +172,11 @@ SELECT pg_catalog.format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I',
 
 	for i := range users {
 		user := users[i]
+
+		// We skip if the user has no databases
+		if len(user.Databases) == 0 {
+			continue
+		}
 		if *user.GrantPublicSchemaAccess {
 			log.V(1).Info("Granting access to public schema for user.", "name", string(user.Name))
 			err = grantUsersSchemasInPostgreSQL(ctx, exec, user)
