@@ -114,35 +114,12 @@ func TestInstanceConfigMap(t *testing.T) {
 func TestInstancePod(t *testing.T) {
 	t.Parallel()
 
-	cluster := new(v1beta1.PostgresCluster)
-	err := cluster.Default(context.Background(), nil)
-	assert.NilError(t, err)
-	cluster.Name = "some-such"
-	cluster.Spec.PostgresVersion = 11
-	cluster.Spec.Image = "image"
-	cluster.Spec.ImagePullPolicy = corev1.PullAlways
-	clusterConfigMap := new(corev1.ConfigMap)
-	clusterPodService := new(corev1.Service)
-	instanceCertificates := new(corev1.Secret)
-	instanceConfigMap := new(corev1.ConfigMap)
-	instanceSpec := new(v1beta1.PostgresInstanceSetSpec)
-	patroniLeaderService := new(corev1.Service)
-	template := new(corev1.PodTemplateSpec)
-	template.Spec.Containers = []corev1.Container{{Name: "database"}}
-
-	call := func() error {
-		return InstancePod(context.Background(),
-			cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
-			instanceSpec, instanceCertificates, instanceConfigMap, template)
-	}
-
-	assert.NilError(t, call())
-
-	assert.DeepEqual(t, template.ObjectMeta, metav1.ObjectMeta{
-		Labels: map[string]string{naming.LabelPatroni: "some-such-ha"},
-	})
-
-	assert.Assert(t, cmp.MarshalMatches(template.Spec, `
+	tests := map[string]struct {
+		expectedSpec string
+		labels       map[string]string
+	}{
+		"version >=2.7.0 specified": {
+			expectedSpec: `
 containers:
 - command:
   - patroni
@@ -221,7 +198,127 @@ volumes:
           path: ~postgres-operator/patroni.ca-roots
         - key: patroni.crt-combined
           path: ~postgres-operator/patroni.crt+key
-	`))
+	`,
+			labels: map[string]string{
+				"pgv2.percona.com/version": "2.7.0",
+			},
+		},
+		"version <2.7.0 specified": {
+			labels: map[string]string{
+				"pgv2.percona.com/version": "2.6.0",
+			},
+			expectedSpec: `
+containers:
+- command:
+  - patroni
+  - /etc/patroni
+  env:
+  - name: PATRONI_NAME
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.name
+  - name: PATRONI_KUBERNETES_POD_IP
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: status.podIP
+  - name: PATRONI_KUBERNETES_PORTS
+    value: |
+      []
+  - name: PATRONI_POSTGRESQL_CONNECT_ADDRESS
+    value: $(PATRONI_NAME).:5432
+  - name: PATRONI_POSTGRESQL_LISTEN
+    value: '*:5432'
+  - name: PATRONI_POSTGRESQL_CONFIG_DIR
+    value: /pgdata/pg11
+  - name: PATRONI_POSTGRESQL_DATA_DIR
+    value: /pgdata/pg11
+  - name: PATRONI_RESTAPI_CONNECT_ADDRESS
+    value: $(PATRONI_NAME).:8008
+  - name: PATRONI_RESTAPI_LISTEN
+    value: '*:8008'
+  - name: PATRONICTL_CONFIG_FILE
+    value: /etc/patroni
+  livenessProbe:
+    failureThreshold: 3
+    httpGet:
+      path: /liveness
+      port: 8008
+      scheme: HTTPS
+    initialDelaySeconds: 3
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 5
+  name: database
+  readinessProbe:
+    failureThreshold: 3
+    httpGet:
+      path: /readiness
+      port: 8008
+      scheme: HTTPS
+    initialDelaySeconds: 3
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 5
+  resources: {}
+  volumeMounts:
+  - mountPath: /etc/patroni
+    name: patroni-config
+    readOnly: true
+volumes:
+- name: patroni-config
+  projected:
+    sources:
+    - configMap:
+        items:
+        - key: patroni.yaml
+          path: ~postgres-operator_cluster.yaml
+    - configMap:
+        items:
+        - key: patroni.yaml
+          path: ~postgres-operator_instance.yaml
+    - secret:
+        items:
+        - key: patroni.ca-roots
+          path: ~postgres-operator/patroni.ca-roots
+        - key: patroni.crt-combined
+          path: ~postgres-operator/patroni.crt+key
+	`,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cluster := new(v1beta1.PostgresCluster)
+			err := cluster.Default(context.Background(), nil)
+			assert.NilError(t, err)
+			cluster.Name = "some-such"
+			cluster.Spec.PostgresVersion = 11
+			cluster.Spec.Image = "image"
+			cluster.Spec.ImagePullPolicy = corev1.PullAlways
+			clusterConfigMap := new(corev1.ConfigMap)
+			clusterPodService := new(corev1.Service)
+			instanceCertificates := new(corev1.Secret)
+			instanceConfigMap := new(corev1.ConfigMap)
+			instanceSpec := new(v1beta1.PostgresInstanceSetSpec)
+			patroniLeaderService := new(corev1.Service)
+			template := new(corev1.PodTemplateSpec)
+			template.Spec.Containers = []corev1.Container{{Name: "database"}}
+			cluster.Labels = tt.labels
+
+			call := func() error {
+				return InstancePod(context.Background(),
+					cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
+					instanceSpec, instanceCertificates, instanceConfigMap, template)
+			}
+			assert.NilError(t, call())
+
+			assert.DeepEqual(t, template.ObjectMeta, metav1.ObjectMeta{
+				Labels: map[string]string{naming.LabelPatroni: "some-such-ha"},
+			})
+			assert.Assert(t, cmp.MarshalMatches(template.Spec, tt.expectedSpec))
+		})
+	}
 }
 
 func TestPodIsPrimary(t *testing.T) {
