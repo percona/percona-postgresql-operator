@@ -554,7 +554,7 @@ type PMMSpec struct {
 	ServerHost string `json:"serverHost,omitempty"`
 
 	// +optional
-	ClusterName string `json:"clusterName,omitempty"`
+	CustomClusterName string `json:"customClusterName,omitempty"`
 
 	// +kubebuilder:validation:Required
 	Secret string `json:"secret,omitempty"`

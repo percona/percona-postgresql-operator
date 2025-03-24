@@ -13422,8 +13422,6 @@ spec:
               pmm:
                 description: The specification of PMM sidecars.
                 properties:
-                  clusterName:
-                    type: string
                   containerSecurityContext:
                     description: |-
                       SecurityContext holds security configuration that will be applied to a container.
@@ -13619,6 +13617,8 @@ spec:
                             type: string
                         type: object
                     type: object
+                  customClusterName:
+                    type: string
                   enabled:
                     type: boolean
                   image:

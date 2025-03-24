@@ -235,8 +235,8 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 
 	if pgc.CompareVersion("2.7.0") >= 0 {
 		clusterName := pgc.Name
-		if pgc.Spec.PMM.ClusterName != "" {
-			clusterName = pgc.Spec.PMM.ClusterName
+		if pgc.Spec.PMM.CustomClusterName != "" {
+			clusterName = pgc.Spec.PMM.CustomClusterName
 		}
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name:  "CLUSTER_NAME",
@@ -430,8 +430,8 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 
 	if pgc.CompareVersion("2.7.0") >= 0 {
 		clusterName := pgc.Name
-		if pgc.Spec.PMM.ClusterName != "" {
-			clusterName = pgc.Spec.PMM.ClusterName
+		if pgc.Spec.PMM.CustomClusterName != "" {
+			clusterName = pgc.Spec.PMM.CustomClusterName
 		}
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name:  "CLUSTER_NAME",
