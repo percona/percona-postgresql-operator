@@ -149,7 +149,7 @@ func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Containe
 	container.LivenessProbe = probeTiming(cluster.Spec.Patroni)
 	container.LivenessProbe.InitialDelaySeconds = 3
 	container.LivenessProbe.Exec = &corev1.ExecAction{
-		Command: []string{"/usr/local/bin/postgres-liveness-check.sh"},
+		Command: []string{"bash", "-c", "/usr/local/bin/postgres-liveness-check.sh"},
 	}
 
 	// Readiness is reflected in the controlling object's status (e.g. ReadyReplicas)
@@ -160,7 +160,7 @@ func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Containe
 	container.ReadinessProbe = probeTiming(cluster.Spec.Patroni)
 	container.ReadinessProbe.InitialDelaySeconds = 3
 	container.ReadinessProbe.Exec = &corev1.ExecAction{
-		Command: []string{"/usr/local/bin/postgres-readiness-check.sh"},
+		Command: []string{"bash", "-c", "/usr/local/bin/postgres-readiness-check.sh"},
 	}
 }
 

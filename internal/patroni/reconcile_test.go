@@ -178,6 +178,8 @@ containers:
   livenessProbe:
     exec:
       command:
+      - bash
+      - -c
       - /usr/local/bin/postgres-liveness-check.sh
     failureThreshold: 3
     initialDelaySeconds: 3
@@ -188,6 +190,8 @@ containers:
   readinessProbe:
     exec:
       command:
+      - bash
+      - -c
       - /usr/local/bin/postgres-readiness-check.sh
     failureThreshold: 3
     initialDelaySeconds: 3
