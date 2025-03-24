@@ -1,0 +1,33 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 520
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: monitoring
+status:
+  collisionCount: 0
+  currentReplicas: 1
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-service
+---
+apiVersion: v1
+count: 1
+involvedObject:
+  apiVersion: v1
+  kind: Service
+  name: monitoring-service
+kind: Event
+message: Ensured load balancer
+reason: EnsuredLoadBalancer
+source:
+  component: service-controller
+type: Normal
