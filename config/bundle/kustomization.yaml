@@ -6,5 +6,5 @@ resources:
 - ../manager/namespace
 images:
 - name: postgres-operator
-  newName: ademajazzserve/percona-postgresql-operator
-  newTag: dev_K8SPG-613-6
+  newName: perconalab/percona-postgresql-operator
+  newTag: main
