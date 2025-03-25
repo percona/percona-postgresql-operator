@@ -5,8 +5,10 @@ export ROOT_REPO=${ROOT_REPO:-${PWD}}
 export DEPLOY_DIR="${DEPLOY_DIR:-${ROOT_REPO}/deploy}"
 export TESTS_DIR="${TESTS_DIR:-${ROOT_REPO}/e2e-tests}"
 export TESTS_CONFIG_DIR="${TESTS_CONFIG_DIR:-${TESTS_DIR}/conf}"
+# shellcheck disable=SC2154
 export TEMP_DIR="/tmp/kuttl/pg/${test_name}"
 
+# shellcheck disable=SC2155
 export GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 export VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' | tr '[:upper:]' '[:lower:]')}
 
@@ -25,7 +27,9 @@ export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:dev-latest"}
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 
+# shellcheck disable=SC2034
 date=$(which gdate || which date)
+# shellcheck disable=SC2034
 sed=$(which gsed || which sed)
 
 if command -v oc &>/dev/null; then
