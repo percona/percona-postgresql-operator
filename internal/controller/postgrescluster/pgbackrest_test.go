@@ -66,7 +66,7 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 				Name: "myImagePullSecret"},
 			},
 			InitImage: "some-init-image",
-			Image: "example.com/crunchy-postgres-ha:test",
+			Image:     "example.com/crunchy-postgres-ha:test",
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 				Name: "instance1",
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{

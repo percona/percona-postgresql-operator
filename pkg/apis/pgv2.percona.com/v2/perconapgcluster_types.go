@@ -362,7 +362,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
-    postgresCluster.Spec.InitImage = cr.Spec.InitImage
+	postgresCluster.Spec.InitImage = cr.Spec.InitImage
 
 	return postgresCluster, nil
 }

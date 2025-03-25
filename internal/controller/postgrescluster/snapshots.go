@@ -377,7 +377,7 @@ func (r *Reconciler) dedicatedSnapshotVolumeRestore(ctx context.Context,
 	restoreJob := &batchv1.Job{}
 	instanceName := cluster.Status.StartupInstance
 
-	if err := r.generateRestoreJobIntent(cluster, configHash, instanceName, cmd, 
+	if err := r.generateRestoreJobIntent(cluster, configHash, instanceName, cmd,
 		volumeMounts, volumes, fakeDataSource, restoreJob); err != nil {
 		return errors.WithStack(err)
 	}

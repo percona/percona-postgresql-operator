@@ -65,9 +65,9 @@ func InitContainer(component, image string,
 }
 
 func InitImage(ctx context.Context, cl client.Reader, cluster *v1beta1.PostgresCluster) (string, error) {
-    if cluster != nil && len(cluster.Spec.InitImage) > 0 {
+	if cluster != nil && len(cluster.Spec.InitImage) > 0 {
 		return cluster.Spec.InitImage, nil
-    }
+	}
 	return OperatorImage(ctx, cl)
 }
 
