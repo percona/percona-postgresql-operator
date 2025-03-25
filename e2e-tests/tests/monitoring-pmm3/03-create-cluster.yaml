@@ -1,0 +1,14 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq eval '.spec.pmm.enabled=true' - \
+        | yq eval '.spec.pmm.image="perconalab/pmm-client:3-dev-latest"' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
