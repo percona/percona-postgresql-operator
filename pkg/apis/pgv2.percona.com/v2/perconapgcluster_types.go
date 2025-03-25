@@ -234,6 +234,9 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
 		cr.Spec.Extensions.BuiltIn.PGVector = &f
 	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
+		cr.Spec.Extensions.BuiltIn.PGRepack = &f
+	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
