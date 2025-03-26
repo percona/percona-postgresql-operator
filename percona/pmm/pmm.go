@@ -257,6 +257,11 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 	}
 
 	pmmSpec := pgc.Spec.PMM
+	clusterName := pgc.Name
+	if pgc.Spec.PMM.CustomClusterName != "" {
+		clusterName = pgc.Spec.PMM.CustomClusterName
+	}
+
 	container := corev1.Container{
 		Name:            "pmm-client",
 		Image:           pmmSpec.Image,
@@ -425,18 +430,11 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 				Name:  "PMM_AGENT_PATHS_TEMPDIR",
 				Value: "/tmp",
 			},
+			{
+				Name:  "CLUSTER_NAME",
+				Value: clusterName,
+			},
 		},
-	}
-
-	if pgc.CompareVersion("2.7.0") >= 0 {
-		clusterName := pgc.Name
-		if pgc.Spec.PMM.CustomClusterName != "" {
-			clusterName = pgc.Spec.PMM.CustomClusterName
-		}
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "CLUSTER_NAME",
-			Value: clusterName,
-		})
 	}
 
 	return container
