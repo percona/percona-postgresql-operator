@@ -114,6 +114,7 @@ func TestInstanceConfigMap(t *testing.T) {
 func TestInstancePod(t *testing.T) {
 	t.Parallel()
 
+	// K8SPG-708 introduced the refactoring to this unit test.
 	tests := map[string]struct {
 		expectedSpec string
 		labels       map[string]string
