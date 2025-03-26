@@ -5,7 +5,8 @@
 package naming
 
 const (
-	annotationPrefix = labelPrefix
+	annotationPrefix        = labelPrefix
+	perconaAnnotationPrefix = perconaLabelPrefix
 
 	// Finalizer marks an object to be garbage collected by this module.
 	Finalizer = annotationPrefix + "finalizer"
@@ -68,4 +69,10 @@ const (
 	// to a cluster without backups. As usual with the operator, we do not
 	// touch cloud-based backups.
 	AuthorizeBackupRemovalAnnotation = annotationPrefix + "authorizeBackupRemoval"
+
+	// OverrideConfigAnnotation is an annotation used to prevent the controller from reconciling
+	// ConfigMaps when a user wants to manually override their contents. When this annotation
+	// is present, the controller will not update the ConfigMap, allowing users to make custom
+	// modifications that won't be overwritten during reconciliation.
+	OverrideConfigAnnotation = perconaAnnotationPrefix + "override-config"
 )
