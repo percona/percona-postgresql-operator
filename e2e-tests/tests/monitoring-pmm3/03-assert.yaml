@@ -40,6 +40,7 @@ spec:
     secret: monitoring-pmm3-pmm-secret
     serverHost: monitoring-service
     customClusterName: monitoring-pmm3-pmm-custom-name
+    postgresParams: "--environment=dev-postgres"
   port: 5432
   proxy:
     pgBouncer:

@@ -182,7 +182,8 @@ get_cr() {
 		.spec.proxy.pgBouncer.image = "'$IMAGE_PGBOUNCER'" |
 		.spec.pmm.image = "'$IMAGE_PMM_CLIENT'" |
 		.spec.pmm.secret = "'${cr_name}'-pmm-secret" |
-		.spec.pmm.customClusterName = "'${cr_name}'-pmm-custom-name"
+		.spec.pmm.customClusterName = "'${cr_name}'-pmm-custom-name" |
+		.spec.pmm.postgresParams = "--environment=dev-postgres"
 		' $DEPLOY_DIR/cr.yaml >$TEMP_DIR/cr.yaml
 
 	if [[ $OPENSHIFT ]]; then
@@ -381,7 +382,7 @@ deploy_pmm3_server() {
 			oc create rolebinding pmm-pg-operator-namespace-only --role percona-postgresql-operator --serviceaccount=$NAMESPACE:pmm-server -n "${NAMESPACE}"
 			oc patch role/percona-postgresql-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' -n "$NAMESPACE"
 		fi
-		helm install monitoring --set imageTag=${IMAGE_PMM3_SERVER#*:} --set imageRepo=${IMAGE_PMM3_SERVER%:*} --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-${PMM3_SERVER_VERSION}.tgz -n "$NAMESPACE"
+		helm install monitoring --set imageTag=${IMAGE_PMM3_SERVER#*:} --set imageRepo=${IMAGE_PMM3_SERVER%:*} --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz -n "$NAMESPACE"
 	else
 		platform=kubernetes
 
