@@ -6,13 +6,9 @@ commands:
       set -o errexit
       set -o xtrace
 
-<<<<<<< HEAD:e2e-tests/tests/major-upgrade/11-wait.yaml
-      sleep 30
-=======
       source ../../functions
 
       sleep 90
->>>>>>> 99139337e (fixes):e2e-tests/tests/major-upgrade/31-wait-and-write-data.yaml
 
       for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
               echo "Checking the status of ${pod}:"

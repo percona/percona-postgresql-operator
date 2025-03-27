@@ -14,7 +14,3 @@ commands:
       run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
         "postgres:$(get_psql_user_pass major-upgrade-pguser-postgres)@$(get_psql_user_host major-upgrade-pguser-postgres)"
-
-      run_psql_local \
-        '\c postgres \\\ CREATE EXTENSION pg_cron' \
-        "postgres:$(get_psql_user_pass major-upgrade-pguser-postgres)@$(get_psql_user_host major-upgrade-pguser-postgres)"

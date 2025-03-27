@@ -14,7 +14,5 @@ commands:
           .spec.image = "perconalab/percona-postgresql-operator:main-ppg13-postgres" |
           .spec.instances[0].dataVolumeClaimSpec.resources.requests.storage = "3Gi" |
           .spec.proxy.pgBouncer.image = "perconalab/percona-postgresql-operator:main-ppg13-pgbouncer" |
-          .spec.backups.pgbackrest.image = "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest" |
-          .spec.patroni.dynamicConfiguration.postgresql.parameters.shared_preload_libraries = "pg_cron" |
-          .spec.extensions.custom += [{"name": "pg_cron", "version": "1.6.1"}]' \
+          .spec.backups.pgbackrest.image = "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest"' \
         | kubectl -n "${NAMESPACE}" apply -f -

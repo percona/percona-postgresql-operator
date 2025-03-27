@@ -1,14 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-<<<<<<< HEAD:e2e-tests/tests/scheduled-backup/07-add-sleep.yaml
   - script: |-
       set -o errexit
       set -o xtrace
 
       sleep 2
-=======
-  - timeout: 600
-    script: |-
-      sleep 60
->>>>>>> 99139337e (fixes):e2e-tests/tests/major-upgrade/13-wait.yaml
