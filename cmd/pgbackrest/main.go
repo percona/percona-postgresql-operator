@@ -27,7 +27,7 @@ import (
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -121,7 +121,7 @@ func (k *KubeAPI) Exec(ctx context.Context, namespace, pod, container string, st
 	var stdout, stderr bytes.Buffer
 
 	Scheme := runtime.NewScheme()
-	if err := core_v1.AddToScheme(Scheme); err != nil {
+	if err := corev1.AddToScheme(Scheme); err != nil {
 		log.Error(err)
 		return "", "", err
 	}
@@ -130,7 +130,7 @@ func (k *KubeAPI) Exec(ctx context.Context, namespace, pod, container string, st
 	request := k.Client.CoreV1().RESTClient().Post().
 		Resource("pods").SubResource("exec").
 		Namespace(namespace).Name(pod).
-		VersionedParams(&core_v1.PodExecOptions{
+		VersionedParams(&corev1.PodExecOptions{
 			Container: container,
 			Command:   command,
 			Stdin:     stdin != nil,
