@@ -5390,8 +5390,6 @@ spec:
                   trackLatestRestorableTime:
                     description: Enable tracking latest restorable time
                     type: boolean
-                required:
-                - pgbackrest
                 type: object
               crVersion:
                 description: |-
@@ -17904,7 +17902,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             required:
-            - backups
             - instances
             - postgresVersion
             type: object
