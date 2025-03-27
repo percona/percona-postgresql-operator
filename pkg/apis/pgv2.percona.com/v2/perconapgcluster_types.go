@@ -57,6 +57,8 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	CRVersion string `json:"crVersion,omitempty"`
 
+	InitImage string `json:"initImage,omitempty"`
+
 	// The image name to use for PostgreSQL containers.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
@@ -359,6 +361,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
+
+	postgresCluster.Spec.InitImage = cr.Spec.InitImage
 
 	return postgresCluster, nil
 }
