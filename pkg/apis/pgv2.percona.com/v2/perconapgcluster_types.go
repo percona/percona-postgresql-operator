@@ -170,8 +170,8 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
 
-	// Whether or not the cluster has schemas automatically created for the user
-	// defined in `spec.users` for all of the databases listed for that user.
+	// Indicates whether schemas are automatically created for the user
+	// specified in `spec.users` across all databases associated with that user.
 	// +optional
 	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
 }
