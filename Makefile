@@ -349,6 +349,11 @@ generate-cw-manager:
 	cd ./config/manager/cluster && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
 	$(KUSTOMIZE) build ./config/manager/cluster/ > ./deploy/cw-operator.yaml
 
+CONTROLLER ?= hack/tools/controller-gen
+tools: tools/controller-gen
+tools/controller-gen:
+	$(call go-get-tool,$(CONTROLLER),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.4)
+
 generate-cw-bundle:
 	cd ./config/cw-bundle/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
 	$(KUSTOMIZE) build ./config/cw-bundle/ > ./deploy/cw-bundle.yaml
