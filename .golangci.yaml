@@ -6,6 +6,7 @@ linters:
     - errchkjson
     - gci
     - gofumpt
+    - goimports
   enable:
     - depguard
     - gomodguard
@@ -48,9 +49,6 @@ linters-settings:
 
   exhaustive:
     default-signifies-exhaustive: true
-
-  goimports:
-    local-prefixes: github.com/percona/percona-postgresql-operator
 
   gomodguard:
     blocked:

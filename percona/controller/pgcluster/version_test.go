@@ -172,14 +172,14 @@ func (vs *fakeVS) Apply(_ context.Context, req any) (any, error) {
 		DatabaseVersion:    "14",
 		KubeVersion:        rec.KubeVersion,
 		NamespaceUid:       "",
-		OperatorVersion:    v2.Version,
+		OperatorVersion:    version.Version(),
 		Platform:           rec.Platform,
 		PmmVersion:         "",
 		PmmEnabled:         true,
 		HelmDeployCr:       true,
 		HelmDeployOperator: true,
 		SidecarsUsed:       true,
-		Product:            v2.ProductName,
+		Product:            version.ProductName,
 	}
 
 	if !reflect.DeepEqual(have, want) {

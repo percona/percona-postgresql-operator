@@ -7,3 +7,8 @@ resources:
 - bases/pgv2.percona.com_perconapgclusters.yaml
 - bases/postgres-operator.crunchydata.com_pgupgrades.yaml
 - bases/postgres-operator.crunchydata.com_pgadmins.yaml
+
+patchesStrategicMerge:
+- patches/versionlabel_in_perconapgclusters.yaml
+- patches/versionlabel_in_perconapgbackups.yaml
+- patches/versionlabel_in_perconapgrestores.yaml

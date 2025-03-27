@@ -2,17 +2,32 @@ package version
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/percona/percona-postgresql-operator/percona/version/service/client"
 	"github.com/percona/percona-postgresql-operator/percona/version/service/client/version_service"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
+
+//go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgclusters.yaml"
+//go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgbackups.yaml"
+//go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgrestores.yaml"
+
+//go:embed version.txt
+var version string
+
+func Version() string {
+	return strings.TrimSpace(version)
+}
+
+const ProductName = "pg-operator"
 
 type Meta struct {
 	Apply              string
@@ -30,10 +45,22 @@ type Meta struct {
 	Extensions         string
 }
 
+const DefaultVersionServiceEndpoint = "https://check.percona.com"
+
+func getDefaultVersionServiceEndpoint() string {
+	endpoint := os.Getenv("PERCONA_VS_FALLBACK_URI")
+
+	if len(endpoint) != 0 {
+		return endpoint
+	}
+
+	return DefaultVersionServiceEndpoint
+}
+
 func EnsureVersion(ctx context.Context, meta Meta) error {
-	err := fetchVersions(ctx, v2.GetDefaultVersionServiceEndpoint(), meta)
+	err := fetchVersions(ctx, getDefaultVersionServiceEndpoint(), meta)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to send telemetry to %s", v2.GetDefaultVersionServiceEndpoint()))
+		return errors.Wrap(err, fmt.Sprintf("failed to send telemetry to %s", getDefaultVersionServiceEndpoint()))
 	}
 
 	return nil
@@ -54,7 +81,7 @@ func fetchVersions(ctx context.Context, endpoint string, vm Meta) error {
 	applyParams := &version_service.VersionServiceApplyParams{
 		Context:            ctx,
 		HTTPClient:         &http.Client{Timeout: 10 * time.Second},
-		Product:            v2.ProductName,
+		Product:            ProductName,
 		Apply:              vm.Apply,
 		BackupVersion:      &vm.BackupVersion,
 		CustomResourceUID:  &vm.CRUID,
