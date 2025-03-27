@@ -8312,6 +8312,8 @@ spec:
                 properties:
                   pgAudit:
                     type: boolean
+                  pgRepack:
+                    type: boolean
                   pgStatMonitor:
                     type: boolean
                   pgStatStatements:

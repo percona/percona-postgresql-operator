@@ -8471,6 +8471,8 @@ spec:
                     properties:
                       pg_audit:
                         type: boolean
+                      pg_repack:
+                        type: boolean
                       pg_stat_monitor:
                         type: boolean
                       pgvector:
