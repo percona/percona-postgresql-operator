@@ -224,15 +224,23 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: agentPrerunScript(pgc.Spec.PMM.QuerySource),
+				Value: agentPrerunScript(pgc.Spec.PMM.QuerySource, pgc),
+			},
+			{
+				Name:  "PMM_AGENT_PATHS_TEMPDIR",
+				Value: "/tmp",
 			},
 		},
 	}
 
-	if pgc.CompareVersion("2.3.0") >= 0 {
+	if pgc.CompareVersion("2.7.0") >= 0 {
+		clusterName := pgc.Name
+		if pgc.Spec.PMM.CustomClusterName != "" {
+			clusterName = pgc.Spec.PMM.CustomClusterName
+		}
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "PMM_AGENT_PATHS_TEMPDIR",
-			Value: "/tmp",
+			Name:  "CLUSTER_NAME",
+			Value: clusterName,
 		})
 	}
 
@@ -249,8 +257,12 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 	}
 
 	pmmSpec := pgc.Spec.PMM
+	clusterName := pgc.Name
+	if pgc.Spec.PMM.CustomClusterName != "" {
+		clusterName = pgc.Spec.PMM.CustomClusterName
+	}
 
-	return corev1.Container{
+	container := corev1.Container{
 		Name:            "pmm-client",
 		Image:           pmmSpec.Image,
 		ImagePullPolicy: pmmSpec.ImagePullPolicy,
@@ -412,17 +424,23 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: agentPrerunScript(pgc.Spec.PMM.QuerySource),
+				Value: agentPrerunScript(pgc.Spec.PMM.QuerySource, pgc),
 			},
 			{
 				Name:  "PMM_AGENT_PATHS_TEMPDIR",
 				Value: "/tmp",
 			},
+			{
+				Name:  "CLUSTER_NAME",
+				Value: clusterName,
+			},
 		},
 	}
+
+	return container
 }
 
-func agentPrerunScript(querySource v2.PMMQuerySource) string {
+func agentPrerunScript(querySource v2.PMMQuerySource, pgc *v2.PerconaPGCluster) string {
 	wait := "pmm-admin status --wait=10s"
 	annotate := "pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'"
 
@@ -439,6 +457,12 @@ func agentPrerunScript(querySource v2.PMMQuerySource) string {
 		"--metrics-mode=push",
 		"--service-name=$(PMM_AGENT_SETUP_NODE_NAME)",
 		fmt.Sprintf("--query-source=%s", querySource),
+	}
+
+	if pgc.CompareVersion("2.7.0") >= 0 {
+		addServiceArgs = append(addServiceArgs,
+			"--cluster=$(CLUSTER_NAME)",
+		)
 	}
 	addService := fmt.Sprintf("pmm-admin add postgresql %s", strings.Join(addServiceArgs, " "))
 

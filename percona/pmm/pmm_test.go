@@ -150,7 +150,7 @@ func TestSidecarContainerV2(t *testing.T) {
 
 	pgc := &v2.PerconaPGCluster{
 		Spec: v2.PerconaPGClusterSpec{
-			CRVersion: "2.6.0",
+			CRVersion: "2.7.0",
 			PMM:       pmmSpec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -179,7 +179,7 @@ func TestSidecarContainerV2(t *testing.T) {
 	assert.NotNil(t, container.Lifecycle.PreStop)
 	assert.Equal(t, []string{"bash", "-c", "pmm-admin unregister --force"}, container.Lifecycle.PreStop.Exec.Command)
 
-	assert.Len(t, container.Env, 31)
+	assert.Len(t, container.Env, 32)
 
 	expectedEnvVars := map[string]string{
 		"POD_NAME":                      "", // field reference is asserted separately
@@ -211,8 +211,9 @@ func TestSidecarContainerV2(t *testing.T) {
 		"DB_TYPE":                       "postgresql",
 		"DB_USER":                       v2.UserMonitoring,
 		"DB_PASS":                       "", // secret reference is asserted separately
-		"PMM_AGENT_PRERUN_SCRIPT":       "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source=; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
+		"PMM_AGENT_PRERUN_SCRIPT":       "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source= --cluster=$(CLUSTER_NAME); pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
 		"PMM_AGENT_PATHS_TEMPDIR":       "/tmp",
+		"CLUSTER_NAME":                  "test-cluster",
 	}
 
 	for _, envVar := range container.Env {
@@ -290,7 +291,7 @@ func TestSidecarContainerV3(t *testing.T) {
 	assert.NotNil(t, container.Lifecycle.PreStop)
 	assert.Equal(t, []string{"bash", "-c", "pmm-admin unregister --force"}, container.Lifecycle.PreStop.Exec.Command)
 
-	assert.Len(t, container.Env, 26)
+	assert.Len(t, container.Env, 27)
 
 	expectedEnvVars := map[string]string{
 		"POD_NAME":                      "", // field reference is asserted separately
@@ -317,8 +318,9 @@ func TestSidecarContainerV3(t *testing.T) {
 		"DB_TYPE":                       "postgresql",
 		"DB_USER":                       v2.UserMonitoring,
 		"DB_PASS":                       "", // secret reference is asserted separately
-		"PMM_AGENT_PRERUN_SCRIPT":       "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source=; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
+		"PMM_AGENT_PRERUN_SCRIPT":       "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source= --cluster=$(CLUSTER_NAME); pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
 		"PMM_AGENT_PATHS_TEMPDIR":       "/tmp",
+		"CLUSTER_NAME":                  "test-cluster",
 	}
 
 	for _, envVar := range container.Env {
