@@ -123,6 +123,7 @@ func TestInstancePod(t *testing.T) {
 			expectedSpec: `
 containers:
 - command:
+  - /usr/local/bin/entrypoint.sh
   - patroni
   - /etc/patroni
   env:

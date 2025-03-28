@@ -105,6 +105,10 @@ func InstancePod(ctx context.Context,
 	}
 
 	container.Command = []string{"patroni", configDirectory}
+	// K8SPG-708 introduces a new entrypoint script in the percona-docker repository.
+	if inCluster.CompareVersion("2.7.0") >= 0 {
+		container.Command = []string{"/usr/local/bin/entrypoint.sh", "patroni", configDirectory}
+	}
 
 	container.Env = append(container.Env,
 		instanceEnvironment(inCluster, inClusterPodService, inPatroniLeaderService,
