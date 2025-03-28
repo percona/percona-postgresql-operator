@@ -27,11 +27,11 @@ RUN mkdir -p build/_output/bin \
         apt-get update -y && apt-get install gcc-x86-64-linux-gnu -y && export CC=x86_64-linux-gnu-gcc; \
       fi \
    && CGO_ENABLED=$OPERATOR_CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
-       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
+       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH -X main.BuildTime=$BUILD_TIME" \
            -o build/_output/bin/postgres-operator \
                ./cmd/postgres-operator \
     && CGO_ENABLED=$EXTENSION_INSTALLER_CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
-       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH" \
+       go build -ldflags "-w -s -X main.GitCommit=$GIT_COMMIT -X main.GitBranch=$GIT_BRANCH -X main.BuildTime=$BUILD_TIME" \
            -o build/_output/bin/extension-installer \
                ./cmd/extension-installer \
     && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator \
