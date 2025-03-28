@@ -105,6 +105,10 @@ func InstancePod(ctx context.Context,
 	}
 
 	container.Command = []string{"patroni", configDirectory}
+	// K8SPG-708 introduces a new entrypoint script in the percona-docker repository.
+	if inCluster.CompareVersion("2.7.0") >= 0 {
+		container.Command = []string{"/usr/local/bin/entrypoint.sh", "patroni", configDirectory}
+	}
 
 	container.Env = append(container.Env,
 		instanceEnvironment(inCluster, inClusterPodService, inPatroniLeaderService,
@@ -150,11 +154,9 @@ func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Containe
 	// TODO(cbandy): Consider if a PreStop hook is necessary.
 	container.LivenessProbe = probeTiming(cluster.Spec.Patroni)
 	container.LivenessProbe.InitialDelaySeconds = 3
-	container.LivenessProbe.HTTPGet = &corev1.HTTPGetAction{
-		Path:   "/liveness",
-		Port:   intstr.FromInt(int(*cluster.Spec.Patroni.Port)),
-		Scheme: corev1.URISchemeHTTPS,
-	}
+	// Create the probe handler through a constructor for the liveness probe.
+	// Introduced with K8SPG-708.
+	container.LivenessProbe.ProbeHandler = livenessProbe(cluster)
 
 	// Readiness is reflected in the controlling object's status (e.g. ReadyReplicas)
 	// and allows our controller to react when Patroni bootstrap completes.
@@ -163,10 +165,50 @@ func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Containe
 	// of the leader Pod in the leader Service.
 	container.ReadinessProbe = probeTiming(cluster.Spec.Patroni)
 	container.ReadinessProbe.InitialDelaySeconds = 3
-	container.ReadinessProbe.HTTPGet = &corev1.HTTPGetAction{
-		Path:   "/readiness",
-		Port:   intstr.FromInt(int(*cluster.Spec.Patroni.Port)),
-		Scheme: corev1.URISchemeHTTPS,
+	// Create the probe handler through a constructor for the readiness probe.
+	// Introduced with K8SPG-708.
+	container.ReadinessProbe.ProbeHandler = readinessProbe(cluster)
+}
+
+// livenessProbe is a custom constructor for the liveness probe.
+// This allows for more sophisticated logic to determine whether
+// the database container is considered "alive" beyond basic checks.
+// Introduced with K8SPG-708.
+func livenessProbe(cluster *v1beta1.PostgresCluster) corev1.ProbeHandler {
+	if cluster.CompareVersion("2.7.0") >= 0 {
+		return corev1.ProbeHandler{
+			Exec: &corev1.ExecAction{
+				Command: []string{"bash", "-c", "/usr/local/bin/postgres-liveness-check.sh"},
+			},
+		}
+	}
+	return corev1.ProbeHandler{
+		HTTPGet: &corev1.HTTPGetAction{
+			Path:   "/liveness",
+			Port:   intstr.FromInt(int(*cluster.Spec.Patroni.Port)),
+			Scheme: corev1.URISchemeHTTPS,
+		},
+	}
+}
+
+// readinessProbe is a custom constructor for the liveness probe.
+// This allows for more sophisticated logic to determine whether
+// the database container is considered "alive" beyond basic checks.
+// Introduced with K8SPG-708.
+func readinessProbe(cluster *v1beta1.PostgresCluster) corev1.ProbeHandler {
+	if cluster.CompareVersion("2.7.0") >= 0 {
+		return corev1.ProbeHandler{
+			Exec: &corev1.ExecAction{
+				Command: []string{"bash", "-c", "/usr/local/bin/postgres-readiness-check.sh"},
+			},
+		}
+	}
+	return corev1.ProbeHandler{
+		HTTPGet: &corev1.HTTPGetAction{
+			Path:   "/readiness",
+			Port:   intstr.FromInt(int(*cluster.Spec.Patroni.Port)),
+			Scheme: corev1.URISchemeHTTPS,
+		},
 	}
 }
 
