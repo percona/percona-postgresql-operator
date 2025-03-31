@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -78,6 +79,11 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 			{
 				Name:      "cert-volume",
 				MountPath: "/pgconf/tls",
+				ReadOnly:  true,
+			},
+			{
+				Name:      postgres.DataVolumeMount().Name,
+				MountPath: postgres.DataVolumeMount().MountPath,
 				ReadOnly:  true,
 			},
 		},
@@ -286,6 +292,11 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 			{
 				Name:      "cert-volume",
 				MountPath: "/pgconf/tls",
+				ReadOnly:  true,
+			},
+			{
+				Name:      postgres.DataVolumeMount().Name,
+				MountPath: postgres.DataVolumeMount().MountPath,
 				ReadOnly:  true,
 			},
 		},

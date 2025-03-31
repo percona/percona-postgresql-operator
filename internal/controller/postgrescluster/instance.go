@@ -1351,7 +1351,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// ShareProcessNamespace makes Kubernetes' pause process PID 1 and lets
 	// containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	sts.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	sts.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(false) // K8SPG-737: should be false
 
 	// Patroni calls the Kubernetes API and pgBackRest may interact with a cloud
 	// storage provider. Use the instance ServiceAccount and automatically mount
