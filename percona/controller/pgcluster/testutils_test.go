@@ -120,11 +120,7 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	if cr.Annotations == nil {
 		cr.Annotations = make(map[string]string)
 	}
-<<<<<<< HEAD
-	cr.Annotations[pNaming.InternalAnnotationDisablePatroniVersionCheck] = "true"
-=======
 	cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "4.0.0"
->>>>>>> upstream/release-2.6.0
 	cr.Namespace = namespace
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
 	return cr, nil
