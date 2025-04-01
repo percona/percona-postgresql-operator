@@ -1367,6 +1367,35 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 		},
 	}
 
+	// Add init containers from RepoHost.InitContainers if provided
+	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&
+		cluster.Spec.Backups.PGBackRest.RepoHost.InitContainers != nil {
+
+		// Get the init containers from RepoHost
+		initContainers := cluster.Spec.Backups.PGBackRest.RepoHost.InitContainers
+
+		// If EnvFromSecret is specified, add the reference to each init container
+		if cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret != nil {
+			secretName := *cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret
+
+			// Add the envFrom reference to each init container
+			for i := range initContainers {
+				initContainers[i].EnvFrom = append(
+					initContainers[i].EnvFrom,
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: secretName,
+							},
+						},
+					})
+			}
+		}
+
+		// Add the init containers to the job's pod spec
+		job.Spec.Template.Spec.InitContainers = initContainers
+	}
+
 	// Add environment variables from the pgBackRest.RepoHost.EnvFromSecret if provided
 	// This allows for environment variables to be set on the restore job from a Secret
 	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&

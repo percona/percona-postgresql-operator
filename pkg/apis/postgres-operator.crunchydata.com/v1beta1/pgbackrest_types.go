@@ -217,7 +217,12 @@ type PGBackRestRepoHost struct {
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
-	// Custom sidecars for the pgBackRest repository host. Changing this value causes 
+	// Custom init containers for the pgBackRest repository host. These containers run to completion
+	// before the main containers start. Changing this value causes the pgBackRest repository host to restart.
+	// +optional
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
+
+	// Custom sidecars for the pgBackRest repository host. Changing this value causes
 	// the pgBackRest repository host to restart.
 	// +optional
 	Containers []corev1.Container `json:"containers,omitempty"`
