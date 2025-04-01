@@ -1,0 +1,14 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr "some-name" ${RANDOM} \
+        | yq '.metadata.annotations."pgv2.percona.com/authorizeBackupRemoval"="true"' \
+        | yq 'del(.spec.backups)' \
+        | kubectl -n "${NAMESPACE}" apply -f -
