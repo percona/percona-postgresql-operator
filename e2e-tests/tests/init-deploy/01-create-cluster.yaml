@@ -11,4 +11,6 @@ commands:
       get_cr \
         | yq '.spec.metadata.labels.test-label = "test"' \
         | yq '.spec.metadata.annotations.test-annotation = "test"' \
+        | yq '.spec.backups.pgbackrest.repoHost.resources.limits.cpu = "200m"' \
+        | yq '.spec.backups.pgbackrest.repoHost.resources.limits.memory = "128Mi"' \
         | kubectl -n "${NAMESPACE}" apply -f -
