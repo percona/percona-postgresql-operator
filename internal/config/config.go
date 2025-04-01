@@ -124,6 +124,7 @@ func VerifyImageValues(cluster *v1beta1.PostgresCluster) error {
 
 	var images []string
 
+	// K8SPG-710: Image check will fail without a backup section in PostgresCluster
 	if cluster.BackupSpecFound() && PGBackRestContainerImage(cluster) == "" {
 		images = append(images, "crunchy-pgbackrest")
 	}
