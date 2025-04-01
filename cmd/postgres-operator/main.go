@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -47,7 +48,12 @@ import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-var versionString string
+var (
+	GitCommit     string
+	GitBranch     string
+	BuildTime     string
+	versionString string
+)
 
 // assertNoError panics when err is not nil.
 func assertNoError(err error) {
@@ -73,6 +79,9 @@ func main() {
 	ctx := cruntime.SetupSignalHandler()
 	log := logging.FromContext(ctx)
 	log.V(1).Info("debug flag set to true")
+
+	log.Info("Manager starting up", "gitCommit", GitCommit, "gitBranch", GitBranch,
+		"buildTime", BuildTime, "goVersion", goruntime.Version(), "os", goruntime.GOOS, "arch", goruntime.GOARCH)
 
 	features := feature.NewGate()
 	err = features.SetFromMap(map[string]bool{
