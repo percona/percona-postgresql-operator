@@ -1367,88 +1367,61 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 		},
 	}
 
-	// Add init containers from RepoHost.InitContainers if provided
-	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&
-		cluster.Spec.Backups.PGBackRest.RepoHost.InitContainers != nil {
+	repoHost := cluster.Spec.Backups.PGBackRest.RepoHost
 
-		// Get the init containers from RepoHost
-		initContainers := cluster.Spec.Backups.PGBackRest.RepoHost.InitContainers
-
-		// If EnvFromSecret is specified, add the reference to each init container
-		if cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret != nil {
-			secretName := *cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret
-
-			// Add the envFrom reference to each init container
-			for i := range initContainers {
-				initContainers[i].EnvFrom = append(
-					initContainers[i].EnvFrom,
-					corev1.EnvFromSource{
-						SecretRef: &corev1.SecretEnvSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: secretName,
-							},
-						},
-					})
-			}
+	if repoHost != nil && repoHost.EnvFromSecret != nil {
+		envFrom := corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: *repoHost.EnvFromSecret,
+				},
+			},
 		}
 
-		// Add the init containers to the job's pod spec
-		job.Spec.Template.Spec.InitContainers = initContainers
+		job.Spec.Template.Spec.Containers[0].EnvFrom = append(job.Spec.Template.Spec.Containers[0].EnvFrom, envFrom)
 	}
 
-	// Add environment variables from the pgBackRest.RepoHost.EnvFromSecret if provided
-	// This allows for environment variables to be set on the restore job from a Secret
-	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&
-		cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret != nil {
+	// Add init containers from RepoHost.InitContainers if provided
+	if repoHost != nil && repoHost.EnvFromSecret != nil && repoHost.InitContainers != nil {
+		initContainers := make([]corev1.Container, 0, len(repoHost.InitContainers))
 
-		secretName := *cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret
-
-		// Find the pgbackrest-restore container and add the envFrom reference
-		for i := range job.Spec.Template.Spec.Containers {
-			if job.Spec.Template.Spec.Containers[i].Name == naming.PGBackRestRestoreContainerName {
-				job.Spec.Template.Spec.Containers[i].EnvFrom = append(
-					job.Spec.Template.Spec.Containers[i].EnvFrom,
-					corev1.EnvFromSource{
-						SecretRef: &corev1.SecretEnvSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: secretName,
-							},
-						},
-					})
-				break
+		// If EnvFromSecret is specified, add the reference to each init container
+		for _, ic := range repoHost.InitContainers {
+			envFrom := corev1.EnvFromSource{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: *repoHost.EnvFromSecret,
+					},
+				},
 			}
+			ic.EnvFrom = append(ic.EnvFrom, envFrom)
+
+			initContainers = append(initContainers, ic)
 		}
+
+		job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, initContainers...)
 	}
 
 	// Add sidecars from RepoHost.Containers to the restore job
-	if cluster.Spec.Backups.PGBackRest.RepoHost != nil &&
-		cluster.Spec.Backups.PGBackRest.RepoHost.Containers != nil {
+	if repoHost != nil && repoHost.EnvFromSecret != nil && repoHost.Containers != nil {
+		containers := make([]corev1.Container, 0, len(repoHost.Containers))
 
-		// Get the sidecars from RepoHost
-		sidecars := cluster.Spec.Backups.PGBackRest.RepoHost.Containers
-
-		// If EnvFromSecret is specified, add the reference to each sidecar container
-		if cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret != nil {
-			secretName := *cluster.Spec.Backups.PGBackRest.RepoHost.EnvFromSecret
-
-			// Add the envFrom reference to each sidecar container
-			for i := range sidecars {
-				sidecars[i].EnvFrom = append(
-					sidecars[i].EnvFrom,
-					corev1.EnvFromSource{
-						SecretRef: &corev1.SecretEnvSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: secretName,
-							},
-						},
-					})
+		// Add the envFrom reference to each sidecar container
+		for _, c := range repoHost.Containers {
+			envFrom := corev1.EnvFromSource{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: *repoHost.EnvFromSecret,
+					},
+				},
 			}
+			c.EnvFrom = append(c.EnvFrom, envFrom)
+
+			containers = append(containers, c)
 		}
 
 		// Add the sidecars to the job's containers
-		job.Spec.Template.Spec.Containers = append(
-			job.Spec.Template.Spec.Containers,
-			sidecars...)
+		job.Spec.Template.Spec.Containers = append(job.Spec.Template.Spec.Containers, containers...)
 	}
 
 	// Set the image pull secrets, if any exist.
