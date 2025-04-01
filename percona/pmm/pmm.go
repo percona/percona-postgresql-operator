@@ -238,10 +238,16 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 		if pgc.Spec.PMM.CustomClusterName != "" {
 			clusterName = pgc.Spec.PMM.CustomClusterName
 		}
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "CLUSTER_NAME",
-			Value: clusterName,
-		})
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CLUSTER_NAME",
+				Value: clusterName,
+			},
+			corev1.EnvVar{
+				Name:  "PMM_POSTGRES_PARAMS",
+				Value: pmmSpec.PostgresParams,
+			},
+		)
 	}
 
 	return container
@@ -434,6 +440,10 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 				Name:  "CLUSTER_NAME",
 				Value: clusterName,
 			},
+			{
+				Name:  "PMM_POSTGRES_PARAMS",
+				Value: pmmSpec.PostgresParams,
+			},
 		},
 	}
 
@@ -461,7 +471,7 @@ func agentPrerunScript(querySource v2.PMMQuerySource, pgc *v2.PerconaPGCluster) 
 
 	if pgc.CompareVersion("2.7.0") >= 0 {
 		addServiceArgs = append(addServiceArgs,
-			"--cluster=$(CLUSTER_NAME)",
+			"--cluster=$(CLUSTER_NAME)", "$PMM_POSTGRES_PARAMS",
 		)
 	}
 	addService := fmt.Sprintf("pmm-admin add postgresql %s", strings.Join(addServiceArgs, " "))
