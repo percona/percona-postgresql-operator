@@ -14331,6 +14331,8 @@ spec:
                     - Never
                     - IfNotPresent
                     type: string
+                  postgresParams:
+                    type: string
                   querySource:
                     default: pgstatmonitor
                     enum:
