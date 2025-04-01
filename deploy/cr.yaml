@@ -475,7 +475,8 @@ spec:
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
-#   customClusterName: "<string>"
+#    customClusterName: "<string>"
+#    postgresParams: "<string>"
 #    querySource: pgstatmonitor
 #  patroni:
 #    # Some values of the Liveness/Readiness probes of the patroni container are calculated using syncPeriodSeconds by the following formulas:
