@@ -472,6 +472,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			RepoHost:      b.PGBackRest.RepoHost,
 			Manual:        b.PGBackRest.Manual,
 			Restore:       b.PGBackRest.Restore,
+			InitImage:     b.PGBackRest.InitImage,
 			Sidecars:      sc,
 		},
 	}
@@ -500,6 +501,9 @@ type PGBackRestArchive struct {
 	// the RELATED_IMAGE_PGBACKREST environment variable
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// +optional
+	InitImage string `json:"initImage,omitempty"`
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional

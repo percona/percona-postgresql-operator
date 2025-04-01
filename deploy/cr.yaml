@@ -69,6 +69,7 @@ spec:
 #        operator: Equal
 #        value: connection-poolers
 #    pgbackrest:
+#      initImage: perconalab/percona-postgresql-operator:main
 #      stanza: db
 #      configuration:
 #      - secret:

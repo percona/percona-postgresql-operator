@@ -868,7 +868,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 				// K8SPG-613
 				InitContainers: []corev1.Container{
 					k8s.InitContainer(
-						"pgbackrest",
+						naming.PGBackRestRepoContainerName,
 						initImage,
 						postgresCluster.Spec.ImagePullPolicy,
 						initialize.RestrictedSecurityContext(postgresCluster.CompareVersion("2.5.0") >= 0),
@@ -2460,7 +2460,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupJob.ObjectMeta.Annotations = annotations
 
 	// K8SPG-613
-	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster)
+	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster, &postgresCluster.Spec.Backups.PGBackRest)
 	if err != nil {
 		return err
 	}
@@ -2632,7 +2632,7 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	backupJob.ObjectMeta.Annotations = annotations
 
 	// K8SPG-613
-	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster)
+	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster, &postgresCluster.Spec.Backups.PGBackRest)
 	if err != nil {
 		return err
 	}
@@ -3069,7 +3069,7 @@ func (r *Reconciler) reconcilePGBackRestCronJob(
 	backupOpts := []string{"--type=" + backupType}
 
 	// K8SPG-613
-	initImage, err := k8s.InitImage(ctx, r.Client, cluster)
+	initImage, err := k8s.InitImage(ctx, r.Client, cluster, &cluster.Spec.Backups.PGBackRest)
 	if err != nil {
 		return err
 	}

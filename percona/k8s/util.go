@@ -64,14 +64,21 @@ func InitContainer(component, image string,
 	}
 }
 
-func InitImage(ctx context.Context, cl client.Reader, cluster *v1beta1.PostgresCluster) (string, error) {
+type ComponentWithInit interface {
+	GetInitImage() string
+}
+
+func InitImage(ctx context.Context, cl client.Reader, cluster *v1beta1.PostgresCluster, componentWithInit ComponentWithInit) (string, error) {
+	if componentWithInit != nil && componentWithInit.GetInitImage() != "" {
+		return componentWithInit.GetInitImage(), nil
+	}
 	if cluster != nil && len(cluster.Spec.InitImage) > 0 {
 		return cluster.Spec.InitImage, nil
 	}
-	return OperatorImage(ctx, cl)
+	return operatorImage(ctx, cl)
 }
 
-func OperatorImage(ctx context.Context, cl client.Reader) (string, error) {
+func operatorImage(ctx context.Context, cl client.Reader) (string, error) {
 	pod, err := operatorPod(ctx, cl)
 	if err != nil {
 		return "", errors.Wrap(err, "get operator pod")
@@ -106,6 +113,10 @@ func operatorPod(ctx context.Context, cl client.Reader) (*corev1.Pod, error) {
 
 // GetOperatorNamespace returns the namespace of the operator pod
 func GetOperatorNamespace() (string, error) {
+	ns, found := os.LookupEnv("OPERATOR_NAMESPACE")
+	if found {
+		return ns, nil
+	}
 	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		return "", err
