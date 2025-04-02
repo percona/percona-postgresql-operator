@@ -30,6 +30,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/internal/pgrepack"
 	"github.com/percona/percona-postgresql-operator/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/internal/pgstatstatements"
 	"github.com/percona/percona-postgresql-operator/internal/pgvector"
@@ -245,7 +246,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
 	// K8SPG-375, K8SPG-577, K8SPG-699
-	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, postgisInstallOK bool
+	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
 		_, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -319,6 +320,19 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
+		// K8SPG-574
+		if cluster.Spec.Extensions.PGRepack {
+			if pgRepackOK = pgrepack.EnableInPostgreSQL(ctx, exec) == nil; !pgRepackOK {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgRepackDisabled",
+					"Unable to install pg_repack")
+			}
+		} else {
+			if pgRepackOK = pgrepack.DisableInPostgreSQL(ctx, exec) == nil; !pgRepackOK {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgRepackEnabled",
+					"Unable to disable pg_repack")
+			}
+		}
+
 		// Enabling PostGIS extensions is a one-way operation
 		// e.g., you can take a PostgresCluster and turn it into a PostGISCluster,
 		// but you cannot reverse the process, as that would potentially remove an extension
@@ -364,7 +378,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
 	}
 	// K8SPG-472
-	if err == nil && pgStatMonitorOK && pgAuditOK && pgvectorOK && postgisInstallOK {
+	if err == nil && pgStatMonitorOK && pgAuditOK && pgvectorOK && postgisInstallOK && pgRepackOK {
 		cluster.Status.DatabaseRevision = revision
 	}
 
@@ -659,7 +673,6 @@ func (r *Reconciler) reconcilePostgresDataVolume(
 	instanceSpec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	clusterVolumes []corev1.PersistentVolumeClaim, sourceCluster *v1beta1.PostgresCluster,
 ) (*corev1.PersistentVolumeClaim, error) {
-
 	labelMap := map[string]string{
 		naming.LabelCluster:     cluster.Name,
 		naming.LabelInstanceSet: instanceSpec.Name,
@@ -743,7 +756,8 @@ func (r *Reconciler) reconcilePostgresDataVolume(
 // setVolumeSize compares the potential sizes from the instance spec, status
 // and limit and sets the appropriate current value.
 func (r *Reconciler) setVolumeSize(ctx context.Context, cluster *v1beta1.PostgresCluster,
-	pvc *corev1.PersistentVolumeClaim, instanceSpecName string) {
+	pvc *corev1.PersistentVolumeClaim, instanceSpecName string,
+) {
 	log := logging.FromContext(ctx)
 
 	// Store the limit for this instance set. This value will not change below.
@@ -818,7 +832,6 @@ func (r *Reconciler) reconcileTablespaceVolumes(
 	instanceSpec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	clusterVolumes []corev1.PersistentVolumeClaim,
 ) (tablespaceVolumes []*corev1.PersistentVolumeClaim, err error) {
-
 	if !feature.Enabled(ctx, feature.TablespaceVolumes) {
 		return
 	}
@@ -893,7 +906,6 @@ func (r *Reconciler) reconcilePostgresWALVolume(
 	instanceSpec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	observed *Instance, clusterVolumes []corev1.PersistentVolumeClaim,
 ) (*corev1.PersistentVolumeClaim, error) {
-
 	labelMap := map[string]string{
 		naming.LabelCluster:     cluster.Name,
 		naming.LabelInstanceSet: instanceSpec.Name,
@@ -992,7 +1004,8 @@ func (r *Reconciler) reconcilePostgresWALVolume(
 // DatabaseInitSQL is defined, the function will find the primary pod and run
 // SQL from the defined ConfigMap
 func (r *Reconciler) reconcileDatabaseInitSQL(ctx context.Context,
-	cluster *v1beta1.PostgresCluster, instances *observedInstances) error {
+	cluster *v1beta1.PostgresCluster, instances *observedInstances,
+) error {
 	log := logging.FromContext(ctx)
 
 	// Spec is not defined, unset status and return

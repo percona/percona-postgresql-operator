@@ -545,6 +545,8 @@ spec:
                           pgBackRest repository hosts and backups. The image may also be set using
                           the RELATED_IMAGE_PGBACKREST environment variable
                         type: string
+                      initImage:
+                        type: string
                       jobs:
                         description: Jobs field allows configuration for all backup
                           jobs
@@ -8066,6 +8068,8 @@ spec:
                     properties:
                       pg_audit:
                         type: boolean
+                      pg_repack:
+                        type: boolean
                       pg_stat_monitor:
                         type: boolean
                       pgvector:
@@ -8201,6 +8205,8 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              initImage:
+                type: string
               instances:
                 description: |-
                   Specifies one or more sets of PostgreSQL pods that replicate data for
@@ -13617,6 +13623,8 @@ spec:
                             type: string
                         type: object
                     type: object
+                  customClusterName:
+                    type: string
                   enabled:
                     type: boolean
                   image:
@@ -13630,6 +13638,8 @@ spec:
                     - Always
                     - Never
                     - IfNotPresent
+                    type: string
+                  postgresParams:
                     type: string
                   querySource:
                     default: pgstatmonitor

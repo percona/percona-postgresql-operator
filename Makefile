@@ -327,6 +327,7 @@ generate-crd: generate-crunchy-crd generate-percona-crd
 	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
 
 generate-percona-crd:
+	go generate ./percona/...
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
 		crd:crdVersions='v1' \
 		paths='./pkg/apis/pgv2.percona.com/...' \
