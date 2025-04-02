@@ -188,6 +188,8 @@ type PostgresClusterSpec struct {
 	Config PostgresAdditionalConfig `json:"config,omitempty"`
 
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
+
+	InitImage string `json:"initImage,omitempty"` // K8SPG-613
 }
 
 type ExtensionsSpec struct {
@@ -195,6 +197,7 @@ type ExtensionsSpec struct {
 	PGAudit          bool `json:"pgAudit,omitempty"`
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
 	PGVector         bool `json:"pgvector,omitempty"`
+	PGRepack         bool `json:"pgRepack,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.

@@ -17,6 +17,52 @@ metadata:
       name: init-deploy
       controller: true
       blockOwnerDeletion: true
+spec:
+  serviceName: init-deploy-pods
+  template:
+    metadata:
+      annotations:
+        test-annotation: test
+    spec:
+      containers:
+        - command:
+            - pgbackrest
+            - server
+          name: pgbackrest
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+        - command:
+            - bash
+            - -ceu
+            - --
+            - |-
+              monitor() {
+              exec {fd}<> <(:||:)
+              until read -r -t 5 -u "${fd}"; do
+                if
+                  [[ "${filename}" -nt "/proc/self/fd/${fd}" ]] &&
+                  pkill -HUP --exact --parent=0 pgbackrest
+                then
+                  exec {fd}>&- && exec {fd}<> <(:||:)
+                  stat --dereference --format='Loaded configuration dated %y' "${filename}"
+                elif
+                  { [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] ||
+                    [[ "${authority}" -nt "/proc/self/fd/${fd}" ]]
+                  } &&
+                  pkill -HUP --exact --parent=0 pgbackrest
+                then
+                  exec {fd}>&- && exec {fd}<> <(:||:)
+                  stat --format='Loaded certificates dated %y' "${directory}"
+                fi
+              done
+              }; export directory="$1" authority="$2" filename="$3"; export -f monitor; exec -a "$0" bash -ceu monitor
+            - pgbackrest-config
+            - /etc/pgbackrest/server
+            - /etc/pgbackrest/conf.d/~postgres-operator/tls-ca.crt
+            - /etc/pgbackrest/conf.d/~postgres-operator_server.conf
+          name: pgbackrest-config
 status:
   observedGeneration: 1
   replicas: 1

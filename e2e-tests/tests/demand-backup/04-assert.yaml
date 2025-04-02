@@ -41,6 +41,8 @@ spec:
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:
+        - mountPath: /opt/crunchy
+          name: crunchy-bin
         - mountPath: /etc/pgbackrest/conf.d
           name: pgbackrest-config
           readOnly: true
@@ -54,6 +56,8 @@ spec:
       serviceAccountName: demand-backup-pgbackrest
       terminationGracePeriodSeconds: 30
       volumes:
+      - emptyDir: {}
+        name: crunchy-bin
       - name: pgbackrest-config
         projected:
           defaultMode: 420

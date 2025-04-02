@@ -2,7 +2,6 @@ package v2
 
 import (
 	"context"
-	"os"
 	"reflect"
 
 	gover "github.com/hashicorp/go-version"
@@ -15,17 +14,13 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func init() {
 	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
 }
-
-const (
-	Version     = "2.7.0"
-	ProductName = "pg-operator"
-)
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
@@ -57,6 +52,8 @@ type PerconaPGClusterSpec struct {
 	// version.
 	// +optional
 	CRVersion string `json:"crVersion,omitempty"`
+
+	InitImage string `json:"initImage,omitempty"`
 
 	// The image name to use for PostgreSQL containers.
 	// +optional
@@ -179,7 +176,7 @@ type PerconaPGClusterSpec struct {
 
 func (cr *PerconaPGCluster) Default() {
 	if len(cr.Spec.CRVersion) == 0 {
-		cr.Spec.CRVersion = Version
+		cr.Spec.CRVersion = version.Version()
 	}
 
 	for i := range cr.Spec.InstanceSets {
@@ -236,6 +233,9 @@ func (cr *PerconaPGCluster) Default() {
 	}
 	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
 		cr.Spec.Extensions.BuiltIn.PGVector = &f
+	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
+		cr.Spec.Extensions.BuiltIn.PGRepack = &f
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
@@ -365,8 +365,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
 	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
+	postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
+
+	postgresCluster.Spec.InitImage = cr.Spec.InitImage
 
 	return postgresCluster, nil
 }
@@ -480,6 +483,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			RepoHost:      b.PGBackRest.RepoHost,
 			Manual:        b.PGBackRest.Manual,
 			Restore:       b.PGBackRest.Restore,
+			InitImage:     b.PGBackRest.InitImage,
 			Sidecars:      sc,
 		},
 	}
@@ -508,6 +512,9 @@ type PGBackRestArchive struct {
 	// the RELATED_IMAGE_PGBACKREST environment variable
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// +optional
+	InitImage string `json:"initImage,omitempty"`
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional
@@ -613,6 +620,7 @@ type BuiltInExtensionsSpec struct {
 	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
 	PGAudit       *bool `json:"pg_audit,omitempty"`
 	PGVector      *bool `json:"pgvector,omitempty"`
+	PGRepack      *bool `json:"pg_repack,omitempty"`
 }
 
 type ExtensionsSpec struct {
@@ -990,18 +998,6 @@ const (
 	LabelOperatorVersion = labelPrefix + "version"
 	LabelPMMSecret       = labelPrefix + "pmm-secret"
 )
-
-const DefaultVersionServiceEndpoint = "https://check.percona.com"
-
-func GetDefaultVersionServiceEndpoint() string {
-	endpoint := os.Getenv("PERCONA_VS_FALLBACK_URI")
-
-	if len(endpoint) != 0 {
-		return endpoint
-	}
-
-	return DefaultVersionServiceEndpoint
-}
 
 const (
 	UserMonitoring = "monitor"

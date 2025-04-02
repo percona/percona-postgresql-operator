@@ -11,7 +11,6 @@ import (
 
 // PGBackRestJobStatus contains information about the state of a pgBackRest Job.
 type PGBackRestJobStatus struct {
-
 	// A unique identifier for the manual backup as provided using the "pgbackrest-backup"
 	// annotation when initiating a backup.
 	// +kubebuilder:validation:Required
@@ -47,7 +46,6 @@ type PGBackRestJobStatus struct {
 }
 
 type PGBackRestScheduledBackupStatus struct {
-
 	// The name of the associated pgBackRest scheduled backup CronJob
 	// +kubebuilder:validation:Required
 	CronJobName string `json:"cronJobName,omitempty"`
@@ -136,6 +134,13 @@ type PGBackRestArchive struct {
 	// Configuration for pgBackRest sidecar containers
 	// +optional
 	Sidecars *PGBackRestSidecars `json:"sidecars,omitempty"`
+
+	InitImage string `json:"initImage,omitempty"` // K8SPG-613
+}
+
+// K8SPG-613
+func (p *PGBackRestArchive) GetInitImage() string {
+	return p.InitImage
 }
 
 // PGBackRestSidecars defines the configuration for pgBackRest sidecar containers
@@ -203,7 +208,6 @@ type PGBackRestManualBackup struct {
 
 // PGBackRestRepoHost represents a pgBackRest dedicated repository host
 type PGBackRestRepoHost struct {
-
 	// Scheduling constraints of the Dedicated repo host pod.
 	// Changing this value causes repo host to restart.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node
@@ -248,7 +252,6 @@ type PGBackRestRepoHost struct {
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.
 type PGBackRestRestore struct {
-
 	// Whether or not in-place pgBackRest restores are enabled for this PostgresCluster.
 	// +kubebuilder:default=false
 	Enabled *bool `json:"enabled"`
@@ -284,7 +287,6 @@ type PGBackRestBackupSchedules struct {
 
 // PGBackRestStatus defines the status of pgBackRest within a PostgresCluster
 type PGBackRestStatus struct {
-
 	// Status information for manual backups
 	// +optional
 	ManualBackup *PGBackRestJobStatus `json:"manualBackup,omitempty"`
@@ -354,7 +356,6 @@ type RepoHostStatus struct {
 
 // RepoPVC represents a pgBackRest repository that is created using a PersistentVolumeClaim
 type RepoPVC struct {
-
 	// Defines a PersistentVolumeClaim spec used to create and/or bind a volume
 	// +kubebuilder:validation:Required
 	VolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"volumeClaimSpec"`
@@ -362,7 +363,6 @@ type RepoPVC struct {
 
 // RepoAzure represents a pgBackRest repository that is created using Azure storage
 type RepoAzure struct {
-
 	// The Azure container utilized for the repository
 	// +kubebuilder:validation:Required
 	Container string `json:"container"`
@@ -370,7 +370,6 @@ type RepoAzure struct {
 
 // RepoGCS represents a pgBackRest repository that is created using Google Cloud Storage
 type RepoGCS struct {
-
 	// The GCS bucket utilized for the repository
 	// +kubebuilder:validation:Required
 	Bucket string `json:"bucket"`
@@ -379,7 +378,6 @@ type RepoGCS struct {
 // RepoS3 represents a pgBackRest repository that is created using AWS S3 (or S3-compatible)
 // storage
 type RepoS3 struct {
-
 	// The S3 bucket utilized for the repository
 	// +kubebuilder:validation:Required
 	Bucket string `json:"bucket"`
@@ -395,7 +393,6 @@ type RepoS3 struct {
 
 // RepoStatus the status of a pgBackRest repository
 type RepoStatus struct {
-
 	// The name of the pgBackRest repository
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
