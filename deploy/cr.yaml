@@ -383,6 +383,10 @@ spec:
 #        repo3-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo3
 #        repo4-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo4
       repoHost:
+#        resources:
+#          limits:
+#            cpu: 200m
+#            memory: 128Mi
         affinity:
           podAntiAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
