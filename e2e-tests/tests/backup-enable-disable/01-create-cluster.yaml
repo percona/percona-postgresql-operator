@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -9,5 +8,5 @@ commands:
       source ../../functions
 
       get_cr "some-name" ${RANDOM} \
-        | yq 'del(.spec.backups)' \
+        | yq '.spec.backups.enabled=false' \
         | kubectl -n "${NAMESPACE}" apply -f -

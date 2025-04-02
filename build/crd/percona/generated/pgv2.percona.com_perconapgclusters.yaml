@@ -64,6 +64,8 @@ spec:
               backups:
                 description: PostgreSQL backup configuration
                 properties:
+                  enabled:
+                    type: boolean
                   pgbackrest:
                     description: pgBackRest archive configuration
                     properties:
@@ -17505,6 +17507,7 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             required:
+            - backups
             - instances
             - postgresVersion
             type: object

@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -10,5 +9,5 @@ commands:
 
       get_cr "some-name" ${RANDOM} \
         | yq '.metadata.annotations."pgv2.percona.com/authorizeBackupRemoval"="true"' \
-        | yq 'del(.spec.backups)' \
+        | yq '.spec.backups.enabled=false' \
         | kubectl -n "${NAMESPACE}" apply -f -

@@ -2,7 +2,6 @@ package v2
 
 import (
 	"context"
-	"reflect"
 
 	gover "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
@@ -155,7 +154,6 @@ type PerconaPGClusterSpec struct {
 
 	// PostgreSQL backup configuration
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	// +optional
 	Backups Backups `json:"backups"`
 
 	// The specification of PMM sidecars.
@@ -244,7 +242,7 @@ func (cr *PerconaPGCluster) Default() {
 }
 
 func (spec *PerconaPGClusterSpec) BackupsEnabled() bool {
-	return !reflect.DeepEqual(spec.Backups, Backups{})
+	return spec.Backups.Enabled == nil || *spec.Backups.Enabled
 }
 
 func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crunchyv1beta1.PostgresCluster, scheme *runtime.Scheme) (*crunchyv1beta1.PostgresCluster, error) {
@@ -450,6 +448,8 @@ type PerconaPGClusterStatus struct {
 }
 
 type Backups struct {
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// pgBackRest archive configuration
 	// +optional
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
@@ -459,7 +459,7 @@ type Backups struct {
 }
 
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
-	if reflect.DeepEqual(b, Backups{}) {
+	if b.Enabled != nil && !*b.Enabled {
 		return crunchyv1beta1.Backups{}
 	}
 

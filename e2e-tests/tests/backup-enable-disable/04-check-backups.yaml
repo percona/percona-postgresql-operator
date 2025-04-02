@@ -16,7 +16,3 @@ commands:
         echo "backups are not disabled properly"
         exit 1
       fi
-
-      get_cr "some-name" ${RANDOM} \
-        | yq 'del(.spec.backups.enabled)' \
-        | kubectl -n "${NAMESPACE}" apply -f -
