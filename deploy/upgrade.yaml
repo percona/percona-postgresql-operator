@@ -8,5 +8,5 @@ spec:
   fromPostgresVersion: 16
   toPostgresVersion: 17
   toPostgresImage: perconalab/percona-postgresql-operator:main-ppg17-postgres
-  toPgBouncerImage: perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
+  toPgBouncerImage: perconalab/percona-postgresql-operator:main-pgbouncer17
   toPgBackRestImage: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
