@@ -13617,6 +13617,8 @@ spec:
                             type: string
                         type: object
                     type: object
+                  customClusterName:
+                    type: string
                   enabled:
                     type: boolean
                   image:
@@ -13630,6 +13632,8 @@ spec:
                     - Always
                     - Never
                     - IfNotPresent
+                    type: string
+                  postgresParams:
                     type: string
                   querySource:
                     default: pgstatmonitor
