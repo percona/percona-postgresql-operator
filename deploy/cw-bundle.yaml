@@ -296,6 +296,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -702,6 +704,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -14324,6 +14328,8 @@ spec:
                             type: string
                         type: object
                     type: object
+                  customClusterName:
+                    type: string
                   enabled:
                     type: boolean
                   image:
@@ -14337,6 +14343,8 @@ spec:
                     - Always
                     - Never
                     - IfNotPresent
+                    type: string
+                  postgresParams:
                     type: string
                   querySource:
                     default: pgstatmonitor
@@ -18277,6 +18285,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
