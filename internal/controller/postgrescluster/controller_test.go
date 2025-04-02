@@ -646,7 +646,7 @@ spec:
 
 			event, ok := <-test.Recorder.Events
 			Expect(ok).To(BeTrue())
-			Expect(event).To(ContainSubstring("PG 11 will no longer receive updates. We recommend upgrading."))
+			Expect(event).To(ContainSubstring("PG 12 will no longer receive updates. We recommend upgrading."))
 		})
 	})
 })
