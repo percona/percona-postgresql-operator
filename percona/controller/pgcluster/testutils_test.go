@@ -119,6 +119,7 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	if cr.Annotations == nil {
 		cr.Annotations = make(map[string]string)
 	}
+	cr.Spec.InitImage = "some-image"
 	cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "4.0.0"
 	cr.Namespace = namespace
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
