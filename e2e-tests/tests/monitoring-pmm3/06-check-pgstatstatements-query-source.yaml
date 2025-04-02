@@ -17,9 +17,8 @@ commands:
       # Wait for the pg_stat_statements extension to be created
       sleep 80
 
-      kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT * FROM pg_extension;"'
-
       primary=$(get_pod_by_role monitoring primary name)
+      kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT * FROM pg_extension;"'
       if ! kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT extname FROM pg_extension;"' | grep pg_stat_statements; then
         echo "pg_stat_statements is not found in pg_extension"
       fi
