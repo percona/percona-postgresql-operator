@@ -52,6 +52,8 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	CRVersion string `json:"crVersion,omitempty"`
 
+	InitImage string `json:"initImage,omitempty"`
+
 	// The image name to use for PostgreSQL containers.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
@@ -229,6 +231,9 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
 		cr.Spec.Extensions.BuiltIn.PGVector = &f
 	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
+		cr.Spec.Extensions.BuiltIn.PGRepack = &f
+	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
@@ -352,8 +357,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
 	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
+	postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
+
+	postgresCluster.Spec.InitImage = cr.Spec.InitImage
 
 	return postgresCluster, nil
 }
@@ -463,6 +471,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			RepoHost:      b.PGBackRest.RepoHost,
 			Manual:        b.PGBackRest.Manual,
 			Restore:       b.PGBackRest.Restore,
+			InitImage:     b.PGBackRest.InitImage,
 			Sidecars:      sc,
 		},
 	}
@@ -491,6 +500,9 @@ type PGBackRestArchive struct {
 	// the RELATED_IMAGE_PGBACKREST environment variable
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// +optional
+	InitImage string `json:"initImage,omitempty"`
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional
@@ -596,6 +608,7 @@ type BuiltInExtensionsSpec struct {
 	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
 	PGAudit       *bool `json:"pg_audit,omitempty"`
 	PGVector      *bool `json:"pgvector,omitempty"`
+	PGRepack      *bool `json:"pg_repack,omitempty"`
 }
 
 type ExtensionsSpec struct {
