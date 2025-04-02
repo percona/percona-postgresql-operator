@@ -2,7 +2,6 @@ package v2
 
 import (
 	"context"
-	"os"
 
 	gover "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
@@ -14,17 +13,13 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func init() {
 	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
 }
-
-const (
-	Version     = "2.7.0"
-	ProductName = "pg-operator"
-)
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
@@ -178,7 +173,7 @@ type PerconaPGClusterSpec struct {
 
 func (cr *PerconaPGCluster) Default() {
 	if len(cr.Spec.CRVersion) == 0 {
-		cr.Spec.CRVersion = Version
+		cr.Spec.CRVersion = version.Version()
 	}
 
 	for i := range cr.Spec.InstanceSets {
@@ -983,18 +978,6 @@ const (
 	LabelOperatorVersion = labelPrefix + "version"
 	LabelPMMSecret       = labelPrefix + "pmm-secret"
 )
-
-const DefaultVersionServiceEndpoint = "https://check.percona.com"
-
-func GetDefaultVersionServiceEndpoint() string {
-	endpoint := os.Getenv("PERCONA_VS_FALLBACK_URI")
-
-	if len(endpoint) != 0 {
-		return endpoint
-	}
-
-	return DefaultVersionServiceEndpoint
-}
 
 const (
 	UserMonitoring = "monitor"
