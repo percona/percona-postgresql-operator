@@ -201,6 +201,7 @@ check-envtest: ## Run check using envtest and a mock kube api
 check-envtest: ENVTEST_USE = hack/tools/setup-envtest --bin-dir=$(CURDIR)/hack/tools/envtest use $(ENVTEST_K8S_VERSION)
 check-envtest: SHELL = bash
 check-envtest: get-pgmonitor tools/setup-envtest
+	GOBIN='$(CURDIR)/hack/tools' $(GO) install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 	@$(ENVTEST_USE) --print=overview && echo
 	source <($(ENVTEST_USE) --print=env) && PGO_NAMESPACE="postgres-operator" QUERIES_CONFIG_DIR="$(CURDIR)/${QUERIES_CONFIG_DIR}" \
 		$(GO_TEST) -count=1 -cover -tags=envtest ./...
