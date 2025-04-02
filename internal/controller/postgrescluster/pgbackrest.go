@@ -1403,26 +1403,26 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	}
 
 	// Add sidecars from RepoHost.Containers to the restore job
-	if repoHost != nil && repoHost.EnvFromSecret != nil && repoHost.Containers != nil {
-		containers := make([]corev1.Container, 0, len(repoHost.Containers))
+	// if repoHost != nil && repoHost.EnvFromSecret != nil && repoHost.Containers != nil {
+	// 	containers := make([]corev1.Container, 0, len(repoHost.Containers))
 
-		// Add the envFrom reference to each sidecar container
-		for _, c := range repoHost.Containers {
-			envFrom := corev1.EnvFromSource{
-				SecretRef: &corev1.SecretEnvSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: *repoHost.EnvFromSecret,
-					},
-				},
-			}
-			c.EnvFrom = append(c.EnvFrom, envFrom)
+	// 	// Add the envFrom reference to each sidecar container
+	// 	for _, c := range repoHost.Containers {
+	// 		envFrom := corev1.EnvFromSource{
+	// 			SecretRef: &corev1.SecretEnvSource{
+	// 				LocalObjectReference: corev1.LocalObjectReference{
+	// 					Name: *repoHost.EnvFromSecret,
+	// 				},
+	// 			},
+	// 		}
+	// 		c.EnvFrom = append(c.EnvFrom, envFrom)
 
-			containers = append(containers, c)
-		}
+	// 		containers = append(containers, c)
+	// 	}
 
-		// Add the sidecars to the job's containers
-		job.Spec.Template.Spec.Containers = append(job.Spec.Template.Spec.Containers, containers...)
-	}
+	// 	// Add the sidecars to the job's containers
+	// 	job.Spec.Template.Spec.Containers = append(job.Spec.Template.Spec.Containers, containers...)
+	// }
 
 	// Set the image pull secrets, if any exist.
 	// This is set here rather than using the service account due to the lack
