@@ -296,6 +296,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -702,6 +704,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -8765,6 +8769,8 @@ spec:
                   builtin:
                     properties:
                       pg_audit:
+                        type: boolean
+                      pg_repack:
                         type: boolean
                       pg_stat_monitor:
                         type: boolean
@@ -18276,6 +18282,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -34001,6 +34009,8 @@ spec:
               extensions:
                 properties:
                   pgAudit:
+                    type: boolean
+                  pgRepack:
                     type: boolean
                   pgStatMonitor:
                     type: boolean

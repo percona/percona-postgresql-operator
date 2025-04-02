@@ -241,7 +241,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-ppg17-pgbouncer
+      image: perconalab/percona-postgresql-operator:main-pgbouncer17
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -385,6 +385,10 @@ spec:
 #        repo3-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo3
 #        repo4-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo4
       repoHost:
+#        resources:
+#          limits:
+#            cpu: 200m
+#            memory: 128Mi
         affinity:
           podAntiAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
@@ -506,6 +510,7 @@ spec:
 #      pg_stat_monitor: true
 #      pg_audit: true
 #      pgvector: false
+#      pg_repack: false
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1
