@@ -10,6 +10,7 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.7.0
+#  initImage: perconalab/percona-postgresql-operator:main
 #  metadata:
 #    annotations:
 #      example-annotation: value
@@ -322,7 +323,8 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-pgbackrest17
+#      initImage: perconalab/percona-postgresql-operator:main
 #
 #      containers:
 #        pgbackrest:

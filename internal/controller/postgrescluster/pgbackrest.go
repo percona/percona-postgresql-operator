@@ -41,6 +41,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -794,9 +796,9 @@ func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresC
 
 // generateBackupJobSpecIntent generates a JobSpec for a pgBackRest backup job
 func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.PostgresCluster,
-	repo v1beta1.PGBackRestRepo, serviceAccountName string,
-	labels, annotations map[string]string, opts ...string) *batchv1.JobSpec {
-
+	repo v1beta1.PGBackRestRepo, serviceAccountName string, initImage string,
+	labels, annotations map[string]string, opts ...string,
+) *batchv1.JobSpec {
 	repoIndex := regexRepoIndex.FindString(repo.Name)
 	cmdOpts := []string{
 		"--stanza=" + pgbackrest.DefaultStanzaName,
@@ -823,6 +825,13 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		ImagePullPolicy: postgresCluster.Spec.ImagePullPolicy,
 		Name:            naming.PGBackRestRepoContainerName,
 		SecurityContext: initialize.RestrictedSecurityContext(postgresCluster.CompareVersion("2.5.0") >= 0), // K8SPG-260
+		// K8SPG-613
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      pNaming.CrunchyBinVolumeName,
+				MountPath: pNaming.CrunchyBinVolumePath,
+			},
+		},
 	}
 
 	if postgresCluster.Spec.Backups.PGBackRest.Jobs != nil {
@@ -847,6 +856,25 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 				RestartPolicy:      corev1.RestartPolicyNever,
 				SecurityContext:    initialize.PodSecurityContext(),
 				ServiceAccountName: serviceAccountName,
+				// K8SPG-613
+				Volumes: []corev1.Volume{
+					{
+						Name: pNaming.CrunchyBinVolumeName,
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
+					},
+				},
+				// K8SPG-613
+				InitContainers: []corev1.Container{
+					k8s.InitContainer(
+						naming.PGBackRestRepoContainerName,
+						initImage,
+						postgresCluster.Spec.ImagePullPolicy,
+						initialize.RestrictedSecurityContext(postgresCluster.CompareVersion("2.5.0") >= 0),
+						container.Resources,
+					),
+				},
 			},
 		},
 	}
@@ -2431,8 +2459,13 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupJob.ObjectMeta.Labels = labels
 	backupJob.ObjectMeta.Annotations = annotations
 
+	// K8SPG-613
+	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster, &postgresCluster.Spec.Backups.PGBackRest)
+	if err != nil {
+		return err
+	}
 	spec := generateBackupJobSpecIntent(ctx, postgresCluster, repo,
-		serviceAccount.GetName(), labels, annotations, backupOpts...)
+		serviceAccount.GetName(), initImage, labels, annotations, backupOpts...)
 
 	backupJob.Spec = *spec
 
@@ -2598,8 +2631,13 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	backupJob.ObjectMeta.Labels = labels
 	backupJob.ObjectMeta.Annotations = annotations
 
+	// K8SPG-613
+	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster, &postgresCluster.Spec.Backups.PGBackRest)
+	if err != nil {
+		return err
+	}
 	spec := generateBackupJobSpecIntent(ctx, postgresCluster, replicaCreateRepo,
-		serviceAccount.GetName(), labels, annotations,
+		serviceAccount.GetName(), initImage, labels, annotations,
 		// K8SPG-506: adding label to get info about this backup in `pgbackrest info`
 		fmt.Sprintf(`--annotation="%s"="%s"`, v2.PGBackrestAnnotationJobType, naming.BackupReplicaCreate),
 	)
@@ -3030,8 +3068,13 @@ func (r *Reconciler) reconcilePGBackRestCronJob(
 	// set backup type (i.e. "full", "diff", "incr")
 	backupOpts := []string{"--type=" + backupType}
 
+	// K8SPG-613
+	initImage, err := k8s.InitImage(ctx, r.Client, cluster, &cluster.Spec.Backups.PGBackRest)
+	if err != nil {
+		return err
+	}
 	jobSpec := generateBackupJobSpecIntent(ctx, cluster, repo,
-		serviceAccount.GetName(), labels, annotations, backupOpts...)
+		serviceAccount.GetName(), initImage, labels, annotations, backupOpts...)
 
 	// Suspend cronjobs when shutdown or read-only. Any jobs that have already
 	// started will continue.
@@ -3064,7 +3107,7 @@ func (r *Reconciler) reconcilePGBackRestCronJob(
 
 	// set metadata
 	pgBackRestCronJob.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("CronJob"))
-	err := errors.WithStack(r.setControllerReference(cluster, pgBackRestCronJob))
+	err = errors.WithStack(r.setControllerReference(cluster, pgBackRestCronJob))
 
 	if err == nil {
 		err = r.apply(ctx, pgBackRestCronJob)

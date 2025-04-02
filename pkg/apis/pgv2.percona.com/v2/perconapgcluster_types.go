@@ -52,6 +52,8 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	CRVersion string `json:"crVersion,omitempty"`
 
+	InitImage string `json:"initImage,omitempty"`
+
 	// The image name to use for PostgreSQL containers.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
@@ -359,6 +361,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
+	postgresCluster.Spec.InitImage = cr.Spec.InitImage
+
 	return postgresCluster, nil
 }
 
@@ -467,6 +471,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			RepoHost:      b.PGBackRest.RepoHost,
 			Manual:        b.PGBackRest.Manual,
 			Restore:       b.PGBackRest.Restore,
+			InitImage:     b.PGBackRest.InitImage,
 			Sidecars:      sc,
 		},
 	}
@@ -495,6 +500,9 @@ type PGBackRestArchive struct {
 	// the RELATED_IMAGE_PGBACKREST environment variable
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// +optional
+	InitImage string `json:"initImage,omitempty"`
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional
