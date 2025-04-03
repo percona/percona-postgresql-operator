@@ -107,7 +107,7 @@ func InstancePod(ctx context.Context,
 	container.Command = []string{"patroni", configDirectory}
 	// K8SPG-708 introduces a new entrypoint script in the percona-docker repository.
 	if inCluster.CompareVersion("2.7.0") >= 0 {
-		container.Command = []string{"/usr/local/bin/entrypoint.sh", "patroni", configDirectory}
+		container.Command = []string{"/opt/crunchy/bin/postgres-entrypoint.sh", "patroni", configDirectory}
 	}
 
 	container.Env = append(container.Env,
@@ -178,7 +178,7 @@ func livenessProbe(cluster *v1beta1.PostgresCluster) corev1.ProbeHandler {
 	if cluster.CompareVersion("2.7.0") >= 0 {
 		return corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
-				Command: []string{"bash", "-c", "/usr/local/bin/postgres-liveness-check.sh"},
+				Command: []string{"bash", "-c", "/opt/crunchy/bin/postgres-liveness-check.sh"},
 			},
 		}
 	}
@@ -199,7 +199,7 @@ func readinessProbe(cluster *v1beta1.PostgresCluster) corev1.ProbeHandler {
 	if cluster.CompareVersion("2.7.0") >= 0 {
 		return corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
-				Command: []string{"bash", "-c", "/usr/local/bin/postgres-readiness-check.sh"},
+				Command: []string{"bash", "-c", "/opt/crunchy/bin/postgres-readiness-check.sh"},
 			},
 		}
 	}

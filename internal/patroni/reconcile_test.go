@@ -123,7 +123,7 @@ func TestInstancePod(t *testing.T) {
 			expectedSpec: `
 containers:
 - command:
-  - /usr/local/bin/entrypoint.sh
+  - /opt/crunchy/bin/postgres-entrypoint.sh
   - patroni
   - /etc/patroni
   env:
@@ -159,7 +159,7 @@ containers:
       command:
       - bash
       - -c
-      - /usr/local/bin/postgres-liveness-check.sh
+      - /opt/crunchy/bin/postgres-liveness-check.sh
     failureThreshold: 3
     initialDelaySeconds: 3
     periodSeconds: 10
@@ -171,7 +171,7 @@ containers:
       command:
       - bash
       - -c
-      - /usr/local/bin/postgres-readiness-check.sh
+      - /opt/crunchy/bin/postgres-readiness-check.sh
     failureThreshold: 3
     initialDelaySeconds: 3
     periodSeconds: 10
