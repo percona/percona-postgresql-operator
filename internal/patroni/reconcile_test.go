@@ -182,6 +182,8 @@ containers:
   - mountPath: /etc/patroni
     name: patroni-config
     readOnly: true
+  - mountPath: /opt/crunchy
+    name: crunchy-bin
 initContainers:
 - command:
   - /usr/local/bin/init-entrypoint.sh

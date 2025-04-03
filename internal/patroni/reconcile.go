@@ -156,6 +156,11 @@ func InstancePod(ctx context.Context,
 				},
 			},
 		}...)
+
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+			Name:      pNaming.CrunchyBinVolumeName,
+			MountPath: pNaming.CrunchyBinVolumePath,
+		})
 	}
 
 	return nil
