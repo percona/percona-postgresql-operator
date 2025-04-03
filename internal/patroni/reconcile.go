@@ -6,7 +6,6 @@ package patroni
 
 import (
 	"context"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
