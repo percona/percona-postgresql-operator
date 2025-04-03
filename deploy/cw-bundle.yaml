@@ -18203,6 +18203,11 @@ spec:
             - instances
             - postgresVersion
             type: object
+            x-kubernetes-validations:
+            - message: PostgresVersion must be >= 15 if grantPublicSchemaAccess exists
+                and is true
+              rule: '!has(self.users) || self.postgresVersion >= 15 || self.users.all(u,
+                !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)'
           status:
             properties:
               host:

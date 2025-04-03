@@ -288,8 +288,8 @@ func grantUserAccessToPublicSchemaInPostgreSQL(ctx context.Context, exec Executo
 			`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO :"username";`,
 
 			// Set default privileges for future objects created in the public schema
-			`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO :"username";`,
-			`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO :"username";`,
+			`ALTER DEFAULT PRIVILEGES FOR ROLE "username" IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO "username";`,
+			`ALTER DEFAULT PRIVILEGES FOR ROLE "username" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO "username";`,
 		}, "\n"),
 		map[string]string{
 			"databases":     string(databases),
