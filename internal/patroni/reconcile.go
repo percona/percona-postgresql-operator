@@ -141,7 +141,7 @@ func InstancePod(ctx context.Context,
 		outInstancePod.Spec.InitContainers = []corev1.Container{
 			k8s.InitContainer(
 				naming.ContainerDatabase,
-				inCluster.Spec.Image,
+				inCluster.Spec.InitImage,
 				inCluster.Spec.ImagePullPolicy,
 				initialize.RestrictedSecurityContext(true),
 				container.Resources,

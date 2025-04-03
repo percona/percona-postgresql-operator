@@ -185,7 +185,7 @@ containers:
 initContainers:
 - command:
   - /usr/local/bin/init-entrypoint.sh
-  image: image
+  image: image-init
   imagePullPolicy: Always
   name: database-init
   resources: {}
@@ -321,6 +321,7 @@ volumes:
 			cluster.Name = "some-such"
 			cluster.Spec.PostgresVersion = 11
 			cluster.Spec.Image = "image"
+			cluster.Spec.InitImage = "image-init"
 			cluster.Spec.ImagePullPolicy = corev1.PullAlways
 			clusterConfigMap := new(corev1.ConfigMap)
 			clusterPodService := new(corev1.Service)
