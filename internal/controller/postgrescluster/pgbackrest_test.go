@@ -67,7 +67,7 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 					Name: "myImagePullSecret",
 				},
 			},
-			InitContainer: v1beta1.InitContainerSpec{
+			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-init-image",
 			},
 			Image: "example.com/crunchy-postgres-ha:test",

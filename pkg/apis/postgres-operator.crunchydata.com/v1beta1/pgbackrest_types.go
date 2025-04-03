@@ -136,11 +136,11 @@ type PGBackRestArchive struct {
 	Sidecars *PGBackRestSidecars `json:"sidecars,omitempty"`
 
 	// +optional
-	InitContainer InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
 }
 
 // K8SPG-613
-func (p *PGBackRestArchive) GetInitContainer() InitContainerSpec {
+func (p *PGBackRestArchive) GetInitContainer() *InitContainerSpec {
 	return p.InitContainer
 }
 

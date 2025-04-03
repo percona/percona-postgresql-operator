@@ -45,10 +45,10 @@ func InitContainer(componentName, image string,
 	resources corev1.ResourceRequirements,
 	component ComponentWithInit,
 ) corev1.Container {
-	if component != nil && component.GetInitContainer().Resources != nil {
+	if component != nil && component.GetInitContainer() != nil && component.GetInitContainer().Resources != nil {
 		resources = *component.GetInitContainer().Resources
 	}
-	if component != nil && component.GetInitContainer().ContainerSecurityContext != nil {
+	if component != nil && component.GetInitContainer() != nil && component.GetInitContainer().ContainerSecurityContext != nil {
 		secCtx = component.GetInitContainer().ContainerSecurityContext
 	}
 
@@ -73,14 +73,14 @@ func InitContainer(componentName, image string,
 }
 
 type ComponentWithInit interface {
-	GetInitContainer() v1beta1.InitContainerSpec
+	GetInitContainer() *v1beta1.InitContainerSpec
 }
 
 func InitImage(ctx context.Context, cl client.Reader, cluster *v1beta1.PostgresCluster, componentWithInit ComponentWithInit) (string, error) {
-	if componentWithInit != nil && componentWithInit.GetInitContainer().Image != "" {
+	if componentWithInit != nil && componentWithInit.GetInitContainer() != nil && componentWithInit.GetInitContainer().Image != "" {
 		return componentWithInit.GetInitContainer().Image, nil
 	}
-	if cluster != nil && len(cluster.Spec.InitContainer.Image) > 0 {
+	if cluster != nil && cluster.Spec.InitContainer != nil && len(cluster.Spec.InitContainer.Image) > 0 {
 		return cluster.Spec.InitContainer.Image, nil
 	}
 	return operatorImage(ctx, cl)

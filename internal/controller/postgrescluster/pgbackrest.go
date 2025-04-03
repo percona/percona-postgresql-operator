@@ -832,7 +832,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 	}
 
 	// K8SPG-613
-	initContainers := []corev1.Container{}
+	var initContainers []corev1.Container
 	volumes := []corev1.Volume{}
 	if postgresCluster.CompareVersion("2.7.0") >= 0 {
 		container.VolumeMounts = []corev1.VolumeMount{

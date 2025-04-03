@@ -150,7 +150,11 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 			(*out)[key] = val
 		}
 	}
-	in.InitContainer.DeepCopyInto(&out.InitContainer)
+	if in.InitContainer != nil {
+		in, out := &in.InitContainer, &out.InitContainer
+		*out = new(v1beta1.InitContainerSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Jobs != nil {
 		in, out := &in.Jobs, &out.Jobs
 		*out = new(v1beta1.BackupJobs)
@@ -659,7 +663,11 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 		*out = new(v1beta1.Metadata)
 		(*in).DeepCopyInto(*out)
 	}
-	in.InitContainer.DeepCopyInto(&out.InitContainer)
+	if in.InitContainer != nil {
+		in, out := &in.InitContainer, &out.InitContainer
+		*out = new(v1beta1.InitContainerSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 		*out = make([]v1.LocalObjectReference, len(*in))
