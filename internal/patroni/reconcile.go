@@ -6,6 +6,7 @@ package patroni
 
 import (
 	"context"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -146,6 +147,15 @@ func InstancePod(ctx context.Context,
 				container.Resources,
 			),
 		}
+
+		outInstancePod.Spec.Volumes = append(outInstancePod.Spec.Volumes, []corev1.Volume{
+			{
+				Name: pNaming.CrunchyBinVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		}...)
 	}
 
 	return nil

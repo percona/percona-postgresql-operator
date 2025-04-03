@@ -222,6 +222,8 @@ volumes:
           path: ~postgres-operator/patroni.ca-roots
         - key: patroni.crt-combined
           path: ~postgres-operator/patroni.crt+key
+- emptyDir: {}
+  name: crunchy-bin
 	`,
 			labels: map[string]string{
 				"pgv2.percona.com/version": "2.7.0",
