@@ -138,32 +138,37 @@ func InstancePod(ctx context.Context,
 
 	// K8SPG-708
 	if inCluster.CompareVersion("2.7.0") >= 0 {
-		outInstancePod.Spec.InitContainers = []corev1.Container{
-			k8s.InitContainer(
-				naming.ContainerDatabase,
-				inCluster.Spec.InitImage,
-				inCluster.Spec.ImagePullPolicy,
-				initialize.RestrictedSecurityContext(true),
-				container.Resources,
-			),
-		}
-
-		outInstancePod.Spec.Volumes = append(outInstancePod.Spec.Volumes, []corev1.Volume{
-			{
-				Name: pNaming.CrunchyBinVolumeName,
-				VolumeSource: corev1.VolumeSource{
-					EmptyDir: &corev1.EmptyDirVolumeSource{},
-				},
-			},
-		}...)
-
-		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-			Name:      pNaming.CrunchyBinVolumeName,
-			MountPath: pNaming.CrunchyBinVolumePath,
-		})
+		instanceInitContainer(inCluster, container, outInstancePod)
 	}
 
 	return nil
+}
+
+// K8SPG-708 instanceInitContainer adds the instance init container
+func instanceInitContainer(cluster *v1beta1.PostgresCluster, container *corev1.Container, instancePod *corev1.PodTemplateSpec) {
+	instancePod.Spec.InitContainers = []corev1.Container{
+		k8s.InitContainer(
+			naming.ContainerDatabase,
+			cluster.Spec.InitImage,
+			cluster.Spec.ImagePullPolicy,
+			initialize.RestrictedSecurityContext(true),
+			container.Resources,
+		),
+	}
+
+	instancePod.Spec.Volumes = append(instancePod.Spec.Volumes, []corev1.Volume{
+		{
+			Name: pNaming.CrunchyBinVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}...)
+
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      pNaming.CrunchyBinVolumeName,
+		MountPath: pNaming.CrunchyBinVolumePath,
+	})
 }
 
 // instanceProbes adds Patroni liveness and readiness probes to container.
