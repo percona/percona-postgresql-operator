@@ -96,7 +96,7 @@ volumeMounts:
 			},
 			func() *v1beta1.PostgresCluster {
 				cr := crunchyCr.DeepCopy()
-				cr.Spec.Backups.PGBackRest.InitContainer = v1beta1.InitContainerSpec{}
+				cr.Spec.Backups.PGBackRest.InitContainer = nil
 				return cr
 			},
 			getPGBackrestComponent,
@@ -151,6 +151,7 @@ volumeMounts:
 			},
 			func() *v1beta1.PostgresCluster {
 				cr := crunchyCr.DeepCopy()
+				cr.Spec.Backups.PGBackRest.InitContainer = &v1beta1.InitContainerSpec{}
 				cr.Spec.Backups.PGBackRest.InitContainer.Resources = &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceMemory: resource.MustParse("1280Mi"),
@@ -281,6 +282,7 @@ func TestInitImage(t *testing.T) {
 			func() *v1beta1.PostgresCluster {
 				cr := crunchyCr.DeepCopy()
 				cr.Spec.InitContainer.Image = "general-init-image"
+				cr.Spec.Backups.PGBackRest.InitContainer = &v1beta1.InitContainerSpec{}
 				cr.Spec.Backups.PGBackRest.InitContainer.Image = "custom-image"
 				return cr
 			},

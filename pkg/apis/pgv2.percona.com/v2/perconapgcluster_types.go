@@ -52,7 +52,7 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	CRVersion string `json:"crVersion,omitempty"`
 
-	InitContainer crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
 
 	// The image name to use for PostgreSQL containers.
 	// +optional
@@ -506,7 +506,7 @@ type PGBackRestArchive struct {
 	Image string `json:"image,omitempty"`
 
 	// +optional
-	InitContainer crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional

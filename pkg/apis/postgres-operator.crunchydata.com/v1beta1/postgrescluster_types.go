@@ -189,7 +189,7 @@ type PostgresClusterSpec struct {
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
 
 	// +optional
-	InitContainer InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
 }
 
 type InitContainerSpec struct {
