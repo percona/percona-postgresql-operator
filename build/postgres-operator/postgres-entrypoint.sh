@@ -6,6 +6,11 @@ if [[ -f ${recovery_file} ]]; then
 	set +o xtrace
 	echo "The $recovery_file file is detected, node entered an infinite sleep"
 	echo "If you want to exit from the infinite sleep, remove the $recovery_file file"
+
+	if [[ ! -d /tmp/postgres ]]; then
+		mkdir -p /tmp/postgres
+	fi
+
 	while [ -f "${recovery_file}" ]; do
 		sleep 3
 	done
