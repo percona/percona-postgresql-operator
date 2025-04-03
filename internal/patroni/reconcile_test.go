@@ -182,6 +182,28 @@ containers:
   - mountPath: /etc/patroni
     name: patroni-config
     readOnly: true
+initContainers:
+- command:
+  - /usr/local/bin/init-entrypoint.sh
+  image: image
+  imagePullPolicy: Always
+  name: database-init
+  resources: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    privileged: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  terminationMessagePath: /dev/termination-log
+  terminationMessagePolicy: File
+  volumeMounts:
+  - mountPath: /opt/crunchy
+    name: crunchy-bin
 volumes:
 - name: patroni-config
   projected:

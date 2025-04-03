@@ -6,6 +6,7 @@ package patroni
 
 import (
 	"context"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -133,6 +134,19 @@ func InstancePod(ctx context.Context,
 	})
 
 	instanceProbes(inCluster, container)
+
+	// K8SPG-708
+	if inCluster.CompareVersion("2.7.0") >= 0 {
+		outInstancePod.Spec.InitContainers = []corev1.Container{
+			k8s.InitContainer(
+				naming.ContainerDatabase,
+				inCluster.Spec.Image,
+				inCluster.Spec.ImagePullPolicy,
+				initialize.RestrictedSecurityContext(true),
+				container.Resources,
+			),
+		}
+	}
 
 	return nil
 }
