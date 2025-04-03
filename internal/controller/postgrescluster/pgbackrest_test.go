@@ -62,11 +62,15 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 			Port:            initialize.Int32(5432),
 			Shutdown:        initialize.Bool(false),
 			PostgresVersion: 13,
-			ImagePullSecrets: []corev1.LocalObjectReference{{
-				Name: "myImagePullSecret"},
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{
+					Name: "myImagePullSecret",
+				},
 			},
-			InitImage: "some-init-image",
-			Image:     "example.com/crunchy-postgres-ha:test",
+			InitContainer: v1beta1.InitContainerSpec{
+				Image: "some-init-image",
+			},
+			Image: "example.com/crunchy-postgres-ha:test",
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 				Name: "instance1",
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{

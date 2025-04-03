@@ -15,15 +15,40 @@ import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
+type testGetCluster func() *v1beta1.PostgresCluster
+
+type testGetComponentWithInit func(cr *v1beta1.PostgresCluster) ComponentWithInit
+
+var getPGBackrestComponent = func(cr *v1beta1.PostgresCluster) ComponentWithInit {
+	return &cr.Spec.Backups.PGBackRest
+}
+
 func TestInitContainer(t *testing.T) {
+	ctx := context.Background()
+	cr, err := readDefaultCR("test-init-image", "test-init-image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cl, err := buildFakeClient(ctx, cr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crunchyCr := new(v1beta1.PostgresCluster)
+	if err := cl.Get(ctx, client.ObjectKeyFromObject(cr), crunchyCr); err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
-		name       string
-		component  string
-		image      string
-		pullPolicy corev1.PullPolicy
-		secCtx     *corev1.SecurityContext
-		resources  corev1.ResourceRequirements
-		expected   string
+		name         string
+		component    string
+		image        string
+		pullPolicy   corev1.PullPolicy
+		secCtx       *corev1.SecurityContext
+		resources    corev1.ResourceRequirements
+		getCluster   testGetCluster
+		getComponent testGetComponentWithInit
+		expected     string
 	}{
 		{
 			"nothing is specified",
@@ -32,6 +57,8 @@ func TestInitContainer(t *testing.T) {
 			"",
 			nil,
 			corev1.ResourceRequirements{},
+			func() *v1beta1.PostgresCluster { return crunchyCr.DeepCopy() },
+			func(cr *v1beta1.PostgresCluster) ComponentWithInit { return nil },
 			`
 command:
 - /usr/local/bin/init-entrypoint.sh
@@ -45,7 +72,7 @@ volumeMounts:
             `,
 		},
 		{
-			"everything is specified",
+			"pgbackrest InitContainer is not specified",
 			"component",
 			"image",
 			corev1.PullAlways,
@@ -67,6 +94,12 @@ volumeMounts:
 					Request: "req",
 				}},
 			},
+			func() *v1beta1.PostgresCluster {
+				cr := crunchyCr.DeepCopy()
+				cr.Spec.Backups.PGBackRest.InitContainer = v1beta1.InitContainerSpec{}
+				return cr
+			},
+			getPGBackrestComponent,
 			`
 command:
 - /usr/local/bin/init-entrypoint.sh
@@ -93,11 +126,86 @@ volumeMounts:
   name: crunchy-bin
             `,
 		},
+		{
+			"pgbackrest everything is specified",
+			"component",
+			"image",
+			corev1.PullAlways,
+			&corev1.SecurityContext{
+				RunAsUser:                ptr.To(int64(1001)),
+				RunAsGroup:               ptr.To(int64(26)),
+				AllowPrivilegeEscalation: ptr.To(true),
+			},
+			corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("128Mi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Claims: []corev1.ResourceClaim{{
+					Name:    "claim",
+					Request: "req",
+				}},
+			},
+			func() *v1beta1.PostgresCluster {
+				cr := crunchyCr.DeepCopy()
+				cr.Spec.Backups.PGBackRest.InitContainer.Resources = &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1280Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1000m"),
+						corev1.ResourceMemory: resource.MustParse("640Mi"),
+					},
+					Claims: []corev1.ResourceClaim{{
+						Name:    "claim2",
+						Request: "req2",
+					}},
+				}
+				cr.Spec.Backups.PGBackRest.InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
+					RunAsUser:                ptr.To(int64(26)),
+					RunAsGroup:               ptr.To(int64(1001)),
+					AllowPrivilegeEscalation: ptr.To(false),
+				}
+				return cr
+			},
+			getPGBackrestComponent,
+			`
+command:
+- /usr/local/bin/init-entrypoint.sh
+image: image
+imagePullPolicy: Always
+name: component-init
+resources:
+  claims:
+  - name: claim2
+    request: req2
+  limits:
+    memory: 1280Mi
+  requests:
+    cpu: "1"
+    memory: 640Mi
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsGroup: 1001
+  runAsUser: 26
+terminationMessagePath: /dev/termination-log
+terminationMessagePolicy: File
+volumeMounts:
+- mountPath: /opt/crunchy
+  name: crunchy-bin
+            `,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			container := InitContainer(tt.component, tt.image, tt.pullPolicy, tt.secCtx, tt.resources)
+			t.Setenv("OPERATOR_NAMESPACE", cr.Namespace)
+			cr := tt.getCluster().DeepCopy()
+
+			container := InitContainer(tt.component, tt.image, tt.pullPolicy, tt.secCtx, tt.resources, tt.getComponent(cr))
 			data, err := yaml.Marshal(container)
 			if err != nil {
 				t.Fatal(err)
@@ -116,7 +224,7 @@ func TestInitImage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cr.Spec.InitImage = ""
+	cr.Spec.InitContainer.Image = ""
 
 	operatorDepl, err := readDefaultOperator(cr.Name+"-operator", cr.Namespace)
 	if err != nil {
@@ -140,19 +248,11 @@ func TestInitImage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	type testGetComponentWithInit func(cr *v1beta1.PostgresCluster) ComponentWithInit
-
-	getPGBackrestComponent := func(cr *v1beta1.PostgresCluster) ComponentWithInit {
-		return &cr.Spec.Backups.PGBackRest
-	}
-
-	type testGetCluster func() *v1beta1.PostgresCluster
-
 	tests := []struct {
-		name          string
-		clusterModify testGetCluster
-		component     testGetComponentWithInit
-		expected      string
+		name       string
+		getCluster testGetCluster
+		component  testGetComponentWithInit
+		expected   string
 	}{
 		{
 			"not specified init image",
@@ -170,7 +270,7 @@ func TestInitImage(t *testing.T) {
 			"pgbackrest general init image",
 			func() *v1beta1.PostgresCluster {
 				cr := crunchyCr.DeepCopy()
-				cr.Spec.InitImage = "general-init-image"
+				cr.Spec.InitContainer.Image = "general-init-image"
 				return cr
 			},
 			getPGBackrestComponent,
@@ -180,8 +280,8 @@ func TestInitImage(t *testing.T) {
 			"pgbackrest custom init image",
 			func() *v1beta1.PostgresCluster {
 				cr := crunchyCr.DeepCopy()
-				cr.Spec.InitImage = "general-init-image"
-				cr.Spec.Backups.PGBackRest.InitImage = "custom-image"
+				cr.Spec.InitContainer.Image = "general-init-image"
+				cr.Spec.Backups.PGBackRest.InitContainer.Image = "custom-image"
 				return cr
 			},
 			getPGBackrestComponent,
@@ -192,7 +292,7 @@ func TestInitImage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("OPERATOR_NAMESPACE", cr.Namespace)
 			t.Setenv("HOSTNAME", operatorPod.Name)
-			cr := tt.clusterModify().DeepCopy()
+			cr := tt.getCluster().DeepCopy()
 
 			res, err := InitImage(ctx, cl, cr, tt.component(cr))
 			if err != nil {

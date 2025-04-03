@@ -825,17 +825,40 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		ImagePullPolicy: postgresCluster.Spec.ImagePullPolicy,
 		Name:            naming.PGBackRestRepoContainerName,
 		SecurityContext: initialize.RestrictedSecurityContext(postgresCluster.CompareVersion("2.5.0") >= 0), // K8SPG-260
-		// K8SPG-613
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      pNaming.CrunchyBinVolumeName,
-				MountPath: pNaming.CrunchyBinVolumePath,
-			},
-		},
 	}
 
 	if postgresCluster.Spec.Backups.PGBackRest.Jobs != nil {
 		container.Resources = postgresCluster.Spec.Backups.PGBackRest.Jobs.Resources
+	}
+
+	// K8SPG-613
+	initContainers := []corev1.Container{}
+	volumes := []corev1.Volume{}
+	if postgresCluster.CompareVersion("2.7.0") >= 0 {
+		container.VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      pNaming.CrunchyBinVolumeName,
+				MountPath: pNaming.CrunchyBinVolumePath,
+			},
+		}
+		initContainers = []corev1.Container{
+			k8s.InitContainer(
+				naming.PGBackRestRepoContainerName,
+				initImage,
+				postgresCluster.Spec.ImagePullPolicy,
+				initialize.RestrictedSecurityContext(true),
+				container.Resources,
+				&postgresCluster.Spec.Backups.PGBackRest,
+			),
+		}
+		volumes = []corev1.Volume{
+			{
+				Name: pNaming.CrunchyBinVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		}
 	}
 
 	jobSpec := &batchv1.JobSpec{
@@ -857,24 +880,9 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 				SecurityContext:    initialize.PodSecurityContext(),
 				ServiceAccountName: serviceAccountName,
 				// K8SPG-613
-				Volumes: []corev1.Volume{
-					{
-						Name: pNaming.CrunchyBinVolumeName,
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					},
-				},
+				Volumes: volumes,
 				// K8SPG-613
-				InitContainers: []corev1.Container{
-					k8s.InitContainer(
-						naming.PGBackRestRepoContainerName,
-						initImage,
-						postgresCluster.Spec.ImagePullPolicy,
-						initialize.RestrictedSecurityContext(postgresCluster.CompareVersion("2.5.0") >= 0),
-						container.Resources,
-					),
-				},
+				InitContainers: initContainers,
 			},
 		},
 	}
