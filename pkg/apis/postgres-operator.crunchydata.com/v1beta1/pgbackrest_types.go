@@ -135,12 +135,13 @@ type PGBackRestArchive struct {
 	// +optional
 	Sidecars *PGBackRestSidecars `json:"sidecars,omitempty"`
 
-	InitImage string `json:"initImage,omitempty"` // K8SPG-613
+	// +optional
+	InitContainer InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
 }
 
 // K8SPG-613
-func (p *PGBackRestArchive) GetInitImage() string {
-	return p.InitImage
+func (p *PGBackRestArchive) GetInitContainer() InitContainerSpec {
+	return p.InitContainer
 }
 
 // PGBackRestSidecars defines the configuration for pgBackRest sidecar containers
