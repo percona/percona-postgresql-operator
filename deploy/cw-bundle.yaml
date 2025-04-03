@@ -296,6 +296,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -702,6 +704,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -1242,6 +1246,8 @@ spec:
                           The image name to use for pgBackRest containers.  Utilized to run
                           pgBackRest repository hosts and backups. The image may also be set using
                           the RELATED_IMAGE_PGBACKREST environment variable
+                        type: string
+                      initImage:
                         type: string
                       jobs:
                         description: Jobs field allows configuration for all backup
@@ -8764,6 +8770,8 @@ spec:
                     properties:
                       pg_audit:
                         type: boolean
+                      pg_repack:
+                        type: boolean
                       pg_stat_monitor:
                         type: boolean
                       pgvector:
@@ -8899,6 +8907,8 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              initImage:
+                type: string
               instances:
                 description: |-
                   Specifies one or more sets of PostgreSQL pods that replicate data for
@@ -14315,6 +14325,8 @@ spec:
                             type: string
                         type: object
                     type: object
+                  customClusterName:
+                    type: string
                   enabled:
                     type: boolean
                   image:
@@ -14328,6 +14340,8 @@ spec:
                     - Always
                     - Never
                     - IfNotPresent
+                    type: string
+                  postgresParams:
                     type: string
                   querySource:
                     default: pgstatmonitor
@@ -18277,6 +18291,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -26069,6 +26085,8 @@ spec:
                           The image name to use for pgBackRest containers.  Utilized to run
                           pgBackRest repository hosts and backups. The image may also be set using
                           the RELATED_IMAGE_PGBACKREST environment variable
+                        type: string
+                      initImage:
                         type: string
                       jobs:
                         description: Jobs field allows configuration for all backup
@@ -34001,6 +34019,8 @@ spec:
                 properties:
                   pgAudit:
                     type: boolean
+                  pgRepack:
+                    type: boolean
                   pgStatMonitor:
                     type: boolean
                   pgStatStatements:
@@ -34044,6 +34064,8 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              initImage:
+                type: string
               instances:
                 description: |-
                   Specifies one or more sets of PostgreSQL pods that replicate data for
