@@ -975,10 +975,10 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 		}
 	}
 	// verify mounted configuration is present
-	assert.Assert(t, len(container.VolumeMounts) == 2)
+	assert.Assert(t, len(container.VolumeMounts) == 3)
 
 	// verify volume for configuration is present
-	assert.Assert(t, len(backupJob.Spec.Template.Spec.Volumes) == 2)
+	assert.Assert(t, len(backupJob.Spec.Template.Spec.Volumes) == 3)
 
 	// verify the image pull secret
 	assert.Assert(t, backupJob.Spec.Template.Spec.ImagePullSecrets != nil)
