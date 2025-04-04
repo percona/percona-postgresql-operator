@@ -542,7 +542,7 @@ func (r *Reconciler) setScheduledJobStatus(ctx context.Context,
 		// by the Operator, simply log an error and return rather than
 		// bubble this up to the other functions
 		log.Error(err, "unable to convert unstructured objects to jobs, "+
-			"unable to set scheduled backup status")
+			"unable to set scheduled backup status", "cluster", postgresCluster.Name)
 		return
 	}
 
@@ -1506,14 +1506,14 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// reconcile the pgbackrest repository host
 	repoHost, err = r.reconcileDedicatedRepoHost(ctx, postgresCluster, repoResources, instances)
 	if err != nil {
-		log.Error(err, "unable to reconcile pgBackRest repo host")
+		log.Error(err, "unable to reconcile pgBackRest repo host", "cluster", postgresCluster.Name)
 		result.Requeue = true
 		return result, nil
 	}
 	repoHostName = repoHost.GetName()
 
 	if err := r.reconcilePGBackRestSecret(ctx, postgresCluster, repoHost, rootCA); err != nil {
-		log.Error(err, "unable to reconcile pgBackRest secret")
+		log.Error(err, "unable to reconcile pgBackRest secret", "cluster", postgresCluster.Name)
 		result.Requeue = true
 	}
 
@@ -1522,7 +1522,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// configuration (and then execute stanza create commands accordingly)
 	configHashes, configHash, err := pgbackrest.CalculateConfigHashes(postgresCluster)
 	if err != nil {
-		log.Error(err, "unable to calculate config hashes")
+		log.Error(err, "unable to calculate config hashes", "cluster", postgresCluster.Name)
 		result.Requeue = true
 		return result, nil
 	}
@@ -1530,7 +1530,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// reconcile all pgbackrest repository repos
 	replicaCreateRepo, err := r.reconcileRepos(ctx, postgresCluster, configHashes, repoResources)
 	if err != nil {
-		log.Error(err, "unable to reconcile pgBackRest repo host")
+		log.Error(err, "unable to reconcile pgBackRest repo host", "cluster", postgresCluster.Name)
 		result.Requeue = true
 		return result, nil
 	}
@@ -1545,14 +1545,14 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	if err := r.reconcilePGBackRestConfig(ctx, postgresCluster, repoHostName,
 		configHash, naming.ClusterPodService(postgresCluster).Name,
 		postgresCluster.GetNamespace(), instanceNames); err != nil {
-		log.Error(err, "unable to reconcile pgBackRest configuration")
+		log.Error(err, "unable to reconcile pgBackRest configuration", "cluster", postgresCluster.Name)
 		result.Requeue = true
 	}
 
 	// reconcile the RBAC required to run pgBackRest Jobs (e.g. for backups)
 	sa, err := r.reconcilePGBackRestRBAC(ctx, postgresCluster)
 	if err != nil {
-		log.Error(err, "unable to create replica creation backup")
+		log.Error(err, "unable to create replica creation backup", "cluster", postgresCluster.Name)
 		result.Requeue = true
 		return result, nil
 	}
@@ -1571,16 +1571,18 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// re-attempted until successful (e.g. allowing users to correct mis-configurations in
 	// custom configuration and ensure stanzas are still created).
 	if err != nil {
-		log.Error(err, "unable to create stanza")
+		log.Error(err, "unable to create stanza", "cluster", postgresCluster.Name)
 		result.RequeueAfter = 10 * time.Second
 	}
 	// If a config hash mismatch, then log an info message and requeue to try again.  Add some time
 	// to the requeue to give the pgBackRest configuration changes a chance to propagate to the
 	// container.
 	if configHashMismatch {
-		log.Info("pgBackRest config hash mismatch detected, requeuing to reattempt stanza create")
+		log.Info("pgBackRest config hash mismatch detected, requeuing to reattempt stanza create",
+			"cluster", postgresCluster.Name)
 		result.RequeueAfter = 10 * time.Second
 	}
+
 	// reconcile the pgBackRest backup CronJobs
 	requeue := r.reconcileScheduledBackups(ctx, postgresCluster, sa, repoResources.cronjobs)
 	// If the pgBackRest backup CronJob reconciliation function has encountered an error, requeue
@@ -1597,7 +1599,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// This is done once stanza creation is successful
 	if err := r.reconcileReplicaCreateBackup(ctx, postgresCluster, instances,
 		repoResources.replicaCreateBackupJobs, sa, configHash, replicaCreateRepo); err != nil {
-		log.Error(err, "unable to reconcile replica creation backup")
+		log.Error(err, "unable to reconcile replica creation backup", "cluster", postgresCluster.Name)
 		result.Requeue = true
 	}
 
@@ -1605,7 +1607,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// annotation
 	if err := r.reconcileManualBackup(ctx, postgresCluster, repoResources.manualBackupJobs,
 		sa, instances); err != nil {
-		log.Error(err, "unable to reconcile manual backup")
+		log.Error(err, "unable to reconcile manual backup", "cluster", postgresCluster.Name)
 		result.Requeue = true
 	}
 
@@ -2262,7 +2264,7 @@ func (r *Reconciler) reconcileDedicatedRepoHost(ctx context.Context,
 	repoHost, err := r.applyRepoHostIntent(ctx, postgresCluster, repoHostName, repoResources,
 		observedInstances)
 	if err != nil {
-		log.Error(err, "reconciling repository host")
+		log.Error(err, "reconciling repository host", "cluster", postgresCluster.Name)
 		return nil, err
 	}
 
@@ -2726,7 +2728,7 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 		repo, err := r.applyRepoVolumeIntent(ctx, postgresCluster, repo.Volume.VolumeClaimSpec,
 			repo.Name, repoResources)
 		if err != nil {
-			log.Error(err, errMsg)
+			log.Error(err, errMsg, "cluster", postgresCluster.Name)
 			errors = append(errors, err)
 			continue
 		}
@@ -3005,21 +3007,21 @@ func (r *Reconciler) reconcileScheduledBackups(
 			if repo.BackupSchedules.Full != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
 					Full, repo.BackupSchedules.Full, sa, cronjobs); err != nil {
-					log.Error(err, "unable to reconcile Full backup for "+repo.Name)
+					log.Error(err, "unable to reconcile Full backup for "+repo.Name, "cluster", cluster.Name)
 					requeue = true
 				}
 			}
 			if repo.BackupSchedules.Differential != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
 					Differential, repo.BackupSchedules.Differential, sa, cronjobs); err != nil {
-					log.Error(err, "unable to reconcile Differential backup for "+repo.Name)
+					log.Error(err, "unable to reconcile Differential backup for "+repo.Name, "cluster", cluster.Name)
 					requeue = true
 				}
 			}
 			if repo.BackupSchedules.Incremental != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
 					Incremental, repo.BackupSchedules.Incremental, sa, cronjobs); err != nil {
-					log.Error(err, "unable to reconcile Incremental backup for "+repo.Name)
+					log.Error(err, "unable to reconcile Incremental backup for "+repo.Name, "cluster", cluster.Name)
 					requeue = true
 				}
 			}
@@ -3155,7 +3157,7 @@ func (r *Reconciler) reconcilePGBackRestCronJob(
 		// record and log any errors resulting from trying to create the pgBackRest backup CronJob
 		r.Recorder.Event(cluster, corev1.EventTypeWarning, EventUnableToCreatePGBackRestCronJob,
 			err.Error())
-		log.Error(err, "error when attempting to create pgBackRest CronJob")
+		log.Error(err, "error when attempting to create pgBackRest CronJob", "cluster", cluster.Name)
 	}
 	return err
 }
