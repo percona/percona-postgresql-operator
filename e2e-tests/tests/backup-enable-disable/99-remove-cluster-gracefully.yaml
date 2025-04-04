@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+- apiVersion: pgv2.percona.com/v2
+  kind: PerconaPGCluster
+  metadata:
+    name: some-name
+- apiVersion: postgres-operator.crunchydata.com/v1beta1
+  kind: PostgresCluster
+  metadata:
+    name: some-name
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      remove_all_finalizers
+      destroy_operator
+    timeout: 60

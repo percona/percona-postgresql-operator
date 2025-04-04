@@ -153,7 +153,6 @@ type PerconaPGClusterSpec struct {
 	Proxy *PGProxySpec `json:"proxy,omitempty"`
 
 	// PostgreSQL backup configuration
-	// +kubebuilder:validation:Required
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	Backups Backups `json:"backups"`
 
@@ -207,19 +206,21 @@ func (cr *PerconaPGCluster) Default() {
 	t := true
 	f := false
 
-	if cr.Spec.Backups.TrackLatestRestorableTime == nil {
-		cr.Spec.Backups.TrackLatestRestorableTime = &t
-	}
-	if cr.Spec.Backups.PGBackRest.Metadata == nil {
-		cr.Spec.Backups.PGBackRest.Metadata = new(crunchyv1beta1.Metadata)
-	}
-	if cr.Spec.Backups.PGBackRest.Metadata.Labels == nil {
-		cr.Spec.Backups.PGBackRest.Metadata.Labels = make(map[string]string)
-	}
-	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
+	if cr.Spec.BackupsEnabled() {
+		if cr.Spec.Backups.TrackLatestRestorableTime == nil {
+			cr.Spec.Backups.TrackLatestRestorableTime = &t
+		}
+		if cr.Spec.Backups.PGBackRest.Metadata == nil {
+			cr.Spec.Backups.PGBackRest.Metadata = new(crunchyv1beta1.Metadata)
+		}
+		if cr.Spec.Backups.PGBackRest.Metadata.Labels == nil {
+			cr.Spec.Backups.PGBackRest.Metadata.Labels = make(map[string]string)
+		}
+		cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
-	if cr.Spec.Backups.PGBackRest.Jobs == nil {
-		cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+		if cr.Spec.Backups.PGBackRest.Jobs == nil {
+			cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+		}
 	}
 
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
@@ -241,6 +242,10 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
 	}
+}
+
+func (spec *PerconaPGClusterSpec) BackupsEnabled() bool {
+	return spec.Backups.Enabled == nil || *spec.Backups.Enabled
 }
 
 func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crunchyv1beta1.PostgresCluster, scheme *runtime.Scheme) (*crunchyv1beta1.PostgresCluster, error) {
@@ -313,6 +318,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		repo.BackupSchedules.Full = nil
 		repo.BackupSchedules.Incremental = nil
 	}
+
 	postgresCluster.Spec.DataSource = cr.Spec.DataSource
 	postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
 	postgresCluster.Spec.Patroni = cr.Spec.Patroni
@@ -446,8 +452,10 @@ type PerconaPGClusterStatus struct {
 }
 
 type Backups struct {
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// pgBackRest archive configuration
-	// +kubebuilder:validation:Required
+	// +optional
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
 
 	// Enable tracking latest restorable time
@@ -455,6 +463,10 @@ type Backups struct {
 }
 
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
+	if b.Enabled != nil && !*b.Enabled {
+		return crunchyv1beta1.Backups{}
+	}
+
 	var sc *crunchyv1beta1.PGBackRestSidecars
 
 	sc = b.PGBackRest.Containers
