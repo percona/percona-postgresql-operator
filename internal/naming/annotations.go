@@ -70,6 +70,7 @@ const (
 	// touch cloud-based backups.
 	AuthorizeBackupRemovalAnnotation = annotationPrefix + "authorizeBackupRemoval"
 
+	// K8SPG-712
 	// OverrideConfigAnnotation is an annotation used to prevent the controller from reconciling
 	// ConfigMaps when a user wants to manually override their contents. When this annotation
 	// is present, the controller will not update the ConfigMap, allowing users to make custom
