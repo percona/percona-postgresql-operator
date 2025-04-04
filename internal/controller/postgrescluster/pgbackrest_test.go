@@ -57,6 +57,9 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 			Name:      clusterName,
 			Namespace: namespace,
 			UID:       types.UID(clusterUID),
+			Labels: map[string]string{
+				naming.LabelVersion: "2.7.0",
+			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
 			Port:            initialize.Int32(5432),
@@ -338,6 +341,8 @@ schedulerName: default-scheduler
 securityContext:
   fsGroup: 26
   fsGroupChangePolicy: OnRootMismatch
+serviceAccount: hippocluster-pgbackrest
+serviceAccountName: hippocluster-pgbackrest
 shareProcessNamespace: true
 terminationGracePeriodSeconds: 30
 tolerations:
@@ -975,10 +980,10 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 		}
 	}
 	// verify mounted configuration is present
-	assert.Assert(t, len(container.VolumeMounts) == 3)
+	assert.Assert(t, len(container.VolumeMounts) == 2)
 
 	// verify volume for configuration is present
-	assert.Assert(t, len(backupJob.Spec.Template.Spec.Volumes) == 3)
+	assert.Assert(t, len(backupJob.Spec.Template.Spec.Volumes) == 2)
 
 	// verify the image pull secret
 	assert.Assert(t, backupJob.Spec.Template.Spec.ImagePullSecrets != nil)
@@ -2460,7 +2465,7 @@ func TestGenerateBackupJobIntent(t *testing.T) {
 					Name:      "",
 					Namespace: "",
 					Labels: map[string]string{
-						naming.LabelVersion: "2.5.0",
+						naming.LabelVersion: "2.7.0",
 					},
 				},
 			},
@@ -2782,7 +2787,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 		err := r.generateRestoreJobIntent(&v1beta1.PostgresCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					naming.LabelVersion: "2.5.0",
+					naming.LabelVersion: "2.7.0",
 				},
 			},
 		}, "", "",
@@ -2830,7 +2835,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 			Labels: map[string]string{
-				naming.LabelVersion: "2.5.0",
+				naming.LabelVersion: "2.7.0",
 			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
@@ -2999,7 +3004,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 				Name:      clusterName,
 				Namespace: namespace,
 				Labels: map[string]string{
-					naming.LabelVersion: "2.5.0",
+					naming.LabelVersion: "2.7.0",
 				},
 			},
 		}
@@ -3236,7 +3241,7 @@ func TestPrepareForRestore(t *testing.T) {
 				Name:      clusterName,
 				Namespace: namespace,
 				Labels: map[string]string{
-					naming.LabelVersion: "2.5.0",
+					naming.LabelVersion: "2.7.0",
 				},
 			},
 		}
