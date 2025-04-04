@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      password=$(get_psql_user_pass chico-credentials)
+      user='chico'
+      db_name='spain'
+      schema='public'
+      hostname=$(get_pgbouncer_host chico-credentials)
+
+
+      run_psql \
+        'SET search_path TO public;CREATE TABLE IF NOT EXISTS customApp (id int PRIMARY KEY);' \
+        "-h $hostname -U $user -d $db_name" "$password"
+      run_psql \
+        "INSERT INTO $schema.customApp (id) VALUES (100500)" \
+        "-h $hostname -U $user -d $db_name" "$password"
+        
