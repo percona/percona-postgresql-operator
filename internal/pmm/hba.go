@@ -15,7 +15,7 @@ const (
 func PostgreSQLHBAs(inCluster *v1beta1.PostgresCluster, outHBAs *postgres.HBAs) {
 	// Limit the monitoring user to local connections using SCRAM.
 	outHBAs.Mandatory = append(outHBAs.Mandatory,
-		*postgres.NewHBA().TCP().User(MonitoringUser).Method("scram-sha-256").Network("127.0.0.0/8"),
-		*postgres.NewHBA().TCP().User(MonitoringUser).Method("scram-sha-256").Network("::1/128"),
-		*postgres.NewHBA().TCP().User(MonitoringUser).Method("reject"))
+		postgres.NewHBA().TCP().User(MonitoringUser).Method("scram-sha-256").Network("127.0.0.0/8"),
+		postgres.NewHBA().TCP().User(MonitoringUser).Method("scram-sha-256").Network("::1/128"),
+		postgres.NewHBA().TCP().User(MonitoringUser).Method("reject"))
 }

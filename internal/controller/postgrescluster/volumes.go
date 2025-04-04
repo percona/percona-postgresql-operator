@@ -476,7 +476,9 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 
 	jobSpec := &batchv1.JobSpec{
 		Template: corev1.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{Labels: labels},
+			ObjectMeta: metav1.ObjectMeta{Labels: labels, Annotations: map[string]string{
+				naming.DefaultContainerAnnotation: naming.ContainerJobMovePGDataDir,
+			}},
 			Spec: corev1.PodSpec{
 				Tolerations: cluster.Spec.DataSource.Volumes.PGDataVolume.Tolerations, // K8SPG-479
 				// Set the image pull secrets, if any exist.
@@ -594,7 +596,9 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 
 	jobSpec := &batchv1.JobSpec{
 		Template: corev1.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{Labels: labels},
+			ObjectMeta: metav1.ObjectMeta{Labels: labels, Annotations: map[string]string{
+				naming.DefaultContainerAnnotation: naming.ContainerJobMovePGWALDir,
+			}},
 			Spec: corev1.PodSpec{
 				Tolerations: cluster.Spec.DataSource.Volumes.PGWALVolume.Tolerations, // K8SPG-479
 				// Set the image pull secrets, if any exist.
@@ -717,7 +721,9 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 
 	jobSpec := &batchv1.JobSpec{
 		Template: corev1.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{Labels: labels},
+			ObjectMeta: metav1.ObjectMeta{Labels: labels, Annotations: map[string]string{
+				naming.DefaultContainerAnnotation: naming.ContainerJobMovePGBackRestRepoDir,
+			}},
 			Spec: corev1.PodSpec{
 				Tolerations: cluster.Spec.DataSource.Volumes.PGBackRestVolume.Tolerations, // K8SPG-479
 				// Set the image pull secrets, if any exist.
