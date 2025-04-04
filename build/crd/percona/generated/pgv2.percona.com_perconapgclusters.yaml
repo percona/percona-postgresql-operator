@@ -8331,6 +8331,8 @@ spec:
                         type: boolean
                       pg_stat_monitor:
                         type: boolean
+                      pg_stat_statements:
+                        type: boolean
                       pgvector:
                         type: boolean
                     type: object
