@@ -6,6 +6,7 @@ package patroni
 
 import (
 	"context"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -17,7 +18,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -146,24 +146,19 @@ func InstancePod(ctx context.Context,
 
 // K8SPG-708 instanceInitContainer adds the instance init container
 func instanceInitContainer(cluster *v1beta1.PostgresCluster, container *corev1.Container, instancePod *corev1.PodTemplateSpec) {
-	instancePod.Spec.InitContainers = []corev1.Container{
-		k8s.InitContainer(
-			naming.ContainerDatabase,
-			cluster.Spec.InitImage,
-			cluster.Spec.ImagePullPolicy,
-			initialize.RestrictedSecurityContext(true),
-			container.Resources,
-		),
-	}
+	instancePod.Spec.InitContainers = append(instancePod.Spec.InitContainers, k8s.InitContainer(
+		naming.ContainerDatabase,
+		cluster.Spec.InitImage,
+		cluster.Spec.ImagePullPolicy,
+		initialize.RestrictedSecurityContext(true),
+		container.Resources))
 
-	instancePod.Spec.Volumes = append(instancePod.Spec.Volumes, []corev1.Volume{
-		{
-			Name: pNaming.CrunchyBinVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
+	instancePod.Spec.Volumes = append(instancePod.Spec.Volumes, corev1.Volume{
+		Name: pNaming.CrunchyBinVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
-	}...)
+	})
 
 	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
 		Name:      pNaming.CrunchyBinVolumeName,
