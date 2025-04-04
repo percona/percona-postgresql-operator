@@ -39,11 +39,19 @@ func GetWatchNamespace() (string, error) {
 	return ns, nil
 }
 
-func InitContainer(component, image string,
+func InitContainer(componentName, image string,
 	pullPolicy corev1.PullPolicy,
 	secCtx *corev1.SecurityContext,
 	resources corev1.ResourceRequirements,
+	component ComponentWithInit,
 ) corev1.Container {
+	if component != nil && component.GetInitContainer() != nil && component.GetInitContainer().Resources != nil {
+		resources = *component.GetInitContainer().Resources
+	}
+	if component != nil && component.GetInitContainer() != nil && component.GetInitContainer().ContainerSecurityContext != nil {
+		secCtx = component.GetInitContainer().ContainerSecurityContext
+	}
+
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      naming.CrunchyBinVolumeName,
@@ -52,7 +60,7 @@ func InitContainer(component, image string,
 	}
 
 	return corev1.Container{
-		Name:                     component + "-init",
+		Name:                     componentName + "-init",
 		Image:                    image,
 		ImagePullPolicy:          pullPolicy,
 		VolumeMounts:             volumeMounts,
@@ -65,15 +73,15 @@ func InitContainer(component, image string,
 }
 
 type ComponentWithInit interface {
-	GetInitImage() string
+	GetInitContainer() *v1beta1.InitContainerSpec
 }
 
 func InitImage(ctx context.Context, cl client.Reader, cluster *v1beta1.PostgresCluster, componentWithInit ComponentWithInit) (string, error) {
-	if componentWithInit != nil && componentWithInit.GetInitImage() != "" {
-		return componentWithInit.GetInitImage(), nil
+	if componentWithInit != nil && componentWithInit.GetInitContainer() != nil && componentWithInit.GetInitContainer().Image != "" {
+		return componentWithInit.GetInitContainer().Image, nil
 	}
-	if cluster != nil && len(cluster.Spec.InitImage) > 0 {
-		return cluster.Spec.InitImage, nil
+	if cluster != nil && cluster.Spec.InitContainer != nil && len(cluster.Spec.InitContainer.Image) > 0 {
+		return cluster.Spec.InitContainer.Image, nil
 	}
 	return operatorImage(ctx, cl)
 }

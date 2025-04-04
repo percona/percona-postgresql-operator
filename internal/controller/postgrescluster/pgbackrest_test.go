@@ -57,16 +57,23 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 			Name:      clusterName,
 			Namespace: namespace,
 			UID:       types.UID(clusterUID),
+			Labels: map[string]string{
+				naming.LabelVersion: "2.7.0",
+			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
 			Port:            initialize.Int32(5432),
 			Shutdown:        initialize.Bool(false),
 			PostgresVersion: 13,
-			ImagePullSecrets: []corev1.LocalObjectReference{{
-				Name: "myImagePullSecret"},
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{
+					Name: "myImagePullSecret",
+				},
 			},
-			InitImage: "some-init-image",
-			Image:     "example.com/crunchy-postgres-ha:test",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-init-image",
+			},
+			Image: "example.com/crunchy-postgres-ha:test",
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 				Name: "instance1",
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
@@ -334,6 +341,8 @@ schedulerName: default-scheduler
 securityContext:
   fsGroup: 26
   fsGroupChangePolicy: OnRootMismatch
+serviceAccount: hippocluster-pgbackrest
+serviceAccountName: hippocluster-pgbackrest
 shareProcessNamespace: true
 terminationGracePeriodSeconds: 30
 tolerations:
@@ -2456,7 +2465,7 @@ func TestGenerateBackupJobIntent(t *testing.T) {
 					Name:      "",
 					Namespace: "",
 					Labels: map[string]string{
-						naming.LabelVersion: "2.5.0",
+						naming.LabelVersion: "2.7.0",
 					},
 				},
 			},
@@ -2778,7 +2787,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 		err := r.generateRestoreJobIntent(&v1beta1.PostgresCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					naming.LabelVersion: "2.5.0",
+					naming.LabelVersion: "2.7.0",
 				},
 			},
 		}, "", "",
@@ -2826,7 +2835,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 			Labels: map[string]string{
-				naming.LabelVersion: "2.5.0",
+				naming.LabelVersion: "2.7.0",
 			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
@@ -2995,7 +3004,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 				Name:      clusterName,
 				Namespace: namespace,
 				Labels: map[string]string{
-					naming.LabelVersion: "2.5.0",
+					naming.LabelVersion: "2.7.0",
 				},
 			},
 		}
@@ -3232,7 +3241,7 @@ func TestPrepareForRestore(t *testing.T) {
 				Name:      clusterName,
 				Namespace: namespace,
 				Labels: map[string]string{
-					naming.LabelVersion: "2.5.0",
+					naming.LabelVersion: "2.7.0",
 				},
 			},
 		}
