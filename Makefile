@@ -120,6 +120,7 @@ uninstall: ## Delete the postgrescluster CRD
 deploy: ## Deploy the PostgreSQL Operator (enables the postgrescluster controller)
 	yq eval '(.spec.template.spec.containers[] | select(.name=="operator")).image = "$(IMAGE)"' ./deploy/operator.yaml \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "true"' - \
+		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="LOG_LEVEL") | .value) = "DEBUG"' - \
 		| kubectl apply -f -
 
 .PHONY: undeploy
