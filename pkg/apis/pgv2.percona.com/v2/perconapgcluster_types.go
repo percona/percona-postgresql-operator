@@ -773,6 +773,11 @@ type PGInstanceSetSpec struct {
 	// SecurityContext defines the security settings for a PostgreSQL pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// K8SPG-708
+	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
+	// +optional
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -794,7 +799,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		VolumeMounts:              p.VolumeMounts,
 		SecurityContext:           p.SecurityContext,
 		TablespaceVolumes:         p.TablespaceVolumes,
-	}
+		InitContainer:             p.InitContainer}
 }
 
 type ServiceExpose struct {
