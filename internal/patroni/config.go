@@ -585,6 +585,14 @@ func instanceYAML(
 		methods = append([]string{pgBackRestCreateReplicaMethod}, methods...)
 	}
 
+	// K8SPG-704: Allow overriding create replica methods list
+	if cluster.Spec.Patroni != nil && len(cluster.Spec.Patroni.CreateReplicaMethods) > 0 {
+		methods = []string{}
+		for _, m := range cluster.Spec.Patroni.CreateReplicaMethods {
+			methods = append(methods, string(m))
+		}
+	}
+
 	// NOTE(cbandy): Is there any chance a user might want to specify their own
 	// method? This is a list and cannot be merged.
 	postgresql["create_replica_methods"] = methods
