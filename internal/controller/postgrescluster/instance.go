@@ -7,7 +7,6 @@ package postgrescluster
 import (
 	"context"
 	"fmt"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"io"
 	"sort"
 	"strings"
@@ -38,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
