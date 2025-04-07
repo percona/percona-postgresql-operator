@@ -139,7 +139,7 @@ func InstancePod(ctx context.Context,
 
 	// K8SPG-708
 	if inCluster.CompareVersion("2.7.0") >= 0 {
-		instanceInitContainer(ctx, inCluster, container, outInstancePod, inInstanceSpec, initImage)
+		instanceInitContainer(inCluster, container, outInstancePod, inInstanceSpec, initImage)
 	}
 
 	return nil
