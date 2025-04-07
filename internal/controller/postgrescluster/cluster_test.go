@@ -144,11 +144,17 @@ func TestCustomLabels(t *testing.T) {
 		cluster.ObjectMeta.Name = "global-cluster"
 		cluster.ObjectMeta.Namespace = ns.Name
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
-			Name:                "daisy-instance1",
+			Name: "daisy-instance1",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-image",
+			},
 			Replicas:            initialize.Int32(1),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}, {
-			Name:                "daisy-instance2",
+			Name: "daisy-instance2",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-image",
+			},
 			Replicas:            initialize.Int32(1),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
@@ -396,11 +402,17 @@ func TestCustomAnnotations(t *testing.T) {
 		cluster.ObjectMeta.Name = "global-cluster"
 		cluster.ObjectMeta.Namespace = ns.Name
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
-			Name:                "daisy-instance1",
+			Name: "daisy-instance1",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-image",
+			},
 			Replicas:            initialize.Int32(1),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}, {
-			Name:                "daisy-instance2",
+			Name: "daisy-instance2",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-image",
+			},
 			Replicas:            initialize.Int32(1),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
