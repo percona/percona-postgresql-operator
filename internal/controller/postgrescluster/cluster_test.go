@@ -200,7 +200,10 @@ func TestCustomLabels(t *testing.T) {
 		cluster.ObjectMeta.Name = "instance-cluster"
 		cluster.ObjectMeta.Namespace = ns.Name
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
-			Name:                "max-instance",
+			Name: "max-instance",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-image",
+			},
 			Replicas:            initialize.Int32(1),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 			Metadata: &v1beta1.Metadata{
