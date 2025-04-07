@@ -19,6 +19,6 @@ commands:
       done
 
       run_psql_local \
-        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
         "postgres:$(get_psql_user_pass major-upgrade-pguser-postgres)@$(get_psql_user_host major-upgrade-pguser-postgres)"
 
