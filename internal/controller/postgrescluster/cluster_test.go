@@ -207,7 +207,10 @@ func TestCustomLabels(t *testing.T) {
 				Labels: map[string]string{"my.instance.label": "max"},
 			},
 		}, {
-			Name:                "lucy-instance",
+			Name: "lucy-instance",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-image",
+			},
 			Replicas:            initialize.Int32(1),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 			Metadata: &v1beta1.Metadata{
@@ -459,14 +462,20 @@ func TestCustomAnnotations(t *testing.T) {
 		cluster.ObjectMeta.Name = "instance-cluster"
 		cluster.ObjectMeta.Namespace = ns.Name
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
-			Name:                "max-instance",
+			Name: "max-instance",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-image",
+			},
 			Replicas:            initialize.Int32(1),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 			Metadata: &v1beta1.Metadata{
 				Annotations: map[string]string{"my.instance.annotation": "max"},
 			},
 		}, {
-			Name:                "lucy-instance",
+			Name: "lucy-instance",
+			InitContainer: &v1beta1.InitContainerSpec{
+				Image: "some-image",
+			},
 			Replicas:            initialize.Int32(1),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 			Metadata: &v1beta1.Metadata{
