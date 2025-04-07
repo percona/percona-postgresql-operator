@@ -97,6 +97,8 @@ spec:
   image: postgres
   instances:
   - name: register-now
+    initContainer:
+      image: postgres
     dataVolumeClaimSpec:
       accessModes:
       - "ReadWriteMany"
