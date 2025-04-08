@@ -53,7 +53,7 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	CRVersion string `json:"crVersion,omitempty"`
 
-	InitImage string `json:"initImage,omitempty"`
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
 
 	// The image name to use for PostgreSQL containers.
 	// +optional
@@ -226,6 +226,9 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
 	}
+	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatStatements = &f
+	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
 		cr.Spec.Extensions.BuiltIn.PGAudit = &t
 	}
@@ -356,13 +359,14 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
 
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
+	postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.BuiltIn.PGStatStatements
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
 	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
 	postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
-	postgresCluster.Spec.InitImage = cr.Spec.InitImage
+	postgresCluster.Spec.InitContainer = cr.Spec.InitContainer
 
 	return postgresCluster, nil
 }
@@ -472,7 +476,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			RepoHost:      b.PGBackRest.RepoHost,
 			Manual:        b.PGBackRest.Manual,
 			Restore:       b.PGBackRest.Restore,
-			InitImage:     b.PGBackRest.InitImage,
+			InitContainer: b.PGBackRest.InitContainer,
 			Sidecars:      sc,
 		},
 	}
@@ -503,7 +507,7 @@ type PGBackRestArchive struct {
 	Image string `json:"image,omitempty"`
 
 	// +optional
-	InitImage string `json:"initImage,omitempty"`
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional
@@ -606,10 +610,11 @@ type CustomExtensionsStorageSpec struct {
 }
 
 type BuiltInExtensionsSpec struct {
-	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
-	PGAudit       *bool `json:"pg_audit,omitempty"`
-	PGVector      *bool `json:"pgvector,omitempty"`
-	PGRepack      *bool `json:"pg_repack,omitempty"`
+	PGStatMonitor    *bool `json:"pg_stat_monitor,omitempty"`
+	PGStatStatements *bool `json:"pg_stat_statements,omitempty"`
+	PGAudit          *bool `json:"pg_audit,omitempty"`
+	PGVector         *bool `json:"pgvector,omitempty"`
+	PGRepack         *bool `json:"pg_repack,omitempty"`
 }
 
 type ExtensionsSpec struct {
