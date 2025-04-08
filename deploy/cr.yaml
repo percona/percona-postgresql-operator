@@ -10,7 +10,31 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.7.0
-#  initImage: perconalab/percona-postgresql-operator:main
+#  initContainer:
+#    image: perconalab/percona-postgresql-operator:main
+#    resources:
+#      limits:
+#        cpu: 2.0
+#        memory: 4Gi
+#    containerSecurityContext:
+#      fsGroup: 1001
+#      runAsUser: 1001
+#      runAsNonRoot: true
+#      fsGroupChangePolicy: "OnRootMismatch"
+#      runAsGroup: 1001
+#      seLinuxOptions:
+#        type: spc_t
+#        level: s0:c123,c456
+#      seccompProfile:
+#        type: Localhost
+#        localhostProfile: localhost/profile.json
+#      supplementalGroups:
+#      - 1001
+#      sysctls:
+#      - name: net.ipv4.tcp_keepalive_time
+#        value: "600"
+#      - name: net.ipv4.tcp_keepalive_intvl
+#        value: "60"
 #  metadata:
 #    annotations:
 #      example-annotation: value
@@ -340,8 +364,31 @@ spec:
 #      metadata:
 #        labels:
       image: perconalab/percona-postgresql-operator:main-pgbackrest17
-#      initImage: perconalab/percona-postgresql-operator:main
-#
+#      initContainer:
+#        image: perconalab/percona-postgresql-operator:main
+#        resources:
+#          limits:
+#            cpu: 2.0
+#            memory: 4Gi
+#        containerSecurityContext:
+#          fsGroup: 1001
+#          runAsUser: 1001
+#          runAsNonRoot: true
+#          fsGroupChangePolicy: "OnRootMismatch"
+#          runAsGroup: 1001
+#          seLinuxOptions:
+#            type: spc_t
+#            level: s0:c123,c456
+#          seccompProfile:
+#            type: Localhost
+#            localhostProfile: localhost/profile.json
+#          supplementalGroups:
+#          - 1001
+#          sysctls:
+#          - name: net.ipv4.tcp_keepalive_time
+#            value: "600"
+#          - name: net.ipv4.tcp_keepalive_intvl
+#            value: "60"
 #      containers:
 #        pgbackrest:
 #          resources:
