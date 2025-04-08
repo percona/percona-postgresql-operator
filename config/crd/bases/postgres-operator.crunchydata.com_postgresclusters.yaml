@@ -14482,6 +14482,15 @@ spec:
                 type: boolean
               patroni:
                 properties:
+                  createReplicaMethods:
+                    description: CreateReplicaMethods allows overriding create_replica_methods
+                      for all instances.
+                    items:
+                      enum:
+                      - basebackup
+                      - pgbackrest
+                      type: string
+                    type: array
                   dynamicConfiguration:
                     description: |-
                       Patroni dynamic configuration settings. Changes to this value will be
