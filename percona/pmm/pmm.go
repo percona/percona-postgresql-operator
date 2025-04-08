@@ -277,20 +277,6 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 	if pgc.Spec.PMM.CustomClusterName != "" {
 		clusterName = pgc.Spec.PMM.CustomClusterName
 	}
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "cert-volume",
-			MountPath: "/pgconf/tls",
-			ReadOnly:  true,
-		},
-	}
-	if pgc.CompareVersion("2.7.0") >= 0 {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      postgres.DataVolumeMount().Name,
-			MountPath: postgres.DataVolumeMount().MountPath,
-			ReadOnly:  true,
-		})
-	}
 
 	container := corev1.Container{
 		Name:            "pmm-client",
@@ -324,7 +310,19 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 				},
 			},
 		},
-		VolumeMounts: volumeMounts,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "cert-volume",
+				MountPath: "/pgconf/tls",
+				ReadOnly:  true,
+			},
+			{
+				Name:      postgres.DataVolumeMount().Name,
+				MountPath: postgres.DataVolumeMount().MountPath,
+				ReadOnly:  true,
+			},
+		},
+
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",
