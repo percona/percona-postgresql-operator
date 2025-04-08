@@ -976,7 +976,6 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 
 		job2 := testBackupJob(cluster, "backup-job-one-complete-2")
 		job2.Namespace = ns.Name
-		job2.Name = "backup-job-2"
 
 		err = r.apply(ctx, job2)
 		assert.NilError(t, err)
@@ -1010,7 +1009,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 
 		latestCompleteBackupJob, err := r.getLatestCompleteBackupJob(ctx, cluster)
 		assert.NilError(t, err)
-		assert.Check(t, latestCompleteBackupJob.Name == "backup-job-1")
+		assert.Check(t, latestCompleteBackupJob.Name == "backup-job-one-complete-1")
 	})
 
 	t.Run("TwoCompleteBackupJobs", func(t *testing.T) {
@@ -1086,7 +1085,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 
 		latestCompleteBackupJob, err := r.getLatestCompleteBackupJob(ctx, cluster)
 		assert.NilError(t, err)
-		assert.Check(t, latestCompleteBackupJob.Name == "backup-job-1")
+		assert.Check(t, latestCompleteBackupJob.Name == "backup-job-two-complete-1")
 	})
 }
 
