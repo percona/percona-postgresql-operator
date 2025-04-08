@@ -13,7 +13,6 @@ commands:
           .spec.postgresVersion = 13 |
           .spec.image = "perconalab/percona-postgresql-operator:main-ppg13-postgres" |
           .spec.instances[0].dataVolumeClaimSpec.resources.requests.storage = "3Gi" |
-          .spec.patroni.createReplicaMethods = ["basebackup","pgbackrest"] |
           .spec.proxy.pgBouncer.image = "perconalab/percona-postgresql-operator:main-ppg13-pgbouncer" |
           .spec.backups.pgbackrest.image = "perconalab/percona-postgresql-operator:main-ppg13-pgbackrest"' \
         | kubectl -n "${NAMESPACE}" apply -f -
