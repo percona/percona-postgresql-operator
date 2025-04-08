@@ -404,10 +404,7 @@ spec:
                               sidecar container
                             properties:
                               containerSecurityContext:
-                                description: |-
-                                  SecurityContext holds security configuration that will be applied to a container.
-                                  Some fields are present in both SecurityContext and PodSecurityContext.  When both
-                                  are set, the values in SecurityContext take precedence.
+                                description: SecurityContext for a sidecar container
                                 properties:
                                   allowPrivilegeEscalation:
                                     description: |-
@@ -664,10 +661,7 @@ spec:
                               config sidecar container
                             properties:
                               containerSecurityContext:
-                                description: |-
-                                  SecurityContext holds security configuration that will be applied to a container.
-                                  Some fields are present in both SecurityContext and PodSecurityContext.  When both
-                                  are set, the values in SecurityContext take precedence.
+                                description: SecurityContext for a sidecar container
                                 properties:
                                   allowPrivilegeEscalation:
                                     description: |-
@@ -5245,10 +5239,7 @@ spec:
                               sidecar container
                             properties:
                               containerSecurityContext:
-                                description: |-
-                                  SecurityContext holds security configuration that will be applied to a container.
-                                  Some fields are present in both SecurityContext and PodSecurityContext.  When both
-                                  are set, the values in SecurityContext take precedence.
+                                description: SecurityContext for a sidecar container
                                 properties:
                                   allowPrivilegeEscalation:
                                     description: |-
@@ -5505,10 +5496,7 @@ spec:
                               config sidecar container
                             properties:
                               containerSecurityContext:
-                                description: |-
-                                  SecurityContext holds security configuration that will be applied to a container.
-                                  Some fields are present in both SecurityContext and PodSecurityContext.  When both
-                                  are set, the values in SecurityContext take precedence.
+                                description: SecurityContext for a sidecar container
                                 properties:
                                   allowPrivilegeEscalation:
                                     description: |-
@@ -9934,10 +9922,7 @@ spec:
                             copy sidecar container
                           properties:
                             containerSecurityContext:
-                              description: |-
-                                SecurityContext holds security configuration that will be applied to a container.
-                                Some fields are present in both SecurityContext and PodSecurityContext.  When both
-                                are set, the values in SecurityContext take precedence.
+                              description: SecurityContext for a sidecar container
                               properties:
                                 allowPrivilegeEscalation:
                                   description: |-
@@ -16032,10 +16017,7 @@ spec:
                               config sidecar container
                             properties:
                               containerSecurityContext:
-                                description: |-
-                                  SecurityContext holds security configuration that will be applied to a container.
-                                  Some fields are present in both SecurityContext and PodSecurityContext.  When both
-                                  are set, the values in SecurityContext take precedence.
+                                description: SecurityContext for a sidecar container
                                 properties:
                                   allowPrivilegeEscalation:
                                     description: |-
