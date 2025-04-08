@@ -170,9 +170,17 @@ spec:
 #          limits:
 #            cpu: 200m
 #            memory: 128Mi
+#        containerSecurityContext:
+#          privileged: false
 #    sidecars:
 #    - name: testcontainer
-#      image: mycontainer1:latest
+#      image: busybox:latest
+#      command: ["sleep", "30d"]
+#      resources:
+#        requests:
+#          memory: 100M
+#      securityContext:
+#        privileged: false
 #    - name: testcontainer2
 #      image: mycontainer1:latest
 #
@@ -253,6 +261,8 @@ spec:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
+#          containerSecurityContext:
+#            privileged: false
 #
 #      expose:
 #        annotations:
@@ -309,7 +319,13 @@ spec:
 #
 #      sidecars:
 #      - name: bouncertestcontainer1
-#        image: mycontainer1:latest
+#        image: busybox:latest
+#        command: ["sleep", "30d"]
+#        resources:
+#          requests:
+#            memory: 100M
+#        securityContext:
+#          privileged: false
 #
 #      customTLSSecret:
 #        name: keycloakdb-pgbouncer.tls
@@ -332,6 +348,8 @@ spec:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
+#          containerSecurityContext:
+#            privileged: false
 #        pgbackrestConfig:
 #          resources:
 #            limits:

@@ -68,6 +68,10 @@ type Sidecar struct {
 	// Resource requirements for a sidecar container
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// SecurityContext for a sidecar container
+	// +optional
+	ContainerSecurityContext *corev1.SecurityContext `json:"containerSecurityContext,omitempty"`
 }
 
 // Metadata contains metadata for custom resources
