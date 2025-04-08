@@ -10,6 +10,7 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.7.0
+#  initImage: perconalab/percona-postgresql-operator:main
 #  metadata:
 #    annotations:
 #      example-annotation: value
@@ -322,7 +323,8 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-pgbackrest17
+#      initImage: perconalab/percona-postgresql-operator:main
 #
 #      containers:
 #        pgbackrest:
@@ -493,6 +495,9 @@ spec:
 #          max_worker_processes: 2
 #          shared_buffers: 1GB
 #          work_mem: 2MB
+#    createReplicaMethods:
+#    - pgbackrest
+#    - basebackup
 
 #  extensions:
 #    image: perconalab/percona-postgresql-operator:main
@@ -506,6 +511,7 @@ spec:
 #        name: cluster1-extensions-secret
 #    builtin:
 #      pg_stat_monitor: true
+#      pg_stat_statements: false
 #      pg_audit: true
 #      pgvector: false
 #      pg_repack: false

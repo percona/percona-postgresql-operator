@@ -44,6 +44,11 @@ func (in *BuiltInExtensionsSpec) DeepCopyInto(out *BuiltInExtensionsSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PGStatStatements != nil {
+		in, out := &in.PGStatStatements, &out.PGStatStatements
+		*out = new(bool)
+		**out = **in
+	}
 	if in.PGAudit != nil {
 		in, out := &in.PGAudit, &out.PGAudit
 		*out = new(bool)

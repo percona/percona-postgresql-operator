@@ -1247,6 +1247,8 @@ spec:
                           pgBackRest repository hosts and backups. The image may also be set using
                           the RELATED_IMAGE_PGBACKREST environment variable
                         type: string
+                      initImage:
+                        type: string
                       jobs:
                         description: Jobs field allows configuration for all backup
                           jobs
@@ -8772,6 +8774,8 @@ spec:
                         type: boolean
                       pg_stat_monitor:
                         type: boolean
+                      pg_stat_statements:
+                        type: boolean
                       pgvector:
                         type: boolean
                     type: object
@@ -8905,6 +8909,8 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              initImage:
+                type: string
               instances:
                 description: |-
                   Specifies one or more sets of PostgreSQL pods that replicate data for
@@ -14051,6 +14057,15 @@ spec:
                 type: boolean
               patroni:
                 properties:
+                  createReplicaMethods:
+                    description: CreateReplicaMethods allows overriding create_replica_methods
+                      for all instances.
+                    items:
+                      enum:
+                      - basebackup
+                      - pgbackrest
+                      type: string
+                    type: array
                   dynamicConfiguration:
                     description: |-
                       Patroni dynamic configuration settings. Changes to this value will be
@@ -26073,6 +26088,8 @@ spec:
                           pgBackRest repository hosts and backups. The image may also be set using
                           the RELATED_IMAGE_PGBACKREST environment variable
                         type: string
+                      initImage:
+                        type: string
                       jobs:
                         description: Jobs field allows configuration for all backup
                           jobs
@@ -34049,6 +34066,8 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              initImage:
+                type: string
               instances:
                 description: |-
                   Specifies one or more sets of PostgreSQL pods that replicate data for
@@ -39653,6 +39672,15 @@ spec:
                 type: boolean
               patroni:
                 properties:
+                  createReplicaMethods:
+                    description: CreateReplicaMethods allows overriding create_replica_methods
+                      for all instances.
+                    items:
+                      enum:
+                      - basebackup
+                      - pgbackrest
+                      type: string
+                    type: array
                   dynamicConfiguration:
                     description: |-
                       Patroni dynamic configuration settings. Changes to this value will be
