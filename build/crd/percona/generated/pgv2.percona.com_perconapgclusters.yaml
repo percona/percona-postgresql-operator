@@ -2112,6 +2112,13 @@ spec:
                         description: Defines details for manual pgBackRest backup
                           Jobs
                         properties:
+                          initialDelaySeconds:
+                            description: |-
+                              InitialDelaySeconds defines the number of seconds to wait before starting the backup.
+                              After the backup pod is scheduled, its entrypoint will wait for this number of seconds
+                              before initiating the backup process.
+                            format: int64
+                            type: integer
                           options:
                             description: |-
                               Command line options to include when running the pgBackRest backup command.
