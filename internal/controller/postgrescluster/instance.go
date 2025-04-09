@@ -37,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -1206,9 +1207,15 @@ func (r *Reconciler) reconcileInstance(
 				ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)
 		}
 
+		// K8SPG-708
+		initImage, err := k8s.InitImage(ctx, r.Client, cluster, spec)
+		if err != nil {
+			return errors.Wrap(err, "failed to determine initial init image")
+		}
+
 		err = patroni.InstancePod(
 			ctx, cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
-			spec, instanceCertificates, instanceConfigMap, &instance.Spec.Template)
+			spec, instanceCertificates, instanceConfigMap, &instance.Spec.Template, initImage) // K8SPG-708
 	}
 
 	// Add pgMonitor resources to the instance Pod spec

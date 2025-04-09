@@ -116,7 +116,10 @@ func testCluster() *v1beta1.PostgresCluster {
 				Name: "myImagePullSecret"},
 			},
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
-				Name:                "instance1",
+				Name: "instance1",
+				InitContainer: &v1beta1.InitContainerSpec{
+					Image: "some-image",
+				},
 				Replicas:            initialize.Int32(1),
 				DataVolumeClaimSpec: testVolumeClaimSpec(),
 			}},

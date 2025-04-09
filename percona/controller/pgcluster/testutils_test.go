@@ -100,6 +100,9 @@ func readTestCR(name, namespace, testFile string) (*v2.PerconaPGCluster, error) 
 	}
 	cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "4.0.0"
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
+	cr.Spec.InitContainer = &v1beta1.InitContainerSpec{
+		Image: "some-image",
+	}
 	return cr, nil
 }
 
