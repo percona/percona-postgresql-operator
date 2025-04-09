@@ -1,91 +1,112 @@
-# https://golangci-lint.run/usage/configuration/
-version: "1"
-
-linters:
-  disable:
-    - contextcheck
-    - gci
-    - gofumpt
-    - goimports
-  enable:
-    - depguard
-    - gomodguard
-    - gosimple
-    - importas
-    - misspell
-    - unconvert
-  presets:
-    - bugs
-    - format
-    - unused
-
-linters-settings:
-  gci:
-    sections:
-      - standard
-      - default
-      - prefix(github.com/percona)
-
-  depguard:
-    rules:
-      everything:
-        deny:
-          - pkg: io/ioutil
-            desc: >
-              Use the "io" and "os" packages instead.
-              See https://go.dev/doc/go1.16#ioutil
-
-      not-tests:
-        files: ['!$test']
-        deny:
-          - pkg: net/http/httptest
-            desc: Should be used only in tests.
-
-          - pkg: testing/*
-            desc: The "testing" packages should be used only in tests.
-
-          - pkg: github.com/percona/percona-postgresql-operator/internal/testing/*
-            desc: The "internal/testing" packages should be used only in tests.
-
-      tests:
-        files: ['$test']
-        deny:
-          - pkg: github.com/pkg/errors
-            desc: Use the "errors" package unless you are interacting with stack traces.
-
-  errchkjson:
-    check-error-free-encoding: true
-
-  exhaustive:
-    default-signifies-exhaustive: true
-
-  gomodguard:
-    blocked:
-      modules:
-        - gopkg.in/yaml.v2: { recommendations: [sigs.k8s.io/yaml] }
-        - gopkg.in/yaml.v3: { recommendations: [sigs.k8s.io/yaml] }
-        - gotest.tools: { recommendations: [gotest.tools/v3] }
-        - k8s.io/kubernetes:
-            reason: >
-              k8s.io/kubernetes is for managing dependencies of the Kubernetes
-              project, i.e. building kubelet and kubeadm.
-
-  importas:
-    alias:
-      - pkg: k8s.io/api/(\w+)/(v[\w\w]+)
-        alias: $1$2
-      - pkg: k8s.io/apimachinery/pkg/apis/(\w+)/(v[\w\d]+)
-        alias: $1$2
-    no-unaliased: true
-
+version: "2"
 run:
   build-tags:
     - envtest
-issues:
-  exclude-generated: strict
-  exclude-rules:
-    # These value types have unmarshal methods.
-    # https://github.com/raeperd/recvcheck/issues/7
-    - linters: [recvcheck]
-      path: internal/pki/pki.go
-      text: 'methods of "(Certificate|PrivateKey)"'
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - depguard
+    - durationcheck
+    - errorlint
+    - exhaustive
+    - gocheckcompilerdirectives
+    - gochecksumtype
+    - gomodguard
+    - gosec
+    - gosmopolitan
+    - importas
+    - loggercheck
+    - makezero
+    - misspell
+    - musttag
+    - nilerr
+    - nilnesserr
+    - noctx
+    - protogetter
+    - reassign
+    - recvcheck
+    - rowserrcheck
+    - spancheck
+    - sqlclosecheck
+    - testifylint
+    - unconvert
+    - unparam
+    - zerologlint
+  disable:
+    - contextcheck
+    - errchkjson
+  settings:
+    depguard:
+      rules:
+        everything:
+          deny:
+            - pkg: io/ioutil
+              desc: |
+                Use the "io" and "os" packages instead. See https://go.dev/doc/go1.16#ioutil
+        not-tests:
+          files:
+            - '!$test'
+          deny:
+            - pkg: net/http/httptest
+              desc: Should be used only in tests.
+            - pkg: testing/*
+              desc: The "testing" packages should be used only in tests.
+            - pkg: github.com/percona/percona-postgresql-operator/internal/testing/*
+              desc: The "internal/testing" packages should be used only in tests.
+    exhaustive:
+      default-signifies-exhaustive: true
+    gomodguard:
+      blocked:
+        modules:
+          - gopkg.in/yaml.v2:
+              recommendations:
+                - sigs.k8s.io/yaml
+          - gopkg.in/yaml.v3:
+              recommendations:
+                - sigs.k8s.io/yaml
+          - gotest.tools:
+              recommendations:
+                - gotest.tools/v3
+          - k8s.io/kubernetes:
+              reason: |
+                k8s.io/kubernetes is for managing dependencies of the Kubernetes project, i.e. building kubelet and kubeadm.
+    importas:
+      alias:
+        - pkg: k8s.io/api/(\w+)/(v[\w\w]+)
+          alias: $1$2
+        - pkg: k8s.io/apimachinery/pkg/apis/(\w+)/(v[\w\d]+)
+          alias: $1$2
+      no-unaliased: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - pkg/generated
+      - hack
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/percona)
+  exclusions:
+    generated: lax
+    paths:
+      - pkg/generated
+      - hack
+      - third_party$
+      - builtin$
+      - examples$
