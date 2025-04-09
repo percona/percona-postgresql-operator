@@ -1622,3 +1622,118 @@ var _ = Describe("Validate TLS", Ordered, func() {
 		checkSecretProjectionWithCA(cr, cr.Spec.Secrets.CustomReplicationClientTLSSecret, secretName)
 	})
 })
+
+type saTestClient struct {
+	client.Client
+
+	crName string
+	ns     string
+}
+
+func (sc *saTestClient) checkObject(ctx context.Context, obj client.Object) error {
+	sts, ok := obj.(*appsv1.StatefulSet)
+	if !ok {
+		return nil
+	}
+	serviceAccountName := sts.Spec.Template.Spec.ServiceAccountName
+	if serviceAccountName == "" {
+		panic("it's not expected to have empty service account name")
+	}
+
+	if err := sc.Client.Get(ctx, types.NamespacedName{
+		Name:      serviceAccountName,
+		Namespace: sts.Namespace,
+	}, new(corev1.ServiceAccount)); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return errors.Wrap(err, "test error: service account should be created before the statefulset")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (sc *saTestClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	if err := sc.checkObject(ctx, obj); err != nil {
+		panic(err) // should panic because reconciler can ignore the error
+	}
+	return sc.Client.Update(ctx, obj, opts...)
+}
+
+func (sc *saTestClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+	if err := sc.checkObject(ctx, obj); err != nil {
+		panic(err) // should panic because reconciler can ignore the error
+	}
+	return sc.Client.Patch(ctx, obj, patch, opts...)
+}
+
+func (sc *saTestClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if err := sc.checkObject(ctx, obj); err != nil {
+		panic(err) // should panic because reconciler can ignore the error
+	}
+	return sc.Client.Create(ctx, obj, opts...)
+}
+
+// This test ensures that the ServiceAccount associated with a StatefulSet is created
+// before the StatefulSet itself. (K8SPG-698)
+// The saTestClient verifies the existence of the ServiceAccount during create, patch,
+// or update operations on the StatefulSet.
+var _ = Describe("ServiceAccount early creation", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "sa-timestamp"
+	const ns = crName
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read default cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	cr.Default()
+	reconciler := reconciler(cr)
+	crunchyReconciler := crunchyReconciler()
+
+	var cl client.Client
+
+	BeforeAll(func() {
+		cl = &saTestClient{
+			Client: k8sClient,
+
+			crName: crName,
+			ns:     ns,
+		}
+		reconciler.Client = cl
+		crunchyReconciler.Client = cl
+
+		By("Creating the Namespace to perform the tests")
+		err := cl.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = cl.Delete(ctx, namespace)
+	})
+
+	It("should create PerconaPGCluster", func() {
+		status := cr.Status
+		Expect(cl.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(cl.Status().Update(ctx, cr)).Should(Succeed())
+	})
+
+	It("Should reconcile", func() {
+		_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+})
