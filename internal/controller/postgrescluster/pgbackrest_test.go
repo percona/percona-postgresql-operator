@@ -2720,6 +2720,144 @@ volumes:
 			}
 		})
 	})
+
+	t.Run("InitialDelaySeconds", func(t *testing.T) {
+		t.Run("<2.7.0", func(t *testing.T) {
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						naming.LabelVersion: "2.6.0",
+					},
+				},
+				Spec: v1beta1.PostgresClusterSpec{
+					Backups: v1beta1.Backups{
+						PGBackRest: v1beta1.PGBackRestArchive{
+							Manual: &v1beta1.PGBackRestManualBackup{
+								InitialDelaySeconds: 30,
+							},
+						},
+					},
+				},
+			}
+			job := generateBackupJobSpecIntent(ctx,
+				cluster, v1beta1.PGBackRestRepo{},
+				"", "",
+				nil, nil,
+			)
+
+			container := job.Template.Spec.Containers[0]
+
+			var envVarFound bool
+			for _, env := range container.Env {
+				if env.Name == "INITIAL_DELAY_SECS" {
+					envVarFound = true
+				}
+			}
+
+			assert.Check(t, envVarFound == false)
+		})
+
+		t.Run(">=2.7.0", func(t *testing.T) {
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						naming.LabelVersion: "2.7.0",
+					},
+				},
+				Spec: v1beta1.PostgresClusterSpec{
+					Backups: v1beta1.Backups{
+						PGBackRest: v1beta1.PGBackRestArchive{
+							Manual: &v1beta1.PGBackRestManualBackup{
+								InitialDelaySeconds: 30,
+							},
+						},
+					},
+				},
+			}
+			job := generateBackupJobSpecIntent(ctx,
+				cluster, v1beta1.PGBackRestRepo{},
+				"", "",
+				nil, nil,
+			)
+
+			container := job.Template.Spec.Containers[0]
+
+			var envVar corev1.EnvVar
+			for _, env := range container.Env {
+				if env.Name == "INITIAL_DELAY_SECS" {
+					envVar = env
+				}
+			}
+
+			if assert.Check(t, envVar.Name == "INITIAL_DELAY_SECS") {
+				assert.Equal(t, envVar.Value, "30")
+			}
+		})
+
+		t.Run("NoManual", func(t *testing.T) {
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						naming.LabelVersion: "2.7.0",
+					},
+				},
+				Spec: v1beta1.PostgresClusterSpec{
+					Backups: v1beta1.Backups{
+						PGBackRest: v1beta1.PGBackRestArchive{},
+					},
+				},
+			}
+			job := generateBackupJobSpecIntent(ctx,
+				cluster, v1beta1.PGBackRestRepo{},
+				"", "",
+				nil, nil,
+			)
+
+			container := job.Template.Spec.Containers[0]
+
+			var envVarFound bool
+			for _, env := range container.Env {
+				if env.Name == "INITIAL_DELAY_SECS" {
+					envVarFound = true
+				}
+			}
+
+			assert.Check(t, envVarFound == false)
+		})
+
+		t.Run("EmptyValue", func(t *testing.T) {
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						naming.LabelVersion: "2.7.0",
+					},
+				},
+				Spec: v1beta1.PostgresClusterSpec{
+					Backups: v1beta1.Backups{
+						PGBackRest: v1beta1.PGBackRestArchive{
+							Manual: &v1beta1.PGBackRestManualBackup{},
+						},
+					},
+				},
+			}
+			job := generateBackupJobSpecIntent(ctx,
+				cluster, v1beta1.PGBackRestRepo{},
+				"", "",
+				nil, nil,
+			)
+
+			container := job.Template.Spec.Containers[0]
+
+			var envVarFound bool
+			for _, env := range container.Env {
+				if env.Name == "INITIAL_DELAY_SECS" {
+					envVarFound = true
+				}
+			}
+
+			assert.Check(t, envVarFound == false)
+		})
+	})
 }
 
 func TestGenerateRepoHostIntent(t *testing.T) {

@@ -205,6 +205,12 @@ type PGBackRestManualBackup struct {
 	// https://pgbackrest.org/command.html#command-backup
 	// +optional
 	Options []string `json:"options,omitempty"`
+
+	// InitialDelaySeconds defines the number of seconds to wait before starting the backup.
+	// After the backup pod is scheduled, its entrypoint will wait for this number of seconds
+	// before initiating the backup process.
+	// +optional
+	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
 }
 
 // PGBackRestRepoHost represents a pgBackRest dedicated repository host
