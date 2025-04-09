@@ -188,7 +188,14 @@ type PostgresClusterSpec struct {
 
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
 
-	InitImage string `json:"initImage,omitempty"` // K8SPG-613
+	// +optional
+	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+}
+
+type InitContainerSpec struct {
+	Image                    string                       `json:"image,omitempty"`
+	Resources                *corev1.ResourceRequirements `json:"resources,omitempty"`
+	ContainerSecurityContext *corev1.SecurityContext      `json:"containerSecurityContext,omitempty"`
 }
 
 type ExtensionsSpec struct {
@@ -542,6 +549,17 @@ type PostgresInstanceSetSpec struct {
 	// SecurityContext defines the security settings for a PostgreSQL pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// K8SPG-708
+	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
+	// +optional
+	InitContainer *InitContainerSpec `json:"initContainer,omitempty"`
+}
+
+// K8SPG-708
+// GetInitContainer get the init container from the PostgresInstanceSetSpec.
+func (p *PostgresInstanceSetSpec) GetInitContainer() *InitContainerSpec {
+	return p.InitContainer
 }
 
 type TablespaceVolume struct {

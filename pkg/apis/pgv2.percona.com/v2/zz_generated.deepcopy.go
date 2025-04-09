@@ -155,6 +155,11 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 			(*out)[key] = val
 		}
 	}
+	if in.InitContainer != nil {
+		in, out := &in.InitContainer, &out.InitContainer
+		*out = new(v1beta1.InitContainerSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Jobs != nil {
 		in, out := &in.Jobs, &out.Jobs
 		*out = new(v1beta1.BackupJobs)
@@ -392,6 +397,11 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
 		*out = new(v1.PodSecurityContext)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.InitContainer != nil {
+		in, out := &in.InitContainer, &out.InitContainer
+		*out = new(v1beta1.InitContainerSpec)
 		(*in).DeepCopyInto(*out)
 	}
 }
@@ -661,6 +671,11 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 	if in.Metadata != nil {
 		in, out := &in.Metadata, &out.Metadata
 		*out = new(v1beta1.Metadata)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.InitContainer != nil {
+		in, out := &in.InitContainer, &out.InitContainer
+		*out = new(v1beta1.InitContainerSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ImagePullSecrets != nil {

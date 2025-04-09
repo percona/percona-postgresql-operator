@@ -52,7 +52,7 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	CRVersion string `json:"crVersion,omitempty"`
 
-	InitImage string `json:"initImage,omitempty"`
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
 
 	// The image name to use for PostgreSQL containers.
 	// +optional
@@ -365,7 +365,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
-	postgresCluster.Spec.InitImage = cr.Spec.InitImage
+	postgresCluster.Spec.InitContainer = cr.Spec.InitContainer
 
 	return postgresCluster, nil
 }
@@ -475,7 +475,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			RepoHost:      b.PGBackRest.RepoHost,
 			Manual:        b.PGBackRest.Manual,
 			Restore:       b.PGBackRest.Restore,
-			InitImage:     b.PGBackRest.InitImage,
+			InitContainer: b.PGBackRest.InitContainer,
 			Sidecars:      sc,
 		},
 	}
@@ -506,7 +506,7 @@ type PGBackRestArchive struct {
 	Image string `json:"image,omitempty"`
 
 	// +optional
-	InitImage string `json:"initImage,omitempty"`
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional
@@ -773,6 +773,11 @@ type PGInstanceSetSpec struct {
 	// SecurityContext defines the security settings for a PostgreSQL pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// K8SPG-708
+	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
+	// +optional
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -794,7 +799,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		VolumeMounts:              p.VolumeMounts,
 		SecurityContext:           p.SecurityContext,
 		TablespaceVolumes:         p.TablespaceVolumes,
-	}
+		InitContainer:             p.InitContainer}
 }
 
 type ServiceExpose struct {
