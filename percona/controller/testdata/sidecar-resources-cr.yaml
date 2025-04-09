@@ -58,7 +58,7 @@ spec:
 
   backups:
     pgbackrest:
-      image: perconalab/percona-postgresql-operator:main-ppg17-pgbackrest
+      image: perconalab/percona-postgresql-operator:main-pgbackrest17
 #      
       containers:
         pgbackrest:

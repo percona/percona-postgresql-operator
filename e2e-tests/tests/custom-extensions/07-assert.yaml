@@ -24,6 +24,8 @@ spec:
         - /usr/local/bin/relocate-extensions.sh
       - command:
         - /usr/local/bin/install-extensions.sh
+      - command:
+        - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
   observedGeneration: 3

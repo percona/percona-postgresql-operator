@@ -116,7 +116,10 @@ func testCluster() *v1beta1.PostgresCluster {
 				Name: "myImagePullSecret"},
 			},
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
-				Name:                "instance1",
+				Name: "instance1",
+				InitContainer: &v1beta1.InitContainerSpec{
+					Image: "some-image",
+				},
 				Replicas:            initialize.Int32(1),
 				DataVolumeClaimSpec: testVolumeClaimSpec(),
 			}},
@@ -141,14 +144,14 @@ func testCluster() *v1beta1.PostgresCluster {
 	return cluster.DeepCopy()
 }
 
-func testBackupJob(cluster *v1beta1.PostgresCluster) *batchv1.Job {
+func testBackupJob(cluster *v1beta1.PostgresCluster, name string) *batchv1.Job {
 	job := batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: batchv1.SchemeGroupVersion.String(),
 			Kind:       "Job",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "backup-job-1",
+			Name:      name,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				naming.LabelCluster:          cluster.Name,

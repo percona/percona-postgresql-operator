@@ -100,6 +100,9 @@ func readTestCR(name, namespace, testFile string) (*v2.PerconaPGCluster, error) 
 	}
 	cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "4.0.0"
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
+	cr.Spec.InitContainer = &v1beta1.InitContainerSpec{
+		Image: "some-image",
+	}
 	return cr, nil
 }
 
@@ -118,6 +121,9 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	cr.Name = name
 	if cr.Annotations == nil {
 		cr.Annotations = make(map[string]string)
+	}
+	cr.Spec.InitContainer = &v1beta1.InitContainerSpec{
+		Image: "some-image",
 	}
 	cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "4.0.0"
 	cr.Namespace = namespace

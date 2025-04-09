@@ -97,6 +97,8 @@ spec:
   image: postgres
   instances:
   - name: register-now
+    initContainer:
+      image: postgres
     dataVolumeClaimSpec:
       accessModes:
       - "ReadWriteMany"
@@ -233,6 +235,8 @@ spec:
   image: postgres
   instances:
   - name: samba
+    initContainer:
+      image: postgres
     dataVolumeClaimSpec:
       accessModes:
       - "ReadWriteMany"
@@ -438,6 +442,8 @@ spec:
   image: postgres
   instances:
   - name: samba
+    initContainer:
+      image: postgres
     dataVolumeClaimSpec:
       accessModes:
       - "ReadWriteMany"
@@ -510,6 +516,31 @@ spec:
 			))
 
 			Expect(icm.Data["patroni.yaml"]).ToNot(BeZero())
+		})
+
+		It("doesn't reconcile ConfigMap with override annotation", func() {
+			icm := &corev1.ConfigMap{}
+			Expect(suite.Client.Get(context.Background(), client.ObjectKey{
+				Namespace: test.Namespace.Name, Name: instance.Name + "-config",
+			}, icm)).To(Succeed())
+
+			Expect(icm.Labels[naming.LabelCluster]).To(Equal("carlos"))
+			Expect(icm.Labels[naming.LabelInstance]).To(Equal(instance.Name))
+			Expect(icm.Data["patroni.yaml"]).ToNot(BeZero())
+
+			icm.SetAnnotations(map[string]string{
+				naming.OverrideConfigAnnotation: "true",
+			})
+			icm.Data["patroni.yaml"] = ""
+
+			Expect(suite.Client.Update(context.Background(), icm)).To(Succeed())
+
+			Expect(suite.Client.Get(context.Background(), client.ObjectKey{
+				Namespace: test.Namespace.Name, Name: instance.Name + "-config",
+			}, icm)).To(Succeed())
+
+			Expect(icm.Annotations[naming.OverrideConfigAnnotation]).To(Equal("true"))
+			Expect(icm.Data["patroni.yaml"]).To(BeZero())
 		})
 
 		Specify("Instance StatefulSet", func() {

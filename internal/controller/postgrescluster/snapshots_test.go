@@ -493,7 +493,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
 
 		// Create successful backup job
-		backupJob := testBackupJob(cluster)
+		backupJob := testBackupJob(cluster, "backup-job-snapshots-enabled-1")
 		err = errors.WithStack(r.setControllerReference(cluster, backupJob))
 		assert.NilError(t, err)
 		err = r.apply(ctx, backupJob)
@@ -562,7 +562,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		earlierTime := metav1.NewTime(currentTime.AddDate(-1, 0, 0))
 
 		// Create successful backup job
-		backupJob := testBackupJob(cluster)
+		backupJob := testBackupJob(cluster, "backup-job-snapshots-enabled-exists-1")
 		err = errors.WithStack(r.setControllerReference(cluster, backupJob))
 		assert.NilError(t, err)
 		err = r.apply(ctx, backupJob)
@@ -665,7 +665,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		earlierTime := metav1.NewTime(currentTime.AddDate(-1, 0, 0))
 
 		// Create successful backup job
-		backupJob := testBackupJob(cluster)
+		backupJob := testBackupJob(cluster, "backup-job-snapshots-enabled-failed-exists-1")
 		err = errors.WithStack(r.setControllerReference(cluster, backupJob))
 		assert.NilError(t, err)
 		err = r.apply(ctx, backupJob)
@@ -796,7 +796,7 @@ func TestDedicatedSnapshotVolumeRestore(t *testing.T) {
 	sts := &appsv1.StatefulSet{}
 	generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1)
 	currentTime := metav1.Now()
-	backupJob := testBackupJob(cluster)
+	backupJob := testBackupJob(cluster, "backup-job-dedicated-snapshot-exists-1")
 	backupJob.Status.CompletionTime = &currentTime
 
 	err := r.dedicatedSnapshotVolumeRestore(ctx, cluster, pvc, backupJob)
@@ -954,7 +954,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 	})
 
 	t.Run("NoCompleteJobs", func(t *testing.T) {
-		job1 := testBackupJob(cluster)
+		job1 := testBackupJob(cluster, "backup-job-latest-complete-1")
 		job1.Namespace = ns.Name
 
 		err := r.apply(ctx, job1)
@@ -968,15 +968,14 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 	t.Run("OneCompleteBackupJob", func(t *testing.T) {
 		currentTime := metav1.Now()
 
-		job1 := testBackupJob(cluster)
+		job1 := testBackupJob(cluster, "backup-job-one-complete-1")
 		job1.Namespace = ns.Name
 
 		err := r.apply(ctx, job1)
 		assert.NilError(t, err)
 
-		job2 := testBackupJob(cluster)
+		job2 := testBackupJob(cluster, "backup-job-one-complete-2")
 		job2.Namespace = ns.Name
-		job2.Name = "backup-job-2"
 
 		err = r.apply(ctx, job2)
 		assert.NilError(t, err)
@@ -1010,7 +1009,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 
 		latestCompleteBackupJob, err := r.getLatestCompleteBackupJob(ctx, cluster)
 		assert.NilError(t, err)
-		assert.Check(t, latestCompleteBackupJob.Name == "backup-job-1")
+		assert.Equal(t, latestCompleteBackupJob.Name, "backup-job-one-complete-1")
 	})
 
 	t.Run("TwoCompleteBackupJobs", func(t *testing.T) {
@@ -1018,15 +1017,14 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 		earlierTime := metav1.NewTime(currentTime.AddDate(-1, 0, 0))
 		assert.Check(t, earlierTime.Before(&currentTime))
 
-		job1 := testBackupJob(cluster)
+		job1 := testBackupJob(cluster, "backup-job-two-complete-1")
 		job1.Namespace = ns.Name
 
 		err := r.apply(ctx, job1)
 		assert.NilError(t, err)
 
-		job2 := testBackupJob(cluster)
+		job2 := testBackupJob(cluster, "backup-job-two-complete-2")
 		job2.Namespace = ns.Name
-		job2.Name = "backup-job-2"
 
 		err = r.apply(ctx, job2)
 		assert.NilError(t, err)
@@ -1087,7 +1085,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 
 		latestCompleteBackupJob, err := r.getLatestCompleteBackupJob(ctx, cluster)
 		assert.NilError(t, err)
-		assert.Check(t, latestCompleteBackupJob.Name == "backup-job-1")
+		assert.Equal(t, latestCompleteBackupJob.Name, "backup-job-one-complete-1")
 	})
 }
 

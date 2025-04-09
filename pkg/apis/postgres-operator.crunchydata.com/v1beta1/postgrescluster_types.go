@@ -187,6 +187,15 @@ type PostgresClusterSpec struct {
 	Config PostgresAdditionalConfig `json:"config,omitempty"`
 
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
+
+	// +optional
+	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+}
+
+type InitContainerSpec struct {
+	Image                    string                       `json:"image,omitempty"`
+	Resources                *corev1.ResourceRequirements `json:"resources,omitempty"`
+	ContainerSecurityContext *corev1.SecurityContext      `json:"containerSecurityContext,omitempty"`
 }
 
 type ExtensionsSpec struct {
@@ -194,6 +203,7 @@ type ExtensionsSpec struct {
 	PGAudit          bool `json:"pgAudit,omitempty"`
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
 	PGVector         bool `json:"pgvector,omitempty"`
+	PGRepack         bool `json:"pgRepack,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.
@@ -539,6 +549,17 @@ type PostgresInstanceSetSpec struct {
 	// SecurityContext defines the security settings for a PostgreSQL pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// K8SPG-708
+	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
+	// +optional
+	InitContainer *InitContainerSpec `json:"initContainer,omitempty"`
+}
+
+// K8SPG-708
+// GetInitContainer get the init container from the PostgresInstanceSetSpec.
+func (p *PostgresInstanceSetSpec) GetInitContainer() *InitContainerSpec {
+	return p.InitContainer
 }
 
 type TablespaceVolume struct {

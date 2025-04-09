@@ -52,6 +52,8 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	CRVersion string `json:"crVersion,omitempty"`
 
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
+
 	// The image name to use for PostgreSQL containers.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
@@ -223,11 +225,17 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
 	}
+	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatStatements = &f
+	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
 		cr.Spec.Extensions.BuiltIn.PGAudit = &t
 	}
 	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
 		cr.Spec.Extensions.BuiltIn.PGVector = &f
+	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
+		cr.Spec.Extensions.BuiltIn.PGRepack = &f
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
@@ -350,10 +358,14 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
 
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
+	postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.BuiltIn.PGStatStatements
 	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
 	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
+	postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
+
+	postgresCluster.Spec.InitContainer = cr.Spec.InitContainer
 
 	return postgresCluster, nil
 }
@@ -463,6 +475,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			RepoHost:      b.PGBackRest.RepoHost,
 			Manual:        b.PGBackRest.Manual,
 			Restore:       b.PGBackRest.Restore,
+			InitContainer: b.PGBackRest.InitContainer,
 			Sidecars:      sc,
 		},
 	}
@@ -491,6 +504,9 @@ type PGBackRestArchive struct {
 	// the RELATED_IMAGE_PGBACKREST environment variable
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// +optional
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional
@@ -593,9 +609,11 @@ type CustomExtensionsStorageSpec struct {
 }
 
 type BuiltInExtensionsSpec struct {
-	PGStatMonitor *bool `json:"pg_stat_monitor,omitempty"`
-	PGAudit       *bool `json:"pg_audit,omitempty"`
-	PGVector      *bool `json:"pgvector,omitempty"`
+	PGStatMonitor    *bool `json:"pg_stat_monitor,omitempty"`
+	PGStatStatements *bool `json:"pg_stat_statements,omitempty"`
+	PGAudit          *bool `json:"pg_audit,omitempty"`
+	PGVector         *bool `json:"pgvector,omitempty"`
+	PGRepack         *bool `json:"pg_repack,omitempty"`
 }
 
 type ExtensionsSpec struct {
@@ -755,6 +773,11 @@ type PGInstanceSetSpec struct {
 	// SecurityContext defines the security settings for a PostgreSQL pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// K8SPG-708
+	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
+	// +optional
+	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -776,7 +799,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		VolumeMounts:              p.VolumeMounts,
 		SecurityContext:           p.SecurityContext,
 		TablespaceVolumes:         p.TablespaceVolumes,
-	}
+		InitContainer:             p.InitContainer}
 }
 
 type ServiceExpose struct {

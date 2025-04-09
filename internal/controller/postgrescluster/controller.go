@@ -27,13 +27,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pgbouncer"
@@ -504,9 +507,22 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		}
 	}
 
+	// K8SPG-712: Allow overriding default configurations
+	configMapPredicate := builder.WithPredicates(predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			configMap, ok := e.ObjectNew.(*corev1.ConfigMap)
+			if !ok {
+				return true
+			}
+			// Skip reconciliation if the ConfigMap has the specified annotation
+			_, hasAnnotation := configMap.Annotations[naming.OverrideConfigAnnotation]
+			return !hasAnnotation
+		},
+	})
+
 	return builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
-		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.ConfigMap{}, configMapPredicate). // K8SPG-712
 		Owns(&corev1.Endpoints{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
