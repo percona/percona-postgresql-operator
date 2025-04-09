@@ -600,6 +600,8 @@ spec:
   image: postgres
   instances:
   - name: instance1
+    initContainer:
+      image: pg-operator
     dataVolumeClaimSpec:
       accessModes:
       - "ReadWriteMany"
