@@ -18,7 +18,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.compercona/percona-postgresql-operator/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -326,7 +326,7 @@ func TestReloadCommand(t *testing.T) {
 }
 
 func TestReloadCommandPrettyYAML(t *testing.T) {
-	assert.Assert(t, cmp.MarshalContains(reloadCommand("any"), "\n- |"),
+	assert.Assert(t, cmp.MarshalContains(reloadCommand("any", true), "\n- |"),
 		"expected literal block scalar")
 }
 
