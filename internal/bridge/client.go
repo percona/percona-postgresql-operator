@@ -724,7 +724,10 @@ func (c *Client) UpdateCluster(
 ) (*ClusterApiResource, error) {
 	result := &ClusterApiResource{}
 
-	clusterbyte, _ := json.Marshal(clusterRequestPayload)
+	clusterbyte, err := json.Marshal(clusterRequestPayload)
+	if err != nil {
+		return result, err
+	}
 
 	response, err := c.doWithRetry(ctx, "PATCH", "/clusters/"+id, nil, clusterbyte, http.Header{
 		"Accept":        []string{"application/json"},
