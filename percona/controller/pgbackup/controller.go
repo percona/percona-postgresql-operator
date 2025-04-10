@@ -99,7 +99,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 		}
 
-		if !pgCluster.Spec.BackupsEnabled() {
+		if !pgCluster.Spec.Backups.IsEnabled() {
 			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				bcp := new(v2.PerconaPGBackup)
 				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {

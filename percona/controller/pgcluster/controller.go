@@ -867,7 +867,7 @@ func (r *PGClusterReconciler) reconcileExternalWatchers(ctx context.Context, cr 
 }
 
 func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if !cr.Spec.BackupsEnabled() {
+	if !cr.Spec.Backups.IsEnabled() {
 		return nil
 	}
 
@@ -894,7 +894,7 @@ func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.
 }
 
 func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.PerconaPGCluster) {
-	if !cr.Spec.BackupsEnabled() {
+	if !cr.Spec.Backups.IsEnabled() {
 		return
 	}
 

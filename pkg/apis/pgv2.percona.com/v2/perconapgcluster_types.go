@@ -206,7 +206,7 @@ func (cr *PerconaPGCluster) Default() {
 	t := true
 	f := false
 
-	if cr.Spec.BackupsEnabled() {
+	if cr.Spec.Backups.IsEnabled() {
 		if cr.Spec.Backups.TrackLatestRestorableTime == nil {
 			cr.Spec.Backups.TrackLatestRestorableTime = &t
 		}
@@ -242,10 +242,6 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
 	}
-}
-
-func (spec *PerconaPGClusterSpec) BackupsEnabled() bool {
-	return spec.Backups.Enabled == nil || *spec.Backups.Enabled
 }
 
 func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crunchyv1beta1.PostgresCluster, scheme *runtime.Scheme) (*crunchyv1beta1.PostgresCluster, error) {
@@ -460,6 +456,10 @@ type Backups struct {
 
 	// Enable tracking latest restorable time
 	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
+}
+
+func (b Backups) IsEnabled() bool {
+	return b.Enabled == nil || *b.Enabled
 }
 
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
