@@ -1678,7 +1678,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.PostgresVersion = 14
-				cr.Spec.Users = []v1beta1.PostgresUserSpec{{}}
+				cr.Spec.Users = []v1beta1.PostgresUserSpec{{Name: "test"}}
 
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 			})
