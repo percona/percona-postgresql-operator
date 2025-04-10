@@ -1640,7 +1640,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		By("Deleting the Namespace to perform the tests")
+		By("Deleting the Namespace to clean up after the tests")
 		_ = k8sClient.Delete(ctx, namespace)
 	})
 
@@ -1651,8 +1651,8 @@ var _ = Describe("CR Validations", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.PostgresVersion = 15
-				cr.Spec.Users = []v2.User{{
-					GrantPublicSchemaAccess: ptr.To(true),
+				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
+					GrantPublicSchemaAccess: true,
 				}}
 
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
@@ -1663,8 +1663,8 @@ var _ = Describe("CR Validations", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.PostgresVersion = 14
-				cr.Spec.Users = []v2.User{{
-					GrantPublicSchemaAccess: ptr.To(false),
+				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
+					GrantPublicSchemaAccess: false,
 				}}
 
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
@@ -1675,7 +1675,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.PostgresVersion = 14
-				cr.Spec.Users = []v2.User{{}}
+				cr.Spec.Users = []v1beta1.PostgresUserSpec{{}}
 
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 			})
@@ -1697,8 +1697,8 @@ var _ = Describe("CR Validations", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.PostgresVersion = 14
-				cr.Spec.Users = []v2.User{{
-					GrantPublicSchemaAccess: ptr.To(true),
+				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
+					GrantPublicSchemaAccess: true,
 				}}
 
 				err = k8sClient.Create(ctx, cr)
@@ -1713,9 +1713,9 @@ var _ = Describe("CR Validations", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.PostgresVersion = 14
-				cr.Spec.Users = []v2.User{
-					{GrantPublicSchemaAccess: ptr.To(false)},
-					{GrantPublicSchemaAccess: ptr.To(true)},
+				cr.Spec.Users = []v1beta1.PostgresUserSpec{
+					{GrantPublicSchemaAccess: false},
+					{GrantPublicSchemaAccess: true},
 				}
 
 				err = k8sClient.Create(ctx, cr)
