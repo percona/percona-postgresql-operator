@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	gs "github.com/onsi/gomega/gstruct"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
@@ -843,7 +841,7 @@ var _ = Describe("Users", Ordered, func() {
 			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 		})
 
-		It("should create defaul and monitor user", func() {
+		It("should create default and monitor user", func() {
 			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
@@ -1620,5 +1618,110 @@ var _ = Describe("Validate TLS", Ordered, func() {
 		secretName := "custom-replication-tls-secret-with-ca" //nolint:gosec
 		cr.Spec.Secrets.CustomReplicationClientTLSSecret = new(corev1.SecretProjection)
 		checkSecretProjectionWithCA(cr, cr.Spec.Secrets.CustomReplicationClientTLSSecret, secretName)
+	})
+})
+
+var _ = FDescribe("CR Validations", Ordered, func() {
+	ctx := context.Background()
+	ns := "cr-validation"
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	Context("PostgresVersion and grantPublicSchemaAccess validations", Ordered, func() {
+		When("creating a CR with valid configurations", func() {
+			It("should accept version >=15 with public schema access", func() {
+				cr, err := readDefaultCR("cr-validation-1", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 15
+				cr.Spec.Users = []v2.User{{
+					GrantPublicSchemaAccess: ptr.To(true),
+				}}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept version <15 without public schema access", func() {
+				cr, err := readDefaultCR("cr-validation-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 14
+				cr.Spec.Users = []v2.User{{
+					GrantPublicSchemaAccess: ptr.To(false),
+				}}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept version <15 with omitted public schema access", func() {
+				cr, err := readDefaultCR("cr-validation-3", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 14
+				cr.Spec.Users = []v2.User{{}}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept when no users are specified", func() {
+				cr, err := readDefaultCR("cr-validation-4", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 14
+				cr.Spec.Users = nil // No users provided
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+		})
+
+		When("creating a CR with invalid configurations", func() {
+			It("should reject version <15 with public schema access", func() {
+				cr, err := readDefaultCR("cr-validation-5", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 14
+				cr.Spec.Users = []v2.User{{
+					GrantPublicSchemaAccess: ptr.To(true),
+				}}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true",
+				))
+			})
+
+			It("should reject mixed access in multiple users", func() {
+				cr, err := readDefaultCR("cr-validation-6", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 14
+				cr.Spec.Users = []v2.User{
+					{GrantPublicSchemaAccess: ptr.To(false)},
+					{GrantPublicSchemaAccess: ptr.To(true)},
+				}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true",
+				))
+			})
+		})
 	})
 })
