@@ -4,7 +4,20 @@ timeout: 360
 commands:
 - script: |-
     kubectl -n ${NAMESPACE} get pg,pod,job
+    #
+    # for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/pgupgrade=13-to-14 | awk '{print $1}'); do
+    #   echo "${pod} logs:"
+    #   kubectl -n ${NAMESPACE} logs ${pod}
+    # done
+    #
     sleep 5
+collectors:
+- type: pod
+  selector: "postgres-operator.crunchydata.com/data=postgres"
+  tail: 30
+- type: pod
+  selector: "postgres-operator.crunchydata.com/pgupgrade=13-to-14"
+  tail: 200
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster

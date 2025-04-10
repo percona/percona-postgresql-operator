@@ -5,3 +5,5 @@ metadata:
 spec:
   pgCluster: major-upgrade
   repoName: repo1
+  options:
+  - --log-level-console=debug

@@ -18,11 +18,14 @@ commands:
                       | kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
       done
 
-      sleep 30
+      sleep 15
 collectors:
 - type: pod
   selector: "postgres-operator.crunchydata.com/data=postgres"
   tail: 30
+- type: pod
+  selector: "job-name=major-upgrade-pgbackrest-restore"
+  tail: 300
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
