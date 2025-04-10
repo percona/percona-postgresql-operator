@@ -1626,7 +1626,8 @@ var _ = Describe("Validate TLS", Ordered, func() {
 var _ = Describe("CR Validations", Ordered, func() {
 	ctx := context.Background()
 	ns := "cr-validation"
-
+	t := true
+	f := false
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns,
@@ -1652,7 +1653,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				cr.Spec.PostgresVersion = 15
 				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
-					GrantPublicSchemaAccess: true,
+					GrantPublicSchemaAccess: &t,
 				}}
 
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
@@ -1664,7 +1665,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				cr.Spec.PostgresVersion = 14
 				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
-					GrantPublicSchemaAccess: false,
+					GrantPublicSchemaAccess: &f,
 				}}
 
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
@@ -1698,7 +1699,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				cr.Spec.PostgresVersion = 14
 				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
-					GrantPublicSchemaAccess: true,
+					GrantPublicSchemaAccess: &t,
 				}}
 
 				err = k8sClient.Create(ctx, cr)
@@ -1714,8 +1715,8 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				cr.Spec.PostgresVersion = 14
 				cr.Spec.Users = []v1beta1.PostgresUserSpec{
-					{GrantPublicSchemaAccess: false},
-					{GrantPublicSchemaAccess: true},
+					{GrantPublicSchemaAccess: &f},
+					{GrantPublicSchemaAccess: &t},
 				}
 
 				err = k8sClient.Create(ctx, cr)
