@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -136,7 +135,6 @@ func TestContainer(t *testing.T) {
 			assert.Contains(t, container.Env, tt.verificationEnvVar())
 		})
 	}
-
 }
 
 func TestSidecarContainerV2(t *testing.T) {
@@ -248,7 +246,7 @@ func TestSidecarContainerV2(t *testing.T) {
 		}
 	}
 
-	assert.Len(t, container.VolumeMounts, 1)
+	assert.Len(t, container.VolumeMounts, 2)
 	assert.Equal(t, "/pgconf/tls", container.VolumeMounts[0].MountPath)
 	assert.True(t, container.VolumeMounts[0].ReadOnly)
 }
@@ -357,7 +355,7 @@ func TestSidecarContainerV3(t *testing.T) {
 		}
 	}
 
-	assert.Len(t, container.VolumeMounts, 1)
+	assert.Len(t, container.VolumeMounts, 2)
 	assert.Equal(t, "/pgconf/tls", container.VolumeMounts[0].MountPath)
 	assert.True(t, container.VolumeMounts[0].ReadOnly)
 }

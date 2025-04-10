@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      series_fetched=$(curl --insecure -G "https://admin:admin@$(get_service_ip monitoring-service)/prometheus/api/v1/query_range" \
+           --data-urlencode "query=node_filesystem_free_bytes{mountpoint=\"/pgdata\"}" \
+           --data-urlencode "start=$(($(date +%s) - 300))" \
+           --data-urlencode "end=$(date +%s)" \
+           --data-urlencode "step=5s" | jq -r '.stats.seriesFetched')
+
+      if [[ $series_fetched == 0 ]]; then 
+        echo "seriesFetched is 0"
+        exit 1
+      fi
+    timeout: 360
