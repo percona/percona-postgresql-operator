@@ -1621,7 +1621,7 @@ var _ = Describe("Validate TLS", Ordered, func() {
 	})
 })
 
-var _ = FDescribe("CR Validations", Ordered, func() {
+var _ = Describe("CR Validations", Ordered, func() {
 	ctx := context.Background()
 	ns := "cr-validation"
 
