@@ -1653,6 +1653,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				cr.Spec.PostgresVersion = 15
 				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
+					Name:                    "test",
 					GrantPublicSchemaAccess: &t,
 				}}
 
@@ -1665,6 +1666,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				cr.Spec.PostgresVersion = 14
 				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
+					Name:                    "test",
 					GrantPublicSchemaAccess: &f,
 				}}
 
@@ -1699,6 +1701,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				cr.Spec.PostgresVersion = 14
 				cr.Spec.Users = []v1beta1.PostgresUserSpec{{
+					Name:                    "test",
 					GrantPublicSchemaAccess: &t,
 				}}
 
@@ -1715,8 +1718,8 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				cr.Spec.PostgresVersion = 14
 				cr.Spec.Users = []v1beta1.PostgresUserSpec{
-					{GrantPublicSchemaAccess: &f},
-					{GrantPublicSchemaAccess: &t},
+					{Name: "test1", GrantPublicSchemaAccess: &f},
+					{Name: "test2", GrantPublicSchemaAccess: &t},
 				}
 
 				err = k8sClient.Create(ctx, cr)
