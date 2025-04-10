@@ -42,11 +42,18 @@ type PatroniSpec struct {
 	// +optional
 	Switchover *PatroniSwitchover `json:"switchover,omitempty"`
 
+	// CreateReplicaMethods allows overriding create_replica_methods for all instances.
+	// +optional
+	CreateReplicaMethods []CreateReplicaMethod `json:"createReplicaMethods,omitempty"`
+
 	// TODO(cbandy): Add UseConfigMaps bool, default false.
 	// TODO(cbandy): Allow other DCS: etcd, raft, etc?
 	// N.B. changing this will cause downtime.
 	// - https://patroni.readthedocs.io/en/latest/kubernetes.html
 }
+
+// +kubebuilder:validation:Enum={basebackup,pgbackrest}
+type CreateReplicaMethod string
 
 type PatroniSwitchover struct {
 

@@ -222,6 +222,8 @@ func (r *Reconciler) reconcilePatroniDynamicConfiguration(
 	}
 	configuration = patroni.DynamicConfiguration(cluster, configuration, pgHBAs, pgParameters)
 
+	logging.FromContext(ctx).V(1).Info("Replacing patroni dynamic configuration")
+
 	return errors.WithStack(
 		patroni.Executor(exec).ReplaceConfiguration(ctx, configuration))
 }
