@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	gs "github.com/onsi/gomega/gstruct"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
