@@ -5074,8 +5074,6 @@ spec:
                                 type: object
                             type: object
                         type: object
-                    required:
-                    - repos
                     type: object
                   snapshots:
                     description: VolumeSnapshot configuration
@@ -20397,7 +20395,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             required:
-            - backups
             - instances
             - postgresVersion
             type: object
