@@ -1625,12 +1625,14 @@ var _ = Describe("Validate TLS", Ordered, func() {
 
 var _ = Describe("CR Validations", Ordered, func() {
 	ctx := context.Background()
-	ns := "cr-validation"
+	const crName = "cr-validation"
+	const ns = crName
 	t := true
 	f := false
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ns,
+			Name:      crName,
+			Namespace: ns,
 		},
 	}
 
