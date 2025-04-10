@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/percona/percona-postgresql-operator/internal/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -42,6 +43,21 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 
 	pmmSpec := pgc.Spec.PMM
 
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "cert-volume",
+			MountPath: "/pgconf/tls",
+			ReadOnly:  true,
+		},
+	}
+	if pgc.CompareVersion("2.7.0") >= 0 {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      postgres.DataVolumeMount().Name,
+			MountPath: postgres.DataVolumeMount().MountPath,
+			ReadOnly:  true,
+		})
+	}
+
 	container := corev1.Container{
 		Name:            "pmm-client",
 		Image:           pmmSpec.Image,
@@ -74,13 +90,7 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 				},
 			},
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "cert-volume",
-				MountPath: "/pgconf/tls",
-				ReadOnly:  true,
-			},
-		},
+		VolumeMounts: volumeMounts,
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",
@@ -306,7 +316,13 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 				MountPath: "/pgconf/tls",
 				ReadOnly:  true,
 			},
+			{
+				Name:      postgres.DataVolumeMount().Name,
+				MountPath: postgres.DataVolumeMount().MountPath,
+				ReadOnly:  true,
+			},
 		},
+
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",

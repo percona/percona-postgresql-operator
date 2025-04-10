@@ -37,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/internal/pki"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -1206,9 +1207,15 @@ func (r *Reconciler) reconcileInstance(
 				ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)
 		}
 
+		// K8SPG-708
+		initImage, err := k8s.InitImage(ctx, r.Client, cluster, spec)
+		if err != nil {
+			return errors.Wrap(err, "failed to determine initial init image")
+		}
+
 		err = patroni.InstancePod(
 			ctx, cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
-			spec, instanceCertificates, instanceConfigMap, &instance.Spec.Template)
+			spec, instanceCertificates, instanceConfigMap, &instance.Spec.Template, initImage) // K8SPG-708
 	}
 
 	// Add pgMonitor resources to the instance Pod spec
@@ -1352,6 +1359,9 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
 	sts.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	if cluster.CompareVersion("2.7.0") >= 0 {
+		sts.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(false) // K8SPG-737: should be false
+	}
 
 	// Patroni calls the Kubernetes API and pgBackRest may interact with a cloud
 	// storage provider. Use the instance ServiceAccount and automatically mount
