@@ -133,7 +133,18 @@ func (k *KubeAPI) Exec(ctx context.Context, namespace, pod, container string, st
 	exec, err := remotecommand.NewSPDYExecutor(k.Config, "POST", request.URL())
 
 	stdoutReader, stdoutWriter := io.Pipe()
+	defer func() {
+		if err := stdoutWriter.Close(); err != nil {
+			log.Errorf("error closing stdoutWriter: %v", err)
+		}
+	}()
+
 	stderrReader, stderrWriter := io.Pipe()
+	defer func() {
+		if err := stderrWriter.Close(); err != nil {
+			log.Errorf("error closing stderrWriter: %v", err)
+		}
+	}()
 
 	go streamUsingPrefix("[pgbackrest:stdout]", stdoutReader)
 	go streamUsingPrefix("[pgbackrest:stderr]", stderrReader)
@@ -143,17 +154,6 @@ func (k *KubeAPI) Exec(ctx context.Context, namespace, pod, container string, st
 		Stdout: stdoutWriter,
 		Stderr: stderrWriter,
 	})
-
-	err = stdoutWriter.Close()
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	err = stderrWriter.Close()
-	if err != nil {
-		log.Error(err)
-		return err
-	}
 
 	return err
 }
