@@ -70,6 +70,11 @@ const (
 	// touch cloud-based backups.
 	AuthorizeBackupRemovalAnnotation = annotationPrefix + "authorizeBackupRemoval"
 
+	// Used from Kubernetes v1.21+ to define a default container used when the
+	// `-c` flag is not passed.
+	// --https://kubernetes.io/docs/reference/labels-annotations-taints/#kubectl-kubernetes-io-default-container
+	DefaultContainerAnnotation = "kubectl.kubernetes.io/default-container"
+
 	// K8SPG-712
 	// OverrideConfigAnnotation is an annotation used to prevent the controller from reconciling
 	// ConfigMaps when a user wants to manually override their contents. When this annotation

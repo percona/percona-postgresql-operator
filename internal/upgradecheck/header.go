@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/rest"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
@@ -57,7 +58,7 @@ func generateHeader(ctx context.Context, cfg *rest.Config, crClient crclient.Cli
 		BridgeClustersTotal: getBridgeClusters(ctx, crClient),
 		BuildSource:         os.Getenv("BUILD_SOURCE"),
 		DeploymentID:        ensureDeploymentID(ctx, crClient),
-		FeatureGatesEnabled: feature.ShowGates(ctx),
+		FeatureGatesEnabled: feature.ShowEnabled(ctx),
 		IsOpenShift:         isOpenShift,
 		KubernetesEnv:       getServerVersion(ctx, cfg),
 		PGOClustersTotal:    getManagedClusters(ctx, crClient),
@@ -128,7 +129,7 @@ func manageUpgradeCheckConfigMap(ctx context.Context, crClient crclient.Client,
 		}
 	}
 
-	err = applyConfigMap(ctx, crClient, cm, currentID)
+	err = applyConfigMap(ctx, crClient, cm, postgrescluster.ControllerName)
 	if err != nil {
 		log.V(1).Info("upgrade check issue: could not apply configmap",
 			"response", err.Error())
@@ -208,11 +209,8 @@ func getServerVersion(ctx context.Context, cfg *rest.Config) string {
 	return versionInfo.String()
 }
 
-func addHeader(req *http.Request, upgradeInfo *clientUpgradeData) (*http.Request, error) {
-	marshaled, err := json.Marshal(upgradeInfo)
-	if err == nil {
-		upgradeInfoString := string(marshaled)
-		req.Header.Add(clientHeader, upgradeInfoString)
-	}
-	return req, err
+func addHeader(req *http.Request, upgradeInfo *clientUpgradeData) *http.Request {
+	marshaled, _ := json.Marshal(upgradeInfo)
+	req.Header.Add(clientHeader, string(marshaled))
+	return req
 }

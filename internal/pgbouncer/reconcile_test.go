@@ -500,6 +500,6 @@ func TestPostgreSQL(t *testing.T) {
 				Mandatory: postgresqlHBAs(),
 			},
 			// postgres.HostBasedAuthentication has unexported fields. Call String() to compare.
-			gocmp.Transformer("", postgres.HostBasedAuthentication.String))
+			gocmp.Transformer("", (*postgres.HostBasedAuthentication).String))
 	})
 }
