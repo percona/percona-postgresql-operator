@@ -221,7 +221,9 @@ spec:
 #            memory: 128Mi
 #    sidecars:
 #    - name: testcontainer
-#      image: mycontainer1:latest
+#      image: busybox:latest
+#      command: ["sleep", "30d"]
+#      securityContext: {}
 #    - name: testcontainer2
 #      image: mycontainer1:latest
 #
@@ -358,7 +360,9 @@ spec:
 #
 #      sidecars:
 #      - name: bouncertestcontainer1
-#        image: mycontainer1:latest
+#        image: busybox:latest
+#        command: ["sleep", "30d"]
+#        securityContext: {}
 #
 #      customTLSSecret:
 #        name: keycloakdb-pgbouncer.tls
