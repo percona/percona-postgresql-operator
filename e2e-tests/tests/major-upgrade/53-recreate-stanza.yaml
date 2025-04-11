@@ -1,0 +1,36 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 300
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
+        kubectl -n ${NAMESPACE} exec ${pod} -- touch /pgdata/sleep-forever
+        kubectl -n ${NAMESPACE} exec ${pod} -- pgbackrest --stanza=db --log-level-console=debug stop
+      done
+
+      pod=$(kubectl get -n ${NAMESPACE} pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | tail -n 1 | awk '{print $1}')
+
+      kubectl -n ${NAMESPACE} exec ${pod} -- patronictl pause
+
+      for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
+        kubectl -n ${NAMESPACE} exec ${pod} -- pg_ctl -D /pgdata/pg17 stop
+      done
+
+      kubectl -n ${NAMESPACE} exec ${pod} -- pgbackrest --stanza=db --log-level-console=debug stanza-delete
+
+      for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
+        kubectl -n ${NAMESPACE} exec ${pod} -- pgbackrest --stanza=db --log-level-console=debug start
+        kubectl -n ${NAMESPACE} exec ${pod} -- rm /pgdata/sleep-forever
+      done
+
+      kubectl -n ${NAMESPACE} exec ${pod} -- patronictl resume
+
+      # give some time to patroni for starting postgres
+      sleep 90
+
+      kubectl -n ${NAMESPACE} exec ${pod} -- pgbackrest --stanza=db --log-level-console=debug stanza-create
