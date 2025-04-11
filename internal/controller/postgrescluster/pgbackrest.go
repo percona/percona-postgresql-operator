@@ -578,10 +578,16 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	annotations := naming.Merge(
 		postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
-		map[string]string{
-			naming.DefaultContainerAnnotation: naming.PGBackRestRepoContainerName,
-		},
 	)
+	if postgresCluster.CompareVersion("2.7.0") >= 0 {
+		annotations = naming.Merge(
+			postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
+			postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
+			map[string]string{
+				naming.DefaultContainerAnnotation: naming.PGBackRestRepoContainerName,
+			},
+		)
+	}
 	labels := naming.Merge(
 		postgresCluster.Spec.Metadata.GetLabelsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
@@ -854,11 +860,13 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		}
 	}
 
-	if annotations != nil {
-		annotations[naming.DefaultContainerAnnotation] = naming.PGBackRestRepoContainerName
-	} else {
-		annotations = map[string]string{
-			naming.DefaultContainerAnnotation: naming.PGBackRestRepoContainerName,
+	if postgresCluster.CompareVersion("2.7.0") >= 0 {
+		if annotations != nil {
+			annotations[naming.DefaultContainerAnnotation] = naming.PGBackRestRepoContainerName
+		} else {
+			annotations = map[string]string{
+				naming.DefaultContainerAnnotation: naming.PGBackRestRepoContainerName,
+			}
 		}
 	}
 

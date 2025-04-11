@@ -386,10 +386,16 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	deploy.Spec.Template.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
-		map[string]string{
-			naming.DefaultContainerAnnotation: naming.ContainerPGBouncer,
-		},
 	)
+	if cluster.CompareVersion("2.7.0") >= 0 {
+		deploy.Spec.Template.Annotations = naming.Merge(
+			cluster.Spec.Metadata.GetAnnotationsOrNil(),
+			cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+			map[string]string{
+				naming.DefaultContainerAnnotation: naming.ContainerPGBouncer,
+			},
+		)
+	}
 	deploy.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
