@@ -177,7 +177,7 @@ SELECT pg_catalog.format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I',
 			continue
 		}
 		if cluster.CompareVersion("2.7.0") >= 0 && user.GrantPublicSchemaAccess != nil && *user.GrantPublicSchemaAccess {
-			log.V(1).Info("Granting access to public schema for user.", "name", string(user.Name))
+			log.Info("Granting access to public schema for user.", "name", string(user.Name))
 			if err = grantUserAccessToPublicSchemaInPostgreSQL(ctx, exec, user); err != nil {
 				return err
 			}
