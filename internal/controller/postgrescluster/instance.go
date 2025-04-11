@@ -1283,10 +1283,16 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	sts.Spec.Template.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
 		spec.Metadata.GetAnnotationsOrNil(),
-		map[string]string{
-			naming.DefaultContainerAnnotation: naming.ContainerDatabase,
-		},
 	)
+	if cluster.CompareVersion("2.7.0") >= 0 {
+		sts.Spec.Template.Annotations = naming.Merge(
+			cluster.Spec.Metadata.GetAnnotationsOrNil(),
+			spec.Metadata.GetAnnotationsOrNil(),
+			map[string]string{
+				naming.DefaultContainerAnnotation: naming.ContainerDatabase,
+			},
+		)
+	}
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
