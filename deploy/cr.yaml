@@ -72,6 +72,7 @@ spec:
 #      password:
 #        type: ASCII
 #      secretName: "rhino-credentials"
+#      grantPublicSchemaAccess: false
 
 #  databaseInitSQL:
 #    key: init.sql
