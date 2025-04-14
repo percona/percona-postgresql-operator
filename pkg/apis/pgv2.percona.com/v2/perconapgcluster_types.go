@@ -42,6 +42,7 @@ type PerconaPGCluster struct {
 	Status PerconaPGClusterStatus `json:"status,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
@@ -153,7 +154,6 @@ type PerconaPGClusterSpec struct {
 	Proxy *PGProxySpec `json:"proxy,omitempty"`
 
 	// PostgreSQL backup configuration
-	// +kubebuilder:validation:Required
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	Backups Backups `json:"backups"`
 
@@ -167,8 +167,8 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
 
-	// Whether or not the cluster has schemas automatically created for the user
-	// defined in `spec.users` for all of the databases listed for that user.
+	// Indicates whether schemas are automatically created for the user
+	// specified in `spec.users` across all databases associated with that user.
 	// +optional
 	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
 }
@@ -207,19 +207,21 @@ func (cr *PerconaPGCluster) Default() {
 	t := true
 	f := false
 
-	if cr.Spec.Backups.TrackLatestRestorableTime == nil {
-		cr.Spec.Backups.TrackLatestRestorableTime = &t
-	}
-	if cr.Spec.Backups.PGBackRest.Metadata == nil {
-		cr.Spec.Backups.PGBackRest.Metadata = new(crunchyv1beta1.Metadata)
-	}
-	if cr.Spec.Backups.PGBackRest.Metadata.Labels == nil {
-		cr.Spec.Backups.PGBackRest.Metadata.Labels = make(map[string]string)
-	}
-	cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
+	if cr.Spec.Backups.IsEnabled() {
+		if cr.Spec.Backups.TrackLatestRestorableTime == nil {
+			cr.Spec.Backups.TrackLatestRestorableTime = &t
+		}
+		if cr.Spec.Backups.PGBackRest.Metadata == nil {
+			cr.Spec.Backups.PGBackRest.Metadata = new(crunchyv1beta1.Metadata)
+		}
+		if cr.Spec.Backups.PGBackRest.Metadata.Labels == nil {
+			cr.Spec.Backups.PGBackRest.Metadata.Labels = make(map[string]string)
+		}
+		cr.Spec.Backups.PGBackRest.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
-	if cr.Spec.Backups.PGBackRest.Jobs == nil {
-		cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+		if cr.Spec.Backups.PGBackRest.Jobs == nil {
+			cr.Spec.Backups.PGBackRest.Jobs = new(crunchyv1beta1.BackupJobs)
+		}
 	}
 
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
@@ -313,6 +315,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		repo.BackupSchedules.Full = nil
 		repo.BackupSchedules.Incremental = nil
 	}
+
 	postgresCluster.Spec.DataSource = cr.Spec.DataSource
 	postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
 	postgresCluster.Spec.Patroni = cr.Spec.Patroni
@@ -446,15 +449,25 @@ type PerconaPGClusterStatus struct {
 }
 
 type Backups struct {
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// pgBackRest archive configuration
-	// +kubebuilder:validation:Required
+	// +optional
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
 
 	// Enable tracking latest restorable time
 	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
 }
 
+func (b Backups) IsEnabled() bool {
+	return b.Enabled == nil || *b.Enabled
+}
+
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
+	if b.Enabled != nil && !*b.Enabled {
+		return crunchyv1beta1.Backups{}
+	}
+
 	var sc *crunchyv1beta1.PGBackRestSidecars
 
 	sc = b.PGBackRest.Containers
