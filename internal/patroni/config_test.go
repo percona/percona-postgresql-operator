@@ -466,8 +466,8 @@ func TestDynamicConfiguration(t *testing.T) {
 				},
 			},
 			hbas: postgres.HBAs{
-				Default: []postgres.HostBasedAuthentication{
-					*postgres.NewHBA().Local().Method("peer"),
+				Default: []*postgres.HostBasedAuthentication{
+					postgres.NewHBA().Local().Method("peer"),
 				},
 			},
 			expected: map[string]any{
@@ -491,8 +491,8 @@ func TestDynamicConfiguration(t *testing.T) {
 				},
 			},
 			hbas: postgres.HBAs{
-				Default: []postgres.HostBasedAuthentication{
-					*postgres.NewHBA().Local().Method("peer"),
+				Default: []*postgres.HostBasedAuthentication{
+					postgres.NewHBA().Local().Method("peer"),
 				},
 			},
 			expected: map[string]any{
@@ -516,8 +516,8 @@ func TestDynamicConfiguration(t *testing.T) {
 				},
 			},
 			hbas: postgres.HBAs{
-				Mandatory: []postgres.HostBasedAuthentication{
-					*postgres.NewHBA().Local().Method("peer"),
+				Mandatory: []*postgres.HostBasedAuthentication{
+					postgres.NewHBA().Local().Method("peer"),
 				},
 			},
 			expected: map[string]any{
@@ -542,8 +542,8 @@ func TestDynamicConfiguration(t *testing.T) {
 				},
 			},
 			hbas: postgres.HBAs{
-				Mandatory: []postgres.HostBasedAuthentication{
-					*postgres.NewHBA().Local().Method("peer"),
+				Mandatory: []*postgres.HostBasedAuthentication{
+					postgres.NewHBA().Local().Method("peer"),
 				},
 			},
 			expected: map[string]any{
@@ -705,24 +705,6 @@ func TestDynamicConfiguration(t *testing.T) {
 					"port":                   int32(5432),
 					"restore_command":        "mandatory",
 					"unrelated":              "input",
-				},
-			},
-		},
-		{
-			name: "pg version 10",
-			cluster: &v1beta1.PostgresCluster{
-				Spec: v1beta1.PostgresClusterSpec{
-					PostgresVersion: 10,
-				},
-			},
-			expected: map[string]any{
-				"loop_wait": int32(10),
-				"ttl":       int32(30),
-				"postgresql": map[string]any{
-					"parameters":    map[string]any{},
-					"pg_hba":        []string{},
-					"use_pg_rewind": false,
-					"use_slots":     false,
 				},
 			},
 		},
