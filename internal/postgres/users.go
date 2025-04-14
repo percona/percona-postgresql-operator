@@ -166,15 +166,29 @@ SELECT pg_catalog.format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I',
 		autoCreateUserSchemaAnnotationValue, annotationExists := cluster.Annotations[naming.AutoCreateUserSchemaAnnotation]
 		if annotationExists && strings.EqualFold(autoCreateUserSchemaAnnotationValue, "true") {
 			log.V(1).Info("Writing schemas for users.")
-			err = WriteUsersSchemasInPostgreSQL(ctx, exec, users)
+			err = writeUsersSchemasInPostgreSQL(ctx, exec, users)
+		}
+	}
+
+	for _, user := range users {
+
+		// We skip if the user has no databases
+		if len(user.Databases) == 0 {
+			continue
+		}
+		if cluster.CompareVersion("2.7.0") >= 0 && user.GrantPublicSchemaAccess != nil && *user.GrantPublicSchemaAccess {
+			log.Info("Granting access to public schema for user.", "name", string(user.Name))
+			if err = grantUserAccessToPublicSchemaInPostgreSQL(ctx, exec, user); err != nil {
+				return err
+			}
 		}
 	}
 
 	return err
 }
 
-// WriteUsersSchemasInPostgreSQL will create a schema for each user in each database that user has access to
-func WriteUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
+// writeUsersSchemasInPostgreSQL will create a schema for each user in each database that user has access to
+func writeUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
 	users []v1beta1.PostgresUserSpec) error {
 
 	log := logging.FromContext(ctx)
@@ -237,5 +251,52 @@ func WriteUsersSchemasInPostgreSQL(ctx context.Context, exec Executor,
 
 		log.V(1).Info("wrote PostgreSQL schemas", "stdout", stdout, "stderr", stderr)
 	}
+	return err
+}
+
+// grantUserAccessToPublicSchemaInPostgreSQL grant the specified user access to the public schema within the specified database.
+func grantUserAccessToPublicSchemaInPostgreSQL(ctx context.Context, exec Executor,
+	user v1beta1.PostgresUserSpec) error {
+
+	log := logging.FromContext(ctx)
+
+	var sql bytes.Buffer
+
+	// Prevent unexpected dereferences by emptying "search_path". The "pg_catalog"
+	// schema is still searched, and only temporary objects can be created.
+	// - https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-SEARCH-PATH
+	_, _ = sql.WriteString(`SET search_path TO '';`)
+
+	_, _ = sql.WriteString(`SELECT * FROM json_array_elements_text(:'databases');`)
+
+	databases, _ := json.Marshal(user.Databases)
+
+	stdout, stderr, err := exec.ExecInDatabasesFromQuery(ctx,
+		sql.String(),
+		strings.Join([]string{
+			// Quiet NOTICE messages from IF EXISTS statements.
+			`SET client_min_messages = WARNING;`,
+
+			// Grant all privileges on the public schema to the user
+			`GRANT ALL PRIVILEGES ON SCHEMA public TO :"username";`,
+
+			// Grant all privileges on existing tables and sequences in the public schema
+			`GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO :"username";`,
+			`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO :"username";`,
+
+			// Set default privileges for future objects created in the public schema
+			`ALTER DEFAULT PRIVILEGES FOR ROLE "username" IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO "username";`,
+			`ALTER DEFAULT PRIVILEGES FOR ROLE "username" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO "username";`,
+		}, "\n"),
+		map[string]string{
+			"databases":     string(databases),
+			"username":      string(user.Name),
+			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
+			"QUIET":         "on", // Do not print successful commands to stdout.
+		},
+	)
+
+	log.V(1).Info("grant access to public PostgreSQL schemas", "stdout", stdout, "stderr", stderr)
+
 	return err
 }
