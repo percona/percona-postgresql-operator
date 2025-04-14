@@ -1637,7 +1637,7 @@ func (sc *saTestClient) checkObject(ctx context.Context, obj client.Object) erro
 	}
 	serviceAccountName := sts.Spec.Template.Spec.ServiceAccountName
 	if serviceAccountName == "" {
-		panic("it's not expected to have empty service account name")
+		return errors.New("it's not expected to have empty service account name")
 	}
 
 	if err := sc.Client.Get(ctx, types.NamespacedName{

@@ -1463,6 +1463,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 		return result, nil
 	}
 
+	// reconcile the RBAC required to run pgBackRest Jobs (e.g. for backups)
 	// K8SPG-698
 	sa, err := r.reconcilePGBackRestRBAC(ctx, postgresCluster)
 	if err != nil {
@@ -1518,15 +1519,6 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 		log.Error(err, "unable to reconcile pgBackRest configuration")
 		result.Requeue = true
 	}
-
-	// reconcile the RBAC required to run pgBackRest Jobs (e.g. for backups)
-	// K8SPG-698: it should happen earlier
-	//sa, err := r.reconcilePGBackRestRBAC(ctx, postgresCluster)
-	//if err != nil {
-	//	log.Error(err, "unable to create replica creation backup")
-	//	result.Requeue = true
-	//	return result, nil
-	//}
 
 	// reconcile the pgBackRest stanza for all configuration pgBackRest repos
 	configHashMismatch, err := r.reconcileStanzaCreate(ctx, postgresCluster, instances, configHash)
