@@ -10,11 +10,7 @@ commands:
       run_psql_local \
         'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
         "postgres:$(get_psql_user_pass major-upgrade-pguser-postgres)@$(get_psql_user_host major-upgrade-pguser-postgres)"
-      
-      run_psql_local \
-        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
-        "postgres:$(get_psql_user_pass major-upgrade-pguser-postgres)@$(get_psql_user_host major-upgrade-pguser-postgres)"
 
       run_psql_local \
-        '\c postgres \\\ CREATE EXTENSION pg_cron' \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
         "postgres:$(get_psql_user_pass major-upgrade-pguser-postgres)@$(get_psql_user_host major-upgrade-pguser-postgres)"

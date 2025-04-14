@@ -7,6 +7,11 @@ commands:
 
       kubectl -n ${NAMESPACE} get pod
 
+      # for pod in $(kubectl -n ${NAMESPACE} get pod -l job-name=major-upgrade-pgbackrest-restore | awk '{print $1}'); do
+      #   echo "${pod} logs:"
+      #   kubectl -n ${NAMESPACE} logs ${pod}
+      # done
+      #
       for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
               phase=$(kubectl -n ${NAMESPACE} get pod/${pod} -o jsonpath={".status.phase"})
               if [[ "${phase}" != "Running" ]]; then
@@ -14,7 +19,7 @@ commands:
                       continue
               fi
               echo "PostgreSQL logs from ${pod}:"
-              echo "find /pgdata/pg16/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
+              echo "find /pgdata/pg14/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
                       | kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
       done
 
@@ -30,7 +35,7 @@ collectors:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: restore-after-15-to-16
+  name: restore-after-13-to-14
 spec:
   pgCluster: major-upgrade
   repoName: repo1

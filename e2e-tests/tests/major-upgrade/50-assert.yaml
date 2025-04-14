@@ -4,12 +4,6 @@ timeout: 360
 commands:
 - script: |-
     kubectl -n ${NAMESPACE} get pg,pod,job
-    #
-    # for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/pgupgrade=13-to-14 | awk '{print $1}'); do
-    #   echo "${pod} logs:"
-    #   kubectl -n ${NAMESPACE} logs ${pod}
-    # done
-    #
     sleep 5
 collectors:
 - type: pod
@@ -24,7 +18,7 @@ kind: PerconaPGCluster
 metadata:
   name: major-upgrade
 spec:
-  postgresVersion: 14
+  postgresVersion: 17
 status:
   pgbouncer:
     ready: 3
