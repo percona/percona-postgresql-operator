@@ -209,7 +209,7 @@ func TestWriteUsersSchemasInPostgreSQL(t *testing.T) {
 			return nil
 		}
 
-		assert.NilError(t, WriteUsersSchemasInPostgreSQL(ctx, exec,
+		assert.NilError(t, writeUsersSchemasInPostgreSQL(ctx, exec,
 			[]v1beta1.PostgresUserSpec{
 				{
 					Name:      "user-single-db",
