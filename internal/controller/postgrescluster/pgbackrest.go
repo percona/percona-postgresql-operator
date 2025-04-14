@@ -1501,20 +1501,11 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 		return result, nil
 	}
 
-	var repoHost *appsv1.StatefulSet
 	var repoHostName string
-	// reconcile the pgbackrest repository host
-	repoHost, err = r.reconcileDedicatedRepoHost(ctx, postgresCluster, repoResources, instances)
-	if err != nil {
-		log.Error(err, "unable to reconcile pgBackRest repo host", "cluster", postgresCluster.Name)
-		result.Requeue = true
-		return result, nil
-	}
-	repoHostName = repoHost.GetName()
-
-	if err := r.reconcilePGBackRestSecret(ctx, postgresCluster, repoHost, rootCA); err != nil {
-		log.Error(err, "unable to reconcile pgBackRest secret", "cluster", postgresCluster.Name)
-		result.Requeue = true
+	if len(repoResources.hosts) == 0 {
+		repoHostName = fmt.Sprintf("%s-%s", postgresCluster.GetName(), "repo-host")
+	} else {
+		repoHostName = repoResources.hosts[0].Name
 	}
 
 	// calculate hashes for the external repository configurations in the spec (e.g. for Azure,
@@ -1581,6 +1572,24 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 		log.Info("pgBackRest config hash mismatch detected, requeuing to reattempt stanza create",
 			"cluster", postgresCluster.Name)
 		result.RequeueAfter = 10 * time.Second
+	}
+
+	if len(instanceNames) < 2 {
+		result.RequeueAfter = 10 * time.Second
+	} else {
+		var repoHost *appsv1.StatefulSet
+		// reconcile the pgbackrest repository host
+		repoHost, err = r.reconcileDedicatedRepoHost(ctx, postgresCluster, repoResources, instances)
+		if err != nil {
+			log.Error(err, "unable to reconcile pgBackRest repo host", "cluster", postgresCluster.Name)
+			result.Requeue = true
+			return result, nil
+		}
+
+		if err := r.reconcilePGBackRestSecret(ctx, postgresCluster, repoHost, rootCA); err != nil {
+			log.Error(err, "unable to reconcile pgBackRest secret", "cluster", postgresCluster.Name)
+			result.Requeue = true
+		}
 	}
 
 	// reconcile the pgBackRest backup CronJobs
