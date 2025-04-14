@@ -47215,10 +47215,6 @@ spec:
                         type:
                           description: The pgBackRest backup type for this Job
                           type: string
-                      required:
-                      - cronJobName
-                      - repo
-                      - type
                       type: object
                     type: array
                 type: object

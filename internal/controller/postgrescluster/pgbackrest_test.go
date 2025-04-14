@@ -25,9 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -38,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
@@ -3754,7 +3753,7 @@ func TestSetScheduledJobStatus(t *testing.T) {
 		// create a PostgresCluster to test with
 		postgresCluster := fakePostgresCluster(clusterName, ns.GetName(), clusterUID, true)
 
-		testJob := &batchv1.Job{
+		uList, err := runtime.ToUnstructuredList(&batchv1.JobList{Items: []batchv1.Job{{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Job",
 			},
@@ -3767,18 +3766,8 @@ func TestSetScheduledJobStatus(t *testing.T) {
 				Succeeded: 2,
 				Failed:    3,
 			},
-		}
-
-		// convert the runtime.Object to an unstructured object
-		unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(testJob)
+		}}})
 		assert.NilError(t, err)
-		unstructuredJob := &unstructured.Unstructured{
-			Object: unstructuredObj,
-		}
-
-		// add it to an unstructured list
-		uList := &unstructured.UnstructuredList{}
-		uList.Items = append(uList.Items, *unstructuredJob)
 
 		// set the status
 		r.setScheduledJobStatus(ctx, postgresCluster, uList.Items)
@@ -3793,7 +3782,7 @@ func TestSetScheduledJobStatus(t *testing.T) {
 		// create a PostgresCluster to test with
 		postgresCluster := fakePostgresCluster(clusterName, ns.GetName(), clusterUID, true)
 
-		testJob := &batchv1.Job{
+		uList, err := runtime.ToUnstructuredList(&batchv1.JobList{Items: []batchv1.Job{{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Job",
 			},
@@ -3805,18 +3794,8 @@ func TestSetScheduledJobStatus(t *testing.T) {
 				Succeeded: 2,
 				Failed:    3,
 			},
-		}
-
-		// convert the runtime.Object to an unstructured object
-		unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(testJob)
+		}}})
 		assert.NilError(t, err)
-		unstructuredJob := &unstructured.Unstructured{
-			Object: unstructuredObj,
-		}
-
-		// add it to an unstructured list
-		uList := &unstructured.UnstructuredList{}
-		uList.Items = append(uList.Items, *unstructuredJob)
 
 		// set the status
 		r.setScheduledJobStatus(ctx, postgresCluster, uList.Items)
