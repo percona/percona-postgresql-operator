@@ -760,8 +760,8 @@ spec:
             properties:
               autoCreateUserSchema:
                 description: |-
-                  Whether or not the cluster has schemas automatically created for the user
-                  defined in `spec.users` for all of the databases listed for that user.
+                  Indicates whether schemas are automatically created for the user
+                  specified in `spec.users` across all databases associated with that user.
                 type: boolean
               backups:
                 description: PostgreSQL backup configuration
@@ -18954,6 +18954,10 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    grantPublicSchemaAccess:
+                      description: Grant the user access to the public schema in each
+                        database listed under `databases`.
+                      type: boolean
                     name:
                       description: |-
                         The name of this PostgreSQL user. The value may contain only lowercase
@@ -19005,6 +19009,11 @@ spec:
             - instances
             - postgresVersion
             type: object
+            x-kubernetes-validations:
+            - message: PostgresVersion must be >= 15 if grantPublicSchemaAccess exists
+                and is true
+              rule: '!has(self.users) || self.postgresVersion >= 15 || self.users.all(u,
+                !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)'
           status:
             properties:
               host:
@@ -46837,6 +46846,10 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    grantPublicSchemaAccess:
+                      description: Grant the user access to the public schema in each
+                        database listed under `databases`.
+                      type: boolean
                     name:
                       description: |-
                         The name of this PostgreSQL user. The value may contain only lowercase
@@ -47215,10 +47228,6 @@ spec:
                         type:
                           description: The pgBackRest backup type for this Job
                           type: string
-                      required:
-                      - cronJobName
-                      - repo
-                      - type
                       type: object
                     type: array
                 type: object

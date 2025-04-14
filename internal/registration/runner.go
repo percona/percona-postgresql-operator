@@ -181,10 +181,6 @@ func (r *Runner) Start(ctx context.Context) error {
 				r.changed()
 			}
 		case <-ctx.Done():
-			// https://github.com/kubernetes-sigs/controller-runtime/issues/1927
-			if errors.Is(ctx.Err(), context.Canceled) {
-				return nil
-			}
 			return ctx.Err()
 		}
 	}
