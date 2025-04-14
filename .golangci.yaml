@@ -3,7 +3,6 @@
 linters:
   disable:
     - contextcheck
-    - errchkjson
     - gci
     - gofumpt
     - goimports
@@ -47,6 +46,15 @@ linters-settings:
           - pkg: github.com/percona/percona-postgresql-operator/internal/testing/*
             desc: The "internal/testing" packages should be used only in tests.
 
+      tests:
+        files: ['$test']
+        deny:
+          - pkg: github.com/pkg/errors
+            desc: Use the "errors" package unless you are interacting with stack traces.
+
+  errchkjson:
+    check-error-free-encoding: true
+
   exhaustive:
     default-signifies-exhaustive: true
 
@@ -73,6 +81,10 @@ run:
   build-tags:
     - envtest
 issues:
-  exclude-dirs:
-    - pkg/generated
-    - hack
+  exclude-generated: strict
+  exclude-rules:
+    # These value types have unmarshal methods.
+    # https://github.com/raeperd/recvcheck/issues/7
+    - linters: [recvcheck]
+      path: internal/pki/pki.go
+      text: 'methods of "(Certificate|PrivateKey)"'

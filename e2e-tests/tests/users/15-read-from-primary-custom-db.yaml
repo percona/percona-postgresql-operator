@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      password=$(get_psql_user_pass chico-credentials)
+      user='chico'
+      db_name='spain'
+      schema='public'
+      hostname=$(get_pgbouncer_host chico-credentials)
+
+      data=$(run_psql "SELECT * from $schema.customApp;" "-h $hostname -U $user -d $db_name" "$password")
+
+      kubectl create configmap -n "${NAMESPACE}" 10-read-from-primary-custom-db --from-literal=data="${data}"
