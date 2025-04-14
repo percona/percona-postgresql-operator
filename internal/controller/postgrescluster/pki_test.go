@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -149,8 +148,7 @@ func TestReconcileCerts(t *testing.T) {
 			rootCertMeta := naming.PostgresRootCASecret(cluster1)
 			emptyRootSecret.ObjectMeta = rootCertMeta
 			emptyRootSecret.Data = make(map[string][]byte)
-			err = errors.WithStack(r.apply(ctx, emptyRootSecret))
-			assert.NilError(t, err)
+			assert.NilError(t, r.apply(ctx, emptyRootSecret))
 
 			// reconcile the root cert secret, creating a new root cert
 			returnedRoot, err := r.reconcileRootCertificate(ctx, cluster1)
@@ -208,7 +206,7 @@ func TestReconcileCerts(t *testing.T) {
 			rootCertMeta := naming.PostgresRootCASecret(cluster1)
 			emptyRootSecret.ObjectMeta = rootCertMeta
 			emptyRootSecret.Data = make(map[string][]byte)
-			err = errors.WithStack(r.apply(ctx, emptyRootSecret))
+			assert.NilError(t, r.apply(ctx, emptyRootSecret))
 
 			// reconcile the root cert secret
 			newRootCert, err := r.reconcileRootCertificate(ctx, cluster1)
@@ -337,8 +335,7 @@ func TestReconcileCerts(t *testing.T) {
 			rootCertMeta := naming.PostgresRootCASecret(cluster1)
 			emptyRootSecret.ObjectMeta = rootCertMeta
 			emptyRootSecret.Data = make(map[string][]byte)
-			err = errors.WithStack(r.apply(ctx, emptyRootSecret))
-			assert.NilError(t, err)
+			assert.NilError(t, r.apply(ctx, emptyRootSecret))
 
 			// reconcile the root cert secret, creating a new root cert
 			returnedRoot, err := r.reconcileRootCertificate(ctx, cluster1)
@@ -398,7 +395,7 @@ func getCertFromSecret(
 	// get the cert from the secret
 	secretCRT, ok := secret.Data[dataKey]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("could not retrieve %s", dataKey))
+		return nil, fmt.Errorf("could not retrieve %s", dataKey)
 	}
 
 	// parse the cert from binary encoded data
