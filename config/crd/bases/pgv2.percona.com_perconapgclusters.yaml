@@ -100,6 +100,8 @@ spec:
                 type: string
               destination:
                 type: string
+              error:
+                type: string
               image:
                 type: string
               jobName:
@@ -469,6 +471,8 @@ spec:
               backups:
                 description: PostgreSQL backup configuration
                 properties:
+                  enabled:
+                    type: boolean
                   pgbackrest:
                     description: pgBackRest archive configuration
                     properties:
@@ -5651,8 +5655,6 @@ spec:
                   trackLatestRestorableTime:
                     description: Enable tracking latest restorable time
                     type: boolean
-                required:
-                - pgbackrest
                 type: object
               crVersion:
                 description: |-
