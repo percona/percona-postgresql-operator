@@ -395,6 +395,8 @@ spec:
                 type: string
               destination:
                 type: string
+              error:
+                type: string
               image:
                 type: string
               jobName:
@@ -766,6 +768,8 @@ spec:
               backups:
                 description: PostgreSQL backup configuration
                 properties:
+                  enabled:
+                    type: boolean
                   pgbackrest:
                     description: pgBackRest archive configuration
                     properties:
@@ -5948,8 +5952,6 @@ spec:
                   trackLatestRestorableTime:
                     description: Enable tracking latest restorable time
                     type: boolean
-                required:
-                - pgbackrest
                 type: object
               crVersion:
                 description: |-
@@ -31571,8 +31573,6 @@ spec:
                                 type: object
                             type: object
                         type: object
-                    required:
-                    - repos
                     type: object
                   snapshots:
                     description: VolumeSnapshot configuration
@@ -46898,7 +46898,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             required:
-            - backups
             - instances
             - postgresVersion
             type: object

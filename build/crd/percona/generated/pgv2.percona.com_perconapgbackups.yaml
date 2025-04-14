@@ -101,6 +101,8 @@ spec:
                 type: string
               destination:
                 type: string
+              error:
+                type: string
               image:
                 type: string
               jobName:

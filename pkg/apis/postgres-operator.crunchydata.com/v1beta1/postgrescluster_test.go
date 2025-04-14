@@ -44,8 +44,7 @@ metadata:
   creationTimestamp: null
 spec:
   backups:
-    pgbackrest:
-      repos: null
+    pgbackrest: {}
   config: {}
   extensions: {}
   instances: null
@@ -79,8 +78,7 @@ metadata:
   creationTimestamp: null
 spec:
   backups:
-    pgbackrest:
-      repos: null
+    pgbackrest: {}
   config: {}
   extensions: {}
   instances:
