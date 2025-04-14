@@ -1653,13 +1653,6 @@ func (sc *saTestClient) checkObject(ctx context.Context, obj client.Object) erro
 	return nil
 }
 
-func (sc *saTestClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	if err := sc.checkObject(ctx, obj); err != nil {
-		panic(err) // should panic because reconciler can ignore the error
-	}
-	return sc.Client.Update(ctx, obj, opts...)
-}
-
 func (sc *saTestClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 	if err := sc.checkObject(ctx, obj); err != nil {
 		panic(err) // should panic because reconciler can ignore the error
