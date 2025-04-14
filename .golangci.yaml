@@ -10,6 +10,7 @@ linters:
     - bodyclose
     - depguard
     - durationcheck
+    - errchkjson
     - errorlint
     - exhaustive
     - gocheckcompilerdirectives
@@ -37,7 +38,6 @@ linters:
     - zerologlint
   disable:
     - contextcheck
-    - errchkjson
   settings:
     depguard:
       rules:
@@ -56,6 +56,14 @@ linters:
               desc: The "testing" packages should be used only in tests.
             - pkg: github.com/percona/percona-postgresql-operator/internal/testing/*
               desc: The "internal/testing" packages should be used only in tests.
+        tests:
+          files:
+            - $test
+          deny:
+            - pkg: github.com/pkg/errors
+              desc: Use the "errors" package unless you are interacting with stack traces.
+    errchkjson:
+      check-error-free-encoding: true
     exhaustive:
       default-signifies-exhaustive: true
     gomodguard:
@@ -81,15 +89,17 @@ linters:
           alias: $1$2
       no-unaliased: true
   exclusions:
-    generated: lax
     presets:
       - comments
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      - linters:
+          - recvcheck
+        path: internal/pki/pki.go
+        text: methods of "(Certificate|PrivateKey)"
     paths:
-      - pkg/generated
-      - hack
       - third_party$
       - builtin$
       - examples$
@@ -103,10 +113,7 @@ formatters:
         - default
         - prefix(github.com/percona)
   exclusions:
-    generated: lax
     paths:
-      - pkg/generated
-      - hack
       - third_party$
       - builtin$
       - examples$
