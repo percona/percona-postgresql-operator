@@ -5,9 +5,13 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -118,10 +122,41 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 
+		updateConditions(cluster, status)
+
 		return r.Client.Status().Update(ctx, cluster)
 	}); err != nil {
 		return errors.Wrap(err, "update PerconaPGCluster status")
 	}
 
 	return nil
+}
+
+func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) {
+	setClusterNotReadyCondition := func(status metav1.ConditionStatus, reason string) {
+		existing := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
+		if existing == nil || existing.Status != status || existing.Reason != reason {
+			_ = meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+				Type:               pNaming.ConditionClusterIsReadyForBackup,
+				Status:             status,
+				LastTransitionTime: metav1.Now(),
+				Reason:             reason,
+			})
+		}
+	}
+
+	repoCondition := meta.FindStatusCondition(status.Conditions, postgrescluster.ConditionRepoHostReady)
+	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
+		setClusterNotReadyCondition(metav1.ConditionFalse, postgrescluster.ConditionRepoHostReady)
+		return
+	}
+
+	backupCondition := meta.FindStatusCondition(status.Conditions, postgrescluster.ConditionReplicaCreate)
+	if backupCondition == nil || backupCondition.Status != metav1.ConditionTrue {
+		setClusterNotReadyCondition(metav1.ConditionFalse, postgrescluster.ConditionReplicaCreate)
+		return
+	}
+
+	setClusterNotReadyCondition(metav1.ConditionTrue, postgrescluster.ConditionReplicaCreate)
+	return
 }
