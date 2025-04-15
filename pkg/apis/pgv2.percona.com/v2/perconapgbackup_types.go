@@ -73,6 +73,7 @@ const (
 type PerconaPGBackupStatus struct {
 	JobName              string                         `json:"jobName,omitempty"`
 	State                PGBackupState                  `json:"state,omitempty"`
+	Error                string                         `json:"error,omitempty"`
 	CompletedAt          *metav1.Time                   `json:"completed,omitempty"`
 	Destination          string                         `json:"destination,omitempty"`
 	BackupType           PGBackupType                   `json:"backupType,omitempty"`

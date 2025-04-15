@@ -178,7 +178,7 @@ get_cr() {
 		.spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
 		.spec.users += [{"name":"'${cr_name}'","password":{"type":"AlphaNumeric"}}] |
 		.spec.image = "'$IMAGE_POSTGRESQL'" |
-		.spec.initContainer.image = "perconalab/percona-postgresql-operator:K8SPG-708-12" |
+		.spec.initContainer.image = "'$IMAGE'" |
 		.spec.backups.pgbackrest.image = "'$IMAGE_BACKREST'" |
 		.spec.proxy.pgBouncer.image = "'$IMAGE_PGBOUNCER'" |
 		.spec.pmm.image = "'$IMAGE_PMM_CLIENT'" |

@@ -72,34 +72,29 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		volumeSnapshotClassName := "my-snapshotclass"
 		snapshot, err := r.generateVolumeSnapshot(cluster, *pvc, volumeSnapshotClassName)
 		assert.NilError(t, err)
-		err = errors.WithStack(r.apply(ctx, snapshot))
-		assert.NilError(t, err)
+		assert.NilError(t, r.apply(ctx, snapshot))
 
 		// Get all snapshots for this cluster and assert 1 exists
 		selectSnapshots, err := naming.AsSelector(naming.Cluster(cluster.Name))
 		assert.NilError(t, err)
 		snapshots := &volumesnapshotv1.VolumeSnapshotList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, snapshots,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectSnapshots},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(snapshots.Items), 1)
 
 		// Reconcile snapshots
-		err = r.reconcileVolumeSnapshots(ctx, cluster, pvc)
-		assert.NilError(t, err)
+		assert.NilError(t, r.reconcileVolumeSnapshots(ctx, cluster, pvc))
 
 		// Get all snapshots for this cluster and assert 0 exist
-		assert.NilError(t, err)
 		snapshots = &volumesnapshotv1.VolumeSnapshotList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, snapshots,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectSnapshots},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(snapshots.Items), 0)
 	})
 
@@ -131,8 +126,7 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		}
 
 		// Reconcile
-		err = r.reconcileVolumeSnapshots(ctx, cluster, pvc)
-		assert.NilError(t, err)
+		assert.NilError(t, r.reconcileVolumeSnapshots(ctx, cluster, pvc))
 
 		// Assert warning event was created and has expected attributes
 		if assert.Check(t, len(recorder.Events) > 0) {
@@ -173,19 +167,17 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		}
 
 		// Reconcile
-		err = r.reconcileVolumeSnapshots(ctx, cluster, pvc)
-		assert.NilError(t, err)
+		assert.NilError(t, r.reconcileVolumeSnapshots(ctx, cluster, pvc))
 
 		// Assert no snapshots exist
 		selectSnapshots, err := naming.AsSelector(naming.Cluster(cluster.Name))
 		assert.NilError(t, err)
 		snapshots := &volumesnapshotv1.VolumeSnapshotList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, snapshots,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectSnapshots},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(snapshots.Items), 0)
 	})
 
@@ -244,18 +236,15 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 				},
 			},
 		}
-		err := errors.WithStack(r.setControllerReference(cluster, snapshot1))
-		assert.NilError(t, err)
-		err = r.apply(ctx, snapshot1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.setControllerReference(cluster, snapshot1))
+		assert.NilError(t, r.apply(ctx, snapshot1))
 
 		// Update snapshot status
 		truePtr := initialize.Bool(true)
 		snapshot1.Status = &volumesnapshotv1.VolumeSnapshotStatus{
 			ReadyToUse: truePtr,
 		}
-		err = r.Client.Status().Update(ctx, snapshot1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Status().Update(ctx, snapshot1))
 
 		// Create second snapshot with different annotation value
 		snapshot2 := &volumesnapshotv1.VolumeSnapshot{
@@ -279,38 +268,32 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 				},
 			},
 		}
-		err = errors.WithStack(r.setControllerReference(cluster, snapshot2))
-		assert.NilError(t, err)
-		err = r.apply(ctx, snapshot2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.setControllerReference(cluster, snapshot2))
+		assert.NilError(t, r.apply(ctx, snapshot2))
 
 		// Update second snapshot's status
 		snapshot2.Status = &volumesnapshotv1.VolumeSnapshotStatus{
 			ReadyToUse: truePtr,
 		}
-		err = r.Client.Status().Update(ctx, snapshot2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Status().Update(ctx, snapshot2))
 
 		// Reconcile
-		err = r.reconcileVolumeSnapshots(ctx, cluster, pvc)
-		assert.NilError(t, err)
+		assert.NilError(t, r.reconcileVolumeSnapshots(ctx, cluster, pvc))
 
 		// Assert first snapshot exists and second snapshot was deleted
 		selectSnapshots, err := naming.AsSelector(naming.Cluster(cluster.Name))
 		assert.NilError(t, err)
 		snapshots := &volumesnapshotv1.VolumeSnapshotList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, snapshots,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectSnapshots},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(snapshots.Items), 1)
 		assert.Equal(t, snapshots.Items[0].Name, "first-snapshot")
 
 		// Cleanup
-		err = r.deleteControlled(ctx, cluster, snapshot1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.deleteControlled(ctx, cluster, snapshot1))
 	})
 
 	t.Run("SnapshotsEnabledCreateSnapshot", func(t *testing.T) {
@@ -347,19 +330,17 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		}
 
 		// Reconcile
-		err = r.reconcileVolumeSnapshots(ctx, cluster, pvc)
-		assert.NilError(t, err)
+		assert.NilError(t, r.reconcileVolumeSnapshots(ctx, cluster, pvc))
 
 		// Assert that a snapshot was created
 		selectSnapshots, err := naming.AsSelector(naming.Cluster(cluster.Name))
 		assert.NilError(t, err)
 		snapshots := &volumesnapshotv1.VolumeSnapshotList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, snapshots,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectSnapshots},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(snapshots.Items), 1)
 		assert.Equal(t, snapshots.Items[0].Annotations[naming.PGBackRestBackupJobCompletion],
 			"another-backup-timestamp")
@@ -413,21 +394,18 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 			},
 			Spec: testVolumeClaimSpec(),
 		}
-		err = errors.WithStack(r.setControllerReference(cluster, pvc))
-		assert.NilError(t, err)
-		err = r.apply(ctx, pvc)
-		assert.NilError(t, err)
+		assert.NilError(t, r.setControllerReference(cluster, pvc))
+		assert.NilError(t, r.apply(ctx, pvc))
 
 		// Assert that the pvc was created
 		selectPvcs, err := naming.AsSelector(naming.Cluster(cluster.Name))
 		assert.NilError(t, err)
 		pvcs := &corev1.PersistentVolumeClaimList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, pvcs,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectPvcs},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(pvcs.Items), 1)
 
 		// Create volumes for reconcile
@@ -471,12 +449,11 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		selectPvcs, err := naming.AsSelector(naming.Cluster(cluster.Name))
 		assert.NilError(t, err)
 		pvcs := &corev1.PersistentVolumeClaimList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, pvcs,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectPvcs},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(pvcs.Items), 1)
 	})
 
@@ -535,12 +512,11 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		restoreJobs := &batchv1.JobList{}
 		selectJobs, err := naming.AsSelector(naming.ClusterRestoreJobs(cluster.Name))
 		assert.NilError(t, err)
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, restoreJobs,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectJobs},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(restoreJobs.Items), 1)
 		assert.Assert(t, restoreJobs.Items[0].Annotations[naming.PGBackRestBackupJobCompletion] != "")
 	})
@@ -594,10 +570,8 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		restoreJob.Annotations = map[string]string{
 			naming.PGBackRestBackupJobCompletion: backupJob.Status.CompletionTime.Format(time.RFC3339),
 		}
-		err = errors.WithStack(r.setControllerReference(cluster, restoreJob))
-		assert.NilError(t, err)
-		err = r.apply(ctx, restoreJob)
-		assert.NilError(t, err)
+		assert.NilError(t, r.setControllerReference(cluster, restoreJob))
+		assert.NilError(t, r.apply(ctx, restoreJob))
 
 		restoreJob.Status = batchv1.JobStatus{
 			Succeeded:      1,
@@ -619,8 +593,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 				},
 			},
 		}
-		err = r.Client.Status().Update(ctx, restoreJob)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Status().Update(ctx, restoreJob))
 
 		// Create instance set and volumes for reconcile
 		sts := &appsv1.StatefulSet{}
@@ -636,12 +609,11 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		restoreJobs := &batchv1.JobList{}
 		selectJobs, err := naming.AsSelector(naming.ClusterRestoreJobs(cluster.Name))
 		assert.NilError(t, err)
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, restoreJobs,
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selectJobs},
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(restoreJobs.Items), 0)
 
 		// Assert pvc was annotated
@@ -697,10 +669,8 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		restoreJob.Annotations = map[string]string{
 			naming.PGBackRestBackupJobCompletion: backupJob.Status.CompletionTime.Format(time.RFC3339),
 		}
-		err = errors.WithStack(r.setControllerReference(cluster, restoreJob))
-		assert.NilError(t, err)
-		err = r.apply(ctx, restoreJob)
-		assert.NilError(t, err)
+		assert.NilError(t, r.setControllerReference(cluster, restoreJob))
+		assert.NilError(t, r.apply(ctx, restoreJob))
 
 		restoreJob.Status = batchv1.JobStatus{
 			Succeeded:      0,
@@ -799,19 +769,17 @@ func TestDedicatedSnapshotVolumeRestore(t *testing.T) {
 	backupJob := testBackupJob(cluster, "backup-job-dedicated-snapshot-exists-1")
 	backupJob.Status.CompletionTime = &currentTime
 
-	err := r.dedicatedSnapshotVolumeRestore(ctx, cluster, pvc, backupJob)
-	assert.NilError(t, err)
+	assert.NilError(t, r.dedicatedSnapshotVolumeRestore(ctx, cluster, pvc, backupJob))
 
 	// Assert a restore job was created that has the correct annotation
 	jobs := &batchv1.JobList{}
 	selectJobs, err := naming.AsSelector(naming.ClusterRestoreJobs(cluster.Name))
 	assert.NilError(t, err)
-	err = errors.WithStack(
+	assert.NilError(t,
 		r.Client.List(ctx, jobs,
 			client.InNamespace(cluster.Namespace),
 			client.MatchingLabelsSelector{Selector: selectJobs},
 		))
-	assert.NilError(t, err)
 	assert.Equal(t, len(jobs.Items), 1)
 	assert.Equal(t, jobs.Items[0].Annotations[naming.PGBackRestBackupJobCompletion],
 		backupJob.Status.CompletionTime.Format(time.RFC3339))
@@ -923,8 +891,7 @@ func TestGetDedicatedSnapshotVolumeRestoreJob(t *testing.T) {
 		job3.Name = "restore-job-3"
 		job3.Namespace = ns.Name
 
-		err = r.apply(ctx, job3)
-		assert.NilError(t, err)
+		assert.NilError(t, r.apply(ctx, job3))
 
 		dsvRestoreJob, err := r.getDedicatedSnapshotVolumeRestoreJob(ctx, cluster)
 		assert.NilError(t, err)
@@ -936,7 +903,6 @@ func TestGetDedicatedSnapshotVolumeRestoreJob(t *testing.T) {
 func TestGetLatestCompleteBackupJob(t *testing.T) {
 	ctx := context.Background()
 	_, cc := setupKubernetes(t)
-	// require.ParallelCapacity(t, 1)
 
 	r := &Reconciler{
 		Client: cc,
@@ -977,12 +943,10 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 		job2 := testBackupJob(cluster, "backup-job-one-complete-2")
 		job2.Namespace = ns.Name
 
-		err = r.apply(ctx, job2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.apply(ctx, job2))
 
 		// Get job1 and update Status.
-		err = r.Client.Get(ctx, client.ObjectKeyFromObject(job1), job1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Get(ctx, client.ObjectKeyFromObject(job1), job1))
 
 		job1.Status = batchv1.JobStatus{
 			Succeeded:      1,
@@ -1004,8 +968,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 				},
 			},
 		}
-		err = r.Client.Status().Update(ctx, job1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Status().Update(ctx, job1))
 
 		latestCompleteBackupJob, err := r.getLatestCompleteBackupJob(ctx, cluster)
 		assert.NilError(t, err)
@@ -1026,12 +989,10 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 		job2 := testBackupJob(cluster, "backup-job-two-complete-2")
 		job2.Namespace = ns.Name
 
-		err = r.apply(ctx, job2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.apply(ctx, job2))
 
 		// Get job1 and update Status.
-		err = r.Client.Get(ctx, client.ObjectKeyFromObject(job1), job1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Get(ctx, client.ObjectKeyFromObject(job1), job1))
 
 		job1.Status = batchv1.JobStatus{
 			Succeeded:      1,
@@ -1053,12 +1014,10 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 				},
 			},
 		}
-		err = r.Client.Status().Update(ctx, job1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Status().Update(ctx, job1))
 
 		// Get job2 and update Status.
-		err = r.Client.Get(ctx, client.ObjectKeyFromObject(job2), job2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Get(ctx, client.ObjectKeyFromObject(job2), job2))
 
 		job2.Status = batchv1.JobStatus{
 			Succeeded:      1,
@@ -1080,8 +1039,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 				},
 			},
 		}
-		err = r.Client.Status().Update(ctx, job2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.Client.Status().Update(ctx, job2))
 
 		latestCompleteBackupJob, err := r.getLatestCompleteBackupJob(ctx, cluster)
 		assert.NilError(t, err)
@@ -1092,6 +1050,17 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 func TestGetSnapshotWithLatestError(t *testing.T) {
 	t.Run("NoSnapshots", func(t *testing.T) {
 		snapshotList := &volumesnapshotv1.VolumeSnapshotList{}
+		snapshotWithLatestError := getSnapshotWithLatestError(snapshotList)
+		assert.Check(t, snapshotWithLatestError == nil)
+	})
+
+	t.Run("NoSnapshotsWithStatus", func(t *testing.T) {
+		snapshotList := &volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
+				{},
+				{},
+			},
+		}
 		snapshotWithLatestError := getSnapshotWithLatestError(snapshotList)
 		assert.Check(t, snapshotWithLatestError == nil)
 	})
@@ -1220,8 +1189,7 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 		}
 		snapshot.Spec.Source.PersistentVolumeClaimName = initialize.String("some-pvc-name")
 		snapshot.Spec.VolumeSnapshotClassName = initialize.String("some-class-name")
-		err := r.apply(ctx, snapshot)
-		assert.NilError(t, err)
+		assert.NilError(t, r.apply(ctx, snapshot))
 
 		snapshots, err := r.getSnapshotsForCluster(ctx, cluster)
 		assert.NilError(t, err)
@@ -1262,8 +1230,7 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 		}
 		snapshot2.Spec.Source.PersistentVolumeClaimName = initialize.String("another-pvc-name")
 		snapshot2.Spec.VolumeSnapshotClassName = initialize.String("another-class-name")
-		err = r.apply(ctx, snapshot2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.apply(ctx, snapshot2))
 
 		snapshots, err := r.getSnapshotsForCluster(ctx, cluster)
 		assert.NilError(t, err)
@@ -1305,8 +1272,7 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 		}
 		snapshot2.Spec.Source.PersistentVolumeClaimName = initialize.String("another-pvc-name")
 		snapshot2.Spec.VolumeSnapshotClassName = initialize.String("another-class-name")
-		err = r.apply(ctx, snapshot2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.apply(ctx, snapshot2))
 
 		snapshots, err := r.getSnapshotsForCluster(ctx, cluster)
 		assert.NilError(t, err)
@@ -1317,6 +1283,17 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 func TestGetLatestReadySnapshot(t *testing.T) {
 	t.Run("NoSnapshots", func(t *testing.T) {
 		snapshotList := &volumesnapshotv1.VolumeSnapshotList{}
+		latestReadySnapshot := getLatestReadySnapshot(snapshotList)
+		assert.Assert(t, latestReadySnapshot == nil)
+	})
+
+	t.Run("NoSnapshotsWithStatus", func(t *testing.T) {
+		snapshotList := &volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
+				{},
+				{},
+			},
+		}
 		latestReadySnapshot := getLatestReadySnapshot(snapshotList)
 		assert.Assert(t, latestReadySnapshot == nil)
 	})
@@ -1455,24 +1432,20 @@ func TestDeleteSnapshots(t *testing.T) {
 				},
 			},
 		}
-		err := errors.WithStack(r.setControllerReference(rhinoCluster, snapshot1))
-		assert.NilError(t, err)
-		err = r.apply(ctx, snapshot1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.setControllerReference(rhinoCluster, snapshot1))
+		assert.NilError(t, r.apply(ctx, snapshot1))
 
 		snapshotList := &volumesnapshotv1.VolumeSnapshotList{
 			Items: []volumesnapshotv1.VolumeSnapshot{
 				*snapshot1,
 			},
 		}
-		err = r.deleteSnapshots(ctx, cluster, snapshotList)
-		assert.NilError(t, err)
+		assert.NilError(t, r.deleteSnapshots(ctx, cluster, snapshotList))
 		existingSnapshots := &volumesnapshotv1.VolumeSnapshotList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, existingSnapshots,
 				client.InNamespace(ns.Namespace),
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(existingSnapshots.Items), 1)
 	})
 
@@ -1493,10 +1466,8 @@ func TestDeleteSnapshots(t *testing.T) {
 				},
 			},
 		}
-		err := errors.WithStack(r.setControllerReference(rhinoCluster, snapshot1))
-		assert.NilError(t, err)
-		err = r.apply(ctx, snapshot1)
-		assert.NilError(t, err)
+		assert.NilError(t, r.setControllerReference(rhinoCluster, snapshot1))
+		assert.NilError(t, r.apply(ctx, snapshot1))
 
 		snapshot2 := &volumesnapshotv1.VolumeSnapshot{
 			TypeMeta: metav1.TypeMeta{
@@ -1513,24 +1484,20 @@ func TestDeleteSnapshots(t *testing.T) {
 				},
 			},
 		}
-		err = errors.WithStack(r.setControllerReference(cluster, snapshot2))
-		assert.NilError(t, err)
-		err = r.apply(ctx, snapshot2)
-		assert.NilError(t, err)
+		assert.NilError(t, r.setControllerReference(cluster, snapshot2))
+		assert.NilError(t, r.apply(ctx, snapshot2))
 
 		snapshotList := &volumesnapshotv1.VolumeSnapshotList{
 			Items: []volumesnapshotv1.VolumeSnapshot{
 				*snapshot1, *snapshot2,
 			},
 		}
-		err = r.deleteSnapshots(ctx, cluster, snapshotList)
-		assert.NilError(t, err)
+		assert.NilError(t, r.deleteSnapshots(ctx, cluster, snapshotList))
 		existingSnapshots := &volumesnapshotv1.VolumeSnapshotList{}
-		err = errors.WithStack(
+		assert.NilError(t,
 			r.Client.List(ctx, existingSnapshots,
 				client.InNamespace(ns.Namespace),
 			))
-		assert.NilError(t, err)
 		assert.Equal(t, len(existingSnapshots.Items), 1)
 		assert.Equal(t, existingSnapshots.Items[0].Name, "first-snapshot")
 	})

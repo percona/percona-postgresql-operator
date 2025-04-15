@@ -220,9 +220,10 @@ func TestVerifyImageValues(t *testing.T) {
 		verifyImageCheck(t, "RELATED_IMAGE_POSTGRES_14_GIS_3.3", "crunchy-postgres-gis", cluster)
 	})
 
-	t.Run("crunchy-pgbackrest", func(t *testing.T) {
-		verifyImageCheck(t, "RELATED_IMAGE_PGBACKREST", "crunchy-pgbackrest", cluster)
-	})
+	// K8SPG-710: Image check will fail without a backup section in PostgresCluster
+	// t.Run("crunchy-pgbackrest", func(t *testing.T) {
+	// 	verifyImageCheck(t, "RELATED_IMAGE_PGBACKREST", "crunchy-pgbackrest", cluster)
+	// })
 
 	t.Run("crunchy-pgbouncer", func(t *testing.T) {
 		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
@@ -246,7 +247,8 @@ func TestVerifyImageValues(t *testing.T) {
 	t.Run("multiple images", func(t *testing.T) {
 		err := VerifyImageValues(cluster)
 		assert.ErrorContains(t, err, "crunchy-postgres-gis")
-		assert.ErrorContains(t, err, "crunchy-pgbackrest")
+		// K8SPG-710: Image check will fail without a backup section in PostgresCluster
+		// assert.ErrorContains(t, err, "crunchy-pgbackrest")
 		assert.ErrorContains(t, err, "crunchy-pgbouncer")
 		assert.ErrorContains(t, err, "crunchy-pgadmin4")
 		assert.ErrorContains(t, err, "crunchy-postgres-exporter")

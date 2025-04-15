@@ -5091,8 +5091,6 @@ spec:
                                 type: object
                             type: object
                         type: object
-                    required:
-                    - repos
                     type: object
                   snapshots:
                     description: VolumeSnapshot configuration
@@ -20458,6 +20456,10 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    grantPublicSchemaAccess:
+                      description: Grant the user access to the public schema in each
+                        database listed under `databases`.
+                      type: boolean
                     name:
                       description: |-
                         The name of this PostgreSQL user. The value may contain only lowercase
@@ -20506,7 +20508,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             required:
-            - backups
             - instances
             - postgresVersion
             type: object
@@ -20836,10 +20837,6 @@ spec:
                         type:
                           description: The pgBackRest backup type for this Job
                           type: string
-                      required:
-                      - cronJobName
-                      - repo
-                      - type
                       type: object
                     type: array
                 type: object

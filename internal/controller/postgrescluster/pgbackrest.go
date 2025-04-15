@@ -25,15 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/internal/config"
+	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
@@ -213,7 +210,7 @@ func (r *Reconciler) getPGBackRestResources(ctx context.Context,
 
 	repoResources := &RepoResources{}
 
-	gvks := []schema.GroupVersionKind{{
+	gvks := []runtime.GVK{{
 		Group:   appsv1.SchemeGroupVersion.Group,
 		Version: appsv1.SchemeGroupVersion.Version,
 		Kind:    "StatefulSetList",
@@ -445,27 +442,24 @@ func unstructuredToRepoResources(kind string, repoResources *RepoResources,
 
 	switch kind {
 	case "StatefulSetList":
-		var stsList appsv1.StatefulSetList
-		if err := runtime.DefaultUnstructuredConverter.
-			FromUnstructured(uList.UnstructuredContent(), &stsList); err != nil {
+		stsList, err := runtime.FromUnstructuredList[appsv1.StatefulSetList](uList)
+		if err != nil {
 			return errors.WithStack(err)
 		}
 		for i := range stsList.Items {
 			repoResources.hosts = append(repoResources.hosts, &stsList.Items[i])
 		}
 	case "CronJobList":
-		var cronList batchv1.CronJobList
-		if err := runtime.DefaultUnstructuredConverter.
-			FromUnstructured(uList.UnstructuredContent(), &cronList); err != nil {
+		cronList, err := runtime.FromUnstructuredList[batchv1.CronJobList](uList)
+		if err != nil {
 			return errors.WithStack(err)
 		}
 		for i := range cronList.Items {
 			repoResources.cronjobs = append(repoResources.cronjobs, &cronList.Items[i])
 		}
 	case "JobList":
-		var jobList batchv1.JobList
-		if err := runtime.DefaultUnstructuredConverter.
-			FromUnstructured(uList.UnstructuredContent(), &jobList); err != nil {
+		jobList, err := runtime.FromUnstructuredList[batchv1.JobList](uList)
+		if err != nil {
 			return errors.WithStack(err)
 		}
 		// we care about replica create backup jobs and manual backup jobs
@@ -483,9 +477,8 @@ func unstructuredToRepoResources(kind string, repoResources *RepoResources,
 		// Repository host now uses mTLS for encryption, authentication, and authorization.
 		// Configmaps for SSHD are no longer managed here.
 	case "PersistentVolumeClaimList":
-		var pvcList corev1.PersistentVolumeClaimList
-		if err := runtime.DefaultUnstructuredConverter.
-			FromUnstructured(uList.UnstructuredContent(), &pvcList); err != nil {
+		pvcList, err := runtime.FromUnstructuredList[corev1.PersistentVolumeClaimList](uList)
+		if err != nil {
 			return errors.WithStack(err)
 		}
 		for i := range pvcList.Items {
@@ -497,27 +490,24 @@ func unstructuredToRepoResources(kind string, repoResources *RepoResources,
 		// TODO(tjmoore4): Consider adding all pgBackRest secrets to RepoResources to
 		// observe all pgBackRest secrets in one place.
 	case "ServiceAccountList":
-		var saList corev1.ServiceAccountList
-		if err := runtime.DefaultUnstructuredConverter.
-			FromUnstructured(uList.UnstructuredContent(), &saList); err != nil {
+		saList, err := runtime.FromUnstructuredList[corev1.ServiceAccountList](uList)
+		if err != nil {
 			return errors.WithStack(err)
 		}
 		for i := range saList.Items {
 			repoResources.sas = append(repoResources.sas, &saList.Items[i])
 		}
 	case "RoleList":
-		var roleList rbacv1.RoleList
-		if err := runtime.DefaultUnstructuredConverter.
-			FromUnstructured(uList.UnstructuredContent(), &roleList); err != nil {
+		roleList, err := runtime.FromUnstructuredList[rbacv1.RoleList](uList)
+		if err != nil {
 			return errors.WithStack(err)
 		}
 		for i := range roleList.Items {
 			repoResources.roles = append(repoResources.roles, &roleList.Items[i])
 		}
 	case "RoleBindingList":
-		var rb rbacv1.RoleBindingList
-		if err := runtime.DefaultUnstructuredConverter.
-			FromUnstructured(uList.UnstructuredContent(), &rb); err != nil {
+		rb, err := runtime.FromUnstructuredList[rbacv1.RoleBindingList](uList)
+		if err != nil {
 			return errors.WithStack(err)
 		}
 		for i := range rb.Items {
@@ -538,9 +528,8 @@ func (r *Reconciler) setScheduledJobStatus(ctx context.Context,
 	log := logging.FromContext(ctx)
 
 	uList := &unstructured.UnstructuredList{Items: items}
-	var jobList batchv1.JobList
-	if err := runtime.DefaultUnstructuredConverter.
-		FromUnstructured(uList.UnstructuredContent(), &jobList); err != nil {
+	jobList, err := runtime.FromUnstructuredList[batchv1.JobList](uList)
+	if err != nil {
 		// as this is only setting a status that is not otherwise used
 		// by the Operator, simply log an error and return rather than
 		// bubble this up to the other functions
@@ -555,8 +544,9 @@ func (r *Reconciler) setScheduledJobStatus(ctx context.Context,
 	for _, job := range jobList.Items {
 		// we only care about the scheduled backup Jobs created by the
 		// associated CronJobs
-		sbs := v1beta1.PGBackRestScheduledBackupStatus{}
 		if job.GetLabels()[naming.LabelPGBackRestCronJob] != "" {
+			sbs := v1beta1.PGBackRestScheduledBackupStatus{}
+
 			if len(job.OwnerReferences) > 0 {
 				sbs.CronJobName = job.OwnerReferences[0].Name
 			}
@@ -588,7 +578,17 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 
 	annotations := naming.Merge(
 		postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
-		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil())
+		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
+	)
+	if postgresCluster.CompareVersion("2.7.0") >= 0 {
+		annotations = naming.Merge(
+			postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
+			postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
+			map[string]string{
+				naming.DefaultContainerAnnotation: naming.PGBackRestRepoContainerName,
+			},
+		)
+	}
 	labels := naming.Merge(
 		postgresCluster.Spec.Metadata.GetLabelsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
@@ -738,8 +738,7 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
 
 	// set ownership references
-	if err := controllerutil.SetControllerReference(postgresCluster, repo,
-		r.Client.Scheme()); err != nil {
+	if err := r.setControllerReference(postgresCluster, repo); err != nil {
 		return nil, err
 	}
 
@@ -863,11 +862,21 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 	}
 
 	// K8SPG-615
-	if manual := postgresCluster.Spec.Backups.PGBackRest.Manual; postgresCluster.CompareVersion("2.7.0") >= 0 && manual != nil && manual.InitialDelaySeconds != 0 {
+	if m := postgresCluster.Spec.Backups.PGBackRest.Manual; postgresCluster.CompareVersion("2.7.0") >= 0 && m != nil && m.InitialDelaySeconds != 0 {
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name:  "INITIAL_DELAY_SECS",
-			Value: strconv.FormatInt(manual.InitialDelaySeconds, 10),
+			Value: strconv.FormatInt(m.InitialDelaySeconds, 10),
 		})
+	}
+
+	if postgresCluster.CompareVersion("2.7.0") >= 0 {
+		if annotations != nil {
+			annotations[naming.DefaultContainerAnnotation] = naming.PGBackRestRepoContainerName
+		} else {
+			annotations = map[string]string{
+				naming.DefaultContainerAnnotation: naming.PGBackRestRepoContainerName,
+			}
+		}
 	}
 
 	jobSpec := &batchv1.JobSpec{
@@ -1357,7 +1366,10 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	annotations := naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil(),
-		map[string]string{naming.PGBackRestConfigHash: configHash})
+		map[string]string{
+			naming.PGBackRestConfigHash:       configHash,
+			naming.DefaultContainerAnnotation: naming.PGBackRestRestoreContainerName,
+		})
 	labels := naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Backups.PGBackRest.Metadata.GetLabelsOrNil(),
@@ -1974,7 +1986,7 @@ func (r *Reconciler) copyConfigurationResources(ctx context.Context, cluster,
 		if sourceCluster.Spec.Backups.PGBackRest.Configuration[i].Secret != nil {
 			secretProjection := sourceCluster.Spec.Backups.PGBackRest.Configuration[i].Secret
 			secretCopy := &corev1.Secret{}
-			secretName := types.NamespacedName{
+			secretName := client.ObjectKey{
 				Name:      secretProjection.Name,
 				Namespace: sourceCluster.Namespace,
 			}
@@ -2030,7 +2042,7 @@ func (r *Reconciler) copyConfigurationResources(ctx context.Context, cluster,
 		if sourceCluster.Spec.Backups.PGBackRest.Configuration[i].ConfigMap != nil {
 			configMapProjection := sourceCluster.Spec.Backups.PGBackRest.Configuration[i].ConfigMap
 			configMapCopy := &corev1.ConfigMap{}
-			configMapName := types.NamespacedName{
+			configMapName := client.ObjectKey{
 				Name:      configMapProjection.Name,
 				Namespace: sourceCluster.Namespace,
 			}
@@ -2093,8 +2105,7 @@ func (r *Reconciler) reconcilePGBackRestConfig(ctx context.Context,
 
 	backrestConfig := pgbackrest.CreatePGBackRestConfigMapIntent(postgresCluster, repoHostName,
 		configHash, serviceName, serviceNamespace, instanceNames)
-	if err := controllerutil.SetControllerReference(postgresCluster, backrestConfig,
-		r.Client.Scheme()); err != nil {
+	if err := r.setControllerReference(postgresCluster, backrestConfig); err != nil {
 		return err
 	}
 	if err := r.apply(ctx, backrestConfig); err != nil {
