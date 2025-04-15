@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -858,6 +859,14 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 				},
 			},
 		}
+	}
+
+	// K8SPG-615
+	if m := postgresCluster.Spec.Backups.PGBackRest.Manual; postgresCluster.CompareVersion("2.7.0") >= 0 && m != nil && m.InitialDelaySeconds != 0 {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "INITIAL_DELAY_SECS",
+			Value: strconv.FormatInt(m.InitialDelaySeconds, 10),
+		})
 	}
 
 	if postgresCluster.CompareVersion("2.7.0") >= 0 {
