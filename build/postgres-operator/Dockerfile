@@ -50,7 +50,6 @@ LABEL name="Percona Postgres Operator" \
       description="Percona Postgres Operator simplifies and automates all essential actions for stable and continuous database operation during the whole database lifecycle" \
       maintainer="Percona Development <info@percona.com>"
 
-
 COPY licenses /licenses
 
 COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
@@ -58,9 +57,11 @@ COPY --from=go_builder /usr/local/bin/extension-installer /usr/local/bin
 COPY --from=go_builder /licenses /licenses
 COPY build/postgres-operator/install-extensions.sh /usr/local/bin
 COPY hack/tools/queries /opt/crunchy/conf
+COPY operator-wrapper.sh /usr/local/bin/operator-wrapper.sh
 
-RUN chgrp -R 0 /opt/crunchy/conf && chmod -R g=u opt/crunchy/conf
+RUN chgrp -R 0 /opt/crunchy/conf && chmod -R g=u opt/crunchy/conf && \
+    chmod +x /usr/local/bin/operator-wrapper.sh
 
 USER 2
 
-CMD ["postgres-operator"]
+ENTRYPOINT ["/usr/local/bin/operator-wrapper.sh"]
