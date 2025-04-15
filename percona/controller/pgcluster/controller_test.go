@@ -1640,7 +1640,7 @@ func (sc *saTestClient) checkObject(ctx context.Context, obj client.Object) erro
 		return errors.New("it's not expected to have empty service account name")
 	}
 
-	if err := sc.Client.Get(ctx, types.NamespacedName{
+	if err := sc.Get(ctx, types.NamespacedName{
 		Name:      serviceAccountName,
 		Namespace: sts.Namespace,
 	}, new(corev1.ServiceAccount)); err != nil {
