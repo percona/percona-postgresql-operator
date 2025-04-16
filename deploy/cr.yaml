@@ -514,6 +514,7 @@ spec:
         repoName: repo1
         options:
          - --type=full
+#        initialDelaySeconds: 120
       repos:
       - name: repo1
         schedules:
