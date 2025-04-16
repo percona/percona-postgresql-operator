@@ -1689,9 +1689,7 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 			client.ObjectKey{Name: sourceClusterName, Namespace: sourceClusterNamespace},
 			sourceCluster); err != nil {
 			if apierrors.IsNotFound(err) {
-				log.Error(
-					errors.New("DataSource refers to a non-existent PostgresCluster"),
-					"failed to fetch source cluster",
+				log.Error(err,
 					"name", sourceClusterName,
 					"namespace", sourceClusterNamespace,
 				)
