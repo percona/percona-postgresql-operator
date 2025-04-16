@@ -158,5 +158,4 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 	}
 
 	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
-	return
 }
