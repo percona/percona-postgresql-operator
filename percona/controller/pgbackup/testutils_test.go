@@ -29,7 +29,7 @@ func (f *fakeClient) Patch(ctx context.Context, obj client.Object, patch client.
 	if !k8serrors.IsNotFound(err) {
 		return err
 	}
-	if err := f.Client.Create(ctx, obj); err != nil {
+	if err := f.Create(ctx, obj); err != nil {
 		return err
 	}
 	return f.Client.Patch(ctx, obj, patch, options...)
