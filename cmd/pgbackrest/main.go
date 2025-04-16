@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -77,6 +78,16 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 	log.Infof("debug flag set to %t", debugFlag)
+
+	if delay, found := os.LookupEnv("INITIAL_DELAY_SECS"); found {
+		delaySecs, err := strconv.ParseInt(delay, 10, 64)
+		if err != nil {
+			panic(err)
+		}
+
+		log.Infof("sleeping for %d seconds", delaySecs)
+		time.Sleep(time.Duration(delaySecs) * time.Second)
+	}
 
 	config, err := NewConfig()
 	if err != nil {
