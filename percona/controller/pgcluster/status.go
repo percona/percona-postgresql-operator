@@ -157,6 +157,6 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 		return
 	}
 
-	setClusterNotReadyCondition(metav1.ConditionTrue, postgrescluster.ConditionReplicaCreate)
+	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
 	return
 }

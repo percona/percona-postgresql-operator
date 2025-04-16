@@ -109,7 +109,7 @@ func (r *PGClusterReconciler) createScheduledBackup(log logr.Logger, backupName,
 	}
 	condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
 	if condition != nil && condition.Status == metav1.ConditionFalse {
-		log.Info("ReadyForBackup condition is set to true. Can't start scheduled backup")
+		log.Info("ReadyForBackup condition is set to false. Can't start scheduled backup")
 		return nil
 	}
 

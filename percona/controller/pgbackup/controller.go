@@ -692,10 +692,11 @@ func failIfClusterIsNotReady(ctx context.Context, cl client.Client, pgCluster *v
 	}
 
 	crunchyCluster := new(v1beta1.PostgresCluster)
-	if err := cl.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, crunchyCluster); err != nil {
+	if err := cl.Get(ctx, client.ObjectKeyFromObject(pgCluster), crunchyCluster); err != nil {
 		return errors.Wrap(err, "get PostgresCluster")
 	}
 
+	// Waiting for the crunchy cluster to receive the annotations added by the startBackup function.
 	_, ok := crunchyCluster.Annotations[pNaming.ToCrunchyAnnotation(naming.PGBackRestBackup)]
 	if !ok {
 		return nil
@@ -705,7 +706,7 @@ func failIfClusterIsNotReady(ctx context.Context, cl client.Client, pgCluster *v
 		return nil
 	}
 
-	log.Info("Cluster is not ready for backup for too long. Throwing error")
+	log.Info("Cluster is not ready for backup for too long. Setting it's state to Failed")
 
 	if err := updateStatus(ctx, cl, pgBackup, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupFailed
