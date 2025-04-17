@@ -706,6 +706,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
     controller-gen.kubebuilder.io/version: v0.16.5
+    argocd.argoproj.io/sync-options: ServerSideApply=true
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
