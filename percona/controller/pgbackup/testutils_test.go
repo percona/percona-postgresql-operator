@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,17 +22,6 @@ type fakeClient struct {
 }
 
 var _ = client.Client(new(fakeClient))
-
-func (f *fakeClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, options ...client.PatchOption) error {
-	err := f.Client.Patch(ctx, obj, patch, options...)
-	if !k8serrors.IsNotFound(err) {
-		return err
-	}
-	if err := f.Create(ctx, obj); err != nil {
-		return err
-	}
-	return f.Client.Patch(ctx, obj, patch, options...)
-}
 
 func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...client.Object) (client.Client, error) {
 	s := scheme.Scheme
