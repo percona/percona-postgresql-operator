@@ -1,9 +1,0 @@
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGBackup
-metadata:
-  name: backup1
-spec:
-  pgCluster: cluster1
-  repoName: repo1
-#  options:
-#  - --type=full
