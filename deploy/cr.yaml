@@ -2,7 +2,8 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: cluster1
-#  annotations:
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
 #    pgv2.percona.com/custom-patroni-version: "4"
 #  finalizers:
 #  - percona.com/delete-pvc
