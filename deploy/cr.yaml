@@ -149,7 +149,7 @@ spec:
 
   instances:
   - name: instance1
-    replicas: 3
+    replicas: 1
 
     affinity:
       podAntiAffinity:
