@@ -11,6 +11,7 @@ package v2
 import (
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -791,6 +792,13 @@ func (in *PerconaPGClusterStatus) DeepCopyInto(out *PerconaPGClusterStatus) {
 		in, out := &in.InstalledCustomExtensions, &out.InstalledCustomExtensions
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]metav1.Condition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

@@ -446,6 +446,10 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	InstalledCustomExtensions []string `json:"installedCustomExtensions"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type Backups struct {
