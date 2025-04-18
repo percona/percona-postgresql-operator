@@ -42,6 +42,8 @@ spec:
           value: INFO
         - name: DISABLE_TELEMETRY
           value: "false"
+        - name: PGO_WORKERS
+          value: "1"
         image: perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:

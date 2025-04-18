@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -24,8 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
+	internalRuntime "github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
@@ -539,7 +542,15 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(err).To(Not(HaveOccurred()))
-		mgr, err := runtime.CreateRuntimeManager(namespace.Name, cfg, true, true, gate)
+
+		os.Setenv("PGO_TARGET_NAMESPACE", "")
+		mgr, err := runtime.CreateRuntimeManager(cfg, gate, internalRuntime.Options{
+			LeaderElection:         false,
+			HealthProbeBindAddress: "0",
+			Metrics: metricsServer.Options{
+				BindAddress: "0",
+			},
+		})
 		Expect(err).To(Succeed())
 		Expect(v2.AddToScheme(mgr.GetScheme())).To(Succeed())
 

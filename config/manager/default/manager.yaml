@@ -35,6 +35,8 @@ spec:
             value: INFO
           - name: DISABLE_TELEMETRY
             value: "false"
+          - name: PGO_WORKERS
+            value: "1"
         ports:
           - containerPort: 8080
             name: metrics
