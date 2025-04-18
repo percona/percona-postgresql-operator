@@ -6,12 +6,14 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -103,6 +105,11 @@ func (r *PGClusterReconciler) createScheduledBackup(log logr.Logger, backupName,
 	}
 	if cr.Status.State != v2.AppStateReady {
 		log.Info("Cluster is not ready. Can't start scheduled backup")
+		return nil
+	}
+	condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
+	if condition != nil && condition.Status == metav1.ConditionFalse {
+		log.Info("ReadyForBackup condition is set to false. Can't start scheduled backup")
 		return nil
 	}
 

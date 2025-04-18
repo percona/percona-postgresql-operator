@@ -11,11 +11,14 @@ import (
 	. "github.com/onsi/gomega"
 	gs "github.com/onsi/gomega/gstruct"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
+	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -327,6 +330,123 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 				Expect(cr.Status.Host).Should(Equal("22.22.22.22"))
+			})
+		})
+	})
+
+	Context("Update PG cluster status.conditions", Ordered, func() {
+		crName := ns + "-conditions"
+		crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+		cr, err := readDefaultCR(crName, ns)
+		It("should read default cr.yaml and create PerconaPGCluster", func() {
+			Expect(err).NotTo(HaveOccurred())
+			status := cr.Status
+			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			cr.Status = status
+			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+		})
+
+		It("should reconcile and create Crunchy PostgreCluster", func() {
+			_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		When("conditions are not set", func() {
+			It("should reconcile and update conditions", func() {
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("ReadyForBackup condition should be False", func() {
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, crNamespacedName, cr)
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+
+				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
+				Expect(condition).Should(Not(BeNil()))
+				Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+			})
+		})
+
+		When("ConditionRepoHostReady is false", func() {
+			It("ReadyForBackup condition should be False", func() {
+				updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
+					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
+						Type:   postgrescluster.ConditionRepoHostReady,
+						Status: metav1.ConditionFalse,
+						Reason: "test",
+					})
+					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
+						Type:   postgrescluster.ConditionReplicaCreate,
+						Status: metav1.ConditionTrue,
+						Reason: "test",
+					})
+				})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, crNamespacedName, cr)
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+
+				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
+				Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+			})
+		})
+
+		When("ConditionReplicaCreate is false", func() {
+			It("ReadyForBackup condition should be False", func() {
+				updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
+					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
+						Type:   postgrescluster.ConditionRepoHostReady,
+						Status: metav1.ConditionTrue,
+						Reason: "test",
+					})
+					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
+						Type:   postgrescluster.ConditionReplicaCreate,
+						Status: metav1.ConditionFalse,
+						Reason: "test",
+					})
+				})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, crNamespacedName, cr)
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+
+				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
+				Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+			})
+		})
+
+		When("both are true", func() {
+			It("ReadyForBackup condition should be True", func() {
+				updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
+					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
+						Type:   postgrescluster.ConditionRepoHostReady,
+						Status: metav1.ConditionTrue,
+						Reason: "test",
+					})
+					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
+						Type:   postgrescluster.ConditionReplicaCreate,
+						Status: metav1.ConditionTrue,
+						Reason: "test",
+					})
+				})
+				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, crNamespacedName, cr)
+					return err == nil
+				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
+
+				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
+				Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
 			})
 		})
 	})

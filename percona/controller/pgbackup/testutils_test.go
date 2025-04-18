@@ -1,13 +1,11 @@
-package k8s
+package pgbackup
 
 import (
 	"context"
 	"os"
 	"path/filepath"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,17 +22,6 @@ type fakeClient struct {
 }
 
 var _ = client.Client(new(fakeClient))
-
-func (f *fakeClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, options ...client.PatchOption) error {
-	err := f.Client.Patch(ctx, obj, patch, options...)
-	if !k8serrors.IsNotFound(err) {
-		return err
-	}
-	if err := f.Create(ctx, obj); err != nil {
-		return err
-	}
-	return f.Client.Patch(ctx, obj, patch, options...)
-}
 
 func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...client.Object) (client.Client, error) {
 	s := scheme.Scheme
@@ -67,7 +54,7 @@ func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...clien
 }
 
 func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "deploy", "cr.yaml"))
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "cr.yaml"))
 	if err != nil {
 		return nil, err
 	}
@@ -88,22 +75,5 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "4.0.0"
 	cr.Namespace = namespace
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
-	return cr, nil
-}
-
-func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "deploy", "operator.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	cr := &appsv1.Deployment{}
-
-	if err := yaml.Unmarshal(data, cr); err != nil {
-		return nil, err
-	}
-
-	cr.Name = name
-	cr.Namespace = namespace
 	return cr, nil
 }
