@@ -1608,7 +1608,7 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 	rootCA *pki.RootCertificateAuthority,
 	backupsSpecFound bool,
 ) error {
-
+	log := logging.FromContext(ctx).WithValues("reconcileResource", "clusterDataSource")
 	// grab cluster, namespaces and repo name information from the data source
 	sourceClusterName := dataSource.ClusterName
 	// if the data source name is empty then we're restoring in-place and use the current cluster
@@ -1699,6 +1699,10 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 			client.ObjectKey{Name: sourceClusterName, Namespace: sourceClusterNamespace},
 			sourceCluster); err != nil {
 			if apierrors.IsNotFound(err) {
+				log.Error(err, "DataSource refers to a non-existent PostgresCluster",
+					"name", sourceClusterName,
+					"namespace", sourceClusterNamespace,
+				)
 				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidDataSource",
 					"PostgresCluster %q does not exist", sourceClusterName)
 				return nil
