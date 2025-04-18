@@ -18,14 +18,12 @@ import (
 // default refresh interval in minutes
 const refreshInterval time.Duration = 60 * time.Minute
 
-const electionID string = "08db3feb.percona.com"
+const ElectionID string = "08db3feb.percona.com"
 
 // CreateRuntimeManager wraps internal/controller/runtime.NewManager and modifies the given options:
 //   - Fully overwrites the Cache field
 //   - Sets Cache.SyncPeriod to refreshInterval const
 //   - Sets Cache.DefaultNamespaces by using k8s.GetWatchNamespace() split by ","
-//   - Sets LeaderElection to true
-//   - Sets LeaderElectionID to the electionID const
 //   - Sets BaseContext to include the provided feature gates
 func CreateRuntimeManager(config *rest.Config, features feature.MutableGate, options manager.Options) (manager.Manager, error) {
 	namespaces, err := k8s.GetWatchNamespace()
@@ -44,9 +42,6 @@ func CreateRuntimeManager(config *rest.Config, features feature.MutableGate, opt
 		}
 		options.Cache.DefaultNamespaces = namespaces
 	}
-
-	options.LeaderElection = true
-	options.LeaderElectionID = electionID
 
 	options.BaseContext = func() context.Context {
 		ctx := context.Background()

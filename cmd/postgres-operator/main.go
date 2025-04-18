@@ -113,6 +113,9 @@ func main() {
 	options, err := initManager(ctx)
 	assertNoError(err)
 
+	options.LeaderElection = true
+	options.LeaderElectionID = perconaRuntime.ElectionID
+
 	mgr, err := perconaRuntime.CreateRuntimeManager(
 		cfg,
 		features,
