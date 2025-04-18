@@ -78,21 +78,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 	pgBackup.Default()
 
-	if !pgBackup.DeletionTimestamp.IsZero() || pgBackup.Status.State == v2.BackupFailed || pgBackup.Status.State == v2.BackupSucceeded {
-		job, err := findBackupJob(ctx, r.Client, pgBackup)
-		if err == nil && len(job.Finalizers) > 0 {
-			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				j := new(batchv1.Job)
-				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
-					return errors.Wrap(err, "get job")
-				}
-				j.Finalizers = []string{}
-
-				return r.Client.Update(ctx, j)
-			}); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
-			}
-		}
+	if !pgBackup.DeletionTimestamp.IsZero() || pgBackup.Status.State == v2.BackupFailed {
 		if _, err := runFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
 		}
@@ -261,6 +247,22 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		job := &batchv1.Job{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job)
 		if err != nil {
+			// If something has deleted the job even with the finalizer, we should fail the backup.
+			if k8serrors.IsNotFound(err) {
+				if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					bcp := new(v2.PerconaPGBackup)
+					if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
+						return errors.Wrap(err, "get PGBackup")
+					}
+
+					bcp.Status.State = v2.BackupFailed
+
+					return r.Client.Status().Update(ctx, bcp)
+				}); err != nil {
+					return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+				}
+				return reconcile.Result{}, nil
+			}
 			return reconcile.Result{}, errors.Wrap(err, "get backup job")
 		}
 
@@ -310,8 +312,23 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		return reconcile.Result{}, nil
 	case v2.BackupSucceeded:
+		job, err := findBackupJob(ctx, r.Client, pgBackup)
+		if err == nil && len(job.Finalizers) > 0 {
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				j := new(batchv1.Job)
+				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+					return errors.Wrap(err, "get job")
+				}
+				j.Finalizers = []string{}
+
+				return r.Client.Update(ctx, j)
+			}); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+			}
+		}
+
 		pgCluster := &v2.PerconaPGCluster{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+		err = r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return reconcile.Result{}, nil
