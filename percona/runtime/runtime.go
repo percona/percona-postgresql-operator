@@ -6,43 +6,36 @@ import (
 	"time"
 
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	r "github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/feature"
+	"github.com/percona/percona-postgresql-operator/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/percona/k8s"
 )
 
 // default refresh interval in minutes
-var refreshInterval = 60 * time.Minute
+const refreshInterval time.Duration = 60 * time.Minute
 
 const electionID string = "08db3feb.percona.com"
 
-// CreateRuntimeManager does the same thing as `internal/controller/runtime.CreateRuntimeManager`,
-// excet it configures the manager to watch multiple namespaces.
-func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics, disableLeaderElection bool, features feature.MutableGate) (manager.Manager, error) {
-
-	var leaderElectionID string
-	if !disableLeaderElection {
-		leaderElectionID = electionID
+// CreateRuntimeManager wraps internal/controller/runtime.NewManager and modifies the given options:
+//   - Fully overwrites the Cache field
+//   - Sets Cache.SyncPeriod to refreshInterval const
+//   - Sets Cache.DefaultNamespaces by using k8s.GetWatchNamespace() split by ","
+//   - Sets LeaderElection to true
+//   - Sets LeaderElectionID to the electionID const
+//   - Sets BaseContext to include the provided feature gates
+func CreateRuntimeManager(config *rest.Config, features feature.MutableGate, options manager.Options) (manager.Manager, error) {
+	namespaces, err := k8s.GetWatchNamespace()
+	if err != nil {
+		return nil, err
 	}
 
-	options := manager.Options{
-		Cache: cache.Options{
-			SyncPeriod: &refreshInterval,
-		},
-		Scheme:           r.Scheme,
-		LeaderElection:   !disableLeaderElection,
-		LeaderElectionID: leaderElectionID,
+	options.Cache = cache.Options{
+		SyncPeriod: initialize.Pointer(refreshInterval),
 	}
-
-	options.BaseContext = func() context.Context {
-		ctx := context.Background()
-		return feature.NewContext(ctx, features)
-	}
-
 	nn := strings.Split(namespaces, ",")
 	if len(nn) > 0 && nn[0] != "" {
 		namespaces := make(map[string]cache.Config)
@@ -52,24 +45,13 @@ func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics
 		options.Cache.DefaultNamespaces = namespaces
 	}
 
-	if disableMetrics {
-		options.HealthProbeBindAddress = "0"
-		options.Metrics = metricsServer.Options{
-			BindAddress: "0",
-		}
+	options.LeaderElection = true
+	options.LeaderElectionID = electionID
+
+	options.BaseContext = func() context.Context {
+		ctx := context.Background()
+		return feature.NewContext(ctx, features)
 	}
 
-	// Create a copy of the config to avoid modifying the original
-	configCopy := rest.CopyConfig(config)
-
-	// Ensure throttling is disabled by setting a fake rate limiter
-	configCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
-
-	// create controller runtime manager
-	mgr, err := manager.New(configCopy, options)
-	if err != nil {
-		return nil, err
-	}
-
-	return mgr, nil
+	return r.NewManager(config, options)
 }

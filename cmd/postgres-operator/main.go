@@ -41,7 +41,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
 	perconaPGUpgrade "github.com/percona/percona-postgresql-operator/percona/controller/pgupgrade"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
 	perconaRuntime "github.com/percona/percona-postgresql-operator/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
@@ -111,15 +110,13 @@ func main() {
 	// deprecation warnings when using an older version of a resource for backwards compatibility).
 	rest.SetDefaultWarningHandler(rest.NoWarnings{})
 
-	namespaces, err := k8s.GetWatchNamespace()
+	options, err := initManager(ctx)
 	assertNoError(err)
 
 	mgr, err := perconaRuntime.CreateRuntimeManager(
-		namespaces,
 		cfg,
-		false,
-		false,
 		features,
+		options,
 	)
 	assertNoError(err)
 
@@ -260,8 +257,8 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 
 //+kubebuilder:rbac:groups="coordination.k8s.io",resources="leases",verbs={get,create,update}
 
-func initManager() (runtime.Options, error) {
-	log := logging.FromContext(context.Background())
+func initManager(ctx context.Context) (runtime.Options, error) {
+	log := logging.FromContext(ctx)
 
 	options := runtime.Options{}
 	options.Cache.SyncPeriod = initialize.Pointer(time.Hour)
