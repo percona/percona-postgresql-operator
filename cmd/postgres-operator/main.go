@@ -276,6 +276,10 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 		options.LeaderElection = true
 		options.LeaderElectionID = lease
 		options.LeaderElectionNamespace = os.Getenv("PGO_NAMESPACE")
+	} else {
+		// K8SPG-761
+		options.LeaderElection = true
+		options.LeaderElectionID = perconaRuntime.ElectionID
 	}
 
 	// Check PGO_TARGET_NAMESPACE for backwards compatibility with
@@ -314,10 +318,6 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 			log.Error(err, "PGO_WORKERS must be a positive number")
 		}
 	}
-
-	// K8SPG-761
-	options.LeaderElection = true
-	options.LeaderElectionID = perconaRuntime.ElectionID
 
 	return options, nil
 }

@@ -32,12 +32,14 @@ func TestInitManager(t *testing.T) {
 			})
 
 		assert.Assert(t, options.Cache.DefaultNamespaces == nil)
-		assert.Assert(t, options.LeaderElection == false)
+		assert.Assert(t, options.LeaderElection == true)
 
 		{
 			options.Cache.SyncPeriod = nil
 			options.Controller.GroupKindConcurrency = nil
 			options.HealthProbeBindAddress = ""
+			options.LeaderElection = false
+			options.LeaderElectionID = ""
 
 			assert.Assert(t, reflect.ValueOf(options).IsZero(),
 				"expected remaining fields to be unset:\n%+v", options)
