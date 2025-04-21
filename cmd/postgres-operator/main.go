@@ -113,9 +113,6 @@ func main() {
 	options, err := initManager(ctx)
 	assertNoError(err)
 
-	options.LeaderElection = true
-	options.LeaderElectionID = perconaRuntime.ElectionID
-
 	mgr, err := perconaRuntime.CreateRuntimeManager(
 		cfg,
 		features,
@@ -317,6 +314,10 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 			log.Error(err, "PGO_WORKERS must be a positive number")
 		}
 	}
+
+	// K8SPG-761
+	options.LeaderElection = true
+	options.LeaderElectionID = perconaRuntime.ElectionID
 
 	return options, nil
 }
