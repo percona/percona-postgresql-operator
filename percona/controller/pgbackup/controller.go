@@ -219,18 +219,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup")
 		}
 
-		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			j := new(batchv1.Job)
-			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
-				return errors.Wrap(err, "get job")
-			}
-			j.Finalizers = append(j.Finalizers, pNaming.FinalizerKeepJob)
-
-			return r.Client.Update(ctx, j)
-		}); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
-		}
-
 		if err := updateStatus(ctx, r.Client, pgBackup, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupRunning
 			bcp.Status.JobName = job.Name
@@ -673,7 +661,10 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 }
 
 func findBackupJob(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) (*batchv1.Job, error) {
-	if jobName := pb.GetAnnotations()[pNaming.AnnotationPGBackrestBackupJobName]; jobName != "" {
+	if jobName := pb.GetAnnotations()[pNaming.AnnotationPGBackrestBackupJobName]; jobName != "" || pb.Status.JobName != "" {
+		if jobName == "" {
+			jobName = pb.Status.JobName
+		}
 		job := new(batchv1.Job)
 		err := c.Get(ctx, types.NamespacedName{Name: jobName, Namespace: pb.Namespace}, job)
 		if err != nil {
