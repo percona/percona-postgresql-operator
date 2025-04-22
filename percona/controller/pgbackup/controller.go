@@ -336,7 +336,21 @@ func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster) func(ctx co
 			return errors.Wrap(err, "get backup job")
 		}
 
-		rr, err := finishBackup(ctx, c, pgBackup, job)
+		// Add retries for the finishBackup operation
+		var rr *reconcile.Result
+		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			var innerErr error
+			rr, innerErr = finishBackup(ctx, c, pgBackup, job)
+			if innerErr != nil {
+				// If the error is about missing annotations, we should retry
+				if strings.Contains(innerErr.Error(), "backup annotations are not found in pgbackrest") {
+					return innerErr
+				}
+				// For other errors, return them without retrying
+				return retry.OnError(retry.DefaultBackoff, func(err error) bool { return false }, func() error { return innerErr })
+			}
+			return nil
+		})
 		if err != nil {
 			return errors.Wrap(err, "failed to finish backup")
 		}
