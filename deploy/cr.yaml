@@ -36,7 +36,7 @@ spec:
 #    port: "<primary-port>"
 #    repoName: repo1
 
-#  openshift: true
+  openshift: true
 
 #  autoCreateUserSchema: true
 
