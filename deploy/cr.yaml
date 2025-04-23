@@ -11,8 +11,9 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.6.0
-#  metadata:
-#    annotations:
+  metadata:
+    annotations:
+      openshift.io/scc: restricted-v2
 #      example-annotation: value
 #    labels:
 #      example-label: value
