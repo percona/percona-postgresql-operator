@@ -193,7 +193,8 @@ spec:
 #
 #    priorityClassName: high-priority
 #
-#    securityContext:
+    securityContext:
+      runAsUser: 1000750000
 #      fsGroup: 1001
 #      runAsUser: 1001
 #      runAsNonRoot: true
@@ -280,7 +281,8 @@ spec:
 #        operator: Equal
 #        value: connection-poolers
 #
-#      securityContext:
+      securityContext:
+        runAsUser: 1000750000
 #        fsGroup: 1001
 #        runAsUser: 1001
 #        runAsNonRoot: true
@@ -355,7 +357,8 @@ spec:
 #          operator: Equal
 #          value: connection-poolers
 #
-#        securityContext:
+        securityContext:
+          runAsUser: 1000750000
 #          fsGroup: 1001
 #          runAsUser: 1001
 #          runAsNonRoot: true
