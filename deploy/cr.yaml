@@ -195,6 +195,7 @@ spec:
 #
     securityContext:
       runAsUser: 1000750000
+      fsGroup: 1000750000
 #      fsGroup: 1001
 #      runAsUser: 1001
 #      runAsNonRoot: true
@@ -283,6 +284,7 @@ spec:
 #
       securityContext:
         runAsUser: 1000750000
+        fsGroup: 1000750000
 #        fsGroup: 1001
 #        runAsUser: 1001
 #        runAsNonRoot: true
@@ -412,6 +414,7 @@ spec:
 #
         securityContext:
           runAsUser: 1000750000
+          fsGroup: 1000750000
 #          fsGroup: 1001
 #          runAsUser: 1001
 #          runAsNonRoot: true
