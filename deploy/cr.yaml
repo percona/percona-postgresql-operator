@@ -11,9 +11,9 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.6.0
-  metadata:
-    annotations:
-      openshift.io/scc: restricted-v2
+#  metadata:
+#    annotations:
+#      openshift.io/scc: restricted-v2
 #      example-annotation: value
 #    labels:
 #      example-label: value
@@ -357,8 +357,6 @@ spec:
 #          operator: Equal
 #          value: connection-poolers
 #
-        securityContext:
-          runAsUser: 1000750000
 #          fsGroup: 1001
 #          runAsUser: 1001
 #          runAsNonRoot: true
@@ -412,7 +410,8 @@ spec:
 #            matchLabels:
 #              postgres-operator.crunchydata.com/pgbackrest: ""
 #
-#        securityContext:
+        securityContext:
+          runAsUser: 1000750000
 #          fsGroup: 1001
 #          runAsUser: 1001
 #          runAsNonRoot: true
