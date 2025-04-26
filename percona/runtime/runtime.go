@@ -59,6 +59,9 @@ func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics
 		}
 	}
 
+	// Enable concurrent reconciles
+	options.Controller.MaxConcurrentReconciles = 10
+
 	// Create a copy of the config to avoid modifying the original
 	configCopy := rest.CopyConfig(config)
 
