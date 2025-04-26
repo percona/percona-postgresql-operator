@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +20,11 @@ import (
 // default refresh interval in minutes
 var refreshInterval = 60 * time.Minute
 
-const electionID string = "08db3feb.percona.com"
+const (
+	electionID string = "08db3feb.percona.com"
+	// DefaultMaxConcurrentReconciles is the default number of concurrent reconciles
+	DefaultMaxConcurrentReconciles = 10
+)
 
 // CreateRuntimeManager does the same thing as `internal/controller/runtime.CreateRuntimeManager`,
 // excet it configures the manager to watch multiple namespaces.
@@ -60,7 +66,13 @@ func CreateRuntimeManager(namespaces string, config *rest.Config, disableMetrics
 	}
 
 	// Enable concurrent reconciles
-	options.Controller.MaxConcurrentReconciles = 10
+	maxConcurrentReconciles := DefaultMaxConcurrentReconciles
+	if envVal := os.Getenv("MAX_CONCURRENT_RECONCILES"); envVal != "" {
+		if val, err := strconv.Atoi(envVal); err == nil && val > 0 {
+			maxConcurrentReconciles = val
+		}
+	}
+	options.Controller.MaxConcurrentReconciles = maxConcurrentReconciles
 
 	// Create a copy of the config to avoid modifying the original
 	configCopy := rest.CopyConfig(config)
