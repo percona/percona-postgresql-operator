@@ -10,5 +10,5 @@ commands:
 
       get_cr \
         | yq eval '.spec.pmm.enabled=true' - \
-        | yq eval '.spec.pmm.image="perconalab/pmm-client:3-dev-latest"' - \
+        | yq eval ".spec.pmm.image=\"${IMAGE_PMM3_CLIENT}\"" - \
         | kubectl -n "${NAMESPACE}" apply -f -
