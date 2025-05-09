@@ -3,6 +3,7 @@ package pgbackup
 import (
 	"context"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -275,13 +276,13 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, nil
 	case v2.BackupSucceeded:
 		job, err := findBackupJob(ctx, r.Client, pgBackup)
-		if err == nil && len(job.Finalizers) > 0 {
+		if err == nil && slices.Contains(job.Finalizers, pNaming.FinalizerKeepJob) {
 			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				j := new(batchv1.Job)
 				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
 					return errors.Wrap(err, "get job")
 				}
-				j.Finalizers = []string{}
+				j.Finalizers = slices.DeleteFunc(j.Finalizers, func(s string) bool { return s == pNaming.FinalizerKeepJob })
 
 				return r.Client.Update(ctx, j)
 			}); err != nil {
