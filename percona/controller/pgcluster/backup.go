@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -87,14 +88,18 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 			// After the pg-backup is deleted, the job is not deleted immediately.
 			// We need to set the DeletionTimestamp for a job so that `reconcileBackupJob` doesn't create a new pg-backup before the job deletion.
 			job := new(batchv1.Job)
-			if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job); err != nil {
+			err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job)
+			if client.IgnoreNotFound(err) != nil {
 				return errors.Wrap(err, "get backup job")
 			}
-			prop := metav1.DeletePropagationForeground
-			if err := r.Client.Delete(ctx, job, &client.DeleteOptions{
-				PropagationPolicy: &prop,
-			}); err != nil {
-				return errors.Wrapf(err, "delete job %s/%s", job.Name, job.Namespace)
+			// The job may be deleted earlier due to ttlSecondsAfterFinished
+			if !k8serrors.IsNotFound(err) {
+				prop := metav1.DeletePropagationForeground
+				if err := r.Client.Delete(ctx, job, &client.DeleteOptions{
+					PropagationPolicy: &prop,
+				}); err != nil {
+					return errors.Wrapf(err, "delete job %s/%s", job.Name, job.Namespace)
+				}
 			}
 			if err := r.Client.Delete(ctx, &pgBackup); err != nil {
 				return errors.Wrapf(err, "delete backup %s/%s", pgBackup.Name, pgBackup.Namespace)
