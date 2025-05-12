@@ -10,7 +10,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.23'
+          go-version: '^1.24'
       - uses: actions/checkout@v4
       - name: Basic tests
         run: make check
