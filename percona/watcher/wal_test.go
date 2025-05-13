@@ -1,0 +1,309 @@
+package watcher
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/percona/percona-postgresql-operator/percona/testutils"
+	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+)
+
+func mustParseTime(layout string, value string) time.Time {
+	time, err := time.Parse(layout, value)
+	if err != nil {
+		panic(err)
+	}
+	return time
+}
+
+func TestGetLatestBackup(t *testing.T) {
+	tests := []struct {
+		name             string
+		backups          []client.Object
+		latestBackupName string
+		expectedErr      error
+	}{
+		{
+			name:             "no backups",
+			backups:          []client.Object{},
+			latestBackupName: "",
+			expectedErr:      errNoBackups,
+		},
+		{
+			name: "single backup",
+			backups: []client.Object{
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup1",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:23:38Z"),
+						},
+					},
+				},
+			},
+			latestBackupName: "backup1",
+			expectedErr:      nil,
+		},
+		{
+			name: "multiple backups, same cluster",
+			backups: []client.Object{
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup1",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:23:38Z"),
+						},
+					},
+				},
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup2",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T22:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T22:24:12Z"),
+						},
+					},
+				},
+			},
+			latestBackupName: "backup2",
+			expectedErr:      nil,
+		},
+		{
+			name: "multiple backups, different clusters",
+			backups: []client.Object{
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup1",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:23:38Z"),
+						},
+					},
+				},
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup2",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T22:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T22:24:12Z"),
+						},
+					},
+				},
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup-from-different-cluster",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T22:10:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "different-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T22:14:12Z"),
+						},
+					},
+				},
+			},
+			latestBackupName: "backup2",
+			expectedErr:      nil,
+		},
+		{
+			name: "single running backup",
+			backups: []client.Object{
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup1",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupRunning,
+					},
+				},
+			},
+			latestBackupName: "",
+			expectedErr:      errRunningBackup,
+		},
+		{
+			name: "running backup but a backup is already succeeded",
+			backups: []client.Object{
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup1",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:23:38Z"),
+						},
+					},
+				},
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup2",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T22:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupRunning,
+					},
+				},
+			},
+			latestBackupName: "backup1",
+			expectedErr:      nil,
+		},
+		{
+			name: "K8SPG-772: multiple backups, some has no CompletedAt",
+			backups: []client.Object{
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup1",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T21:24:12Z"),
+						},
+					},
+				},
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup2",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T22:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+					},
+				},
+				&pgv2.PerconaPGBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup3",
+						Namespace: "test-ns",
+						CreationTimestamp: metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T23:00:57Z"),
+						},
+					},
+					Spec: pgv2.PerconaPGBackupSpec{
+						PGCluster: "test-cluster",
+					},
+					Status: pgv2.PerconaPGBackupStatus{
+						State: pgv2.BackupSucceeded,
+						CompletedAt: &metav1.Time{
+							Time: mustParseTime(time.RFC3339, "2024-02-04T23:24:12Z"),
+						},
+					},
+				},
+			},
+			latestBackupName: "backup3",
+			expectedErr:      nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := testutils.BuildFakeClient(tt.backups...)
+
+			cluster := &pgv2.PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-ns",
+				},
+			}
+
+			latest, err := getLatestBackup(t.Context(), client, cluster)
+			if tt.expectedErr != nil {
+				assert.EqualError(t, err, tt.expectedErr.Error())
+				assert.Nil(t, latest)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, latest)
+				assert.Equal(t, latest.Name, tt.latestBackupName)
+			}
+		})
+	}
+}
