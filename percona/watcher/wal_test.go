@@ -1,10 +1,12 @@
 package watcher
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -284,6 +286,7 @@ func TestGetLatestBackup(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := testutils.BuildFakeClient(tt.backups...)
@@ -295,12 +298,12 @@ func TestGetLatestBackup(t *testing.T) {
 				},
 			}
 
-			latest, err := getLatestBackup(t.Context(), client, cluster)
+			latest, err := getLatestBackup(ctx, client, cluster)
 			if tt.expectedErr != nil {
-				assert.EqualError(t, err, tt.expectedErr.Error())
+				require.EqualError(t, err, tt.expectedErr.Error())
 				assert.Nil(t, latest)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, latest)
 				assert.Equal(t, latest.Name, tt.latestBackupName)
 			}
