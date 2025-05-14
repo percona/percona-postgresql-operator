@@ -7,6 +7,7 @@ import (
 
 	v "github.com/hashicorp/go-version"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -58,6 +59,16 @@ type PerconaPGBackupSpec struct {
 	// https://pgbackrest.org/command.html#command-backup
 	// +optional
 	Options []string `json:"options,omitempty"`
+}
+
+const IndexFieldPGCluster = "spec.pgCluster"
+
+var PGClusterIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	backup, ok := obj.(*PerconaPGBackup)
+	if !ok {
+		return nil
+	}
+	return []string{backup.Spec.PGCluster}
 }
 
 type PGBackupState string
