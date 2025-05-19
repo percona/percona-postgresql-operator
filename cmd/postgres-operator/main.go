@@ -194,11 +194,8 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&v2.PerconaPGBackup{},
-		"spec.pgCluster",
-		func(rawObj client.Object) []string {
-			backup := rawObj.(*v2.PerconaPGBackup)
-			return []string{backup.Spec.PGCluster}
-		},
+		v2.IndexFieldPGCluster,
+		v2.PGClusterIndexerFunc,
 	); err != nil {
 		return err
 	}
