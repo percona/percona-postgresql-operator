@@ -131,9 +131,19 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 	runningBackupExists := false
 	for _, backup := range backupList.Items {
 		backup := backup
+
 		switch backup.Status.State {
 		case pgv2.BackupSucceeded:
-			if latest.Status.CompletedAt == nil || backup.Status.CompletedAt.After(latest.Status.CompletedAt.Time) {
+			var completedAt *metav1.Time
+
+			if backup.Status.CompletedAt != nil {
+				completedAt = backup.Status.CompletedAt
+			}
+			if completedAt == nil {
+				completedAt = &backup.CreationTimestamp
+			}
+
+			if latest.Status.CompletedAt == nil || completedAt.After(latest.Status.CompletedAt.Time) {
 				latest = &backup
 			}
 		case pgv2.BackupFailed:
