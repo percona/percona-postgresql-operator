@@ -13,7 +13,6 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -50,7 +49,7 @@ func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...clien
 
 	cl := new(fakeClient)
 	cl.Client = fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).WithStatusSubresource(objs...).
-		WithIndex(new(pgv2.PerconaPGBackup), pgv2.IndexFieldPGCluster, pgv2.PGClusterIndexerFunc).
+		WithIndex(new(v2.PerconaPGBackup), v2.IndexFieldPGCluster, v2.PGClusterIndexerFunc).
 		Build()
 
 	return cl, nil
