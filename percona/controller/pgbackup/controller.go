@@ -3,6 +3,7 @@ package pgbackup
 import (
 	"context"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -131,7 +132,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		}
 
 		// start backup only if backup job doesn't exist
-		_, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
+		_, err := findBackupJob(ctx, r.Client, pgBackup)
 		if err != nil {
 			if !errors.Is(err, ErrBackupJobNotFound) {
 				return reconcile.Result{}, errors.Wrap(err, "find backup job")
@@ -184,7 +185,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Errorf("PostgresCluster %s is not found", pgBackup.Spec.PGCluster)
 		}
 
-		job, err := findBackupJob(ctx, r.Client, pgCluster, pgBackup)
+		job, err := findBackupJob(ctx, r.Client, pgBackup)
 		if err != nil {
 			if errors.Is(err, ErrBackupJobNotFound) {
 				log.Info("Waiting for backup to start")
@@ -231,6 +232,15 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		job := &batchv1.Job{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Status.JobName, Namespace: pgBackup.Namespace}, job)
 		if err != nil {
+			// If something has deleted the job even with the finalizer, we should fail the backup.
+			if k8serrors.IsNotFound(err) {
+				if err := updateStatus(ctx, r.Client, pgBackup, func(bcp *v2.PerconaPGBackup) {
+					bcp.Status.State = v2.BackupFailed
+				}); err != nil {
+					return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+				}
+				return reconcile.Result{}, nil
+			}
 			return reconcile.Result{}, errors.Wrap(err, "get backup job")
 		}
 
@@ -265,6 +275,21 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		return reconcile.Result{}, nil
 	case v2.BackupSucceeded:
+		job, err := findBackupJob(ctx, r.Client, pgBackup)
+		if err == nil && slices.Contains(job.Finalizers, pNaming.FinalizerKeepJob) {
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				j := new(batchv1.Job)
+				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+					return errors.Wrap(err, "get job")
+				}
+				j.Finalizers = slices.DeleteFunc(j.Finalizers, func(s string) bool { return s == pNaming.FinalizerKeepJob })
+
+				return r.Client.Update(ctx, j)
+			}); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+			}
+		}
+
 		if pgCluster == nil {
 			return reconcile.Result{}, nil
 		}
@@ -636,8 +661,11 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 	return nil
 }
 
-func findBackupJob(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) (*batchv1.Job, error) {
-	if jobName := pb.GetAnnotations()[pNaming.AnnotationPGBackrestBackupJobName]; jobName != "" {
+func findBackupJob(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) (*batchv1.Job, error) {
+	if jobName := pb.GetAnnotations()[pNaming.AnnotationPGBackrestBackupJobName]; jobName != "" || pb.Status.JobName != "" {
+		if jobName == "" {
+			jobName = pb.Status.JobName
+		}
 		job := new(batchv1.Job)
 		err := c.Get(ctx, types.NamespacedName{Name: jobName, Namespace: pb.Namespace}, job)
 		if err != nil {
@@ -648,9 +676,9 @@ func findBackupJob(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster
 
 	jobList := &batchv1.JobList{}
 	err := c.List(ctx, jobList,
-		client.InNamespace(pg.Namespace),
+		client.InNamespace(pb.Namespace),
 		client.MatchingLabelsSelector{
-			Selector: naming.PGBackRestBackupJobSelector(pg.Name, pb.Spec.RepoName, naming.BackupManual),
+			Selector: naming.PGBackRestBackupJobSelector(pb.Spec.PGCluster, pb.Spec.RepoName, naming.BackupManual),
 		})
 	if err != nil {
 		return nil, errors.Wrap(err, "get backup jobs")

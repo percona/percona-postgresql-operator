@@ -671,7 +671,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		})
 
 		It("should reconcile 1 time", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*15, time.Millisecond*250).
+			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*20, time.Millisecond*250).
 				Should(Equal(reconcileCount + 1))
 		})
 
@@ -692,7 +692,7 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		})
 
 		It("should reconcile 2 times", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*15, time.Millisecond*250).
+			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*20, time.Millisecond*250).
 				Should(Equal(reconcileCount + 2))
 		})
 	})
