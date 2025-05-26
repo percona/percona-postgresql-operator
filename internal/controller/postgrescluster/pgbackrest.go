@@ -2491,6 +2491,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 		})
 	backupJob.ObjectMeta.Labels = labels
 	backupJob.ObjectMeta.Annotations = annotations
+	// K8SPG-703
+	backupJob.Finalizers = []string{pNaming.FinalizerKeepJob}
 
 	// K8SPG-613
 	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster, &postgresCluster.Spec.Backups.PGBackRest)
