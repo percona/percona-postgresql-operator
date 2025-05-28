@@ -1,3 +1,9 @@
+# Fly.io Postgres Operator
+
+This is a fork of the [Percona Operator for PostgreSQL](https://github.com/percona/percona-postgresql-operator) that is modified to work better with Fly.io for Managed Postgres (MPG).
+
+For our purposes, `flyio-2.6.0` is roughly our main branch.
+
 # Percona Operator for PostgreSQL
 
 ![Percona Kubernetes Operators](kubernetes.svg)
@@ -33,11 +39,11 @@ Learn more about [architecture and design decisions](https://docs.percona.com/pe
 
 # Documentation
 
-To learn more about the Operator, check the [Percona Operator for PostgreSQL documentation](https://docs.percona.com/percona-operator-for-postgresql/2.0/index.html). 
+To learn more about the Operator, check the [Percona Operator for PostgreSQL documentation](https://docs.percona.com/percona-operator-for-postgresql/2.0/index.html).
 
 ## Quickstart installation
 
-Ready to try out the Operator? Check the [Quickstart tutorial](https://docs.percona.com/percona-operator-for-postgresql/2.0/quickstart.html) for easy-to follow steps. 
+Ready to try out the Operator? Check the [Quickstart tutorial](https://docs.percona.com/percona-operator-for-postgresql/2.0/quickstart.html) for easy-to follow steps.
 
 Below is one of the ways to deploy the Operator using `kubectl`.
 
@@ -59,7 +65,7 @@ kubectl apply -f https://raw.githubusercontent.com/percona/percona-postgresql-op
 
 **Commercial Support**  | **Community Support** |
 :-: | :-: |
-| <br/>Enterprise-grade assistance for your mission-critical PostgreSQL deployments with the Percona Operator for PostgreSQL. Get expert guidance for complex tasks like multi-cloud replication, database migration and building platforms.<br/><br/>  | <br/>Connect with our engineers and fellow users for general questions, troubleshooting, and sharing feedback and ideas.<br/><br/>  | 
+| <br/>Enterprise-grade assistance for your mission-critical PostgreSQL deployments with the Percona Operator for PostgreSQL. Get expert guidance for complex tasks like multi-cloud replication, database migration and building platforms.<br/><br/>  | <br/>Connect with our engineers and fellow users for general questions, troubleshooting, and sharing feedback and ideas.<br/><br/>  |
 | **[Get Percona Support](https://hubs.ly/Q02ZTH9s0)** | **[Visit our Forum](https://forums.percona.com/c/postgresql/percona-kubernetes-operator-for-postgresql/68)** |
 
 # Contributing
@@ -74,6 +80,6 @@ We have a public roadmap which can be found [here](https://github.com/orgs/perco
 
 ## Submitting Bug Reports
 
-If you find a bug in Percona Docker Images or in one of the related projects, please submit a report to that project's [JIRA](https://jira.percona.com/browse/K8SPG) issue tracker or [create a GitHub issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/creating-an-issue#creating-an-issue-from-a-repository) in this repository. 
+If you find a bug in Percona Docker Images or in one of the related projects, please submit a report to that project's [JIRA](https://jira.percona.com/browse/K8SPG) issue tracker or [create a GitHub issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/creating-an-issue#creating-an-issue-from-a-repository) in this repository.
 
 Learn more about submitting bugs, new features ideas and improvements in the [Contribution Guide](CONTRIBUTING.md).
