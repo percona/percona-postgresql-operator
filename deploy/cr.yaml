@@ -2,6 +2,8 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: cluster1
+#  annotations:
+#    pgv2.percona.com/custom-patroni-version: "4"
 #  finalizers:
 #  - percona.com/delete-pvc
 #  - percona.com/delete-ssl
@@ -122,9 +124,9 @@ spec:
 #          test-label: value
 
 
-  image: percona/percona-postgresql-operator:2.6.0-ppg17.2-postgres
+  image: percona/percona-postgresql-operator:2.6.0-ppg16.8-postgres
   imagePullPolicy: Always
-  postgresVersion: 17
+  postgresVersion: 16
 #  port: 5432
 
 #  expose:
@@ -238,7 +240,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbouncer1.23.1
+      image: percona/percona-postgresql-operator:2.6.0-ppg16.8-pgbouncer1.24.0
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -318,9 +320,13 @@ spec:
   backups:
 #    trackLatestRestorableTime: true
     pgbackrest:
+      # Optional: Sets a grace period in seconds before the first backup is performed
+      # after PostgreSQL initialization. This helps prevent backup failures that can
+      # occur when the backup starts before PostgreSQL is fully ready.
+      # initialBackupDelaySeconds: 120
+      image: percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbackrest2.54.0
 #      metadata:
 #        labels:
-      image: percona/percona-postgresql-operator:2.6.0-ppg17.2-pgbackrest2.54.0
 #
 #      containers:
 #        pgbackrest:
@@ -471,7 +477,7 @@ spec:
     serverHost: monitoring-service
 #    querySource: pgstatmonitor
 #  patroni:
-#    # Some values of the Liveness/Readiness probes of the patroni container are calulated using syncPeriodSeconds by the following formulas:
+#    # Some values of the Liveness/Readiness probes of the patroni container are calculated using syncPeriodSeconds by the following formulas:
 #    # - timeoutSeconds:   syncPeriodSeconds / 2;
 #    # - periodSeconds:    syncPeriodSeconds;
 #    # - failureThreshold: leaderLeaseDurationSeconds / syncPeriodSeconds.

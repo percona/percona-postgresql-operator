@@ -459,16 +459,17 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 
 	return crunchyv1beta1.Backups{
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
-			Metadata:      b.PGBackRest.Metadata,
-			Configuration: b.PGBackRest.Configuration,
-			Global:        b.PGBackRest.Global,
-			Image:         b.PGBackRest.Image,
-			Jobs:          b.PGBackRest.Jobs,
-			Repos:         b.PGBackRest.Repos,
-			RepoHost:      b.PGBackRest.RepoHost,
-			Manual:        b.PGBackRest.Manual,
-			Restore:       b.PGBackRest.Restore,
-			Sidecars:      sc,
+			Metadata:                  b.PGBackRest.Metadata,
+			Configuration:             b.PGBackRest.Configuration,
+			Global:                    b.PGBackRest.Global,
+			Image:                     b.PGBackRest.Image,
+			InitialBackupDelaySeconds: b.PGBackRest.InitialBackupDelaySeconds,
+			Jobs:                      b.PGBackRest.Jobs,
+			Repos:                     b.PGBackRest.Repos,
+			RepoHost:                  b.PGBackRest.RepoHost,
+			Manual:                    b.PGBackRest.Manual,
+			Restore:                   b.PGBackRest.Restore,
+			Sidecars:                  sc,
 		},
 	}
 }
@@ -496,6 +497,13 @@ type PGBackRestArchive struct {
 	// the RELATED_IMAGE_PGBACKREST environment variable
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// InitialBackupDelaySeconds introduces a grace period before performing the first backup
+	// after PostgreSQL initialization. This helps prevent backup failures when attempting backup
+	// on a newly initialized cluster. If not specified, no delay is introduced.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	InitialBackupDelaySeconds *int32 `json:"initialBackupDelaySeconds,omitempty"`
 
 	// Jobs field allows configuration for all backup jobs
 	// +optional
@@ -698,6 +706,11 @@ type PGInstanceSetSpec struct {
 	// +optional
 	InitContainers []corev1.Container `json:"initContainers,omitempty"`
 
+	// Name of a Secret containing environment variables to be set in the PostgreSQL
+	// database container. The secret must exist in the same namespace as the cluster.
+	// +optional
+	EnvFromSecret *string `json:"envFromSecret,omitempty"`
+
 	// Priority class name for the PostgreSQL pod. Changing this value causes
 	// PostgreSQL to restart.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
@@ -764,6 +777,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Affinity:                  p.Affinity,
 		Containers:                p.Sidecars,
 		Sidecars:                  p.Containers,
+		EnvFromSecret:             p.EnvFromSecret,
 		InitContainers:            p.InitContainers,
 		PriorityClassName:         p.PriorityClassName,
 		Replicas:                  p.Replicas,

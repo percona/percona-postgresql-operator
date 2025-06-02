@@ -542,7 +542,7 @@ func (r *Reconciler) setScheduledJobStatus(ctx context.Context,
 		// by the Operator, simply log an error and return rather than
 		// bubble this up to the other functions
 		log.Error(err, "unable to convert unstructured objects to jobs, "+
-			"unable to set scheduled backup status")
+			"unable to set scheduled backup status", "cluster", postgresCluster.Name)
 		return
 	}
 
@@ -733,6 +733,11 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
 
 	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
+
+	// Add custom containers if defined in the RepoHost spec
+	if repoHost := postgresCluster.Spec.Backups.PGBackRest.RepoHost; repoHost != nil && len(repoHost.Containers) > 0 {
+		repo.Spec.Template.Spec.Containers = append(repo.Spec.Template.Spec.Containers, repoHost.Containers...)
+	}
 
 	// set ownership references
 	if err := controllerutil.SetControllerReference(postgresCluster, repo,
@@ -1144,6 +1149,18 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 	dataSource *v1beta1.PostgresClusterDataSource,
 	instanceName, instanceSetName, configHash, stanzaName string) error {
 
+	// Check if the pgBackRest secret exists before proceeding
+	pgbackrestSecret := &corev1.Secret{ObjectMeta: naming.PGBackRestSecret(cluster)}
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgbackrestSecret), pgbackrestSecret); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Secret doesn't exist yet, requeue to wait for it
+			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "WaitingForSecret",
+				"Waiting for pgBackRest secret to be created before starting restore")
+			return errors.New("pgBackRest secret not yet available, waiting before starting restore")
+		}
+		return errors.WithStack(err)
+	}
+
 	repoName := dataSource.RepoName
 	options := dataSource.Options
 
@@ -1350,6 +1367,63 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 		},
 	}
 
+	repoHost := cluster.Spec.Backups.PGBackRest.RepoHost
+
+	if repoHost != nil && repoHost.EnvFromSecret != nil {
+		envFrom := corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: *repoHost.EnvFromSecret,
+				},
+			},
+		}
+
+		job.Spec.Template.Spec.Containers[0].EnvFrom = append(job.Spec.Template.Spec.Containers[0].EnvFrom, envFrom)
+	}
+
+	// Add init containers from RepoHost.InitContainers if provided
+	if repoHost != nil && repoHost.EnvFromSecret != nil && repoHost.InitContainers != nil {
+		initContainers := make([]corev1.Container, 0, len(repoHost.InitContainers))
+
+		// If EnvFromSecret is specified, add the reference to each init container
+		for _, ic := range repoHost.InitContainers {
+			envFrom := corev1.EnvFromSource{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: *repoHost.EnvFromSecret,
+					},
+				},
+			}
+			ic.EnvFrom = append(ic.EnvFrom, envFrom)
+
+			initContainers = append(initContainers, ic)
+		}
+
+		job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, initContainers...)
+	}
+
+	// Add sidecars from RepoHost.Containers to the restore job
+	// if repoHost != nil && repoHost.EnvFromSecret != nil && repoHost.Containers != nil {
+	// 	containers := make([]corev1.Container, 0, len(repoHost.Containers))
+
+	// 	// Add the envFrom reference to each sidecar container
+	// 	for _, c := range repoHost.Containers {
+	// 		envFrom := corev1.EnvFromSource{
+	// 			SecretRef: &corev1.SecretEnvSource{
+	// 				LocalObjectReference: corev1.LocalObjectReference{
+	// 					Name: *repoHost.EnvFromSecret,
+	// 				},
+	// 			},
+	// 		}
+	// 		c.EnvFrom = append(c.EnvFrom, envFrom)
+
+	// 		containers = append(containers, c)
+	// 	}
+
+	// 	// Add the sidecars to the job's containers
+	// 	job.Spec.Template.Spec.Containers = append(job.Spec.Template.Spec.Containers, containers...)
+	// }
+
 	// Set the image pull secrets, if any exist.
 	// This is set here rather than using the service account due to the lack
 	// of propagation to existing pods when the CRD is updated:
@@ -1427,20 +1501,11 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 		return result, nil
 	}
 
-	var repoHost *appsv1.StatefulSet
 	var repoHostName string
-	// reconcile the pgbackrest repository host
-	repoHost, err = r.reconcileDedicatedRepoHost(ctx, postgresCluster, repoResources, instances)
-	if err != nil {
-		log.Error(err, "unable to reconcile pgBackRest repo host")
-		result.Requeue = true
-		return result, nil
-	}
-	repoHostName = repoHost.GetName()
-
-	if err := r.reconcilePGBackRestSecret(ctx, postgresCluster, repoHost, rootCA); err != nil {
-		log.Error(err, "unable to reconcile pgBackRest secret")
-		result.Requeue = true
+	if len(repoResources.hosts) == 0 {
+		repoHostName = fmt.Sprintf("%s-%s", postgresCluster.GetName(), "repo-host")
+	} else {
+		repoHostName = repoResources.hosts[0].Name
 	}
 
 	// calculate hashes for the external repository configurations in the spec (e.g. for Azure,
@@ -1448,7 +1513,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// configuration (and then execute stanza create commands accordingly)
 	configHashes, configHash, err := pgbackrest.CalculateConfigHashes(postgresCluster)
 	if err != nil {
-		log.Error(err, "unable to calculate config hashes")
+		log.Error(err, "unable to calculate config hashes", "cluster", postgresCluster.Name)
 		result.Requeue = true
 		return result, nil
 	}
@@ -1456,7 +1521,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// reconcile all pgbackrest repository repos
 	replicaCreateRepo, err := r.reconcileRepos(ctx, postgresCluster, configHashes, repoResources)
 	if err != nil {
-		log.Error(err, "unable to reconcile pgBackRest repo host")
+		log.Error(err, "unable to reconcile pgBackRest repo host", "cluster", postgresCluster.Name)
 		result.Requeue = true
 		return result, nil
 	}
@@ -1471,14 +1536,14 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	if err := r.reconcilePGBackRestConfig(ctx, postgresCluster, repoHostName,
 		configHash, naming.ClusterPodService(postgresCluster).Name,
 		postgresCluster.GetNamespace(), instanceNames); err != nil {
-		log.Error(err, "unable to reconcile pgBackRest configuration")
+		log.Error(err, "unable to reconcile pgBackRest configuration", "cluster", postgresCluster.Name)
 		result.Requeue = true
 	}
 
 	// reconcile the RBAC required to run pgBackRest Jobs (e.g. for backups)
 	sa, err := r.reconcilePGBackRestRBAC(ctx, postgresCluster)
 	if err != nil {
-		log.Error(err, "unable to create replica creation backup")
+		log.Error(err, "unable to create replica creation backup", "cluster", postgresCluster.Name)
 		result.Requeue = true
 		return result, nil
 	}
@@ -1497,16 +1562,36 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// re-attempted until successful (e.g. allowing users to correct mis-configurations in
 	// custom configuration and ensure stanzas are still created).
 	if err != nil {
-		log.Error(err, "unable to create stanza")
+		log.Error(err, "unable to create stanza", "cluster", postgresCluster.Name)
 		result.RequeueAfter = 10 * time.Second
 	}
 	// If a config hash mismatch, then log an info message and requeue to try again.  Add some time
 	// to the requeue to give the pgBackRest configuration changes a chance to propagate to the
 	// container.
 	if configHashMismatch {
-		log.Info("pgBackRest config hash mismatch detected, requeuing to reattempt stanza create")
+		log.Info("pgBackRest config hash mismatch detected, requeuing to reattempt stanza create",
+			"cluster", postgresCluster.Name)
 		result.RequeueAfter = 10 * time.Second
 	}
+
+	if len(instanceNames) < 2 {
+		result.RequeueAfter = 10 * time.Second
+	} else {
+		var repoHost *appsv1.StatefulSet
+		// reconcile the pgbackrest repository host
+		repoHost, err = r.reconcileDedicatedRepoHost(ctx, postgresCluster, repoResources, instances)
+		if err != nil {
+			log.Error(err, "unable to reconcile pgBackRest repo host", "cluster", postgresCluster.Name)
+			result.Requeue = true
+			return result, nil
+		}
+
+		if err := r.reconcilePGBackRestSecret(ctx, postgresCluster, repoHost, rootCA); err != nil {
+			log.Error(err, "unable to reconcile pgBackRest secret", "cluster", postgresCluster.Name)
+			result.Requeue = true
+		}
+	}
+
 	// reconcile the pgBackRest backup CronJobs
 	requeue := r.reconcileScheduledBackups(ctx, postgresCluster, sa, repoResources.cronjobs)
 	// If the pgBackRest backup CronJob reconciliation function has encountered an error, requeue
@@ -1523,7 +1608,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// This is done once stanza creation is successful
 	if err := r.reconcileReplicaCreateBackup(ctx, postgresCluster, instances,
 		repoResources.replicaCreateBackupJobs, sa, configHash, replicaCreateRepo); err != nil {
-		log.Error(err, "unable to reconcile replica creation backup")
+		log.Error(err, "unable to reconcile replica creation backup", "cluster", postgresCluster.Name)
 		result.Requeue = true
 	}
 
@@ -1531,7 +1616,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// annotation
 	if err := r.reconcileManualBackup(ctx, postgresCluster, repoResources.manualBackupJobs,
 		sa, instances); err != nil {
-		log.Error(err, "unable to reconcile manual backup")
+		log.Error(err, "unable to reconcile manual backup", "cluster", postgresCluster.Name)
 		result.Requeue = true
 	}
 
@@ -1550,21 +1635,6 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 	rootCA *pki.RootCertificateAuthority,
 	backupsSpecFound bool,
 ) error {
-
-	// grab cluster, namespaces and repo name information from the data source
-	sourceClusterName := dataSource.ClusterName
-	// if the data source name is empty then we're restoring in-place and use the current cluster
-	// as the source cluster
-	if sourceClusterName == "" {
-		sourceClusterName = cluster.GetName()
-	}
-	// if data source namespace is empty then use the same namespace as the current cluster
-	sourceClusterNamespace := dataSource.ClusterNamespace
-	if sourceClusterNamespace == "" {
-		sourceClusterNamespace = cluster.GetNamespace()
-	}
-	// repo name is required by the api, so RepoName should be populated
-	sourceRepoName := dataSource.RepoName
 
 	// Ensure the proper instance and instance set can be identified via the status.  The
 	// StartupInstance and StartupInstanceSet values should be populated when the cluster
@@ -1615,59 +1685,40 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 		return nil
 	}
 
-	// Identify the proper source cluster.  If the source cluster configured matches the current
-	// cluster, then we do not need to lookup a cluster and simply copy the current PostgresCluster.
-	// Additionally, pgBackRest is reconciled to ensure any configuration needed to bootstrap the
-	// cluster exists (specifically since it may not yet exist, e.g. if we're initializing the
-	// data directory for a brand new PostgresCluster using existing backups for that cluster).
-	// If the source cluster is not the same as the current cluster, then look it up.
+	// First, create the restore configuration and ensure secrets exist
+	// before proceeding with other operations
+	if err := r.createRestoreConfig(ctx, cluster, configHash); err != nil {
+		return err
+	}
+
+	// Create a fake StatefulSet for reconciling the PGBackRest secret
+	fakeRepoHost := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name + "-repo-host",
+			Namespace: cluster.Namespace,
+		},
+	}
+
+	// Ensure the PGBackRest secret exists
+	if err := r.reconcilePGBackRestSecret(ctx, cluster, fakeRepoHost, rootCA); err != nil {
+		return err
+	}
+
+	// Now proceed with volumes and other resources for the restore
 	sourceCluster := &v1beta1.PostgresCluster{}
-	if sourceClusterName == cluster.GetName() && sourceClusterNamespace == cluster.GetNamespace() {
-		sourceCluster = cluster.DeepCopy()
-		instance := &Instance{Name: instanceName}
-		// Reconciling pgBackRest here will ensure a pgBackRest instance config file exists (since
-		// the cluster hasn't bootstrapped yet, and pgBackRest configs therefore have not yet been
-		// reconciled) as needed to properly configure the pgBackRest restore Job.
-		// Note that function reconcilePGBackRest only uses forCluster in observedInstances.
-		result, err := r.reconcilePGBackRest(ctx, cluster, &observedInstances{
-			forCluster: []*Instance{instance},
-		}, rootCA, backupsSpecFound)
-		if err != nil || result != (reconcile.Result{}) {
-			return fmt.Errorf("unable to reconcile pgBackRest as needed to initialize "+
-				"PostgreSQL data for the cluster: %w", err)
+	if dataSource.ClusterName != "" && dataSource.ClusterNamespace != "" {
+		if err := r.Client.Get(ctx, types.NamespacedName{
+			Name:      dataSource.ClusterName,
+			Namespace: dataSource.ClusterNamespace,
+		}, sourceCluster); err != nil {
+			// If source is not found, proceed with the restore using nil for sourceCluster
+			if !apierrors.IsNotFound(err) {
+				return errors.WithStack(err)
+			}
+			sourceCluster = nil
 		}
 	} else {
-		if err := r.Client.Get(ctx,
-			client.ObjectKey{Name: sourceClusterName, Namespace: sourceClusterNamespace},
-			sourceCluster); err != nil {
-			if apierrors.IsNotFound(err) {
-				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidDataSource",
-					"PostgresCluster %q does not exist", sourceClusterName)
-				return nil
-			}
-			return errors.WithStack(err)
-		}
-
-		// Copy repository definitions and credentials from the source cluster.
-		// A copy is the only way to get this information across namespaces.
-		if err := r.copyRestoreConfiguration(ctx, cluster, sourceCluster); err != nil {
-			return err
-		}
-	}
-
-	// verify the repo defined in the data source exists in the source cluster
-	var foundRepo bool
-	for _, repo := range sourceCluster.Spec.Backups.PGBackRest.Repos {
-		if repo.Name == sourceRepoName {
-			foundRepo = true
-			break
-		}
-	}
-	if !foundRepo {
-		r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidDataSource",
-			"PostgresCluster %q does not have a repo named %q defined",
-			sourceClusterName, sourceRepoName)
-		return nil
+		sourceCluster = nil
 	}
 
 	// Define a fake STS to use when calling the reconcile functions below since when
@@ -2222,7 +2273,7 @@ func (r *Reconciler) reconcileDedicatedRepoHost(ctx context.Context,
 	repoHost, err := r.applyRepoHostIntent(ctx, postgresCluster, repoHostName, repoResources,
 		observedInstances)
 	if err != nil {
-		log.Error(err, "reconciling repository host")
+		log.Error(err, "reconciling repository host", "cluster", postgresCluster.Name)
 		return nil, err
 	}
 
@@ -2515,6 +2566,48 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 		return nil
 	}
 
+	// If InitialBackupDelaySeconds is set, check if enough time has passed since the cluster became ready
+	// before proceeding with the initial backup
+	if postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds != nil &&
+		*postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds > 0 {
+
+		// Check when the first instance became ready
+		var oldestReadyTime *metav1.Time
+		for _, instance := range instances.forCluster {
+			if len(instance.Pods) > 0 {
+				for _, pod := range instance.Pods {
+					for _, containerStatus := range pod.Status.ContainerStatuses {
+						if containerStatus.Name == naming.ContainerDatabase && containerStatus.Ready {
+							if containerStatus.State.Running != nil {
+								if oldestReadyTime == nil || containerStatus.State.Running.StartedAt.Before(oldestReadyTime) {
+									oldestReadyTime = &containerStatus.State.Running.StartedAt
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// If we found a ready time, check if enough time has passed
+		if oldestReadyTime != nil {
+			delaySeconds := *postgresCluster.Spec.Backups.PGBackRest.InitialBackupDelaySeconds
+			gracePeriod := time.Duration(delaySeconds) * time.Second
+			readyDuration := time.Since(oldestReadyTime.Time)
+
+			// If the grace period hasn't passed yet, log and return
+			if readyDuration < gracePeriod {
+				log := logging.FromContext(ctx)
+				waitingFor := gracePeriod - readyDuration
+				log.Info("Waiting for initial backup grace period to pass",
+					"waitingFor", waitingFor.String(),
+					"gracePeriod", gracePeriod.String(),
+					"readySince", oldestReadyTime.String())
+				return nil
+			}
+		}
+	}
+
 	// determine if the replica create repo is ready using the "PGBackRestReplicaRepoReady" condition
 	var replicaRepoReady bool
 	condition := meta.FindStatusCondition(postgresCluster.Status.Conditions, ConditionReplicaRepoReady)
@@ -2644,7 +2737,7 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 		repo, err := r.applyRepoVolumeIntent(ctx, postgresCluster, repo.Volume.VolumeClaimSpec,
 			repo.Name, repoResources)
 		if err != nil {
-			log.Error(err, errMsg)
+			log.Error(err, errMsg, "cluster", postgresCluster.Name)
 			errors = append(errors, err)
 			continue
 		}
@@ -2923,21 +3016,21 @@ func (r *Reconciler) reconcileScheduledBackups(
 			if repo.BackupSchedules.Full != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
 					Full, repo.BackupSchedules.Full, sa, cronjobs); err != nil {
-					log.Error(err, "unable to reconcile Full backup for "+repo.Name)
+					log.Error(err, "unable to reconcile Full backup for "+repo.Name, "cluster", cluster.Name)
 					requeue = true
 				}
 			}
 			if repo.BackupSchedules.Differential != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
 					Differential, repo.BackupSchedules.Differential, sa, cronjobs); err != nil {
-					log.Error(err, "unable to reconcile Differential backup for "+repo.Name)
+					log.Error(err, "unable to reconcile Differential backup for "+repo.Name, "cluster", cluster.Name)
 					requeue = true
 				}
 			}
 			if repo.BackupSchedules.Incremental != nil {
 				if err := r.reconcilePGBackRestCronJob(ctx, cluster, repo,
 					Incremental, repo.BackupSchedules.Incremental, sa, cronjobs); err != nil {
-					log.Error(err, "unable to reconcile Incremental backup for "+repo.Name)
+					log.Error(err, "unable to reconcile Incremental backup for "+repo.Name, "cluster", cluster.Name)
 					requeue = true
 				}
 			}
@@ -3073,7 +3166,7 @@ func (r *Reconciler) reconcilePGBackRestCronJob(
 		// record and log any errors resulting from trying to create the pgBackRest backup CronJob
 		r.Recorder.Event(cluster, corev1.EventTypeWarning, EventUnableToCreatePGBackRestCronJob,
 			err.Error())
-		log.Error(err, "error when attempting to create pgBackRest CronJob")
+		log.Error(err, "error when attempting to create pgBackRest CronJob", "cluster", cluster.Name)
 	}
 	return err
 }

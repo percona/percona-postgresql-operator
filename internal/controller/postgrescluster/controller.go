@@ -79,6 +79,8 @@ func (r *Reconciler) Reconcile(
 	log := logging.FromContext(ctx)
 	defer span.End()
 
+	log.Info("Starting reconciliation", "cluster", request.Name)
+
 	// get the postgrescluster from the cache
 	cluster := &v1beta1.PostgresCluster{}
 	if err := r.Client.Get(ctx, request.NamespacedName, cluster); err != nil {
@@ -86,11 +88,19 @@ func (r *Reconciler) Reconcile(
 		// deletion, we receive delete events from cluster's dependents after
 		// cluster is deleted.
 		if err = client.IgnoreNotFound(err); err != nil {
-			log.Error(err, "unable to fetch PostgresCluster")
+			log.Error(err, "unable to fetch PostgresCluster", "cluster", request.Name)
 			span.RecordError(err)
+		} else {
+			log.Info("PostgresCluster not found, likely deleted", "cluster", request.Name)
 		}
 		return runtime.ErrorWithBackoff(err)
 	}
+
+	log.Info("Retrieved PostgresCluster",
+		"cluster", cluster.Name,
+		"generation", cluster.GetGeneration(),
+		"observedGeneration", cluster.Status.ObservedGeneration,
+		"resourceVersion", cluster.GetResourceVersion())
 
 	// Set any defaults that may not have been stored in the API. No DeepCopy
 	// is necessary because controller-runtime makes a copy before returning
@@ -114,12 +124,12 @@ func (r *Reconciler) Reconcile(
 	// deleted or there was an error.
 	if result, err := r.handleDelete(ctx, cluster); err != nil {
 		span.RecordError(err)
-		log.Error(err, "deleting")
+		log.Error(err, "deleting", "cluster", cluster.Name)
 		return runtime.ErrorWithBackoff(err)
 
 	} else if result != nil {
 		if log := log.V(1); log.Enabled() {
-			log.Info("deleting", "result", fmt.Sprintf("%+v", *result))
+			log.Info("deleting", "cluster", cluster.Name, "result", fmt.Sprintf("%+v", *result))
 		}
 		return *result, nil
 	}
@@ -180,10 +190,10 @@ func (r *Reconciler) Reconcile(
 			// managed fields on the status subresource: https://issue.k8s.io/88901
 			if err := r.Client.Status().Patch(
 				ctx, cluster, client.MergeFrom(before), r.Owner); err != nil {
-				log.Error(err, "patching cluster status")
+				log.Error(err, "patching cluster status", "cluster", cluster.Name)
 				return err
 			}
-			log.V(1).Info("patched cluster status")
+			log.V(1).Info("patched cluster status", "cluster", cluster.Name)
 		}
 		return nil
 	}
@@ -210,7 +220,16 @@ func (r *Reconciler) Reconcile(
 	}
 
 	if err == nil {
+		log.V(1).Info("Starting backups reconciliation check", "cluster", cluster.Name)
 		backupsSpecFound, backupsReconciliationAllowed, err = r.BackupsEnabled(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to check backups status", "cluster", cluster.Name)
+		} else {
+			log.V(1).Info("Backups status",
+				"cluster", cluster.Name,
+				"backupsSpecFound", backupsSpecFound,
+				"backupsReconciliationAllowed", backupsReconciliationAllowed)
+		}
 
 		// If we cannot reconcile because the backup reconciliation is paused, set a condition and exit
 		if !backupsReconciliationAllowed {
@@ -264,7 +283,11 @@ func (r *Reconciler) Reconcile(
 	postgres.SetHugePages(cluster, &pgParameters)
 
 	if err == nil {
+		log.V(1).Info("Starting root certificate reconciliation", "cluster", cluster.Name)
 		rootCA, err = r.reconcileRootCertificate(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile root certificate", "cluster", cluster.Name)
+		}
 	}
 
 	if err == nil {
@@ -274,45 +297,92 @@ func (r *Reconciler) Reconcile(
 		// return a bool indicating that the controller should return early while any
 		// required Jobs are running, after which it will indicate that an early
 		// return is no longer needed, and reconciliation can proceed normally.
+		log.V(1).Info("Starting directory move jobs reconciliation", "cluster", cluster.Name)
+
 		returnEarly, err := r.reconcileDirMoveJobs(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile directory move jobs", "cluster", cluster.Name)
+		} else if returnEarly {
+			log.Info("Directory move jobs in progress, returning early", "cluster", cluster.Name)
+		}
 		if err != nil || returnEarly {
 			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
 		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting PVC observation", "cluster", cluster.Name)
 		clusterVolumes, err = r.observePersistentVolumeClaims(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to observe PVCs", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting PVC configuration", "cluster", cluster.Name)
 		clusterVolumes, err = r.configureExistingPVCs(ctx, cluster, clusterVolumes)
+		if err != nil {
+			log.Error(err, "Failed to configure PVCs", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting instance observation", "cluster", cluster.Name)
 		instances, err = r.observeInstances(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to observe instances", "cluster", cluster.Name)
+		} else {
+			// Count writable instances
+			writableCount := 0
+			for _, instance := range instances.forCluster {
+				if writable, known := instance.IsWritable(); writable && known {
+					writableCount++
+				}
+			}
+			log.V(1).Info("Instance observation complete",
+				"cluster", cluster.Name,
+				"instanceCount", len(instances.forCluster),
+				"writableInstanceCount", writableCount)
+		}
 	}
 
 	result := reconcile.Result{}
 
 	if err == nil {
+		log.V(1).Info("Starting Patroni status reconciliation", "cluster", cluster.Name)
 		var requeue time.Duration
 		if requeue, err = r.reconcilePatroniStatus(ctx, cluster, instances); err == nil && requeue > 0 {
 			result.RequeueAfter = requeue
+			log.V(1).Info("Patroni status reconciliation requires requeue",
+				"cluster", cluster.Name,
+				"requeueAfter", requeue)
 		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting Patroni switchover reconciliation", "cluster", cluster.Name)
 		err = r.reconcilePatroniSwitchover(ctx, cluster, instances)
+		if err != nil {
+			log.Error(err, "Failed to reconcile Patroni switchover", "cluster", cluster.Name)
+		}
 	}
 	// reconcile the Pod service before reconciling any data source in case it is necessary
 	// to start Pods during data source reconciliation that require network connections (e.g.
 	// if it is necessary to start a dedicated repo host to bootstrap a new cluster using its
 	// own existing backups).
 	if err == nil {
+		log.V(1).Info("Starting cluster pod service reconciliation", "cluster", cluster.Name)
 		clusterPodService, err = r.reconcileClusterPodService(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile cluster pod service", "cluster", cluster.Name)
+		}
 	}
 	// reconcile the RBAC resources before reconciling any data source in case
 	// restore/move Job pods require the ServiceAccount to access any data source.
 	// e.g., we are restoring from an S3 source using an IAM for access
 	// - https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts-technical-overview.html
 	if err == nil {
+		log.V(1).Info("Starting RBAC resources reconciliation", "cluster", cluster.Name)
 		instanceServiceAccount, err = r.reconcileRBACResources(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile RBAC resources", "cluster", cluster.Name)
+		}
 	}
 	// First handle reconciling any data source configured for the PostgresCluster.  This includes
 	// reconciling the data source defined to bootstrap a new cluster, as well as a reconciling
@@ -330,93 +400,188 @@ func (r *Reconciler) Reconcile(
 		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting cluster config map reconciliation", "cluster", cluster.Name)
 		clusterConfigMap, err = r.reconcileClusterConfigMap(ctx, cluster, pgHBAs, pgParameters)
+		if err != nil {
+			log.Error(err, "Failed to reconcile cluster config map", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting replication secret reconciliation", "cluster", cluster.Name)
 		clusterReplicationSecret, err = r.reconcileReplicationSecret(ctx, cluster, rootCA)
+		if err != nil {
+			log.Error(err, "Failed to reconcile replication secret", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting Patroni leader lease reconciliation", "cluster", cluster.Name)
 		patroniLeaderService, err = r.reconcilePatroniLeaderLease(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile Patroni leader lease", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting primary service reconciliation", "cluster", cluster.Name)
 		primaryService, err = r.reconcileClusterPrimaryService(ctx, cluster, patroniLeaderService)
+		if err != nil {
+			log.Error(err, "Failed to reconcile primary service", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting replica service reconciliation", "cluster", cluster.Name)
 		replicaService, err = r.reconcileClusterReplicaService(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile replica service", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting cluster certificate reconciliation", "cluster", cluster.Name)
 		primaryCertificate, err = r.reconcileClusterCertificate(ctx, rootCA, cluster, primaryService, replicaService)
+		if err != nil {
+			log.Error(err, "Failed to reconcile cluster certificate", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting Patroni distributed configuration reconciliation", "cluster", cluster.Name)
 		err = r.reconcilePatroniDistributedConfiguration(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile Patroni distributed configuration", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting Patroni dynamic configuration reconciliation", "cluster", cluster.Name)
 		err = r.reconcilePatroniDynamicConfiguration(ctx, cluster, instances, pgHBAs, pgParameters)
+		if err != nil {
+			log.Error(err, "Failed to reconcile Patroni dynamic configuration", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting monitoring secret reconciliation", "cluster", cluster.Name)
 		monitoringSecret, err = r.reconcileMonitoringSecret(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile monitoring secret", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting exporter queries config reconciliation", "cluster", cluster.Name)
 		exporterQueriesConfig, err = r.reconcileExporterQueriesConfig(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile exporter queries config", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting exporter web config reconciliation", "cluster", cluster.Name)
 		exporterWebConfig, err = r.reconcileExporterWebConfig(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile exporter web config", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting instance sets reconciliation", "cluster", cluster.Name)
 		err = r.reconcileInstanceSets(
 			ctx, cluster, clusterConfigMap, clusterReplicationSecret, rootCA,
 			clusterPodService, instanceServiceAccount, instances, patroniLeaderService,
 			primaryCertificate, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
 			backupsSpecFound,
 		)
+		if err != nil {
+			log.Error(err, "Failed to reconcile instance sets", "cluster", cluster.Name)
+		}
 	}
 
 	if err == nil {
+		log.V(1).Info("Starting Postgres databases reconciliation", "cluster", cluster.Name)
 		err = r.reconcilePostgresDatabases(ctx, cluster, instances)
+		if err != nil {
+			log.Error(err, "Failed to reconcile Postgres databases", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting Postgres users reconciliation", "cluster", cluster.Name)
 		err = r.reconcilePostgresUsers(ctx, cluster, instances)
+		if err != nil {
+			log.Error(err, "Failed to reconcile Postgres users", "cluster", cluster.Name)
+		}
 	}
 
 	if err == nil {
+		log.V(1).Info("Starting PGBackRest reconciliation", "cluster", cluster.Name)
 		var next reconcile.Result
 		if next, err = r.reconcilePGBackRest(ctx, cluster,
 			instances, rootCA, backupsSpecFound); err == nil && !next.IsZero() {
 			result.Requeue = result.Requeue || next.Requeue
 			if next.RequeueAfter > 0 {
+				log.V(1).Info("PGBackRest reconciliation requires requeue",
+					"cluster", cluster.Name,
+					"requeueAfter", next.RequeueAfter)
 				result.RequeueAfter = next.RequeueAfter
 			}
 		}
+		if err != nil {
+			log.Error(err, "Failed to reconcile PGBackRest", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting dedicated snapshot volume reconciliation", "cluster", cluster.Name)
 		dedicatedSnapshotPVC, err = r.reconcileDedicatedSnapshotVolume(ctx, cluster, clusterVolumes)
+		if err != nil {
+			log.Error(err, "Failed to reconcile dedicated snapshot volume", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting volume snapshots reconciliation", "cluster", cluster.Name)
 		err = r.reconcileVolumeSnapshots(ctx, cluster, dedicatedSnapshotPVC)
+		if err != nil {
+			log.Error(err, "Failed to reconcile volume snapshots", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting PGBouncer reconciliation", "cluster", cluster.Name)
 		err = r.reconcilePGBouncer(ctx, cluster, instances, primaryCertificate, rootCA)
+		if err != nil {
+			log.Error(err, "Failed to reconcile PGBouncer", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting PGMonitor reconciliation", "cluster", cluster.Name)
 		err = r.reconcilePGMonitor(ctx, cluster, instances, monitoringSecret)
+		if err != nil {
+			log.Error(err, "Failed to reconcile PGMonitor", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting database init SQL reconciliation", "cluster", cluster.Name)
 		err = r.reconcileDatabaseInitSQL(ctx, cluster, instances)
+		if err != nil {
+			log.Error(err, "Failed to reconcile database init SQL", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
+		log.V(1).Info("Starting PGAdmin reconciliation", "cluster", cluster.Name)
 		err = r.reconcilePGAdmin(ctx, cluster)
+		if err != nil {
+			log.Error(err, "Failed to reconcile PGAdmin", "cluster", cluster.Name)
+		}
 	}
 	if err == nil {
 		// This is after [Reconciler.rolloutInstances] to ensure that recreating
 		// Pods takes precedence.
+		log.V(1).Info("Starting Patroni restarts reconciliation", "cluster", cluster.Name)
 		err = r.handlePatroniRestarts(ctx, cluster, instances)
+		if err != nil {
+			log.Error(err, "Failed to reconcile Patroni restarts", "cluster", cluster.Name)
+		}
 	}
 
 	// at this point everything reconciled successfully, and we can update the
 	// observedGeneration
 	cluster.Status.ObservedGeneration = cluster.GetGeneration()
 
-	log.V(1).Info("reconciled cluster")
+	log.Info("Completed reconciliation",
+		"cluster", cluster.Name,
+		"generation", cluster.GetGeneration(),
+		"observedGeneration", cluster.Status.ObservedGeneration,
+		"result", fmt.Sprintf("%+v", result))
 
 	return result, errors.Join(err, patchClusterStatus())
 }

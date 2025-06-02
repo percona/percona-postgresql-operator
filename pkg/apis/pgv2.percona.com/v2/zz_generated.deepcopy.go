@@ -145,6 +145,11 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 			(*out)[key] = val
 		}
 	}
+	if in.InitialBackupDelaySeconds != nil {
+		in, out := &in.InitialBackupDelaySeconds, &out.InitialBackupDelaySeconds
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Jobs != nil {
 		in, out := &in.Jobs, &out.Jobs
 		*out = new(v1beta1.BackupJobs)
@@ -328,6 +333,11 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.EnvFromSecret != nil {
+		in, out := &in.EnvFromSecret, &out.EnvFromSecret
+		*out = new(string)
+		**out = **in
 	}
 	if in.PriorityClassName != nil {
 		in, out := &in.PriorityClassName, &out.PriorityClassName

@@ -109,6 +109,13 @@ type PGBackRestArchive struct {
 	// +optional
 	Image string `json:"image,omitempty"`
 
+	// InitialBackupDelaySeconds introduces a grace period before performing the first backup
+	// after PostgreSQL initialization. This helps prevent backup failures when attempting backup
+	// on a newly initialized cluster. If not specified, no delay is introduced.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	InitialBackupDelaySeconds *int32 `json:"initialBackupDelaySeconds,omitempty"`
+
 	// Jobs field allows configuration for all backup jobs
 	// +optional
 	Jobs *BackupJobs `json:"jobs,omitempty"`
@@ -209,6 +216,21 @@ type PGBackRestRepoHost struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Custom init containers for the pgBackRest repository host. These containers run to completion
+	// before the main containers start. Changing this value causes the pgBackRest repository host to restart.
+	// +optional
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
+
+	// Custom sidecars for the pgBackRest repository host. Changing this value causes
+	// the pgBackRest repository host to restart.
+	// +optional
+	Containers []corev1.Container `json:"containers,omitempty"`
+
+	// Name of a Secret containing environment variables to be set in the pgBackRest
+	// repository host container. The secret must exist in the same namespace as the cluster.
+	// +optional
+	EnvFromSecret *string `json:"envFromSecret,omitempty"`
 
 	// Priority class name for the pgBackRest repo host pod. Changing this value
 	// causes PostgreSQL to restart.

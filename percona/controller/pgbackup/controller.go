@@ -336,7 +336,21 @@ func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster) func(ctx co
 			return errors.Wrap(err, "get backup job")
 		}
 
-		rr, err := finishBackup(ctx, c, pgBackup, job)
+		// Add retries for the finishBackup operation
+		var rr *reconcile.Result
+		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			var innerErr error
+			rr, innerErr = finishBackup(ctx, c, pgBackup, job)
+			if innerErr != nil {
+				// If the error is about missing annotations, we should retry
+				if strings.Contains(innerErr.Error(), "backup annotations are not found in pgbackrest") {
+					return innerErr
+				}
+				// For other errors, return them without retrying
+				return retry.OnError(retry.DefaultBackoff, func(err error) bool { return false }, func() error { return innerErr })
+			}
+			return nil
+		})
 		if err != nil {
 			return errors.Wrap(err, "failed to finish backup")
 		}
@@ -390,11 +404,57 @@ func getBackupInProgress(ctx context.Context, c client.Client, clusterName, ns s
 	annotation := pNaming.AnnotationBackupInProgress
 	crunchyAnnotation := pNaming.ToCrunchyAnnotation(annotation)
 
+	// Get the backup name from annotations
+	backupName := ""
 	if crunchyCluster.Annotations[crunchyAnnotation] != "" {
-		return crunchyCluster.Annotations[crunchyAnnotation], nil
+		backupName = crunchyCluster.Annotations[crunchyAnnotation]
+	} else if pgCluster.Annotations[annotation] != "" {
+		backupName = pgCluster.Annotations[annotation]
 	}
 
-	return pgCluster.Annotations[annotation], nil
+	// If no backup is marked as in progress, return empty
+	if backupName == "" {
+		return "", nil
+	}
+
+	// Verify the backup is actually still running
+	backup := &v2.PerconaPGBackup{}
+	err = c.Get(ctx, types.NamespacedName{Name: backupName, Namespace: ns}, backup)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			// Backup resource doesn't exist, clean up the annotation
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				pg := new(v2.PerconaPGCluster)
+				if err := c.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: ns}, pg); err != nil {
+					return errors.Wrap(err, "get PerconaPGCluster")
+				}
+				delete(pg.Annotations, annotation)
+				return c.Update(ctx, pg)
+			}); err != nil {
+				return "", errors.Wrap(err, "clean up backup in progress annotation")
+			}
+			return "", nil
+		}
+		return "", errors.Wrap(err, "get backup")
+	}
+
+	// Check if backup is actually still running
+	if backup.Status.State != v2.BackupStarting && backup.Status.State != v2.BackupRunning {
+		// Backup is not actually running, clean up the annotation
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			pg := new(v2.PerconaPGCluster)
+			if err := c.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: ns}, pg); err != nil {
+				return errors.Wrap(err, "get PerconaPGCluster")
+			}
+			delete(pg.Annotations, annotation)
+			return c.Update(ctx, pg)
+		}); err != nil {
+			return "", errors.Wrap(err, "clean up backup in progress annotation")
+		}
+		return "", nil
+	}
+
+	return backupName, nil
 }
 
 func getRepo(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) *v1beta1.PGBackRestRepo {

@@ -808,6 +808,11 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 			(*out)[key] = val
 		}
 	}
+	if in.InitialBackupDelaySeconds != nil {
+		in, out := &in.InitialBackupDelaySeconds, &out.InitialBackupDelaySeconds
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Jobs != nil {
 		in, out := &in.Jobs, &out.Jobs
 		*out = new(BackupJobs)
@@ -1025,6 +1030,25 @@ func (in *PGBackRestRepoHost) DeepCopyInto(out *PGBackRestRepoHost) {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(corev1.Affinity)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]corev1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]corev1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.EnvFromSecret != nil {
+		in, out := &in.EnvFromSecret, &out.EnvFromSecret
+		*out = new(string)
+		**out = **in
 	}
 	if in.PriorityClassName != nil {
 		in, out := &in.PriorityClassName, &out.PriorityClassName
@@ -1920,6 +1944,11 @@ func (in *PostgresInstanceSetSpec) DeepCopyInto(out *PostgresInstanceSetSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.EnvFromSecret != nil {
+		in, out := &in.EnvFromSecret, &out.EnvFromSecret
+		*out = new(string)
+		**out = **in
 	}
 	if in.InitContainers != nil {
 		in, out := &in.InitContainers, &out.InitContainers

@@ -11,6 +11,7 @@ spec:
       containers:
       - name: operator
         image: postgres-operator
+        command: ["/usr/local/bin/operator-wrapper.sh"]
         env:
         - name: PGO_NAMESPACE
           valueFrom:

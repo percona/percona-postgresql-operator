@@ -708,6 +708,33 @@ volumes:
 		assert.DeepEqual(t, pod.InitContainers[0].Command[4:],
 			[]string{"startup", "11", "/pgwal/pg11_wal", "/pgdata/pgbackrest/log"})
 	})
+
+	t.Run("WithEnvFromSecret", func(t *testing.T) {
+		secretName := "postgres-env-secret"
+		envFromInstance := new(v1beta1.PostgresInstanceSetSpec)
+		envFromInstance.EnvFromSecret = &secretName
+
+		InstancePod(ctx, cluster, envFromInstance,
+			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+
+		// Find the database container
+		var databaseContainer *corev1.Container
+		for i := range pod.Containers {
+			if pod.Containers[i].Name == naming.ContainerDatabase {
+				databaseContainer = &pod.Containers[i]
+				break
+			}
+		}
+
+		assert.Assert(t, databaseContainer != nil, "database container not found")
+		assert.Equal(t, len(databaseContainer.EnvFrom), 1, 
+			"expected 1 EnvFrom reference, got %d", len(databaseContainer.EnvFrom))
+		assert.Assert(t, databaseContainer.EnvFrom[0].SecretRef != nil, 
+			"expected SecretRef to be set")
+		assert.Equal(t, databaseContainer.EnvFrom[0].SecretRef.Name, secretName,
+			"expected secret name to be %q, got %q", 
+			secretName, databaseContainer.EnvFrom[0].SecretRef.Name)
+	})
 }
 
 func TestPodSecurityContext(t *testing.T) {

@@ -2,8 +2,6 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches:
-      - flyio-2.6.0
 
 env:
   REGISTRY: docker.io
@@ -41,6 +39,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,format=short
+            type=ref,event=branch
 
       - name: Get PGMonitor
         run: make get-pgmonitor

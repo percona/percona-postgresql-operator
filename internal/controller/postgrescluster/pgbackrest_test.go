@@ -2739,6 +2739,77 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Equal(t, *sts.Spec.Replicas, int32(0))
 	})
+
+	t.Run("Custom Sidecars", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{
+			Spec: v1beta1.PostgresClusterSpec{
+				Backups: v1beta1.Backups{
+					PGBackRest: v1beta1.PGBackRestArchive{
+						RepoHost: &v1beta1.PGBackRestRepoHost{
+							Containers: []corev1.Container{
+								{Name: "custom-sidecar1"},
+								{Name: "custom-sidecar2"},
+							},
+						},
+					},
+				},
+			},
+		}
+		observed := &observedInstances{forCluster: []*Instance{{}}}
+		sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, observed)
+		assert.NilError(t, err)
+
+		// Check if our custom sidecars are in the pod spec
+		var sidecar1Found, sidecar2Found bool
+		for _, container := range sts.Spec.Template.Spec.Containers {
+			if container.Name == "custom-sidecar1" {
+				sidecar1Found = true
+			}
+			if container.Name == "custom-sidecar2" {
+				sidecar2Found = true
+			}
+		}
+		assert.Assert(t, sidecar1Found, "expected custom sidecar 'custom-sidecar1', but container not found")
+		assert.Assert(t, sidecar2Found, "expected custom sidecar 'custom-sidecar2', but container not found")
+	})
+
+	t.Run("Environment From Secret", func(t *testing.T) {
+		secretName := "my-pgbackrest-env-secret"
+		cluster := &v1beta1.PostgresCluster{
+			Spec: v1beta1.PostgresClusterSpec{
+				Backups: v1beta1.Backups{
+					PGBackRest: v1beta1.PGBackRestArchive{
+						RepoHost: &v1beta1.PGBackRestRepoHost{
+							EnvFromSecret: &secretName,
+						},
+					},
+				},
+			},
+		}
+		observed := &observedInstances{forCluster: []*Instance{{}}}
+		sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, observed)
+		assert.NilError(t, err)
+
+		// Find the pgBackRest container
+		var pgBackRestContainer *corev1.Container
+		for i := range sts.Spec.Template.Spec.Containers {
+			if sts.Spec.Template.Spec.Containers[i].Name == naming.PGBackRestRepoContainerName {
+				pgBackRestContainer = &sts.Spec.Template.Spec.Containers[i]
+				break
+			}
+		}
+
+		assert.Assert(t, pgBackRestContainer != nil, "pgbackrest container not found")
+
+		// Verify EnvFrom is set correctly
+		assert.Assert(t, len(pgBackRestContainer.EnvFrom) == 1,
+			"expected 1 EnvFrom reference, got %d", len(pgBackRestContainer.EnvFrom))
+		assert.Assert(t, pgBackRestContainer.EnvFrom[0].SecretRef != nil,
+			"expected SecretRef to be set")
+		assert.Equal(t, pgBackRestContainer.EnvFrom[0].SecretRef.Name, secretName,
+			"expected secret name to be %q, got %q",
+			secretName, pgBackRestContainer.EnvFrom[0].SecretRef.Name)
+	})
 }
 
 func TestGenerateRestoreJobIntent(t *testing.T) {

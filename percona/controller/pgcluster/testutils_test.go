@@ -98,9 +98,9 @@ func readTestCR(name, namespace, testFile string) (*v2.PerconaPGCluster, error) 
 	if cr.Annotations == nil {
 		cr.Annotations = make(map[string]string)
 	}
-	cr.Annotations[pNaming.InternalAnnotationDisablePatroniVersionCheck] = "true"
+
+	cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "4.0.0"
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
-	cr.Status.PatroniVersion = "4.0.0"
 	return cr, nil
 }
 
@@ -120,10 +120,9 @@ func readDefaultCR(name, namespace string) (*v2.PerconaPGCluster, error) {
 	if cr.Annotations == nil {
 		cr.Annotations = make(map[string]string)
 	}
-	cr.Annotations[pNaming.InternalAnnotationDisablePatroniVersionCheck] = "true"
+	cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "4.0.0"
 	cr.Namespace = namespace
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
-	cr.Status.PatroniVersion = "4.0.0"
 	return cr, nil
 }
 

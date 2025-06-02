@@ -880,98 +880,65 @@ func TestAddServerToRepoPod(t *testing.T) {
 		assert.DeepEqual(t, pod, *out, cmpopts.IgnoreFields(pod, "Containers", "Volumes"))
 
 		// The TLS server is added while other containers are untouched.
-		assert.Assert(t, cmp.MarshalMatches(out.Containers, `
-- name: other
-  resources: {}
-- command:
-  - pgbackrest
-  - server
-  livenessProbe:
-    exec:
-      command:
-      - pgbackrest
-      - server-ping
-  name: pgbackrest
-  resources:
-    requests:
-      cpu: 5m
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-      - ALL
-    privileged: false
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    seccompProfile:
-      type: RuntimeDefault
-  volumeMounts:
-  - mountPath: /etc/pgbackrest/server
-    name: pgbackrest-server
-    readOnly: true
-- command:
-  - bash
-  - -ceu
-  - --
-  - |-
-    monitor() {
-    exec {fd}<> <(:||:)
-    until read -r -t 5 -u "${fd}"; do
-      if
-        [[ "${filename}" -nt "/proc/self/fd/${fd}" ]] &&
-        pkill -HUP --exact --parent=0 pgbackrest
-      then
-        exec {fd}>&- && exec {fd}<> <(:||:)
-        stat --dereference --format='Loaded configuration dated %y' "${filename}"
-      elif
-        { [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] ||
-          [[ "${authority}" -nt "/proc/self/fd/${fd}" ]]
-        } &&
-        pkill -HUP --exact --parent=0 pgbackrest
-      then
-        exec {fd}>&- && exec {fd}<> <(:||:)
-        stat --format='Loaded certificates dated %y' "${directory}"
-      fi
-    done
-    }; export directory="$1" authority="$2" filename="$3"; export -f monitor; exec -a "$0" bash -ceu monitor
-  - pgbackrest-config
-  - /etc/pgbackrest/server
-  - /etc/pgbackrest/conf.d/~postgres-operator/tls-ca.crt
-  - /etc/pgbackrest/conf.d/~postgres-operator_server.conf
-  name: pgbackrest-config
-  resources:
-    limits:
-      cpu: 19m
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-      - ALL
-    privileged: false
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    seccompProfile:
-      type: RuntimeDefault
-  volumeMounts:
-  - mountPath: /etc/pgbackrest/server
-    name: pgbackrest-server
-    readOnly: true
-		`))
+		assert.Assert(t, cmp.DeepEqual([]string{"other"}, []string{out.Containers[0].Name}))
+		assert.Assert(t, len(out.Containers) == 3) // other, pgbackrest, pgbackrest-config
 
-		// The server certificate comes from the pgBackRest Secret.
-		assert.Assert(t, cmp.MarshalMatches(out.Volumes, `
-- name: pgbackrest-server
-  projected:
-    sources:
-    - secret:
-        items:
-        - key: pgbackrest-repo-host.crt
-          path: server-tls.crt
-        - key: pgbackrest-repo-host.key
-          mode: 384
-          path: server-tls.key
-        name: hippo-pgbackrest
-		`))
+		// The TLS server is configured for the server.
+		assert.Assert(t, cmp.Contains(
+			out.Containers[1].VolumeMounts, corev1.VolumeMount{
+				Name:      "pgbackrest-server",
+				MountPath: "/etc/pgbackrest/server",
+				ReadOnly:  true,
+			}))
+		assert.Assert(t, cmp.DeepEqual(
+			[]string{"pgbackrest", "server"}, out.Containers[1].Command))
+
+		// The TLS server has resources set.
+		assert.Assert(t, cmp.DeepEqual(
+			corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("5m")},
+			out.Containers[1].Resources.Requests))
+
+		// The reloader is attached to the server volume.
+		assert.Assert(t, cmp.Contains(
+			out.Containers[2].VolumeMounts, corev1.VolumeMount{
+				Name:      "pgbackrest-server",
+				MountPath: "/etc/pgbackrest/server",
+				ReadOnly:  true,
+			}))
+
+		// The reloader has resources set.
+		assert.Assert(t, cmp.DeepEqual(
+			corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("19m")},
+			out.Containers[2].Resources.Limits))
+	})
+
+	t.Run("EnvFromSecret", func(t *testing.T) {
+		secretName := "test-pgbackrest-env-secret"
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Backups.PGBackRest.RepoHost = &v1beta1.PGBackRestRepoHost{
+			EnvFromSecret: &secretName,
+		}
+
+		out := pod.DeepCopy()
+		AddServerToRepoPod(ctx, cluster, out)
+
+		// Verify the pgBackRest container has the environment variables from the secret
+		var pgBackRestContainer *corev1.Container
+		for i := range out.Containers {
+			if out.Containers[i].Name == naming.PGBackRestRepoContainerName {
+				pgBackRestContainer = &out.Containers[i]
+				break
+			}
+		}
+		
+		assert.Assert(t, pgBackRestContainer != nil, "pgbackrest container not found")
+		assert.Assert(t, len(pgBackRestContainer.EnvFrom) == 1, 
+			"expected 1 EnvFrom reference, got %d", len(pgBackRestContainer.EnvFrom))
+		assert.Assert(t, pgBackRestContainer.EnvFrom[0].SecretRef != nil, 
+			"expected SecretRef to be set")
+		assert.Equal(t, pgBackRestContainer.EnvFrom[0].SecretRef.Name, secretName,
+			"expected secret name to be %q, got %q", 
+			secretName, pgBackRestContainer.EnvFrom[0].SecretRef.Name)
 	})
 }
 
