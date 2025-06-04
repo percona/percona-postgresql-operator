@@ -337,6 +337,15 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
 		cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
+
+		orig := cr.DeepCopy()
+
+		cr.Status.PatroniVersion = patroniVersion
+
+		if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
+			return errors.Wrap(err, "failed to patch patroni version")
+		}
+
 		return nil
 	}
 
