@@ -338,14 +338,21 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
 		cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
 
-		orig := cr.DeepCopy()
+		// To ensure that the update was done given that conflicts can be caused by
+		// other code making unrelated updates to the same resource at the same time.
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			orig := cr.DeepCopy()
 
-		cr.Status.PatroniVersion = patroniVersion
+			cr.Status.PatroniVersion = patroniVersion
 
-		if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
-			return errors.Wrap(err, "failed to patch patroni version")
+			if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
+				return errors.Wrap(err, "failed to patch patroni version")
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to execute retry on patroni version")
 		}
-
 		return nil
 	}
 
