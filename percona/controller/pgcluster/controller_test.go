@@ -868,10 +868,13 @@ var _ = Describe("Version labels", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-		Expect(err).NotTo(HaveOccurred())
-		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-		Expect(err).NotTo(HaveOccurred())
+		// Run multiple reconcile cycles to ensure all resources are created
+		for i := 0; i < 3; i++ {
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		}
 	})
 
 	It("should label PostgreSQL statefulsets", func() {
@@ -915,9 +918,30 @@ var _ = Describe("Version labels", Ordered, func() {
 			"postgres-operator.crunchydata.com/data":    "pgbackrest",
 			"postgres-operator.crunchydata.com/cluster": crName,
 		}
-		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stsList.Items).NotTo(BeEmpty())
+
+		// Add a retry loop to give time for the StatefulSets to be created
+		Eventually(func() bool {
+			err := k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+			if err != nil {
+				GinkgoWriter.Printf("Error listing StatefulSets: %v\n", err)
+				return false
+			}
+
+			if len(stsList.Items) == 0 {
+				// List all StatefulSets to debug what's available
+				allStsList := &appsv1.StatefulSetList{}
+				err := k8sClient.List(ctx, allStsList, client.InNamespace(cr.Namespace))
+				if err == nil {
+					GinkgoWriter.Printf("Available StatefulSets in namespace %s:\n", cr.Namespace)
+					for _, sts := range allStsList.Items {
+						GinkgoWriter.Printf("  - %s (labels: %v)\n", sts.Name, sts.Labels)
+					}
+				}
+				return false
+			}
+
+			return true
+		}, time.Second*30, time.Millisecond*500).Should(BeTrue())
 
 		Expect(stsList.Items).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 			"ObjectMeta": gs.MatchFields(gs.IgnoreExtras, gs.Fields{
@@ -1182,10 +1206,13 @@ var _ = Describe("Security context", Ordered, func() {
 	})
 
 	It("should reconcile", func() {
-		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-		Expect(err).NotTo(HaveOccurred())
-		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-		Expect(err).NotTo(HaveOccurred())
+		// Run multiple reconcile cycles to ensure all resources are created
+		for i := 0; i < 3; i++ {
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		}
 	})
 
 	It("Instances should have security context", func() {
@@ -1216,14 +1243,18 @@ var _ = Describe("Security context", Ordered, func() {
 	})
 
 	It("PgBackrest Repo should have security context", func() {
+		// Wait for the StatefulSet to be created before checking it
 		sts := &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      crName + "-repo-host",
 				Namespace: cr.Namespace,
 			},
 		}
-		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
-		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
+		}, time.Second*30, time.Millisecond*500).Should(Succeed())
+
 		Expect(sts.Spec.Template.Spec.SecurityContext).To(Equal(podSecContext))
 	})
 })

@@ -710,7 +710,7 @@ volumes:
 	})
 
 	t.Run("WithEnvFromSecret", func(t *testing.T) {
-		secretName := "postgres-env-secret"
+		secretName := "postgres-env-secret" // #nosec G101
 		envFromInstance := new(v1beta1.PostgresInstanceSetSpec)
 		envFromInstance.EnvFromSecret = &secretName
 
@@ -727,12 +727,12 @@ volumes:
 		}
 
 		assert.Assert(t, databaseContainer != nil, "database container not found")
-		assert.Equal(t, len(databaseContainer.EnvFrom), 1, 
+		assert.Equal(t, len(databaseContainer.EnvFrom), 1,
 			"expected 1 EnvFrom reference, got %d", len(databaseContainer.EnvFrom))
-		assert.Assert(t, databaseContainer.EnvFrom[0].SecretRef != nil, 
+		assert.Assert(t, databaseContainer.EnvFrom[0].SecretRef != nil,
 			"expected SecretRef to be set")
 		assert.Equal(t, databaseContainer.EnvFrom[0].SecretRef.Name, secretName,
-			"expected secret name to be %q, got %q", 
+			"expected secret name to be %q, got %q",
 			secretName, databaseContainer.EnvFrom[0].SecretRef.Name)
 	})
 }

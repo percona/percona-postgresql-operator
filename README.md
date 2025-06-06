@@ -4,6 +4,12 @@ This is a fork of the [Percona Operator for PostgreSQL](https://github.com/perco
 
 For our purposes, `flyio-2.6.0` is roughly our main branch.
 
+## Installing/updating on an FKS cluster
+
+Update the image spec on `operator/cw-operator.yaml` to point at a newly built and pushed operator image (see GitHub Actions for the build and push image name).
+
+See [mpg-console](https://github.com/superfly/mpg-console) for the instructions to install/update on an FKS cluster (hint: `mpg operator install`).
+
 # Percona Operator for PostgreSQL
 
 ![Percona Kubernetes Operators](kubernetes.svg)

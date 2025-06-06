@@ -930,14 +930,14 @@ func TestAddServerToRepoPod(t *testing.T) {
 				break
 			}
 		}
-		
+
 		assert.Assert(t, pgBackRestContainer != nil, "pgbackrest container not found")
-		assert.Assert(t, len(pgBackRestContainer.EnvFrom) == 1, 
+		assert.Assert(t, len(pgBackRestContainer.EnvFrom) == 1,
 			"expected 1 EnvFrom reference, got %d", len(pgBackRestContainer.EnvFrom))
-		assert.Assert(t, pgBackRestContainer.EnvFrom[0].SecretRef != nil, 
+		assert.Assert(t, pgBackRestContainer.EnvFrom[0].SecretRef != nil,
 			"expected SecretRef to be set")
 		assert.Equal(t, pgBackRestContainer.EnvFrom[0].SecretRef.Name, secretName,
-			"expected secret name to be %q, got %q", 
+			"expected secret name to be %q, got %q",
 			secretName, pgBackRestContainer.EnvFrom[0].SecretRef.Name)
 	})
 }

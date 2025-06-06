@@ -40,7 +40,6 @@ const (
 
 	AnnotationPatroniVersion = PrefixPerconaPGV2 + "patroni-version"
 
-
 	// Special annotation to disable `patroni-version-check` by overriding the patroni version with a custom value.
 	AnnotationCustomPatroniVersion = PrefixPerconaPGV2 + "custom-patroni-version"
 )

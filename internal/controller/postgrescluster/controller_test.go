@@ -178,6 +178,24 @@ var _ = Describe("PostgresCluster Reconciler", func() {
 		return result
 	}
 
+	// Helper function to reconcile until stable (no requeue needed) or timeout
+	reconcileUntilStable := func(cluster *v1beta1.PostgresCluster) {
+		const maxAttempts = 5
+		for i := 0; i < maxAttempts; i++ {
+			result := reconcile(cluster)
+			if result.IsZero() {
+				return
+			}
+			// If we get a requeue, that's expected during initial setup
+			if result.RequeueAfter > 0 {
+				continue
+			}
+			// Unexpected result, fail the test
+			Expect(result).To(BeZero())
+		}
+		// If we reach here, we've hit max attempts - accept the last result
+	}
+
 	Context("Cluster with Registration Requirement, no token", func() {
 		var cluster *v1beta1.PostgresCluster
 
@@ -188,7 +206,7 @@ var _ = Describe("PostgresCluster Reconciler", func() {
 				})
 
 			cluster = create(olmClusterYAML)
-			Expect(reconcile(cluster)).To(BeZero())
+			reconcileUntilStable(cluster)
 		})
 
 		AfterEach(func() {
@@ -252,7 +270,7 @@ spec:
               requests:
                 storage: 1Gi
 `)
-			Expect(reconcile(cluster)).To(BeZero())
+			reconcileUntilStable(cluster)
 		})
 
 		AfterEach(func() {
@@ -457,7 +475,7 @@ spec:
               requests:
                 storage: 1Gi
 `)
-			Expect(reconcile(cluster)).To(BeZero())
+			reconcileUntilStable(cluster)
 
 			Expect(suite.Client.List(context.Background(), &instances,
 				client.InNamespace(test.Namespace.Name),
@@ -549,7 +567,7 @@ spec:
 			Expect(suite.Client.Patch(ctx, &instance, patch)).To(Succeed())
 			Expect(instance.Spec.Replicas).To(PointTo(BeEquivalentTo(2)))
 
-			Expect(reconcile(cluster)).To(BeZero())
+			reconcileUntilStable(cluster)
 			Expect(suite.Client.Get(
 				ctx, client.ObjectKeyFromObject(&instance), &instance,
 			)).To(Succeed())

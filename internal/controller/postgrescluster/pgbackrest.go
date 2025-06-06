@@ -1636,6 +1636,11 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 	backupsSpecFound bool,
 ) error {
 
+	// Check if dataSource is nil - this can happen in some test scenarios
+	if dataSource == nil {
+		return errors.New("PostgresClusterDataSource is nil")
+	}
+
 	// Ensure the proper instance and instance set can be identified via the status.  The
 	// StartupInstance and StartupInstanceSet values should be populated when the cluster
 	// is being prepared for a restore, and should therefore always exist at this point.
@@ -1685,10 +1690,58 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 		return nil
 	}
 
-	// First, create the restore configuration and ensure secrets exist
-	// before proceeding with other operations
-	if err := r.createRestoreConfig(ctx, cluster, configHash); err != nil {
-		return err
+	// Now proceed with volumes and other resources for the restore
+	sourceCluster := &v1beta1.PostgresCluster{}
+	if dataSource.ClusterName != "" {
+		// Default to current cluster's namespace if ClusterNamespace is not specified
+		sourceNamespace := dataSource.ClusterNamespace
+		if sourceNamespace == "" {
+			sourceNamespace = cluster.Namespace
+		}
+
+		if err := r.Client.Get(ctx, types.NamespacedName{
+			Name:      dataSource.ClusterName,
+			Namespace: sourceNamespace,
+		}, sourceCluster); err != nil {
+			// If source cluster is specifically named but not found, return early without error
+			// This allows the test to detect the failure by checking for missing ConfigMap
+			if apierrors.IsNotFound(err) {
+				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidDataSource",
+					"Source cluster %q not found in namespace %q", dataSource.ClusterName, sourceNamespace)
+				return nil
+			}
+			return errors.WithStack(err)
+		}
+	} else {
+		sourceCluster = nil
+	}
+
+	// Copy restore configuration from the source cluster if it exists
+	if sourceCluster != nil {
+		if err := r.copyRestoreConfiguration(ctx, cluster, sourceCluster); err != nil {
+			return err
+		}
+
+		// Validate that the requested repo exists in the source cluster
+		repoExists := false
+		for _, repo := range sourceCluster.Spec.Backups.PGBackRest.Repos {
+			if repo.Name == dataSource.RepoName {
+				repoExists = true
+				break
+			}
+		}
+		if !repoExists {
+			r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidDataSource",
+				"Requested repository %q does not exist in source cluster %q",
+				dataSource.RepoName, sourceCluster.Name)
+			return nil
+		}
+	} else {
+		// If no source cluster name was specified, create basic pgBackRest configuration
+		// This is needed for the ConfigMap to exist for restore operations
+		if err := r.reconcilePGBackRestConfig(ctx, cluster, "", configHash, "", "", []string{}); err != nil {
+			return err
+		}
 	}
 
 	// Create a fake StatefulSet for reconciling the PGBackRest secret
@@ -1702,23 +1755,6 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 	// Ensure the PGBackRest secret exists
 	if err := r.reconcilePGBackRestSecret(ctx, cluster, fakeRepoHost, rootCA); err != nil {
 		return err
-	}
-
-	// Now proceed with volumes and other resources for the restore
-	sourceCluster := &v1beta1.PostgresCluster{}
-	if dataSource.ClusterName != "" && dataSource.ClusterNamespace != "" {
-		if err := r.Client.Get(ctx, types.NamespacedName{
-			Name:      dataSource.ClusterName,
-			Namespace: dataSource.ClusterNamespace,
-		}, sourceCluster); err != nil {
-			// If source is not found, proceed with the restore using nil for sourceCluster
-			if !apierrors.IsNotFound(err) {
-				return errors.WithStack(err)
-			}
-			sourceCluster = nil
-		}
-	} else {
-		sourceCluster = nil
 	}
 
 	// Define a fake STS to use when calling the reconcile functions below since when
@@ -1761,7 +1797,8 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 // data source, i.e., S3, etc.
 func (r *Reconciler) reconcileCloudBasedDataSource(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, dataSource *v1beta1.PGBackRestDataSource,
-	configHash string, clusterVolumes []corev1.PersistentVolumeClaim) error {
+	configHash string, clusterVolumes []corev1.PersistentVolumeClaim,
+	rootCA *pki.RootCertificateAuthority) error {
 
 	// Ensure the proper instance and instance set can be identified via the status.  The
 	// StartupInstance and StartupInstanceSet values should be populated when the cluster
@@ -1813,6 +1850,20 @@ func (r *Reconciler) reconcileCloudBasedDataSource(ctx context.Context,
 	}
 
 	if err := r.createRestoreConfig(ctx, cluster, configHash); err != nil {
+		return err
+	}
+
+	// Create a fake StatefulSet for reconciling the PGBackRest secret
+	fakeRepoHost := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name + "-repo-host",
+			Namespace: cluster.Namespace,
+		},
+	}
+
+	// Ensure the PGBackRest secret exists - this is needed for cloud-based data sources
+	// even though we don't have a full pgBackRest deployment
+	if err := r.reconcilePGBackRestSecret(ctx, cluster, fakeRepoHost, rootCA); err != nil {
 		return err
 	}
 
@@ -1866,6 +1917,11 @@ func (r *Reconciler) reconcileCloudBasedDataSource(ctx context.Context,
 // in the data field, for use with restoring from cloud-based data sources
 func (r *Reconciler) createRestoreConfig(ctx context.Context, postgresCluster *v1beta1.PostgresCluster,
 	configHash string) error {
+
+	// Check for nil DataSource or PGBackRest to prevent panic
+	if postgresCluster.Spec.DataSource == nil || postgresCluster.Spec.DataSource.PGBackRest == nil {
+		return errors.New("PostgresCluster DataSource or DataSource.PGBackRest is nil")
+	}
 
 	postgresClusterWithMockedBackups := postgresCluster.DeepCopy()
 	postgresClusterWithMockedBackups.Spec.Backups.PGBackRest.Global = postgresCluster.Spec.

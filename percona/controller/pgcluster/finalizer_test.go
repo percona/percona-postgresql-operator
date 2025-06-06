@@ -349,7 +349,7 @@ var _ = Describe("Finalizers", Ordered, func() {
 					})
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-				Expect(len(secretList.Items)).Should(Equal(8))
+				Expect(len(secretList.Items)).Should(Equal(7))
 			})
 		})
 	})

@@ -335,7 +335,6 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		cr.Annotations = make(map[string]string)
 	}
 
-
 	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
 		cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
 		return nil

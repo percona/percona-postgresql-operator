@@ -2135,15 +2135,20 @@ func TestReconcileCloudBasedDataSource(t *testing.T) {
 				cluster.Status.StartupInstanceSet = "instance1"
 				assert.NilError(t, tClient.Status().Update(ctx, cluster))
 
+				// Create a rootCA for the test
+				rootCA, err := pki.NewRootCertificateAuthority()
+				assert.NilError(t, err)
+
 				var pgclusterDataSource *v1beta1.PGBackRestDataSource
 				if tc.dataSource != nil {
 					pgclusterDataSource = tc.dataSource.PGBackRest
 				}
-				err := r.reconcileCloudBasedDataSource(ctx,
+				err = r.reconcileCloudBasedDataSource(ctx,
 					cluster,
 					pgclusterDataSource,
 					"testhash",
 					nil,
+					rootCA,
 				)
 				assert.NilError(t, err)
 
@@ -2774,7 +2779,7 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 	})
 
 	t.Run("Environment From Secret", func(t *testing.T) {
-		secretName := "my-pgbackrest-env-secret"
+		secretName := "my-pgbackrest-env-secret" // #nosec G101
 		cluster := &v1beta1.PostgresCluster{
 			Spec: v1beta1.PostgresClusterSpec{
 				Backups: v1beta1.Backups{

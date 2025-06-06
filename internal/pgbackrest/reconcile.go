@@ -535,7 +535,7 @@ func Secret(ctx context.Context,
 	var err error
 
 	// Save the CA and generate a TLS client certificate for the entire cluster.
-	if inRepoHost != nil {
+	if inRepoHost != nil && inRoot != nil {
 		initialize.Map(&outSecret.Data)
 
 		// The server verifies its "tls-server-auth" option contains the common
@@ -570,7 +570,7 @@ func Secret(ctx context.Context,
 	}
 
 	// Generate a TLS server certificate for each repository host.
-	if inRepoHost != nil {
+	if inRepoHost != nil && inRoot != nil {
 		// The client verifies the "pg-host" or "repo-host" option it used is
 		// present in the DNS names of the server certificate.
 		leaf := &pki.LeafCertificate{}

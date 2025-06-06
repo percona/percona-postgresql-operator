@@ -415,7 +415,7 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 		}
 	case cloudDataSource != nil:
 		if err := r.reconcileCloudBasedDataSource(ctx, cluster, cloudDataSource,
-			configHash, clusterVolumes); err != nil {
+			configHash, clusterVolumes, rootCA); err != nil {
 			return true, err
 		}
 	}
