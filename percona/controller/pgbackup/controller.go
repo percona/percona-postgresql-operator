@@ -54,6 +54,10 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 		Complete(r))
 }
 
+const (
+	requeueTimeout = time.Second * 15
+)
+
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete;patch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
@@ -82,7 +86,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		if _, err := runFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
 		}
-		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		return reconcile.Result{RequeueAfter: requeueTimeout}, nil
 	}
 
 	if pgBackup.Status.State != v2.BackupFailed && pgBackup.Status.State != v2.BackupSucceeded {
@@ -101,7 +105,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		if pgCluster.Spec.Pause != nil && *pgCluster.Spec.Pause {
 			log.Info("Can't start backup. PostgresCluster is paused", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
-			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+			return reconcile.Result{RequeueAfter: requeueTimeout}, nil
 		}
 
 		// start backup only if backup job doesn't exist
@@ -117,7 +121,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			}
 			if runningBackup != "" && runningBackup != pgBackup.Name {
 				log.Info("Can't start backup. Previous backup is still in progress", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
-				return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+				return reconcile.Result{RequeueAfter: requeueTimeout}, nil
 			}
 			if err := startBackup(ctx, r.Client, pgBackup); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "failed to start backup")
@@ -172,7 +176,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			if errors.Is(err, ErrBackupJobNotFound) {
 				log.Info("Waiting for backup to start")
 
-				return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+				return reconcile.Result{RequeueAfter: requeueTimeout}, nil
 			}
 			return reconcile.Result{}, errors.Wrap(err, "find backup job")
 		}
@@ -228,7 +232,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			log.Info("Backup succeeded")
 		default:
 			log.Info("Waiting for backup to complete")
-			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+			return reconcile.Result{RequeueAfter: requeueTimeout}, nil
 		}
 
 		pgCluster := &v2.PerconaPGCluster{}
@@ -247,7 +251,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		}
 		if !done {
 			log.Info("Waiting for crunchy reconciler to finish")
-			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+			return reconcile.Result{RequeueAfter: requeueTimeout}, nil
 		}
 
 		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -611,7 +615,7 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		// If we delete the job labels without waiting for the reconcile to finish, the Crunchy reconciler will
 		// receive the pgcluster with the "naming.PGBackRestBackup" annotation, but will not find the manual backup job.
 		// It will attempt to create a new job with the same name, failing and resulting in a scary error in the logs.
-		return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		return &reconcile.Result{RequeueAfter: requeueTimeout}, nil
 	}
 
 	// Remove PGBackRest labels to prevent the job from being
@@ -650,7 +654,7 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		return nil, errors.Wrapf(err, "delete %s annotation", pNaming.AnnotationBackupInProgress)
 	}
 	if !deleted {
-		return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		return &reconcile.Result{RequeueAfter: requeueTimeout}, nil
 	}
 
 	if checkBackupJob(job) != v2.BackupSucceeded {
