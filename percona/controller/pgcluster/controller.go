@@ -399,7 +399,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 				Containers: []corev1.Container{
 					{
 						Name:  pNaming.ContainerPatroniVersionCheck,
-						Image: cr.Spec.Image,
+						Image: cr.PostgresImage(),
 						Command: []string{
 							"bash",
 						},
@@ -781,7 +781,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
 		set.InitContainers = append(set.InitContainers, extensions.ExtensionRelocatorContainer(
-			cr, cr.Spec.Image, cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion,
+			cr, cr.PostgresImage(), cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion,
 		))
 		set.InitContainers = append(set.InitContainers, extensions.ExtensionInstallerContainer(
 			cr,
