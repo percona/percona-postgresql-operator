@@ -8,3 +8,4 @@ LICENSE.md
 README.md
 .gitignore
 release_versions
+.snyk
