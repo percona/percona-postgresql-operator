@@ -1,0 +1,10 @@
+#SNYK - percona/percona-postgresql-operator
+
+exclude:
+  global:
+  - e2e-tests/**
+  - testing/**
+
+version: v1.25.0
+ignore: {}
+patch: {}
