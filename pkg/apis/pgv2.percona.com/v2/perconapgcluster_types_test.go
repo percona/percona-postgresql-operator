@@ -2,6 +2,8 @@ package v2
 
 import (
 	"testing"
+	"os"
+	"fmt"
 
 	"gotest.tools/v3/assert"
 )
@@ -40,4 +42,37 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+
+func TestPerconaPGCluster_PostgresImage(t *testing.T) {
+	cluster := new(PerconaPGCluster)
+	cluster.Default()
+
+	postgresVersion := 16
+	testDefaultImage := fmt.Sprintf("test_default_image:%d", postgresVersion)
+	testSpecificImage := fmt.Sprintf("test_defined_image:%d", postgresVersion)
+	testEnv := fmt.Sprintf("RELATED_IMAGE_POSTGRES_%d", postgresVersion)
+
+	cluster.Spec.PostgresVersion = postgresVersion
+
+	t.Run("Spec.Image should be empty by default", func(t *testing.T) {
+		assert.Equal(t, cluster.PostgresImage(), "")
+	})
+
+	t.Run("Spec.Image should use env variables if present", func(t *testing.T) {
+		os.Setenv(testEnv, testDefaultImage)
+		defer os.Unsetenv(testEnv)
+
+		assert.Equal(t, cluster.PostgresImage(), testDefaultImage)
+	})
+
+	t.Run("Spec.Image should use defined variable", func (t *testing.T) {
+		os.Setenv(testEnv, testDefaultImage)
+		defer os.Unsetenv(testEnv)
+
+		cluster.Spec.Image = testSpecificImage
+
+		assert.Equal(t, cluster.PostgresImage(), testSpecificImage)
+	})
 }
