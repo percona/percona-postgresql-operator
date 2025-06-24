@@ -18,7 +18,7 @@ type S3 struct {
 
 func NewS3(endpoint, region, bucket string, uriStyle string, verifyTLS bool) *S3 {
 	cfg := aws.NewConfig().WithRegion(region)
-	if(uriStyle == "path") {
+	if uriStyle == "path" {
 		cfg = cfg.WithS3ForcePathStyle(true)
 	}
 	if !verifyTLS {
