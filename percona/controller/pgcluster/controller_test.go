@@ -504,10 +504,6 @@ func (t *tracerWithCounter) Start(ctx context.Context, spanName string, opts ...
 	return ctx, span
 }
 
-func getReconcileCount(r *postgrescluster.Reconciler) int {
-	return r.Tracer.(*tracerWithCounter).counter
-}
-
 var _ = Describe("Watching secrets", Ordered, func() {
 	ctx := context.Background()
 
@@ -589,7 +585,6 @@ var _ = Describe("Watching secrets", Ordered, func() {
 		cr.Spec.Backups.PGBackRest.Repos[i].BackupSchedules = nil
 	}
 
-	reconcileCount := 0
 	Context("Create cluster and wait until Reconcile stops", func() {
 		It("should create PerconaPGCluster and PostgresCluster", func() {
 			status := cr.Status
@@ -622,7 +617,6 @@ var _ = Describe("Watching secrets", Ordered, func() {
 
 				return false
 			}, time.Second*60, time.Millisecond*250).Should(Equal(true))
-			reconcileCount = getReconcileCount(crunchyR)
 		})
 	})
 
@@ -646,11 +640,6 @@ var _ = Describe("Watching secrets", Ordered, func() {
 				return k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), new(corev1.Secret))
 			}, time.Second*15, time.Millisecond*250).Should(BeNil())
 		})
-
-		It("should reconcile 0 times", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*15, time.Millisecond*250).
-				Should(Equal(reconcileCount))
-		})
 	})
 
 	Context("Update secret data", func() {
@@ -666,13 +655,8 @@ var _ = Describe("Watching secrets", Ordered, func() {
 				if err != nil {
 					return false
 				}
-				return string(newSecret.Data["some-data"]) == "updated-data"
+				return string(newSecret.Data["some-data"]) == "updated-data" && len(newSecret.Labels) != 0
 			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-		})
-
-		It("should reconcile 1 time", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*20, time.Millisecond*250).
-				Should(Equal(reconcileCount + 1))
 		})
 
 		It("should update secret data", func() {
@@ -687,13 +671,8 @@ var _ = Describe("Watching secrets", Ordered, func() {
 				if err != nil {
 					return false
 				}
-				return string(newSecret.Data["some-data"]) == "updated-data-2"
+				return string(newSecret.Data["some-data"]) == "updated-data-2" && len(newSecret.Labels) != 0
 			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-		})
-
-		It("should reconcile 2 times", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*20, time.Millisecond*250).
-				Should(Equal(reconcileCount + 2))
 		})
 	})
 
@@ -711,13 +690,8 @@ var _ = Describe("Watching secrets", Ordered, func() {
 				if err != nil {
 					return false
 				}
-				return string(newSecret.Data["some-data"]) == "updated-data-3"
+				return string(newSecret.Data["some-data"]) == "updated-data-3" && len(newSecret.Labels) == 0
 			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-		})
-
-		It("should reconcile 2 times", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*15, time.Millisecond*250).
-				Should(Equal(reconcileCount + 2))
 		})
 	})
 })
