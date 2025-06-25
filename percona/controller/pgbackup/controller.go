@@ -4,7 +4,6 @@ import (
 	"context"
 	"path"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -519,30 +518,6 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 		// This block only runs after all finalizer operations are complete.
 		// Or, it runs when the user deletes a backup object that never started.
 		// In both cases, treat this as the function's exit point.
-
-		if job != nil && checkBackupJob(job) != v2.BackupSucceeded {
-			// Remove all crunchy labels to prevent the job from being included in
-			// repoResources.manualBackupJobs used in reconcileManualBackup method.
-			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				j := new(batchv1.Job)
-				if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
-					if k8serrors.IsNotFound(err) {
-						return nil
-					}
-					return errors.Wrap(err, "get job")
-				}
-
-				for k := range j.Labels {
-					if strings.HasPrefix(k, pNaming.PrefixCrunchy) {
-						delete(j.Labels, k)
-					}
-				}
-
-				return c.Update(ctx, j)
-			}); err != nil {
-				return nil, errors.Wrap(err, "delete backup job labels")
-			}
-		}
 		return nil, nil
 	}
 
@@ -591,23 +566,35 @@ func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBa
 	}
 
 	// Remove PGBackRest labels to prevent the job from being
-	// deleted by the cleanupRepoResources method.
+	// deleted by the cleanupRepoResources method and included in
+	// repoResources.manualBackupJobs used in reconcileManualBackup method
 	if job != nil {
-		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			j := new(batchv1.Job)
-			if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
-				if k8serrors.IsNotFound(err) {
-					return nil
-				}
-				return errors.Wrap(err, "get job")
+		shouldDeleteLabels := false
+		for k := range naming.PGBackRestLabels(pgBackup.Spec.PGCluster) {
+			if _, ok := job.Labels[k]; ok {
+				shouldDeleteLabels = true
+				break
 			}
-			for k := range naming.PGBackRestLabels(pgBackup.Spec.PGCluster) {
-				delete(j.Labels, k)
-			}
+		}
 
-			return c.Update(ctx, j)
-		}); err != nil {
-			return nil, errors.Wrap(err, "update backup job labels")
+		if shouldDeleteLabels {
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				j := new(batchv1.Job)
+				if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+					return errors.Wrap(err, "get job")
+				}
+
+				for k := range naming.PGBackRestLabels(pgBackup.Spec.PGCluster) {
+					delete(j.Labels, k)
+				}
+
+				return c.Update(ctx, j)
+			}); err != nil {
+				return nil, errors.Wrap(err, "update backup job labels")
+			}
+			// We need to recheck after some time to see if the labels were deleted,
+			// because Crunchy reconciler can add them back if it has old data (naming.PGBackRestBackup annotation)
+			return &reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 	}
 
