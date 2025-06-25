@@ -1,9 +1,9 @@
 package v2
 
 import (
-	"testing"
-	"os"
 	"fmt"
+	"os"
+	"testing"
 
 	"gotest.tools/v3/assert"
 )
@@ -44,7 +44,6 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 	}
 }
 
-
 func TestPerconaPGCluster_PostgresImage(t *testing.T) {
 	cluster := new(PerconaPGCluster)
 	cluster.Default()
@@ -58,23 +57,23 @@ func TestPerconaPGCluster_PostgresImage(t *testing.T) {
 
 	tests := map[string]struct {
 		expectedImage string
-		setImage string
-		envImage string
+		setImage      string
+		envImage      string
 	}{
 		"Spec.Image should be empty by default": {
 			expectedImage: "",
-			setImage: "",
-			envImage: "",
+			setImage:      "",
+			envImage:      "",
 		},
 		"Spec.Image should use env variables if present": {
 			expectedImage: testDefaultImage,
-			setImage: "",
-			envImage: testDefaultImage,
+			setImage:      "",
+			envImage:      testDefaultImage,
 		},
 		"Spec.Image should use defined variable": {
 			expectedImage: testSpecificImage,
-			setImage: testSpecificImage,
-			envImage: testDefaultImage,
+			setImage:      testSpecificImage,
+			envImage:      testDefaultImage,
 		},
 	}
 
@@ -83,16 +82,16 @@ func TestPerconaPGCluster_PostgresImage(t *testing.T) {
 
 			cluster.Spec.Image = tt.setImage
 
-			if (tt.envImage != "") {
+			if tt.envImage != "" {
 				err := os.Setenv(testEnv, tt.envImage)
 
-				if (err != nil) {
+				if err != nil {
 					t.Fatalf("Failed to set %s env variable: %v", testEnv, err)
 				}
 
 				defer func() {
 					err := os.Unsetenv(testEnv)
-					if (err != nil) {
+					if err != nil {
 						t.Errorf("Failed to unset %s env variable: %v", testEnv, err)
 					}
 				}()
