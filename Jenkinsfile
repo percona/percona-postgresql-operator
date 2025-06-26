@@ -13,7 +13,23 @@ void createCluster(String CLUSTER_SUFFIX) {
                 gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
                 gcloud config set project $GCP_PROJECT
                 gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $region --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $region --quiet || true
-                gcloud container clusters create --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.30 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=\$NODES_NUM --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 --enable-ip-alias && \
+                gcloud container clusters create $CLUSTER_NAME-${CLUSTER_SUFFIX} \
+                --zone $region \
+                --cluster-version=1.30 \
+                --machine-type=n1-standard-4 \
+                --preemptible \
+                --disk-size 30 \
+                --num-nodes=\$NODES_NUM \
+                --network=jenkins-vpc \
+                --subnetwork=jenkins-${CLUSTER_SUFFIX} \
+                --no-enable-autoupgrade \
+                --cluster-ipv4-cidr=/21 \
+                --labels delete-cluster-after-hours=6 \
+                --monitoring=NONE \
+                --logging=NONE \
+                --no-enable-managed-prometheus \
+                --enable-ip-alias \
+                --quiet && \
                 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
                 if [ \${ret_val} -eq 0 ]; then break; fi
                 ret_num=\$((ret_num + 1))
@@ -149,7 +165,27 @@ void printKubernetesStatus(String LOCATION, String CLUSTER_SUFFIX) {
     """
 }
 
-TestsReport = '| Test name | Status |\r\n| ------------- | ------------- |'
+String formatTime(def time) {
+    if (!time || time == "N/A") return "N/A"
+
+    try {
+        println("Input time: ${time} (type: ${time.class})")
+        def totalSeconds = time as Double
+        println("Converted to double: ${totalSeconds}")
+
+        def hours = (totalSeconds / 3600) as Integer
+        def minutes = ((totalSeconds % 3600) / 60) as Integer
+        def seconds = (totalSeconds % 60) as Integer
+
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+
+    } catch (Exception e) {
+        println("Error converting time: ${e.message}")
+        return time.toString()
+    }
+}
+
+TestsReport = '| Test Name | Result | Time |\r\n| ----------- | -------- | ------ |'
 TestsReportXML = '<testsuite name=\\"PG\\">\n'
 
 void makeReport() {
@@ -165,7 +201,7 @@ void makeReport() {
         if (tests[i]["result"] != "skipped") {
             startedTestAmount++
         }
-        TestsReport = TestsReport + "\r\n| "+ testName +" | ["+ testResult +"]("+ testUrl +") |"
+        TestsReport = TestsReport + "\r\n| " + testName + " | [" + testResult + "](" + testUrl + ") | " + formatTime(testTime) + " |"
         TestsReportXML = TestsReportXML + '<testcase name=\\"' + testName + '\\" time=\\"' + testTime + '\\"><'+ testResult +'/></testcase>\n'
     }
     TestsReport = TestsReport + "\r\n| We run $startedTestAmount out of $wholeTestAmount|"
