@@ -1843,7 +1843,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 			}
 
 			cr2.Status.PatroniVersion = "3.1.0"
-			cr2.Status.Postgres.ImageID = "postgres:16"
+			cr2.Status.Postgres.ImageID = "some-image-id"
 
 			status := cr2.Status
 			Expect(k8sClient.Create(ctx, cr2)).Should(Succeed())
@@ -1870,8 +1870,6 @@ var _ = Describe("patroni version check", Ordered, func() {
 			}
 			Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
 
-			// Setting the container status at the pod creation is not possible
-			// so we need to update the pod with the right status separately.
 			pod.Status = corev1.PodStatus{
 				Phase: corev1.PodRunning,
 				ContainerStatuses: []corev1.ContainerStatus{
