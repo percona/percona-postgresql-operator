@@ -1768,7 +1768,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 		_ = k8sClient.Delete(ctx, namespace)
 	})
 
-	Context("With custom patroni version", func() {
+	Context("With custom patroni version annotation", func() {
 		cr, err := readDefaultCR(crName, ns)
 		It("should read default cr.yaml", func() {
 			Expect(err).NotTo(HaveOccurred())
@@ -1792,7 +1792,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should copy custom patroni version to status and annotation", func() {
+		It("should copy custom patroni version to status", func() {
 			updatedCR := &v2.PerconaPGCluster{}
 			Expect(k8sClient.Get(ctx, crNamespacedName, updatedCR)).Should(Succeed())
 
@@ -1828,7 +1828,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should create PerconaPGCluster without custom patroni version", func() {
+		It("should create PerconaPGCluster without custom patroni version annotation", func() {
 			if cr2.Annotations == nil {
 				cr2.Annotations = make(map[string]string)
 			}
@@ -1843,7 +1843,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 			}
 
 			cr2.Status.PatroniVersion = "3.1.0"
-			cr2.Status.Postgres.ImageID = "some-image-id"
+			cr2.Status.Postgres.ImageID = "postgres:16"
 
 			status := cr2.Status
 			Expect(k8sClient.Create(ctx, cr2)).Should(Succeed())
@@ -1870,6 +1870,8 @@ var _ = Describe("patroni version check", Ordered, func() {
 			}
 			Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
 
+			// Setting the container status at the pod creation is not possible
+			// so we need to update the pod with the right status separately.
 			pod.Status = corev1.PodStatus{
 				Phase: corev1.PodRunning,
 				ContainerStatuses: []corev1.ContainerStatus{
