@@ -422,6 +422,7 @@ spec:
 #        restartPolicy: OnFailure
 #        backoffLimit: 2
 #        priorityClassName: high-priority
+#        ttlSecondsAfterFinished: 60
 #        resources:
 #          limits:
 #            cpu: 200m
