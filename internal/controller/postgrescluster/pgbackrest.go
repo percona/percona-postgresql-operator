@@ -2359,6 +2359,10 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 					client.PropagationPolicy(metav1.DeletePropagationBackground)))
 			}
 		}
+
+		// K8SPG-XXX: We should return here. Otherwise, this method will update the job labels
+		// that we are trying to delete in the internal.percona.com/delete-backup finalizer
+		return nil
 	}
 
 	// pgBackRest connects to a PostgreSQL instance that is not in recovery to
