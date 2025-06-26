@@ -1,13 +1,6 @@
-testUrlPrefix="https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator"
-tests=[]
-
-def config = [:]
-config.nodes_num = 3
-config.disk_size = 30
-config.k8s_version = '1.30'
-config.region = 'us-central1-a'
-config.machine_type = 'n1-standard-4'
-config.labels = 'delete-cluster-after-hours=6'
+region = 'us-central1-a'
+testUrlPrefix = "https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator"
+tests = []
 
 void createCluster(String CLUSTER_SUFFIX) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
@@ -18,15 +11,15 @@ void createCluster(String CLUSTER_SUFFIX) {
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
                 ret_val=0
-                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone ${config.region}  --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone ${config.region} --quiet || true
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone ${region}  --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone ${region} --quiet || true
                 gcloud container clusters create $CLUSTER_NAME-${CLUSTER_SUFFIX} \
                     --preemptible \
-                    --zone=${config.region} \
-                    --machine-type=${config.machine_type} \
-                    --cluster-version=${config.k8s_version} \
-                    --num-nodes=${config.nodes_num} \
-                    --labels=${config.labels} \
-                    --disk-size=${config.disk_size} \
+                    --zone=${region} \
+                    --machine-type='n1-standard-4' \
+                    --cluster-version='1.30' \
+                    --num-nodes=3 \
+                    --labels='delete-cluster-after-hours=6' \
+                    --disk-size=30 \
                     --network=jenkins-vpc \
                     --subnetwork=jenkins-${CLUSTER_SUFFIX} \
                     --cluster-ipv4-cidr=/21 \
@@ -41,7 +34,7 @@ void createCluster(String CLUSTER_SUFFIX) {
                 ret_num=\$((ret_num + 1))
             done
             if [ \${ret_num} -eq 15 ]; then
-                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone ${config.region}  --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone ${config.region} --quiet || true
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone ${region}  --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone ${region} --quiet || true
                 exit 1
             fi
         """
@@ -63,7 +56,7 @@ void shutdownCluster(String CLUSTER_SUFFIX) {
                 kubectl delete pods --all -n \$namespace --force --grace-period=0 || true
             done
             kubectl get svc --all-namespaces || true
-            gcloud container clusters delete --zone ${config.region} $CLUSTER_NAME-${CLUSTER_SUFFIX}
+            gcloud container clusters delete --zone ${region} $CLUSTER_NAME-${CLUSTER_SUFFIX}
         """
    }
 }
@@ -87,7 +80,7 @@ void deleteOldClusters(String FILTER) {
                             break
                         fi
                     done
-                    gcloud container clusters delete --async --zone ${config.region} --quiet \$GKE_CLUSTER || true
+                    gcloud container clusters delete --async --zone ${region} --quiet \$GKE_CLUSTER || true
                 done
             fi
         """
