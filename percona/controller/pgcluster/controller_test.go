@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
-	"k8s.io/utils/ptr"
 	"os"
 	"strconv"
 	"sync"
@@ -22,8 +21,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -1912,6 +1913,18 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(pod.Spec.SecurityContext).To(Equal(expectedSecurityContext))
 			Expect(pod.Spec.TerminationGracePeriodSeconds).To(Equal(ptr.To(int64(5))))
 			Expect(pod.Spec.ImagePullSecrets).To(Equal(expectedImagePullSecrets))
+
+			expectedResources := &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("32Mi"),
+				},
+			}
+			Expect(pod.Spec.Resources).To(Equal(expectedResources))
 		})
 
 		It("should preserve existing patroni version in annotation", func() {
