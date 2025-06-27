@@ -2305,11 +2305,11 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	postgresCluster *v1beta1.PostgresCluster, manualBackupJobs []*batchv1.Job,
 	serviceAccount *corev1.ServiceAccount, instances *observedInstances,
 ) error {
-	// K8SPG-XXX: Get the current state of PostgresCluster.
+	// K8SPG-804: Get the current state of PostgresCluster.
 	// It's necessary to make internal.percona.com/delete-backup finalizer work.
 	// Because the reconcileManualBackup can get an outdated postgresCluster,
 	// resulting in a duplicated backup jobs per one pg-backup resources.
-	// For more information check the K8SPG-XXX PR description.
+	// For more information check the K8SPG-804 PR description.
 	currentPostgresCluster := new(v1beta1.PostgresCluster)
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), currentPostgresCluster); err != nil {
 		return err
@@ -2375,7 +2375,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 			}
 		}
 
-		// K8SPG-XXX: We should return here. Otherwise, this method will update the job labels
+		// K8SPG-804: We should return here. Otherwise, this method will update the job labels
 		// that we are trying to delete in the internal.percona.com/delete-backup finalizer
 		return nil
 	}
