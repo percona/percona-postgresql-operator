@@ -58,7 +58,7 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 		})
 	}
 
-	container := corev1.Container{
+	return corev1.Container{
 		Name:            "pmm-client",
 		Image:           pmmSpec.Image,
 		ImagePullPolicy: pmmSpec.ImagePullPolicy,
@@ -242,25 +242,6 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 		},
 	}
-
-	if pgc.CompareVersion("2.7.0") >= 0 {
-		clusterName := pgc.Name
-		if pgc.Spec.PMM.CustomClusterName != "" {
-			clusterName = pgc.Spec.PMM.CustomClusterName
-		}
-		container.Env = append(container.Env,
-			corev1.EnvVar{
-				Name:  "CLUSTER_NAME",
-				Value: clusterName,
-			},
-			corev1.EnvVar{
-				Name:  "PMM_POSTGRES_PARAMS",
-				Value: pmmSpec.PostgresParams,
-			},
-		)
-	}
-
-	return container
 }
 
 // sidecarContainerV3 refers to the construction of the PMM3 container.
@@ -273,10 +254,6 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 	}
 
 	pmmSpec := pgc.Spec.PMM
-	clusterName := pgc.Name
-	if pgc.Spec.PMM.CustomClusterName != "" {
-		clusterName = pgc.Spec.PMM.CustomClusterName
-	}
 
 	container := corev1.Container{
 		Name:            "pmm-client",
@@ -452,14 +429,6 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 				Name:  "PMM_AGENT_PATHS_TEMPDIR",
 				Value: "/tmp",
 			},
-			{
-				Name:  "CLUSTER_NAME",
-				Value: clusterName,
-			},
-			{
-				Name:  "PMM_POSTGRES_PARAMS",
-				Value: pmmSpec.PostgresParams,
-			},
 		},
 	}
 
@@ -486,8 +455,12 @@ func agentPrerunScript(querySource v2.PMMQuerySource, pgc *v2.PerconaPGCluster) 
 	}
 
 	if pgc.CompareVersion("2.7.0") >= 0 {
+		clusterName := pgc.Name
+		if pgc.Spec.PMM.CustomClusterName != "" {
+			clusterName = pgc.Spec.PMM.CustomClusterName
+		}
 		addServiceArgs = append(addServiceArgs,
-			"--cluster=$(CLUSTER_NAME)", "$PMM_POSTGRES_PARAMS",
+			fmt.Sprintf("--cluster=%s", clusterName), pgc.Spec.PMM.PostgresParams,
 		)
 	}
 	addService := fmt.Sprintf("pmm-admin add postgresql %s", strings.Join(addServiceArgs, " "))
