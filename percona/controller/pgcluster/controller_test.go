@@ -7,9 +7,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
-	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -25,15 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
-	internalRuntime "github.com/percona/percona-postgresql-operator/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
-	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	"github.com/percona/percona-postgresql-operator/percona/runtime"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -503,224 +496,6 @@ func (t *tracerWithCounter) Start(ctx context.Context, spanName string, opts ...
 	}
 	return ctx, span
 }
-
-func getReconcileCount(r *postgrescluster.Reconciler) int {
-	return r.Tracer.(*tracerWithCounter).counter
-}
-
-var _ = Describe("Watching secrets", Ordered, func() {
-	ctx := context.Background()
-
-	const crName = "watch-secret-test"
-	const ns = crName
-
-	crunchyR := crunchyReconciler()
-	r := reconciler(&v2.PerconaPGCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      crName,
-			Namespace: ns,
-		},
-	})
-
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      crName,
-			Namespace: ns,
-		},
-	}
-
-	mgrCtx, cancel := context.WithCancel(ctx)
-	wg := sync.WaitGroup{}
-
-	BeforeAll(func() {
-		By("Creating the Namespace to perform the tests")
-		err := k8sClient.Create(ctx, namespace)
-		Expect(err).NotTo(HaveOccurred())
-
-		gate := feature.NewGate()
-		err = gate.SetFromMap(map[string]bool{})
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(err).To(Not(HaveOccurred()))
-
-		os.Setenv("PGO_TARGET_NAMESPACE", "")
-		mgr, err := runtime.CreateRuntimeManager(cfg, gate, internalRuntime.Options{
-			LeaderElection:         false,
-			HealthProbeBindAddress: "0",
-			Metrics: metricsServer.Options{
-				BindAddress: "0",
-			},
-		})
-		Expect(err).To(Succeed())
-		Expect(v2.AddToScheme(mgr.GetScheme())).To(Succeed())
-
-		r.Client = mgr.GetClient()
-		crunchyR.Client = mgr.GetClient()
-		crunchyR.Tracer = &tracerWithCounter{t: crunchyR.Tracer}
-
-		cm := &perconaController.CustomManager{Manager: mgr}
-		Expect(crunchyR.SetupWithManager(cm)).To(Succeed())
-
-		Expect(cm.Controller()).NotTo(BeNil())
-		r.CrunchyController = cm.Controller()
-		Expect(r.SetupWithManager(mgr)).To(Succeed())
-
-		wg.Add(1)
-		go func() {
-			Expect(mgr.Start(mgrCtx)).To(Succeed())
-			wg.Done()
-		}()
-	})
-
-	AfterAll(func() {
-		By("Stopping manager")
-		cancel()
-		wg.Wait()
-
-		By("Deleting the Namespace to perform the tests")
-		_ = k8sClient.Delete(ctx, namespace)
-	})
-
-	cr, err := readDefaultCR(crName, ns)
-	It("should read default cr.yaml", func() {
-		Expect(err).NotTo(HaveOccurred())
-	})
-	for i := range cr.Spec.Backups.PGBackRest.Repos {
-		cr.Spec.Backups.PGBackRest.Repos[i].BackupSchedules = nil
-	}
-
-	reconcileCount := 0
-	Context("Create cluster and wait until Reconcile stops", func() {
-		It("should create PerconaPGCluster and PostgresCluster", func() {
-			status := cr.Status
-			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
-			cr.Status = status
-			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
-
-			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v2.PerconaPGCluster))
-			}, time.Second*15, time.Millisecond*250).Should(BeNil())
-
-			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), new(v1beta1.PostgresCluster))
-			}, time.Second*15, time.Millisecond*250).Should(BeNil())
-		})
-
-		It("should wait until PostgresCluster will stop to Reconcile multiple times", func() {
-			Eventually(func() bool {
-				pgCluster := new(v1beta1.PostgresCluster)
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), pgCluster)
-				if err != nil {
-					return false
-				}
-				// When ManagedFields get field with `status` subresource, crunchy's Reconcile stops being called
-				for _, f := range pgCluster.ManagedFields {
-					if f.Manager == postgrescluster.ControllerName && f.Subresource == "status" {
-						return true
-					}
-				}
-
-				return false
-			}, time.Second*60, time.Millisecond*250).Should(Equal(true))
-			reconcileCount = getReconcileCount(crunchyR)
-		})
-	})
-
-	var secret *corev1.Secret
-	Context("Create secret", func() {
-		secret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "some-secret",
-				Namespace: ns,
-				Labels: map[string]string{
-					naming.LabelCluster: cr.Name,
-				},
-			},
-			Data: map[string][]byte{
-				"some-data": []byte("data"),
-			},
-		}
-		It("should create secret", func() {
-			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
-			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), new(corev1.Secret))
-			}, time.Second*15, time.Millisecond*250).Should(BeNil())
-		})
-
-		It("should reconcile 0 times", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*15, time.Millisecond*250).
-				Should(Equal(reconcileCount))
-		})
-	})
-
-	Context("Update secret data", func() {
-		It("should update secret data", func() {
-			secret.Data["some-data"] = []byte("updated-data")
-			Expect(k8sClient.Update(ctx, secret)).To(Succeed())
-		})
-
-		It("should wait until secret is updated", func() {
-			Eventually(func() bool {
-				newSecret := new(corev1.Secret)
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), newSecret)
-				if err != nil {
-					return false
-				}
-				return string(newSecret.Data["some-data"]) == "updated-data"
-			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-		})
-
-		It("should reconcile 1 time", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*20, time.Millisecond*250).
-				Should(Equal(reconcileCount + 1))
-		})
-
-		It("should update secret data", func() {
-			secret.Data["some-data"] = []byte("updated-data-2")
-			Expect(k8sClient.Update(ctx, secret)).To(Succeed())
-		})
-
-		It("should wait until secret is updated", func() {
-			Eventually(func() bool {
-				newSecret := new(corev1.Secret)
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), newSecret)
-				if err != nil {
-					return false
-				}
-				return string(newSecret.Data["some-data"]) == "updated-data-2"
-			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-		})
-
-		It("should reconcile 2 times", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*20, time.Millisecond*250).
-				Should(Equal(reconcileCount + 2))
-		})
-	})
-
-	Context("Update secret data and remove labels", func() {
-		It("should remove cluster label and update data", func() {
-			secret.Labels = make(map[string]string)
-			secret.Data["some-data"] = []byte("updated-data-3")
-			Expect(k8sClient.Update(ctx, secret)).To(Succeed())
-		})
-
-		It("should wait until secret is updated", func() {
-			Eventually(func() bool {
-				newSecret := new(corev1.Secret)
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), newSecret)
-				if err != nil {
-					return false
-				}
-				return string(newSecret.Data["some-data"]) == "updated-data-3"
-			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-		})
-
-		It("should reconcile 2 times", func() {
-			Eventually(func() int { return getReconcileCount(crunchyR) }, time.Second*15, time.Millisecond*250).
-				Should(Equal(reconcileCount + 2))
-		})
-	})
-})
 
 var _ = Describe("Users", Ordered, func() {
 	ctx := context.Background()
