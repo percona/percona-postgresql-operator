@@ -2303,7 +2303,22 @@ func (r *Reconciler) reconcileDedicatedRepoHost(ctx context.Context,
 // manually by the end-user
 func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	postgresCluster *v1beta1.PostgresCluster, manualBackupJobs []*batchv1.Job,
-	serviceAccount *corev1.ServiceAccount, instances *observedInstances) error {
+	serviceAccount *corev1.ServiceAccount, instances *observedInstances,
+) error {
+	// K8SPG-804: Get the current state of PostgresCluster.
+	// It's necessary to make internal.percona.com/delete-backup finalizer work.
+	// Because the reconcileManualBackup can get an outdated postgresCluster,
+	// resulting in a duplicated backup jobs per one pg-backup resources.
+	// For more information check the K8SPG-804 PR description.
+	currentPostgresCluster := new(v1beta1.PostgresCluster)
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), currentPostgresCluster); err != nil {
+		return err
+	}
+	// If it's the first run of reconcileManualBackup .Status will be nil.
+	// Nothing will happen if we keep the old postgresCluster.
+	if currentPostgresCluster.Status.PGBackRest != nil {
+		postgresCluster = currentPostgresCluster
+	}
 
 	manualAnnotation := postgresCluster.GetAnnotations()[naming.PGBackRestBackup]
 	manualStatus := postgresCluster.Status.PGBackRest.ManualBackup
@@ -2359,6 +2374,10 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 					client.PropagationPolicy(metav1.DeletePropagationBackground)))
 			}
 		}
+
+		// K8SPG-804: We should return here. Otherwise, this method will update the job labels
+		// that we are trying to delete in the internal.percona.com/delete-backup finalizer
+		return nil
 	}
 
 	// pgBackRest connects to a PostgreSQL instance that is not in recovery to
