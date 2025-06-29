@@ -19204,6 +19204,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
+  labels:
+    pgv2.percona.com/version: v2.7.0
   name: perconapgupgrades.pgv2.percona.com
 spec:
   group: pgv2.percona.com

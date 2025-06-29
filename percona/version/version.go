@@ -19,6 +19,7 @@ import (
 //go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgclusters.yaml"
 //go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgbackups.yaml"
 //go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgrestores.yaml"
+//go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgupgrade.yaml"
 
 //go:embed version.txt
 var version string
