@@ -12,3 +12,4 @@ patchesStrategicMerge:
 - patches/versionlabel_in_perconapgclusters.yaml
 - patches/versionlabel_in_perconapgbackups.yaml
 - patches/versionlabel_in_perconapgrestores.yaml
+- patches/versionlabel_in_perconapgupgrade.yaml
