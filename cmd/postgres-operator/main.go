@@ -305,12 +305,20 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	}
 
 	options.Controller.GroupKindConcurrency = map[string]int{
-		"PostgresCluster." + v1beta1.GroupVersion.Group: 2,
+		"PostgresCluster." + v1beta1.GroupVersion.Group: 1,
+		"PGUpgrade." + v1beta1.GroupVersion.Group:       1,
+		"PGAdmin." + v1beta1.GroupVersion.Group:         1,
+		"PerconaPGCluster." + v2.GroupVersion.Group:     1,
+		"PerconaPGUpgrade." + v2.GroupVersion.Group:     1,
+		"PerconaPGBackup." + v2.GroupVersion.Group:      1,
+		"PerconaPGRestore." + v2.GroupVersion.Group:     1,
 	}
 
 	if s := os.Getenv("PGO_WORKERS"); s != "" {
 		if i, err := strconv.Atoi(s); err == nil && i > 0 {
-			options.Controller.GroupKindConcurrency["PostgresCluster."+v1beta1.GroupVersion.Group] = i
+			for kind, _ := range options.Controller.GroupKindConcurrency {
+				options.Controller.GroupKindConcurrency[kind] = i
+			}
 		} else {
 			log.Error(err, "PGO_WORKERS must be a positive number")
 		}
