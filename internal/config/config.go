@@ -99,16 +99,26 @@ func PGExporterContainerImage(cluster *v1beta1.PostgresCluster) string {
 	return defaultFromEnv(image, "RELATED_IMAGE_PGEXPORTER")
 }
 
-// PostgresContainerImage returns the container image to use for PostgreSQL.
-func PostgresContainerImage(cluster *v1beta1.PostgresCluster) string {
-	image := cluster.Spec.Image
-	key := "RELATED_IMAGE_POSTGRES_" + fmt.Sprint(cluster.Spec.PostgresVersion)
+// PostgresContainerImageString returns the container image to use for PostgreSQL (from string params).
+// This func copies logic from original PostgresContainerImage as is, leaving PostgresContainerImage as a wrapper for upstream compatibility
+func PostgresContainerImageString(image string, postgresVersion int, postGISVersion string) string {
+	key := "RELATED_IMAGE_POSTGRES_" + fmt.Sprint(postgresVersion)
 
-	if version := cluster.Spec.PostGISVersion; version != "" {
-		key += "_GIS_" + version
+	if postGISVersion != "" {
+		key += "_GIS_" + postGISVersion
 	}
 
 	return defaultFromEnv(image, key)
+}
+
+// PostgresContainerImage returns the container image to use for PostgreSQL.
+// Made as a wrapper of PostgresContainerImageString for compat reasons
+func PostgresContainerImage(cluster *v1beta1.PostgresCluster) string {
+	image := cluster.Spec.Image
+	postgresVersion := cluster.Spec.PostgresVersion
+	postGISVersion := cluster.Spec.PostGISVersion
+
+	return PostgresContainerImageString(image, postgresVersion, postGISVersion)
 }
 
 // PGONamespace returns the namespace where the PGO is running,
