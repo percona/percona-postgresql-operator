@@ -436,6 +436,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 				},
 				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
 				TerminationGracePeriodSeconds: ptr.To(int64(5)),
+				ImagePullSecrets:              cr.Spec.ImagePullSecrets,
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),

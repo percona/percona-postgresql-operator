@@ -57,7 +57,13 @@ func GetInfo(ctx context.Context, pod *corev1.Pod, repoName string) (InfoOutput,
 		return InfoOutput{}, errors.Wrap(err, "failed to create client")
 	}
 
-	if err := c.Exec(ctx, pod, naming.ContainerDatabase, nil, stdout, stderr, "pgbackrest", "info", "--output=json", "--repo="+strings.TrimPrefix(repoName, "repo")); err != nil {
+	// Setting --log-level-console=info is needed because if the --log-level-console=debug is configured
+	// through `backups.pgbackrest.global`, the stdout output contains additional text output that
+	// cannot be unmarshalled to InfoOutput without further processing.
+	if err := c.Exec(
+		ctx, pod, naming.ContainerDatabase, nil, stdout, stderr,
+		"pgbackrest", "info", "--output=json", "--repo="+strings.TrimPrefix(repoName, "repo"), "--log-level-console=info",
+	); err != nil {
 		return InfoOutput{}, errors.Wrapf(err, "exec: %s", stderr.String())
 	}
 
