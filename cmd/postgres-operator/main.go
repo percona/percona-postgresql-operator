@@ -316,7 +316,7 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 
 	if s := os.Getenv("PGO_WORKERS"); s != "" {
 		if i, err := strconv.Atoi(s); err == nil && i > 0 {
-			for kind, _ := range options.Controller.GroupKindConcurrency {
+			for kind := range options.Controller.GroupKindConcurrency {
 				options.Controller.GroupKindConcurrency[kind] = i
 			}
 		} else {
