@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
@@ -243,6 +244,12 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
 	}
+}
+
+func (cr *PerconaPGCluster) PostgresImage() string {
+	image := cr.Spec.Image
+	postgresVersion := cr.Spec.PostgresVersion
+	return config.PostgresContainerImageString(image, postgresVersion, "")
 }
 
 func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crunchyv1beta1.PostgresCluster, scheme *runtime.Scheme) (*crunchyv1beta1.PostgresCluster, error) {
