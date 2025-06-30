@@ -28,7 +28,13 @@ func TestInitManager(t *testing.T) {
 
 		assert.DeepEqual(t, options.Controller.GroupKindConcurrency,
 			map[string]int{
-				"PostgresCluster.postgres-operator.crunchydata.com": 2,
+				"PGAdmin.postgres-operator.crunchydata.com":         1,
+				"PGUpgrade.postgres-operator.crunchydata.com":       1,
+				"PerconaPGBackup.pgv2.percona.com":                  1,
+				"PerconaPGCluster.pgv2.percona.com":                 1,
+				"PerconaPGRestore.pgv2.percona.com":                 1,
+				"PerconaPGUpgrade.pgv2.percona.com":                 1,
+				"PostgresCluster.postgres-operator.crunchydata.com": 1,
 			})
 
 		assert.Assert(t, options.Cache.DefaultNamespaces == nil)
@@ -103,7 +109,13 @@ func TestInitManager(t *testing.T) {
 				assert.NilError(t, err)
 				assert.DeepEqual(t, options.Controller.GroupKindConcurrency,
 					map[string]int{
-						"PostgresCluster.postgres-operator.crunchydata.com": 2,
+						"PGAdmin.postgres-operator.crunchydata.com":         1,
+						"PGUpgrade.postgres-operator.crunchydata.com":       1,
+						"PerconaPGBackup.pgv2.percona.com":                  1,
+						"PerconaPGCluster.pgv2.percona.com":                 1,
+						"PerconaPGRestore.pgv2.percona.com":                 1,
+						"PerconaPGUpgrade.pgv2.percona.com":                 1,
+						"PostgresCluster.postgres-operator.crunchydata.com": 1,
 					})
 			}
 		})
@@ -115,6 +127,12 @@ func TestInitManager(t *testing.T) {
 			assert.NilError(t, err)
 			assert.DeepEqual(t, options.Controller.GroupKindConcurrency,
 				map[string]int{
+					"PGAdmin.postgres-operator.crunchydata.com":         19,
+					"PGUpgrade.postgres-operator.crunchydata.com":       19,
+					"PerconaPGBackup.pgv2.percona.com":                  19,
+					"PerconaPGCluster.pgv2.percona.com":                 19,
+					"PerconaPGRestore.pgv2.percona.com":                 19,
+					"PerconaPGUpgrade.pgv2.percona.com":                 19,
 					"PostgresCluster.postgres-operator.crunchydata.com": 19,
 				})
 		})
