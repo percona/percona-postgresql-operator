@@ -171,6 +171,7 @@ func instanceInitContainer(cluster *v1beta1.PostgresCluster, container *corev1.C
 
 // instanceProbes adds Patroni liveness and readiness probes to container.
 func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Container) {
+
 	// Patroni uses a watchdog to ensure that PostgreSQL does not accept commits
 	// after the leader lock expires, even if Patroni becomes unresponsive.
 	// - https://github.com/zalando/patroni/blob/v2.0.1/docs/watchdog.rst
