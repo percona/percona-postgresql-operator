@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -2323,7 +2322,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 
 	// If it's the first run of reconcileManualBackup .Status will be nil.
 	// Nothing will happen if we keep the old postgresCluster.
-	if !k8serrors.IsNotFound(err) && currentPostgresCluster.Status.PGBackRest != nil {
+	if !apierrors.IsNotFound(err) && currentPostgresCluster.Status.PGBackRest != nil {
 		postgresCluster = currentPostgresCluster
 	}
 
