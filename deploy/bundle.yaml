@@ -1511,6 +1511,8 @@ spec:
                                   More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                                 type: object
                             type: object
+                        required:
+                        - image
                         type: object
                       jobs:
                         description: Jobs field allows configuration for all backup
@@ -9394,6 +9396,8 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                required:
+                - image
                 type: object
               instances:
                 description: |-
@@ -10855,6 +10859,8 @@ spec:
                                 More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                               type: object
                           type: object
+                      required:
+                      - image
                       type: object
                     initContainers:
                       description: |-
@@ -27147,6 +27153,8 @@ spec:
                                   More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                                 type: object
                             type: object
+                        required:
+                        - image
                         type: object
                       jobs:
                         description: Jobs field allows configuration for all backup
@@ -35346,6 +35354,8 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                required:
+                - image
                 type: object
               instances:
                 description: |-
@@ -38166,6 +38176,8 @@ spec:
                                 More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                               type: object
                           type: object
+                      required:
+                      - image
                       type: object
                     initContainers:
                       description: |-

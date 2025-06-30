@@ -39,7 +39,7 @@ func GetWatchNamespace() (string, error) {
 	return ns, nil
 }
 
-func InitContainer(componentName, image string,
+func InitContainer(cluster *v1beta1.PostgresCluster, componentName, image string,
 	pullPolicy corev1.PullPolicy,
 	secCtx *corev1.SecurityContext,
 	resources corev1.ResourceRequirements,
@@ -47,9 +47,13 @@ func InitContainer(componentName, image string,
 ) corev1.Container {
 	if component != nil && component.GetInitContainer() != nil && component.GetInitContainer().Resources != nil {
 		resources = *component.GetInitContainer().Resources
+	} else if ic := cluster.Spec.InitContainer; ic != nil && ic.Resources != nil {
+		resources = *ic.Resources
 	}
 	if component != nil && component.GetInitContainer() != nil && component.GetInitContainer().ContainerSecurityContext != nil {
 		secCtx = component.GetInitContainer().ContainerSecurityContext
+	} else if ic := cluster.Spec.InitContainer; ic != nil && ic.ContainerSecurityContext != nil {
+		secCtx = *&ic.ContainerSecurityContext
 	}
 
 	volumeMounts := []corev1.VolumeMount{

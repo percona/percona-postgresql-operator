@@ -148,6 +148,7 @@ func InstancePod(ctx context.Context,
 // K8SPG-708 instanceInitContainer adds the instance init container
 func instanceInitContainer(cluster *v1beta1.PostgresCluster, container *corev1.Container, instancePod *corev1.PodTemplateSpec, inInstanceSpec *v1beta1.PostgresInstanceSetSpec, initImage string) {
 	instancePod.Spec.InitContainers = append(instancePod.Spec.InitContainers, k8s.InitContainer(
+		cluster,
 		naming.ContainerDatabase,
 		initImage,
 		cluster.Spec.ImagePullPolicy,
@@ -170,7 +171,6 @@ func instanceInitContainer(cluster *v1beta1.PostgresCluster, container *corev1.C
 
 // instanceProbes adds Patroni liveness and readiness probes to container.
 func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Container) {
-
 	// Patroni uses a watchdog to ensure that PostgreSQL does not accept commits
 	// after the leader lock expires, even if Patroni becomes unresponsive.
 	// - https://github.com/zalando/patroni/blob/v2.0.1/docs/watchdog.rst
