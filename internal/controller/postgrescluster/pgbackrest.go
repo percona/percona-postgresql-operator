@@ -2311,12 +2311,18 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	// resulting in a duplicated backup jobs per one pg-backup resources.
 	// For more information check the K8SPG-804 PR description.
 	currentPostgresCluster := new(v1beta1.PostgresCluster)
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), currentPostgresCluster); err != nil {
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), currentPostgresCluster)
+	if client.IgnoreNotFound(err) != nil {
 		return err
 	}
+
+	// refPostgresCluster keeps pointer to the postgresCluster which is used in other reconcile functions
+	// It should be used to assign values to the postgresCluster inside this function
+	refPostgresCluster := postgresCluster
+
 	// If it's the first run of reconcileManualBackup .Status will be nil.
 	// Nothing will happen if we keep the old postgresCluster.
-	if currentPostgresCluster.Status.PGBackRest != nil {
+	if !k8serrors.IsNotFound(err) && currentPostgresCluster.Status.PGBackRest != nil {
 		postgresCluster = currentPostgresCluster
 	}
 
@@ -2411,7 +2417,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 		meta.RemoveStatusCondition(&postgresCluster.Status.Conditions,
 			ConditionManualBackupSuccessful)
 
-		postgresCluster.Status.PGBackRest.ManualBackup = manualStatus
+		refPostgresCluster.Status.PGBackRest.ManualBackup = manualStatus
 	}
 
 	// if the status shows the Job is no longer in progress, then simply exit (which means a Job
