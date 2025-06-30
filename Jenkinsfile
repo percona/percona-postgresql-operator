@@ -1,25 +1,40 @@
-region="us-central1-a"
-testUrlPrefix="https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator"
-tests=[]
+region = 'us-central1-a'
+testUrlPrefix = "https://percona-jenkins-artifactory-public.s3.amazonaws.com/cloud-pg-operator"
+tests = []
 
 void createCluster(String CLUSTER_SUFFIX) {
     withCredentials([string(credentialsId: 'GCP_PROJECT_ID', variable: 'GCP_PROJECT'), file(credentialsId: 'gcloud-key-file', variable: 'CLIENT_SECRET_FILE')]) {
         sh """
-            NODES_NUM=3
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
+            gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
+            gcloud config set project $GCP_PROJECT
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
                 ret_val=0
-                gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
-                gcloud config set project $GCP_PROJECT
-                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $region --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $region --quiet || true
-                gcloud container clusters create --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX} --cluster-version=1.30 --machine-type=n1-standard-4 --preemptible --disk-size 30 --num-nodes=\$NODES_NUM --network=jenkins-vpc --subnetwork=jenkins-${CLUSTER_SUFFIX} --no-enable-autoupgrade --cluster-ipv4-cidr=/21 --labels delete-cluster-after-hours=6 --enable-ip-alias && \
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone ${region}  --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone ${region} --quiet || true
+                gcloud container clusters create $CLUSTER_NAME-${CLUSTER_SUFFIX} \
+                    --preemptible \
+                    --zone=${region} \
+                    --machine-type='n1-standard-4' \
+                    --cluster-version='1.30' \
+                    --num-nodes=3 \
+                    --labels='delete-cluster-after-hours=6' \
+                    --disk-size=30 \
+                    --network=jenkins-vpc \
+                    --subnetwork=jenkins-${CLUSTER_SUFFIX} \
+                    --cluster-ipv4-cidr=/21 \
+                    --enable-ip-alias \
+                    --no-enable-autoupgrade \
+                    --monitoring=NONE \
+                    --logging=NONE \
+                    --no-enable-managed-prometheus \
+                    --quiet && \
                 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
                 if [ \${ret_val} -eq 0 ]; then break; fi
                 ret_num=\$((ret_num + 1))
             done
             if [ \${ret_num} -eq 15 ]; then
-                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone $region --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone $region --quiet || true
+                gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone ${region}  --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone ${region} --quiet || true
                 exit 1
             fi
         """
@@ -41,7 +56,7 @@ void shutdownCluster(String CLUSTER_SUFFIX) {
                 kubectl delete pods --all -n \$namespace --force --grace-period=0 || true
             done
             kubectl get svc --all-namespaces || true
-            gcloud container clusters delete --zone $region $CLUSTER_NAME-${CLUSTER_SUFFIX}
+            gcloud container clusters delete --zone ${region} $CLUSTER_NAME-${CLUSTER_SUFFIX}
         """
    }
 }
@@ -65,7 +80,7 @@ void deleteOldClusters(String FILTER) {
                             break
                         fi
                     done
-                    gcloud container clusters delete --async --zone $region --quiet \$GKE_CLUSTER || true
+                    gcloud container clusters delete --async --zone ${region} --quiet \$GKE_CLUSTER || true
                 done
             fi
         """
@@ -120,7 +135,7 @@ void markPassedTests() {
 
         for (int i=0; i<tests.size(); i++) {
             def testName = tests[i]["name"]
-            def file="${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$testName"
+            def file = "${env.GIT_BRANCH}-${env.GIT_SHORT_COMMIT}-$testName"
             def retFileExists = sh(script: "aws s3api head-object --bucket percona-jenkins-artifactory --key ${JOB_NAME}/${env.GIT_SHORT_COMMIT}/${file} >/dev/null 2>&1", returnStatus: true)
 
             if (retFileExists == 0) {
@@ -149,12 +164,30 @@ void printKubernetesStatus(String LOCATION, String CLUSTER_SUFFIX) {
     """
 }
 
-TestsReport = '| Test name | Status |\r\n| ------------- | ------------- |'
+String formatTime(def time) {
+    if (!time || time == "N/A") return "N/A"
+
+    try {
+        def totalSeconds = time as Double
+        def hours = (totalSeconds / 3600) as Integer
+        def minutes = ((totalSeconds % 3600) / 60) as Integer
+        def seconds = (totalSeconds % 60) as Integer
+
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+
+    } catch (Exception e) {
+        println("Error converting time: ${e.message}")
+        return time.toString()
+    }
+}
+
+TestsReport = '| Test Name | Result | Time |\r\n| ----------- | -------- | ------ |'
 TestsReportXML = '<testsuite name=\\"PG\\">\n'
 
 void makeReport() {
-    def wholeTestAmount=tests.size()
+    def wholeTestAmount = tests.size()
     def startedTestAmount = 0
+    def totalTestTime = 0
 
     for (int i=0; i<tests.size(); i++) {
         def testName = tests[i]["name"]
@@ -162,13 +195,17 @@ void makeReport() {
         def testTime = tests[i]["time"]
         def testUrl = "${testUrlPrefix}/${env.GIT_BRANCH}/${env.GIT_SHORT_COMMIT}/${testName}.log"
 
+        if (testTime instanceof Number) {
+            totalTestTime += testTime
+        }
+
         if (tests[i]["result"] != "skipped") {
             startedTestAmount++
         }
-        TestsReport = TestsReport + "\r\n| "+ testName +" | ["+ testResult +"]("+ testUrl +") |"
+        TestsReport = TestsReport + "\r\n| " + testName + " | [" + testResult + "](" + testUrl + ") | " + formatTime(testTime) + " |"
         TestsReportXML = TestsReportXML + '<testcase name=\\"' + testName + '\\" time=\\"' + testTime + '\\"><'+ testResult +'/></testcase>\n'
     }
-    TestsReport = TestsReport + "\r\n| We run $startedTestAmount out of $wholeTestAmount|"
+    TestsReport = TestsReport + "\r\n| We run $startedTestAmount out of $wholeTestAmount | | " + formatTime(totalTestTime) + " |"
     TestsReportXML = TestsReportXML + '</testsuite>\n'
 
     sh """
@@ -244,10 +281,10 @@ void runTest(Integer TEST_ID) {
 
 void prepareNode() {
     sh """
-        sudo curl -s -L -o /usr/local/bin/kubectl https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl && sudo chmod +x /usr/local/bin/kubectl
+        sudo curl -sLo /usr/local/bin/kubectl https://dl.k8s.io/release/\$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl && sudo chmod +x /usr/local/bin/kubectl
         kubectl version --client --output=yaml
 
-        curl -fsSL https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz | sudo tar -C /usr/local/bin --strip-components 1 -xzf - linux-amd64/helm
+        curl -fsSL https://get.helm.sh/helm-v3.18.3-linux-amd64.tar.gz | sudo tar -C /usr/local/bin --strip-components 1 -xzf - linux-amd64/helm
 
         sudo curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_amd64 -o /usr/local/bin/yq && sudo chmod +x /usr/local/bin/yq
         sudo curl -fsSL https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64 -o /usr/local/bin/jq && sudo chmod +x /usr/local/bin/jq
@@ -258,8 +295,8 @@ void prepareNode() {
 
         kubectl krew install assert
 
-        # v0.17.0 kuttl version
-        kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/336ef83542fd2f783bfa2c075b24599e834dcc77/plugins/kuttl.yaml
+        # v0.22.0 kuttl version
+        kubectl krew install --manifest-url https://raw.githubusercontent.com/kubernetes-sigs/krew-index/02d5befb2bc9554fdcd8386b8bfbed2732d6802e/plugins/kuttl.yaml
         echo \$(kubectl kuttl --version) is installed
 
         sudo tee /etc/yum.repos.d/google-cloud-sdk.repo << EOF
@@ -459,7 +496,7 @@ pipeline {
                                  -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                                  -w /go/src/github.com/percona/percona-postgresql-operator \
                                  -e GO111MODULE=on \
-                                 golang:1.23 sh -c '
+                                 golang:1.24 sh -c '
                                      go install github.com/google/go-licenses@latest;
                                      /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
                                          | cut -d , -f 3 \

@@ -337,6 +337,31 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
 		cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
+
+		patroniVersionUpdateFunc := func() error {
+			cluster := &v2.PerconaPGCluster{}
+			if err := r.Client.Get(ctx, types.NamespacedName{
+				Name:      cr.Name,
+				Namespace: cr.Namespace,
+			}, cluster); err != nil {
+				return errors.Wrap(err, "get PerconaPGCluster")
+			}
+
+			orig := cluster.DeepCopy()
+
+			cluster.Status.PatroniVersion = patroniVersion
+
+			if err := r.Client.Status().Patch(ctx, cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
+				return errors.Wrap(err, "failed to patch patroni version")
+			}
+			return nil
+		}
+
+		// To ensure that the update was done given that conflicts can be caused by
+		// other code making unrelated updates to the same resource at the same time.
+		if err := retry.RetryOnConflict(retry.DefaultRetry, patroniVersionUpdateFunc); err != nil {
+			return errors.Wrap(err, "failed to patch patroni version")
+		}
 		return nil
 	}
 
@@ -411,6 +436,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 				},
 				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
 				TerminationGracePeriodSeconds: ptr.To(int64(5)),
+				ImagePullSecrets:              cr.Spec.ImagePullSecrets,
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
