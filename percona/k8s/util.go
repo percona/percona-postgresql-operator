@@ -53,7 +53,7 @@ func InitContainer(cluster *v1beta1.PostgresCluster, componentName, image string
 	if component != nil && component.GetInitContainer() != nil && component.GetInitContainer().ContainerSecurityContext != nil {
 		secCtx = component.GetInitContainer().ContainerSecurityContext
 	} else if ic := cluster.Spec.InitContainer; ic != nil && ic.ContainerSecurityContext != nil {
-		secCtx = *&ic.ContainerSecurityContext
+		secCtx = ic.ContainerSecurityContext
 	}
 
 	volumeMounts := []corev1.VolumeMount{
