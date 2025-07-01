@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	pg_query "github.com/pganalyze/pg_query_go/v6"
@@ -262,37 +263,31 @@ func grantUserAccessToPublicSchemaInPostgreSQL(ctx context.Context, exec Executo
 
 	var sql bytes.Buffer
 
-	// Prevent unexpected dereferences by emptying "search_path". The "pg_catalog"
-	// schema is still searched, and only temporary objects can be created.
-	// - https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-SEARCH-PATH
+	// Prevent unexpected dereferences by emptying "search_path"
 	_, _ = sql.WriteString(`SET search_path TO '';`)
-
 	_, _ = sql.WriteString(`SELECT * FROM json_array_elements_text(:'databases');`)
 
 	databases, _ := json.Marshal(user.Databases)
 
+	// Replace :"username" with actual quoted username
+	username := fmt.Sprintf(`"%s"`, user.Name)
+
 	stdout, stderr, err := exec.ExecInDatabasesFromQuery(ctx,
 		sql.String(),
 		strings.Join([]string{
-			// Quiet NOTICE messages from IF EXISTS statements.
 			`SET client_min_messages = WARNING;`,
 
-			// Grant all privileges on the public schema to the user
-			`GRANT ALL PRIVILEGES ON SCHEMA public TO :"username";`,
+			fmt.Sprintf(`GRANT ALL PRIVILEGES ON SCHEMA public TO %s;`, username),
+			fmt.Sprintf(`GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO %s;`, username),
+			fmt.Sprintf(`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO %s;`, username),
 
-			// Grant all privileges on existing tables and sequences in the public schema
-			`GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO :"username";`,
-			`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO :"username";`,
-
-			// Set default privileges for future objects created in the public schema
-			`ALTER DEFAULT PRIVILEGES FOR ROLE "username" IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO "username";`,
-			`ALTER DEFAULT PRIVILEGES FOR ROLE "username" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO "username";`,
+			fmt.Sprintf(`ALTER DEFAULT PRIVILEGES FOR ROLE %s IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO %s;`, username, username),
+			fmt.Sprintf(`ALTER DEFAULT PRIVILEGES FOR ROLE %s IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO %s;`, username, username),
 		}, "\n"),
 		map[string]string{
 			"databases":     string(databases),
-			"username":      string(user.Name),
-			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
-			"QUIET":         "on", // Do not print successful commands to stdout.
+			"ON_ERROR_STOP": "on",
+			"QUIET":         "on",
 		},
 	)
 
