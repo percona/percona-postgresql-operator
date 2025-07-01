@@ -170,6 +170,7 @@ get_cr() {
 		cr_name=${test_name}
 	fi
 	local repo_path=$2
+	local source_path=$3
 
 	yq eval '
 		.metadata.name = "'${cr_name}'" |
@@ -210,7 +211,7 @@ get_cr() {
 				yq eval -i '
 					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
 					.spec.dataSource.pgbackrest.stanza = "db" |
-					.spec.dataSource.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/demand-backup-ppg'$PG_VER'/repo1" |
+					.spec.dataSource.pgbackrest.global.repo1-path = "'${source_path}'" |
 					.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
 					' $TEMP_DIR/cr.yaml
 			fi
