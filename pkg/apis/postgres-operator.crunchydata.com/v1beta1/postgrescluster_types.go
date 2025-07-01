@@ -194,6 +194,7 @@ type PostgresClusterSpec struct {
 }
 
 type InitContainerSpec struct {
+	// +kubebuilder:validation:Required
 	Image                    string                       `json:"image,omitempty"`
 	Resources                *corev1.ResourceRequirements `json:"resources,omitempty"`
 	ContainerSecurityContext *corev1.SecurityContext      `json:"containerSecurityContext,omitempty"`
