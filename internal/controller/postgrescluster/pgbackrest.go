@@ -843,6 +843,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		}
 		initContainers = []corev1.Container{
 			k8s.InitContainer(
+				postgresCluster,
 				naming.PGBackRestRepoContainerName,
 				initImage,
 				postgresCluster.Spec.ImagePullPolicy,
