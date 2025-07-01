@@ -263,31 +263,39 @@ func grantUserAccessToPublicSchemaInPostgreSQL(ctx context.Context, exec Executo
 
 	var sql bytes.Buffer
 
-	// Prevent unexpected dereferences by emptying "search_path"
+	// Prevent unexpected dereferences by emptying "search_path". The "pg_catalog"
+	// schema is still searched, and only temporary objects can be created.
+	// - https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-SEARCH-PATH
 	_, _ = sql.WriteString(`SET search_path TO '';`)
+
 	_, _ = sql.WriteString(`SELECT * FROM json_array_elements_text(:'databases');`)
 
 	databases, _ := json.Marshal(user.Databases)
 
-	// Replace :"username" with actual quoted username
+	// Format the username as an identifier
 	username := fmt.Sprintf(`"%s"`, user.Name)
 
 	stdout, stderr, err := exec.ExecInDatabasesFromQuery(ctx,
 		sql.String(),
 		strings.Join([]string{
+			// Quiet NOTICE messages from IF EXISTS statements.
 			`SET client_min_messages = WARNING;`,
 
+			// Grant all privileges on the public schema to the user
 			fmt.Sprintf(`GRANT ALL PRIVILEGES ON SCHEMA public TO %s;`, username),
+
+			// Grant all privileges on existing tables and sequences in the public schema
 			fmt.Sprintf(`GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO %s;`, username),
 			fmt.Sprintf(`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO %s;`, username),
 
+			// Set default privileges for future objects created in the public schema
 			fmt.Sprintf(`ALTER DEFAULT PRIVILEGES FOR ROLE %s IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO %s;`, username, username),
 			fmt.Sprintf(`ALTER DEFAULT PRIVILEGES FOR ROLE %s IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO %s;`, username, username),
 		}, "\n"),
 		map[string]string{
 			"databases":     string(databases),
-			"ON_ERROR_STOP": "on",
-			"QUIET":         "on",
+			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
+			"QUIET":         "on", // Do not print successful commands to stdout.
 		},
 	)
 
