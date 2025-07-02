@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1844,17 +1845,28 @@ var _ = Describe("Init Container", Ordered, func() {
 		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
 
-	Context("Reconcile controller", func() {
-		It("Controller should reconcile", func() {
-			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-			Expect(err).NotTo(HaveOccurred())
-			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-			Expect(err).NotTo(HaveOccurred())
-		})
+	It("Controller should reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+	It("should create fake pods for statefulsets", func() {
+		stsList := &appsv1.StatefulSetList{}
+		Expect(k8sClient.List(ctx, stsList, client.InNamespace(ns))).To(Succeed())
+		Expect(len(stsList.Items)).To(Equal(4))
+		Expect(createFakePodsForStatefulsets(ctx, k8sClient, stsList)).To(Succeed())
+	})
+	It("Controller should reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Context("check init containers in the statefulsets", func() {
+	Context("check init containers", func() {
 		stsList := &appsv1.StatefulSetList{}
+		var backupJob batchv1.Job
 		It("should get statefulsets", func() {
 			selector, err := naming.AsSelector(metav1.LabelSelector{MatchLabels: map[string]string{naming.LabelCluster: crName, naming.LabelInstanceSet: "instance1"}})
 			Expect(err).To(Succeed())
@@ -1863,8 +1875,16 @@ var _ = Describe("Init Container", Ordered, func() {
 
 			Expect(len(stsList.Items)).To(Equal(3))
 		})
+		It("should get replica-create backup job", func() {
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(ctx, jobList, client.InNamespace(ns))).To(Succeed())
 
-		It("should have default init container", func() {
+			Expect(len(jobList.Items)).To(Equal(1))
+
+			backupJob = jobList.Items[0]
+		})
+
+		It("should have default init container in the instances", func() {
 			for _, sts := range stsList.Items {
 				var initContainer *corev1.Container
 				for _, c := range sts.Spec.Template.Spec.InitContainers {
@@ -1907,6 +1927,44 @@ var _ = Describe("Init Container", Ordered, func() {
 				}))
 			}
 		})
+		It("should have default init container in the backup job", func() {
+			var initContainer *corev1.Container
+			for _, c := range backupJob.Spec.Template.Spec.InitContainers {
+				if c.Name == "pgbackrest-init" {
+					initContainer = &c
+					break
+				}
+			}
+			Expect(initContainer).NotTo(BeNil())
+
+			Expect(initContainer.Image).To(Equal("some-image"))
+			Expect(initContainer.ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(initContainer.Command).To(Equal([]string{"/usr/local/bin/init-entrypoint.sh"}))
+			Expect(initContainer.Resources).To(Equal(corev1.ResourceRequirements{}))
+			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{
+						"ALL",
+					},
+				},
+				Privileged:               ptr.To(false),
+				RunAsNonRoot:             ptr.To(true),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
+			}))
+			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
+			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
+			Expect(initContainer.VolumeMounts).To(Equal([]corev1.VolumeMount{
+				{
+					Name:      "crunchy-bin",
+					MountPath: "/opt/crunchy",
+				},
+			}))
+		})
+
 		It("update global initContainer", func() {
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).To(Succeed())
 
@@ -1921,8 +1979,17 @@ var _ = Describe("Init Container", Ordered, func() {
 			}
 			Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
 		})
+		It("should delete backup job labels and annotations", func() {
+			// Deleting job labels and annotations to update the job during reconcile
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&backupJob), &backupJob)).To(Succeed())
+			backupJob.Labels = nil
+			backupJob.Annotations = nil
+			Expect(k8sClient.Update(ctx, &backupJob)).To(Succeed())
+		})
 		It("Controller should reconcile", func() {
 			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -1935,7 +2002,16 @@ var _ = Describe("Init Container", Ordered, func() {
 
 			Expect(len(stsList.Items)).To(Equal(3))
 		})
-		It("should have updated init container", func() {
+		It("should get replica-create backup job", func() {
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(ctx, jobList, client.InNamespace(ns))).To(Succeed())
+
+			Expect(len(jobList.Items)).To(Equal(1))
+
+			backupJob = jobList.Items[0]
+		})
+
+		It("should have updated init container in the instances", func() {
 			for _, sts := range stsList.Items {
 				var initContainer *corev1.Container
 				for _, c := range sts.Spec.Template.Spec.InitContainers {
@@ -1971,7 +2047,38 @@ var _ = Describe("Init Container", Ordered, func() {
 				}))
 			}
 		})
-		It("update initContainer of instance", func() {
+		It("should have updated init container in the backup job", func() {
+			var initContainer *corev1.Container
+			for _, c := range backupJob.Spec.Template.Spec.InitContainers {
+				if c.Name == "pgbackrest-init" {
+					initContainer = &c
+					break
+				}
+			}
+			Expect(initContainer).NotTo(BeNil())
+
+			Expect(initContainer.Image).To(Equal("new-image"))
+			Expect(initContainer.ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(initContainer.Command).To(Equal([]string{"/usr/local/bin/init-entrypoint.sh"}))
+			Expect(initContainer.Resources).To(Equal(corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("2"),
+				},
+			}))
+			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
+				RunAsNonRoot: ptr.To(false),
+			}))
+			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
+			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
+			Expect(initContainer.VolumeMounts).To(Equal([]corev1.VolumeMount{
+				{
+					Name:      "crunchy-bin",
+					MountPath: "/opt/crunchy",
+				},
+			}))
+		})
+
+		It("update initContainer of the instance set", func() {
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).To(Succeed())
 
 			cr.Spec.InstanceSets[0].InitContainer = new(v1beta1.InitContainerSpec)
@@ -1986,8 +2093,17 @@ var _ = Describe("Init Container", Ordered, func() {
 			}
 			Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
 		})
+		It("should delete backup job labels and annotations", func() {
+			// Deleting job labels and annotations to update the job during reconcile
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&backupJob), &backupJob)).To(Succeed())
+			backupJob.Labels = nil
+			backupJob.Annotations = nil
+			Expect(k8sClient.Update(ctx, &backupJob)).To(Succeed())
+		})
 		It("Controller should reconcile", func() {
 			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
@@ -2000,7 +2116,16 @@ var _ = Describe("Init Container", Ordered, func() {
 
 			Expect(len(stsList.Items)).To(Equal(3))
 		})
-		It("should have updated init container", func() {
+		It("should get replica-create backup job", func() {
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(ctx, jobList, client.InNamespace(ns))).To(Succeed())
+
+			Expect(len(jobList.Items)).To(Equal(1))
+
+			backupJob = jobList.Items[0]
+		})
+
+		It("should have updated init container in the instances", func() {
 			for _, sts := range stsList.Items {
 				var initContainer *corev1.Container
 				for _, c := range sts.Spec.Template.Spec.InitContainers {
@@ -2035,6 +2160,108 @@ var _ = Describe("Init Container", Ordered, func() {
 					},
 				}))
 			}
+		})
+		It("should have the same init container in the backup job", func() {
+			var initContainer *corev1.Container
+			for _, c := range backupJob.Spec.Template.Spec.InitContainers {
+				if c.Name == "pgbackrest-init" {
+					initContainer = &c
+					break
+				}
+			}
+			Expect(initContainer).NotTo(BeNil())
+
+			Expect(initContainer.Image).To(Equal("new-image"))
+			Expect(initContainer.ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(initContainer.Command).To(Equal([]string{"/usr/local/bin/init-entrypoint.sh"}))
+			Expect(initContainer.Resources).To(Equal(corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("2"),
+				},
+			}))
+			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
+				RunAsNonRoot: ptr.To(false),
+			}))
+			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
+			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
+			Expect(initContainer.VolumeMounts).To(Equal([]corev1.VolumeMount{
+				{
+					Name:      "crunchy-bin",
+					MountPath: "/opt/crunchy",
+				},
+			}))
+		})
+
+		It("should delete backup job labels and annotations", func() {
+			// Deleting job labels and annotations to update the job during reconcile
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&backupJob), &backupJob)).To(Succeed())
+			backupJob.Labels = nil
+			backupJob.Annotations = nil
+			Expect(k8sClient.Update(ctx, &backupJob)).To(Succeed())
+		})
+		It("update initContainer of the pgbackrest set", func() {
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).To(Succeed())
+
+			cr.Spec.Backups.PGBackRest.InitContainer = new(v1beta1.InitContainerSpec)
+			cr.Spec.Backups.PGBackRest.InitContainer.Image = "pgbackrest-image"
+			cr.Spec.Backups.PGBackRest.InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
+				RunAsNonRoot: ptr.To(false),
+				Privileged:   ptr.To(true),
+			}
+			cr.Spec.Backups.PGBackRest.InitContainer.Resources = &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			}
+			Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+		})
+		It("Controller should reconcile", func() {
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		})
+		It("should get replica-create backup job", func() {
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(ctx, jobList, client.InNamespace(ns))).To(Succeed())
+
+			Expect(len(jobList.Items)).To(Equal(1))
+
+			backupJob = jobList.Items[0]
+		})
+
+		It("should have updated init container in the backup job", func() {
+			var initContainer *corev1.Container
+			for _, c := range backupJob.Spec.Template.Spec.InitContainers {
+				if c.Name == "pgbackrest-init" {
+					initContainer = &c
+					break
+				}
+			}
+			Expect(initContainer).NotTo(BeNil())
+
+			Expect(initContainer.Image).To(Equal("pgbackrest-image"))
+			Expect(initContainer.ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(initContainer.Command).To(Equal([]string{"/usr/local/bin/init-entrypoint.sh"}))
+			Expect(initContainer.Resources).To(Equal(corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			}))
+			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
+				Privileged:   ptr.To(true),
+				RunAsNonRoot: ptr.To(false),
+			}))
+			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
+			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
+			Expect(initContainer.VolumeMounts).To(Equal([]corev1.VolumeMount{
+				{
+					Name:      "crunchy-bin",
+					MountPath: "/opt/crunchy",
+				},
+			}))
 		})
 	})
 })
