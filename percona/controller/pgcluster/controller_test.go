@@ -19,6 +19,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -1805,6 +1806,250 @@ var _ = Describe("CR Validations", Ordered, func() {
 					"PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true",
 				))
 			})
+		})
+	})
+})
+
+var _ = Describe("Init Container", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "init-container-test"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster", func() {
+		status := cr.Status
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+	})
+
+	Context("Reconcile controller", func() {
+		It("Controller should reconcile", func() {
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	crunchyCr := v1beta1.PostgresCluster{}
+
+	It("should get PostgresCluster", func() {
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), &crunchyCr)).Should(Succeed())
+	})
+
+	Context("check init containers in the statefulsets", func() {
+		stsList := &appsv1.StatefulSetList{}
+		It("should get statefulsets", func() {
+			selector, err := naming.AsSelector(metav1.LabelSelector{MatchLabels: map[string]string{naming.LabelCluster: crName, naming.LabelInstanceSet: "instance1"}})
+			Expect(err).To(Succeed())
+
+			Expect(k8sClient.List(ctx, stsList, client.InNamespace(ns), client.MatchingLabelsSelector{Selector: selector})).To(Succeed())
+
+			Expect(len(stsList.Items)).To(Equal(3))
+		})
+
+		It("should have default init container", func() {
+			Expect(len(stsList.Items)).To(Equal(3))
+
+			for _, sts := range stsList.Items {
+				var initContainer *corev1.Container
+				for _, c := range sts.Spec.Template.Spec.InitContainers {
+					if c.Name == "database-init" {
+						initContainer = &c
+						break
+					}
+				}
+				Expect(initContainer).NotTo(BeNil())
+
+				Expect(initContainer.Image).To(Equal("some-image"))
+				Expect(initContainer.ImagePullPolicy).To(Equal(corev1.PullAlways))
+				Expect(initContainer.Command).To(Equal([]string{"/usr/local/bin/init-entrypoint.sh"}))
+				Expect(initContainer.Resources).To(Equal(corev1.ResourceRequirements{}))
+				Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{
+							corev1.Capability("ALL"),
+						},
+					},
+					Privileged:               ptr.To(false),
+					RunAsNonRoot:             ptr.To(true),
+					ReadOnlyRootFilesystem:   ptr.To(true),
+					AllowPrivilegeEscalation: ptr.To(false),
+					SeccompProfile: &corev1.SeccompProfile{
+						Type: corev1.SeccompProfileTypeRuntimeDefault,
+					},
+				}))
+				Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
+				Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
+				Expect(initContainer.VolumeMounts).To(Equal([]corev1.VolumeMount{
+					{
+						Name:      "crunchy-bin",
+						MountPath: "/opt/crunchy",
+					},
+					{
+						Name:      "tmp",
+						MountPath: "/tmp",
+					},
+				}))
+			}
+		})
+		It("update global initContainer", func() {
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).To(Succeed())
+
+			cr.Spec.InitContainer.Image = "new-image"
+			cr.Spec.InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
+				RunAsNonRoot: ptr.To(false),
+			}
+			cr.Spec.InitContainer.Resources = &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("2"),
+				},
+			}
+			Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+		})
+		It("Controller should reconcile", func() {
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		})
+		It("should get statefulsets", func() {
+			selector, err := naming.AsSelector(metav1.LabelSelector{MatchLabels: map[string]string{naming.LabelCluster: crName, naming.LabelInstanceSet: "instance1"}})
+			Expect(err).To(Succeed())
+
+			Expect(k8sClient.List(ctx, stsList, client.InNamespace(ns), client.MatchingLabelsSelector{Selector: selector})).To(Succeed())
+
+			Expect(len(stsList.Items)).To(Equal(3))
+		})
+		It("should have updated init container", func() {
+			Expect(len(stsList.Items)).To(Equal(3))
+
+			for _, sts := range stsList.Items {
+				var initContainer *corev1.Container
+				for _, c := range sts.Spec.Template.Spec.InitContainers {
+					if c.Name == "database-init" {
+						initContainer = &c
+						break
+					}
+				}
+				Expect(initContainer).NotTo(BeNil())
+
+				Expect(initContainer.Image).To(Equal("new-image"))
+				Expect(initContainer.ImagePullPolicy).To(Equal(corev1.PullAlways))
+				Expect(initContainer.Command).To(Equal([]string{"/usr/local/bin/init-entrypoint.sh"}))
+				Expect(initContainer.Resources).To(Equal(corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("2"),
+					},
+				}))
+				Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
+					RunAsNonRoot: ptr.To(false),
+				}))
+				Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
+				Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
+				Expect(initContainer.VolumeMounts).To(Equal([]corev1.VolumeMount{
+					{
+						Name:      "crunchy-bin",
+						MountPath: "/opt/crunchy",
+					},
+					{
+						Name:      "tmp",
+						MountPath: "/tmp",
+					},
+				}))
+			}
+		})
+		It("update initContainer of instance", func() {
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).To(Succeed())
+
+			cr.Spec.InstanceSets[0].InitContainer = new(v1beta1.InitContainerSpec)
+			cr.Spec.InstanceSets[0].InitContainer.Image = "instance-image"
+			cr.Spec.InstanceSets[0].InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
+				RunAsNonRoot: ptr.To(true),
+			}
+			cr.Spec.InstanceSets[0].InitContainer.Resources = &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("3"),
+				},
+			}
+			Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+		})
+		It("Controller should reconcile", func() {
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		})
+		It("should get statefulsets", func() {
+			selector, err := naming.AsSelector(metav1.LabelSelector{MatchLabels: map[string]string{naming.LabelCluster: crName, naming.LabelInstanceSet: "instance1"}})
+			Expect(err).To(Succeed())
+
+			Expect(k8sClient.List(ctx, stsList, client.InNamespace(ns), client.MatchingLabelsSelector{Selector: selector})).To(Succeed())
+
+			Expect(len(stsList.Items)).To(Equal(3))
+		})
+		It("should have updated init container", func() {
+			Expect(len(stsList.Items)).To(Equal(3))
+
+			for _, sts := range stsList.Items {
+				var initContainer *corev1.Container
+				for _, c := range sts.Spec.Template.Spec.InitContainers {
+					if c.Name == "database-init" {
+						initContainer = &c
+						break
+					}
+				}
+				Expect(initContainer).NotTo(BeNil())
+
+				Expect(initContainer.Image).To(Equal("instance-image"))
+				Expect(initContainer.ImagePullPolicy).To(Equal(corev1.PullAlways))
+				Expect(initContainer.Command).To(Equal([]string{"/usr/local/bin/init-entrypoint.sh"}))
+				Expect(initContainer.Resources).To(Equal(corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("3"),
+					},
+				}))
+				Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
+					RunAsNonRoot: ptr.To(true),
+				}))
+				Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
+				Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
+				Expect(initContainer.VolumeMounts).To(Equal([]corev1.VolumeMount{
+					{
+						Name:      "crunchy-bin",
+						MountPath: "/opt/crunchy",
+					},
+					{
+						Name:      "tmp",
+						MountPath: "/tmp",
+					},
+				}))
+			}
 		})
 	})
 })
