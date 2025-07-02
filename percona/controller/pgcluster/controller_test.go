@@ -1,6 +1,3 @@
-//go:build envtest
-// +build envtest
-
 package pgcluster
 
 import (
@@ -1856,12 +1853,6 @@ var _ = Describe("Init Container", Ordered, func() {
 		})
 	})
 
-	crunchyCr := v1beta1.PostgresCluster{}
-
-	It("should get PostgresCluster", func() {
-		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), &crunchyCr)).Should(Succeed())
-	})
-
 	Context("check init containers in the statefulsets", func() {
 		stsList := &appsv1.StatefulSetList{}
 		It("should get statefulsets", func() {
@@ -1874,8 +1865,6 @@ var _ = Describe("Init Container", Ordered, func() {
 		})
 
 		It("should have default init container", func() {
-			Expect(len(stsList.Items)).To(Equal(3))
-
 			for _, sts := range stsList.Items {
 				var initContainer *corev1.Container
 				for _, c := range sts.Spec.Template.Spec.InitContainers {
@@ -1893,7 +1882,7 @@ var _ = Describe("Init Container", Ordered, func() {
 				Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{
-							corev1.Capability("ALL"),
+							"ALL",
 						},
 					},
 					Privileged:               ptr.To(false),
@@ -1947,8 +1936,6 @@ var _ = Describe("Init Container", Ordered, func() {
 			Expect(len(stsList.Items)).To(Equal(3))
 		})
 		It("should have updated init container", func() {
-			Expect(len(stsList.Items)).To(Equal(3))
-
 			for _, sts := range stsList.Items {
 				var initContainer *corev1.Container
 				for _, c := range sts.Spec.Template.Spec.InitContainers {
@@ -2014,8 +2001,6 @@ var _ = Describe("Init Container", Ordered, func() {
 			Expect(len(stsList.Items)).To(Equal(3))
 		})
 		It("should have updated init container", func() {
-			Expect(len(stsList.Items)).To(Equal(3))
-
 			for _, sts := range stsList.Items {
 				var initContainer *corev1.Container
 				for _, c := range sts.Spec.Template.Spec.InitContainers {
