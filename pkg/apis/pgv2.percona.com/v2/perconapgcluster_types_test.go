@@ -122,21 +122,29 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 	ctx := context.Background()
 
 	tests := map[string]struct {
-		name                 string
-		perconaPGCluster     *PerconaPGCluster
-		inputPostgresCluster *crunchyv1beta1.PostgresCluster
-		expectedError        bool
-		validateResult       func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster)
+		name                     string
+		expectedPerconaPGCluster *PerconaPGCluster
+		inputPostgresCluster     *crunchyv1beta1.PostgresCluster
+		expectedError            bool
+		assertClusterFunc        func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, expected *PerconaPGCluster)
 	}{
 		"creates new PostgresCluster when nil input": {
-			perconaPGCluster: &PerconaPGCluster{
+			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: "test-namespace",
 				},
 				Spec: PerconaPGClusterSpec{
-					CRVersion:       "2.5.0",
+					CRVersion:       "2.8.0",
 					PostgresVersion: 15,
+					Expose: &ServiceExpose{
+						Type:              "LoadBalancer",
+						LoadBalancerClass: &[]string{"someloadbalancerclass"}[0],
+					},
+					ExposeReplicas: &ServiceExpose{
+						Type:              "LoadBalancer",
+						LoadBalancerClass: &[]string{"someloadbalancerclass"}[0],
+					},
 					InstanceSets: PGInstanceSets{
 						{
 							Name:     "instance1",
@@ -155,16 +163,27 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					},
 				},
 			},
-			validateResult: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
-				assert.Equal(t, result.Name, original.Name)
-				assert.Equal(t, result.Namespace, original.Namespace)
-				assert.DeepEqual(t, result.Finalizers, []string{naming.Finalizer})
-				assert.Equal(t, result.Spec.PostgresVersion, original.Spec.PostgresVersion)
-				assert.Equal(t, result.Labels[LabelOperatorVersion], original.Spec.CRVersion)
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, expected *PerconaPGCluster) {
+				assert.Equal(t, actual.Name, expected.Name)
+				assert.Equal(t, actual.Namespace, expected.Namespace)
+				assert.DeepEqual(t, actual.Finalizers, []string{naming.Finalizer})
+				assert.Equal(t, actual.Spec.PostgresVersion, expected.Spec.PostgresVersion)
+				assert.Equal(t, actual.Labels[LabelOperatorVersion], expected.Spec.CRVersion)
+				assert.Equal(t, len(actual.Spec.InstanceSets), 1)
+				assert.Equal(t, len(actual.Spec.InstanceSets), len(expected.Spec.InstanceSets))
+				assert.Equal(t, actual.Spec.InstanceSets[0].Name, expected.Spec.InstanceSets[0].Name)
+
+				assert.Equal(t, actual.Spec.Service.Type, expected.Spec.Expose.Type)
+				assert.Assert(t, actual.Spec.Service.LoadBalancerClass != nil)
+				assert.Equal(t, actual.Spec.Service.LoadBalancerClass, expected.Spec.Expose.LoadBalancerClass)
+
+				assert.Equal(t, actual.Spec.ReplicaService.Type, expected.Spec.ExposeReplicas.Type)
+				assert.Assert(t, actual.Spec.ReplicaService.LoadBalancerClass != nil)
+				assert.Equal(t, actual.Spec.ReplicaService.LoadBalancerClass, expected.Spec.ExposeReplicas.LoadBalancerClass)
 			},
 		},
 		"updates existing PostgresCluster": {
-			perconaPGCluster: &PerconaPGCluster{
+			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: "test-namespace",
@@ -201,20 +220,19 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			inputPostgresCluster: &crunchyv1beta1.PostgresCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "existing-cluster",
-					Namespace: "test-namespace", // Same namespace to avoid cross-namespace error
+					Namespace: "test-namespace",
 				},
 			},
-			expectedError: false,
-			validateResult: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
-				assert.Equal(t, result.Spec.PostgresVersion, original.Spec.PostgresVersion)
-				assert.Equal(t, result.Spec.Port, original.Spec.Port)
-				assert.Equal(t, result.Spec.TLSOnly, original.Spec.TLSOnly)
-				assert.Equal(t, result.Labels["test-label"], "test-value")
-				assert.Equal(t, result.Labels[LabelOperatorVersion], original.Spec.CRVersion)
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, expected *PerconaPGCluster) {
+				assert.Equal(t, actual.Spec.PostgresVersion, expected.Spec.PostgresVersion)
+				assert.Equal(t, actual.Spec.Port, expected.Spec.Port)
+				assert.Equal(t, actual.Spec.TLSOnly, expected.Spec.TLSOnly)
+				assert.Equal(t, actual.Labels["test-label"], "test-value")
+				assert.Equal(t, actual.Labels[LabelOperatorVersion], expected.Spec.CRVersion)
 			},
 		},
 		"handles PMM enabled scenario": {
-			perconaPGCluster: &PerconaPGCluster{
+			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: "test-namespace",
@@ -244,14 +262,9 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					},
 				},
 			},
-			inputPostgresCluster: nil,
-			expectedError:        false,
-			validateResult: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
-				// Extensions are set from BuiltIn values which are defaulted.
-				// PMM logic sets the value, but it gets overwritten by BuiltIn defaults
-				// So we check the PMM behavior through monitoring user presence
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
 				hasMonitoringUser := false
-				for _, user := range result.Spec.Users {
+				for _, user := range actual.Spec.Users {
 					if user.Name == UserMonitoring {
 						hasMonitoringUser = true
 						break
@@ -261,7 +274,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			},
 		},
 		"handles AutoCreateUserSchema annotation": {
-			perconaPGCluster: &PerconaPGCluster{
+			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: "test-namespace",
@@ -288,14 +301,12 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					},
 				},
 			},
-			inputPostgresCluster: nil,
-			expectedError:        false,
-			validateResult: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
-				assert.Equal(t, result.Annotations[naming.AutoCreateUserSchemaAnnotation], "true")
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				assert.Equal(t, actual.Annotations[naming.AutoCreateUserSchemaAnnotation], "true")
 			},
 		},
 		"filters out reserved monitoring user": {
-			perconaPGCluster: &PerconaPGCluster{
+			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: "test-namespace",
@@ -305,7 +316,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					PostgresVersion: 15,
 					Users: []crunchyv1beta1.PostgresUserSpec{
 						{Name: "regular-user"},
-						{Name: UserMonitoring}, // This should be filtered out
+						{Name: UserMonitoring},
 						{Name: "another-user"},
 					},
 					InstanceSets: PGInstanceSets{
@@ -326,10 +337,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					},
 				},
 			},
-			inputPostgresCluster: nil,
-			expectedError:        false,
-			validateResult: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
-				// Should only have 2 users (regular-user and another-user)
+			assertClusterFunc: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
 				assert.Equal(t, len(result.Spec.Users), 2)
 				userNames := make([]string, len(result.Spec.Users))
 				for i, user := range result.Spec.Users {
@@ -344,10 +352,9 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
-			// Apply defaults to the test cluster
-			tt.perconaPGCluster.Default()
+			tt.expectedPerconaPGCluster.Default()
 
-			result, err := tt.perconaPGCluster.ToCrunchy(ctx, tt.inputPostgresCluster, scheme)
+			crunchyCluster, err := tt.expectedPerconaPGCluster.ToCrunchy(ctx, tt.inputPostgresCluster, scheme)
 
 			if tt.expectedError {
 				assert.Assert(t, err != nil)
@@ -355,10 +362,10 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			}
 
 			assert.NilError(t, err)
-			assert.Assert(t, result != nil)
+			assert.Assert(t, crunchyCluster != nil)
 
-			if tt.validateResult != nil {
-				tt.validateResult(t, result, tt.perconaPGCluster)
+			if tt.assertClusterFunc != nil {
+				tt.assertClusterFunc(t, crunchyCluster, tt.expectedPerconaPGCluster)
 			}
 		})
 	}
