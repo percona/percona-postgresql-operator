@@ -216,7 +216,7 @@ done
 	if post250 {
 		script = fmt.Sprintf(`
 # Parameters for curl when managing autogrow annotation.
-APISERVER="https://kubernetes.default.svc"
+APISERVER="https://${KUBERNETES_SERVICE_HOST}"
 SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
 NAMESPACE=$(cat ${SERVICEACCOUNT}/namespace)
 TOKEN=$(cat ${SERVICEACCOUNT}/token)
