@@ -3,6 +3,7 @@ package watcher
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -167,6 +168,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 
 	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
 	if err != nil {
+		log.V(1).Info("failed to get primary pod", "err", err)
 		return nil, PrimaryPodNotFound
 	}
 
@@ -203,7 +205,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (time.Time, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
 	if err != nil {
-		return time.Time{}, PrimaryPodNotFound
+		return time.Time{}, fmt.Errorf("%w: %v", PrimaryPodNotFound, err)
 	}
 
 	pgbackrestInfo, err := pgbackrest.GetInfo(ctx, primary, backup.Spec.RepoName)
