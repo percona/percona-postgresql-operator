@@ -168,7 +168,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 
 	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
 	if err != nil {
-		log.V(1).Info("failed to get primary pod", "err", err)
+		log.Error(err, "failed to get primary pod")
 		return nil, PrimaryPodNotFound
 	}
 
