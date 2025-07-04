@@ -2,8 +2,6 @@ package v2
 
 import (
 	"context"
-	"fmt"
-
 	gover "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -180,7 +178,6 @@ type PerconaPGClusterSpec struct {
 func (cr *PerconaPGCluster) Default() {
 	if len(cr.Spec.CRVersion) == 0 {
 		cr.Spec.CRVersion = version.Version()
-		fmt.Printf("Default CRVersion set to: %s\n", cr.Spec.CRVersion)
 	}
 
 	for i := range cr.Spec.InstanceSets {
