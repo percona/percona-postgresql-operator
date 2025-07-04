@@ -93,6 +93,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 			Expect(cr.Status.Postgres.Ready).Should(Equal(int32(3)))
 			Expect(cr.Status.Postgres.Size).Should(Equal(int32(4)))
 			Expect(cr.Status.Postgres.InstanceSets).Should(HaveLen(2))
+			Expect(cr.Status.ObservedGeneration).Should(Equal(int64(1)))
 			Expect(cr.Status.Postgres.InstanceSets).Should(ContainElement(gs.MatchFields(gs.IgnoreExtras, gs.Fields{
 				"Name":  Equal("instance1"),
 				"Ready": Equal(int32(0)),
@@ -138,6 +139,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 				return err == nil
 			}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 
+			Expect(cr.Status.ObservedGeneration).Should(Equal(int64(1)))
 			Expect(cr.Status.PGBouncer.Ready).Should(Equal(int32(0)))
 			Expect(cr.Status.PGBouncer.Size).Should(Equal(int32(1)))
 		})
@@ -294,6 +296,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 				Expect(cr.Status.Host).Should(Equal(pgBouncerSVC.Name + "." + ns + ".svc"))
+				Expect(cr.Status.ObservedGeneration).Should(Equal(int64(2)))
 			})
 		})
 
@@ -330,6 +333,8 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 				Expect(cr.Status.Host).Should(Equal("22.22.22.22"))
+
+				Expect(cr.Status.ObservedGeneration).Should(Equal(int64(3)))
 			})
 		})
 	})
@@ -393,6 +398,7 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 
 				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
 				Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+				Expect(cr.Status.ObservedGeneration).Should(Equal(int64(1)))
 			})
 		})
 

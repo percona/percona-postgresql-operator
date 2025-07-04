@@ -122,6 +122,8 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 
+		cluster.Status.ObservedGeneration = cluster.Generation
+
 		updateConditions(cluster, status)
 
 		return r.Client.Status().Update(ctx, cluster)
