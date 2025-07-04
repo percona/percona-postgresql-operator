@@ -5644,6 +5644,9 @@ spec:
                   Version of the operator. Update this to new version after operator
                   upgrade to apply changes to Kubernetes objects. Default is the latest
                   version.
+                enum:
+                - 2.7.0
+                pattern: ^$|^\d+\.\d+\.\d+$
                 type: string
               dataSource:
                 description: Specifies a data source for bootstrapping the PostgreSQL
