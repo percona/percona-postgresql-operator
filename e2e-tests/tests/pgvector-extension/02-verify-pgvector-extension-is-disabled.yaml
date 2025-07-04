@@ -12,15 +12,7 @@ commands:
         "postgres:$(get_psql_user_pass pgvector-extension-pguser-postgres)@$(get_psql_user_host pgvector-extension-pguser-postgres)/postgres")
 
       if [[ "$result" = *"vector"* ]]; then
-        echo "pgvector extension is enabled"
-      else
-        echo "pgvector extension is not enabled"
+        echo "pgvector extension is not disabled by default"
         exit 1
       fi
-
-      echo "Testing extension"
-      run_psql_local \
-        "SELECT '\''[1,2,3]'\''::vector <-> '\''[3,2,1]'\''::vector;" \
-        "postgres:$(get_psql_user_pass pgvector-extension-pguser-postgres)@$(get_psql_user_host pgvector-extension-pguser-postgres)/postgres"
-
     timeout: 360

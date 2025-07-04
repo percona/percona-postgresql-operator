@@ -11,21 +11,24 @@ commands:
       wait_seconds=5
 
       for i in $(seq 1 $retries); do
-        echo "Attempt $i of $retries..."
 
         result=$(run_psql_local \
           "SELECT * FROM pg_extension WHERE extname = '\''vector'\'';" \
           "postgres:$(get_psql_user_pass pgvector-extension-pguser-postgres)@$(get_psql_user_host pgvector-extension-pguser-postgres)/postgres")
 
-        if [[ "$result" != *"vector"* ]]; then
-          echo "pgvector extension is disabled"
+        if [[ "$result" = *"vector"* ]]; then
+          echo "pgvector extension is enabled, verifying extension"
+          run_psql_local \
+            "SELECT '\''[1,2,3]'\''::vector <-> '\''[3,2,1]'\''::vector;" \
+            "postgres:$(get_psql_user_pass pgvector-extension-pguser-postgres)@$(get_psql_user_host pgvector-extension-pguser-postgres)/postgres"
+
           exit 0
         fi
 
-        echo "pgvector extension still present, retrying in $wait_seconds seconds..."
+        echo "pgvector extension not enabled, retrying in $wait_seconds seconds..."
         sleep $wait_seconds
       done
-
-      echo "pgvector extension was not properly disabled"
+      
+      echo "pgvector extension is not properly enabled"
       exit 1
     timeout: 360

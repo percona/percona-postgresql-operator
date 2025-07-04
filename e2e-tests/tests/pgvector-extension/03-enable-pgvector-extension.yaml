@@ -9,4 +9,5 @@ commands:
       source ../../functions
 
       get_cr "pgvector-extension" ${RANDOM} \
+        | yq '.spec.extensions.builtin.pgvector=true' \
         | kubectl -n "${NAMESPACE}" apply -f -
