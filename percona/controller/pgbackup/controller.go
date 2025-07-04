@@ -490,7 +490,11 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 			return nil
 		}
 	}
-	return errors.New("backup annotations are not found in pgbackrest")
+	log := logging.FromContext(ctx)
+	// We should log error here instead of returning it
+	// to allow deletion of the backup in the Starting/Running state
+	log.Error(nil, "backup annotations are not found in pgbackrest")
+	return nil
 }
 
 func finishBackup(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup, job *batchv1.Job) (*reconcile.Result, error) {
