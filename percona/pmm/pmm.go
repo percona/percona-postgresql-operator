@@ -224,7 +224,7 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: agentPrerunScript(pgc.Spec.PMM.QuerySource, pgc),
+				Value: agentPrerunScript(pgc, false),
 			},
 			{
 				Name:  "PMM_AGENT_PATHS_TEMPDIR",
@@ -407,7 +407,7 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: agentPrerunScript(pgc.Spec.PMM.QuerySource, pgc),
+				Value: agentPrerunScript(pgc, true),
 			},
 			{
 				Name:  "PMM_AGENT_PATHS_TEMPDIR",
@@ -419,7 +419,7 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 	return container
 }
 
-func agentPrerunScript(querySource v2.PMMQuerySource, pgc *v2.PerconaPGCluster) string {
+func agentPrerunScript(pgc *v2.PerconaPGCluster, isPMM3 bool) string {
 	wait := "pmm-admin status --wait=10s"
 	annotate := "pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'"
 
@@ -435,7 +435,7 @@ func agentPrerunScript(querySource v2.PMMQuerySource, pgc *v2.PerconaPGCluster) 
 		"--skip-connection-check",
 		"--metrics-mode=push",
 		"--service-name=$(PMM_AGENT_SETUP_NODE_NAME)",
-		fmt.Sprintf("--query-source=%s", querySource),
+		fmt.Sprintf("--query-source=%s", pgc.Spec.PMM.QuerySource),
 	}
 
 	if pgc.CompareVersion("2.7.0") >= 0 {
@@ -448,6 +448,12 @@ func agentPrerunScript(querySource v2.PMMQuerySource, pgc *v2.PerconaPGCluster) 
 		)
 	}
 	addService := fmt.Sprintf("pmm-admin add postgresql %s", strings.Join(addServiceArgs, " "))
+
+	if pgc.CompareVersion("2.8.0") >= 0 && isPMM3 {
+		addPatroniMetrics := fmt.Sprintf(
+			"pmm-admin add external --scheme=https --listen-port=%d --tls-skip-verify --service-name=$(PMM_AGENT_SETUP_NODE_NAME)-patroni-external", pgc.Spec.Patroni.GetPort())
+		return fmt.Sprintf("%s; %s; %s; %s", wait, addService, addPatroniMetrics, annotate)
+	}
 
 	return wait + "; " + addService + "; " + annotate
 }

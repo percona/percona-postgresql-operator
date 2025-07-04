@@ -10,5 +10,6 @@ commands:
 
       get_cr \
         | yq eval '.spec.pmm.enabled=true' - \
+        | yq eval '.spec.crVersion="2.8.0"' - \
         | yq eval ".spec.pmm.image=\"${IMAGE_PMM3_CLIENT}\"" - \
         | kubectl -n "${NAMESPACE}" apply -f -
