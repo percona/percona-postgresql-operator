@@ -165,6 +165,7 @@ spec:
 #    labels:
 #      my-label: value2
 #    type: LoadBalancer
+#    loadBalancerClass: "eks.amazonaws.com/nlb"
 #    loadBalancerSourceRanges:
 #      - 10.0.0.0/8
 #  exposeReplicas:
@@ -173,6 +174,7 @@ spec:
 #    labels:
 #      my-label: value2
 #    type: LoadBalancer
+#    loadBalancerClass: "eks.amazonaws.com/nlb"
 #    loadBalancerSourceRanges:
 #      - 10.0.0.0/8
 
@@ -329,6 +331,7 @@ spec:
 #        labels:
 #          my-label: value2
 #        type: LoadBalancer
+#        loadBalancerClass: "eks.amazonaws.com/nlb"
 #        loadBalancerSourceRanges:
 #          - 10.0.0.0/8
 #

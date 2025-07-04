@@ -40,6 +40,14 @@ type ServiceSpec struct {
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	Type string `json:"type"`
 
+	// LoadBalancerClass specifies the class of the load balancer implementation
+	// to be used. This field is supported for Service Type LoadBalancer only.
+	//
+	// More info:
+	// https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
+	// +optional
+	LoadBalancerClass *string `json:"loadBalancerClass,omitempty"`
+
 	// LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
 	// This field will be ignored if the cloud-provider does not support the feature.
 	// +optional
