@@ -216,7 +216,7 @@ done
 	if post250 {
 		script = fmt.Sprintf(`
 # Parameters for curl when managing autogrow annotation.
-APISERVER="https://kubernetes.default.svc"
+APISERVER="https://${KUBERNETES_SERVICE_HOST}"
 SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
 NAMESPACE=$(cat ${SERVICEACCOUNT}/namespace)
 TOKEN=$(cat ${SERVICEACCOUNT}/token)
@@ -246,7 +246,7 @@ while read -r -t 5 -u "${fd}" ||:; do
     newSize="$(((sizeInt / 2)+sizeInt))"
     newSizeMi="${newSize}Mi"
     d='[{"op": "add", "path": "/metadata/annotations/suggested-pgdata-pvc-size", "value": "'"$newSizeMi"'"}]'
-    curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -XPATCH "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}?fieldManager=kubectl-annotate" -H "Content-Type: application/json-patch+json" --data "$d"
+    curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -XPATCH "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${hostname}?fieldManager=kubectl-annotate" -H "Content-Type: application/json-patch+json" --data "$d"
   fi
 done
 `,
