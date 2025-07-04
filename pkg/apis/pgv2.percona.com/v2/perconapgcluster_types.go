@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 
 	gover "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
@@ -52,6 +53,8 @@ type PerconaPGClusterSpec struct {
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
 	// +optional
+	// +kubebuilder:validation:Pattern=`^$|^\d+\.\d+\.\d+$`
+	// +kubebuilder:validation:Enum="2.7.0"
 	CRVersion string `json:"crVersion,omitempty"`
 
 	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
@@ -177,6 +180,7 @@ type PerconaPGClusterSpec struct {
 func (cr *PerconaPGCluster) Default() {
 	if len(cr.Spec.CRVersion) == 0 {
 		cr.Spec.CRVersion = version.Version()
+		fmt.Printf("Default CRVersion set to: %s\n", cr.Spec.CRVersion)
 	}
 
 	for i := range cr.Spec.InstanceSets {
