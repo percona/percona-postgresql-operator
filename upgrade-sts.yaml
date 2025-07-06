@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+ name: pg-upgrade
+spec:
+ replicas: 1
+ selector:
+   matchLabels:
+     app: pg-upgrade
+ template:
+   metadata:
+     labels:
+       app: pg-upgrade
+   spec:
+     securityContext:
+       fsGroup: 26
+       fsGroupChangePolicy: OnRootMismatch
+     containers:
+     - name: database
+       image: perconalab/percona-postgresql-operator:k8spg-784-upgrade-1
+       command:
+       - sleep
+       - infinity
+       volumeMounts:
+       - name: pgdata
+         mountPath: /pgdata
+       - name: cert-volume
+         mountPath: /pgconf/tls
+         readOnly: true
+     volumes:
+     - name: pgdata
+       persistentVolumeClaim:
+         claimName: cluster1-upgrade1-tz96-pgdata
+     - name: cert-volume
+       projected:
+         defaultMode: 384
+         sources:
+         - secret:
+             items:
+             - key: tls.crt
+               path: tls.crt
+             - key: tls.key
+               path: tls.key
+             - key: ca.crt
+               path: ca.crt
+             name: cluster1-cluster-cert
+         - secret:
+             items:
+             - key: tls.crt
+               path: replication/tls.crt
+             - key: tls.key
+               path: replication/tls.key
+             - key: ca.crt
+               path: replication/ca.crt
+             name: cluster1-replication-cert
+     - name: pgbackrest-config
+       projected:
+         defaultMode: 420
+         sources:
+         - configMap:
+             items:
+             - key: pgbackrest_instance.conf
+               path: pgbackrest_instance.conf
+             - key: config-hash
+               path: config-hash
+             - key: pgbackrest-server.conf
+               path: ~postgres-operator_server.conf
+             name: cluster1-pgbackrest-config
+         - secret:
+             items:
+             - key: pgbackrest.ca-roots
+               path: ~postgres-operator/tls-ca.crt
+             - key: pgbackrest-client.crt
+               path: ~postgres-operator/client-tls.crt
+             - key: pgbackrest-client.key
+               mode: 384
+               path: ~postgres-operator/client-tls.key
+             name: cluster1-pgbackrest

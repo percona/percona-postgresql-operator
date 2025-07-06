@@ -4,7 +4,7 @@ metadata:
   name: cluster1-15-to-16
 spec:
   postgresClusterName: cluster1
-  image: perconalab/percona-postgresql-operator:main-upgrade
+  image: perconalab/percona-postgresql-operator:k8spg-784-upgrade-1
   fromPostgresVersion: 16
   toPostgresVersion: 17
   toPostgresImage: perconalab/percona-postgresql-operator:main-ppg17-postgres

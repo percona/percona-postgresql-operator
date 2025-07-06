@@ -517,6 +517,8 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		}
 	}
 
+	log := logging.FromContext(context.Background())
+
 	// K8SPG-712: Allow overriding default configurations
 	configMapPredicate := builder.WithPredicates(predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
@@ -530,6 +532,27 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		},
 	})
 
+	stsPredicate := builder.WithPredicates(predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			sts, ok := e.ObjectNew.(*appsv1.StatefulSet)
+			log.Info("StatefulSetUpdateEvent 1", "ok", ok)
+			if !ok {
+				return true
+			}
+			// Skip reconciliation if the StatefulSet has the specified annotation
+			_, hasAnnotation := sts.Annotations[naming.SkipReconciliationAnnotation]
+			log.Info("StatefulSetUpdateEvent 2",
+				"hasAnnotation", hasAnnotation,
+				"name", sts.Name,
+				"image", sts.Spec.Template.Spec.Containers[0].Image,
+				"command", sts.Spec.Template.Spec.Containers[0].Command,
+				"liveness", sts.Spec.Template.Spec.Containers[0].LivenessProbe,
+				"readiness", sts.Spec.Template.Spec.Containers[0].ReadinessProbe,
+			)
+			return !hasAnnotation
+		},
+	})
+
 	return builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
 		Owns(&corev1.ConfigMap{}, configMapPredicate). // K8SPG-712
@@ -539,7 +562,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&appsv1.Deployment{}).
-		Owns(&appsv1.StatefulSet{}).
+		Owns(&appsv1.StatefulSet{}, stsPredicate). // K8SPG-784
 		Owns(&batchv1.Job{}).
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).

@@ -581,7 +581,7 @@ spec:
 #    - pgbackrest
 #    - basebackup
 
-#  extensions:
+  extensions:
 #    image: perconalab/percona-postgresql-operator:main
 #    imagePullPolicy: Always
 #    storage:
@@ -591,12 +591,12 @@ spec:
 #      endpoint: s3.eu-central-1.amazonaws.com
 #      secret:
 #        name: cluster1-extensions-secret
-#    builtin:
-#      pg_stat_monitor: true
-#      pg_stat_statements: false
-#      pg_audit: true
-#      pgvector: false
-#      pg_repack: false
+    builtin:
+      pg_stat_monitor: false
+      pg_stat_statements: false
+      pg_audit: false
+      pgvector: false
+      pg_repack: false
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1

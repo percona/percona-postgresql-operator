@@ -2,25 +2,27 @@ package pgupgrade
 
 import (
 	"context"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/percona/extensions"
+	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -38,6 +40,7 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGUpgrade{}).Complete(r)
 }
 
+// +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/status,verbs=patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/finalizers,verbs=patch;update
@@ -65,189 +68,225 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 		},
 	}
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgCluster), pgCluster); err != nil {
-		return reconcile.Result{}, errors.Wrapf(err, "get PerconaPGCluster %s/%s", perconaPGUpgrade.Namespace, perconaPGUpgrade.Spec.PostgresClusterName)
+		return reconcile.Result{}, errors.Wrapf(
+			err, "get PerconaPGCluster %s/%s",
+			perconaPGUpgrade.Namespace,
+			perconaPGUpgrade.Spec.PostgresClusterName,
+		)
 	}
 
-	pgUpgrade := &crunchyv1beta1.PGUpgrade{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      perconaPGUpgrade.Name,
-			Namespace: perconaPGUpgrade.Namespace,
-		},
-	}
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgUpgrade), pgUpgrade); err != nil {
-		if k8serrors.IsNotFound(err) {
-			if err := controllerutil.SetControllerReference(perconaPGUpgrade, pgUpgrade, r.Client.Scheme()); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "set controller reference")
-			}
-
-			if err := r.createPGUpgrade(ctx, pgCluster, pgUpgrade, perconaPGUpgrade); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "create PGUpgrade")
-			}
-
-			log.Info("PGUpgrade created", "cluster", pgCluster.Name)
-
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
-		}
-
-		return reconcile.Result{}, errors.Wrapf(err, "get PGUpgrade %s/%s", pgUpgrade.Namespace, pgUpgrade.Name)
+	if pgCluster.Status.State != pgv2.AppStateReady {
+		return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	defer func() {
-		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			perconaPGUpgrade.Status.Conditions = pgUpgrade.Status.Conditions
-			perconaPGUpgrade.Status.ObservedGeneration = perconaPGUpgrade.Generation
-
-			return r.Client.Status().Update(ctx, perconaPGUpgrade)
-		})
-		if err != nil {
-			log.Error(err, "update PerconaPGUpgrade status")
-		}
-	}()
-
-	if cond := meta.FindStatusCondition(pgUpgrade.Status.Conditions, "Progressing"); cond != nil {
-		log.Info("PGUpgrade progressing", "reason", cond.Reason, "message", cond.Message, "type", cond.Type, "status", cond.Status)
-		if cond.Status == metav1.ConditionTrue {
-			log.Info("PGUpgrade in progress", "cluster", pgCluster.Name)
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
-		}
-
-		switch cond.Reason {
-		case "PGUpgradeInvalidForCluster":
-			log.Info("PGUpgrade invalid for cluster", "cluster", pgCluster.Name)
-			return reconcile.Result{}, nil
-		case "PGClusterNotShutdown":
-			log.Info("Pausing PGCluster", "PGCluster", pgCluster.Name)
-			if err := r.pauseCluster(ctx, pgCluster); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "pause PGCluster")
-			}
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
-		case "PGClusterMissingRequiredAnnotation":
-			log.Info("Annotating PGCluster", "cluster", pgCluster.Name)
-			if err := r.annotateCluster(ctx, pgCluster, perconaPGUpgrade); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "annotate PGCluster")
-			}
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
-		}
+	if err := r.doReconcile(ctx, pgCluster, perconaPGUpgrade); err != nil {
+		return reconcile.Result{}, err
 	}
 
-	if cond := meta.FindStatusCondition(pgUpgrade.Status.Conditions, "Succeeded"); cond != nil {
-		log.Info("PGUpgrade succeeded", "reason", cond.Reason, "message", cond.Message, "type", cond.Type, "status", cond.Status)
-		switch cond.Reason {
-		case "PGUpgradeFailed":
-			log.Info("PGUpgrade failed", "cluster", pgCluster.Name)
-			return reconcile.Result{}, nil
-		case "PGUpgradeSucceeded":
-			if err := r.finalizeUpgrade(ctx, pgCluster, perconaPGUpgrade); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "finalize upgrade")
-			}
-			log.Info("Resuming PGCluster", "PGCluster", pgCluster.Name)
-			if err := r.resumeCluster(ctx, pgCluster); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "resume PGCluster")
-			}
+	log.Info("PerconaPGUpgrade status", "status", perconaPGUpgrade.Status)
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		local := &pgv2.PerconaPGUpgrade{}
+		if err := r.Client.Get(ctx, request.NamespacedName, local); err != nil {
+			return err
 		}
+
+		local.Status = perconaPGUpgrade.Status
+
+		return r.Client.Status().Update(ctx, local)
+	})
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "update status")
 	}
 
 	return reconcile.Result{}, nil
 }
 
-func (r *PGUpgradeReconciler) createPGUpgrade(ctx context.Context, cluster *pgv2.PerconaPGCluster, pgUpgrade *crunchyv1beta1.PGUpgrade, perconaPGUpgrade *pgv2.PerconaPGUpgrade) error {
-	pgUpgrade.Spec.Metadata = perconaPGUpgrade.Spec.Metadata
-	pgUpgrade.Spec.PostgresClusterName = perconaPGUpgrade.Spec.PostgresClusterName
-
-	pgUpgrade.Spec.Image = perconaPGUpgrade.Spec.Image
-	pgUpgrade.Spec.ImagePullPolicy = perconaPGUpgrade.Spec.ImagePullPolicy
-	pgUpgrade.Spec.ImagePullSecrets = perconaPGUpgrade.Spec.ImagePullSecrets
-
-	pgUpgrade.Spec.FromPostgresVersion = perconaPGUpgrade.Spec.FromPostgresVersion
-	pgUpgrade.Spec.ToPostgresVersion = perconaPGUpgrade.Spec.ToPostgresVersion
-	pgUpgrade.Spec.ToPostgresImage = perconaPGUpgrade.Spec.ToPostgresImage
-
-	pgUpgrade.Spec.Resources = perconaPGUpgrade.Spec.Resources
-	pgUpgrade.Spec.Affinity = perconaPGUpgrade.Spec.Affinity
-	pgUpgrade.Spec.PriorityClassName = perconaPGUpgrade.Spec.PriorityClassName
-	pgUpgrade.Spec.Tolerations = perconaPGUpgrade.Spec.Tolerations
-	pgUpgrade.Spec.InitContainers = perconaPGUpgrade.Spec.InitContainers
-
-	if cluster.Spec.Extensions.Storage.Secret == nil {
-		return r.Client.Create(ctx, pgUpgrade)
-	}
-
-	for _, pgVersion := range []int{perconaPGUpgrade.Spec.FromPostgresVersion, perconaPGUpgrade.Spec.ToPostgresVersion} {
-		extensionKeys := make([]string, 0)
-
-		for _, extension := range cluster.Spec.Extensions.Custom {
-			key := extensions.GetExtensionKey(pgVersion, extension.Name, extension.Version)
-			extensionKeys = append(extensionKeys, key)
+func (r PGUpgradeReconciler) doReconcile(ctx context.Context, cluster *pgv2.PerconaPGCluster, cr *pgv2.PerconaPGUpgrade) error {
+	if meta.FindStatusCondition(cr.Status.Conditions, "ReplicaCreated") == nil {
+		if err := r.createReplica(ctx, cluster); err != nil {
+			return errors.Wrap(err, "create new replica")
 		}
 
-		pgUpgrade.Spec.InitContainers = append(pgUpgrade.Spec.InitContainers, extensions.ExtensionRelocatorContainer(
-			cluster, *perconaPGUpgrade.Spec.Image, cluster.Spec.ImagePullPolicy, pgVersion,
-		))
+		if err := r.waitForInstanceToBeReady(ctx, cluster, "upgrade"); err != nil {
+			return errors.Wrap(err, "wait for instance to be ready")
+		}
 
-		pgUpgrade.Spec.InitContainers = append(pgUpgrade.Spec.InitContainers, extensions.ExtensionInstallerContainer(
-			cluster,
-			pgVersion,
-			&cluster.Spec.Extensions,
-			strings.Join(extensionKeys, ","),
-			cluster.Spec.OpenShift,
-		))
+		meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+			Type:               "ReplicaCreated",
+			Reason:             "ReplicaCreated",
+			Status:             metav1.ConditionTrue,
+			Message:            "Replica for upgrade created and ready",
+			ObservedGeneration: cr.ObjectMeta.Generation,
+			LastTransitionTime: metav1.Now(),
+		})
+
+		return nil
 	}
 
-	// we're only adding the volume mounts for target version since current volume mounts are already mounted
-	pgUpgrade.Spec.VolumeMounts = append(pgUpgrade.Spec.VolumeMounts, extensions.ExtensionVolumeMounts(
-		perconaPGUpgrade.Spec.ToPostgresVersion)...,
-	)
+	if meta.FindStatusCondition(cr.Status.Conditions, "InstanceUpdated") == nil {
+		if err := r.updateInstance(ctx, cluster, cr); err != nil {
+			return errors.Wrap(err, "update instance")
+		}
 
-	return r.Client.Create(ctx, pgUpgrade)
-}
+		if err := r.waitForInstanceToBeReady(ctx, cluster, "upgrade"); err != nil {
+			return errors.Wrap(err, "wait for instance to be ready")
+		}
 
-func (r *PGUpgradeReconciler) pauseCluster(ctx context.Context, pgCluster *pgv2.PerconaPGCluster) error {
-	orig := pgCluster.DeepCopy()
-
-	t := true
-	pgCluster.Spec.Pause = &t
-
-	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
-}
-
-func (r *PGUpgradeReconciler) resumeCluster(ctx context.Context, pgCluster *pgv2.PerconaPGCluster) error {
-	orig := pgCluster.DeepCopy()
-
-	pgCluster.Spec.Pause = nil
-
-	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
-}
-
-func (r *PGUpgradeReconciler) annotateCluster(ctx context.Context, pgCluster *pgv2.PerconaPGCluster, pgUpgrade *pgv2.PerconaPGUpgrade) error {
-	orig := pgCluster.DeepCopy()
-
-	if pgCluster.Annotations == nil {
-		pgCluster.Annotations = make(map[string]string)
+		meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+			Type:               "InstanceUpdated",
+			Reason:             "InstanceUpdated",
+			Status:             metav1.ConditionTrue,
+			Message:            "Replica for upgrade updated with upgrade image",
+			ObservedGeneration: cr.ObjectMeta.Generation,
+			LastTransitionTime: metav1.Now(),
+		})
 	}
 
-	pgCluster.Annotations[pgv2.AnnotationAllowUpgrade] = pgUpgrade.Name
-
-	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
+	return nil
 }
 
-func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pgv2.PerconaPGCluster, pgUpgrade *pgv2.PerconaPGUpgrade) error {
-	log := logging.FromContext(ctx)
+var errStsNotFound = errors.New("statefulset not found")
 
-	orig := pgCluster.DeepCopy()
+func (r *PGUpgradeReconciler) getStatefulSetForInstance(
+	ctx context.Context,
+	cluster *pgv2.PerconaPGCluster,
+	name string,
+) (*appsv1.StatefulSet, error) {
+	stsList := &appsv1.StatefulSetList{}
+	err := r.Client.List(ctx, stsList, &client.ListOptions{
+		Namespace: cluster.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelCluster:     cluster.Name,
+			naming.LabelInstanceSet: name,
+		}),
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	delete(pgCluster.Annotations, pgv2.AnnotationAllowUpgrade)
+	if len(stsList.Items) == 0 {
+		return nil, errStsNotFound
+	}
 
-	pgCluster.Spec.PostgresVersion = pgUpgrade.Spec.ToPostgresVersion
-	pgCluster.Spec.Image = pgUpgrade.Spec.ToPostgresImage
-	pgCluster.Spec.Proxy.PGBouncer.Image = pgUpgrade.Spec.ToPgBouncerImage
-	pgCluster.Spec.Backups.PGBackRest.Image = pgUpgrade.Spec.ToPgBackRestImage
+	if len(stsList.Items) != 1 {
+		return nil, errors.Errorf("expected 1 statefulset, got %d", len(stsList.Items))
+	}
 
-	log.Info("Finalizing upgrade",
-		"newPostgresVersion", pgCluster.Spec.PostgresVersion,
-		"newPostgresImage", pgCluster.Spec.Image,
-		"newPgBouncerImage", pgCluster.Spec.Proxy.PGBouncer.Image,
-		"newPgBackRestImage", pgCluster.Spec.Backups.PGBackRest.Image,
+	sts := &stsList.Items[0]
+
+	err = r.Client.Get(ctx, types.NamespacedName{
+		Name:      sts.Name,
+		Namespace: sts.Namespace,
+	}, sts)
+	if err != nil {
+		return nil, err
+	}
+
+	logging.FromContext(ctx).Info("Got statefulset",
+		"sts", sts.Name,
+		"image", sts.Spec.Template.Spec.Containers[0].Image,
+		"command", sts.Spec.Template.Spec.Containers[0].Command,
+		"liveness", sts.Spec.Template.Spec.Containers[0].LivenessProbe,
+		"readiness", sts.Spec.Template.Spec.Containers[0].ReadinessProbe,
 	)
 
-	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
+	return sts, nil
+}
+
+func (r *PGUpgradeReconciler) waitForInstanceToBeReady(ctx context.Context, cluster *pgv2.PerconaPGCluster, name string) error {
+	for {
+		sts, err := r.getStatefulSetForInstance(ctx, cluster, name)
+		if err != nil {
+			if errors.Is(err, errStsNotFound) {
+				continue
+			}
+			return errors.Wrap(err, "get statefulset")
+		}
+
+		if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
+			err = r.Client.DeleteAllOf(ctx, &corev1.Pod{}, &client.DeleteAllOfOptions{
+				ListOptions: client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						naming.LabelCluster:  cluster.Name,
+						naming.LabelInstance: sts.Name,
+					}),
+				},
+			})
+			if err != nil {
+				return errors.Wrap(err, "delete all pods")
+			}
+
+			continue
+		}
+
+		if sts.Status.UpdatedReplicas != sts.Status.CurrentReplicas {
+			continue
+		}
+
+		if sts.Status.CurrentReplicas != 1 {
+			continue
+		}
+
+		break
+	}
+
+	logging.FromContext(ctx).Info("Statefulset is ready", "cluster", cluster.Name, "instance", name)
+
+	return nil
+}
+
+func (r *PGUpgradeReconciler) createReplica(ctx context.Context, cluster *pgv2.PerconaPGCluster) error {
+	orig := cluster.DeepCopy()
+
+	instanceSet := cluster.Spec.InstanceSets[0]
+	instanceSet.Name = "upgrade"
+	instanceSet.Replicas = ptr.To(int32(1))
+
+	cluster.Spec.InstanceSets = append(cluster.Spec.InstanceSets, instanceSet)
+
+	err := r.Client.Patch(ctx, cluster, client.MergeFrom(orig))
+	if err != nil {
+		return errors.Wrap(err, "patch pgCluster")
+	}
+
+	return nil
+}
+
+func (r *PGUpgradeReconciler) updateInstance(
+	ctx context.Context,
+	cluster *pgv2.PerconaPGCluster,
+	cr *pgv2.PerconaPGUpgrade,
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		sts, err := r.getStatefulSetForInstance(ctx, cluster, "upgrade")
+		if err != nil {
+			return errors.Wrap(err, "get statefulset")
+		}
+
+		if sts.Annotations == nil {
+			sts.Annotations = make(map[string]string)
+		}
+		sts.Annotations[naming.SkipReconciliationAnnotation] = "true"
+
+		i := slices.IndexFunc(sts.Spec.Template.Spec.Containers, func(c corev1.Container) bool {
+			return c.Name == "database"
+		})
+		dbContainer := sts.Spec.Template.Spec.Containers[i]
+
+		dbContainer.Image = *cr.Spec.Image
+		dbContainer.LivenessProbe = nil
+		dbContainer.ReadinessProbe = nil
+		dbContainer.Command = []string{"sleep", "infinity"}
+
+		sts.Spec.Template.Spec.Containers = []corev1.Container{dbContainer}
+		err = r.Client.Update(ctx, sts)
+		if err != nil {
+			return err
+		}
+
+		logging.FromContext(ctx).Info("StatefulSet updated", "sts", sts.Name)
+
+		return nil
+	})
 }

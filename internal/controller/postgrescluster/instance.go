@@ -1158,6 +1158,10 @@ func (r *Reconciler) reconcileInstance(
 	ctx = logging.NewContext(ctx, log)
 
 	existing := instance.DeepCopy()
+	if _, skipReconcile := existing.Annotations[naming.SkipReconciliationAnnotation]; skipReconcile {
+		return nil
+	}
+
 	*instance = appsv1.StatefulSet{}
 	instance.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("StatefulSet"))
 	instance.Namespace, instance.Name = existing.Namespace, existing.Name

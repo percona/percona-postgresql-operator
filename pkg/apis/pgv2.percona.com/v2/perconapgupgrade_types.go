@@ -110,7 +110,16 @@ type PerconaPGUpgradeSpec struct {
 }
 
 type PerconaPGUpgradeStatus struct {
-	crunchyv1beta1.PGUpgradeStatus `json:",inline"`
+	// conditions represent the observations of PGUpgrade's current state.
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// observedGeneration represents the .metadata.generation on which the status was based.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 const AnnotationAllowUpgrade = "pgv2.percona.com/allow-upgrade"

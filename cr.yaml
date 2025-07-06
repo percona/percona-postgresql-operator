@@ -1,0 +1,90 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  finalizers:
+    - internal.percona.com/stop-watchers
+  name: cluster1
+spec:
+  backups:
+    pgbackrest:
+      image: perconalab/percona-postgresql-operator:main-pgbackrest17
+      manual:
+        options:
+          - --type=full
+        repoName: repo1
+      repoHost:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      postgres-operator.crunchydata.com/data: pgbackrest
+                  topologyKey: none
+                weight: 1
+      repos:
+        - name: repo1
+          schedules:
+            full: 0 0 * * 6
+          volume:
+            volumeClaimSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+  crVersion: 2.7.0
+  extensions:
+    builtin:
+      pg_audit: false
+      pg_repack: false
+      pg_stat_monitor: false
+      pg_stat_statements: false
+      pgvector: false
+  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
+  imagePullPolicy: Always
+  initContainer:
+    image: perconalab/percona-postgresql-operator:K8SPG-784-21616
+  instances:
+    - affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    postgres-operator.crunchydata.com/data: postgres
+                topologyKey: none
+              weight: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+      name: instance1
+      replicas: 3
+      resources: {}
+  pmm:
+    enabled: false
+    image: perconalab/pmm-client:dev-latest
+    querySource: pgstatmonitor
+    secret: cluster1-pmm-secret
+    serverHost: monitoring-service
+  port: 5432
+  postgresVersion: 17
+  proxy:
+    pgBouncer:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    postgres-operator.crunchydata.com/role: pgbouncer
+                topologyKey: none
+              weight: 1
+      image: perconalab/percona-postgresql-operator:main-pgbouncer17
+      port: 5432
+      replicas: 3
+  users:
+    - name: postgres

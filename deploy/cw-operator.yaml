@@ -44,7 +44,7 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
-        image: perconalab/percona-postgresql-operator:main
+        image: perconalab/percona-postgresql-operator:k8spg-784
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
