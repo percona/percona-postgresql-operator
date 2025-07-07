@@ -1,9 +1,9 @@
 # Images versions
 IMAGE_OPERATOR=percona/percona-postgresql-operator:2.7.0
 
-IMAGE_POSTGRESQL17=percona/percona-postgresql-operator:2.7.0-ppg17.5-2-postgres
+IMAGE_POSTGRESQL17=percona/percona-postgresql-operator:2.7.0-ppg17.5.2-postgres
 IMAGE_PGBOUNCER17=percona/percona-pgbouncer:1.24.1
-IMAGE_POSTGIS17=percona/percona-postgresql-operator:2.7.0-ppg17.5-2-postgres-gis3.3.8
+IMAGE_POSTGIS17=percona/percona-postgresql-operator:2.7.0-ppg17.5.2-postgres-gis3.3.8
 IMAGE_BACKREST17=percona/percona-pgbackrest:2.55.0
 
 IMAGE_POSTGRESQL16=percona/percona-postgresql-operator:2.7.0-ppg16.9-postgres

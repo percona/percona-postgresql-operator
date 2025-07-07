@@ -7,6 +7,6 @@ spec:
   image: percona/percona-postgresql-operator:2.7.0-upgrade
   fromPostgresVersion: 16
   toPostgresVersion: 17
-  toPostgresImage: percona/percona-postgresql-operator:2.7.0-ppg17.5-2-postgres
+  toPostgresImage: percona/percona-postgresql-operator:2.7.0-ppg17.5.2-postgres
   toPgBouncerImage: percona/percona-pgbouncer:1.24.1
   toPgBackRestImage: percona/percona-pgbackrest:2.55.0
