@@ -4,6 +4,7 @@ custom-tls
 demand-backup
 finalizers
 init-deploy
+pgvector-extension
 one-pod
 operator-self-healing
 scaling
