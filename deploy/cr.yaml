@@ -16,6 +16,9 @@ spec:
 #      limits:
 #        cpu: 2.0
 #        memory: 4Gi
+#      requests:
+#        cpu: 1.0
+#        memory: 3Gi
 #    containerSecurityContext:
 #      runAsUser: 1001
 #      runAsGroup: 1001
@@ -218,12 +221,18 @@ spec:
 #      limits:
 #        cpu: 2.0
 #        memory: 4Gi
+#      requests:
+#        cpu: 1.0
+#        memory: 3Gi
 #    containers:
 #      replicaCertCopy:
 #        resources:
 #          limits:
 #            cpu: 200m
 #            memory: 128Mi
+#          requests:
+#            cpu: 100m
+#            memory: 120Mi
 #    sidecars:
 #    - name: testcontainer
 #      image: busybox:latest
@@ -303,12 +312,18 @@ spec:
 #        limits:
 #          cpu: 200m
 #          memory: 128Mi
+#        requests:
+#          cpu: 150m
+#          memory: 120Mi
 #      containers:
 #        pgbouncerConfig:
 #          resources:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
+#            requests:
+#              cpu: 150m
+#              memory: 120Mi
 #
 #      expose:
 #        annotations:
@@ -389,6 +404,9 @@ spec:
 #          limits:
 #            cpu: 2.0
 #            memory: 4Gi
+#          requests:
+#            cpu: 1.0
+#            memory: 3Gi
 #        containerSecurityContext:
 #          runAsUser: 1001
 #          runAsGroup: 1001
@@ -415,11 +433,17 @@ spec:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
+#            requests:
+#              cpu: 150m
+#              memory: 120Mi
 #        pgbackrestConfig:
 #          resources:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
+#            requests:
+#              cpu: 150m
+#              memory: 120Mi
 #
 #      configuration:
 #        - secret:
@@ -433,6 +457,9 @@ spec:
 #          limits:
 #            cpu: 200m
 #            memory: 128Mi
+#          requests:
+#            cpu: 150m
+#            memory: 120Mi
 #        tolerations:
 #        - effect: NoSchedule
 #          key: role
@@ -473,6 +500,9 @@ spec:
 #          limits:
 #            cpu: 200m
 #            memory: 128Mi
+#          requests:
+#            cpu: 150m
+#            memory: 120Mi
         affinity:
           podAntiAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
@@ -562,6 +592,13 @@ spec:
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
+#    resources:
+#      limits:
+#        memory: 200M
+#        cpu: 350m
+#      requests:
+#        memory: 150M
+#        cpu: 300m
 #    customClusterName: "<string>"
 #    postgresParams: "<string>"
 #    querySource: pgstatmonitor
