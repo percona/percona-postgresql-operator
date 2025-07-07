@@ -456,6 +456,10 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 type Backups struct {
@@ -822,7 +826,8 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		VolumeMounts:              p.VolumeMounts,
 		SecurityContext:           p.SecurityContext,
 		TablespaceVolumes:         p.TablespaceVolumes,
-		InitContainer:             p.InitContainer}
+		InitContainer:             p.InitContainer,
+	}
 }
 
 type ServiceExpose struct {
