@@ -1,6 +1,6 @@
 # Contributing to Percona Operator for PostgreSQL
 
-We welcome contributions to the Percona Operator for PostgreSQL project and we're glad that you would like to become a Percona community member and participate in keeping open source open. for you to help us improve the Operator, please follow the guidelines below.
+We welcome contributions to the Percona Operator for PostgreSQL project and we're glad that you would like to become a Percona community member and participate in keeping open source open. For you to help us improve the Operator, please follow the guidelines below.
 
 ## Prerequisites
 
