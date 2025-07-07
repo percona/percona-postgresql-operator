@@ -49,8 +49,7 @@ Follow the workflow described below:
 4. Create a pull request to the main repository on GitHub.
 5. [Build a custom Operator image based on your changes](#build-a-custom-operator-image) to verify that they work
 6. [Update deployment manifests](#update-deployment-manifests) to reflect your changes
-7. [Run e2e tests](#run-e2e-tests)
-) to verify your changes are stable and robust.
+7. [Run e2e tests](#run-e2e-tests) to verify your changes are stable and robust.
 8. Someone from our team reviews your pull request. When the reviewer makes some comments, address any feedback that comes and update the pull request.
 9. When your contribution is accepted, your pull request will be approved and merged to the main branch.
 
