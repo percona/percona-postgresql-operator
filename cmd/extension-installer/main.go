@@ -23,8 +23,8 @@ func main() {
 
 	flag.BoolVar(&install, "install", false, "Install extension")
 	flag.BoolVar(&uninstall, "uninstall", false, "Uninstall extension")
-	flag.BoolVar(&forcePathStyle, "forcePathStyle", false, "Force path style")
-	flag.BoolVar(&disableSSL, "disableSSL", false, "Disable SSL")
+	flag.BoolVar(&forcePathStyle, "force-path-style", false, "Force path style")
+	flag.BoolVar(&disableSSL, "disable-ssl", false, "Disable SSL")
 	flag.Parse()
 
 	if (install && uninstall) || (!install && !uninstall) {
