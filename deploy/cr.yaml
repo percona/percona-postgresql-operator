@@ -621,14 +621,16 @@ spec:
 #    - pgbackrest
 #    - basebackup
 
-#  extensions:
-#    image: perconalab/percona-postgresql-operator:main
-#    imagePullPolicy: Always
-#    storage:
-#      type: s3
-#      bucket: pg-extensions
-#      region: eu-central-1
-#      endpoint: s3.eu-central-1.amazonaws.com
+  extensions:
+    image: perconalab/percona-postgresql-operator:main
+    imagePullPolicy: Always
+    storage:
+      type: s3
+      bucket: pg-extensions
+      region: eu-central-1
+      endpoint: s3.eu-central-1.amazonaws.com
+      forcePathStyle: false
+      disableSSL: false
 #      secret:
 #        name: cluster1-extensions-secret
 #    builtin:
