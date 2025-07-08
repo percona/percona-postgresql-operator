@@ -9,13 +9,21 @@ declare -a args=(
 	-type "${STORAGE_TYPE}"
 	-region "${STORAGE_REGION}"
 	-bucket "${STORAGE_BUCKET}"
-	-force-path-style "${STORAGE_FORCE_PATH_STYLE}"
-	-disable-ssl "${STORAGE_DISABLE_SSL}"
 	-extension-path "${PGDATA_EXTENSIONS}"
 )
 
 if [[ -n $STORAGE_ENDPOINT ]]; then
 	args+=(-endpoint "$STORAGE_ENDPOINT")
+fi
+
+# Checking the STORAGE_DISABLE_SSL env for backwards compatibility before 2.8.0
+if [[ -n $STORAGE_DISABLE_SSL ]]; then
+	args+=(-disable-ssl "$STORAGE_ENDPOINT")
+fi
+
+# Checking the STORAGE_FORCE_PATH_STYLE env for backwards compatibility before 2.8.0
+if [[ -n $STORAGE_FORCE_PATH_STYLE ]]; then
+	args+=(-force-path-style "$STORAGE_FORCE_PATH_STYLE")
 fi
 
 for key in "${extensions[@]}"; do
