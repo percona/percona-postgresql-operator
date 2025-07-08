@@ -9,8 +9,8 @@ declare -a args=(
 	-type "${STORAGE_TYPE}"
 	-region "${STORAGE_REGION}"
 	-bucket "${STORAGE_BUCKET}"
-  -force-path-style "${STORAGE_FORCE_PATH_STYLE}"
-  -disable-ssl "${STORAGE_DISABLE_SSL}"
+	-force-path-style "${STORAGE_FORCE_PATH_STYLE}"
+	-disable-ssl "${STORAGE_DISABLE_SSL}"
 	-extension-path "${PGDATA_EXTENSIONS}"
 )
 
