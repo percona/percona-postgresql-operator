@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -26,7 +27,7 @@ func TestContainer(t *testing.T) {
 
 	pgc := &v2.PerconaPGCluster{
 		Spec: v2.PerconaPGClusterSpec{
-			CRVersion: "2.8.0", // TODO use version.Version()
+			CRVersion: version.Version(),
 			PMM:       pmmSpec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -152,7 +153,7 @@ func TestSidecarContainerV2(t *testing.T) {
 
 	pgc := &v2.PerconaPGCluster{
 		Spec: v2.PerconaPGClusterSpec{
-			CRVersion: "2.8.0", // TODO use version.Version()
+			CRVersion: version.Version(),
 			PMM:       pmmSpec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -264,7 +265,7 @@ func TestSidecarContainerV3(t *testing.T) {
 
 	pgc := &v2.PerconaPGCluster{
 		Spec: v2.PerconaPGClusterSpec{
-			CRVersion: "2.8.0",
+			CRVersion: version.Version(),
 			PMM:       pmmSpec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
