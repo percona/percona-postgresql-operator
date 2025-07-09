@@ -583,8 +583,6 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 
 		if err == nil {
 			userSecrets[userName], err = r.generatePostgresUserSecret(cluster, user, secret)
-		}
-		if err == nil {
 			err = errors.WithStack(r.apply(ctx, userSecrets[userName]))
 		}
 	}
@@ -592,8 +590,8 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 	return specUsers, userSecrets, err
 }
 
-// updateCustomSecretLabels checks if a custom secret exists and updates it
-// with required labels if they are missing that enabled the
+// updateCustomSecretLabels checks if a custom secret exists - can be created manually through kubectl apply
+// and updates it with required labels if they are missing that enabled the
 // naming.AsSelector(naming.ClusterPostgresUsers(cluster.Name)) to identify them.
 func (r *Reconciler) updateCustomSecretLabels(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, user v1beta1.PostgresUserSpec,
