@@ -52,8 +52,9 @@ type PerconaPGClusterSpec struct {
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
 	// +optional
+	// Version is the application version in the format X.Y.Z (e.g., "2.7.0").
 	// +kubebuilder:validation:Pattern=`^$|^\d+\.\d+\.\d+$`
-	// +kubebuilder:validation:Enum="2.7.0"
+	// +kubebuilder:example="2.7.0"
 	CRVersion string `json:"crVersion,omitempty"`
 
 	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`

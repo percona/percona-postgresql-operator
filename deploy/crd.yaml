@@ -5941,8 +5941,8 @@ spec:
                   Version of the operator. Update this to new version after operator
                   upgrade to apply changes to Kubernetes objects. Default is the latest
                   version.
-                enum:
-                - 2.7.0
+                  Version is the application version in the format X.Y.Z (e.g., "2.7.0").
+                example: 2.7.0
                 pattern: ^$|^\d+\.\d+\.\d+$
                 type: string
               dataSource:
