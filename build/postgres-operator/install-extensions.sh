@@ -18,7 +18,7 @@ fi
 
 # Checking the STORAGE_DISABLE_SSL env for backwards compatibility before 2.8.0
 if [[ -n $STORAGE_DISABLE_SSL ]]; then
-	args+=(-disable-ssl "$STORAGE_ENDPOINT")
+	args+=(-disable-ssl "$STORAGE_DISABLE_SSL")
 fi
 
 # Checking the STORAGE_FORCE_PATH_STYLE env for backwards compatibility before 2.8.0
