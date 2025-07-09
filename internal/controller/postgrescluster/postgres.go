@@ -19,8 +19,10 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -494,6 +496,14 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 		userSpecs[string(specUsers[i].Name)] = &specUsers[i]
 	}
 
+	for _, user := range specUsers {
+		if user.SecretName != "" {
+			if err := r.updateCustomSecretLabels(ctx, cluster, user); err != nil {
+				return specUsers, nil, err
+			}
+		}
+	}
+
 	secrets := &corev1.SecretList{}
 	selector, err := naming.AsSelector(naming.ClusterPostgresUsers(cluster.Name))
 	if err == nil {
@@ -580,6 +590,51 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 	}
 
 	return specUsers, userSecrets, err
+}
+
+// updateCustomSecretLabels checks if a custom secret exists and updates it
+// with required labels if they are missing that enabled the
+// naming.AsSelector(naming.ClusterPostgresUsers(cluster.Name)) to identify them.
+func (r *Reconciler) updateCustomSecretLabels(
+	ctx context.Context, cluster *v1beta1.PostgresCluster, user v1beta1.PostgresUserSpec,
+) error {
+	secretName := string(user.SecretName)
+	userName := string(user.Name)
+
+	secret := &corev1.Secret{}
+	err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      secretName,
+		Namespace: cluster.Namespace,
+	}, secret)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, fmt.Sprintf("failed to get user %s secret %s", userName, secretName))
+	}
+
+	requiredLabels := map[string]string{
+		naming.LabelCluster:      cluster.Name,
+		naming.LabelPostgresUser: userName,
+	}
+
+	needsUpdate := false
+	if secret.Labels == nil {
+		secret.Labels = make(map[string]string)
+	}
+
+	for labelKey, labelValue := range requiredLabels {
+		if existing, exists := secret.Labels[labelKey]; !exists || existing != labelValue {
+			secret.Labels[labelKey] = labelValue
+			needsUpdate = true
+		}
+	}
+
+	if needsUpdate {
+		return errors.WithStack(r.Client.Update(ctx, secret))
+	}
+
+	return nil
 }
 
 // reconcilePostgresUsersInPostgreSQL creates users inside of PostgreSQL and
