@@ -171,6 +171,29 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 // certificate files when they change. The process will appear as name in `ps`
 // and `top`.
 func reloadCommand(name string, post250 bool, AutoGrowVolumes bool) []string {
+	// Use a Bash loop to periodically check the mtime of the mounted
+	// certificate volume. When it changes, copy the replication certificate,
+	// signal PostgreSQL, and print the observed timestamp.
+	//
+	// PostgreSQL v10 reads its server certificate files during reload (SIGHUP).
+	// - https://www.postgresql.org/docs/current/ssl-tcp.html#SSL-SERVER-FILES
+	// - https://www.postgresql.org/docs/current/app-postgres.html
+	//
+	// PostgreSQL reads its replication credentials every time it opens a
+	// replication connection. It does not need to be signaled when the
+	// certificate contents change.
+	//
+	// The copy is necessary because Kubernetes sets g+r when fsGroup is enabled,
+	// but PostgreSQL requires client keys to not be readable by other users.
+	// - https://www.postgresql.org/docs/current/libpq-ssl.html
+	// - https://issue.k8s.io/57923
+	//
+	// Coreutils `sleep` uses a lot of memory, so the following opens a file
+	// descriptor and uses the timeout of the builtin `read` to wait. That same
+	// descriptor gets closed and reopened to use the builtin `[ -nt` to check
+	// mtimes.
+	// - https://unix.stackexchange.com/a/407383
+
 	script := fmt.Sprintf(`
 declare -r directory=%q
 exec {fd}<> <(:)
