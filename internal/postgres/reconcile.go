@@ -6,15 +6,13 @@ package postgres
 
 import (
 	"context"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	"github.com/percona/percona-postgresql-operator/internal/config"
 	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var (
@@ -182,7 +180,7 @@ func InstancePod(ctx context.Context,
 	reloader := corev1.Container{
 		Name: naming.ContainerClientCertCopy,
 
-		Command: reloadCommand(naming.ContainerClientCertCopy, inCluster.CompareVersion("2.5.0") >= 0),
+		Command: reloadCommand(naming.ContainerClientCertCopy, inCluster.CompareVersion("2.5.0") >= 0, feature.Enabled(ctx, feature.AutoGrowVolumes)),
 
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
