@@ -16,14 +16,12 @@ if [[ -n $STORAGE_ENDPOINT ]]; then
 	args+=(-endpoint "$STORAGE_ENDPOINT")
 fi
 
-# Checking the STORAGE_DISABLE_SSL env for backwards compatibility before 2.8.0
-if [[ -n $STORAGE_DISABLE_SSL ]]; then
-	args+=(-disable-ssl "$STORAGE_DISABLE_SSL")
+if [[ "${STORAGE_DISABLE_SSL}" == "true" ]]; then
+	args+=(-disable-ssl)
 fi
 
-# Checking the STORAGE_FORCE_PATH_STYLE env for backwards compatibility before 2.8.0
-if [[ -n $STORAGE_FORCE_PATH_STYLE ]]; then
-	args+=(-force-path-style "$STORAGE_FORCE_PATH_STYLE")
+if [[ "${STORAGE_FORCE_PATH_STYLE}" == "true" ]]; then
+	args+=(-force-path-style)
 fi
 
 for key in "${extensions[@]}"; do
