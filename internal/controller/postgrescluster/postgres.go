@@ -613,6 +613,8 @@ func (r *Reconciler) updateCustomSecretLabels(
 		return errors.Wrap(err, fmt.Sprintf("failed to get user %s secret %s", userName, secretName))
 	}
 
+	orig := secret.DeepCopy()
+
 	requiredLabels := map[string]string{
 		naming.LabelCluster:      cluster.Name,
 		naming.LabelPostgresUser: userName,
@@ -631,7 +633,7 @@ func (r *Reconciler) updateCustomSecretLabels(
 	}
 
 	if needsUpdate {
-		return errors.WithStack(r.Client.Update(ctx, secret))
+		return errors.WithStack(r.Client.Patch(ctx, secret.DeepCopy(), client.MergeFrom(orig)))
 	}
 
 	return nil
