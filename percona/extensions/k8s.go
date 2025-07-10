@@ -21,11 +21,15 @@ func ExtensionRelocatorContainer(cr *pgv2.PerconaPGCluster, image string, imageP
 		containerName = fmt.Sprintf("extension-relocator-%d", postgresVersion)
 	}
 
+	command := "/usr/local/bin/relocate-extensions.sh"
+	if cr.CompareVersion("2.8.0") >= 0 {
+		command = "/opt/crunchy/bin/relocate-extensions.sh"
+	}
 	return corev1.Container{
 		Name:            containerName,
 		Image:           image,
 		ImagePullPolicy: imagePullPolicy,
-		Command:         []string{"/usr/local/bin/relocate-extensions.sh"},
+		Command:         []string{command},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "PG_VERSION",
