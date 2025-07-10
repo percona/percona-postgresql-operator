@@ -20,7 +20,7 @@ if [[ "${STORAGE_DISABLE_SSL}" == "true" ]]; then
 	args+=(-disable-ssl)
 fi
 
-if [[ "${STORAGE_FORCE_PATH_STYLE}" == "true" ]]; then
+if [[ ${STORAGE_FORCE_PATH_STYLE} == "true" ]]; then
 	args+=(-force-path-style)
 fi
 
