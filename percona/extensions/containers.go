@@ -91,16 +91,21 @@ func InstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int, spec *pg
 	}
 
 	if cr.CompareVersion("2.8.0") >= 0 {
-		container.Env = append(container.Env, []corev1.EnvVar{
-			{
+		// Check whether the configuration exists so that existing e2e tests
+		// that do not set these values are not affected.
+		if spec.Storage.DisableSSL != "" {
+			container.Env = append(container.Env, corev1.EnvVar{
 				Name:  "STORAGE_DISABLE_SSL",
 				Value: spec.Storage.DisableSSL,
-			},
-			{
+			})
+		}
+
+		if spec.Storage.ForcePathStyle != "" {
+			container.Env = append(container.Env, corev1.EnvVar{
 				Name:  "STORAGE_FORCE_PATH_STYLE",
 				Value: spec.Storage.ForcePathStyle,
-			},
-		}...)
+			})
+		}
 	}
 
 	if openshift == nil || !*openshift {
