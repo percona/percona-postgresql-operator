@@ -16,7 +16,7 @@ if [[ -n $STORAGE_ENDPOINT ]]; then
 	args+=(-endpoint "$STORAGE_ENDPOINT")
 fi
 
-if [[ "${STORAGE_DISABLE_SSL}" == "true" ]]; then
+if [[ ${STORAGE_DISABLE_SSL} == "true" ]]; then
 	args+=(-disable-ssl)
 fi
 
