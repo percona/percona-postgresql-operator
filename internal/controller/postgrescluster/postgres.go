@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/internal/feature"
@@ -496,6 +497,9 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 		userSpecs[string(specUsers[i].Name)] = &specUsers[i]
 	}
 
+	// K8SPG-570 for secrets that were created manually, update them
+	// with the right labels so that the selector called next to track them
+	// and utilize their data.
 	for _, user := range specUsers {
 		if user.SecretName != "" {
 			if err := r.updateCustomSecretLabels(ctx, cluster, user); err != nil {
@@ -590,9 +594,10 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 	return specUsers, userSecrets, err
 }
 
-// updateCustomSecretLabels checks if a custom secret exists - can be created manually through kubectl apply
-// and updates it with required labels if they are missing that enabled the
-// naming.AsSelector(naming.ClusterPostgresUsers(cluster.Name)) to identify them.
+// K8SPG-570
+// updateCustomSecretLabels checks if a custom secret exists - can be created manually through
+// kubectl apply - and updates it with required labels if they are missing. This enables the
+// naming.AsSelector(naming.ClusterPostgresUsers(cluster.Name)) to identify these secrets.
 func (r *Reconciler) updateCustomSecretLabels(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, user v1beta1.PostgresUserSpec,
 ) error {
@@ -611,11 +616,10 @@ func (r *Reconciler) updateCustomSecretLabels(
 		return errors.Wrap(err, fmt.Sprintf("failed to get user %s secret %s", userName, secretName))
 	}
 
-	orig := secret.DeepCopy()
-
 	requiredLabels := map[string]string{
 		naming.LabelCluster:      cluster.Name,
 		naming.LabelPostgresUser: userName,
+		naming.LabelRole:         naming.RolePostgresUser,
 	}
 
 	needsUpdate := false
@@ -631,7 +635,58 @@ func (r *Reconciler) updateCustomSecretLabels(
 	}
 
 	if needsUpdate {
-		return errors.WithStack(r.Client.Patch(ctx, secret.DeepCopy(), client.MergeFrom(orig)))
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			current := &corev1.Secret{}
+			if err := r.Client.Get(ctx, types.NamespacedName{
+				Name:      secretName,
+				Namespace: cluster.Namespace,
+			}, current); err != nil {
+				return err
+			}
+
+			currentOrig := current.DeepCopy()
+			if current.Labels == nil {
+				current.Labels = make(map[string]string)
+			}
+
+			updateNeeded := false
+			for labelKey, labelValue := range requiredLabels {
+				if existing, exists := current.Labels[labelKey]; !exists || existing != labelValue {
+					current.Labels[labelKey] = labelValue
+					updateNeeded = true
+				}
+			}
+
+			if !updateNeeded {
+				return nil
+			}
+
+			return r.Client.Patch(ctx, current, client.MergeFrom(currentOrig))
+		})
+
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to update secret %s", secretName))
+		}
+
+		verifyErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			verifySecret := &corev1.Secret{}
+			if err := r.Client.Get(ctx, types.NamespacedName{
+				Name:      secretName,
+				Namespace: cluster.Namespace,
+			}, verifySecret); err != nil {
+				return err
+			}
+
+			for labelKey, labelValue := range requiredLabels {
+				if existing, exists := verifySecret.Labels[labelKey]; !exists || existing != labelValue {
+					return errors.Errorf("secret %s label %s not yet propagated", secretName, labelKey)
+				}
+			}
+
+			return nil
+		})
+
+		return errors.Wrap(verifyErr, "failed to update secret")
 	}
 
 	return nil
