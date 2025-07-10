@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
@@ -431,7 +432,8 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 						Args: []string{
 							"-c", "sleep 60",
 						},
-						Resources: cr.Spec.InstanceSets[0].Resources,
+						Resources:       cr.Spec.InstanceSets[0].Resources,
+						SecurityContext: initialize.RestrictedSecurityContext(cr.CompareVersion("2.5.0") >= 0),
 					},
 				},
 				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
