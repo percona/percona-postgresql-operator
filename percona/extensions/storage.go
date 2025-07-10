@@ -12,7 +12,5 @@ type ObjectGetter interface {
 type StorageType string
 
 const (
-	StorageTypeS3    StorageType = "s3"
-	StorageTypeGCS   StorageType = "gcs"
-	StorageTypeAzure StorageType = "azure"
+	StorageTypeS3 StorageType = "s3"
 )
