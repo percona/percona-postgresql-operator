@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: init-database-sql
+data:
+  init.sql: |
+    CREATE TABLE e2e_init_table(id INT PRIMARY KEY);
+    INSERT INTO e2e_init_table VALUES (42);
