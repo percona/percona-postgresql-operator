@@ -24,14 +24,18 @@ commands:
       fi
       echo $pg_ver >"${TEMP_DIR}/pg_ver.txt"
 
+      if [[ $OPENSHIFT ]]; then
+          $sed -E -i "s|^( *image: *)(.*)|\1${REGISTRY}\2|" ${TEMP_DIR}/cr_lower.yaml
+      fi
+
       yq -i eval '
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |
-          .spec.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-postgres" |
+          .spec.image = "'${REGISTRY}'percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-postgres" |
           .spec.postgresVersion = '$pg_ver' |
-          .spec.proxy.pgBouncer.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-pgbouncer" |
+          .spec.proxy.pgBouncer.image = "'${REGISTRY}'percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-pgbouncer" |
           .spec.backups.pgbackrest.repos[0].schedules = null |
-          .spec.backups.pgbackrest.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-pgbackrest" |
+          .spec.backups.pgbackrest.image = "'${REGISTRY}'percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-pgbackrest" |
           .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
           .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' "${TEMP_DIR}/cr_lower.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"

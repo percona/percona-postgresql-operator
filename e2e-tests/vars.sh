@@ -35,7 +35,7 @@ export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 
 if [[ $OPENSHIFT ]]; then
-	REGISTRY='docker.io/'
+	export REGISTRY='docker.io/'
 	echo "Appending 'docker.io/' to image variables for OpenShift..."
 
 	for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
