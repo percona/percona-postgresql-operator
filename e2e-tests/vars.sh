@@ -50,4 +50,3 @@ fi
 date=$(which gdate || which date)
 # shellcheck disable=SC2034
 sed=$(which gsed || which sed)
-
