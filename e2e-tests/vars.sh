@@ -34,16 +34,6 @@ export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3-dev-lates
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 
-# if [[ $OPENSHIFT ]]; then
-# 	REGISTRY='docker.io/'
-# 	echo "Append 'docker.io to images for openshift'"
-# 	for var in $(printenv | grep IMAGE | awk -F'=' '{print $1}'); do
-# 		echo "Reassigning vars"
-# 		var_value=$(eval "echo \$$var")
-# 		eval "$var='$REGISTRY$var_value'"
-# 	done
-# fi
-
 if [[ $OPENSHIFT ]]; then
   REGISTRY='docker.io/'
   echo "Appending 'docker.io/' to image variables for OpenShift..."
@@ -55,8 +45,6 @@ if [[ $OPENSHIFT ]]; then
     echo "$var=$new_value"
   done
 fi
-
-echo $IMAGE_BASE $IMAGE $IMAGE_PGBOUNCER $IMAGE_BACKREST $IMAGE_PMM_CLIENT $IMAGE_PMM_SERVER $IMAGE_PMM3_CLIENT $IMAGE_PMM3_CLIENT $IMAGE_PMM3_SERVER
 
 # shellcheck disable=SC2034
 date=$(which gdate || which date)
