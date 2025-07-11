@@ -35,15 +35,15 @@ export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 
 if [[ $OPENSHIFT ]]; then
-  REGISTRY='docker.io/'
-  echo "Appending 'docker.io/' to image variables for OpenShift..."
+	REGISTRY='docker.io/'
+	echo "Appending 'docker.io/' to image variables for OpenShift..."
 
-  for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
-    var_value=$(eval "echo \$$var")
-    new_value="${REGISTRY}${var_value}"
-    export "$var=$new_value"
-    echo "$var=$new_value"
-  done
+	for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
+		var_value=$(eval "echo \$$var")
+		new_value="${REGISTRY}${var_value}"
+		export "$var=$new_value"
+		echo "$var=$new_value"
+	done
 fi
 
 # shellcheck disable=SC2034
