@@ -12,6 +12,14 @@ export TEMP_DIR="/tmp/kuttl/pg/${test_name}"
 export GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 export VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' | tr '[:upper:]' '[:lower:]')}
 
+if command -v oc &>/dev/null; then
+	if oc get projects; then
+		export OPENSHIFT=4
+	fi
+fi
+
+OPENSHIFT=4
+
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
 export PG_VER="${PG_VER:-17}"
@@ -28,13 +36,32 @@ export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3-dev-lates
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 
+# if [[ $OPENSHIFT ]]; then
+# 	REGISTRY='docker.io/'
+# 	echo "Append 'docker.io to images for openshift'"
+# 	for var in $(printenv | grep IMAGE | awk -F'=' '{print $1}'); do
+# 		echo "Reassigning vars"
+# 		var_value=$(eval "echo \$$var")
+# 		eval "$var='$REGISTRY$var_value'"
+# 	done
+# fi
+
+if [[ $OPENSHIFT ]]; then
+  REGISTRY='docker.io/'
+  echo "Appending 'docker.io/' to image variables for OpenShift..."
+
+  for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
+    var_value=$(eval "echo \$$var")
+    new_value="${REGISTRY}${var_value}"
+    export "$var=$new_value"
+    echo "$var=$new_value"
+  done
+fi
+
+echo $IMAGE_BASE $IMAGE $IMAGE_PGBOUNCER $IMAGE_BACKREST $IMAGE_PMM_CLIENT $IMAGE_PMM_SERVER $IMAGE_PMM3_CLIENT $IMAGE_PMM3_CLIENT $IMAGE_PMM3_SERVER
+
 # shellcheck disable=SC2034
 date=$(which gdate || which date)
 # shellcheck disable=SC2034
 sed=$(which gsed || which sed)
 
-if command -v oc &>/dev/null; then
-	if oc get projects; then
-		export OPENSHIFT=4
-	fi
-fi
