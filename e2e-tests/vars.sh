@@ -18,8 +18,6 @@ if command -v oc &>/dev/null; then
 	fi
 fi
 
-OPENSHIFT=4
-
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
 export PG_VER="${PG_VER:-17}"
