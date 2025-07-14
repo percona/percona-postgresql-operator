@@ -218,7 +218,7 @@ done
 		// Only add annotation update logic if AutoGrowVolumes is true
 		autogrowScript := ""
 		if AutoGrowVolumes {
-			autogrowScript = `
+			autogrowScript = strings.TrimSuffix(`
   # Manage autogrow annotation.
   # Return size in Mebibytes.
   size=$(df --human-readable --block-size=M /pgdata | awk 'FNR == 2 {print $2}')
@@ -233,7 +233,7 @@ done
     d='[{"op": "add", "path": "/metadata/annotations/suggested-pgdata-pvc-size", "value": "'"$newSizeMi"'"}]'
     curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -XPATCH "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}?fieldManager=kubectl-annotate" -H "Content-Type: application/json-patch+json" --data "$d"
   fi
-`
+`, "\n")
 		}
 
 		script = fmt.Sprintf(`
