@@ -921,7 +921,7 @@ deploy_cert_manager() {
 	echo 'deploy cert manager'
 	kubectl create namespace cert-manager || :
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false > /dev/null 2>&1 || :
+	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v1.17.1/cert-manager.yaml" --validate=false > /dev/null 2>&1 || :
 
 	kubectl wait deployment cert-manager cert-manager-webhook cert-manager-cainjector \
 		--for=condition=available \

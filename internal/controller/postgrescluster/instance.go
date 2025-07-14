@@ -1448,7 +1448,7 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 func (r *Reconciler) reconcileInstanceCertificates(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
-	root *pki.RootCertificateAuthority,
+	rootCertificateAuth *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
 	existing := &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
 	err := errors.WithStack(client.IgnoreNotFound(
@@ -1486,16 +1486,16 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	var leafCert *pki.LeafCertificate
 
 	if err == nil {
-		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, root)
+		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth)
 	}
 	if err == nil {
 		err = patroni.InstanceCertificates(ctx,
-			root.Certificate, leafCert.Certificate,
+			rootCertificateAuth.Certificate, leafCert.Certificate,
 			leafCert.PrivateKey, instanceCerts)
 	}
 	if err == nil {
 		err = pgbackrest.InstanceCertificates(ctx, cluster,
-			root.Certificate, leafCert.Certificate, leafCert.PrivateKey,
+			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
 			instanceCerts)
 	}
 	if err == nil {

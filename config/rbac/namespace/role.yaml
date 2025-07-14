@@ -84,6 +84,22 @@ rules:
   - update
   - watch
 - apiGroups:
+  - cert-manager.io
+  - certmanager.k8s.io
+  resources:
+  - certificaterequests
+  - certificates
+  - issuers
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases

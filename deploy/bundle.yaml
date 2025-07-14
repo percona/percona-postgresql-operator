@@ -47415,6 +47415,22 @@ rules:
   - update
   - watch
 - apiGroups:
+  - cert-manager.io
+  - certmanager.k8s.io
+  resources:
+  - certificaterequests
+  - certificates
+  - issuers
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -47640,7 +47656,7 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
-        image: perconalab/percona-postgresql-operator:main
+        image: perconalab/percona-postgresql-operator:K8SPG-552-5
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

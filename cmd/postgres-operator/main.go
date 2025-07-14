@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/percona/percona-postgresql-operator/percona/certmanager"
 	"os"
 	goruntime "runtime"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	certmanagerscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
 	"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
@@ -123,6 +125,10 @@ func main() {
 	// Add Percona custom resource types to scheme
 	assertNoError(v2.AddToScheme(mgr.GetScheme()))
 
+	// K8SPG-552
+	// Add Scheme for cert-manager resources like Issuer and Certificate.
+	assertNoError(certmanagerscheme.AddToScheme(mgr.GetScheme()))
+
 	// add all PostgreSQL Operator controllers to the runtime manager
 	err = addControllersToManager(ctx, mgr)
 	assertNoError(err)
@@ -148,11 +154,14 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	os.Setenv("REGISTRATION_REQUIRED", "false")
 
 	r := &postgrescluster.Reconciler{
-		Client:      mgr.GetClient(),
-		Owner:       postgrescluster.ControllerName,
-		Recorder:    mgr.GetEventRecorderFor(postgrescluster.ControllerName),
-		Tracer:      otel.Tracer(postgrescluster.ControllerName),
-		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		Owner:               postgrescluster.ControllerName,
+		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName),
+		Tracer:              otel.Tracer(postgrescluster.ControllerName),
+		IsOpenShift:         isOpenshift(ctx, mgr.GetConfig()),
+		CertManagerCtrlFunc: certmanager.NewController,
+		RestConfig:          mgr.GetConfig(),
 	}
 	cm := &perconaController.CustomManager{Manager: mgr}
 	if err := r.SetupWithManager(cm); err != nil {

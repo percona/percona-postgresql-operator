@@ -6,6 +6,9 @@ package postgrescluster
 
 import (
 	"context"
+	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"github.com/percona/percona-postgresql-operator/percona/certmanager"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -77,6 +80,14 @@ func (r *Reconciler) reconcileRootCertificate(
 	}
 	if k8serrors.IsNotFound(err) {
 		err = nil
+
+		certManagerSecret, certManagerErr := r.reconcileCertManagerRootCertificate(ctx, cluster)
+		if certManagerErr != nil {
+			return nil, certManagerErr
+		}
+		if certManagerSecret != nil {
+			existing = certManagerSecret
+		}
 	}
 
 	root := &pki.RootCertificateAuthority{}
@@ -145,6 +156,35 @@ func (r *Reconciler) reconcileRootCertificate(
 	return root, err
 }
 
+// +kubebuilder:rbac:groups=certmanager.k8s.io,resources=issuers;certificates;certificaterequests,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=cert-manager.io,resources=issuers;certificates;certificaterequests,verbs=get;list;watch;create;update;patch;delete;deletecollection
+
+// reconcileCertManagerRootCertificate func.
+func (r *Reconciler) reconcileCertManagerRootCertificate(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) (*corev1.Secret, error) {
+	log := logging.FromContext(ctx)
+	installed, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "error checking if cert-manager is installed")
+	}
+	if !installed {
+		log.Info("cert-manager is not installed")
+		return nil, nil
+	}
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+	err = c.ApplyCAIssuer(ctx, cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "error applying CA issuer")
+	}
+	err = c.ApplyCACertificate(ctx, cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "error applying CA certificate")
+	}
+
+	return nil, nil
+}
+
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
@@ -168,6 +208,8 @@ func (r *Reconciler) reconcileClusterCertificate(
 	if cluster.Spec.CustomTLSSecret != nil {
 		return cluster.Spec.CustomTLSSecret, nil
 	}
+
+	//r.reconcileCertManagerClusterCertificate(ctx, root, cluster, primaryService, replicaService)
 
 	const keyCertificate, keyPrivateKey, rootCA = "tls.crt", "tls.key", "ca.crt"
 
@@ -231,6 +273,68 @@ func (r *Reconciler) reconcileClusterCertificate(
 	}
 
 	return clusterCertSecretProjection(intent), err
+}
+
+func (r *Reconciler) reconcileCertManagerClusterCertificate(
+	ctx context.Context, root *pki.RootCertificateAuthority,
+	cluster *v1beta1.PostgresCluster, primaryService *corev1.Service,
+	replicaService *corev1.Service,
+) (
+	*corev1.SecretProjection, error,
+) {
+	log := logging.FromContext(ctx)
+	exists, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check if cert manager is installed")
+	}
+	if !exists {
+		log.Info("cert manager is not installed")
+		return nil, nil
+	}
+
+	log.Info("reconciling cert manager cluster certificate")
+
+	return r.createCertManagerClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+}
+
+func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (bool, error) {
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, true)
+	err := c.Check(ctx, r.RestConfig, ns)
+	if err != nil {
+		switch {
+		case errors.Is(err, certmanager.ErrCertManagerNotFound):
+			return false, nil
+		case errors.Is(err, certmanager.ErrCertManagerNotReady):
+			return true, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *Reconciler) createCertManagerClusterCertificate(
+	ctx context.Context, root *pki.RootCertificateAuthority,
+	cluster *v1beta1.PostgresCluster, primaryService *corev1.Service,
+	replicaService *corev1.Service,
+) (*corev1.SecretProjection, error) {
+	log := logf.FromContext(ctx).WithName("createCertManagerClusterCertificate")
+
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+	err := r.applyCertManagerCertificates(ctx, cluster, c)
+	if err != nil {
+		log.Error(err, "failed to reconcile cert manager cluster certificate")
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (r *Reconciler) applyCertManagerCertificates(ctx context.Context, cluster *v1beta1.PostgresCluster, controller certmanager.Controller) error {
+	err := controller.ApplyIssuer(ctx, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply issuer")
+	}
+
+	return nil
 }
 
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
