@@ -36,10 +36,12 @@ export PGOV1_VER=${PGOV1_VER:-"14"}
 
 if [[ $OPENSHIFT ]]; then
 	export REGISTRY='docker.io/'
-	echo "Appending 'docker.io/' to image variables for OpenShift..."
 
 	for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
 		var_value=$(eval "echo \$$var")
+		if [[ $var_value == docker.io/* ]]; then
+			continue
+		fi
 		new_value="${REGISTRY}${var_value}"
 		export "$var=$new_value"
 		echo "$var=$new_value"
