@@ -160,4 +160,27 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 	}
 
 	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
+
+	syncConditionsFromPostgresToPercona(status, cr)
+
+}
+
+func syncConditionsFromPostgresToPercona(postgresStatus *v1beta1.PostgresClusterStatus, perconaStatus *v2.PerconaPGCluster) {
+	for _, pcCond := range postgresStatus.Conditions {
+		existing := meta.FindStatusCondition(perconaStatus.Status.Conditions, pcCond.Type)
+		if existing != nil {
+			continue
+		}
+
+		newCond := metav1.Condition{
+			Type:               pcCond.Type,
+			Status:             pcCond.Status,
+			Reason:             pcCond.Reason,
+			Message:            pcCond.Message,
+			LastTransitionTime: pcCond.LastTransitionTime,
+			ObservedGeneration: perconaStatus.Generation,
+		}
+
+		perconaStatus.Status.Conditions = append(perconaStatus.Status.Conditions, newCond)
+	}
 }
