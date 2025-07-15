@@ -170,7 +170,7 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 // reloadCommand returns an entrypoint that convinces PostgreSQL to reload
 // certificate files when they change. The process will appear as name in `ps`
 // and `top`.
-func reloadCommand(name string, post250 bool, AutoGrowVolumes bool) []string {
+func reloadCommand(cluster *v1beta1.PostgresCluster, name string, post250 bool, AutoGrowVolumes bool) []string {
 	// Use a Bash loop to periodically check the mtime of the mounted
 	// certificate volume. When it changes, copy the replication certificate,
 	// signal PostgreSQL, and print the observed timestamp.
@@ -217,7 +217,7 @@ done
 	if post250 {
 		// Only add annotation update logic if AutoGrowVolumes is true
 		autogrowScript := ""
-		if AutoGrowVolumes {
+		if AutoGrowVolumes || cluster.CompareVersion("2.8.0") < 0 {
 			autogrowScript = strings.TrimSuffix(`
   # Manage autogrow annotation.
   # Return size in Mebibytes.
