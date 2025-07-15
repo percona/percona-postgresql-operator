@@ -399,7 +399,6 @@ deploy_pmm3_server() {
 		--set image.tag=${IMAGE_PMM3_SERVER#*:} \
 		--set image.repository=${IMAGE_PMM3_SERVER%:*} \
 		--set service.type=LoadBalancer \
-		--set platform="$platform" \
 		$additional_params \
 		--force
 }
