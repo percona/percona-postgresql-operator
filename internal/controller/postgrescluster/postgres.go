@@ -636,67 +636,67 @@ func (r *Reconciler) updateCustomSecretLabels(
 		}
 	}
 
-	if needsUpdate {
-		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			current := &corev1.Secret{}
+	if !needsUpdate {
+		return nil
+	}
+
+	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current := &corev1.Secret{}
+		if err := r.Client.Get(ctx, types.NamespacedName{
+			Name:      secretName,
+			Namespace: cluster.Namespace,
+		}, current); err != nil {
+			return err
+		}
+
+		currentOrig := current.DeepCopy()
+		if current.Labels == nil {
+			current.Labels = make(map[string]string)
+		}
+
+		updateNeeded := false
+		for labelKey, labelValue := range requiredLabels {
+			if existing, exists := current.Labels[labelKey]; !exists || existing != labelValue {
+				current.Labels[labelKey] = labelValue
+				updateNeeded = true
+			}
+		}
+
+		if !updateNeeded {
+			return nil
+		}
+
+		return r.Client.Patch(ctx, current, client.MergeFrom(currentOrig))
+	})
+
+	if updateErr != nil {
+		return errors.Wrap(updateErr, fmt.Sprintf("failed to update secret %s", secretName))
+	}
+
+	verifyErr := retry.OnError(
+		retry.DefaultRetry,
+		func(err error) bool {
+			return true
+		},
+		func() error {
+			verifySecret := &corev1.Secret{}
 			if err := r.Client.Get(ctx, types.NamespacedName{
 				Name:      secretName,
 				Namespace: cluster.Namespace,
-			}, current); err != nil {
+			}, verifySecret); err != nil {
 				return err
 			}
 
-			currentOrig := current.DeepCopy()
-			if current.Labels == nil {
-				current.Labels = make(map[string]string)
-			}
-
-			updateNeeded := false
 			for labelKey, labelValue := range requiredLabels {
-				if existing, exists := current.Labels[labelKey]; !exists || existing != labelValue {
-					current.Labels[labelKey] = labelValue
-					updateNeeded = true
+				if existing, exists := verifySecret.Labels[labelKey]; !exists || existing != labelValue {
+					return errors.Errorf("secret %s label %s not yet propagated", secretName, labelKey)
 				}
 			}
 
-			if !updateNeeded {
-				return nil
-			}
-
-			return r.Client.Patch(ctx, current, client.MergeFrom(currentOrig))
+			return nil
 		})
 
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to update secret %s", secretName))
-		}
-
-		verifyErr := retry.OnError(
-			retry.DefaultRetry,
-			func(err error) bool {
-				return true
-			},
-			func() error {
-				verifySecret := &corev1.Secret{}
-				if err := r.Client.Get(ctx, types.NamespacedName{
-					Name:      secretName,
-					Namespace: cluster.Namespace,
-				}, verifySecret); err != nil {
-					return err
-				}
-
-				for labelKey, labelValue := range requiredLabels {
-					if existing, exists := verifySecret.Labels[labelKey]; !exists || existing != labelValue {
-						return errors.Errorf("secret %s label %s not yet propagated", secretName, labelKey)
-					}
-				}
-
-				return nil
-			})
-
-		return errors.Wrap(verifyErr, "failed to update secret")
-	}
-
-	return nil
+	return errors.Wrap(verifyErr, "failed to update secret")
 }
 
 // reconcilePostgresUsersInPostgreSQL creates users inside of PostgreSQL and
