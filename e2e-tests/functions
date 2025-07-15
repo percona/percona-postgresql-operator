@@ -401,6 +401,22 @@ deploy_pmm3_server() {
 		--force
 }
 
+retry() {
+	local max=$1
+	local delay=$2
+	shift 2 # cut delay and max args
+	local n=1
+
+	until "$@"; do
+		if [[ $n -ge $max ]]; then
+			echo "The command '$@' has failed after $n attempts."
+			exit 1
+		fi
+		((n++))
+		sleep $delay
+	done
+}
+
 generate_pmm_api_key() {
 	local ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" exec monitoring-0 -- bash -c "printenv | grep ADMIN_PASSWORD | cut -d '=' -f2")
 	local PMM_SERVICE_IP=$(get_service_ip monitoring-service)
