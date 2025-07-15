@@ -240,6 +240,13 @@ get_cr() {
 	cat $TEMP_DIR/cr.yaml
 }
 
+run_comand_on_pod() {
+	local command=${1}
+
+	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
+		bash -c "$command"
+}
+
 run_psql_local() {
 	local command=${1}
 	local uri=${2}

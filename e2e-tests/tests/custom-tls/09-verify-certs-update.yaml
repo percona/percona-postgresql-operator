@@ -8,11 +8,9 @@ commands:
 
       source ../../functions
 
-      pg_certificate_data=$(run_command_local "openssl s_client -connect custom-tls-primary:5432 -starttls postgres <<< '' | openssl x509 -noout -subject -issuer -dates -serial")
+      pg_certificate_data=$(run_comand_on_pod "openssl s_client -connect custom-tls-primary:5432 -starttls postgres <<< '' | openssl x509 -noout -subject -issuer -dates -serial")
 
       if [[ "$pg_certificate_data" != *"subject=CN=new-custom-tls-primary"* || "$pg_certificate_data" != *"issuer=CN=new-postgres-operator-ca"* ]]; then
           echo "Postgres not configured with the new certificate"
           exit 1
       fi
-
-      

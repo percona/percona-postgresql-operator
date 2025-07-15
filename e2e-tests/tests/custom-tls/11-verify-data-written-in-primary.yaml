@@ -14,4 +14,3 @@ commands:
           echo "Missing data in primary"
           exit 1
       fi
-
