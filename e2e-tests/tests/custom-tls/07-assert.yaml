@@ -24,7 +24,7 @@ metadata:
   generation: 1
   name: new-custom-cert-tls-ssl
 spec:
-  commonName: new-custom-tls-primary
+  commonName: custom-tls-primary
   issuerRef:
     kind: Issuer
     name: new-custom-cert-tls-pg-issuer

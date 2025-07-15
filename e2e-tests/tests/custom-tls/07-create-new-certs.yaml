@@ -12,16 +12,16 @@ metadata:
   generation: 1
   name: new-custom-cert-tls-ssl
 spec:
-  commonName: new-custom-tls-primary
+  commonName: custom-tls-primary
   dnsNames:
-  - new-custom-tls-primary.$NAMESPACE.svc.cluster.local
-  - new-custom-tls-primary.$NAMESPACE.svc
-  - new-custom-tls-primary.$NAMESPACE
-  - new-custom-tls-primary
-  - new-custom-tls-replicas.$NAMESPACE.svc.cluster.local
-  - new-custom-tls-replicas.$NAMESPACE.svc
-  - new-custom-tls-replicas.$NAMESPACE
-  - new-custom-tls-replicas
+  - custom-tls-primary.$NAMESPACE.svc.cluster.local
+  - custom-tls-primary.$NAMESPACE.svc
+  - custom-tls-primary.$NAMESPACE
+  - custom-tls-primary
+  - custom-tls-replicas.$NAMESPACE.svc.cluster.local
+  - custom-tls-replicas.$NAMESPACE.svc
+  - custom-tls-replicas.$NAMESPACE
+  - custom-tls-replicas
   issuerRef:
     kind: Issuer
     name: new-custom-cert-tls-pg-issuer
