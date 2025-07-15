@@ -670,23 +670,28 @@ func (r *Reconciler) updateCustomSecretLabels(
 			return errors.Wrap(err, fmt.Sprintf("failed to update secret %s", secretName))
 		}
 
-		verifyErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			verifySecret := &corev1.Secret{}
-			if err := r.Client.Get(ctx, types.NamespacedName{
-				Name:      secretName,
-				Namespace: cluster.Namespace,
-			}, verifySecret); err != nil {
-				return err
-			}
-
-			for labelKey, labelValue := range requiredLabels {
-				if existing, exists := verifySecret.Labels[labelKey]; !exists || existing != labelValue {
-					return errors.Errorf("secret %s label %s not yet propagated", secretName, labelKey)
+		verifyErr := retry.OnError(
+			retry.DefaultRetry,
+			func(err error) bool {
+				return true
+			},
+			func() error {
+				verifySecret := &corev1.Secret{}
+				if err := r.Client.Get(ctx, types.NamespacedName{
+					Name:      secretName,
+					Namespace: cluster.Namespace,
+				}, verifySecret); err != nil {
+					return err
 				}
-			}
 
-			return nil
-		})
+				for labelKey, labelValue := range requiredLabels {
+					if existing, exists := verifySecret.Labels[labelKey]; !exists || existing != labelValue {
+						return errors.Errorf("secret %s label %s not yet propagated", secretName, labelKey)
+					}
+				}
+
+				return nil
+			})
 
 		return errors.Wrap(verifyErr, "failed to update secret")
 	}
