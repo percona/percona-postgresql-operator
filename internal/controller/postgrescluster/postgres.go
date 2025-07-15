@@ -587,6 +587,8 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 
 		if err == nil {
 			userSecrets[userName], err = r.generatePostgresUserSecret(cluster, user, secret)
+		}
+		if err == nil {
 			err = errors.WithStack(r.apply(ctx, userSecrets[userName]))
 		}
 	}
