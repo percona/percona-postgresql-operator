@@ -372,7 +372,6 @@ deploy_pmm_server() {
 deploy_pmm3_server() {
 	helm uninstall -n "${NAMESPACE}" pmm || :
 	if [[ $OPENSHIFT ]]; then
-		platform=openshift
 		oc create sa pmm-server -n "$NAMESPACE"
 		oc adm policy add-scc-to-user privileged -z pmm-server -n "$NAMESPACE"
 
@@ -384,9 +383,8 @@ deploy_pmm3_server() {
 			oc create rolebinding pmm-pg-operator-namespace-only --role percona-postgresql-operator --serviceaccount=$NAMESPACE:pmm-server -n "${NAMESPACE}"
 			oc patch role/percona-postgresql-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' -n "$NAMESPACE"
 		fi
-		helm install monitoring --set imageTag=${IMAGE_PMM3_SERVER#*:} --set imageRepo=${IMAGE_PMM3_SERVER%:*} --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz -n "$NAMESPACE"
-	else
-		platform=kubernetes
+		local additional_params="--set platform=openshift --set supresshttp2=false --set serviceAccount.create=false --set serviceAccount.name=pmm-server"
+	fi
 
 		helm uninstall -n "${NAMESPACE}" monitoring || :
 		helm repo remove percona || :
@@ -394,14 +392,16 @@ deploy_pmm3_server() {
 		kubectl delete clusterrolebinding monitoring --ignore-not-found
 
 		helm repo add percona https://percona.github.io/percona-helm-charts/
-		helm install monitoring percona/pmm -n "${NAMESPACE}" \
+		helm repo update
+
+		retry 10 60 helm install monitoring percona/pmm -n "${NAMESPACE}" \
 			--set fullnameOverride=monitoring \
 			--set image.tag=${IMAGE_PMM3_SERVER#*:} \
 			--set image.repository=${IMAGE_PMM3_SERVER%:*} \
 			--set service.type=LoadBalancer \
 			--set platform="$platform" \
+			$additional_params \
 			--force
-	fi
 }
 
 generate_pmm_api_key() {
