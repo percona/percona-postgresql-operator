@@ -1,0 +1,14 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq '.spec.databaseInitSQL.name = "init-database-sql"' \
+        | yq '.spec.databaseInitSQL.key = "init.sql"' \
+        | kubectl -n "${NAMESPACE}" apply -f -
