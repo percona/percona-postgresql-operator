@@ -364,9 +364,9 @@ copy_custom_extensions_form_aws() {
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
 	kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
-	  --image=perconalab/awscli \
-	  --restart=Never -- \
-	  bash -c "
+		--image=perconalab/awscli \
+		--restart=Never -- \
+		bash -c "
 		AWS_ACCESS_KEY_ID=$(get_aws_access_key_id aws-s3-secret) \
 		AWS_SECRET_ACCESS_KEY=$(get_aws_access_key aws-s3-secret) \
 		AWS_DEFAULT_REGION=eu-central-1 \
