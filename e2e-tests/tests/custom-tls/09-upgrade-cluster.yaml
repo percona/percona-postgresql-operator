@@ -9,6 +9,7 @@ commands:
       source ../../functions
 
       get_cr "custom-tls" ${RANDOM} \
+        | yq '.spec.pause=false' \
         | yq '.spec.secrets.customRootCATLSSecret.name="new-custom-cert-tls-pg-ca-cert"' \
         | yq '.spec.secrets.customRootCATLSSecret.items[0].key="tls.key"' \
         | yq '.spec.secrets.customRootCATLSSecret.items[0].path="root.key"' \
