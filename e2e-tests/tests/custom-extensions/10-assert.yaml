@@ -22,41 +22,13 @@ spec:
       - name: postgres-startup
       - command:
         - /usr/local/bin/relocate-extensions.sh
-        resources: {}
-        volumeMounts:
-        - mountPath: /pgdata
-          name: postgres-data
-        - mountPath: /tmp
-          name: tmp
       - command:
         - /usr/local/bin/install-extensions.sh
-        env:
-        - name: STORAGE_TYPE
-          value: s3
-        - name: STORAGE_ENDPOINT
-        - name: STORAGE_REGION
-          value: eu-central-1
-        - name: STORAGE_BUCKET
-          value: pg-extensions
-        - name: INSTALL_EXTENSIONS
-        - name: PG_VERSION
-        - name: PGDATA_EXTENSIONS
-        envFrom:
-        - secretRef:
-            name: aws-s3-secret
-        resources: {}
-        volumeMounts:
-        - mountPath: /pgdata
-          name: postgres-data
-        - name: postgres-data
-        - name: postgres-data
-        - mountPath: /tmp
-          name: tmp
       - command:
         - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
-  observedGeneration: 3
+  observedGeneration: 4
   replicas: 1
   updatedReplicas: 1
   readyReplicas: 1
