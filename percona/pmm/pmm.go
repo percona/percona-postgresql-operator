@@ -411,7 +411,7 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 			},
 			{
 				Name:  "PMM_AGENT_PATHS_TEMPDIR",
-				Value: "/tmp",
+				Value: "/tmp/pmm",
 			},
 		},
 	}
