@@ -904,13 +904,20 @@ wait_cluster_consistency() {
 
 deploy_cert_manager() {
 	echo 'deploy cert manager'
+	kubectl delete validatingwebhookconfiguration cert-manager-webhook || :
 	kubectl create namespace cert-manager || :
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
 	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false || : 2>/dev/null
+
 	kubectl wait deployment cert-manager cert-manager-webhook cert-manager-cainjector \
 		--for=condition=available \
 		--timeout=100s \
 		--namespace cert-manager
+
+	until kubectl get validatingwebhookconfiguration cert-manager-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | grep -q '[A-Za-z0-9+/=]'; do
+		echo "Waiting for cert-manager webhook to be ready..."
+		sleep 1
+	done
 }
 
 get_container_image() {
