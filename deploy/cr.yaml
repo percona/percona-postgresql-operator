@@ -11,7 +11,7 @@ metadata:
 spec:
   crVersion: 2.7.0
 #  initContainer:
-#    image: percona/percona-postgresql-operator:2.7.0-ppg17.5.2-postgres
+#    image: docker.io/percona/percona-postgresql-operator:2.7.0-ppg17.5.2-postgres
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -154,7 +154,7 @@ spec:
 #          test-label: value
 
 
-  image: percona/percona-postgresql-operator:2.7.0-ppg17.5.2-postgres
+  image: docker.io/percona/percona-postgresql-operator:2.7.0-ppg17.5.2-postgres
   imagePullPolicy: Always
   postgresVersion: 17
 #  port: 5432
@@ -180,7 +180,7 @@ spec:
   - name: instance1
     replicas: 3
 #    initContainer:
-#      image: perconalab/percona-postgresql-operator:main
+#      image: docker.io/percona/percona-postgresql-operator:2.7.0
 #      resources:
 #        limits:
 #          cpu: 2.0
@@ -304,7 +304,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: percona/percona-pgbouncer:1.24.1
+      image: docker.io/percona/percona-pgbouncer:1.24.1
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -394,9 +394,9 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: percona/percona-pgbackrest:2.55.0
+      image: docker.io/percona/percona-pgbackrest:2.55.0
 #      initContainer:
-#        image: perconalab/percona-postgresql-operator:main
+#        image: docker.io/percona/percona-postgresql-operator:2.7.0
 #        resources:
 #          limits:
 #            cpu: 2.0
@@ -585,7 +585,7 @@ spec:
 
   pmm:
     enabled: false
-    image: percona/pmm-client:3.2.0
+    image: docker.io/percona/pmm-client:3.2.0
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -619,7 +619,7 @@ spec:
 #    - basebackup
 
 #  extensions:
-#    image: percona/percona-postgresql-operator:2.7.0
+#    image: docker.io/percona/percona-postgresql-operator:2.7.0
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
