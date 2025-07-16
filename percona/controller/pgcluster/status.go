@@ -2,7 +2,7 @@ package pgcluster
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -161,13 +161,17 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 
 	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
 
-	syncConditionsFromPostgresToPercona(status, cr)
+	syncConditionsFromPostgresToPercona(cr, status)
+
+	syncPatroniFromPostgresToPercona(cr, status)
+
+	syncPgbackrestFromPostgresToPercona(cr, status)
 
 }
 
-func syncConditionsFromPostgresToPercona(postgresStatus *v1beta1.PostgresClusterStatus, perconaStatus *v2.PerconaPGCluster) {
+func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
 	for _, pcCond := range postgresStatus.Conditions {
-		existing := meta.FindStatusCondition(perconaStatus.Status.Conditions, pcCond.Type)
+		existing := meta.FindStatusCondition(cr.Status.Conditions, pcCond.Type)
 		if existing != nil {
 			continue
 		}
@@ -178,9 +182,34 @@ func syncConditionsFromPostgresToPercona(postgresStatus *v1beta1.PostgresCluster
 			Reason:             pcCond.Reason,
 			Message:            pcCond.Message,
 			LastTransitionTime: pcCond.LastTransitionTime,
-			ObservedGeneration: perconaStatus.Generation,
+			ObservedGeneration: cr.Generation,
 		}
 
-		perconaStatus.Status.Conditions = append(perconaStatus.Status.Conditions, newCond)
+		cr.Status.Conditions = append(cr.Status.Conditions, newCond)
 	}
+}
+
+func syncPatroniFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
+
+	if cr.Status.PatroniStatus.Patroni == nil {
+		fmt.Println("DEBUG >>> PatroniStatus.Patroni ")
+		cr.Status.PatroniStatus.Patroni = &v1beta1.PatroniStatus{}
+	}
+
+	if postgresStatus.Patroni.SystemIdentifier != "" {
+		cr.Status.PatroniStatus.Patroni.SystemIdentifier = postgresStatus.Patroni.SystemIdentifier
+	}
+	if postgresStatus.Patroni.SwitchoverTimeline != nil {
+		cr.Status.PatroniStatus.Patroni.SwitchoverTimeline = postgresStatus.Patroni.SwitchoverTimeline
+	}
+	if postgresStatus.Patroni.Switchover != nil {
+		cr.Status.PatroniStatus.Patroni.Switchover = postgresStatus.Patroni.Switchover
+	}
+}
+
+func syncPgbackrestFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
+	if postgresStatus.PGBackRest != nil {
+		cr.Status.PGBackRest = postgresStatus.PGBackRest.DeepCopy()
+	}
+
 }

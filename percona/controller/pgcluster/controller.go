@@ -354,7 +354,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 			orig := cluster.DeepCopy()
 
-			cluster.Status.PatroniVersion = patroniVersion
+			cluster.Status.PatroniStatus.PatroniVersion = patroniVersion
 
 			if err := r.Client.Status().Patch(ctx, cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
 				return errors.Wrap(err, "failed to patch patroni version")
@@ -401,8 +401,8 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	// If the imageIDs slice contains the imageID from the status, we skip checking the Patroni version.
 	// This ensures that the Patroni version is only checked after all pods have been updated.
-	if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.PatroniVersion != "" {
-		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
+	if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.PatroniStatus.PatroniVersion != "" {
+		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniStatus.PatroniVersion
 		return nil
 	}
 
@@ -494,7 +494,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	orig := cr.DeepCopy()
 
-	cr.Status.PatroniVersion = patroniVersion
+	cr.Status.PatroniStatus.PatroniVersion = patroniVersion
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
 	cr.Status.Postgres.ImageID = getImageIDFromPod(p, pNaming.ContainerPatroniVersionCheck)
 

@@ -446,7 +446,11 @@ type PerconaPGClusterStatus struct {
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
-	PatroniVersion string `json:"patroniVersion"`
+	PatroniStatus PatroniStatus `json:"patroniStatus,omitempty"`
+
+	// Status information for pgBackRest
+	// +optional
+	PGBackRest *crunchyv1beta1.PGBackRestStatus `json:"pgbackrest,omitempty"`
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
@@ -463,6 +467,16 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+type PatroniStatus struct {
+
+	// +optional
+	Patroni *crunchyv1beta1.PatroniStatus `json:"patroni,omitempty"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	PatroniVersion string `json:"patroniVersion"`
 }
 
 type Backups struct {
