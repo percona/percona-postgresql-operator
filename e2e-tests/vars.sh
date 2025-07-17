@@ -35,8 +35,8 @@ export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 
 # Add 'docker.io' for images that are provided without registry
-
-export REGISTRY='docker.io/'
+export REGISTRY_NAME="docker.io"
+export REGISTRY_NAME_FULL="${REGISTRY_NAME}/"
 
 for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
 	var_value=$(eval "echo \$$var")
@@ -44,9 +44,11 @@ for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
 		continue
 	fi
 	if [[ "$var_value" == percona/* || "$var_value" == perconalab/* ]]; then
-		new_value="${REGISTRY}${var_value}"
+		new_value="${REGISTRY_NAME_FULL}${var_value}"
 		export "$var=$new_value"
+		echo $var=$new_value
 	fi
+	echo $IMAGE
 done
 
 # shellcheck disable=SC2034

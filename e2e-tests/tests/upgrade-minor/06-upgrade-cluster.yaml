@@ -13,9 +13,9 @@ commands:
       target_image_backrest=$IMAGE_BACKREST
 
       if [ "$pg_ver_lower" != "$PG_VER" ]; then
-          target_image_postgresql="${REGISTRY}perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-postgres"
-          target_image_pgbouncer="${REGISTRY}perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-pgbouncer"
-          target_image_backrest="${REGISTRY}perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-pgbackrest"
+          target_image_postgresql="${REGISTRY_NAME_FULL}perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-postgres"
+          target_image_pgbouncer="${REGISTRY_NAME_FULL}perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-pgbouncer"
+          target_image_backrest="${REGISTRY_NAME_FULL}perconalab/percona-postgresql-operator:main-ppg$pg_ver_lower-pgbackrest"
       fi
       cr_ver=$(yq '.spec.crVersion' $DEPLOY_DIR/cr.yaml)
 
