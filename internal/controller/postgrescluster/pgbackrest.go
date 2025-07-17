@@ -843,6 +843,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		}
 		initContainers = []corev1.Container{
 			k8s.InitContainer(
+				postgresCluster,
 				naming.PGBackRestRepoContainerName,
 				initImage,
 				postgresCluster.Spec.ImagePullPolicy,
@@ -2303,7 +2304,28 @@ func (r *Reconciler) reconcileDedicatedRepoHost(ctx context.Context,
 // manually by the end-user
 func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	postgresCluster *v1beta1.PostgresCluster, manualBackupJobs []*batchv1.Job,
-	serviceAccount *corev1.ServiceAccount, instances *observedInstances) error {
+	serviceAccount *corev1.ServiceAccount, instances *observedInstances,
+) error {
+	// K8SPG-804: Get the current state of PostgresCluster.
+	// It's necessary to make internal.percona.com/delete-backup finalizer work.
+	// Because the reconcileManualBackup can get an outdated postgresCluster,
+	// resulting in a duplicated backup jobs per one pg-backup resources.
+	// For more information check the K8SPG-804 PR description.
+	currentPostgresCluster := new(v1beta1.PostgresCluster)
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), currentPostgresCluster)
+	if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	// refPostgresCluster keeps pointer to the postgresCluster which is used in other reconcile functions
+	// It should be used to assign values to the postgresCluster inside this function
+	refPostgresCluster := postgresCluster
+
+	// If it's the first run of reconcileManualBackup .Status will be nil.
+	// Nothing will happen if we keep the old postgresCluster.
+	if !apierrors.IsNotFound(err) && currentPostgresCluster.Status.PGBackRest != nil {
+		postgresCluster = currentPostgresCluster
+	}
 
 	manualAnnotation := postgresCluster.GetAnnotations()[naming.PGBackRestBackup]
 	manualStatus := postgresCluster.Status.PGBackRest.ManualBackup
@@ -2396,7 +2418,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 		meta.RemoveStatusCondition(&postgresCluster.Status.Conditions,
 			ConditionManualBackupSuccessful)
 
-		postgresCluster.Status.PGBackRest.ManualBackup = manualStatus
+		refPostgresCluster.Status.PGBackRest.ManualBackup = manualStatus
 	}
 
 	// if the status shows the Job is no longer in progress, then simply exit (which means a Job
@@ -2491,6 +2513,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 		})
 	backupJob.ObjectMeta.Labels = labels
 	backupJob.ObjectMeta.Annotations = annotations
+	// K8SPG-703
+	backupJob.Finalizers = []string{pNaming.FinalizerKeepJob}
 
 	// K8SPG-613
 	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster, &postgresCluster.Spec.Backups.PGBackRest)

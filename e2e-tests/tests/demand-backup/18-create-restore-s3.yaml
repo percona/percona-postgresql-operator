@@ -8,7 +8,7 @@ commands:
       source ../../functions
 
       primary=$(get_pod_by_role demand-backup primary name)
-      latest_full_repo1_backup=$(kubectl -n ${NAMESPACE} exec ${primary} -- pgbackrest info --output json | jq '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 1)][-1].label')
+      latest_full_repo1_backup=$(kubectl -n ${NAMESPACE} exec ${primary} -- pgbackrest info --output json --log-level-console=info | jq '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 1)][-1].label')
 
       cat <<EOF | kubectl -n ${NAMESPACE} apply -f -
       apiVersion: pgv2.percona.com/v2

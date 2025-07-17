@@ -206,7 +206,7 @@ volumeMounts:
 			t.Setenv("OPERATOR_NAMESPACE", cr.Namespace)
 			cr := tt.getCluster().DeepCopy()
 
-			container := InitContainer(tt.component, tt.image, tt.pullPolicy, tt.secCtx, tt.resources, tt.getComponent(cr))
+			container := InitContainer(tt.getCluster(), tt.component, tt.image, tt.pullPolicy, tt.secCtx, tt.resources, tt.getComponent(cr))
 			data, err := yaml.Marshal(container)
 			if err != nil {
 				t.Fatal(err)

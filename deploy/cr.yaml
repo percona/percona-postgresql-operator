@@ -16,25 +16,29 @@ spec:
 #      limits:
 #        cpu: 2.0
 #        memory: 4Gi
+#      requests:
+#        cpu: 1.0
+#        memory: 3Gi
 #    containerSecurityContext:
-#      fsGroup: 1001
 #      runAsUser: 1001
-#      runAsNonRoot: true
-#      fsGroupChangePolicy: "OnRootMismatch"
 #      runAsGroup: 1001
-#      seLinuxOptions:
-#        type: spc_t
-#        level: s0:c123,c456
+#      runAsNonRoot: true
+#      privileged: false
+#      allowPrivilegeEscalation: false
+#      readOnlyRootFilesystem: true
+#      capabilities:
+#        add:
+#          - NET_ADMIN
+#          - SYS_TIME
+#        drop:
+#          - ALL
 #      seccompProfile:
 #        type: Localhost
 #        localhostProfile: localhost/profile.json
-#      supplementalGroups:
-#      - 1001
-#      sysctls:
-#      - name: net.ipv4.tcp_keepalive_time
-#        value: "600"
-#      - name: net.ipv4.tcp_keepalive_intvl
-#        value: "60"
+#      procMount: Default
+#      seLinuxOptions:
+#        type: spc_t
+#        level: s0:c123,c456
 #  metadata:
 #    annotations:
 #      example-annotation: value
@@ -161,6 +165,7 @@ spec:
 #    labels:
 #      my-label: value2
 #    type: LoadBalancer
+#    loadBalancerClass: "eks.amazonaws.com/nlb"
 #    loadBalancerSourceRanges:
 #      - 10.0.0.0/8
 #  exposeReplicas:
@@ -169,6 +174,7 @@ spec:
 #    labels:
 #      my-label: value2
 #    type: LoadBalancer
+#    loadBalancerClass: "eks.amazonaws.com/nlb"
 #    loadBalancerSourceRanges:
 #      - 10.0.0.0/8
 
@@ -182,24 +188,25 @@ spec:
 #          cpu: 2.0
 #          memory: 4Gi
 #      containerSecurityContext:
-#        fsGroup: 1001
 #        runAsUser: 1001
-#        runAsNonRoot: true
-#        fsGroupChangePolicy: "OnRootMismatch"
 #        runAsGroup: 1001
-#        seLinuxOptions:
-#          type: spc_t
-#          level: s0:c123,c456
+#        runAsNonRoot: true
+#        privileged: false
+#        allowPrivilegeEscalation: false
+#        readOnlyRootFilesystem: true
+#        capabilities:
+#          add:
+#            - NET_ADMIN
+#            - SYS_TIME
+#          drop:
+#            - ALL
 #        seccompProfile:
 #          type: Localhost
 #          localhostProfile: localhost/profile.json
-#        supplementalGroups:
-#        - 1001
-#        sysctls:
-#        - name: net.ipv4.tcp_keepalive_time
-#          value: "600"
-#        - name: net.ipv4.tcp_keepalive_intvl
-#          value: "60"
+#        procMount: Default
+#        seLinuxOptions:
+#          type: spc_t
+#          level: s0:c123,c456
 
     affinity:
       podAntiAffinity:
@@ -214,12 +221,18 @@ spec:
 #      limits:
 #        cpu: 2.0
 #        memory: 4Gi
+#      requests:
+#        cpu: 1.0
+#        memory: 3Gi
 #    containers:
 #      replicaCertCopy:
 #        resources:
 #          limits:
 #            cpu: 200m
 #            memory: 128Mi
+#          requests:
+#            cpu: 100m
+#            memory: 120Mi
 #    sidecars:
 #    - name: testcontainer
 #      image: busybox:latest
@@ -299,12 +312,18 @@ spec:
 #        limits:
 #          cpu: 200m
 #          memory: 128Mi
+#        requests:
+#          cpu: 150m
+#          memory: 120Mi
 #      containers:
 #        pgbouncerConfig:
 #          resources:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
+#            requests:
+#              cpu: 150m
+#              memory: 120Mi
 #
 #      expose:
 #        annotations:
@@ -312,6 +331,7 @@ spec:
 #        labels:
 #          my-label: value2
 #        type: LoadBalancer
+#        loadBalancerClass: "eks.amazonaws.com/nlb"
 #        loadBalancerSourceRanges:
 #          - 10.0.0.0/8
 #
@@ -384,36 +404,46 @@ spec:
 #          limits:
 #            cpu: 2.0
 #            memory: 4Gi
+#          requests:
+#            cpu: 1.0
+#            memory: 3Gi
 #        containerSecurityContext:
-#          fsGroup: 1001
 #          runAsUser: 1001
-#          runAsNonRoot: true
-#          fsGroupChangePolicy: "OnRootMismatch"
 #          runAsGroup: 1001
-#          seLinuxOptions:
-#            type: spc_t
-#            level: s0:c123,c456
+#          runAsNonRoot: true
+#          privileged: false
+#          allowPrivilegeEscalation: false
+#          readOnlyRootFilesystem: true
+#          capabilities:
+#            add:
+#              - NET_ADMIN
+#              - SYS_TIME
+#            drop:
+#              - ALL
 #          seccompProfile:
 #            type: Localhost
 #            localhostProfile: localhost/profile.json
-#          supplementalGroups:
-#          - 1001
-#          sysctls:
-#          - name: net.ipv4.tcp_keepalive_time
-#            value: "600"
-#          - name: net.ipv4.tcp_keepalive_intvl
-#            value: "60"
+#          procMount: Default
+#          seLinuxOptions:
+#            type: spc_t
+#            level: s0:c123,c456
 #      containers:
 #        pgbackrest:
 #          resources:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
+#            requests:
+#              cpu: 150m
+#              memory: 120Mi
 #        pgbackrestConfig:
 #          resources:
 #            limits:
 #              cpu: 200m
 #              memory: 128Mi
+#            requests:
+#              cpu: 150m
+#              memory: 120Mi
 #
 #      configuration:
 #        - secret:
@@ -422,10 +452,14 @@ spec:
 #        restartPolicy: OnFailure
 #        backoffLimit: 2
 #        priorityClassName: high-priority
+#        ttlSecondsAfterFinished: 60
 #        resources:
 #          limits:
 #            cpu: 200m
 #            memory: 128Mi
+#          requests:
+#            cpu: 150m
+#            memory: 120Mi
 #        tolerations:
 #        - effect: NoSchedule
 #          key: role
@@ -466,6 +500,9 @@ spec:
 #          limits:
 #            cpu: 200m
 #            memory: 128Mi
+#          requests:
+#            cpu: 150m
+#            memory: 120Mi
         affinity:
           podAntiAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
@@ -555,6 +592,13 @@ spec:
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
+#    resources:
+#      limits:
+#        memory: 200M
+#        cpu: 350m
+#      requests:
+#        memory: 150M
+#        cpu: 300m
 #    customClusterName: "<string>"
 #    postgresParams: "<string>"
 #    querySource: pgstatmonitor

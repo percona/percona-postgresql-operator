@@ -19,3 +19,8 @@ const (
 const (
 	FinalizerDeleteBackup = PrefixPerconaInternal + "delete-backup" //nolint:gosec
 )
+
+// PerconaPGBackup job finalizers
+const (
+	FinalizerKeepJob = PrefixPerconaInternal + "keep-job" //nolint:gosec
+)

@@ -207,7 +207,9 @@ func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...clien
 	objs = append(objs, dcs)
 
 	cl := new(fakeClient)
-	cl.Client = fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).WithStatusSubresource(objs...).Build()
+	cl.Client = fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).WithStatusSubresource(objs...).
+		WithIndex(new(v2.PerconaPGBackup), v2.IndexFieldPGCluster, v2.PGClusterIndexerFunc).
+		Build()
 
 	return cl, nil
 }
