@@ -13,56 +13,58 @@ BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 GIT_COMMIT=$(git rev-parse HEAD)
 IMAGE=${IMAGE/#percona\//perconalab/}
 
-if [[ ${DOCKER_NOCACHE:-0} == 1 ]]; then
-	no_cache="--no-cache"
-fi
-if [[ ${DOCKER_SQUASH:-1} == 1 ]]; then
-	squash="--squash"
-fi
+echo $IMAGE
 
-if [[ ${DOCKER_PUSH:-1} == 1 ]]; then
-	imgresult="--push=true"
-else
-	imgresult="--load"
-fi
+# if [[ ${DOCKER_NOCACHE:-0} == 1 ]]; then
+# 	no_cache="--no-cache"
+# fi
+# if [[ ${DOCKER_SQUASH:-1} == 1 ]]; then
+# 	squash="--squash"
+# fi
 
-BUILD_COMPONENT=${COMPONENT:-"postgres-operator"}
+# if [[ ${DOCKER_PUSH:-1} == 1 ]]; then
+# 	imgresult="--push=true"
+# else
+# 	imgresult="--load"
+# fi
 
-build_operator() {
-	if [ "${RELEASE:-1}" = 0 ]; then
-		GO_LDFLAGS="-race"
-	fi
+# BUILD_COMPONENT=${COMPONENT:-"postgres-operator"}
 
-	export DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-"linux/amd64"}
-	export GO_LDFLAGS="-w -s -trimpath ${GO_LDFLAGS}"
+# build_operator() {
+# 	if [ "${RELEASE:-1}" = 0 ]; then
+# 		GO_LDFLAGS="-race"
+# 	fi
 
-	if echo "$DOCKER_DEFAULT_PLATFORM" | grep -q ','; then
-		if [ "${DOCKER_PUSH:-1}" = 0 ]; then
-			echo "'docker $build_command' doesn't support DOCKER_PUSH=0 option in case of multi-arch builds, please use DOCKER_PUSH=1"
-			exit 1
-		fi
-	fi
+# 	export DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-"linux/amd64"}
+# 	export GO_LDFLAGS="-w -s -trimpath ${GO_LDFLAGS}"
 
-	pushd "${ROOT_REPO}" || exit
-	docker buildx build \
-		--platform $DOCKER_DEFAULT_PLATFORM \
-		--build-arg GIT_COMMIT="${GIT_COMMIT}" \
-		--build-arg GIT_BRANCH="${GIT_BRANCH}" \
-		--build-arg BUILD_TIME="${BUILD_TIME}" \
-		--build-arg GO_LDFLAGS="${GO_LDFLAGS}" \
-		--progress plain \
-		$imgresult \
-		$squash \
-		$no_cache \
-		-t "${IMAGE}" -f build/${BUILD_COMPONENT}/Dockerfile .
-	popd || exit
-}
+# 	if echo "$DOCKER_DEFAULT_PLATFORM" | grep -q ','; then
+# 		if [ "${DOCKER_PUSH:-1}" = 0 ]; then
+# 			echo "'docker $build_command' doesn't support DOCKER_PUSH=0 option in case of multi-arch builds, please use DOCKER_PUSH=1"
+# 			exit 1
+# 		fi
+# 	fi
 
-if [[ $BUILD == "0" ]]; then
-	exit 0
-fi
+# 	pushd "${ROOT_REPO}" || exit
+# 	docker buildx build \
+# 		--platform $DOCKER_DEFAULT_PLATFORM \
+# 		--build-arg GIT_COMMIT="${GIT_COMMIT}" \
+# 		--build-arg GIT_BRANCH="${GIT_BRANCH}" \
+# 		--build-arg BUILD_TIME="${BUILD_TIME}" \
+# 		--build-arg GO_LDFLAGS="${GO_LDFLAGS}" \
+# 		--progress plain \
+# 		$imgresult \
+# 		$squash \
+# 		$no_cache \
+# 		-t "${IMAGE}" -f build/${BUILD_COMPONENT}/Dockerfile .
+# 	popd || exit
+# }
 
-# wait for docker
-until docker info >/dev/null; do sleep 1; done
+# if [[ $BUILD == "0" ]]; then
+# 	exit 0
+# fi
 
-build_operator
+# # wait for docker
+# until docker info >/dev/null; do sleep 1; done
+
+# build_operator
