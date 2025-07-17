@@ -170,7 +170,7 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 // reloadCommand returns an entrypoint that convinces PostgreSQL to reload
 // certificate files when they change. The process will appear as name in `ps`
 // and `top`.
-func reloadCommand(name string, post250 bool) []string {
+func reloadCommand(cluster *v1beta1.PostgresCluster, name string, post250 bool, AutoGrowVolumes bool) []string {
 	// Use a Bash loop to periodically check the mtime of the mounted
 	// certificate volume. When it changes, copy the replication certificate,
 	// signal PostgreSQL, and print the observed timestamp.
@@ -193,6 +193,7 @@ func reloadCommand(name string, post250 bool) []string {
 	// descriptor gets closed and reopened to use the builtin `[ -nt` to check
 	// mtimes.
 	// - https://unix.stackexchange.com/a/407383
+
 	script := fmt.Sprintf(`
 declare -r directory=%q
 exec {fd}<> <(:)
@@ -214,6 +215,27 @@ done
 	)
 
 	if post250 {
+		// Only add annotation update logic if AutoGrowVolumes is true
+		autogrowScript := ""
+		if AutoGrowVolumes || cluster.CompareVersion("2.8.0") < 0 {
+			autogrowScript = strings.TrimSuffix(`
+  # Manage autogrow annotation.
+  # Return size in Mebibytes.
+  size=$(df --human-readable --block-size=M /pgdata | awk 'FNR == 2 {print $2}')
+  use=$(df --human-readable /pgdata | awk 'FNR == 2 {print $5}')
+  sizeInt="${size//M/}"
+  # Use the sed punctuation class, because the shell will not accept the percent sign in an expansion.
+  useInt=$(echo $use | sed 's/[[:punct:]]//g')
+  triggerExpansion="$((useInt > 75))"
+  if [ $triggerExpansion -eq 1 ]; then
+    newSize="$(((sizeInt / 2)+sizeInt))"
+    newSizeMi="${newSize}Mi"
+    d='[{"op": "add", "path": "/metadata/annotations/suggested-pgdata-pvc-size", "value": "'"$newSizeMi"'"}]'
+    curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -XPATCH "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}?fieldManager=kubectl-annotate" -H "Content-Type: application/json-patch+json" --data "$d"
+  fi
+`, "\n")
+		}
+
 		script = fmt.Sprintf(`
 # Parameters for curl when managing autogrow annotation.
 APISERVER="https://kubernetes.default.svc"
@@ -233,21 +255,7 @@ while read -r -t 5 -u "${fd}" ||:; do
     exec {fd}>&- && exec {fd}<> <(:||:)
     stat --format='Loaded certificates dated %%y' "${directory}"
   fi
-
-  # Manage autogrow annotation.
-  # Return size in Mebibytes.
-  size=$(df --human-readable --block-size=M /pgdata | awk 'FNR == 2 {print $2}')
-  use=$(df --human-readable /pgdata | awk 'FNR == 2 {print $5}')
-  sizeInt="${size//M/}"
-  # Use the sed punctuation class, because the shell will not accept the percent sign in an expansion.
-  useInt=$(echo $use | sed 's/[[:punct:]]//g')
-  triggerExpansion="$((useInt > 75))"
-  if [ $triggerExpansion -eq 1 ]; then
-    newSize="$(((sizeInt / 2)+sizeInt))"
-    newSizeMi="${newSize}Mi"
-    d='[{"op": "add", "path": "/metadata/annotations/suggested-pgdata-pvc-size", "value": "'"$newSizeMi"'"}]'
-    curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -XPATCH "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}?fieldManager=kubectl-annotate" -H "Content-Type: application/json-patch+json" --data "$d"
-  fi
+%s
 done
 `,
 			naming.CertMountPath,
@@ -255,6 +263,7 @@ done
 			naming.ReplicationCertPath,
 			naming.ReplicationPrivateKeyPath,
 			naming.ReplicationCACertPath,
+			autogrowScript, // This will be empty if  AutoGrowVolumes is false
 		)
 	}
 
