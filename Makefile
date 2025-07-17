@@ -375,6 +375,21 @@ ROOT_REPO ?= ${PWD}
 IMAGE_TAG_BASE ?= perconalab/$(NAME)
 IMAGE ?= $(IMAGE_TAG_BASE):$(VERSION)
 PGO_VERSION ?= $(shell git describe --tags)
+IMAGE_REGISTRY ?= docker.io/
+
+# Images should contain registry. If IMAGE is provided with registry - use it. If no registry is provided - use `docker.io`
+SLASH_COUNT := $(words $(subst /, ,$(IMAGE)))
+ifeq ($(SLASH_COUNT),3)
+  IMAGE_REGISTRY := $(word 1,$(subst /, ,$(IMAGE)))/
+  $(info IMAGE is qualified: $(IMAGE))
+  $(info Registry: $(IMAGE_REGISTRY))
+else
+  IMAGE := $(IMAGE_REGISTRY)$(IMAGE)
+  $(info IMAGE reassigned to: $(IMAGE))
+endif
+
+print:
+	@echo "Using image: $(IMAGE)"
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
@@ -425,17 +440,17 @@ include e2e-tests/release_versions
 release: generate
 	$(SED) -i \
     	-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
-        -e "/^spec:/,/^  image:/{s#image: .*#image: ${IMAGE_REGISTRY}$(IMAGE_POSTGRESQL17)#}" \
-        -e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: ${IMAGE_REGISTRY}$(IMAGE_PGBOUNCER17)#}" \
-        -e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: ${IMAGE_REGISTRY}$(IMAGE_BACKREST17)#}" \
-        -e "/extensions:/,/image:/{s#image: .*#image: ${IMAGE_REGISTRY}$(IMAGE_OPERATOR)#}" \
-        -e "/^  pmm:/,/^    image:/{s#image: .*#image: ${IMAGE_REGISTRY}$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
+        -e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_REGISTRY)$(IMAGE_POSTGRESQL17)#}" \
+        -e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(IMAGE_REGISTRY)$(IMAGE_PGBOUNCER17)#}" \
+        -e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(IMAGE_REGISTRY)$(IMAGE_BACKREST17)#}" \
+        -e "/extensions:/,/image:/{s#image: .*#image: $(IMAGE_REGISTRY)$(IMAGE_OPERATOR)#}" \
+        -e "/^  pmm:/,/^    image:/{s#image: .*#image: $(IMAGE_REGISTRY)$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
-       -e "/^spec:/,/^  image:/{s#image: .*#image: ${IMAGE_REGISTRY}$(IMAGE_UPGRADE)#}" \
-       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: ${IMAGE_REGISTRY}$(IMAGE_POSTGRESQL17)#}" \
-       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: ${IMAGE_REGISTRY}$(IMAGE_PGBOUNCER17)#}" \
-       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: ${IMAGE_REGISTRY}$(IMAGE_BACKREST17)#}" deploy/upgrade.yaml
+       -e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_REGISTRY)$(IMAGE_UPGRADE)#}" \
+       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(IMAGE_REGISTRY)$(IMAGE_POSTGRESQL17)#}" \
+       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(IMAGE_REGISTRY)$(IMAGE_PGBOUNCER17)#}" \
+       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(IMAGE_REGISTRY)$(IMAGE_BACKREST17)#}" deploy/upgrade.yaml
 
 # Prepare main branch after release
 MAJOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f1)
@@ -444,14 +459,14 @@ NEXT_VER ?= $(MAJOR_VER).$$(($(MINOR_VER) + 1)).0
 after-release: generate
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
-		-e "/^spec:/,/^  image:/{s#image: .*#image: ${IMAGE_REGISTRY}perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
-		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: ${IMAGE_REGISTRY}perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbouncer#}" \
-		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: ${IMAGE_REGISTRY}perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbackrest#}" \
-		-e "/extensions:/,/image:/{s#image: .*#image: ${IMAGE_REGISTRY}perconalab/percona-postgresql-operator:main#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: ${IMAGE_REGISTRY}perconalab/pmm-client:dev-latest#}" deploy/cr.yaml
+		-e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_REGISTRY)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
+		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(IMAGE_REGISTRY)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
+		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(IMAGE_REGISTRY)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" \
+		-e "/extensions:/,/image:/{s#image: .*#image: $(IMAGE_REGISTRY)perconalab/percona-postgresql-operator:main#}" \
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(IMAGE_REGISTRY)perconalab/pmm-client:dev-latest#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
-		-e "/^spec:/,/^  image:/{s#image: .*#image: ${IMAGE_REGISTRY}perconalab/percona-postgresql-operator:-ugrade#}" \
-		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: ${IMAGE_REGISTRY}perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
-		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: ${IMAGE_REGISTRY}perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbouncer#}" \
-		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: ${IMAGE_REGISTRY}perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-pgbackrest#}" deploy/upgrade.yaml
+		-e "/^spec:/,/^  image:/{s#image: .*#image: $(IMAGE_REGISTRY)perconalab/percona-postgresql-operator:main-upgrade#}" \
+		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(IMAGE_REGISTRY)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
+		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(IMAGE_REGISTRY)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
+		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(IMAGE_REGISTRY)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" deploy/upgrade.yaml

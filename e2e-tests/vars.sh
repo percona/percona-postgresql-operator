@@ -34,19 +34,19 @@ export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3-dev-lates
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 
-if [[ $OPENSHIFT ]]; then
-	export REGISTRY='docker.io/'
 
-	for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
-		var_value=$(eval "echo \$$var")
-		if [[ $var_value == docker.io/* ]]; then
-			continue
-		fi
-		new_value="${REGISTRY}${var_value}"
-		export "$var=$new_value"
-		echo "$var=$new_value"
-	done
-fi
+# Add 'docker.io' for images that are provided without registry
+export REGISTRY='docker.io/'
+
+for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
+	var_value=$(eval "echo \$$var")
+	if [[ $var_value == */*/*:* ]]; then
+		continue
+	fi
+	new_value="${REGISTRY}${var_value}"
+	export "$var=$new_value"
+done
+
 
 # shellcheck disable=SC2034
 date=$(which gdate || which date)
