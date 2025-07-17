@@ -19,13 +19,13 @@ spec:
   template:
     spec:
       initContainers:
-      - name: postgres-startup
-      - command:
-        - /usr/local/bin/relocate-extensions.sh
-      - command:
-        - /usr/local/bin/install-extensions.sh
       - command:
         - /usr/local/bin/init-entrypoint.sh
+      - name: postgres-startup
+      - command:
+        - /opt/crunchy/bin/relocate-extensions.sh
+      - command:
+        - /usr/local/bin/install-extensions.sh
       - name: nss-wrapper-init
 status:
   observedGeneration: 3
