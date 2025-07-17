@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -26,7 +27,7 @@ func TestContainer(t *testing.T) {
 
 	pgc := &v2.PerconaPGCluster{
 		Spec: v2.PerconaPGClusterSpec{
-			CRVersion: "2.6.0",
+			CRVersion: version.Version(),
 			PMM:       pmmSpec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -152,7 +153,7 @@ func TestSidecarContainerV2(t *testing.T) {
 
 	pgc := &v2.PerconaPGCluster{
 		Spec: v2.PerconaPGClusterSpec{
-			CRVersion: "2.7.0",
+			CRVersion: version.Version(),
 			PMM:       pmmSpec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -264,7 +265,7 @@ func TestSidecarContainerV3(t *testing.T) {
 
 	pgc := &v2.PerconaPGCluster{
 		Spec: v2.PerconaPGClusterSpec{
-			CRVersion: "2.7.0",
+			CRVersion: version.Version(),
 			PMM:       pmmSpec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -321,7 +322,7 @@ func TestSidecarContainerV3(t *testing.T) {
 		"DB_USER":                       v2.UserMonitoring,
 		"DB_PASS":                       "", // secret reference is asserted separately
 		"PMM_AGENT_PRERUN_SCRIPT":       "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source= --cluster=test-cluster --environment=dev-postgres; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
-		"PMM_AGENT_PATHS_TEMPDIR":       "/tmp",
+		"PMM_AGENT_PATHS_TEMPDIR":       "/tmp/pmm",
 	}
 
 	for _, envVar := range container.Env {
