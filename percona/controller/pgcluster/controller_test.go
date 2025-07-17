@@ -1613,6 +1613,15 @@ var _ = Describe("patroni version check", Ordered, func() {
 			cr2.Spec.InstanceSets[0].SecurityContext = &corev1.PodSecurityContext{
 				RunAsUser: &uid,
 			}
+			cr2.Spec.InstanceSets[0].Affinity = &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+						{
+							Weight: int32(1),
+						},
+					},
+				},
+			}
 			cr2.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 				{Name: "test-pull-secret"},
 			}
@@ -1683,10 +1692,20 @@ var _ = Describe("patroni version check", Ordered, func() {
 			expectedImagePullSecrets := []corev1.LocalObjectReference{
 				{Name: "test-pull-secret"},
 			}
+			expectedAffinity := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+						{
+							Weight: int32(1),
+						},
+					},
+				},
+			}
 
 			Expect(pod.Spec.SecurityContext).To(Equal(expectedSecurityContext))
 			Expect(pod.Spec.TerminationGracePeriodSeconds).To(Equal(ptr.To(int64(5))))
 			Expect(pod.Spec.ImagePullSecrets).To(Equal(expectedImagePullSecrets))
+			Expect(pod.Spec.Affinity).To(Equal(expectedAffinity))
 		})
 
 		It("should preserve existing patroni version in annotation", func() {
