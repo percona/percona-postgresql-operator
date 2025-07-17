@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -50,6 +51,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	perconaPG "github.com/percona/percona-postgresql-operator/percona/postgres"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -202,6 +204,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 	}
 
+	if err := r.setCRVersion(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "set CR version")
+	}
 	cr.Default()
 
 	if cr.Spec.OpenShift == nil {
@@ -963,6 +968,23 @@ func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.Perco
 			return errors.Wrap(err, "patch finalizers")
 		}
 	}
+
+	return nil
+}
+
+func (r *PGClusterReconciler) setCRVersion(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if len(cr.Spec.CRVersion) > 0 {
+		return nil
+	}
+
+	orig := cr.DeepCopy()
+	cr.Spec.CRVersion = version.Version()
+
+	if err := r.Client.Patch(ctx, cr, client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "patch CR")
+	}
+
+	logf.FromContext(ctx).Info("Set CR version", "version", cr.Spec.CRVersion)
 
 	return nil
 }

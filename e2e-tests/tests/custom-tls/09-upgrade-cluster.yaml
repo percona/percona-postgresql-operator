@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr "custom-tls" ${RANDOM} \
+        | yq '.spec.pause=false' \
+        | yq '.spec.secrets.customRootCATLSSecret.name="new-custom-cert-tls-pg-ca-cert"' \
+        | yq '.spec.secrets.customRootCATLSSecret.items[0].key="tls.key"' \
+        | yq '.spec.secrets.customRootCATLSSecret.items[0].path="root.key"' \
+        | yq '.spec.secrets.customRootCATLSSecret.items[1].key="tls.crt"' \
+        | yq '.spec.secrets.customRootCATLSSecret.items[1].path="root.crt"' \
+        | yq '.spec.secrets.customTLSSecret.name="new-custom-cert-tls-ssl"' \
+        | yq '.spec.secrets.customReplicationTLSSecret.name="new-custom-cert-tls-ssl-replica"' \
+        | kubectl -n "${NAMESPACE}" apply -f -
