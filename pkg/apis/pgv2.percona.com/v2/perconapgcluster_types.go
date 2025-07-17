@@ -469,7 +469,7 @@ type PerconaPGClusterStatus struct {
 type PatroniStatus struct {
 
 	// +optional
-	Patroni *crunchyv1beta1.PatroniStatus `json:"patroni,omitempty"`
+	*crunchyv1beta1.PatroniStatus `json:"patroni,omitempty"`
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status

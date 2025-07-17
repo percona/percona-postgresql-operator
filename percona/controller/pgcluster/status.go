@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-	"fmt"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -191,19 +190,18 @@ func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus
 
 func syncPatroniFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
 
-	if cr.Status.PatroniStatus.Patroni == nil {
-		fmt.Println("DEBUG >>> PatroniStatus.Patroni ")
-		cr.Status.PatroniStatus.Patroni = &v1beta1.PatroniStatus{}
+	if cr.Status.PatroniStatus.PatroniStatus == nil {
+		cr.Status.PatroniStatus.PatroniStatus = &v1beta1.PatroniStatus{}
 	}
 
 	if postgresStatus.Patroni.SystemIdentifier != "" {
-		cr.Status.PatroniStatus.Patroni.SystemIdentifier = postgresStatus.Patroni.SystemIdentifier
+		cr.Status.PatroniStatus.SystemIdentifier = postgresStatus.Patroni.SystemIdentifier
 	}
 	if postgresStatus.Patroni.SwitchoverTimeline != nil {
-		cr.Status.PatroniStatus.Patroni.SwitchoverTimeline = postgresStatus.Patroni.SwitchoverTimeline
+		cr.Status.PatroniStatus.SwitchoverTimeline = postgresStatus.Patroni.SwitchoverTimeline
 	}
 	if postgresStatus.Patroni.Switchover != nil {
-		cr.Status.PatroniStatus.Patroni.Switchover = postgresStatus.Patroni.Switchover
+		cr.Status.PatroniStatus.Switchover = postgresStatus.Patroni.Switchover
 	}
 }
 
