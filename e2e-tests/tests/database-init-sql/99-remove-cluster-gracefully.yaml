@@ -4,11 +4,11 @@ delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
-    name: custom-tls
+    name: database-init-sql
 - apiVersion: postgres-operator.crunchydata.com/v1beta1
   kind: PostgresCluster
   metadata:
-    name: custom-tls
+    name: database-init-sql
 commands:
   - script: |-
       set -o errexit
@@ -18,5 +18,4 @@ commands:
 
       remove_all_finalizers
       destroy_operator
-      destroy_cert_manager
     timeout: 60

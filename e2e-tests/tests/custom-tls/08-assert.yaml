@@ -1,0 +1,75 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: custom-tls
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: custom-tls
+      controller: true
+      blockOwnerDeletion: true
+status:
+  replicas: 0
+  availableReplicas: 0
+  collisionCount: 0
+  observedGeneration: 2
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: custom-tls-pgbouncer
+  labels:
+    postgres-operator.crunchydata.com/cluster: custom-tls
+    postgres-operator.crunchydata.com/role: pgbouncer
+  annotations:
+    deployment.kubernetes.io/revision: '2'
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: custom-tls
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  replicas: 0
+status:
+  observedGeneration: 2
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: custom-tls
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: custom-tls
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  observedGeneration: 2
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: custom-tls
+status:
+  observedGeneration: 2
+  pgbouncer:
+    ready: 0
+    size: 0
+  postgres:
+    instances:
+    - name: instance1
+      ready: 0
+      size: 0
+    ready: 0
+    size: 0
+  state: paused
