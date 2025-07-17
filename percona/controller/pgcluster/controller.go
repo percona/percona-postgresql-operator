@@ -440,6 +440,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 					},
 				},
 				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
+				Affinity:                      cr.Spec.InstanceSets[0].Affinity,
 				TerminationGracePeriodSeconds: ptr.To(int64(5)),
 				ImagePullSecrets:              cr.Spec.ImagePullSecrets,
 				Resources: &corev1.ResourceRequirements{
