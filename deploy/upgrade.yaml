@@ -1,7 +1,7 @@
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGUpgrade
 metadata:
-  name: cluster1-15-to-16
+  name: cluster1-16-to-17
 spec:
   postgresClusterName: cluster1
   image: docker.io/percona/percona-postgresql-operator:2.7.0-upgrade
