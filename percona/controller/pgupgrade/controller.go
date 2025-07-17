@@ -180,11 +180,11 @@ func (r *PGUpgradeReconciler) createPGUpgrade(ctx context.Context, cluster *pgv2
 			extensionKeys = append(extensionKeys, key)
 		}
 
-		pgUpgrade.Spec.InitContainers = append(pgUpgrade.Spec.InitContainers, extensions.ExtensionRelocatorContainer(
+		pgUpgrade.Spec.InitContainers = append(pgUpgrade.Spec.InitContainers, extensions.RelocatorContainer(
 			cluster, *perconaPGUpgrade.Spec.Image, cluster.Spec.ImagePullPolicy, pgVersion,
 		))
 
-		pgUpgrade.Spec.InitContainers = append(pgUpgrade.Spec.InitContainers, extensions.ExtensionInstallerContainer(
+		pgUpgrade.Spec.InitContainers = append(pgUpgrade.Spec.InitContainers, extensions.InstallerContainer(
 			cluster,
 			pgVersion,
 			&cluster.Spec.Extensions,
@@ -194,7 +194,7 @@ func (r *PGUpgradeReconciler) createPGUpgrade(ctx context.Context, cluster *pgv2
 	}
 
 	// we're only adding the volume mounts for target version since current volume mounts are already mounted
-	pgUpgrade.Spec.VolumeMounts = append(pgUpgrade.Spec.VolumeMounts, extensions.ExtensionVolumeMounts(
+	pgUpgrade.Spec.VolumeMounts = append(pgUpgrade.Spec.VolumeMounts, extensions.VolumeMounts(
 		perconaPGUpgrade.Spec.ToPostgresVersion)...,
 	)
 

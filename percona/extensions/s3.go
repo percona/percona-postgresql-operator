@@ -15,8 +15,11 @@ type S3 struct {
 	svc *s3.S3
 }
 
-func NewS3(endpoint, region, bucket string) *S3 {
-	cfg := aws.NewConfig().WithRegion(region)
+func NewS3(endpoint, region, bucket string, s3ForcePathStyle, disableSSL bool) *S3 {
+	cfg := aws.NewConfig().
+		WithRegion(region).
+		WithDisableSSL(disableSSL).
+		WithS3ForcePathStyle(s3ForcePathStyle)
 
 	if endpoint != "" {
 		cfg = cfg.WithEndpoint(endpoint)

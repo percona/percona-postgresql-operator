@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      kubectl patch pg custom-extensions \
+        -n "${NAMESPACE}" \
+        --type='json' \
+        -p='[
+          {"op": "remove", "path": "/spec/extensions/storage/disableSSL"},
+          {"op": "remove", "path": "/spec/extensions/storage/forcePathStyle"},
+          {"op": "replace", "path": "/spec/extensions/storage/secret/name", "value": "aws-s3-secret"},
+          {"op": "replace", "path": "/spec/extensions/storage/region", "value": "eu-central-1"},
+          {"op": "replace", "path": "/spec/extensions/storage/bucket", "value": "pg-extensions"},
+          {"op": "replace", "path": "/spec/extensions/storage/endpoint", "value": "s3.eu-central-1.amazonaws.com"}
+         ]'
