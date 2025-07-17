@@ -6,7 +6,7 @@ spec:
   extensions:
     custom:
     - name: pg_cron
-      version: 1.6.1
+      version: 1.6.4
   patroni:
     dynamicConfiguration:
       postgresql:
