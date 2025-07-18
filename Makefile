@@ -466,6 +466,7 @@ MAJOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[
 MINOR_VER := $(shell grep -oE "crVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+\.[0-9]+\.[0-9]+"|cut -d'.' -f2)
 NEXT_VER ?= $(MAJOR_VER).$$(($(MINOR_VER) + 1)).0
 after-release: generate
+	echo $(NEXT_VER) > percona/version/version.txt
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
