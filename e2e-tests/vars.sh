@@ -40,10 +40,10 @@ export REGISTRY_NAME_FULL="${REGISTRY_NAME}/"
 
 for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
 	var_value=$(eval "echo \$$var")
-	if [[ "$var_value" == docker.io/* ]]; then
+	if [[ $var_value == docker.io/* ]]; then
 		continue
 	fi
-	if [[ "$var_value" == percona/* || "$var_value" == perconalab/* ]]; then
+	if [[ $var_value == percona/* || $var_value == perconalab/* ]]; then
 		new_value="${REGISTRY_NAME_FULL}${var_value}"
 		export "$var=$new_value"
 		echo $var=$new_value
