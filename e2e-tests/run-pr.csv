@@ -1,6 +1,7 @@
 backup-enable-disable
 custom-extensions
 custom-tls
+database-init-sql
 demand-backup
 finalizers
 init-deploy
@@ -8,6 +9,7 @@ monitoring
 monitoring-pmm3
 one-pod
 operator-self-healing
+pgvector-extension
 pitr
 scaling
 scheduled-backup

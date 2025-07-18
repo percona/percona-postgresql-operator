@@ -13,7 +13,6 @@ commands:
       schema='public'
       hostname=$(get_pgbouncer_host chico-credentials)
 
-
       run_psql \
         'SET search_path TO public;CREATE TABLE IF NOT EXISTS customApp (id int PRIMARY KEY);' \
         "-h $hostname -U $user -d $db_name" "$password"

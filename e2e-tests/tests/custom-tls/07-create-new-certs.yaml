@@ -1,0 +1,51 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: new-custom-cert-tls-pg-issuer
+spec:
+  ca:
+    secretName: new-custom-cert-tls-pg-ca-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  generation: 1
+  name: new-custom-cert-tls-ssl
+spec:
+  commonName: custom-tls-primary
+  dnsNames:
+  - custom-tls-primary.$NAMESPACE.svc.cluster.local
+  - custom-tls-primary.$NAMESPACE.svc
+  - custom-tls-primary.$NAMESPACE
+  - custom-tls-primary
+  - custom-tls-replicas.$NAMESPACE.svc.cluster.local
+  - custom-tls-replicas.$NAMESPACE.svc
+  - custom-tls-replicas.$NAMESPACE
+  - custom-tls-replicas
+  issuerRef:
+    kind: Issuer
+    name: new-custom-cert-tls-pg-issuer
+  secretName: new-custom-cert-tls-ssl
+  privateKey:
+    algorithm: ECDSA
+    size: 384
+  usages:
+    - "digital signature"
+    - "key encipherment"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: new-custom-cert-tls-ssl-replica
+spec:
+  commonName: _crunchyrepl
+  issuerRef:
+    kind: Issuer
+    name: new-custom-cert-tls-pg-issuer
+  secretName: new-custom-cert-tls-ssl-replica
+  privateKey:
+    algorithm: ECDSA
+    size: 384
+  usages:
+    - "digital signature"
+    - "key encipherment"

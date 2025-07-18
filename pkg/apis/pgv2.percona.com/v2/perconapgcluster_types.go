@@ -304,8 +304,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Paused = cr.Spec.Unmanaged
 	postgresCluster.Spec.Shutdown = cr.Spec.Pause
 	postgresCluster.Spec.Standby = cr.Spec.Standby
-	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy()
-	postgresCluster.Spec.ReplicaService = cr.Spec.ExposeReplicas.ToCrunchy()
+	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy(cr.Spec.CRVersion)
+	postgresCluster.Spec.ReplicaService = cr.Spec.ExposeReplicas.ToCrunchy(cr.Spec.CRVersion)
 
 	postgresCluster.Spec.CustomReplicationClientTLSSecret = cr.Spec.Secrets.CustomReplicationClientTLSSecret
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
@@ -365,7 +365,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Users = users
 
 	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
-	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy()
+	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy(cr.Spec.CRVersion)
 
 	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.BuiltIn.PGStatStatements
@@ -395,7 +395,6 @@ const (
 	AppStatePaused   AppState = "paused"
 	AppStateStopping AppState = "stopping"
 	AppStateReady    AppState = "ready"
-	AppStateError    AppState = "error"
 )
 
 type PostgresInstanceSetStatus struct {
@@ -457,6 +456,10 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 type Backups struct {
@@ -823,7 +826,8 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		VolumeMounts:              p.VolumeMounts,
 		SecurityContext:           p.SecurityContext,
 		TablespaceVolumes:         p.TablespaceVolumes,
-		InitContainer:             p.InitContainer}
+		InitContainer:             p.InitContainer,
+	}
 }
 
 type ServiceExpose struct {
@@ -843,18 +847,26 @@ type ServiceExpose struct {
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	Type string `json:"type,omitempty"`
 
+	// LoadBalancerClass specifies the class of the load balancer implementation
+	// to be used. This field is supported for Service Type LoadBalancer only.
+	//
+	// More info:
+	// https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
+	// +optional
+	LoadBalancerClass *string `json:"loadBalancerClass,omitempty"`
+
 	// LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
 	// This field will be ignored if the cloud-provider does not support the feature.
 	// +optional
 	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
 }
 
-func (s *ServiceExpose) ToCrunchy() *crunchyv1beta1.ServiceSpec {
+func (s *ServiceExpose) ToCrunchy(version string) *crunchyv1beta1.ServiceSpec {
 	if s == nil {
 		return nil
 	}
 
-	return &crunchyv1beta1.ServiceSpec{
+	serviceSpec := &crunchyv1beta1.ServiceSpec{
 		Metadata: &crunchyv1beta1.Metadata{
 			Annotations: s.Annotations,
 			Labels:      s.Labels,
@@ -863,6 +875,13 @@ func (s *ServiceExpose) ToCrunchy() *crunchyv1beta1.ServiceSpec {
 		Type:                     s.Type,
 		LoadBalancerSourceRanges: s.LoadBalancerSourceRanges,
 	}
+
+	currVersion, err := gover.NewVersion(version)
+	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.8.0"))) {
+		serviceSpec.LoadBalancerClass = s.LoadBalancerClass
+	}
+
+	return serviceSpec
 }
 
 type PGProxySpec struct {
@@ -870,13 +889,13 @@ type PGProxySpec struct {
 	PGBouncer *PGBouncerSpec `json:"pgBouncer"`
 }
 
-func (p *PGProxySpec) ToCrunchy() *crunchyv1beta1.PostgresProxySpec {
+func (p *PGProxySpec) ToCrunchy(version string) *crunchyv1beta1.PostgresProxySpec {
 	if p == nil {
 		return nil
 	}
 
 	return &crunchyv1beta1.PostgresProxySpec{
-		PGBouncer: p.PGBouncer.ToCrunchy(),
+		PGBouncer: p.PGBouncer.ToCrunchy(version),
 	}
 }
 
@@ -976,7 +995,7 @@ type PGBouncerSpec struct {
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
-func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
+func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSpec {
 	if p == nil {
 		return nil
 	}
@@ -995,7 +1014,7 @@ func (p *PGBouncerSpec) ToCrunchy() *crunchyv1beta1.PGBouncerPodSpec {
 		Replicas:                  p.Replicas,
 		MinAvailable:              p.MinAvailable,
 		Resources:                 p.Resources,
-		Service:                   p.ServiceExpose.ToCrunchy(),
+		Service:                   p.ServiceExpose.ToCrunchy(version),
 		Tolerations:               p.Tolerations,
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
 		SecurityContext:           p.SecurityContext,

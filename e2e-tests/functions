@@ -240,6 +240,13 @@ get_cr() {
 	cat $TEMP_DIR/cr.yaml
 }
 
+run_comand_on_pod() {
+	local command=${1}
+
+	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
+		bash -c "$command"
+}
+
 run_psql_local() {
 	local command=${1}
 	local uri=${2}
@@ -909,11 +916,27 @@ wait_cluster_consistency() {
 }
 
 deploy_cert_manager() {
+	destroy_cert_manager
+
 	echo 'deploy cert manager'
 	kubectl create namespace cert-manager || :
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false || : 2>/dev/null
-	sleep 70
+	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false > /dev/null 2>&1 || :
+
+	kubectl wait deployment cert-manager cert-manager-webhook cert-manager-cainjector \
+		--for=condition=available \
+		--timeout=100s \
+		--namespace cert-manager
+
+	echo "Waiting for cert-manager webhook to be ready..."
+	until kubectl get validatingwebhookconfiguration cert-manager-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | grep -q '[A-Za-z0-9+/=]'; do
+		sleep 5
+	done
+}
+
+destroy_cert_manager() {
+	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml > /dev/null 2>&1 || :
+	kubectl delete --grace-period=0 --force=true namespace cert-manager > /dev/null 2>&1 || :
 }
 
 get_container_image() {

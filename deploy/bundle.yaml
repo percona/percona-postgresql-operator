@@ -8931,6 +8931,14 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
+                  loadBalancerClass:
+                    description: |-
+                      LoadBalancerClass specifies the class of the load balancer implementation
+                      to be used. This field is supported for Service Type LoadBalancer only.
+
+                      More info:
+                      https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
+                    type: string
                   loadBalancerSourceRanges:
                     description: |-
                       LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -8967,6 +8975,14 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
+                  loadBalancerClass:
+                    description: |-
+                      LoadBalancerClass specifies the class of the load balancer implementation
+                      to be used. This field is supported for Service Type LoadBalancer only.
+
+                      More info:
+                      https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
+                    type: string
                   loadBalancerSourceRanges:
                     description: |-
                       LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -16640,6 +16656,14 @@ spec:
                             additionalProperties:
                               type: string
                             type: object
+                          loadBalancerClass:
+                            description: |-
+                              LoadBalancerClass specifies the class of the load balancer implementation
+                              to be used. This field is supported for Service Type LoadBalancer only.
+
+                              More info:
+                              https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
+                            type: string
                           loadBalancerSourceRanges:
                             description: |-
                               LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -19049,6 +19073,9 @@ spec:
                 items:
                   type: string
                 type: array
+              observedGeneration:
+                format: int64
+                type: integer
               patroniVersion:
                 type: string
               pgbouncer:
@@ -44461,6 +44488,14 @@ spec:
                             - Cluster
                             - Local
                             type: string
+                          loadBalancerClass:
+                            description: |-
+                              LoadBalancerClass specifies the class of the load balancer implementation
+                              to be used. This field is supported for Service Type LoadBalancer only.
+
+                              More info:
+                              https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
+                            type: string
                           loadBalancerSourceRanges:
                             description: |-
                               LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -44805,6 +44840,14 @@ spec:
                     - Cluster
                     - Local
                     type: string
+                  loadBalancerClass:
+                    description: |-
+                      LoadBalancerClass specifies the class of the load balancer implementation
+                      to be used. This field is supported for Service Type LoadBalancer only.
+
+                      More info:
+                      https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
+                    type: string
                   loadBalancerSourceRanges:
                     description: |-
                       LoadBalancerSourceRanges is a list of IP CIDRs allowed access to load.
@@ -44856,6 +44899,14 @@ spec:
                     enum:
                     - Cluster
                     - Local
+                    type: string
+                  loadBalancerClass:
+                    description: |-
+                      LoadBalancerClass specifies the class of the load balancer implementation
+                      to be used. This field is supported for Service Type LoadBalancer only.
+
+                      More info:
+                      https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
                     type: string
                   loadBalancerSourceRanges:
                     description: |-
@@ -46537,6 +46588,14 @@ spec:
                             enum:
                             - Cluster
                             - Local
+                            type: string
+                          loadBalancerClass:
+                            description: |-
+                              LoadBalancerClass specifies the class of the load balancer implementation
+                              to be used. This field is supported for Service Type LoadBalancer only.
+
+                              More info:
+                              https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class
                             type: string
                           loadBalancerSourceRanges:
                             description: |-
