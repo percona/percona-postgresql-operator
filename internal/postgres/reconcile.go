@@ -157,6 +157,22 @@ func InstancePod(ctx context.Context,
 		dataVolumeMount,
 		downwardAPIVolumeMount,
 	}
+
+	if HugePages2MiRequested(inCluster) {
+		dbContainerMounts = append(dbContainerMounts, corev1.VolumeMount{
+
+			Name:      "hugepage-2mi",
+			MountPath: "/hugepages-2Mi",
+		})
+	}
+
+	if HugePages1GiRequested(inCluster) {
+		dbContainerMounts = append(dbContainerMounts, corev1.VolumeMount{
+			Name:      "hugepage-1gi",
+			MountPath: "/hugepages-1Gi",
+		})
+	}
+
 	dbContainerMounts = append(dbContainerMounts, inInstanceSpec.VolumeMounts...)
 
 	container := corev1.Container{
@@ -219,6 +235,28 @@ func InstancePod(ctx context.Context,
 		certVolume,
 		dataVolume,
 		downwardAPIVolume,
+	}
+
+	if HugePages2MiRequested(inCluster) {
+		outInstancePod.Volumes = append(outInstancePod.Volumes, corev1.Volume{
+			Name: "hugepage-2mi",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumHugePagesPrefix + "2Mi",
+				},
+			},
+		})
+	}
+
+	if HugePages1GiRequested(inCluster) {
+		outInstancePod.Volumes = append(outInstancePod.Volumes, corev1.Volume{
+			Name: "hugepage-1gi",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumHugePagesPrefix + "1Gi",
+				},
+			},
+		})
 	}
 
 	// If `TablespaceVolumes` FeatureGate is enabled, `inTablespaceVolumes` may not be nil.
