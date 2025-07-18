@@ -11,5 +11,6 @@ commands:
       instance=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[].metadata.name}')
 
       get_metric_values node_boot_time_seconds ${NAMESPACE}-${instance} ${token}
+      get_metric_values patroni_postgres_running ${NAMESPACE}-${instance} ${token}
       get_qan20_values_pmm3 ${NAMESPACE}-${instance} ${token}
     timeout: 240
