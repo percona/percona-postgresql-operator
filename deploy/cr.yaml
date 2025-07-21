@@ -312,7 +312,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      iimage: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer17
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer17
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
