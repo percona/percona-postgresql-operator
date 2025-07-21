@@ -1,0 +1,18 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+- script: |-
+    set -o errexit
+    set -o xtrace
+
+    source ../../functions
+
+    # Replace new lines, whitespaces and quotes
+    query_mismatch=$(<09-collation-mismatch.sql tr '\n' ' ' | sed "s/'/'\\\\''/g" | sed 's/  */ /g')
+    data=$(run_psql_local "$query_mismatch" "postgres:$(get_psql_user_pass upgrade-minor-pguser-postgres)@$(get_psql_user_host upgrade-minor-pguser-postgres)")
+
+    if [[ -z "$SKIP_TEST_WARNINGS" && "$data" == *"Collection mismatch detected"* ]]; then
+      echo "Mismatch found after minor upgrade"
+      exit 1
+    fi
