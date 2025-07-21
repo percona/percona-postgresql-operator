@@ -9,9 +9,9 @@ metadata:
 #  - percona.com/delete-ssl
 #  - percona.com/delete-backups
 spec:
-  crVersion: 2.7.0
+  crVersion: 2.8.0
 #  initContainer:
-#    image: perconalab/percona-postgresql-operator:main
+#    image: docker.io/perconalab/percona-postgresql-operator:main
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -154,7 +154,7 @@ spec:
 #          test-label: value
 
 
-  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
+  image: docker.io/perconalab/percona-postgresql-operator:main-ppg17-postgres
   imagePullPolicy: Always
   postgresVersion: 17
 #  port: 5432
@@ -188,7 +188,7 @@ spec:
 #    - secretRef:
 #        name: instance-env-secret
 #    initContainer:
-#      image: perconalab/percona-postgresql-operator:main
+#      image: docker.io/perconalab/percona-postgresql-operator:main
 #      resources:
 #        limits:
 #          cpu: 2.0
@@ -312,7 +312,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-pgbouncer17
+      iimage: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer17
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
@@ -409,9 +409,9 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-pgbackrest17
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest17
 #      initContainer:
-#        image: perconalab/percona-postgresql-operator:main
+#        image: docker.io/perconalab/percona-postgresql-operator:main
 #        resources:
 #          limits:
 #            cpu: 2.0
@@ -612,7 +612,7 @@ spec:
 
   pmm:
     enabled: false
-    image: perconalab/pmm-client:dev-latest
+    image: docker.io/perconalab/pmm-client:dev-latest
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -646,7 +646,7 @@ spec:
 #    - basebackup
 
 #  extensions:
-#    image: perconalab/percona-postgresql-operator:main
+#    image: docker.io/perconalab/percona-postgresql-operator:main
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
