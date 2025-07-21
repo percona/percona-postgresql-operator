@@ -1,0 +1,90 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 100
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  generation: 1
+  name: new-custom-cert-tls-pg-issuer
+spec:
+  ca:
+    secretName: new-custom-cert-tls-pg-ca-cert
+status:
+  conditions:
+  - message: Signing CA verified
+    observedGeneration: 1
+    reason: KeyPairVerified
+    status: "True"
+    type: Ready
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  generation: 1
+  name: new-custom-cert-tls-ssl
+spec:
+  commonName: custom-tls-primary
+  issuerRef:
+    kind: Issuer
+    name: new-custom-cert-tls-pg-issuer
+  secretName: new-custom-cert-tls-ssl
+status:
+  conditions:
+  - message: Certificate is up to date and has not expired
+    observedGeneration: 1
+    reason: Ready
+    status: "True"
+    type: Ready
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  generation: 1
+  name: new-custom-cert-tls-ssl-replica
+spec:
+  commonName: _crunchyrepl
+  issuerRef:
+    kind: Issuer
+    name: new-custom-cert-tls-pg-issuer
+  secretName: new-custom-cert-tls-ssl-replica
+status:
+  conditions:
+  - message: Certificate is up to date and has not expired
+    observedGeneration: 1
+    reason: Ready
+    status: "True"
+    type: Ready
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    cert-manager.io/alt-names: ""
+    cert-manager.io/certificate-name: new-custom-cert-tls-pg-ca-cert
+    cert-manager.io/common-name: new-postgres-operator-ca
+    cert-manager.io/ip-sans: ""
+    cert-manager.io/issuer-group: ""
+    cert-manager.io/issuer-kind: Issuer
+    cert-manager.io/issuer-name: new-custom-cert-tls-pg-ca-issuer
+    cert-manager.io/uri-sans: ""
+  labels:
+    controller.cert-manager.io/fao: "true"
+  name: new-custom-cert-tls-pg-ca-cert
+type: kubernetes.io/tls
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    controller.cert-manager.io/fao: "true"
+  name: new-custom-cert-tls-ssl
+type: kubernetes.io/tls
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    controller.cert-manager.io/fao: "true"
+  name: new-custom-cert-tls-ssl-replica
+type: kubernetes.io/tls

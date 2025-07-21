@@ -18,4 +18,5 @@ commands:
 
       remove_all_finalizers
       destroy_operator
+      destroy_cert_manager
     timeout: 60
