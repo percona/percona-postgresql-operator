@@ -18779,9 +18779,9 @@ spec:
               observedGeneration:
                 format: int64
                 type: integer
-              patroniStatus:
+              patroni:
                 properties:
-                  patroni:
+                  status:
                     properties:
                       switchover:
                         description: Tracks the execution of the switchover requests.
@@ -18795,7 +18795,7 @@ spec:
                           Patroni.
                         type: string
                     type: object
-                  patroniVersion:
+                  version:
                     type: string
                 type: object
               pgbackrest:

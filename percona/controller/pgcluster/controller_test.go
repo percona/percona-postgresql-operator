@@ -1571,7 +1571,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 			updatedCR := &v2.PerconaPGCluster{}
 			Expect(k8sClient.Get(ctx, crNamespacedName, updatedCR)).Should(Succeed())
 
-			Expect(updatedCR.Status.PatroniStatus.PatroniVersion).To(Equal("3.2.1"))
+			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.2.1"))
 		})
 	})
 
@@ -1617,7 +1617,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 				{Name: "test-pull-secret"},
 			}
 
-			cr2.Status.PatroniStatus.PatroniVersion = "3.1.0"
+			cr2.Status.Patroni.Version = "3.1.0"
 			cr2.Status.Postgres.ImageID = "some-image-id"
 
 			status := cr2.Status
@@ -1693,7 +1693,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 			updatedCR := &v2.PerconaPGCluster{}
 			Expect(k8sClient.Get(ctx, crNamespacedName2, updatedCR)).Should(Succeed())
 
-			Expect(updatedCR.Status.PatroniStatus.PatroniVersion).To(Equal("3.1.0"))
+			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.1.0"))
 		})
 	})
 })

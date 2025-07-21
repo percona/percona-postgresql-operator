@@ -190,18 +190,18 @@ func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus
 
 func syncPatroniFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
 
-	if cr.Status.PatroniStatus.PatroniStatus == nil {
-		cr.Status.PatroniStatus.PatroniStatus = &v1beta1.PatroniStatus{}
+	if cr.Status.Patroni.Status == nil {
+		cr.Status.Patroni.Status = &v1beta1.PatroniStatus{}
 	}
 
 	if postgresStatus.Patroni.SystemIdentifier != "" {
-		cr.Status.PatroniStatus.SystemIdentifier = postgresStatus.Patroni.SystemIdentifier
+		cr.Status.Patroni.Status.SystemIdentifier = postgresStatus.Patroni.SystemIdentifier
 	}
 	if postgresStatus.Patroni.SwitchoverTimeline != nil {
-		cr.Status.PatroniStatus.SwitchoverTimeline = postgresStatus.Patroni.SwitchoverTimeline
+		cr.Status.Patroni.Status.SwitchoverTimeline = postgresStatus.Patroni.SwitchoverTimeline
 	}
 	if postgresStatus.Patroni.Switchover != nil {
-		cr.Status.PatroniStatus.Switchover = postgresStatus.Patroni.Switchover
+		cr.Status.Patroni.Status.Switchover = postgresStatus.Patroni.Switchover
 	}
 }
 

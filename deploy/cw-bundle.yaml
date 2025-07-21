@@ -19076,9 +19076,9 @@ spec:
               observedGeneration:
                 format: int64
                 type: integer
-              patroniStatus:
+              patroni:
                 properties:
-                  patroni:
+                  status:
                     properties:
                       switchover:
                         description: Tracks the execution of the switchover requests.
@@ -19092,7 +19092,7 @@ spec:
                           Patroni.
                         type: string
                     type: object
-                  patroniVersion:
+                  version:
                     type: string
                 type: object
               pgbackrest:
@@ -47855,7 +47855,7 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
-        image: perconalab/percona-postgresql-operator:main
+        image: tishina/percona-postgresql-operator:K8SPG-748-v2-18
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
