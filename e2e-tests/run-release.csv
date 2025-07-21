@@ -6,7 +6,6 @@ demand-backup
 finalizers
 init-deploy
 major-upgrade
-migration-backup-s3
 monitoring
 monitoring-pmm3
 one-pod
