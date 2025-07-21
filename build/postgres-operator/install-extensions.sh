@@ -16,6 +16,14 @@ if [[ -n $STORAGE_ENDPOINT ]]; then
 	args+=(-endpoint "$STORAGE_ENDPOINT")
 fi
 
+if [[ ${STORAGE_DISABLE_SSL} == "true" ]]; then
+	args+=(-disable-ssl)
+fi
+
+if [[ ${STORAGE_FORCE_PATH_STYLE} == "true" ]]; then
+	args+=(-force-path-style)
+fi
+
 for key in "${extensions[@]}"; do
 	if [ -f "${PGDATA_EXTENSIONS}"/"${key}".installed ]; then
 		echo "Extension ${key} already installed"
