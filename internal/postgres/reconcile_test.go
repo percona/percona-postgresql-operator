@@ -16,6 +16,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -69,7 +70,7 @@ func TestInstancePod(t *testing.T) {
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 	cluster.Spec.PostgresVersion = 11
 	cluster.SetLabels(map[string]string{
-		naming.LabelVersion: "2.8.0",
+		naming.LabelVersion: version.Version(),
 	})
 
 	dataVolume := new(corev1.PersistentVolumeClaim)
