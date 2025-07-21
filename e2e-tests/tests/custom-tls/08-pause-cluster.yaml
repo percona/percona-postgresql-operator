@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
+timeout: 250
 commands:
   - script: |-
       set -o errexit
@@ -8,9 +8,6 @@ commands:
 
       source ../../functions
 
-      get_cr \
-        | yq eval '
-            .spec.crVersion="2.7.0"' - \
+      get_cr "custom-tls" ${RANDOM} \
+        | yq '.spec.pause=true' \
         | kubectl -n "${NAMESPACE}" apply -f -
-
-      sleep 10
