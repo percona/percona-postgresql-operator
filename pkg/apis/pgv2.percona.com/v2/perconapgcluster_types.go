@@ -805,6 +805,9 @@ type PGInstanceSetSpec struct {
 	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
 	// +optional
 	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
+
+	Env     []corev1.EnvVar        `json:"env,omitempty"`
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -827,6 +830,8 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		SecurityContext:           p.SecurityContext,
 		TablespaceVolumes:         p.TablespaceVolumes,
 		InitContainer:             p.InitContainer,
+		Env:                       p.Env,
+		EnvFrom:                   p.EnvFrom,
 	}
 }
 
@@ -993,6 +998,9 @@ type PGBouncerSpec struct {
 	// SecurityContext defines the security settings for PGBouncer pods.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	Env     []corev1.EnvVar        `json:"env,omitempty"`
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSpec {
@@ -1018,6 +1026,8 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		Tolerations:               p.Tolerations,
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
 		SecurityContext:           p.SecurityContext,
+		Env:                       p.Env,
+		EnvFrom:                   p.EnvFrom,
 	}
 
 	spec.Default()

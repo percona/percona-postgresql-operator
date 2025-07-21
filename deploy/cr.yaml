@@ -181,6 +181,12 @@ spec:
   instances:
   - name: instance1
     replicas: 3
+#    env:
+#    - name: MY_ENV
+#      value: "1000"
+#    envFrom:
+#    - secretRef:
+#        name: instance-env-secret
 #    initContainer:
 #      image: perconalab/percona-postgresql-operator:main
 #      resources:
@@ -307,6 +313,12 @@ spec:
     pgBouncer:
       replicas: 3
       image: perconalab/percona-postgresql-operator:main-pgbouncer17
+#      env:
+#      - name: MY_ENV
+#        value: "1000"
+#      envFrom:
+#      - secretRef:
+#          name: pgbouncer-env-secret
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -449,6 +461,12 @@ spec:
 #        - secret:
 #            name: cluster1-pgbackrest-secrets
 #      jobs:
+#        env:
+#        - name: MY_ENV
+#          value: "1000"
+#        envFrom:
+#        - secretRef:
+#            name: backup-env-secret
 #        restartPolicy: OnFailure
 #        backoffLimit: 2
 #        priorityClassName: high-priority
@@ -496,6 +514,12 @@ spec:
 #        repo3-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo3
 #        repo4-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo4
       repoHost:
+#        env:
+#        - name: MY_ENV
+#          value: "1000"
+#        envFrom:
+#        - secretRef:
+#            name: repo-host-env-secret
 #        resources:
 #          limits:
 #            cpu: 200m

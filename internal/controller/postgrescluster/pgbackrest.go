@@ -737,6 +737,18 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 
 	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
 
+	// K8SPG-833
+	if repoHost := postgresCluster.Spec.Backups.PGBackRest.RepoHost; postgresCluster.CompareVersion("2.8.0") >= 0 && (len(repoHost.Env) != 0 || len(repoHost.EnvFrom) != 0) {
+		for i := range repo.Spec.Template.Spec.Containers {
+			if len(repoHost.Env) != 0 {
+				repo.Spec.Template.Spec.Containers[i].Env = append(repo.Spec.Template.Spec.Containers[i].Env, repoHost.Env...)
+			}
+			if len(repoHost.EnvFrom) != 0 {
+				repo.Spec.Template.Spec.Containers[i].EnvFrom = append(repo.Spec.Template.Spec.Containers[i].EnvFrom, repoHost.EnvFrom...)
+			}
+		}
+	}
+
 	// set ownership references
 	if err := r.setControllerReference(postgresCluster, repo); err != nil {
 		return nil, err
@@ -923,6 +935,18 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		// K8SPG-619
 		if postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit != nil {
 			jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
+		}
+
+		// K8SPG-833
+		if postgresCluster.CompareVersion("2.8.0") >= 0 && (len(postgresCluster.Spec.Backups.PGBackRest.Jobs.Env) != 0 || len(postgresCluster.Spec.Backups.PGBackRest.Jobs.EnvFrom) != 0) {
+			for i := range jobSpec.Template.Spec.Containers {
+				if len(postgresCluster.Spec.Backups.PGBackRest.Jobs.Env) != 0 {
+					jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, postgresCluster.Spec.Backups.PGBackRest.Jobs.Env...)
+				}
+				if len(postgresCluster.Spec.Backups.PGBackRest.Jobs.EnvFrom) != 0 {
+					jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, postgresCluster.Spec.Backups.PGBackRest.Jobs.EnvFrom...)
+				}
+			}
 		}
 	}
 

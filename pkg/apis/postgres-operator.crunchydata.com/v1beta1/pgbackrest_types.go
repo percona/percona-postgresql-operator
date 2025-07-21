@@ -191,6 +191,11 @@ type BackupJobs struct {
 
 	// +optional
 	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"` // K8SPG-619
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // PGBackRestManualBackup contains information that is used for creating a
@@ -255,6 +260,11 @@ type PGBackRestRepoHost struct {
 	// SecurityContext defines the security settings for PGBackRest pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.
