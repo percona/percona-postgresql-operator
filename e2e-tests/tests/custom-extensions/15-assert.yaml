@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 180
+timeout: 120
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -22,8 +22,6 @@ spec:
       - name: postgres-startup
       - command:
         - /usr/local/bin/relocate-extensions.sh
-        env:
-        - name: PG_VERSION
         resources: {}
         volumeMounts:
         - mountPath: /pgdata
@@ -37,19 +35,15 @@ spec:
           value: s3
         - name: STORAGE_ENDPOINT
         - name: STORAGE_REGION
-          value: us-east-1
+          value: eu-central-1
         - name: STORAGE_BUCKET
-          value: operator-testing
+          value: pg-extensions
         - name: INSTALL_EXTENSIONS
         - name: PG_VERSION
         - name: PGDATA_EXTENSIONS
-        - name: STORAGE_DISABLE_SSL
-          value: "true"
-        - name: STORAGE_FORCE_PATH_STYLE
-          value: "true"
         envFrom:
         - secretRef:
-            name: minio-secret
+            name: aws-s3-secret
         resources: {}
         volumeMounts:
         - mountPath: /pgdata
@@ -62,7 +56,7 @@ spec:
         - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
-  observedGeneration: 3
+  observedGeneration: 6
   replicas: 1
   updatedReplicas: 1
   readyReplicas: 1
