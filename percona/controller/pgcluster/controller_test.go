@@ -1059,6 +1059,140 @@ var _ = Describe("Security context", Ordered, func() {
 	})
 })
 
+var _ = Describe("Sidecars", Ordered, func() {
+	gate := feature.NewGate()
+	err := gate.SetFromMap(map[string]bool{
+		feature.InstanceSidecars:           true,
+		feature.PGBouncerSidecars:          true,
+		feature.PGBackrestRepoHostSidecars: true,
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	ctx := feature.NewContext(context.Background(), gate)
+
+	const crName = "sidecars"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster", func() {
+		for i := range cr.Spec.InstanceSets {
+			i := &cr.Spec.InstanceSets[i]
+			i.Sidecars = []corev1.Container{
+				{
+					Name:    "instance-sidecar",
+					Command: []string{"instance-cmd"},
+					Image:   "instance-image",
+				},
+			}
+		}
+		cr.Spec.Proxy.PGBouncer.Sidecars = []corev1.Container{
+			{
+				Name:    "pgbouncer-sidecar",
+				Command: []string{"pgbouncer-cmd"},
+				Image:   "pgbouncer-image",
+			},
+		}
+		cr.Spec.Backups.PGBackRest.RepoHost.Sidecars = []corev1.Container{
+			{
+				Name:    "repohost-sidecar",
+				Command: []string{"repohost-cmd"},
+				Image:   "repohost-image",
+			},
+		}
+		status := cr.Status
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	getContainer := func(containers []corev1.Container, name string) *corev1.Container {
+		for _, c := range containers {
+			if c.Name == name {
+				return &c
+			}
+		}
+		return nil
+	}
+
+	It("Instances should have sidecar", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":    "postgres",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			sidecar := getContainer(sts.Spec.Template.Spec.Containers, "instance-sidecar")
+			Expect(sidecar).NotTo(BeNil())
+			Expect(sidecar.Command).To(Equal([]string{"instance-cmd"}))
+			Expect(sidecar.Image).To(Equal("instance-image"))
+		}
+	})
+
+	It("PgBouncer should have sidecar", func() {
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-pgbouncer",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment)
+		Expect(err).NotTo(HaveOccurred())
+		sidecar := getContainer(deployment.Spec.Template.Spec.Containers, "pgbouncer-sidecar")
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Command).To(Equal([]string{"pgbouncer-cmd"}))
+		Expect(sidecar.Image).To(Equal("pgbouncer-image"))
+	})
+
+	It("PgBackrest Repo should have sidecar", func() {
+		sts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-repo-host",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
+		Expect(err).NotTo(HaveOccurred())
+		sidecar := getContainer(sts.Spec.Template.Spec.Containers, "repohost-sidecar")
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Command).To(Equal([]string{"repohost-cmd"}))
+		Expect(sidecar.Image).To(Equal("repohost-image"))
+	})
+})
+
 var _ = Describe("Operator-created sidecar container resources", Ordered, func() {
 	ctx := context.Background()
 
