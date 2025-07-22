@@ -22,6 +22,8 @@ spec:
       - name: postgres-startup
       - command:
         - /usr/local/bin/relocate-extensions.sh
+        env:
+        - name: PG_VERSION
         resources: {}
         volumeMounts:
         - mountPath: /pgdata
@@ -56,7 +58,7 @@ spec:
         - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
-  observedGeneration: 2
+  observedGeneration: 3
   replicas: 1
   updatedReplicas: 1
   readyReplicas: 1

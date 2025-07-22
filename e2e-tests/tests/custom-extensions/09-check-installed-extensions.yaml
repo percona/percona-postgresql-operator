@@ -10,4 +10,4 @@ commands:
 
       data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres) -c "\c postgres" -c "select extname from pg_extension order by extname")
 
-      kubectl create configmap -n "${NAMESPACE}" 12-check-extensions --from-literal=data="${data}"
+      kubectl create configmap -n "${NAMESPACE}" 11-check-extensions --from-literal=data="${data}"
