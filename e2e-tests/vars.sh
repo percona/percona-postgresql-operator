@@ -33,6 +33,7 @@ export IMAGE_PMM3_CLIENT=${IMAGE_PMM3_CLIENT:-"perconalab/pmm-client:3-dev-lates
 export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3-dev-latest"}
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
+export MINIO_VER="5.4.0"
 
 # Add 'docker.io' for images that are provided without registry
 export REGISTRY_NAME="docker.io"
