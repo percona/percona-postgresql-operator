@@ -33,11 +33,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	"github.com/percona/percona-postgresql-operator/internal/postgres"
@@ -49,6 +51,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/percona/pmm"
 	perconaPG "github.com/percona/percona-postgresql-operator/percona/postgres"
 	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/percona/percona-postgresql-operator/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -201,6 +204,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 	}
 
+	if err := r.setCRVersion(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "set CR version")
+	}
 	cr.Default()
 
 	if cr.Spec.OpenShift == nil {
@@ -431,7 +437,8 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 						Args: []string{
 							"-c", "sleep 60",
 						},
-						Resources: cr.Spec.InstanceSets[0].Resources,
+						Resources:       cr.Spec.InstanceSets[0].Resources,
+						SecurityContext: initialize.RestrictedSecurityContext(cr.CompareVersion("2.5.0") >= 0),
 					},
 				},
 				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
@@ -806,17 +813,17 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
-		set.InitContainers = append(set.InitContainers, extensions.ExtensionRelocatorContainer(
+		set.InitContainers = append(set.InitContainers, extensions.RelocatorContainer(
 			cr, cr.PostgresImage(), cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion,
 		))
-		set.InitContainers = append(set.InitContainers, extensions.ExtensionInstallerContainer(
+		set.InitContainers = append(set.InitContainers, extensions.InstallerContainer(
 			cr,
 			cr.Spec.PostgresVersion,
 			&cr.Spec.Extensions,
 			strings.Join(extensionKeys, ","),
 			cr.Spec.OpenShift,
 		))
-		set.VolumeMounts = append(set.VolumeMounts, extensions.ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
+		set.VolumeMounts = append(set.VolumeMounts, extensions.VolumeMounts(cr.Spec.PostgresVersion)...)
 	}
 	return nil
 }
@@ -961,6 +968,23 @@ func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.Perco
 			return errors.Wrap(err, "patch finalizers")
 		}
 	}
+
+	return nil
+}
+
+func (r *PGClusterReconciler) setCRVersion(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if len(cr.Spec.CRVersion) > 0 {
+		return nil
+	}
+
+	orig := cr.DeepCopy()
+	cr.Spec.CRVersion = version.Version()
+
+	if err := r.Client.Patch(ctx, cr, client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "patch CR")
+	}
+
+	logf.FromContext(ctx).Info("Set CR version", "version", cr.Spec.CRVersion)
 
 	return nil
 }

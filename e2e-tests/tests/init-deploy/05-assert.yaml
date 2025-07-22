@@ -12,7 +12,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv2.percona.com/version: 2.7.0
+    pgv2.percona.com/version: 2.8.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/pgbackrest: ""
     postgres-operator.crunchydata.com/pgbackrest-config: ""
@@ -81,7 +81,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv2.percona.com/version: 2.7.0
+    pgv2.percona.com/version: 2.8.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/role: pgbouncer
     test-label: test
@@ -144,7 +144,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv2.percona.com/version: 2.7.0
+    pgv2.percona.com/version: 2.8.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/pgbackrest: ""
     postgres-operator.crunchydata.com/pgbackrest-config: ""
@@ -168,7 +168,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv2.percona.com/version: 2.7.0
+    pgv2.percona.com/version: 2.8.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/role: pgbouncer
     test-label: test
@@ -191,7 +191,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv2.percona.com/version: 2.7.0
+    pgv2.percona.com/version: 2.8.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/data: pgbackrest
     postgres-operator.crunchydata.com/pgbackrest: ""
@@ -214,7 +214,7 @@ spec:
         app.kubernetes.io/managed-by: percona-postgresql-operator
         app.kubernetes.io/name: percona-postgresql
         app.kubernetes.io/part-of: percona-postgresql
-        pgv2.percona.com/version: 2.7.0
+        pgv2.percona.com/version: 2.8.0
         postgres-operator.crunchydata.com/cluster: init-deploy
         postgres-operator.crunchydata.com/data: pgbackrest
         postgres-operator.crunchydata.com/pgbackrest: ""

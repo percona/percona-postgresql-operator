@@ -2,7 +2,7 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-CERT_MANAGER_VER="1.17.1"
+CERT_MANAGER_VER="1.18.2"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
@@ -92,7 +92,7 @@ deploy_operator_gh() {
 
 	curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/${cw_prefix}operator.yaml" >"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml"
 
-	yq eval '.spec.template.spec.containers[0].image = "percona/percona-postgresql-operator:'${git_tag#v}'"' \
+	yq eval '.spec.template.spec.containers[0].image = "'${REGISTRY_NAME_FULL}'percona/percona-postgresql-operator:'${git_tag#v}'"' \
 		"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml" \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
@@ -125,6 +125,56 @@ get_operator_pod() {
 	echo $(kubectl get pods -n "${OPERATOR_NS:-$NAMESPACE}" --selector=app.kubernetes.io/name=percona-postgresql-operator -o jsonpath='{.items[].metadata.name}')
 }
 
+retry() {
+	local max=$1
+	local delay=$2
+	shift 2 # cut delay and max args
+	local n=1
+
+	until "$@"; do
+		if [[ $n -ge $max ]]; then
+			echo "The command ${*} has failed after $n attempts."
+			exit 1
+		fi
+		((n++))
+		sleep $delay
+	done
+}
+
+deploy_minio() {
+	local access_key
+	local secret_key
+	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+	helm uninstall -n "${NAMESPACE}" minio-service || :
+	helm repo remove minio || :
+	helm repo add minio https://charts.min.io/
+	retry 10 60 helm install minio-service \
+		-n "${NAMESPACE}" \
+		--version "${MINIO_VER}" \
+		--set replicas=1 \
+		--set mode=standalone \
+		--set resources.requests.memory=256Mi \
+		--set rootUser=rootuser \
+		--set rootPassword=rootpass123 \
+		--set "users[0].accessKey"="$(printf '%q' "$(printf '%q' "$access_key")")" \
+		--set "users[0].secretKey"="$(printf '%q' "$(printf '%q' "$secret_key")")" \
+		--set "users[0].policy"=consoleAdmin \
+		--set service.type=ClusterIP \
+		--set configPathmc=/tmp/.minio/ \
+		--set persistence.size=2G \
+		--set securityContext.enabled=false \
+		minio/minio
+	MINIO_POD=$(kubectl -n "${NAMESPACE}" get pods --selector=release=minio-service -o 'jsonpath={.items[].metadata.name}')
+	wait_pod $MINIO_POD
+
+	# create bucket
+	kubectl -n "${NAMESPACE}" run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
+		bash -c "AWS_ACCESS_KEY_ID='$access_key' AWS_SECRET_ACCESS_KEY='$secret_key' AWS_DEFAULT_REGION=us-east-1 \
+		/usr/bin/aws --endpoint-url http://minio-service:9000 s3 mb s3://operator-testing"
+}
+
 deploy_s3_secrets() {
 	set +o xtrace
 	printf "[global]\nrepo1-s3-key=%s\nrepo1-s3-key-secret=%s\n" \
@@ -147,6 +197,7 @@ deploy_s3_secrets() {
 			;;
 		"custom-extensions" | "major-upgrade")
 			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
+			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
 			;;
 		*)
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini"
@@ -229,15 +280,29 @@ get_cr() {
 				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
 			;;
-		"custom-extensions" | "major-upgrade")
+		"major-upgrade")
 			yq eval -i '
 				.spec.extensions.image = "'$IMAGE'" |
 				.spec.extensions.imagePullPolicy = "Always" |
 				.spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
 			    ' $TEMP_DIR/cr.yaml
 			;;
+		"custom-extensions")
+			yq eval -i '
+				.spec.extensions.image = "'$IMAGE'" |
+				.spec.extensions.imagePullPolicy = "Always" |
+				.spec.extensions.storage = {"type": "s3", "bucket": "operator-testing", "region": "us-east-1", "endpoint": "http://minio-service:9000", "forcePathStyle": "true", "disableSSL": "true", "secret": {"name": "minio-secret"}}
+			    ' $TEMP_DIR/cr.yaml
+			;;
 	esac
 	cat $TEMP_DIR/cr.yaml
+}
+
+run_comand_on_pod() {
+	local command=${1}
+
+	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
+		bash -c "$command"
 }
 
 run_psql_local() {
@@ -276,10 +341,50 @@ get_psql_user_host() {
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.host | base64decode }}'
 }
 
+get_aws_access_key() {
+	local secret_name=${1}
+
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.AWS_SECRET_ACCESS_KEY | base64decode }}'
+}
+
+get_aws_access_key_id() {
+	local secret_name=${1}
+
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.AWS_ACCESS_KEY_ID | base64decode }}'
+}
+
+get_psql_user_host() {
+	local secret_name=${1}
+
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.host | base64decode }}'
+}
 get_instance_set_pods() {
 	local instance=${1:-instance1}
 
 	kubectl get pods -n ${NAMESPACE} --selector postgres-operator.crunchydata.com/instance-set=${instance} -o custom-columns='NAME:.metadata.name' --no-headers
+}
+
+copy_custom_extensions_form_aws() {
+	set +o xtrace
+
+	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+	kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
+		--image=perconalab/awscli \
+		--restart=Never -- \
+		bash -c "
+		AWS_ACCESS_KEY_ID=$(get_aws_access_key_id aws-s3-secret) \
+		AWS_SECRET_ACCESS_KEY=$(get_aws_access_key aws-s3-secret) \
+		AWS_DEFAULT_REGION=eu-central-1 \
+		/usr/bin/aws --endpoint-url https://s3.amazonaws.com s3 cp s3://pg-extensions/ /tmp/ --recursive &&
+
+		AWS_ACCESS_KEY_ID='${access_key}' \
+		AWS_SECRET_ACCESS_KEY='${secret_key}' \
+		AWS_DEFAULT_REGION=us-east-1 \
+		/usr/bin/aws --endpoint-url http://minio-service:9000 s3 cp /tmp/ s3://operator-testing/ --recursive
+	  "
+	set -o xtrace
 }
 
 get_psql_pod_host() {
@@ -370,9 +475,14 @@ deploy_pmm_server() {
 }
 
 deploy_pmm3_server() {
-	helm uninstall -n "${NAMESPACE}" pmm || :
+	helm uninstall -n "${NAMESPACE}" monitoring || :
+	helm repo remove percona || :
+	kubectl delete clusterrole monitoring --ignore-not-found
+	kubectl delete clusterrolebinding monitoring --ignore-not-found
+	helm repo add percona https://percona.github.io/percona-helm-charts/
+	helm repo update
+
 	if [[ $OPENSHIFT ]]; then
-		platform=openshift
 		oc create sa pmm-server -n "$NAMESPACE"
 		oc adm policy add-scc-to-user privileged -z pmm-server -n "$NAMESPACE"
 
@@ -384,24 +494,32 @@ deploy_pmm3_server() {
 			oc create rolebinding pmm-pg-operator-namespace-only --role percona-postgresql-operator --serviceaccount=$NAMESPACE:pmm-server -n "${NAMESPACE}"
 			oc patch role/percona-postgresql-operator --type json -p='[{"op":"add","path": "/rules/-","value":{"apiGroups":["security.openshift.io"],"resources":["securitycontextconstraints"],"verbs":["use"],"resourceNames":["privileged"]}}]' -n "$NAMESPACE"
 		fi
-		helm install monitoring --set imageTag=${IMAGE_PMM3_SERVER#*:} --set imageRepo=${IMAGE_PMM3_SERVER%:*} --set platform=$platform --set sa=pmm-server --set supresshttp2=false https://percona-charts.storage.googleapis.com/pmm-server-${PMM_SERVER_VERSION}.tgz -n "$NAMESPACE"
-	else
-		platform=kubernetes
-
-		helm uninstall -n "${NAMESPACE}" monitoring || :
-		helm repo remove percona || :
-		kubectl delete clusterrole monitoring --ignore-not-found
-		kubectl delete clusterrolebinding monitoring --ignore-not-found
-
-		helm repo add percona https://percona.github.io/percona-helm-charts/
-		helm install monitoring percona/pmm -n "${NAMESPACE}" \
-			--set fullnameOverride=monitoring \
-			--set image.tag=${IMAGE_PMM3_SERVER#*:} \
-			--set image.repository=${IMAGE_PMM3_SERVER%:*} \
-			--set service.type=LoadBalancer \
-			--set platform="$platform" \
-			--force
+		local additional_params="--set platform=openshift --set supresshttp2=false --set serviceAccount.create=false --set serviceAccount.name=pmm-server"
 	fi
+
+	retry 10 60 helm install monitoring percona/pmm -n "${NAMESPACE}" \
+		--set fullnameOverride=monitoring \
+		--set image.tag=${IMAGE_PMM3_SERVER#*:} \
+		--set image.repository=${IMAGE_PMM3_SERVER%:*} \
+		--set service.type=LoadBalancer \
+		$additional_params \
+		--force
+}
+
+retry() {
+	local max=$1
+	local delay=$2
+	shift 2 # cut delay and max args
+	local n=1
+
+	until "$@"; do
+		if [[ $n -ge $max ]]; then
+			echo "The command '$@' has failed after $n attempts."
+			exit 1
+		fi
+		((n++))
+		sleep $delay
+	done
 }
 
 generate_pmm_api_key() {
@@ -896,11 +1014,27 @@ wait_cluster_consistency() {
 }
 
 deploy_cert_manager() {
+	destroy_cert_manager
+
 	echo 'deploy cert manager'
 	kubectl create namespace cert-manager || :
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false || : 2>/dev/null
-	sleep 70
+	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false > /dev/null 2>&1 || :
+
+	kubectl wait deployment cert-manager cert-manager-webhook cert-manager-cainjector \
+		--for=condition=available \
+		--timeout=100s \
+		--namespace cert-manager
+
+	echo "Waiting for cert-manager webhook to be ready..."
+	until kubectl get validatingwebhookconfiguration cert-manager-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | grep -q '[A-Za-z0-9+/=]'; do
+		sleep 5
+	done
+}
+
+destroy_cert_manager() {
+	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml > /dev/null 2>&1 || :
+	kubectl delete --grace-period=0 --force=true namespace cert-manager > /dev/null 2>&1 || :
 }
 
 get_container_image() {
