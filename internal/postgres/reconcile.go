@@ -198,7 +198,7 @@ func InstancePod(ctx context.Context,
 	reloader := corev1.Container{
 		Name: naming.ContainerClientCertCopy,
 
-		Command: reloadCommand(naming.ContainerClientCertCopy, inCluster.CompareVersion("2.5.0") >= 0),
+		Command: reloadCommand(inCluster, naming.ContainerClientCertCopy, inCluster.CompareVersion("2.5.0") >= 0, feature.Enabled(ctx, feature.AutoGrowVolumes)),
 
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
