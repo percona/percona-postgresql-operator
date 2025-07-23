@@ -83,6 +83,9 @@ type PatroniSwitchover struct {
 const (
 	PatroniSwitchoverTypeFailover   = "Failover"
 	PatroniSwitchoverTypeSwitchover = "Switchover"
+
+	// K8SPG-718
+	patroniDefaultPort = int32(8008)
 )
 
 // Default sets the default values for certain Patroni configuration attributes,
@@ -103,6 +106,15 @@ func (s *PatroniSpec) Default() {
 		s.SyncPeriodSeconds = new(int32)
 		*s.SyncPeriodSeconds = 10
 	}
+}
+
+// GetPort returns the patroni port. Added as part of K8SPG-718.
+func (s *PatroniSpec) GetPort() int32 {
+	patroniPort := patroniDefaultPort
+	if s != nil && s.Port != nil {
+		patroniPort = *s.Port
+	}
+	return patroniPort
 }
 
 type PatroniStatus struct {

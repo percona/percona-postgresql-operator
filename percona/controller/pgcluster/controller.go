@@ -355,7 +355,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 			orig := cluster.DeepCopy()
 
-			cluster.Status.PatroniVersion = patroniVersion
+			cluster.Status.Patroni.Version = patroniVersion
 
 			if err := r.Client.Status().Patch(ctx, cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
 				return errors.Wrap(err, "failed to patch patroni version")
@@ -402,8 +402,8 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	// If the imageIDs slice contains the imageID from the status, we skip checking the Patroni version.
 	// This ensures that the Patroni version is only checked after all pods have been updated.
-	if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.PatroniVersion != "" {
-		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.PatroniVersion
+	if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.Patroni.Version != "" {
+		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.Patroni.Version
 		return nil
 	}
 
@@ -442,6 +442,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 					},
 				},
 				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
+				Affinity:                      cr.Spec.InstanceSets[0].Affinity,
 				TerminationGracePeriodSeconds: ptr.To(int64(5)),
 				ImagePullSecrets:              cr.Spec.ImagePullSecrets,
 				Resources: &corev1.ResourceRequirements{
@@ -496,7 +497,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 
 	orig := cr.DeepCopy()
 
-	cr.Status.PatroniVersion = patroniVersion
+	cr.Status.Patroni.Version = patroniVersion
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
 	cr.Status.Postgres.ImageID = getImageIDFromPod(p, pNaming.ContainerPatroniVersionCheck)
 
@@ -813,17 +814,17 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
-		set.InitContainers = append(set.InitContainers, extensions.ExtensionRelocatorContainer(
+		set.InitContainers = append(set.InitContainers, extensions.RelocatorContainer(
 			cr, cr.PostgresImage(), cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion,
 		))
-		set.InitContainers = append(set.InitContainers, extensions.ExtensionInstallerContainer(
+		set.InitContainers = append(set.InitContainers, extensions.InstallerContainer(
 			cr,
 			cr.Spec.PostgresVersion,
 			&cr.Spec.Extensions,
 			strings.Join(extensionKeys, ","),
 			cr.Spec.OpenShift,
 		))
-		set.VolumeMounts = append(set.VolumeMounts, extensions.ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
+		set.VolumeMounts = append(set.VolumeMounts, extensions.VolumeMounts(cr.Spec.PostgresVersion)...)
 	}
 	return nil
 }

@@ -167,7 +167,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 
 	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
 	if err != nil {
-		return nil, PrimaryPodNotFound
+		return nil, errors.Wrap(PrimaryPodNotFound, err.Error())
 	}
 
 	log.V(1).Info("Getting latest commit timestamp from primary pod", "pod", primary.Name)
@@ -203,7 +203,7 @@ func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (time.Time, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
 	if err != nil {
-		return time.Time{}, PrimaryPodNotFound
+		return time.Time{}, errors.Wrap(PrimaryPodNotFound, err.Error())
 	}
 
 	pgbackrestInfo, err := pgbackrest.GetInfo(ctx, primary, backup.Spec.RepoName)
