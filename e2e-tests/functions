@@ -92,7 +92,8 @@ deploy_operator_gh() {
 
 	curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/${cw_prefix}operator.yaml" >"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml"
 
-	yq eval '.spec.template.spec.containers[0].image = "'${REGISTRY_NAME_FULL}'percona/percona-postgresql-operator:'${git_tag#v}'"' \
+	local docker_hub_org=$(echo "$IMAGE" | sed -E 's|(.*/)?([^/]+)/[^/]+(:.*)?|\2|')
+	yq eval '.spec.template.spec.containers[0].image = "'${REGISTRY_NAME_FULL}''$docker_hub_org'/percona-postgresql-operator:'${git_tag#v}'"' \
 		"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml" \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }

@@ -12,6 +12,9 @@ export TEMP_DIR="/tmp/kuttl/pg/${test_name}"
 export GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 export VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' | tr '[:upper:]' '[:lower:]')}
 
+# Skip warning checks used for documentation by default
+export SKIP_TEST_WARNINGS=${SKIP_TEST_WARNINGS:-"true"}
+
 if command -v oc &>/dev/null; then
 	if oc get projects; then
 		export OPENSHIFT=4

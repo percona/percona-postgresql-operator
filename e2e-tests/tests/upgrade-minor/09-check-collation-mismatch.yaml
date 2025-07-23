@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+- script: |-
+    set -o errexit
+    set -o xtrace
+
+    source ../../functions
+
+    if [[ "${SKIP_TEST_WARNINGS}" == "true" ]]; then
+      echo "Collation mismatch verification skipped."
+      exit 0
+    fi
+
+    # Replace new lines, whitespaces and quotes
+    query_mismatch=$(<09-collation-mismatch.sql tr '\n' ' ' | sed "s/'/'\\\\''/g" | sed 's/  */ /g')
+    data=$(run_psql_local "$query_mismatch" "postgres:$(get_psql_user_pass upgrade-minor-pguser-postgres)@$(get_psql_user_host upgrade-minor-pguser-postgres)")
+
+    if [[ "$data" == *"Collection mismatch detected"* ]]; then
+      echo "Collation mismatch detected after minor upgrade. Ensure that the necessary Release Notes documentation is in place. For further details, refer to: https://perconadev.atlassian.net/browse/K8SPG-820."
+      exit 1
+    fi
