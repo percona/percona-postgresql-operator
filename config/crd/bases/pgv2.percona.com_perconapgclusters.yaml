@@ -9085,7 +9085,11 @@ spec:
                     properties:
                       bucket:
                         type: string
+                      disableSSL:
+                        type: string
                       endpoint:
+                        type: string
+                      forcePathStyle:
                         type: string
                       region:
                         type: string
