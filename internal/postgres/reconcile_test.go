@@ -1352,6 +1352,282 @@ volumes:
 		assert.DeepEqual(t, pod.InitContainers[0].Command[4:],
 			[]string{"startup", "11", "/pgwal/pg11_wal", "/pgdata/pgbackrest/log"})
 	})
+
+	t.Run("WithHugepages2Mi", func(t *testing.T) {
+		clusterWithHugepages2Mi := cluster.DeepCopy()
+		clusterWithHugepages2Mi.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
+			{
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory:                  resource.MustParse("4Gi"),
+						corev1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Gi"),
+					},
+				},
+			},
+		}
+
+		pod := new(corev1.PodSpec)
+		InstancePod(ctx, clusterWithHugepages2Mi, instance,
+			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
+- name: cert-volume
+  projected:
+    defaultMode: 384
+    sources:
+    - secret:
+        items:
+        - key: tls.crt
+          path: tls.crt
+        - key: tls.key
+          path: tls.key
+        - key: ca.crt
+          path: ca.crt
+        name: srv-secret
+    - secret:
+        items:
+        - key: tls.crt
+          path: replication/tls.crt
+        - key: tls.key
+          path: replication/tls.key
+        name: repl-secret
+- name: postgres-data
+  persistentVolumeClaim:
+    claimName: datavol
+- downwardAPI:
+    items:
+    - path: cpu_limit
+      resourceFieldRef:
+        containerName: database
+        divisor: 1m
+        resource: limits.cpu
+    - path: cpu_request
+      resourceFieldRef:
+        containerName: database
+        divisor: 1m
+        resource: requests.cpu
+    - path: mem_limit
+      resourceFieldRef:
+        containerName: database
+        divisor: 1Mi
+        resource: limits.memory
+    - path: mem_request
+      resourceFieldRef:
+        containerName: database
+        divisor: 1Mi
+        resource: requests.memory
+    - fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.labels
+      path: labels
+    - fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.annotations
+      path: annotations
+  name: database-containerinfo
+- emptyDir:
+    medium: HugePages-2Mi
+  name: hugepage-2mi
+		`), "expected HugePages-2Mi volume")
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Containers[0].VolumeMounts, `
+- mountPath: /pgconf/tls
+  name: cert-volume
+  readOnly: true
+- mountPath: /pgdata
+  name: postgres-data
+- mountPath: /etc/database-containerinfo
+  name: database-containerinfo
+  readOnly: true
+- mountPath: /hugepages-2Mi
+  name: hugepage-2mi`), "expected hugepage mount in %q container", pod.Containers[0].Name)
+	})
+
+	t.Run("WithHugepages1Gi", func(t *testing.T) {
+		clusterWithHugepages1Gi := cluster.DeepCopy()
+		clusterWithHugepages1Gi.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
+			{
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory:                  resource.MustParse("4Gi"),
+						corev1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+					},
+				},
+			},
+		}
+
+		pod := new(corev1.PodSpec)
+		InstancePod(ctx, clusterWithHugepages1Gi, instance,
+			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
+- name: cert-volume
+  projected:
+    defaultMode: 384
+    sources:
+    - secret:
+        items:
+        - key: tls.crt
+          path: tls.crt
+        - key: tls.key
+          path: tls.key
+        - key: ca.crt
+          path: ca.crt
+        name: srv-secret
+    - secret:
+        items:
+        - key: tls.crt
+          path: replication/tls.crt
+        - key: tls.key
+          path: replication/tls.key
+        name: repl-secret
+- name: postgres-data
+  persistentVolumeClaim:
+    claimName: datavol
+- downwardAPI:
+    items:
+    - path: cpu_limit
+      resourceFieldRef:
+        containerName: database
+        divisor: 1m
+        resource: limits.cpu
+    - path: cpu_request
+      resourceFieldRef:
+        containerName: database
+        divisor: 1m
+        resource: requests.cpu
+    - path: mem_limit
+      resourceFieldRef:
+        containerName: database
+        divisor: 1Mi
+        resource: limits.memory
+    - path: mem_request
+      resourceFieldRef:
+        containerName: database
+        divisor: 1Mi
+        resource: requests.memory
+    - fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.labels
+      path: labels
+    - fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.annotations
+      path: annotations
+  name: database-containerinfo
+- emptyDir:
+    medium: HugePages-1Gi
+  name: hugepage-1gi
+		`), "expected HugePages-1Gi volume")
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Containers[0].VolumeMounts, `
+- mountPath: /pgconf/tls
+  name: cert-volume
+  readOnly: true
+- mountPath: /pgdata
+  name: postgres-data
+- mountPath: /etc/database-containerinfo
+  name: database-containerinfo
+  readOnly: true
+- mountPath: /hugepages-1Gi
+  name: hugepage-1gi`), "expected hugepage mount in %q container", pod.Containers[0].Name)
+	})
+
+	t.Run("WithHugepages", func(t *testing.T) {
+		clusterWithHugepages := cluster.DeepCopy()
+		clusterWithHugepages.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
+			{
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory:                  resource.MustParse("4Gi"),
+						corev1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Gi"),
+						corev1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+					},
+				},
+			},
+		}
+
+		pod := new(corev1.PodSpec)
+		InstancePod(ctx, clusterWithHugepages, instance,
+			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
+- name: cert-volume
+  projected:
+    defaultMode: 384
+    sources:
+    - secret:
+        items:
+        - key: tls.crt
+          path: tls.crt
+        - key: tls.key
+          path: tls.key
+        - key: ca.crt
+          path: ca.crt
+        name: srv-secret
+    - secret:
+        items:
+        - key: tls.crt
+          path: replication/tls.crt
+        - key: tls.key
+          path: replication/tls.key
+        name: repl-secret
+- name: postgres-data
+  persistentVolumeClaim:
+    claimName: datavol
+- downwardAPI:
+    items:
+    - path: cpu_limit
+      resourceFieldRef:
+        containerName: database
+        divisor: 1m
+        resource: limits.cpu
+    - path: cpu_request
+      resourceFieldRef:
+        containerName: database
+        divisor: 1m
+        resource: requests.cpu
+    - path: mem_limit
+      resourceFieldRef:
+        containerName: database
+        divisor: 1Mi
+        resource: limits.memory
+    - path: mem_request
+      resourceFieldRef:
+        containerName: database
+        divisor: 1Mi
+        resource: requests.memory
+    - fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.labels
+      path: labels
+    - fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.annotations
+      path: annotations
+  name: database-containerinfo
+- emptyDir:
+    medium: HugePages-2Mi
+  name: hugepage-2mi
+- emptyDir:
+    medium: HugePages-1Gi
+  name: hugepage-1gi
+		`), "expected HugePages-2Mi and HugePages-1Gi volumes")
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Containers[0].VolumeMounts, `
+- mountPath: /pgconf/tls
+  name: cert-volume
+  readOnly: true
+- mountPath: /pgdata
+  name: postgres-data
+- mountPath: /etc/database-containerinfo
+  name: database-containerinfo
+  readOnly: true
+- mountPath: /hugepages-2Mi
+  name: hugepage-2mi
+- mountPath: /hugepages-1Gi
+  name: hugepage-1gi`), "expected hugepage mounts in %q container", pod.Containers[0].Name)
+	})
 }
 
 func TestPodSecurityContext(t *testing.T) {
