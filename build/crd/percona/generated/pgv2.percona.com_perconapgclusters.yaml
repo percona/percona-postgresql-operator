@@ -19045,8 +19045,225 @@ spec:
               observedGeneration:
                 format: int64
                 type: integer
-              patroniVersion:
-                type: string
+              patroni:
+                properties:
+                  status:
+                    properties:
+                      switchover:
+                        description: Tracks the execution of the switchover requests.
+                        type: string
+                      switchoverTimeline:
+                        description: Tracks the current timeline during switchovers
+                        format: int64
+                        type: integer
+                      systemIdentifier:
+                        description: The PostgreSQL system identifier reported by
+                          Patroni.
+                        type: string
+                    type: object
+                  version:
+                    type: string
+                type: object
+              pgbackrest:
+                description: Status information for pgBackRest
+                properties:
+                  manualBackup:
+                    description: Status information for manual backups
+                    properties:
+                      active:
+                        description: The number of actively running manual backup
+                          Pods.
+                        format: int32
+                        type: integer
+                      completionTime:
+                        description: |-
+                          Represents the time the manual backup Job was determined by the Job controller
+                          to be completed.  This field is only set if the backup completed successfully.
+                          Additionally, it is represented in RFC3339 form and is in UTC.
+                        format: date-time
+                        type: string
+                      failed:
+                        description: The number of Pods for the manual backup Job
+                          that reached the "Failed" phase.
+                        format: int32
+                        type: integer
+                      finished:
+                        description: |-
+                          Specifies whether or not the Job is finished executing (does not indicate success or
+                          failure).
+                        type: boolean
+                      id:
+                        description: |-
+                          A unique identifier for the manual backup as provided using the "pgbackrest-backup"
+                          annotation when initiating a backup.
+                        type: string
+                      startTime:
+                        description: |-
+                          Represents the time the manual backup Job was acknowledged by the Job controller.
+                          It is represented in RFC3339 form and is in UTC.
+                        format: date-time
+                        type: string
+                      succeeded:
+                        description: The number of Pods for the manual backup Job
+                          that reached the "Succeeded" phase.
+                        format: int32
+                        type: integer
+                    required:
+                    - finished
+                    - id
+                    type: object
+                  repoHost:
+                    description: Status information for the pgBackRest dedicated repository
+                      host
+                    properties:
+                      apiVersion:
+                        description: |-
+                          APIVersion defines the versioned schema of this representation of an object.
+                          Servers should convert recognized schemas to the latest internal value, and
+                          may reject unrecognized values.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                        type: string
+                      kind:
+                        description: |-
+                          Kind is a string value representing the REST resource this object represents.
+                          Servers may infer this from the endpoint the client submits requests to.
+                          Cannot be updated.
+                          In CamelCase.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      ready:
+                        description: Whether or not the pgBackRest repository host
+                          is ready for use
+                        type: boolean
+                    type: object
+                  repos:
+                    description: Status information for pgBackRest repositories
+                    items:
+                      description: RepoStatus the status of a pgBackRest repository
+                      properties:
+                        bound:
+                          description: Whether or not the pgBackRest repository PersistentVolumeClaim
+                            is bound to a volume
+                          type: boolean
+                        name:
+                          description: The name of the pgBackRest repository
+                          type: string
+                        replicaCreateBackupComplete:
+                          description: |-
+                            ReplicaCreateBackupReady indicates whether a backup exists in the repository as needed
+                            to bootstrap replicas.
+                          type: boolean
+                        repoOptionsHash:
+                          description: |-
+                            A hash of the required fields in the spec for defining an Azure, GCS or S3 repository,
+                            Utilized to detect changes to these fields and then execute pgBackRest stanza-create
+                            commands accordingly.
+                          type: string
+                        stanzaCreated:
+                          description: Specifies whether or not a stanza has been
+                            successfully created for the repository
+                          type: boolean
+                        volume:
+                          description: The name of the volume the containing the pgBackRest
+                            repository
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  restore:
+                    description: Status information for in-place restores
+                    properties:
+                      active:
+                        description: The number of actively running manual backup
+                          Pods.
+                        format: int32
+                        type: integer
+                      completionTime:
+                        description: |-
+                          Represents the time the manual backup Job was determined by the Job controller
+                          to be completed.  This field is only set if the backup completed successfully.
+                          Additionally, it is represented in RFC3339 form and is in UTC.
+                        format: date-time
+                        type: string
+                      failed:
+                        description: The number of Pods for the manual backup Job
+                          that reached the "Failed" phase.
+                        format: int32
+                        type: integer
+                      finished:
+                        description: |-
+                          Specifies whether or not the Job is finished executing (does not indicate success or
+                          failure).
+                        type: boolean
+                      id:
+                        description: |-
+                          A unique identifier for the manual backup as provided using the "pgbackrest-backup"
+                          annotation when initiating a backup.
+                        type: string
+                      startTime:
+                        description: |-
+                          Represents the time the manual backup Job was acknowledged by the Job controller.
+                          It is represented in RFC3339 form and is in UTC.
+                        format: date-time
+                        type: string
+                      succeeded:
+                        description: The number of Pods for the manual backup Job
+                          that reached the "Succeeded" phase.
+                        format: int32
+                        type: integer
+                    required:
+                    - finished
+                    - id
+                    type: object
+                  scheduledBackups:
+                    description: Status information for scheduled backups
+                    items:
+                      properties:
+                        active:
+                          description: The number of actively running manual backup
+                            Pods.
+                          format: int32
+                          type: integer
+                        completionTime:
+                          description: |-
+                            Represents the time the manual backup Job was determined by the Job controller
+                            to be completed.  This field is only set if the backup completed successfully.
+                            Additionally, it is represented in RFC3339 form and is in UTC.
+                          format: date-time
+                          type: string
+                        cronJobName:
+                          description: The name of the associated pgBackRest scheduled
+                            backup CronJob
+                          type: string
+                        failed:
+                          description: The number of Pods for the manual backup Job
+                            that reached the "Failed" phase.
+                          format: int32
+                          type: integer
+                        repo:
+                          description: The name of the associated pgBackRest repository
+                          type: string
+                        startTime:
+                          description: |-
+                            Represents the time the manual backup Job was acknowledged by the Job controller.
+                            It is represented in RFC3339 form and is in UTC.
+                          format: date-time
+                          type: string
+                        succeeded:
+                          description: The number of Pods for the manual backup Job
+                            that reached the "Succeeded" phase.
+                          format: int32
+                          type: integer
+                        type:
+                          description: The pgBackRest backup type for this Job
+                          type: string
+                      type: object
+                    type: array
+                type: object
               pgbouncer:
                 properties:
                   ready:

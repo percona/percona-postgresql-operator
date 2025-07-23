@@ -24,19 +24,6 @@ if [[ ${STORAGE_FORCE_PATH_STYLE} == "true" ]]; then
 	args+=(-force-path-style)
 fi
 
-for key in "${extensions[@]}"; do
-	if [ -f "${PGDATA_EXTENSIONS}"/"${key}".installed ]; then
-		echo "Extension ${key} already installed"
-		continue
-	fi
-
-	echo "Installing extension: ${key}"
-	/usr/local/bin/extension-installer \
-		"${args[@]}" \
-		-key "${key}" \
-		-install
-done
-
 for installed in "${PGDATA_EXTENSIONS}"/*.installed; do
 	filename=$(basename -- "${installed}")
 	key=${filename%.*}
@@ -52,4 +39,17 @@ for installed in "${PGDATA_EXTENSIONS}"/*.installed; do
 			-uninstall
 		rm -f "${installed}"
 	fi
+done
+
+for key in "${extensions[@]}"; do
+	if [ -f "${PGDATA_EXTENSIONS}"/"${key}".installed ]; then
+		echo "Extension ${key} already installed"
+		continue
+	fi
+
+	echo "Installing extension: ${key}"
+	/usr/local/bin/extension-installer \
+		"${args[@]}" \
+		-key "${key}" \
+		-install
 done
