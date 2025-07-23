@@ -268,6 +268,19 @@ func TestInitImage(t *testing.T) {
 			"operator-image",
 		},
 		{
+			"pgbackrest not specified init image with different versions",
+			func() *v1beta1.PostgresCluster {
+				cr := crunchyCr.DeepCopy()
+
+				oldVersion := "1.2.0"
+
+				cr.Labels = map[string]string{v1beta1.LabelVersion: oldVersion}
+				return cr
+			},
+			getPGBackrestComponent,
+			"operator-image:1.2.0",
+		},
+		{
 			"pgbackrest general init image",
 			func() *v1beta1.PostgresCluster {
 				cr := crunchyCr.DeepCopy()
