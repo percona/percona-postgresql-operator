@@ -1,26 +1,27 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 300
+timeout: 180
 ---
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: upgrade-consistency-repo-host
+  name: custom-extensions-repo-host
   labels:
-    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/cluster: custom-extensions
     postgres-operator.crunchydata.com/data: pgbackrest
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-dedicated: ''
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
-      name: upgrade-consistency
+      name: custom-extensions
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
+  observedGeneration: 1
   replicas: 1
   readyReplicas: 1
+  currentReplicas: 1
   updatedReplicas: 1
   collisionCount: 0
 ---
@@ -28,17 +29,17 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/cluster: custom-extensions
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
-      name: upgrade-consistency
+      name: custom-extensions
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
+  observedGeneration: 4
   replicas: 1
   readyReplicas: 1
   updatedReplicas: 1
@@ -47,20 +48,20 @@ status:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: upgrade-consistency-pgbouncer
+  name: custom-extensions-pgbouncer
   labels:
-    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/cluster: custom-extensions
     postgres-operator.crunchydata.com/role: pgbouncer
   annotations:
-    deployment.kubernetes.io/revision: '2'
+    deployment.kubernetes.io/revision: '1'
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
-      name: upgrade-consistency
+      name: custom-extensions
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
+  observedGeneration: 1
   replicas: 3
   updatedReplicas: 3
   readyReplicas: 3
@@ -69,7 +70,7 @@ kind: Job
 apiVersion: batch/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/cluster: custom-extensions
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
@@ -84,11 +85,11 @@ status:
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: upgrade-consistency
+  name: custom-extensions
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: upgrade-consistency
+      name: custom-extensions
       controller: true
       blockOwnerDeletion: true
   finalizers:
@@ -99,7 +100,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 2
+  observedGeneration: 4
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
@@ -118,9 +119,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: upgrade-consistency
-spec:
-  crVersion: 2.7.0
+  name: custom-extensions
 status:
   pgbouncer:
     ready: 3

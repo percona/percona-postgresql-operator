@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/percona/naming"
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -87,7 +88,28 @@ func InitImage(ctx context.Context, cl client.Reader, cluster *v1beta1.PostgresC
 	if cluster != nil && cluster.Spec.InitContainer != nil && len(cluster.Spec.InitContainer.Image) > 0 {
 		return cluster.Spec.InitContainer.Image, nil
 	}
-	return operatorImage(ctx, cl)
+
+	operatorImage, err := operatorImage(ctx, cl)
+	if err != nil {
+		return "", errors.Wrap(err, "get operator image")
+	}
+
+	imageName := operatorImage
+
+	if cluster == nil {
+		return imageName, nil
+	}
+
+	crVersion, ok := cluster.Labels[v1beta1.LabelVersion]
+	if !ok || crVersion == "" {
+		return imageName, nil
+	}
+
+	if cluster.CompareVersion(version.Version()) != 0 {
+		imageName = strings.Split(operatorImage, ":")[0] + ":" + crVersion
+	}
+
+	return imageName, nil
 }
 
 func operatorImage(ctx context.Context, cl client.Reader) (string, error) {
