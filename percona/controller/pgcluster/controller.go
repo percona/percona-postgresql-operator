@@ -814,17 +814,17 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
-		set.InitContainers = append(set.InitContainers, extensions.ExtensionRelocatorContainer(
+		set.InitContainers = append(set.InitContainers, extensions.RelocatorContainer(
 			cr, cr.PostgresImage(), cr.Spec.ImagePullPolicy, cr.Spec.PostgresVersion,
 		))
-		set.InitContainers = append(set.InitContainers, extensions.ExtensionInstallerContainer(
+		set.InitContainers = append(set.InitContainers, extensions.InstallerContainer(
 			cr,
 			cr.Spec.PostgresVersion,
 			&cr.Spec.Extensions,
 			strings.Join(extensionKeys, ","),
 			cr.Spec.OpenShift,
 		))
-		set.VolumeMounts = append(set.VolumeMounts, extensions.ExtensionVolumeMounts(cr.Spec.PostgresVersion)...)
+		set.VolumeMounts = append(set.VolumeMounts, extensions.VolumeMounts(cr.Spec.PostgresVersion)...)
 	}
 	return nil
 }
