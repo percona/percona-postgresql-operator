@@ -187,6 +187,18 @@ func Pod(
 	}
 
 	outPod.Volumes = []corev1.Volume{configVolume}
+
+	// K8SPG-833
+	if pgbouncer := inCluster.Spec.Proxy.PGBouncer; inCluster.CompareVersion("2.8.0") >= 0 && pgbouncer != nil {
+		for i := range outPod.Containers {
+			if len(pgbouncer.Env) != 0 {
+				outPod.Containers[i].Env = append(outPod.Containers[i].Env, pgbouncer.Env...)
+			}
+			if len(pgbouncer.EnvFrom) != 0 {
+				outPod.Containers[i].EnvFrom = append(outPod.Containers[i].EnvFrom, pgbouncer.EnvFrom...)
+			}
+		}
+	}
 }
 
 // PostgreSQL populates outHBAs with any records needed to run PgBouncer.

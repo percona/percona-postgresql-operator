@@ -556,6 +556,11 @@ type PostgresInstanceSetSpec struct {
 	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"`
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // K8SPG-708

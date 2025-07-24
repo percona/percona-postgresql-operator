@@ -139,6 +139,11 @@ type PGBouncerPodSpec struct {
 	// SecurityContext defines the security settings for PGBouncer pods.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // PGBouncerSidecars defines the configuration for pgBouncer sidecar containers
