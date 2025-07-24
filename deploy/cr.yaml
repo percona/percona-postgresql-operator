@@ -496,6 +496,13 @@ spec:
 #        repo3-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo3
 #        repo4-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo4
       repoHost:
+#        sidecars:
+#        - name: testcontainer
+#          image: busybox:latest
+#          command: ["sleep", "30d"]
+#          securityContext: {}
+#        - name: testcontainer2
+#          image: mycontainer1:latest
 #        resources:
 #          limits:
 #            cpu: 200m

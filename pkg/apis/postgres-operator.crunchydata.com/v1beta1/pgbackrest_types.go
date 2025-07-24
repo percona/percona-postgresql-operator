@@ -255,6 +255,11 @@ type PGBackRestRepoHost struct {
 	// SecurityContext defines the security settings for PGBackRest pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// Custom sidecars for PostgreSQL instance pods. Changing this value causes
+	// PostgreSQL to restart.
+	// +optional
+	Sidecars []corev1.Container `json:"sidecars,omitempty"`
 }
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.
