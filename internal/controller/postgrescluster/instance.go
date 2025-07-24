@@ -1244,7 +1244,7 @@ func (r *Reconciler) reconcileInstance(
 	}
 
 	// K8SPG-833
-	if cluster.CompareVersion("2.8.0") >= 0 && (len(spec.Env) != 0 || len(spec.EnvFrom) != 0) {
+	if cluster.CompareVersion("2.8.0") >= 0 {
 		for i := range instance.Spec.Template.Spec.Containers {
 			if len(spec.Env) != 0 {
 				instance.Spec.Template.Spec.Containers[i].Env = append(instance.Spec.Template.Spec.Containers[i].Env, spec.Env...)

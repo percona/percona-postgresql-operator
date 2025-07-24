@@ -189,7 +189,7 @@ func Pod(
 	outPod.Volumes = []corev1.Volume{configVolume}
 
 	// K8SPG-833
-	if pgbouncer := inCluster.Spec.Proxy.PGBouncer; inCluster.CompareVersion("2.8.0") >= 0 && pgbouncer != nil && (len(pgbouncer.Env) != 0 || len(pgbouncer.EnvFrom) != 0) {
+	if pgbouncer := inCluster.Spec.Proxy.PGBouncer; inCluster.CompareVersion("2.8.0") >= 0 && pgbouncer != nil {
 		for i := range outPod.Containers {
 			if len(pgbouncer.Env) != 0 {
 				outPod.Containers[i].Env = append(outPod.Containers[i].Env, pgbouncer.Env...)
