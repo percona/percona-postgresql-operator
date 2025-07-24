@@ -520,6 +520,13 @@ spec:
 #        envFrom:
 #        - secretRef:
 #            name: repo-host-env-secret
+#        sidecars:
+#        - name: testcontainer
+#          image: busybox:latest
+#          command: ["sleep", "30d"]
+#          securityContext: {}
+#        - name: testcontainer2
+#          image: mycontainer1:latest
 #        resources:
 #          limits:
 #            cpu: 200m

@@ -265,6 +265,10 @@ type PGBackRestRepoHost struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 	// K8SPG-833
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+	// Custom sidecars for PostgreSQL instance pods. Changing this value causes
+	// PostgreSQL to restart.
+	// +optional
+	Sidecars []corev1.Container `json:"sidecars,omitempty"`
 }
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.

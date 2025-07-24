@@ -730,8 +730,15 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 
 	// K8SPG-435
 	resources := corev1.ResourceRequirements{}
-	if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
+	if repoHost := postgresCluster.Spec.Backups.PGBackRest.RepoHost; repoHost != nil {
 		resources = postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources
+
+		// K8SPG-832
+		// If the PGBackrestRepoHostSidecars feature gate is enabled and instance sidecars are
+		// defined, add the defined container to the Pod.
+		if feature.Enabled(ctx, feature.PGBackrestRepoHostSidecars) && repoHost.Sidecars != nil {
+			repo.Spec.Template.Spec.Containers = append(repo.Spec.Template.Spec.Containers, repoHost.Sidecars...)
+		}
 	}
 	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
 
