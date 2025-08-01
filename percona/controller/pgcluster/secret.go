@@ -2,7 +2,7 @@ package pgcluster
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -20,7 +20,7 @@ func getEnvFromSecrets(ctx context.Context, cl client.Client, cr *v2.PerconaPGCl
 	for _, source := range envFromSource {
 		var secret corev1.Secret
 		if err := cl.Get(ctx, types.NamespacedName{
-			Name:      source.SecretRef.LocalObjectReference.Name,
+			Name:      source.SecretRef.Name,
 			Namespace: cr.Namespace,
 		}, &secret); err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -34,14 +34,12 @@ func getEnvFromSecrets(ctx context.Context, cl client.Client, cr *v2.PerconaPGCl
 	return secrets, nil
 }
 
-func getSecretHash(secrets ...corev1.Secret) (string, error) {
+func getSecretHash(secrets ...corev1.Secret) string {
 	var data string
 
 	for _, secret := range secrets {
 		data += fmt.Sprintln(secret.Data)
 	}
 
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(data)))
-
-	return hash, nil
+	return fmt.Sprintf("%x", md5.Sum([]byte(data))) //nolint:gosec
 }

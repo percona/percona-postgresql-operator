@@ -755,17 +755,12 @@ func (r *PGClusterReconciler) handleEnvFromSecrets(ctx context.Context, cr *v2.P
 			return errors.Wrap(err, "get env from secrets")
 		}
 
-		h, err := getSecretHash(secrets...)
-		if err != nil {
-			return errors.Wrap(err, "get secret hash")
-		}
-
 		if metadata.Annotations == nil {
 			metadata.Annotations = make(map[string]string)
 		}
 
 		// If the currentHash is the same  is the on the STS, restart will not  happen
-		metadata.Annotations[pNaming.AnnotationEnvVarsSecretHash] = h
+		metadata.Annotations[pNaming.AnnotationEnvVarsSecretHash] = getSecretHash(secrets...)
 	}
 
 	return nil
