@@ -137,6 +137,11 @@ type PGBackRestArchive struct {
 
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // K8SPG-613
@@ -191,11 +196,6 @@ type BackupJobs struct {
 
 	// +optional
 	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"` // K8SPG-619
-
-	// K8SPG-833
-	Env []corev1.EnvVar `json:"env,omitempty"`
-	// K8SPG-833
-	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // PGBackRestManualBackup contains information that is used for creating a
@@ -261,10 +261,6 @@ type PGBackRestRepoHost struct {
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 
-	// K8SPG-833
-	Env []corev1.EnvVar `json:"env,omitempty"`
-	// K8SPG-833
-	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 	// Custom sidecars for PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
 	// +optional

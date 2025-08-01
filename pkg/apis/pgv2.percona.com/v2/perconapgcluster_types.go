@@ -467,7 +467,6 @@ type PerconaPGClusterStatus struct {
 }
 
 type Patroni struct {
-
 	// +optional
 	Status *crunchyv1beta1.PatroniStatus `json:"status,omitempty"`
 
@@ -518,6 +517,8 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			Restore:       b.PGBackRest.Restore,
 			InitContainer: b.PGBackRest.InitContainer,
 			Sidecars:      sc,
+			Env:           b.PGBackRest.Env,
+			EnvFrom:       b.PGBackRest.EnvFrom,
 		},
 	}
 }
@@ -580,6 +581,11 @@ type PGBackRestArchive struct {
 	// Configuration for pgBackRest sidecar containers
 	// +optional
 	Containers *crunchyv1beta1.PGBackRestSidecars `json:"containers,omitempty"`
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 type PMMQuerySource string

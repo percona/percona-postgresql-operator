@@ -281,6 +281,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
+	if err := r.handleEnvFromSecrets(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to handle envFrom secrets")
+	}
+
 	if err := r.reconcileCustomExtensions(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile custom extensions")
 	}
@@ -712,6 +716,56 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 		set.Metadata.Annotations[pNaming.AnnotationPMMSecretHash] = pmmSecretHash
 
 		set.Sidecars = append(set.Sidecars, pmmContainer)
+	}
+
+	return nil
+}
+
+func (r *PGClusterReconciler) handleEnvFromSecrets(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	m := make(map[*[]corev1.EnvFromSource]*v1beta1.Metadata)
+
+	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+		set := &cr.Spec.InstanceSets[i]
+		if len(set.EnvFrom) == 0 {
+			continue
+		}
+		if set.Metadata == nil {
+			set.Metadata = new(v1beta1.Metadata)
+		}
+		m[&set.EnvFrom] = set.Metadata
+	}
+
+	if len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
+		if cr.Spec.Proxy.PGBouncer.Metadata == nil {
+			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
+		}
+		m[&cr.Spec.Proxy.PGBouncer.EnvFrom] = cr.Spec.Proxy.PGBouncer.Metadata
+	}
+
+	if len(cr.Spec.Backups.PGBackRest.EnvFrom) > 0 {
+		if cr.Spec.Backups.PGBackRest.Metadata == nil {
+			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
+		}
+		m[&cr.Spec.Backups.PGBackRest.EnvFrom] = cr.Spec.Backups.PGBackRest.Metadata
+	}
+
+	for envFrom, metadata := range m {
+		secrets, err := getEnvFromSecrets(ctx, r.Client, cr, *envFrom)
+		if err != nil {
+			return errors.Wrap(err, "get env from secrets")
+		}
+
+		h, err := getSecretHash(secrets...)
+		if err != nil {
+			return errors.Wrap(err, "get secret hash")
+		}
+
+		if metadata.Annotations == nil {
+			metadata.Annotations = make(map[string]string)
+		}
+
+		// If the currentHash is the same  is the on the STS, restart will not  happen
+		metadata.Annotations[pNaming.AnnotationEnvVarsSecretHash] = h
 	}
 
 	return nil

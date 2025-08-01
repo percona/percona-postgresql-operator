@@ -1104,6 +1104,15 @@ var _ = Describe("Envs", Ordered, func() {
 			},
 		},
 	}
+	instanceSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-instance-env",
+			Namespace: ns,
+		},
+		StringData: map[string]string{
+			"instance": "test",
+		},
+	}
 
 	pgbouncerEnv := []corev1.EnvVar{
 		{
@@ -1120,6 +1129,15 @@ var _ = Describe("Envs", Ordered, func() {
 			},
 		},
 	}
+	pgbouncerSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-pgbouncer-env",
+			Namespace: ns,
+		},
+		StringData: map[string]string{
+			"pgbouncer": "test",
+		},
+	}
 
 	repoHostEnv := []corev1.EnvVar{
 		{
@@ -1131,9 +1149,18 @@ var _ = Describe("Envs", Ordered, func() {
 		{
 			SecretRef: &corev1.SecretEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: "repohost-pgbouncer-env",
+					Name: "secret-pgbackrest-env",
 				},
 			},
+		},
+	}
+	repoHostSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-pgbackrest-env",
+			Namespace: ns,
+		},
+		StringData: map[string]string{
+			"pgbackrest": "test",
 		},
 	}
 
@@ -1171,17 +1198,17 @@ var _ = Describe("Envs", Ordered, func() {
 				},
 			},
 		}
-		cr.Spec.Backups.PGBackRest.RepoHost.Env = []corev1.EnvVar{
+		cr.Spec.Backups.PGBackRest.Env = []corev1.EnvVar{
 			{
 				Name:  "REPOHOST_ENV",
 				Value: "VALUE3",
 			},
 		}
-		cr.Spec.Backups.PGBackRest.RepoHost.EnvFrom = []corev1.EnvFromSource{
+		cr.Spec.Backups.PGBackRest.EnvFrom = []corev1.EnvFromSource{
 			{
 				SecretRef: &corev1.SecretEnvSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "repohost-pgbouncer-env",
+						Name: "secret-pgbackrest-env",
 					},
 				},
 			},
@@ -1192,6 +1219,10 @@ var _ = Describe("Envs", Ordered, func() {
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 		cr.Status = status
 		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+
+		Expect(k8sClient.Create(ctx, instanceSecret)).Should(Succeed())
+		Expect(k8sClient.Create(ctx, pgbouncerSecret)).Should(Succeed())
+		Expect(k8sClient.Create(ctx, repoHostSecret)).Should(Succeed())
 	})
 
 	It("should reconcile", func() {
@@ -1212,6 +1243,7 @@ var _ = Describe("Envs", Ordered, func() {
 		Expect(stsList.Items).NotTo(BeEmpty())
 
 		for _, sts := range stsList.Items {
+			Expect(sts.Spec.Template.Annotations[pNaming.AnnotationEnvVarsSecretHash]).To(Equal("fadefc4ed7b5e5948dc8b03f2a3a71be"))
 			for _, c := range sts.Spec.Template.Spec.Containers {
 				Expect(c.Env).To(ContainElement(instanceEnv[0]))
 				Expect(c.EnvFrom).To(Equal(instanceEnvFrom))
@@ -1228,6 +1260,7 @@ var _ = Describe("Envs", Ordered, func() {
 		}
 		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(deployment.Spec.Template.Annotations[pNaming.AnnotationEnvVarsSecretHash]).To(Equal("6bc7e8df0909c789be90c630c9edce14"))
 		for _, c := range deployment.Spec.Template.Spec.Containers {
 			Expect(c.Env).To(ContainElement(pgbouncerEnv[0]))
 			Expect(c.EnvFrom).To(Equal(pgbouncerEnvFrom))
@@ -1243,6 +1276,7 @@ var _ = Describe("Envs", Ordered, func() {
 		}
 		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(sts.Spec.Template.Annotations[pNaming.AnnotationEnvVarsSecretHash]).To(Equal("22eb2683af3f48813c0cd53f905b67d0"))
 		for _, c := range sts.Spec.Template.Spec.Containers {
 			Expect(c.Env).To(ContainElement(repoHostEnv[0]))
 			Expect(c.EnvFrom).To(Equal(repoHostEnvFrom))
