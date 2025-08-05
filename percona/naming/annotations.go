@@ -30,6 +30,10 @@ const (
 	// rollout restart PG pods in case monitor user password is changed.
 	AnnotationMonitorUserSecretHash = PrefixPerconaPGV2 + "monitor-user-secret-hash"
 
+	// AnnotationEnvVarsSecretHash is the annotation that is added to
+	// rollout restart pods in case envFrom secret is changed.
+	AnnotationEnvVarsSecretHash = PrefixPerconaPGV2 + "env-secret-config-hash"
+
 	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
 	// indicate that backup is in progress.
 	AnnotationBackupInProgress = PrefixPerconaPGV2 + "backup-in-progress"
