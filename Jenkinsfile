@@ -308,7 +308,7 @@ gpgcheck=1
 repo_gpgcheck=0
 gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 EOF
-        sudo yum install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
+        sudo yum install -y make google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
     """
 }
 
