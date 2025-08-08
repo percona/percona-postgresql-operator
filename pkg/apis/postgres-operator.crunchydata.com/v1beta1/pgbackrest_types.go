@@ -137,6 +137,11 @@ type PGBackRestArchive struct {
 
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // K8SPG-613
