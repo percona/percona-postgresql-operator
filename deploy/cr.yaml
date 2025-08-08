@@ -181,6 +181,12 @@ spec:
   instances:
   - name: instance1
     replicas: 3
+#    env:
+#    - name: MY_ENV
+#      value: "1000"
+#    envFrom:
+#    - secretRef:
+#        name: instance-env-secret
 #    initContainer:
 #      image: docker.io/perconalab/percona-postgresql-operator:main
 #      resources:
@@ -307,6 +313,12 @@ spec:
     pgBouncer:
       replicas: 3
       image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer17
+#      env:
+#      - name: MY_ENV
+#        value: "1000"
+#      envFrom:
+#      - secretRef:
+#          name: pgbouncer-env-secret
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -398,6 +410,12 @@ spec:
 #      metadata:
 #        labels:
       image: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest17
+#      env:
+#      - name: MY_ENV
+#        value: "1000"
+#      envFrom:
+#      - secretRef:
+#          name: repo-host-env-secret
 #      initContainer:
 #        image: docker.io/perconalab/percona-postgresql-operator:main
 #        resources:
