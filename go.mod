@@ -34,9 +34,9 @@ require (
 	golang.org/x/crypto v0.41.0
 	google.golang.org/grpc v1.74.2
 	gotest.tools/v3 v3.5.2
-	k8s.io/api v0.33.3
-	k8s.io/apimachinery v0.33.3
-	k8s.io/client-go v0.33.3
+	k8s.io/api v0.33.4
+	k8s.io/apimachinery v0.33.4
+	k8s.io/client-go v0.33.4
 	k8s.io/component-base v0.33.3
 	sigs.k8s.io/controller-runtime v0.21.0
 	sigs.k8s.io/yaml v1.6.0
