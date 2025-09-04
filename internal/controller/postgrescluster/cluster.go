@@ -117,10 +117,12 @@ func (r *Reconciler) generateClusterPrimaryService(
 	if spec := cluster.Spec.Service; spec != nil {
 		service.Annotations = naming.Merge(
 			service.Annotations,
-			spec.Metadata.GetAnnotationsOrNil())
+			spec.Metadata.GetAnnotationsOrNil(),
+		)
 		service.Labels = naming.Merge(
 			service.Labels,
-			spec.Metadata.GetLabelsOrNil())
+			spec.Metadata.GetLabelsOrNil(),
+		)
 	}
 
 	err := errors.WithStack(r.setControllerReference(cluster, service))
