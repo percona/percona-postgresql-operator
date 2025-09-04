@@ -104,16 +104,24 @@ func (r *Reconciler) generateClusterPrimaryService(
 
 	service := &corev1.Service{ObjectMeta: naming.ClusterPrimaryService(cluster)}
 	service.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
-
-	service.Annotations = naming.Merge(
-		cluster.Spec.Metadata.GetAnnotationsOrNil())
+	service.Annotations = cluster.Spec.Metadata.GetAnnotationsOrNil()
 	service.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		// K8SPG-430
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePrimary,
-		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]),
+	)
+
+	if spec := cluster.Spec.Service; spec != nil {
+		service.Annotations = naming.Merge(
+			service.Annotations,
+			spec.Metadata.GetAnnotationsOrNil())
+		service.Labels = naming.Merge(
+			service.Labels,
+			spec.Metadata.GetLabelsOrNil())
+	}
 
 	err := errors.WithStack(r.setControllerReference(cluster, service))
 
