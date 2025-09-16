@@ -443,7 +443,11 @@ type PerconaPGClusterStatus struct {
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
-	PatroniVersion string `json:"patroniVersion"`
+	Patroni Patroni `json:"patroni,omitempty"`
+
+	// Status information for pgBackRest
+	// +optional
+	PGBackRest *crunchyv1beta1.PGBackRestStatus `json:"pgbackrest,omitempty"`
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
@@ -460,6 +464,15 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+type Patroni struct {
+	// +optional
+	Status *crunchyv1beta1.PatroniStatus `json:"status,omitempty"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	Version string `json:"version"`
 }
 
 type Backups struct {
@@ -504,6 +517,8 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			Restore:       b.PGBackRest.Restore,
 			InitContainer: b.PGBackRest.InitContainer,
 			Sidecars:      sc,
+			Env:           b.PGBackRest.Env,
+			EnvFrom:       b.PGBackRest.EnvFrom,
 		},
 	}
 }
@@ -566,6 +581,11 @@ type PGBackRestArchive struct {
 	// Configuration for pgBackRest sidecar containers
 	// +optional
 	Containers *crunchyv1beta1.PGBackRestSidecars `json:"containers,omitempty"`
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 type PMMQuerySource string
@@ -628,11 +648,13 @@ type CustomExtensionSpec struct {
 
 type CustomExtensionsStorageSpec struct {
 	// +kubebuilder:validation:Enum={s3,gcs,azure}
-	Type     string                   `json:"type,omitempty"`
-	Bucket   string                   `json:"bucket,omitempty"`
-	Region   string                   `json:"region,omitempty"`
-	Endpoint string                   `json:"endpoint,omitempty"`
-	Secret   *corev1.SecretProjection `json:"secret,omitempty"`
+	Type           string                   `json:"type,omitempty"`
+	Bucket         string                   `json:"bucket,omitempty"`
+	Region         string                   `json:"region,omitempty"`
+	Endpoint       string                   `json:"endpoint,omitempty"`
+	ForcePathStyle string                   `json:"forcePathStyle,omitempty"`
+	DisableSSL     string                   `json:"disableSSL,omitempty"`
+	Secret         *corev1.SecretProjection `json:"secret,omitempty"`
 }
 
 type BuiltInExtensionsSpec struct {
@@ -805,6 +827,9 @@ type PGInstanceSetSpec struct {
 	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
 	// +optional
 	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
+
+	Env     []corev1.EnvVar        `json:"env,omitempty"`
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
@@ -827,6 +852,8 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		SecurityContext:           p.SecurityContext,
 		TablespaceVolumes:         p.TablespaceVolumes,
 		InitContainer:             p.InitContainer,
+		Env:                       p.Env,
+		EnvFrom:                   p.EnvFrom,
 	}
 }
 
@@ -993,6 +1020,9 @@ type PGBouncerSpec struct {
 	// SecurityContext defines the security settings for PGBouncer pods.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	Env     []corev1.EnvVar        `json:"env,omitempty"`
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSpec {
@@ -1018,6 +1048,8 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		Tolerations:               p.Tolerations,
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
 		SecurityContext:           p.SecurityContext,
+		Env:                       p.Env,
+		EnvFrom:                   p.EnvFrom,
 	}
 
 	spec.Default()

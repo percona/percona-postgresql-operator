@@ -137,6 +137,11 @@ type PGBackRestArchive struct {
 
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // K8SPG-613
@@ -255,6 +260,11 @@ type PGBackRestRepoHost struct {
 	// SecurityContext defines the security settings for PGBackRest pod.
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// Custom sidecars for PostgreSQL instance pods. Changing this value causes
+	// PostgreSQL to restart.
+	// +optional
+	Sidecars []corev1.Container `json:"sidecars,omitempty"`
 }
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.

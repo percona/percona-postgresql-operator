@@ -11,7 +11,7 @@ metadata:
 spec:
   crVersion: 2.8.0
 #  initContainer:
-#    image: perconalab/percona-postgresql-operator:main
+#    image: docker.io/perconalab/percona-postgresql-operator:main
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -154,7 +154,7 @@ spec:
 #          test-label: value
 
 
-  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
+  image: docker.io/perconalab/percona-postgresql-operator:main-ppg17-postgres
   imagePullPolicy: Always
   postgresVersion: 17
 #  port: 5432
@@ -181,8 +181,14 @@ spec:
   instances:
   - name: instance1
     replicas: 3
+#    env:
+#    - name: MY_ENV
+#      value: "1000"
+#    envFrom:
+#    - secretRef:
+#        name: instance-env-secret
 #    initContainer:
-#      image: perconalab/percona-postgresql-operator:main
+#      image: docker.io/perconalab/percona-postgresql-operator:main
 #      resources:
 #        limits:
 #          cpu: 2.0
@@ -306,7 +312,13 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: perconalab/percona-postgresql-operator:main-pgbouncer17
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer17
+#      env:
+#      - name: MY_ENV
+#        value: "1000"
+#      envFrom:
+#      - secretRef:
+#          name: pgbouncer-env-secret
 #      exposeSuperusers: true
 #      resources:
 #        limits:
@@ -397,9 +409,15 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: perconalab/percona-postgresql-operator:main-pgbackrest17
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest17
+#      env:
+#      - name: MY_ENV
+#        value: "1000"
+#      envFrom:
+#      - secretRef:
+#          name: repo-host-env-secret
 #      initContainer:
-#        image: perconalab/percona-postgresql-operator:main
+#        image: docker.io/perconalab/percona-postgresql-operator:main
 #        resources:
 #          limits:
 #            cpu: 2.0
@@ -496,6 +514,13 @@ spec:
 #        repo3-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo3
 #        repo4-path: /pgbackrest/postgres-operator/cluster1-multi-repo/repo4
       repoHost:
+#        sidecars:
+#        - name: testcontainer
+#          image: busybox:latest
+#          command: ["sleep", "30d"]
+#          securityContext: {}
+#        - name: testcontainer2
+#          image: mycontainer1:latest
 #        resources:
 #          limits:
 #            cpu: 200m
@@ -588,7 +613,7 @@ spec:
 
   pmm:
     enabled: false
-    image: perconalab/pmm-client:dev-latest
+    image: docker.io/perconalab/pmm-client:dev-latest
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -622,13 +647,15 @@ spec:
 #    - basebackup
 
 #  extensions:
-#    image: perconalab/percona-postgresql-operator:main
+#    image: docker.io/perconalab/percona-postgresql-operator:main
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
 #      bucket: pg-extensions
 #      region: eu-central-1
 #      endpoint: s3.eu-central-1.amazonaws.com
+#      forcePathStyle: false
+#      disableSSL: false
 #      secret:
 #        name: cluster1-extensions-secret
 #    builtin:

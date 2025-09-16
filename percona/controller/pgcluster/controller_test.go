@@ -27,6 +27,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/internal/feature"
 	"github.com/percona/percona-postgresql-operator/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -686,7 +687,7 @@ var _ = Describe("Version labels", Ordered, func() {
 	})
 
 	cr, err := readDefaultCR(crName, ns)
-	It("should read defautl cr.yaml", func() {
+	It("should read default cr.yaml", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -1055,6 +1056,513 @@ var _ = Describe("Security context", Ordered, func() {
 		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(sts.Spec.Template.Spec.SecurityContext).To(Equal(podSecContext))
+	})
+})
+
+var _ = Describe("Envs", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "envs"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	instanceEnv := []corev1.EnvVar{
+		{
+			Name:  "INSTANCE_ENV",
+			Value: "VALUE1",
+		},
+	}
+	instanceEnvFrom := []corev1.EnvFromSource{
+		{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "secret-instance-env",
+				},
+			},
+		},
+	}
+	instanceSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-instance-env",
+			Namespace: ns,
+		},
+		StringData: map[string]string{
+			"instance": "test",
+		},
+	}
+
+	pgbouncerEnv := []corev1.EnvVar{
+		{
+			Name:  "PGBOUNCER_ENV",
+			Value: "VALUE2",
+		},
+	}
+	pgbouncerEnvFrom := []corev1.EnvFromSource{
+		{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "secret-pgbouncer-env",
+				},
+			},
+		},
+	}
+	pgbouncerSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-pgbouncer-env",
+			Namespace: ns,
+		},
+		StringData: map[string]string{
+			"pgbouncer": "test",
+		},
+	}
+
+	repoHostEnv := []corev1.EnvVar{
+		{
+			Name:  "REPOHOST_ENV",
+			Value: "VALUE3",
+		},
+	}
+	repoHostEnvFrom := []corev1.EnvFromSource{
+		{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "secret-pgbackrest-env",
+				},
+			},
+		},
+	}
+	repoHostSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-pgbackrest-env",
+			Namespace: ns,
+		},
+		StringData: map[string]string{
+			"pgbackrest": "test",
+		},
+	}
+
+	It("should create PerconaPGCluster", func() {
+		for i := range cr.Spec.InstanceSets {
+			cr.Spec.InstanceSets[i].Env = []corev1.EnvVar{
+				{
+					Name:  "INSTANCE_ENV",
+					Value: "VALUE1",
+				},
+			}
+
+			cr.Spec.InstanceSets[i].EnvFrom = []corev1.EnvFromSource{
+				{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "secret-instance-env",
+						},
+					},
+				},
+			}
+		}
+		cr.Spec.Proxy.PGBouncer.Env = []corev1.EnvVar{
+			{
+				Name:  "PGBOUNCER_ENV",
+				Value: "VALUE2",
+			},
+		}
+		cr.Spec.Proxy.PGBouncer.EnvFrom = []corev1.EnvFromSource{
+			{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "secret-pgbouncer-env",
+					},
+				},
+			},
+		}
+		cr.Spec.Backups.PGBackRest.Env = []corev1.EnvVar{
+			{
+				Name:  "REPOHOST_ENV",
+				Value: "VALUE3",
+			},
+		}
+		cr.Spec.Backups.PGBackRest.EnvFrom = []corev1.EnvFromSource{
+			{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "secret-pgbackrest-env",
+					},
+				},
+			},
+		}
+		cr.Spec.CRVersion = "2.8.0"
+
+		status := cr.Status
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+
+		Expect(k8sClient.Create(ctx, instanceSecret)).Should(Succeed())
+		Expect(k8sClient.Create(ctx, pgbouncerSecret)).Should(Succeed())
+		Expect(k8sClient.Create(ctx, repoHostSecret)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Instances should have envs", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":    "postgres",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			Expect(sts.Spec.Template.Annotations[pNaming.AnnotationEnvVarsSecretHash]).To(Equal("fadefc4ed7b5e5948dc8b03f2a3a71be"))
+			for _, c := range sts.Spec.Template.Spec.Containers {
+				Expect(c.Env).To(ContainElement(instanceEnv[0]))
+				Expect(c.EnvFrom).To(Equal(instanceEnvFrom))
+			}
+		}
+	})
+
+	It("PgBouncer should have envs", func() {
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-pgbouncer",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(deployment.Spec.Template.Annotations[pNaming.AnnotationEnvVarsSecretHash]).To(Equal("6bc7e8df0909c789be90c630c9edce14"))
+		for _, c := range deployment.Spec.Template.Spec.Containers {
+			Expect(c.Env).To(ContainElement(pgbouncerEnv[0]))
+			Expect(c.EnvFrom).To(Equal(pgbouncerEnvFrom))
+		}
+	})
+
+	It("PgBackrest Repo should have envs", func() {
+		sts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-repo-host",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sts.Spec.Template.Annotations[pNaming.AnnotationEnvVarsSecretHash]).To(Equal("22eb2683af3f48813c0cd53f905b67d0"))
+		for _, c := range sts.Spec.Template.Spec.Containers {
+			Expect(c.Env).To(ContainElement(repoHostEnv[0]))
+			Expect(c.EnvFrom).To(Equal(repoHostEnvFrom))
+		}
+	})
+})
+
+var _ = Describe("Sidecars", Ordered, func() {
+	gate := feature.NewGate()
+	err := gate.SetFromMap(map[string]bool{
+		feature.InstanceSidecars:           true,
+		feature.PGBouncerSidecars:          true,
+		feature.PGBackrestRepoHostSidecars: true,
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	ctx := feature.NewContext(context.Background(), gate)
+
+	const crName = "sidecars"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read defautl cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster", func() {
+		for i := range cr.Spec.InstanceSets {
+			i := &cr.Spec.InstanceSets[i]
+			i.Sidecars = []corev1.Container{
+				{
+					Name:    "instance-sidecar",
+					Command: []string{"instance-cmd"},
+					Image:   "instance-image",
+				},
+			}
+		}
+		cr.Spec.Proxy.PGBouncer.Sidecars = []corev1.Container{
+			{
+				Name:    "pgbouncer-sidecar",
+				Command: []string{"pgbouncer-cmd"},
+				Image:   "pgbouncer-image",
+			},
+		}
+		cr.Spec.Backups.PGBackRest.RepoHost.Sidecars = []corev1.Container{
+			{
+				Name:    "repohost-sidecar",
+				Command: []string{"repohost-cmd"},
+				Image:   "repohost-image",
+			},
+		}
+		status := cr.Status
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	getContainer := func(containers []corev1.Container, name string) *corev1.Container {
+		for _, c := range containers {
+			if c.Name == name {
+				return &c
+			}
+		}
+		return nil
+	}
+
+	It("Instances should have sidecar", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":    "postgres",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			sidecar := getContainer(sts.Spec.Template.Spec.Containers, "instance-sidecar")
+			Expect(sidecar).NotTo(BeNil())
+			Expect(sidecar.Command).To(Equal([]string{"instance-cmd"}))
+			Expect(sidecar.Image).To(Equal("instance-image"))
+		}
+	})
+
+	It("PgBouncer should have sidecar", func() {
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-pgbouncer",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment)
+		Expect(err).NotTo(HaveOccurred())
+		sidecar := getContainer(deployment.Spec.Template.Spec.Containers, "pgbouncer-sidecar")
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Command).To(Equal([]string{"pgbouncer-cmd"}))
+		Expect(sidecar.Image).To(Equal("pgbouncer-image"))
+	})
+
+	It("PgBackrest Repo should have sidecar", func() {
+		sts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-repo-host",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
+		Expect(err).NotTo(HaveOccurred())
+		sidecar := getContainer(sts.Spec.Template.Spec.Containers, "repohost-sidecar")
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Command).To(Equal([]string{"repohost-cmd"}))
+		Expect(sidecar.Image).To(Equal("repohost-image"))
+	})
+
+	It("should update PerconaPGCluster with multiple sidecars", func() {
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).Should(Succeed())
+
+		for i := range cr.Spec.InstanceSets {
+			i := &cr.Spec.InstanceSets[i]
+			i.Sidecars = []corev1.Container{
+				{
+					Name:    "instance-sidecar-2",
+					Command: []string{"instance-cmd-2"},
+					Image:   "instance-image-2",
+				},
+				{
+					Name:    "instance-sidecar",
+					Command: []string{"instance-cmd"},
+					Image:   "instance-image",
+				},
+			}
+		}
+		cr.Spec.Proxy.PGBouncer.Sidecars = []corev1.Container{
+			{
+				Name:    "pgbouncer-sidecar",
+				Command: []string{"pgbouncer-cmd"},
+				Image:   "pgbouncer-image",
+			},
+			{
+				Name:    "pgbouncer-sidecar-2",
+				Command: []string{"pgbouncer-cmd-2"},
+				Image:   "pgbouncer-image-2",
+			},
+			{
+				Name:    "pgbouncer-sidecar-3",
+				Command: []string{"pgbouncer-cmd-3"},
+				Image:   "pgbouncer-image-3",
+			},
+		}
+		cr.Spec.Backups.PGBackRest.RepoHost.Sidecars = []corev1.Container{
+			{
+				Name:    "repohost-sidecar-2",
+				Command: []string{"repohost-cmd-2"},
+				Image:   "repohost-image-2",
+			},
+			{
+				Name:    "repohost-sidecar",
+				Command: []string{"repohost-cmd"},
+				Image:   "repohost-image",
+			},
+			{
+				Name:    "repohost-sidecar-3",
+				Command: []string{"repohost-cmd-3"},
+				Image:   "repohost-image-3",
+			},
+		}
+		Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+	})
+
+	It("should reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Instances should have multiple sidecars", func() {
+		stsList := &appsv1.StatefulSetList{}
+		labels := map[string]string{
+			"postgres-operator.crunchydata.com/data":    "postgres",
+			"postgres-operator.crunchydata.com/cluster": crName,
+		}
+		err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			l := len(sts.Spec.Template.Spec.Containers)
+			sidecar := sts.Spec.Template.Spec.Containers[l-4]
+			Expect(sidecar).NotTo(BeNil())
+			Expect(sidecar.Name).To(Equal("instance-sidecar-2"))
+			Expect(sidecar.Command).To(Equal([]string{"instance-cmd-2"}))
+			Expect(sidecar.Image).To(Equal("instance-image-2"))
+
+			sidecar = sts.Spec.Template.Spec.Containers[l-3]
+			Expect(sidecar).NotTo(BeNil())
+			Expect(sidecar.Name).To(Equal("instance-sidecar"))
+			Expect(sidecar.Command).To(Equal([]string{"instance-cmd"}))
+			Expect(sidecar.Image).To(Equal("instance-image"))
+		}
+	})
+
+	It("PgBouncer should have multiple sidecars", func() {
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-pgbouncer",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deployment)
+		Expect(err).NotTo(HaveOccurred())
+
+		l := len(deployment.Spec.Template.Spec.Containers)
+		sidecar := deployment.Spec.Template.Spec.Containers[l-3]
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Name).To(Equal("pgbouncer-sidecar"))
+		Expect(sidecar.Command).To(Equal([]string{"pgbouncer-cmd"}))
+		Expect(sidecar.Image).To(Equal("pgbouncer-image"))
+
+		sidecar = deployment.Spec.Template.Spec.Containers[l-2]
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Name).To(Equal("pgbouncer-sidecar-2"))
+		Expect(sidecar.Command).To(Equal([]string{"pgbouncer-cmd-2"}))
+		Expect(sidecar.Image).To(Equal("pgbouncer-image-2"))
+
+		sidecar = deployment.Spec.Template.Spec.Containers[l-1]
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Name).To(Equal("pgbouncer-sidecar-3"))
+		Expect(sidecar.Command).To(Equal([]string{"pgbouncer-cmd-3"}))
+		Expect(sidecar.Image).To(Equal("pgbouncer-image-3"))
+	})
+
+	It("PgBackrest Repo should have multiple sidecars", func() {
+		sts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crName + "-repo-host",
+				Namespace: cr.Namespace,
+			},
+		}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)
+		Expect(err).NotTo(HaveOccurred())
+
+		l := len(sts.Spec.Template.Spec.Containers)
+		sidecar := sts.Spec.Template.Spec.Containers[l-3]
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Name).To(Equal("repohost-sidecar-2"))
+		Expect(sidecar.Command).To(Equal([]string{"repohost-cmd-2"}))
+		Expect(sidecar.Image).To(Equal("repohost-image-2"))
+
+		sidecar = sts.Spec.Template.Spec.Containers[l-2]
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Name).To(Equal("repohost-sidecar"))
+		Expect(sidecar.Command).To(Equal([]string{"repohost-cmd"}))
+		Expect(sidecar.Image).To(Equal("repohost-image"))
+
+		sidecar = sts.Spec.Template.Spec.Containers[l-1]
+		Expect(sidecar).NotTo(BeNil())
+		Expect(sidecar.Name).To(Equal("repohost-sidecar-3"))
+		Expect(sidecar.Command).To(Equal([]string{"repohost-cmd-3"}))
+		Expect(sidecar.Image).To(Equal("repohost-image-3"))
 	})
 })
 
@@ -1570,7 +2078,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 			updatedCR := &v2.PerconaPGCluster{}
 			Expect(k8sClient.Get(ctx, crNamespacedName, updatedCR)).Should(Succeed())
 
-			Expect(updatedCR.Status.PatroniVersion).To(Equal("3.2.1"))
+			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.2.1"))
 		})
 	})
 
@@ -1612,11 +2120,20 @@ var _ = Describe("patroni version check", Ordered, func() {
 			cr2.Spec.InstanceSets[0].SecurityContext = &corev1.PodSecurityContext{
 				RunAsUser: &uid,
 			}
+			cr2.Spec.InstanceSets[0].Affinity = &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+						{
+							Weight: int32(1),
+						},
+					},
+				},
+			}
 			cr2.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 				{Name: "test-pull-secret"},
 			}
 
-			cr2.Status.PatroniVersion = "3.1.0"
+			cr2.Status.Patroni.Version = "3.1.0"
 			cr2.Status.Postgres.ImageID = "some-image-id"
 
 			status := cr2.Status
@@ -1682,17 +2199,27 @@ var _ = Describe("patroni version check", Ordered, func() {
 			expectedImagePullSecrets := []corev1.LocalObjectReference{
 				{Name: "test-pull-secret"},
 			}
+			expectedAffinity := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+						{
+							Weight: int32(1),
+						},
+					},
+				},
+			}
 
 			Expect(pod.Spec.SecurityContext).To(Equal(expectedSecurityContext))
 			Expect(pod.Spec.TerminationGracePeriodSeconds).To(Equal(ptr.To(int64(5))))
 			Expect(pod.Spec.ImagePullSecrets).To(Equal(expectedImagePullSecrets))
+			Expect(pod.Spec.Affinity).To(Equal(expectedAffinity))
 		})
 
 		It("should preserve existing patroni version in annotation", func() {
 			updatedCR := &v2.PerconaPGCluster{}
 			Expect(k8sClient.Get(ctx, crNamespacedName2, updatedCR)).Should(Succeed())
 
-			Expect(updatedCR.Status.PatroniVersion).To(Equal("3.1.0"))
+			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.1.0"))
 		})
 	})
 })
@@ -2262,6 +2789,80 @@ var _ = Describe("Init Container", Ordered, func() {
 					MountPath: "/opt/crunchy",
 				},
 			}))
+		})
+	})
+})
+
+var _ = Describe("CR Version Management", Ordered, func() {
+	ctx := context.Background()
+	const crName = "cr-version"
+	const ns = crName
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace for CR version tests")
+		err := k8sClient.Create(ctx, namespace)
+		Expect(err).To(Not(HaveOccurred()))
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace after CR version tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	Context("setCRVersion logic", Ordered, func() {
+		When("the CRVersion is already set", func() {
+			It("should not change the CRVersion", func() {
+				cr, err := readDefaultCR("cr-version-1", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.CRVersion = "2.7.0"
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+
+				reconciler := &PGClusterReconciler{Client: k8sClient}
+				err = reconciler.setCRVersion(ctx, cr)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cr.Spec.CRVersion).To(Equal("2.7.0"))
+			})
+		})
+
+		When("the CRVersion is empty", func() {
+			It("should set CRVersion and patch the resource", func() {
+				cr, err := readDefaultCR("cr-version-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.CRVersion = ""
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+
+				reconciler := &PGClusterReconciler{Client: k8sClient}
+				err = reconciler.setCRVersion(ctx, cr)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Fetch the CR again to verify the patch was applied in the cluster
+				updated := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, updated)).Should(Succeed())
+				Expect(updated.Spec.CRVersion).To(Equal(version.Version()))
+			})
+		})
+
+		When("the patch operation fails", func() {
+			It("should return an error", func() {
+				cr, err := readDefaultCR("cr-version-3", ns)
+				Expect(err).NotTo(HaveOccurred())
+				cr.Spec.CRVersion = ""
+
+				// Do NOT create the CR in k8s, so Patch will fail (object does not exist)
+				reconciler := &PGClusterReconciler{Client: k8sClient}
+				err = reconciler.setCRVersion(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("patch CR"))
+			})
 		})
 	})
 })
