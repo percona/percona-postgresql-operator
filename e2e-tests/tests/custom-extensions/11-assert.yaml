@@ -48,8 +48,6 @@ spec:
         - name: postgres-data
         - mountPath: /tmp
           name: tmp
-      - command:
-        - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
   observedGeneration: 5

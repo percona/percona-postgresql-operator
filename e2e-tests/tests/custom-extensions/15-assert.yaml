@@ -26,8 +26,6 @@ spec:
         - /opt/crunchy/bin/relocate-extensions.sh
       - command:
         - /usr/local/bin/install-extensions.sh
-      - command:
-        - /usr/local/bin/install-extensions.sh
         env:
         - name: STORAGE_TYPE
           value: s3
@@ -50,8 +48,6 @@ spec:
         - name: postgres-data
         - mountPath: /tmp
           name: tmp
-      - command:
-        - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
   observedGeneration: 6
