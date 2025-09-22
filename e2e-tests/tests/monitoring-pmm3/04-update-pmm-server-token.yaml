@@ -1,16 +1,28 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 25
+timeout: 60
 commands:
   - script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
+      
+      sts=$(kubectl -n "${NAMESPACE}" get sts --selector=postgres-operator.crunchydata.com/instance-set=instance1 -o jsonpath='{.items[*].metadata.name}')
+      for st in $sts; do
+        wait_for_generation "sts/$st" 2
+      done
 
       token=$(generate_pmm3_server_token)
       [[ -n ${token} && ${token} != null ]] \
         &&  kubectl -n ${NAMESPACE} patch secret monitoring-pmm3-pmm-secret --type merge --patch '{"stringData": {"PMM_SERVER_TOKEN": "'${token}'"}}' \
         || true
+      
+      sleep 10
+      
+      sts=$(kubectl -n "${NAMESPACE}" get sts --selector=postgres-operator.crunchydata.com/instance-set=instance1 -o jsonpath='{.items[*].metadata.name}')
+      for st in $sts; do
+        wait_for_generation "sts/$st" 3
+      done
 
       sleep 25
