@@ -501,10 +501,8 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 	// with the right labels so that the selector called next to track them
 	// and utilize their data.
 	for _, user := range specUsers {
-		if user.SecretName != "" {
-			if err := r.updateCustomSecretLabels(ctx, cluster, user); err != nil {
-				return specUsers, nil, err
-			}
+		if err := r.updateCustomSecretLabels(ctx, cluster, user); err != nil {
+			return specUsers, nil, err
 		}
 	}
 
@@ -603,8 +601,12 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 func (r *Reconciler) updateCustomSecretLabels(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, user v1beta1.PostgresUserSpec,
 ) error {
-	secretName := string(user.SecretName)
+
 	userName := string(user.Name)
+	secretName := naming.PostgresUserSecret(cluster, userName).Name
+	if user.SecretName != "" {
+		secretName = string(user.SecretName)
+	}
 
 	secret := &corev1.Secret{}
 	err := r.Client.Get(ctx, types.NamespacedName{
