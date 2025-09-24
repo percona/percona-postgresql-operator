@@ -320,10 +320,10 @@ ownerReferences:
 			}},
 		{Description: "NodePort with Port 32001", Type: "NodePort",
 			NodePort: initialize.Int32(32001), Expect: func(t testing.TB, service *corev1.Service, err error) {
-			assert.NilError(t, err)
-			assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
-			alwaysExpect(t, service)
-			assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
+				assert.NilError(t, err)
+				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
+				alwaysExpect(t, service)
+				assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
 - name: pgadmin
   nodePort: 32001
   port: 5050
