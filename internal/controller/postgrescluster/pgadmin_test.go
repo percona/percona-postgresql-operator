@@ -333,10 +333,10 @@ ownerReferences:
 			}},
 		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
 			NodePort: initialize.Int32(32002), Expect: func(t testing.TB, service *corev1.Service, err error) {
-			assert.NilError(t, err)
-			assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
-			alwaysExpect(t, service)
-			assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
+				assert.NilError(t, err)
+				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
+				alwaysExpect(t, service)
+				assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
 - name: pgadmin
   nodePort: 32002
   port: 5050
