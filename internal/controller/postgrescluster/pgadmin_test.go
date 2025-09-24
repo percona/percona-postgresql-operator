@@ -315,9 +315,9 @@ ownerReferences:
 	}{
 		{Description: "ClusterIP with Port 32000", Type: "ClusterIP",
 			NodePort: initialize.Int32(32000), Expect: func(t testing.TB, service *corev1.Service, err error) {
-			assert.ErrorContains(t, err, "NodePort cannot be set with type ClusterIP on Service \"my-cluster-pgadmin\"")
-			assert.Assert(t, service == nil)
-		}},
+				assert.ErrorContains(t, err, "NodePort cannot be set with type ClusterIP on Service \"my-cluster-pgadmin\"")
+				assert.Assert(t, service == nil)
+			}},
 		{Description: "NodePort with Port 32001", Type: "NodePort",
 			NodePort: initialize.Int32(32001), Expect: func(t testing.TB, service *corev1.Service, err error) {
 			assert.NilError(t, err)
