@@ -330,7 +330,7 @@ ownerReferences:
   protocol: TCP
   targetPort: pgadmin
 `))
-		}},
+			}},
 		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
 			NodePort: initialize.Int32(32002), Expect: func(t testing.TB, service *corev1.Service, err error) {
 			assert.NilError(t, err)
