@@ -343,7 +343,7 @@ ownerReferences:
   protocol: TCP
   targetPort: pgadmin
 `))
-		}},
+			}},
 	}
 
 	for _, test := range typesAndPort {
