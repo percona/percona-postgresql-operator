@@ -146,6 +146,12 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 		}
 	}
 
+	syncConditionsFromPostgresToPercona(cr, status)
+
+	syncPatroniFromPostgresToPercona(cr, status)
+
+	syncPgbackrestFromPostgresToPercona(cr, status)
+
 	repoCondition := meta.FindStatusCondition(status.Conditions, postgrescluster.ConditionRepoHostReady)
 	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
 		setClusterNotReadyCondition(metav1.ConditionFalse, postgrescluster.ConditionRepoHostReady)
@@ -159,12 +165,6 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 	}
 
 	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
-
-	syncConditionsFromPostgresToPercona(cr, status)
-
-	syncPatroniFromPostgresToPercona(cr, status)
-
-	syncPgbackrestFromPostgresToPercona(cr, status)
 
 }
 
