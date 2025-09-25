@@ -1,8 +1,6 @@
 module github.com/percona/percona-postgresql-operator
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25.1
 
 require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
