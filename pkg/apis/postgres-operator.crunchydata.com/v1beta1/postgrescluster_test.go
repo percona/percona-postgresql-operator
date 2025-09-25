@@ -40,8 +40,7 @@ func TestPostgresClusterDefault(t *testing.T) {
 		assert.DeepEqual(t, string(b), strings.TrimSpace(`
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
-metadata:
-  creationTimestamp: null
+metadata: {}
 spec:
   backups:
     pgbackrest: {}
@@ -74,8 +73,7 @@ status:
 		assert.DeepEqual(t, string(b), strings.TrimSpace(`
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
-metadata:
-  creationTimestamp: null
+metadata: {}
 spec:
   backups:
     pgbackrest: {}

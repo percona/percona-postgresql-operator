@@ -603,7 +603,6 @@ apiVersion: v1
 kind: Service
 		`))
 		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
-creationTimestamp: null
 labels:
   app.kubernetes.io/component: pg
   app.kubernetes.io/instance: pg5
@@ -637,7 +636,6 @@ ownerReferences:
 apiVersion: v1
 kind: Endpoints
 metadata:
-  creationTimestamp: null
   labels:
     app.kubernetes.io/component: pg
     app.kubernetes.io/instance: pg5
@@ -737,7 +735,6 @@ apiVersion: v1
 kind: Service
 		`))
 		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
-creationTimestamp: null
 labels:
   app.kubernetes.io/component: pg
   app.kubernetes.io/instance: pg2
