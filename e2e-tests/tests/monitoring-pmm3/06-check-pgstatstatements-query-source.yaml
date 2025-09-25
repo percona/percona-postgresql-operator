@@ -7,7 +7,7 @@ commands:
 
       source ../../functions
 
-      kubectl -n ${NAMESPACE} patch perconapgcluster/monitoring-pmm3 --type=merge -p '{
+      kubectl -n ${NAMESPACE} patch pg/monitoring-pmm3 --type=merge -p '{
         "spec":{
           "pmm":{"querySource":"pgstatstatements"},
           "extensions": {"builtin": {"pg_stat_statements": true }}}
