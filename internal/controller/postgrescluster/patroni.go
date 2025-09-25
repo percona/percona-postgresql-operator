@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -51,6 +52,7 @@ func (r *Reconciler) handlePatroniRestarts(
 ) error {
 	const container = naming.ContainerDatabase
 	var primaryNeedsRestart, replicaNeedsRestart *Instance
+	log := logging.FromContext(ctx).WithName("[PATRONI]")
 
 	// Look for one primary and one replica that need to restart. Ignore
 	// containers that are terminating or not running; Kubernetes will start
@@ -88,11 +90,6 @@ func (r *Reconciler) handlePatroniRestarts(
 	// first.
 	if primaryNeedsRestart != nil {
 		pod := primaryNeedsRestart.Pods[0]
-		exec := patroni.Executor(func(
-			ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
-		})
 
 		patroniVer4, err := cluster.IsPatroniVer4()
 		if err != nil {
@@ -105,6 +102,27 @@ func (r *Reconciler) handlePatroniRestarts(
 		if !patroniVer4 {
 			role = "master"
 		}
+
+		// If FEAT_PATRONI_PREFER_HTTP is active, try HTTP first, then fallback
+		if os.Getenv("FEAT_PATRONI_PREFER_HTTP") == "true" {
+			log.Info("Attempting HTTP call...")
+
+			if client, err := patroni.NewHttpClient(ctx, r.Client, pod.Name); err == nil {
+				// We don't use scope in the HTTP Rest API
+				if err := client.RestartPendingMembers(ctx, role, ""); err == nil {
+					log.Info("HTTP call succeeded.")
+					return nil
+				}
+			}
+
+			log.Info("HTTP call failed. Falling back to PodExec...")
+		}
+
+		exec := patroni.Executor(func(
+			ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
+		})
 
 		return errors.WithStack(exec.RestartPendingMembers(ctx, role, naming.PatroniScope(cluster)))
 	}
@@ -124,10 +142,26 @@ func (r *Reconciler) handlePatroniRestarts(
 	// how we decide when to restart.
 	// - https://www.postgresql.org/docs/current/runtime-config-replication.html
 	if replicaNeedsRestart != nil {
+		pod := replicaNeedsRestart.Pods[0]
+
+		// If FEAT_PATRONI_PREFER_HTTP is active, try HTTP first, then fallback
+		if os.Getenv("FEAT_PATRONI_PREFER_HTTP") == "true" {
+			log.Info("Attempting HTTP call...")
+
+			if client, err := patroni.NewHttpClient(ctx, r.Client, pod.Name); err == nil {
+				// We don't use scope in the HTTP Rest API
+				if err := client.RestartPendingMembers(ctx, "replica", ""); err == nil {
+					log.Info("HTTP call succeeded.")
+					return nil
+				}
+			}
+
+			log.Info("HTTP call failed. Falling back to PodExec...")
+		}
+
 		exec := patroni.Executor(func(
 			ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
-			pod := replicaNeedsRestart.Pods[0]
 			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
 		})
 
@@ -187,6 +221,8 @@ func (r *Reconciler) reconcilePatroniDynamicConfiguration(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
 	pgHBAs postgres.HBAs, pgParameters postgres.Parameters,
 ) error {
+	log := logging.FromContext(ctx).WithName("[PATRONI]")
+
 	if !patroni.ClusterBootstrapped(cluster) {
 		// Patroni has not yet bootstrapped. Dynamic configuration happens through
 		// configuration files during bootstrap, so there's nothing to do here.
@@ -209,21 +245,35 @@ func (r *Reconciler) reconcilePatroniDynamicConfiguration(
 		return nil
 	}
 
+	var configuration map[string]any
+
+	if cluster.Spec.Patroni != nil {
+		configuration = cluster.Spec.Patroni.DynamicConfiguration
+	}
+
+	configuration = patroni.DynamicConfiguration(cluster, configuration, pgHBAs, pgParameters)
+
+	// If FEAT_PATRONI_PREFER_HTTP is active, try HTTP first, then fallback
+	if os.Getenv("FEAT_PATRONI_PREFER_HTTP") == "true" {
+		log.Info("Attempting HTTP call...")
+
+		if client, err := patroni.NewHttpClient(ctx, r.Client, pod.Name); err == nil {
+			if err := client.ReplaceConfiguration(ctx, configuration); err == nil {
+				log.Info("HTTP call succeeded.")
+				return nil
+			}
+		}
+
+		log.Info("HTTP call failed. Falling back to PodExec...")
+	}
+
 	// NOTE(cbandy): Despite the guards above, calling PodExec may still fail
 	// due to a missing or stopped container.
-
 	exec := func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
 		return r.PodExec(ctx, pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 	}
 
-	var configuration map[string]any
-	if cluster.Spec.Patroni != nil {
-		configuration = cluster.Spec.Patroni.DynamicConfiguration
-	}
-	configuration = patroni.DynamicConfiguration(cluster, configuration, pgHBAs, pgParameters)
-
-	return errors.WithStack(
-		patroni.Executor(exec).ReplaceConfiguration(ctx, configuration))
+	return errors.WithStack(patroni.Executor(exec).ReplaceConfiguration(ctx, configuration))
 }
 
 // generatePatroniLeaderLeaseService returns a v1.Service that exposes the
@@ -462,7 +512,7 @@ func replicationCertSecretProjection(certificate *corev1.Secret) *corev1.SecretP
 func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, instances *observedInstances,
 ) error {
-	log := logging.FromContext(ctx)
+	log := logging.FromContext(ctx).WithName("[PATRONI]")
 
 	// If switchover is not enabled, clear out the Patroni switchover status fields
 	// which might have been set by previous switchovers.
@@ -552,9 +602,29 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 	// TODO(benjaminjb): consider pulling the timeline from the pod annotation; manual experiments
 	// have shown that the annotation on the Leader pod is up to date during a switchover, but
 	// missing from the Replica pods.
-	timeline, err := patroni.Executor(exec).GetTimeline(ctx)
-	if err != nil {
-		return err
+	var timeline int64
+	var err error
+
+	// If FEAT_PATRONI_PREFER_HTTP is active, try HTTP first, then fallback
+	if os.Getenv("FEAT_PATRONI_PREFER_HTTP") == "true" {
+		log.Info("Attempting HTTP call...")
+
+		if res, httpErr := patroni.NewHttpClient(ctx, r.Client, runningPod.Name); httpErr == nil {
+			if timeline, err = res.GetTimeline(ctx); err == nil {
+				log.Info("HTTP call succeeded.")
+			}
+		}
+
+		if err != nil {
+			log.Error(err, "HTTP call failed. Falling back to PodExec...")
+		}
+	}
+
+	if timeline == 0 {
+		timeline, err = patroni.Executor(exec).GetTimeline(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	if timeline == 0 {

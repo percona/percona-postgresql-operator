@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -776,10 +777,13 @@ func (r *Reconciler) rolloutInstance(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	instances *observedInstances, instance *Instance,
 ) error {
+	log := logging.FromContext(ctx).WithName("patroni")
+	log.Info("Starting to rolloutInstance...", "cluster", cluster.Name)
 	// The StatefulSet and number of Pods should have already been verified, but
 	// check again rather than panic.
 	// TODO(cbandy): The check for StatefulSet can go away if we watch Pod deletes.
 	if instance.Runner == nil || len(instance.Pods) != 1 {
+		log.Info("Unexpected instance state during rollout.")
 		return errors.Errorf(
 			"unexpected instance state during rollout: %v has %v pods",
 			instance.Name, len(instance.Pods))
@@ -805,6 +809,8 @@ func (r *Reconciler) rolloutInstance(
 	// NOTE(cbandy): The StatefulSet controlling this Pod reflects this change
 	// in its Status and triggers another reconcile.
 	if primary && len(instances.forCluster) > 1 {
+		log.Info("Starting controlled switchover...")
+
 		var span trace.Span
 		ctx, span = r.Tracer.Start(ctx, "patroni-change-primary")
 		defer span.End()
@@ -814,7 +820,27 @@ func (r *Reconciler) rolloutInstance(
 			return errors.Wrap(err, "failed to check if patroni v4 is used")
 		}
 
-		success, err := patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "", patroniVer4)
+		var success bool
+
+		// If FEAT_PATRONI_PREFER_HTTP is active, try HTTP first, then fallback
+		if os.Getenv("FEAT_PATRONI_PREFER_HTTP") == "true" {
+			log.Info("Attempting HTTP call...")
+
+			if res, httpErr := patroni.NewHttpClient(ctx, r.Client, pod.Name); httpErr == nil {
+				if success, err = res.ChangePrimaryAndWait(ctx, pod.Name, "", true); err == nil {
+					log.Info("HTTP call succeeded.")
+				}
+			}
+
+			if err != nil {
+				log.Info("HTTP call failed. Falling back to PodExec...")
+			}
+		}
+
+		if err != nil {
+			success, err = patroni.Executor(exec).ChangePrimaryAndWait(ctx, pod.Name, "", patroniVer4)
+		}
+
 		if err = errors.WithStack(err); err == nil && !success {
 			err = errors.New("unable to switchover")
 		}
