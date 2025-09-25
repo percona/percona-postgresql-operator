@@ -138,7 +138,6 @@ kind: Job
 metadata:
   annotations:
     kubectl.kubernetes.io/default-container: database
-  creationTimestamp: null
   labels:
     postgres-operator.crunchydata.com/cluster: pg5
     postgres-operator.crunchydata.com/pgupgrade: pgu2
@@ -159,7 +158,6 @@ spec:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: database
-      creationTimestamp: null
       labels:
         postgres-operator.crunchydata.com/cluster: pg5
         postgres-operator.crunchydata.com/pgupgrade: pgu2
@@ -283,7 +281,6 @@ kind: Job
 metadata:
   annotations:
     kubectl.kubernetes.io/default-container: database
-  creationTimestamp: null
   labels:
     postgres-operator.crunchydata.com/cluster: pg5
     postgres-operator.crunchydata.com/pgupgrade: pgu2
@@ -303,7 +300,6 @@ spec:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: database
-      creationTimestamp: null
       labels:
         postgres-operator.crunchydata.com/cluster: pg5
         postgres-operator.crunchydata.com/pgupgrade: pgu2
