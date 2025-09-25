@@ -1065,3 +1065,22 @@ get_postgresql_logs() {
 			| kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
 	done
 }
+
+wait_for_generation() {
+	local resource="$1"
+	local target_generation="$2"
+
+	echo "Waiting for $resource to reach generation $target_generation..."
+
+	while true; do
+		current_generation=$(kubectl -n ${NAMESPACE} get "$resource" -o jsonpath='{.metadata.generation}')
+
+		if [ "$current_generation" -eq "$target_generation" ]; then
+			echo "Resource $resource has reached generation $target_generation."
+			break
+		else
+			echo "Resource $resource is at generation $current_generation. Waiting..."
+			sleep 5
+		fi
+	done
+}

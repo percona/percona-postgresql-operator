@@ -74,7 +74,6 @@ apiVersion: v1
 kind: ConfigMap
 		`))
 		assert.Assert(t, cmp.MarshalMatches(configmap.ObjectMeta, `
-creationTimestamp: null
 labels:
   app.kubernetes.io/instance: pg1
   app.kubernetes.io/managed-by: percona-postgresql-operator
@@ -154,7 +153,6 @@ func TestGeneratePGAdminService(t *testing.T) {
 			assert.Assert(t, !specified)
 
 			assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
-creationTimestamp: null
 name: my-cluster-pgadmin
 namespace: my-ns
 			`))
@@ -171,7 +169,6 @@ apiVersion: v1
 kind: Service
 		`))
 		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
-creationTimestamp: null
 labels:
   app.kubernetes.io/instance: my-cluster
   app.kubernetes.io/managed-by: percona-postgresql-operator
@@ -522,7 +519,6 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 		assert.Assert(t, cmp.MarshalMatches(template.ObjectMeta, `
 annotations:
   kubectl.kubernetes.io/default-container: pgadmin
-creationTimestamp: null
 labels:
   app.kubernetes.io/instance: test-cluster
   app.kubernetes.io/managed-by: percona-postgresql-operator
@@ -643,7 +639,6 @@ terminationGracePeriodSeconds: 30
 annotations:
   annotation1: annotationvalue
   kubectl.kubernetes.io/default-container: pgadmin
-creationTimestamp: null
 labels:
   app.kubernetes.io/instance: custom-cluster
   app.kubernetes.io/managed-by: percona-postgresql-operator
