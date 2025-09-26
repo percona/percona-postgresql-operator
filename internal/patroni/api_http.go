@@ -15,6 +15,10 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/percona/percona-postgresql-operator/internal/logging"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -412,12 +416,12 @@ func newInstanceClient(
 
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
+		Transport: otelhttp.NewTransport(&http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs:      caCert,
 				Certificates: []tls.Certificate{clientCert},
 			},
-		},
+		}),
 	}
 
 	return instanceClient{
@@ -431,12 +435,14 @@ type HTTPClient struct {
 	kubeClient client.Client
 	client     instanceClient
 	logger     logr.Logger
+	tracer     trace.Tracer
 }
 
 var _ API = HTTPClient{}
 
 func NewHttpClient(ctx context.Context, kube client.Client, podName string) (HTTPClient, error) {
 	logger := logging.FromContext(ctx).WithName("patroni.http")
+	tracer := otel.Tracer("github.com/percona/percona-postgresql-operator/patroni")
 
 	// We can extract all the information we need from the podName due to the
 	// way podName is built: ${namespace}-${instanceSuffix}-${podNumeral}.
@@ -455,13 +461,22 @@ func NewHttpClient(ctx context.Context, kube client.Client, podName string) (HTT
 		client:     patroniHttpClient,
 		kubeClient: kube,
 		logger:     logger,
+		tracer:     tracer,
 	}, nil
 }
 
 // Called when the operator believes Patroni configuration needs to be updated due to CRD changes.
 func (h HTTPClient) ReplaceConfiguration(ctx context.Context, configuration map[string]any) error {
+	ctx, span := h.tracer.Start(ctx, "patroni.replace-configuration")
+	defer span.End()
+
 	h.logger.Info("Calling ReplaceConfiguration")
-	return h.client.putConfig(ctx, configuration)
+
+	err := h.client.putConfig(ctx, configuration)
+	if err != nil {
+		span.RecordError(err)
+	}
+	return err
 }
 
 // Called when the operator detects pod restarts or changes that require pod restarts, such
@@ -471,14 +486,34 @@ func (h HTTPClient) ChangePrimaryAndWait(
 	leader, candidate string,
 	_patroniVer4 bool,
 ) (bool, error) {
+	ctx, span := h.tracer.Start(ctx, "patroni.change-primary")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("patroni.leader", leader),
+		attribute.String("patroni.candidate", candidate),
+		attribute.Bool("patroni.ver4", _patroniVer4),
+	)
+
 	h.logger.WithValues("leader", leader).Info("Calling ChangePrimaryAndWait")
-	return h.client.switchover(ctx, leader, candidate)
+
+	success, err := h.client.switchover(ctx, leader, candidate)
+	if err != nil {
+		span.RecordError(err)
+	}
+	span.SetAttributes(attribute.Bool("patroni.success", success))
+	return success, err
 }
 
 // Very similar to ChangePrimaryAndWait, but implemented by the Percona team for
 // the reconcileSwitchover method. The difference here is that SwitchoverAndWait
 // does not provide a leader.
 func (h HTTPClient) SwitchoverAndWait(ctx context.Context, candidate string) (bool, error) {
+	ctx, span := h.tracer.Start(ctx, "patroni.switchover")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("patroni.candidate", candidate))
+
 	h.logger.WithValues("candidate", candidate).Info("Calling SwitchoverAndWait")
 	leader, err := h.client.getLeader(ctx)
 
@@ -487,8 +522,11 @@ func (h HTTPClient) SwitchoverAndWait(ctx context.Context, candidate string) (bo
 			err,
 			"Failed to auto-detect current leader for switchover",
 		)
+		span.RecordError(err)
 		return false, fmt.Errorf("failed to detect current leader: %w", err)
 	}
+
+	span.SetAttributes(attribute.String("patroni.leader", leader.Name))
 
 	// NOTE:
 	// Potential race condition where the leader changes between these two calls.
@@ -500,15 +538,32 @@ func (h HTTPClient) SwitchoverAndWait(ctx context.Context, candidate string) (bo
 		"candidate",
 		candidate,
 	)
-	return h.client.switchover(ctx, leader.Name, candidate)
+
+	success, err := h.client.switchover(ctx, leader.Name, candidate)
+	if err != nil {
+		span.RecordError(err)
+	}
+	span.SetAttributes(attribute.Bool("patroni.success", success))
+	return success, err
 }
 
 // FailoverAndWait tries to change the leader when the cluster is NOT healthy. When it's
 // healthy, switchover is advised.
 // Ref.: https://patroni.readthedocs.io/en/latest/rest_api.html#failover
 func (h HTTPClient) FailoverAndWait(ctx context.Context, candidate string) (bool, error) {
+	ctx, span := h.tracer.Start(ctx, "patroni.failover")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("patroni.candidate", candidate))
+
 	h.logger.WithValues("candidate", candidate).Info("Calling FailoverAndWait")
-	return h.client.failover(ctx, candidate)
+
+	success, err := h.client.failover(ctx, candidate)
+	if err != nil {
+		span.RecordError(err)
+	}
+	span.SetAttributes(attribute.Bool("patroni.success", success))
+	return success, err
 }
 
 // Restarts Patroni members that have a pending restart and match a given role.
@@ -516,6 +571,14 @@ func (h HTTPClient) FailoverAndWait(ctx context.Context, candidate string) (bool
 // requires a restart to take effect. The operator watches for the pending status and first
 // asks for the leader to be restarted, followed by its replicas.
 func (h HTTPClient) RestartPendingMembers(ctx context.Context, role, _scope string) error {
+	ctx, span := h.tracer.Start(ctx, "patroni.restart-pending-members")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("patroni.role", role),
+		attribute.String("patroni.scope", _scope),
+	)
+
 	h.logger.WithValues("role", role).Info("Calling RestartPendingMembers")
 
 	if role == "" {
@@ -525,6 +588,7 @@ func (h HTTPClient) RestartPendingMembers(ctx context.Context, role, _scope stri
 		// function was called without a role.
 		err := fmt.Errorf("role is empty")
 		h.logger.Error(err, "Failed to restart pending members")
+		span.RecordError(err)
 		return err
 	}
 
@@ -539,8 +603,11 @@ func (h HTTPClient) RestartPendingMembers(ctx context.Context, role, _scope stri
 	members, err := h.client.getMembersByRole(ctx, roles)
 	if err != nil {
 		h.logger.Error(err, "Failed to fetch cluster members")
+		span.RecordError(err)
 		return err
 	}
+
+	span.SetAttributes(attribute.Int("patroni.members_found", len(members)))
 
 	if len(members) == 0 {
 		h.logger.Info("Found no members to restart", "role", role)
@@ -552,18 +619,21 @@ func (h HTTPClient) RestartPendingMembers(ctx context.Context, role, _scope stri
 
 		podMetadata, err := extractMetadataFromPodName(member.Name)
 		if err != nil {
+			span.RecordError(err)
 			return err
 		}
 
 		client, err := newInstanceClient(ctx, h.logger, h.kubeClient, podMetadata)
 		if err != nil {
 			h.logger.Error(err, "Failed to create client for pod", "pod", member.Name)
+			span.RecordError(err)
 			return err
 		}
 
 		err = client.restartPendingWithRole(ctx, role)
 		if err != nil {
 			h.logger.Error(err, "Restart failed for pod", "pod", member.Name)
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -576,20 +646,32 @@ func (h HTTPClient) RestartPendingMembers(ctx context.Context, role, _scope stri
 // Used as sanity check by the operator before a switchover/failover operation.
 // Returns the timeline of the running leader, or 0 if no running leader found.
 func (h HTTPClient) GetTimeline(ctx context.Context) (int64, error) {
+	ctx, span := h.tracer.Start(ctx, "patroni.get-timeline")
+	defer span.End()
+
 	h.logger.Info("Calling GetTimeline")
 
 	leader, err := h.client.getLeader(ctx)
 	if err != nil {
 		h.logger.Info("No leader found for timeline", "error", err)
+		span.SetAttributes(attribute.Bool("patroni.leader_found", false))
 		return 0, nil // Return 0 when no leader (matches CLI behavior)
 	}
+
+	span.SetAttributes(
+		attribute.Bool("patroni.leader_found", true),
+		attribute.String("patroni.leader_name", leader.Name),
+		attribute.String("patroni.leader_state", leader.State),
+	)
 
 	// Check if leader is running (same logic as CLI implementation)
 	if leader.State != "running" {
 		h.logger.Info("Leader not in running state", "state", leader.State)
+		span.SetAttributes(attribute.Int64("patroni.timeline", 0))
 		return 0, nil
 	}
 
 	h.logger.Info("Found running leader", "member", leader.Name, "timeline", leader.Timeline)
+	span.SetAttributes(attribute.Int64("patroni.timeline", leader.Timeline))
 	return leader.Timeline, nil
 }

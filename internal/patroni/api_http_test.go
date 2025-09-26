@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"go.opentelemetry.io/otel"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -152,6 +153,7 @@ func TestHTTPClientChangePrimaryAndWait(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.ChangePrimaryAndWait(context.Background(), "old", "new", true)
@@ -185,6 +187,7 @@ func TestHTTPClientChangePrimaryAndWait(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.ChangePrimaryAndWait(context.Background(), "old", "new", true)
@@ -202,6 +205,7 @@ func TestHTTPClientChangePrimaryAndWait(t *testing.T) {
 				logger: logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.ChangePrimaryAndWait(context.Background(), "", "new", true)
@@ -232,6 +236,7 @@ func TestHTTPClientChangePrimaryAndWait(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.ChangePrimaryAndWait(context.Background(), "old", "new", true)
@@ -282,6 +287,7 @@ func TestHTTPClientSwitchoverAndWait(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.SwitchoverAndWait(context.Background(), "new")
@@ -327,6 +333,7 @@ func TestHTTPClientSwitchoverAndWait(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.SwitchoverAndWait(context.Background(), "new")
@@ -361,6 +368,7 @@ func TestHTTPClientFailoverAndWait(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.FailoverAndWait(context.Background(), "new")
@@ -392,6 +400,7 @@ func TestHTTPClientFailoverAndWait(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.FailoverAndWait(context.Background(), "new")
@@ -409,13 +418,14 @@ func TestHTTPClientFailoverAndWait(t *testing.T) {
 				logger: logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.FailoverAndWait(context.Background(), "")
 
 		assert.Assert(t, err != nil)
 		assert.Assert(t, !success)
-		assert.Assert(t, strings.Contains(err.Error(), "failover requires a specific candidate"))
+		assert.Assert(t, strings.Contains(err.Error(), "candidate is required for failover"))
 	})
 
 	// Same as switchover. If we failover but to a different candidate, the
@@ -439,6 +449,7 @@ func TestHTTPClientFailoverAndWait(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		success, err := httpClient.FailoverAndWait(context.Background(), "new")
@@ -474,6 +485,7 @@ func TestHTTPClientReplaceConfiguration(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		config := map[string]any{"some": "values"}
@@ -504,6 +516,7 @@ func TestHTTPClientReplaceConfiguration(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		err := httpClient.ReplaceConfiguration(
@@ -553,6 +566,7 @@ func TestHTTPClientGetTimeline(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		timeline, err := httpClient.GetTimeline(context.Background())
@@ -591,6 +605,7 @@ func TestHTTPClientGetTimeline(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		timeline, err := httpClient.GetTimeline(context.Background())
@@ -629,6 +644,7 @@ func TestHTTPClientGetTimeline(t *testing.T) {
 				logger:     logr.Discard(),
 			},
 			logger: logr.Discard(),
+			tracer: otel.Tracer("test"),
 		}
 
 		timeline, err := httpClient.GetTimeline(context.Background())
