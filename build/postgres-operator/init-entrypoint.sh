@@ -9,3 +9,4 @@ install -o "$(id -u)" -g "$(id -g)" -m 0755 -D "/usr/local/bin/pgbackrest" "${CR
 install -o "$(id -u)" -g "$(id -g)" -m 0755 -D "/usr/local/bin/postgres-entrypoint.sh" "${CRUNCHY_BINDIR}/bin/postgres-entrypoint.sh"
 install -o "$(id -u)" -g "$(id -g)" -m 0755 -D "/usr/local/bin/postgres-liveness-check.sh" "${CRUNCHY_BINDIR}/bin/postgres-liveness-check.sh"
 install -o "$(id -u)" -g "$(id -g)" -m 0755 -D "/usr/local/bin/postgres-readiness-check.sh" "${CRUNCHY_BINDIR}/bin/postgres-readiness-check.sh"
+install -o "$(id -u)" -g "$(id -g)" -m 0755 -D "/usr/local/bin/relocate-extensions.sh" "${CRUNCHY_BINDIR}/bin/relocate-extensions.sh"

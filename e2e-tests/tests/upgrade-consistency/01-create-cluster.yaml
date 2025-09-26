@@ -9,7 +9,7 @@ commands:
       source ../../functions
 
       get_cr \
-        | yq eval '
-            .spec.crVersion="2.6.0"' - \
+        | yq eval '.spec.crVersion="2.6.0"' - \
+        | yq eval ".spec.image=\"${IMAGE_BASE}:main-ppg$PG_VER-postgres\"" - \
         | yq eval ".spec.backups.pgbackrest.image=\"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest\"" - \
         | kubectl -n "${NAMESPACE}" apply -f -

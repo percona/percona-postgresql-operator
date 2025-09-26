@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 180
+timeout: 240
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -19,15 +19,19 @@ spec:
   template:
     spec:
       initContainers:
+      - command:
+        - /usr/local/bin/init-entrypoint.sh
       - name: postgres-startup
       - command:
-        - /usr/local/bin/relocate-extensions.sh
+        - /opt/crunchy/bin/relocate-extensions.sh
         env:
         - name: PG_VERSION
         resources: {}
         volumeMounts:
         - mountPath: /pgdata
           name: postgres-data
+        - mountPath: /opt/crunchy
+          name: crunchy-bin
         - mountPath: /tmp
           name: tmp
       - command:
@@ -58,8 +62,6 @@ spec:
         - name: postgres-data
         - mountPath: /tmp
           name: tmp
-      - command:
-        - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
   observedGeneration: 3

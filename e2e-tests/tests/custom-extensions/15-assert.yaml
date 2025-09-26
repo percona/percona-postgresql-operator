@@ -19,15 +19,11 @@ spec:
   template:
     spec:
       initContainers:
+      - command:
+        - /usr/local/bin/init-entrypoint.sh
       - name: postgres-startup
       - command:
-        - /usr/local/bin/relocate-extensions.sh
-        resources: {}
-        volumeMounts:
-        - mountPath: /pgdata
-          name: postgres-data
-        - mountPath: /tmp
-          name: tmp
+        - /opt/crunchy/bin/relocate-extensions.sh
       - command:
         - /usr/local/bin/install-extensions.sh
         env:
@@ -52,8 +48,6 @@ spec:
         - name: postgres-data
         - mountPath: /tmp
           name: tmp
-      - command:
-        - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
   observedGeneration: 6
