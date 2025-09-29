@@ -183,9 +183,6 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 			Config: cfg,
 		}
 		s.check(ctx)
-		time.Sleep(5 * time.Second)
-
-		fmt.Println(calls)
 
 		assert.Equal(t, len(calls), 2)
 		assert.Assert(t, cmp.Contains(calls[1], `encountered panic in upgrade check`))
