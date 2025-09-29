@@ -62,6 +62,7 @@ COPY --from=go_builder /usr/local/bin/extension-installer /usr/local/bin
 COPY --from=go_builder /usr/local/bin/pgbackrest /usr/local/bin/
 COPY --from=go_builder /licenses /licenses
 COPY build/postgres-operator/install-extensions.sh /usr/local/bin
+COPY build/postgres-operator/relocate-extensions.sh /usr/local/bin
 COPY build/postgres-operator/init-entrypoint.sh /usr/local/bin
 COPY build/postgres-operator/postgres-entrypoint.sh /usr/local/bin
 COPY build/postgres-operator/postgres-liveness-check.sh /usr/local/bin
