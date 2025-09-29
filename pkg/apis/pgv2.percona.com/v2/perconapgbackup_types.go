@@ -137,6 +137,13 @@ func (t *PITRestoreDateTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.Time.Format("2006-01-02 15:04:05.000000-0700"))
 }
 
+func (t *PITRestoreDateTime) ToUnstructured() interface{} {
+	if t.Time == nil {
+		return nil
+	}
+	return t.Time.ToUnstructured()
+}
+
 type PGBackupStorageType string
 
 const (
