@@ -520,6 +520,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			Env:           b.PGBackRest.Env,
 			EnvFrom:       b.PGBackRest.EnvFrom,
 		},
+		TrackLatestRestorableTime: b.TrackLatestRestorableTime,
 	}
 }
 
