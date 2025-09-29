@@ -183,6 +183,7 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 			Config: cfg,
 		}
 		s.check(ctx)
+		time.Sleep(5 * time.Second)
 
 		fmt.Println(calls)
 
