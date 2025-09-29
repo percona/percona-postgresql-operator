@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/percona/percona-postgresql-operator/percona/naming"
 	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -15,24 +16,36 @@ func GetExtensionKey(pgMajor int, name, version string) string {
 
 // RelocatorContainer returns a container that will relocate extensions from the base image (i.e. pg_stat_monitor, pg_audit)
 // to the data directory so we don't lose them when user adds a custom extension.
-func RelocatorContainer(_ *pgv2.PerconaPGCluster, image string, imagePullPolicy corev1.PullPolicy, postgresVersion int) corev1.Container {
+func RelocatorContainer(cr *pgv2.PerconaPGCluster, image string, imagePullPolicy corev1.PullPolicy, postgresVersion int) corev1.Container {
+	mounts := []corev1.VolumeMount{
+		{
+			Name:      "postgres-data",
+			MountPath: "/pgdata",
+		},
+	}
+
+	command := "/usr/local/bin/relocate-extensions.sh"
+
+	if cr.CompareVersion("2.8.0") >= 0 {
+		command = "/opt/crunchy/bin/relocate-extensions.sh"
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      naming.CrunchyBinVolumeName,
+			MountPath: naming.CrunchyBinVolumePath,
+		})
+	}
+
 	return corev1.Container{
 		Name:            fmt.Sprintf("extension-relocator-%d", postgresVersion),
 		Image:           image,
 		ImagePullPolicy: imagePullPolicy,
-		Command:         []string{"/usr/local/bin/relocate-extensions.sh"},
+		Command:         []string{command},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "PG_VERSION",
 				Value: strconv.Itoa(postgresVersion),
 			},
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "postgres-data",
-				MountPath: "/pgdata",
-			},
-		},
+		VolumeMounts: mounts,
 	}
 }
 

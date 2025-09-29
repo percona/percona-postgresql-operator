@@ -55,7 +55,6 @@ apiVersion: v1
 kind: Service
 		`))
 		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
-creationTimestamp: null
 labels:
   app.kubernetes.io/instance: pg2
   app.kubernetes.io/managed-by: percona-postgresql-operator
