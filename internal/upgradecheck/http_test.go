@@ -184,6 +184,8 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 		}
 		s.check(ctx)
 
+		fmt.Println(calls)
+
 		assert.Equal(t, len(calls), 2)
 		assert.Assert(t, cmp.Contains(calls[1], `encountered panic in upgrade check`))
 	})
