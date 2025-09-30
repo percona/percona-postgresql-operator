@@ -10,6 +10,7 @@ commands:
 
       get_cr \
         | yq eval '.spec.crVersion="2.6.0"' - \
-        | yq eval ".spec.image=\"${IMAGE_BASE}:main-ppg$PG_VER-postgres\"" - \
-        | yq eval ".spec.backups.pgbackrest.image=\"${IMAGE_BASE}:main-ppg$PG_VER-pgbackrest\"" - \
+        | yq eval ".spec.image=\"${IMAGE_BASE}:pg-operator-2.6.0-ppg$PG_VER-postgres\"" - \
+        | yq eval ".spec.backups.pgbackrest.image=\"${IMAGE_BASE}:pg-operator-2.6.0-ppg$PG_VER-pgbackrest\"" - \
+        | yq eval ".spec.proxy.pgBouncer.image=\"${IMAGE_BASE}:pg-operator-2.6.0-ppg$PG_VER-pgbouncer\"" - \
         | kubectl -n "${NAMESPACE}" apply -f -

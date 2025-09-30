@@ -11,7 +11,9 @@ commands:
       get_cr \
         | yq eval '
             .spec.crVersion="2.7.0"' - \
-        | yq eval ".spec.image=\"${IMAGE_BASE}:main-ppg$PG_VER-postgres\"" - \
+        | yq eval ".spec.image=\"${IMAGE_BASE}:pg-operator-2.7.0-ppg$PG_VER-postgres\"" - \
+        | yq eval ".spec.backups.pgbackrest.image=\"${IMAGE_BASE}:pg-operator-2.7.0-pgbackrest$PG_VER\"" - \
+        | yq eval ".spec.proxy.pgBouncer.image=\"${IMAGE_BASE}:pg-operator-2.7.0-pgbouncer$PG_VER\"" - \
         | kubectl -n "${NAMESPACE}" apply -f -
 
       sleep 10
