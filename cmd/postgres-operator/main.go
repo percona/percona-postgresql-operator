@@ -163,6 +163,15 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return errors.New("missing controller in manager")
 	}
 
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v2.PerconaPGCluster{},
+		v2.IndexFieldEnvFromSecrets,
+		v2.EnvFromSecretsIndexerFunc,
+	); err != nil {
+		return err
+	}
+
 	externalEvents := make(chan event.GenericEvent)
 	stopChan := make(chan event.DeleteEvent)
 

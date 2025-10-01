@@ -106,6 +106,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Service{}, r.watchServices())).
+		Watches(&corev1.Secret{}, r.watchEnvFromSecrets()).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
@@ -163,6 +164,33 @@ func (r *PGClusterReconciler) watchPGBackups() handler.TypedFuncs[*v2.PerconaPGB
 			}})
 		},
 	}
+}
+
+func (r *PGClusterReconciler) watchEnvFromSecrets() handler.TypedEventHandler[client.Object, reconcile.Request] {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		log := logf.FromContext(ctx).WithName("watchEnvFromSecrets")
+
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var clusters v2.PerconaPGClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v2.IndexFieldEnvFromSecrets: client.ObjectKeyFromObject(secret).String(),
+		}); err != nil {
+			log.Error(err, "Failed to list clusters by env from secrets index failed", "key", client.ObjectKeyFromObject(secret).String())
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for _, cr := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&cr),
+			})
+		}
+		return reqs
+	})
 }
 
 func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, reconcile.Request] {
@@ -281,7 +309,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle monitor user password change")
 	}
 
-	if err := r.handleEnvFromSecrets(ctx, cr); err != nil {
+	if err := r.reconcileEnvFromSecrets(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to handle envFrom secrets")
 	}
 
@@ -721,7 +749,7 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 	return nil
 }
 
-func (r *PGClusterReconciler) handleEnvFromSecrets(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	m := make(map[*[]corev1.EnvFromSource]*v1beta1.Metadata)
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
@@ -759,7 +787,7 @@ func (r *PGClusterReconciler) handleEnvFromSecrets(ctx context.Context, cr *v2.P
 			metadata.Annotations = make(map[string]string)
 		}
 
-		// If the currentHash is the same  is the on the STS, restart will not  happen
+		// If the currentHash is the same on the STS, restart will not happen
 		metadata.Annotations[pNaming.AnnotationEnvVarsSecretHash] = getSecretHash(secrets...)
 	}
 
