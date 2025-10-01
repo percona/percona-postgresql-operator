@@ -308,7 +308,7 @@ gpgcheck=1
 repo_gpgcheck=0
 gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 EOF
-        sudo yum install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
+        sudo yum install -y make google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
     """
 }
 
@@ -402,7 +402,7 @@ pipeline {
         AUTHOR_NAME = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
     }
     agent {
-        label 'docker'
+        label 'docker-x64-min'
     }
     options {
         disableConcurrentBuilds(abortPrevious: true)
@@ -496,7 +496,7 @@ pipeline {
                                  -v $WORKSPACE/src/github.com/percona/percona-postgresql-operator:/go/src/github.com/percona/percona-postgresql-operator \
                                  -w /go/src/github.com/percona/percona-postgresql-operator \
                                  -e GO111MODULE=on \
-                                 golang:1.24 sh -c '
+                                 golang:1.25.1 sh -c '
                                      go install github.com/google/go-licenses@latest;
                                      /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
                                          | cut -d , -f 3 \
@@ -522,7 +522,7 @@ pipeline {
             parallel {
                 stage('cluster1') {
                     agent {
-                        label 'docker'
+                        label 'docker-x64-min'
                     }
                     steps {
                         prepareNode()
@@ -532,7 +532,7 @@ pipeline {
                 }
                 stage('cluster2') {
                     agent {
-                        label 'docker'
+                        label 'docker-x64-min'
                     }
                     steps {
                         prepareNode()
@@ -542,7 +542,7 @@ pipeline {
                 }
                 stage('cluster3') {
                     agent {
-                        label 'docker'
+                        label 'docker-x64-min'
                     }
                     steps {
                         prepareNode()
@@ -552,7 +552,7 @@ pipeline {
                 }
                 stage('cluster4') {
                     agent {
-                        label 'docker'
+                        label 'docker-x64-min'
                     }
                     steps {
                         prepareNode()
