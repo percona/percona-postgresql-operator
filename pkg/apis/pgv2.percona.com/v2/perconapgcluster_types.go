@@ -1118,7 +1118,7 @@ func (cr *PerconaPGCluster) EnvFromSecrets() []string {
 	return secrets
 }
 
-const IndexFieldEnvFromSecrets = "pgCluster.envFromSecrets"
+const IndexFieldEnvFromSecrets = "pgCluster.envFromSecrets" //nolint:gosec
 
 var EnvFromSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
 	cr, ok := obj.(*PerconaPGCluster)
