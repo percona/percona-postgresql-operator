@@ -178,7 +178,7 @@ func (r *PGClusterReconciler) watchEnvFromSecrets() handler.TypedEventHandler[cl
 		var clusters v2.PerconaPGClusterList
 		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
 			v2.IndexFieldEnvFromSecrets: secret.Name,
-		}); err != nil {
+		}, client.InNamespace(secret.Namespace)); err != nil {
 			log.Error(err, "Failed to list clusters by env from secrets index failed", "key", client.ObjectKeyFromObject(secret).String())
 			return nil
 		}
