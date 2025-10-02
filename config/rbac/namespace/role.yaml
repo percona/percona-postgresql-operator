@@ -93,6 +93,13 @@ rules:
   - update
   - watch
 - apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - create
+  - patch
+- apiGroups:
   - pgv2.percona.com
   resources:
   - perconapgbackups
