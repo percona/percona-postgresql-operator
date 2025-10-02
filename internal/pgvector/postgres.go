@@ -3,8 +3,8 @@ package pgvector
 import (
 	"context"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 )
 
 // EnableInPostgreSQL installs pgvector triggers into every database.

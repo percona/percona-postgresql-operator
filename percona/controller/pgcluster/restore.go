@@ -6,9 +6,9 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
 // createBootstrapRestoreObject creates a PerconaPGRestore object for the bootstrap restore

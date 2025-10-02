@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
 func getEnvFromSecrets(ctx context.Context, cl client.Client, cr *v2.PerconaPGCluster, envFromSource []corev1.EnvFromSource) ([]corev1.Secret, error) {
