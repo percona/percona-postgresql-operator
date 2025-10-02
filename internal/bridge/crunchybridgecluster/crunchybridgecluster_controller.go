@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/bridge"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	pgoRuntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -223,7 +222,7 @@ func (r *CrunchyBridgeClusterReconciler) Reconcile(ctx context.Context, req ctrl
 	// TODO(crunchybridgecluster): Do we want the operator to interrupt
 	// upgrades created through the GUI/API?
 	if len(crunchybridgecluster.Status.OngoingUpgrade) != 0 {
-		return runtime.RequeueWithoutBackoff(3 * time.Minute), nil
+		return pgoRuntime.RequeueWithoutBackoff(3 * time.Minute), nil
 	}
 
 	// Check if there's an upgrade difference for the three upgradeable fields that hit the upgrade endpoint
@@ -253,7 +252,7 @@ func (r *CrunchyBridgeClusterReconciler) Reconcile(ctx context.Context, req ctrl
 	log.Info("Reconciled")
 	// TODO(crunchybridgecluster): do we always want to requeue? Does the Watch mean we
 	// don't need this, or do we want both?
-	return runtime.RequeueWithoutBackoff(3 * time.Minute), nil
+	return pgoRuntime.RequeueWithoutBackoff(3 * time.Minute), nil
 }
 
 // reconcileBridgeConnectionSecret looks for the Bridge connection secret specified by the cluster,
@@ -403,7 +402,7 @@ func (r *CrunchyBridgeClusterReconciler) handleCreateCluster(ctx context.Context
 		Message:            "The condition of the upgrade(s) is unknown.",
 	})
 
-	return runtime.RequeueWithoutBackoff(3 * time.Minute)
+	return pgoRuntime.RequeueWithoutBackoff(3 * time.Minute)
 }
 
 // handleGetCluster handles getting the cluster details from Bridge and
@@ -564,7 +563,7 @@ func (r *CrunchyBridgeClusterReconciler) handleUpgrade(ctx context.Context,
 		})
 	}
 
-	return runtime.RequeueWithoutBackoff(3 * time.Minute)
+	return pgoRuntime.RequeueWithoutBackoff(3 * time.Minute)
 }
 
 // handleUpgradeHA handles upgrades that hit the
@@ -611,7 +610,7 @@ func (r *CrunchyBridgeClusterReconciler) handleUpgradeHA(ctx context.Context,
 		})
 	}
 
-	return runtime.RequeueWithoutBackoff(3 * time.Minute)
+	return pgoRuntime.RequeueWithoutBackoff(3 * time.Minute)
 }
 
 // handleUpdate handles upgrades that hit the "PATCH /clusters/<id>" endpoint
@@ -656,7 +655,7 @@ func (r *CrunchyBridgeClusterReconciler) handleUpdate(ctx context.Context,
 			clusterUpdate.ClusterName, *clusterUpdate.IsProtected),
 	})
 
-	return runtime.RequeueWithoutBackoff(3 * time.Minute)
+	return pgoRuntime.RequeueWithoutBackoff(3 * time.Minute)
 }
 
 // GetSecretKeys gets the secret and returns the expected API key and team id
