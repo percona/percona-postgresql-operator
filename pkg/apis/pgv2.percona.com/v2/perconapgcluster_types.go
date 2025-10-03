@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
@@ -1079,4 +1080,50 @@ const (
 // UserMonitoring constructs the monitoring user.
 func (pgc PerconaPGCluster) UserMonitoring() string {
 	return pgc.Name + "-" + naming.RolePostgresUser + "-" + UserMonitoring
+}
+
+func (cr *PerconaPGCluster) EnvFromSecrets() []string {
+	secrets := []string{}
+
+	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
+		set := &cr.Spec.InstanceSets[i]
+		if len(set.EnvFrom) == 0 {
+			continue
+		}
+		for _, envFrom := range set.EnvFrom {
+			if envFrom.SecretRef == nil {
+				continue
+			}
+			secrets = append(secrets, envFrom.SecretRef.Name)
+		}
+	}
+
+	if len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
+		for _, envFrom := range cr.Spec.Proxy.PGBouncer.EnvFrom {
+			if envFrom.SecretRef == nil {
+				continue
+			}
+			secrets = append(secrets, envFrom.SecretRef.Name)
+		}
+	}
+
+	if len(cr.Spec.Backups.PGBackRest.EnvFrom) > 0 {
+		for _, envFrom := range cr.Spec.Backups.PGBackRest.EnvFrom {
+			if envFrom.SecretRef == nil {
+				continue
+			}
+			secrets = append(secrets, envFrom.SecretRef.Name)
+		}
+	}
+	return secrets
+}
+
+const IndexFieldEnvFromSecrets = "pgCluster.envFromSecrets" //nolint:gosec
+
+var EnvFromSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	cr, ok := obj.(*PerconaPGCluster)
+	if !ok {
+		return nil
+	}
+	return cr.EnvFromSecrets()
 }
