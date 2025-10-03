@@ -1,4 +1,4 @@
-module github.com/percona/percona-postgresql-operator
+module github.com/percona/percona-postgresql-operator/v2
 
 go 1.25.1
 

@@ -54,7 +54,7 @@ linters:
               desc: Should be used only in tests.
             - pkg: testing/*
               desc: The "testing" packages should be used only in tests.
-            - pkg: github.com/percona/percona-postgresql-operator/internal/testing/*
+            - pkg: github.com/percona/percona-postgresql-operator/v2/internal/testing/*
               desc: The "internal/testing" packages should be used only in tests.
         tests:
           files:

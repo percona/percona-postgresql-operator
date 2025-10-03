@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/percona/percona-postgresql-operator/internal/testing/events"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
 )
 
 func TestNewRunner(t *testing.T) {

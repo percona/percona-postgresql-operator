@@ -10,7 +10,7 @@ import (
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 )
 
 func TestAnnotations(t *testing.T) {

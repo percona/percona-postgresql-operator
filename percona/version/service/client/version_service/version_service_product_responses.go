@@ -12,7 +12,7 @@ import (
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
 
-	"github.com/percona/percona-postgresql-operator/percona/version/service/client/models"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version/service/client/models"
 )
 
 // VersionServiceProductReader is a Reader for the VersionServiceProduct structure.

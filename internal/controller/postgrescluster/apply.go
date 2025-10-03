@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/v2/internal/kubeapi"
 )
 
 // apply sends an apply patch to object's endpoint in the Kubernetes API and

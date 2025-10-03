@@ -12,8 +12,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/percona/percona-postgresql-operator/percona/version/service/client"
-	"github.com/percona/percona-postgresql-operator/percona/version/service/client/version_service"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version/service/client"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version/service/client/version_service"
 )
 
 //go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgclusters.yaml"

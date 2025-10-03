@@ -7,8 +7,8 @@ package pgupgrade
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 
-	"github.com/percona/percona-postgresql-operator/internal/registration"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func (r *PGUpgradeReconciler) UpgradeAuthorized(upgrade *v1beta1.PGUpgrade) bool {

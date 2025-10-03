@@ -10,7 +10,7 @@ import (
 	"gotest.tools/v3/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 )
 
 func TestDefaultTopologySpreadConstraints(t *testing.T) {
