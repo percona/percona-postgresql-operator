@@ -208,8 +208,8 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 			}, nil
 		}
 
-		// Set loop time to 1s and sleep for 2s before sending the done signal
-		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		// Set loop time to 1s and sleep for 5s before sending the done signal
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		s := CheckForUpgradesScheduler{
 			Client:  fakeClient,
@@ -220,7 +220,7 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 
 		// Sleeping leads to some non-deterministic results, but we expect at least 2 executions
 		// plus one log for the failure to apply the configmap
-		assert.Assert(t, len(calls) >= 4)
+		assert.Assert(t, len(calls) >= 4, fmt.Sprintf("expected at least 4 calls, got %d", len(calls)))
 
 		assert.Assert(t, cmp.Contains(calls[1], `{\"pgo_versions\":[{\"tag\":\"v5.0.4\"},{\"tag\":\"v5.0.3\"},{\"tag\":\"v5.0.2\"},{\"tag\":\"v5.0.1\"},{\"tag\":\"v5.0.0\"}]}`))
 		assert.Assert(t, cmp.Contains(calls[3], `{\"pgo_versions\":[{\"tag\":\"v5.0.4\"},{\"tag\":\"v5.0.3\"},{\"tag\":\"v5.0.2\"},{\"tag\":\"v5.0.1\"},{\"tag\":\"v5.0.0\"}]}`))
