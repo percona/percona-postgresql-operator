@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -597,7 +598,7 @@ func TestGenerateClusterPrimaryService(t *testing.T) {
 	_, _, err := reconciler.generateClusterPrimaryService(cluster, nil)
 	assert.ErrorContains(t, err, "not implemented")
 
-	alwaysExpect := func(t testing.TB, service *corev1.Service, endpoints *corev1.Endpoints) {
+	alwaysExpect := func(t testing.TB, service *corev1.Service, endpointSlice *discoveryv1.EndpointSlice) {
 		assert.Assert(t, cmp.MarshalMatches(service.TypeMeta, `
 apiVersion: v1
 kind: Service
@@ -632,9 +633,9 @@ ownerReferences:
 		assert.Assert(t, service.Spec.Selector == nil,
 			"got %v", service.Spec.Selector)
 
-		assert.Assert(t, cmp.MarshalMatches(endpoints, `
-apiVersion: v1
-kind: Endpoints
+		assert.Assert(t, cmp.MarshalMatches(endpointSlice, `
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
 metadata:
   labels:
     app.kubernetes.io/component: pg
@@ -642,6 +643,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
+    kubernetes.io/service-name: pg5-primary
     postgres-operator.crunchydata.com/cluster: pg5
     postgres-operator.crunchydata.com/role: primary
   name: pg5-primary
@@ -653,19 +655,20 @@ metadata:
     kind: PostgresCluster
     name: pg5
     uid: ""
-subsets:
+addressType: IPv4
+endpoints:
 - addresses:
-  - ip: 1.9.8.3
-  ports:
-  - name: postgres
-    port: 2600
-    protocol: TCP
+  - 1.9.8.3
+ports:
+- name: postgres
+  port: 2600
+  protocol: TCP
 		`))
 	}
 
-	service, endpoints, err := reconciler.generateClusterPrimaryService(cluster, leader)
+	service, endpointSlice, err := reconciler.generateClusterPrimaryService(cluster, leader)
 	assert.NilError(t, err)
-	alwaysExpect(t, service, endpoints)
+	alwaysExpect(t, service, endpointSlice)
 
 	t.Run("LeaderLoadBalancer", func(t *testing.T) {
 		leader := leader.DeepCopy()
@@ -676,9 +679,9 @@ subsets:
 			{IP: "1.2.3.4", Hostname: "only.the.first"},
 		}
 
-		service, endpoints, err := reconciler.generateClusterPrimaryService(cluster, leader)
+		service, endpointSlice, err := reconciler.generateClusterPrimaryService(cluster, leader)
 		assert.NilError(t, err)
-		alwaysExpect(t, service, endpoints)
+		alwaysExpect(t, service, endpointSlice)
 
 		// generateClusterPrimaryService no longer sets ExternalIPs or ExternalName from
 		// LoadBalancer-type leader service
