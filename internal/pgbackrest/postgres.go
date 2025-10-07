@@ -31,18 +31,12 @@ func PostgreSQL(
 	archive := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-push "%p"`
 
 	// K8SPG-518
-	if track := inCluster.Spec.Backups.TrackLatestRestorableTime; track != nil && *track {
-		fixTimezone := `sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | sed "s/UTC/Z/"`
-		extractCommitTime := `grep -oP "COMMIT \K[^;]+" | ` + fixTimezone + ``
-		validateCommitTime := `grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"`
-
-		archive += ` && timestamp=$(pg_waldump "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
-		archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
-
-		// K8SPG-518: This parameter is required to ensure that the commit timestamp is
-		// included in the WAL file. This is necessary for the WAL watcher to
-		// function correctly.
-		outParameters.Mandatory.Add("track_commit_timestamp", "true")
+	if inCluster.CompareVersion("2.8.0") >= 0 {
+		if trackRestorableTime := inCluster.Spec.Backups.TrackLatestRestorableTime; trackRestorableTime != nil && *trackRestorableTime {
+			updateCommandRestorableTime(&archive, outParameters)
+		}
+	} else {
+		updateCommandRestorableTime(&archive, outParameters)
 	}
 
 	outParameters.Mandatory.Add("archive_mode", "on")
@@ -97,4 +91,18 @@ func PostgreSQL(
 		restore += " --repo=" + strings.TrimPrefix(repoName, "repo")
 		outParameters.Mandatory.Add("restore_command", restore)
 	}
+}
+
+func updateCommandRestorableTime(archive *string, outParameters *postgres.Parameters) {
+	fixTimezone := `sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | sed "s/UTC/Z/"`
+	extractCommitTime := `grep -oP "COMMIT \K[^;]+" | ` + fixTimezone + ``
+	validateCommitTime := `grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"`
+
+	*archive += ` && timestamp=$(pg_waldump "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
+	*archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
+
+	// K8SPG-518: This parameter is required to ensure that the commit timestamp is
+	// included in the WAL file. This is necessary for the WAL watcher to
+	// function correctly.
+	outParameters.Mandatory.Add("track_commit_timestamp", "true")
 }
