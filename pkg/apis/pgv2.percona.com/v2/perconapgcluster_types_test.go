@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/percona/percona-postgresql-operator/percona/version"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -135,7 +136,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 				Spec: PerconaPGClusterSpec{
-					CRVersion:       "2.8.0",
+					CRVersion:       version.Version(),
 					PostgresVersion: 15,
 					Expose: &ServiceExpose{
 						Type:              "LoadBalancer",
@@ -180,6 +181,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				assert.Equal(t, actual.Spec.ReplicaService.Type, expected.Spec.ExposeReplicas.Type)
 				assert.Assert(t, actual.Spec.ReplicaService.LoadBalancerClass != nil)
 				assert.Equal(t, actual.Spec.ReplicaService.LoadBalancerClass, expected.Spec.ExposeReplicas.LoadBalancerClass)
+				assert.Equal(t, *actual.Spec.Backups.TrackLatestRestorableTime, true)
 			},
 		},
 		"updates existing PostgresCluster": {

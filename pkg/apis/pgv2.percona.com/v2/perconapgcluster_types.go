@@ -504,7 +504,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 		sc = b.PGBackRest.Sidecars
 	}
 
-	return crunchyv1beta1.Backups{
+	backups := crunchyv1beta1.Backups{
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
 			Metadata:      b.PGBackRest.Metadata,
 			Configuration: b.PGBackRest.Configuration,
@@ -520,8 +520,13 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			Env:           b.PGBackRest.Env,
 			EnvFrom:       b.PGBackRest.EnvFrom,
 		},
-		TrackLatestRestorableTime: b.TrackLatestRestorableTime,
 	}
+
+	if currVersion != nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.8.0"))) {
+		backups.TrackLatestRestorableTime = b.TrackLatestRestorableTime
+	}
+
+	return backups
 }
 
 type PGBackRestArchive struct {
