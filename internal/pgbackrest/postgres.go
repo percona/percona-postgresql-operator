@@ -34,6 +34,10 @@ func PostgreSQL(
 	if inCluster.CompareVersion("2.8.0") >= 0 {
 		if trackRestorableTime := inCluster.Spec.Backups.TrackLatestRestorableTime; trackRestorableTime != nil && *trackRestorableTime {
 			updateCommandRestorableTime(&archive, outParameters)
+			// K8SPG-518: This parameter is required to ensure that the commit timestamp is
+			// included in the WAL file. This is necessary for the WAL watcher to
+			// function correctly.
+			outParameters.Mandatory.Add("track_commit_timestamp", "true")
 		}
 	} else {
 		updateCommandRestorableTime(&archive, outParameters)
@@ -47,6 +51,13 @@ func PostgreSQL(
 		// If backups are disabled, keep archive_mode on (to avoid a Postgres restart)
 		// and throw away WAL.
 		outParameters.Mandatory.Add("archive_command", `true`)
+	}
+
+	if inCluster.CompareVersion("2.8.0") < 0 {
+		// K8SPG-518: This parameter is required to ensure that the commit timestamp is
+		// included in the WAL file. This is necessary for the WAL watcher to
+		// function correctly.
+		outParameters.Mandatory.Add("track_commit_timestamp", "true")
 	}
 
 	// archive_timeout is used to determine at what point a WAL file is switched,
@@ -100,9 +111,4 @@ func updateCommandRestorableTime(archive *string, outParameters *postgres.Parame
 
 	*archive += ` && timestamp=$(pg_waldump "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
 	*archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
-
-	// K8SPG-518: This parameter is required to ensure that the commit timestamp is
-	// included in the WAL file. This is necessary for the WAL watcher to
-	// function correctly.
-	outParameters.Mandatory.Add("track_commit_timestamp", "true")
 }
