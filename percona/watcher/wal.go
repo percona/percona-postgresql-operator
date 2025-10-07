@@ -162,6 +162,7 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 	return latest, nil
 }
 
+// GetLatestCommitTimestamp gets the timestamp of the latest commit.
 func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *clientcmd.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (*metav1.Time, error) {
 	log := logging.FromContext(ctx)
 

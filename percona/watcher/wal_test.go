@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -307,6 +308,52 @@ func TestGetLatestBackup(t *testing.T) {
 				assert.NotNil(t, latest)
 				assert.Equal(t, latest.Name, tt.latestBackupName)
 			}
+		})
+	}
+}
+
+func TestGetLatestCommitTimestamp(t *testing.T) {
+	ctx := context.Background()
+
+	tests := map[string]struct {
+		pods        []client.Object
+		backup      *pgv2.PerconaPGBackup
+		cluster     *pgv2.PerconaPGCluster
+		expectedErr error
+	}{
+		"primary pod not found due to invalid patroni version": {
+			pods: []client.Object{},
+			backup: &pgv2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup1",
+					Namespace: "test-ns",
+				},
+				Spec: pgv2.PerconaPGBackupSpec{
+					PGCluster: "test-cluster",
+					RepoName:  "repo1",
+				},
+			},
+			cluster: &pgv2.PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-ns",
+				},
+				Status: pgv2.PerconaPGClusterStatus{
+					Patroni: pgv2.Patroni{
+						Version: "error",
+					},
+				},
+			},
+			expectedErr: errors.New("failed to get patroni version: Malformed version: error: primary pod not found"),
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := testutils.BuildFakeClient(tt.pods...)
+
+			_, err := GetLatestCommitTimestamp(ctx, c, nil, tt.cluster, tt.backup)
+
+			assert.EqualError(t, err, tt.expectedErr.Error())
 		})
 	}
 }
