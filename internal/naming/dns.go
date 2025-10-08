@@ -84,5 +84,5 @@ func KubernetesClusterDomain(ctx context.Context) string {
 	span.RecordError(err)
 	// The kubeadm default is "cluster.local" and is adequate when not running
 	// in an actual Kubernetes cluster.
-	return "cluster.local."
+	return "cluster.local"
 }
