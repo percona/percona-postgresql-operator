@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -72,7 +73,7 @@ func generateLeafCertificate(
 	}
 
 	parsed, err := x509.ParseCertificate(bytes)
-	return parsed, errors.Wrap(err, "error parsing certificate")
+	return parsed, errors.Wrap(err, fmt.Sprintf("error parsing certificate with dns names: %s", dnsNames))
 }
 
 func generateRootCertificate(
