@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      kubectl -n "${NAMESPACE}" patch pg custom-envs \
+        --type merge \
+        -p '{"spec":{"proxy":{"pgBouncer":{"replicas":1,"env":[{"name":"MY_ENV","value":"1000"}]}}}}'
+          
+      sleep 10  
+      wait_cluster_consistency custom-envs
+      
+      check_env_in_pod add pgbouncer MY_ENV 1000

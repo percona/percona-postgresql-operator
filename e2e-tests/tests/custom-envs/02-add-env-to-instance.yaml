@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      get_cr | yq eval '
+        .spec.proxy.pgBouncer.replicas = 1 |
+        .spec.instances[].replicas = 1 |
+        .spec.instances[].env = ((.spec.instances[].env // []) + [{"name": "MY_ENV", "value": "1000"}] | unique_by(.name))
+        ' - | kubectl -n "${NAMESPACE}" apply -f -
+
+  
+        sleep 10  
+        wait_cluster_consistency custom-envs
+        
+        check_env_in_pod add instance MY_ENV 1000
+        
