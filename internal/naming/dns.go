@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -35,7 +36,17 @@ func InstancePodDNSNames(ctx context.Context, instance *appsv1.StatefulSet) []st
 
 // RepoHostPodDNSNames returns the possible DNS names for a pgBackRest repository host Pod.
 // The first name is the fully qualified domain name (FQDN).
-func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) []string {
+func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) ([]string, error) {
+	if repoHost.Namespace == "" {
+		return nil, errors.New("repoHost.Namespace is empty")
+	}
+	if repoHost.Name == "" {
+		return nil, errors.New("repoHost.Name is empty")
+	}
+	if repoHost.Spec.ServiceName == "" {
+		return nil, errors.New("repoHost.Spec.ServiceName is empty")
+	}
+
 	var (
 		domain    = KubernetesClusterDomain(ctx)
 		namespace = repoHost.Namespace
@@ -50,7 +61,7 @@ func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) []st
 		name + "." + namespace + ".svc",
 		name + "." + namespace,
 		name,
-	}
+	}, nil
 }
 
 // ServiceDNSNames returns the possible DNS names for service. The first name
