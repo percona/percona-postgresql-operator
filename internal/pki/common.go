@@ -95,9 +95,9 @@ func generateRootCertificate(
 	bytes, err := x509.CreateCertificate(rand.Reader, template, template,
 		privateKey.Public(), privateKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating certificate")
 	}
 
 	parsed, err := x509.ParseCertificate(bytes)
-	return parsed, err
+	return parsed, errors.Wrap(err, "error parsing certificate")
 }
