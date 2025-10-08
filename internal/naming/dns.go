@@ -66,7 +66,15 @@ func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) ([]s
 
 // ServiceDNSNames returns the possible DNS names for service. The first name
 // is the fully qualified domain name (FQDN).
-func ServiceDNSNames(ctx context.Context, service *corev1.Service) []string {
+func ServiceDNSNames(ctx context.Context, service *corev1.Service) ([]string, error) {
+	if service.Name == "" {
+		return nil, errors.New("service.Name is empty")
+	}
+
+	if service.Namespace == "" {
+		return nil, errors.New("service.Namespace is empty")
+	}
+
 	domain := KubernetesClusterDomain(ctx)
 
 	return []string{
@@ -74,7 +82,7 @@ func ServiceDNSNames(ctx context.Context, service *corev1.Service) []string {
 		service.Name + "." + service.Namespace + ".svc",
 		service.Name + "." + service.Namespace,
 		service.Name,
-	}
+	}, nil
 }
 
 // KubernetesClusterDomain looks up the Kubernetes cluster domain name.

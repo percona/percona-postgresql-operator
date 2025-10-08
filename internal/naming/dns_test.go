@@ -46,7 +46,8 @@ func TestServiceDNSNames(t *testing.T) {
 	service.Namespace = "baltia"
 	service.Name = "the-primary"
 
-	names := ServiceDNSNames(ctx, service)
+	names, err := ServiceDNSNames(ctx, service)
+	assert.NilError(t, err)
 	assert.Assert(t, len(names) > 0)
 
 	assert.DeepEqual(t, names[1:], []string{
