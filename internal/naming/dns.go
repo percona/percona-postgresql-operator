@@ -89,7 +89,7 @@ func KubernetesClusterDomain(ctx context.Context) string {
 	cname, err := net.DefaultResolver.LookupCNAME(ctx, api)
 
 	if err == nil {
-		return strings.TrimPrefix(cname, api+".")
+		return strings.TrimSuffix(strings.TrimPrefix(cname, api+"."), ".")
 	}
 
 	span.RecordError(err)
