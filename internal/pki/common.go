@@ -5,6 +5,7 @@
 package pki
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // certificateSignatureAlgorithm is ECDSA with SHA-384, the recommended
@@ -44,6 +46,10 @@ func generateLeafCertificate(
 ) (*x509.Certificate, error) {
 	const leafExpiration = time.Hour * 24 * 365
 	const leafStartValid = time.Hour * -1
+
+	log := logf.FromContext(context.Background())
+
+	log.Info("dns names", dnsNames)
 
 	now := currentTime()
 	template := &x509.Certificate{
