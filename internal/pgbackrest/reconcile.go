@@ -551,7 +551,10 @@ func Secret(ctx context.Context,
 		// The client verifies the "pg-host" or "repo-host" option it used is
 		// present in the DNS names of the server certificate.
 		leaf := &pki.LeafCertificate{}
-		dnsNames := naming.RepoHostPodDNSNames(ctx, inRepoHost)
+		dnsNames, err := naming.RepoHostPodDNSNames(ctx, inRepoHost)
+		if err != nil {
+			return errors.Wrap(err, "failed to resolve repo host pod DNS names")
+		}
 		commonName := dnsNames[0] // FQDN
 
 		if err == nil {
