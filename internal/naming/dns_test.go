@@ -35,7 +35,7 @@ func TestInstancePodDNSNames(t *testing.T) {
 
 	assert.Assert(t, len(names[0]) > len(names[1]), "expected FQDN first, got %q", names[0])
 	assert.Assert(t, strings.HasPrefix(names[0], names[1]+"."), "wrong FQDN: %q", names[0])
-	assert.Assert(t, !strings.HasSuffix(names[0], "."), "expected root, got %q", names[0])
+	assert.Assert(t, !strings.HasSuffix(names[0], "."), "not expected root, got %q", names[0])
 }
 
 func TestServiceDNSNames(t *testing.T) {
@@ -58,5 +58,5 @@ func TestServiceDNSNames(t *testing.T) {
 
 	assert.Assert(t, len(names[0]) > len(names[1]), "expected FQDN first, got %q", names[0])
 	assert.Assert(t, strings.HasPrefix(names[0], names[1]+"."), "wrong FQDN: %q", names[0])
-	assert.Assert(t, !strings.HasSuffix(names[0], "."), "expected root, got %q", names[0])
+	assert.Assert(t, !strings.HasSuffix(names[0], "."), "not expected root, got %q", names[0])
 }

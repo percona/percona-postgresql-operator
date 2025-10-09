@@ -97,6 +97,8 @@ func KubernetesClusterDomain(ctx context.Context) string {
 	cname, err := net.DefaultResolver.LookupCNAME(ctx, api)
 
 	if err == nil {
+		// The cname returned from the LookupCNAME can be `kubernetes.default.svc.cluster.local.`
+		// Since go stdlib validates and rejects DNS with the dot suffix, the operator has to trim it.
 		return strings.TrimSuffix(strings.TrimPrefix(cname, api+"."), ".")
 	}
 
