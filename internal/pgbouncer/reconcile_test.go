@@ -57,6 +57,8 @@ func TestSecret(t *testing.T) {
 	ctx := context.Background()
 	cluster := new(v1beta1.PostgresCluster)
 	service := new(corev1.Service)
+	service.Namespace = "ns1"
+	service.Name = "some-name"
 	existing := new(corev1.Secret)
 	intent := new(corev1.Secret)
 

@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -35,7 +36,17 @@ func InstancePodDNSNames(ctx context.Context, instance *appsv1.StatefulSet) []st
 
 // RepoHostPodDNSNames returns the possible DNS names for a pgBackRest repository host Pod.
 // The first name is the fully qualified domain name (FQDN).
-func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) []string {
+func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) ([]string, error) {
+	if repoHost.Namespace == "" {
+		return nil, errors.New("repoHost.Namespace is empty")
+	}
+	if repoHost.Name == "" {
+		return nil, errors.New("repoHost.Name is empty")
+	}
+	if repoHost.Spec.ServiceName == "" {
+		return nil, errors.New("repoHost.Spec.ServiceName is empty")
+	}
+
 	var (
 		domain    = KubernetesClusterDomain(ctx)
 		namespace = repoHost.Namespace
@@ -50,12 +61,20 @@ func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) []st
 		name + "." + namespace + ".svc",
 		name + "." + namespace,
 		name,
-	}
+	}, nil
 }
 
 // ServiceDNSNames returns the possible DNS names for service. The first name
 // is the fully qualified domain name (FQDN).
-func ServiceDNSNames(ctx context.Context, service *corev1.Service) []string {
+func ServiceDNSNames(ctx context.Context, service *corev1.Service) ([]string, error) {
+	if service.Name == "" {
+		return nil, errors.New("service.Name is empty")
+	}
+
+	if service.Namespace == "" {
+		return nil, errors.New("service.Namespace is empty")
+	}
+
 	domain := KubernetesClusterDomain(ctx)
 
 	return []string{
@@ -63,7 +82,7 @@ func ServiceDNSNames(ctx context.Context, service *corev1.Service) []string {
 		service.Name + "." + service.Namespace + ".svc",
 		service.Name + "." + service.Namespace,
 		service.Name,
-	}
+	}, nil
 }
 
 // KubernetesClusterDomain looks up the Kubernetes cluster domain name.
@@ -78,11 +97,13 @@ func KubernetesClusterDomain(ctx context.Context) string {
 	cname, err := net.DefaultResolver.LookupCNAME(ctx, api)
 
 	if err == nil {
-		return strings.TrimPrefix(cname, api+".")
+		// The cname returned from the LookupCNAME can be `kubernetes.default.svc.cluster.local.`
+		// Since go stdlib validates and rejects DNS with the dot suffix, the operator has to trim it.
+		return strings.TrimSuffix(strings.TrimPrefix(cname, api+"."), ".")
 	}
 
 	span.RecordError(err)
 	// The kubeadm default is "cluster.local" and is adequate when not running
 	// in an actual Kubernetes cluster.
-	return "cluster.local."
+	return "cluster.local"
 }
