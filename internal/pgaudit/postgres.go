@@ -7,8 +7,8 @@ package pgaudit
 import (
 	"context"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 )
 
 // When the pgAudit shared library is not loaded, the extension cannot be

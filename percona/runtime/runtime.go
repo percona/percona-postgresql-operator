@@ -9,10 +9,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	r "github.com/percona/percona-postgresql-operator/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/internal/feature"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
+	r "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 )
 
 // default refresh interval in minutes

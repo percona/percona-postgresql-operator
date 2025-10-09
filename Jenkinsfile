@@ -498,7 +498,7 @@ pipeline {
                                  -e GO111MODULE=on \
                                  golang:1.25.1 sh -c '
                                      go install github.com/google/go-licenses@latest;
-                                     /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
+                                     /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/v2/cmd/postgres-operator \
                                          | cut -d , -f 3 \
                                          | sort -u \
                                          > go-licenses-new || :
