@@ -13,8 +13,8 @@ import (
 	"gotest.tools/v3/assert"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestGenerateDefaultExporterQueries(t *testing.T) {

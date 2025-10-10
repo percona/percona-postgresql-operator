@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 )
 
 func EnableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
