@@ -1084,3 +1084,51 @@ wait_for_generation() {
 		fi
 	done
 }
+
+check_env_in_pod() {
+  local check_type=$1      # add | delete
+  local component=$2       # instance | pgbouncer | repohost
+  local var_name=$3        # e.g. MY_ENV
+  local expected_value=$4  # used only for 'add'
+
+  case "$component" in
+    instance)
+      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[0].metadata.name}')
+      CONTAINER=""
+      ;;
+    pgbouncer)
+      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
+      CONTAINER="-c pgbouncer"
+      ;;
+    repohost)
+      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
+      CONTAINER="-c pgbackrest"
+      ;;
+    *)
+      echo "ERROR: unknown component '$component'"
+      exit 1
+      ;;
+  esac
+
+  VALUE=$(kubectl exec -n "${NAMESPACE}" $POD $CONTAINER -- printenv "$var_name" || true)
+
+  if [[ "$check_type" == "add" ]]; then
+    if [ "$VALUE" != "$expected_value" ]; then
+      echo "ERROR: $var_name is missing or incorrect in pod $POD (expected '$expected_value', got '$VALUE')"
+      exit 1
+    else
+      echo "$var_name exists and is set to: $VALUE in pod $POD"
+    fi
+  elif [[ "$check_type" == "delete" ]]; then
+    if [ -n "$VALUE" ]; then
+      echo "ERROR: $var_name exists in pod $POD (should not exist)"
+      exit 1
+    else
+      echo "$var_name is missing as expected in pod $POD"
+    fi
+  else
+    echo "ERROR: unknown check type '$check_type'"
+    exit 1
+  fi
+}
+

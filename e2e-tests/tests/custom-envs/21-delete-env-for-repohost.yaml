@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+      
+      source ../../functions
+      
+      kubectl get pg custom-envs -n ${NAMESPACE} -o yaml | \
+        yq eval '
+        .spec.backups.pgbackrest.env |= map(select(.name != "MY_ENV"))
+        ' - | kubectl apply -f -
+      
+      sleep 60 
+      wait_cluster_consistency custom-envs
+        
+      check_env_in_pod delete repohost MY_ENV
+
