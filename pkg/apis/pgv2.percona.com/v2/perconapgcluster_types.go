@@ -659,8 +659,8 @@ type CustomExtensionsStorageSpec struct {
 	Bucket         string                   `json:"bucket,omitempty"`
 	Region         string                   `json:"region,omitempty"`
 	Endpoint       string                   `json:"endpoint,omitempty"`
-	ForcePathStyle string                   `json:"forcePathStyle,omitempty"`
-	DisableSSL     string                   `json:"disableSSL,omitempty"`
+	ForcePathStyle bool                     `json:"forcePathStyle,omitempty"`
+	DisableSSL     bool                     `json:"disableSSL,omitempty"`
 	Secret         *corev1.SecretProjection `json:"secret,omitempty"`
 }
 
