@@ -45,7 +45,7 @@ RUN mkdir -p build/_output/bin \
 RUN ./bin/license_aggregator.sh ./cmd/...; \
 	cp -r ./licenses /licenses
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal AS ubi9
+FROM registry.access.redhat.com/ubi10/ubi-minimal AS ubi10
 RUN microdnf update -y && microdnf clean all -y
 
 LABEL name="Percona Postgres Operator" \
