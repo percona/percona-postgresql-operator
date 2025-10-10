@@ -292,7 +292,7 @@ get_cr() {
 			yq eval -i '
 				.spec.extensions.image = "'$IMAGE'" |
 				.spec.extensions.imagePullPolicy = "Always" |
-				.spec.extensions.storage = {"type": "s3", "bucket": "operator-testing", "region": "us-east-1", "endpoint": "http://minio-service:9000", "forcePathStyle": "true", "disableSSL": "true", "secret": {"name": "minio-secret"}}
+				.spec.extensions.storage = {"type": "s3", "bucket": "operator-testing", "region": "us-east-1", "endpoint": "http://minio-service:9000", "forcePathStyle": true, "disableSSL": true, "secret": {"name": "minio-secret"}}
 			    ' $TEMP_DIR/cr.yaml
 			;;
 	esac
