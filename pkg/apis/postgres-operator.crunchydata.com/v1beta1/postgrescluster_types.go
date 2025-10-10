@@ -365,6 +365,9 @@ type Backups struct {
 	// VolumeSnapshot configuration
 	// +optional
 	Snapshots *VolumeSnapshots `json:"snapshots,omitempty"`
+
+	// Enable tracking latest restorable time
+	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
 }
 
 // PostgresClusterStatus defines the observed state of PostgresCluster
