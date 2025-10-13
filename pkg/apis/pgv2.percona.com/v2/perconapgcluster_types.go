@@ -505,7 +505,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 		sc = b.PGBackRest.Sidecars
 	}
 
-	return crunchyv1beta1.Backups{
+	backups := crunchyv1beta1.Backups{
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
 			Metadata:      b.PGBackRest.Metadata,
 			Configuration: b.PGBackRest.Configuration,
@@ -522,6 +522,12 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			EnvFrom:       b.PGBackRest.EnvFrom,
 		},
 	}
+
+	if currVersion != nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.8.0"))) {
+		backups.TrackLatestRestorableTime = b.TrackLatestRestorableTime
+	}
+
+	return backups
 }
 
 type PGBackRestArchive struct {
@@ -653,8 +659,8 @@ type CustomExtensionsStorageSpec struct {
 	Bucket         string                   `json:"bucket,omitempty"`
 	Region         string                   `json:"region,omitempty"`
 	Endpoint       string                   `json:"endpoint,omitempty"`
-	ForcePathStyle string                   `json:"forcePathStyle,omitempty"`
-	DisableSSL     string                   `json:"disableSSL,omitempty"`
+	ForcePathStyle bool                     `json:"forcePathStyle,omitempty"`
+	DisableSSL     bool                     `json:"disableSSL,omitempty"`
 	Secret         *corev1.SecretProjection `json:"secret,omitempty"`
 }
 

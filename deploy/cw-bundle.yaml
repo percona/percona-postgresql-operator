@@ -11005,11 +11005,11 @@ spec:
                       bucket:
                         type: string
                       disableSSL:
-                        type: string
+                        type: boolean
                       endpoint:
                         type: string
                       forcePathStyle:
-                        type: string
+                        type: boolean
                       region:
                         type: string
                       secret:
@@ -36721,6 +36721,9 @@ spec:
                     required:
                     - volumeSnapshotClassName
                     type: object
+                  trackLatestRestorableTime:
+                    description: Enable tracking latest restorable time
+                    type: boolean
                 type: object
               config:
                 properties:
