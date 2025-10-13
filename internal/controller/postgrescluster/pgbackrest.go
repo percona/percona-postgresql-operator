@@ -947,11 +947,18 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		// K8SPG-833
 		if postgresCluster.CompareVersion("2.8.0") >= 0 {
 			for i := range jobSpec.Template.Spec.Containers {
-				if len(postgresCluster.Spec.Backups.PGBackRest.Env) != 0 {
-					jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, postgresCluster.Spec.Backups.PGBackRest.Env...)
+				pgbackrest := postgresCluster.Spec.Backups.PGBackRest
+
+				if len(pgbackrest.Manual.Env) != 0 {
+					jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, pgbackrest.Manual.Env...)
+				} else if len(pgbackrest.Env) != 0 {
+					jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, pgbackrest.Env...)
 				}
-				if len(postgresCluster.Spec.Backups.PGBackRest.EnvFrom) != 0 {
-					jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, postgresCluster.Spec.Backups.PGBackRest.EnvFrom...)
+
+				if len(pgbackrest.Manual.EnvFrom) != 0 {
+					jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, pgbackrest.Manual.EnvFrom...)
+				} else if len(pgbackrest.EnvFrom) != 0 {
+					jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, pgbackrest.EnvFrom...)
 				}
 			}
 		}
@@ -1461,6 +1468,25 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 		job.Spec.Template.Spec.SecurityContext = cluster.Spec.Backups.PGBackRest.Jobs.SecurityContext
 	} else {
 		job.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
+	}
+
+	// K8SPG-833
+	if cluster.CompareVersion("2.8.0") >= 0 {
+		for i := range job.Spec.Template.Spec.Containers {
+			pgbackrest := cluster.Spec.Backups.PGBackRest
+
+			if len(pgbackrest.Manual.Env) != 0 {
+				job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, pgbackrest.Restore.Env...)
+			} else if len(pgbackrest.Env) != 0 {
+				job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, pgbackrest.Env...)
+			}
+
+			if len(pgbackrest.Manual.EnvFrom) != 0 {
+				job.Spec.Template.Spec.Containers[i].EnvFrom = append(job.Spec.Template.Spec.Containers[i].EnvFrom, pgbackrest.Restore.EnvFrom...)
+			} else if len(pgbackrest.EnvFrom) != 0 {
+				job.Spec.Template.Spec.Containers[i].EnvFrom = append(job.Spec.Template.Spec.Containers[i].EnvFrom, pgbackrest.EnvFrom...)
+			}
+		}
 	}
 
 	// set the priority class name, if it exists

@@ -216,6 +216,11 @@ type PGBackRestManualBackup struct {
 	// before initiating the backup process.
 	// +optional
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
+
+	// K8SPG-873
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-873
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // PGBackRestRepoHost represents a pgBackRest dedicated repository host

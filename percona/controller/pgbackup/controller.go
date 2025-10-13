@@ -640,6 +640,9 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 		pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
 		pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options
 
+		pg.Spec.Backups.PGBackRest.Manual.Env = pb.Spec.ContainerOptions.Env
+		pg.Spec.Backups.PGBackRest.Manual.EnvFrom = pb.Spec.ContainerOptions.EnvFrom
+
 		return c.Update(ctx, pg)
 	}); err != nil {
 		return errors.Wrap(err, "update PostgresCluster")

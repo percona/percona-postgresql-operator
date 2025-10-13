@@ -5,6 +5,13 @@ metadata:
 spec:
   pgCluster: cluster1
   repoName: repo1
+#  containerOptions:
+#    env:
+#    - name: MY_ENV
+#      value: "1000"
+#    envFrom:
+#    - secretRef:
+#        name: restore-env-secret
 #  options:
 #  - --type=time
 #  - --target="2022-11-30 15:12:11+03"
