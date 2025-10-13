@@ -10,9 +10,9 @@ commands:
         
       kubectl -n "${NAMESPACE}" patch pg custom-envs \
         --type merge \
-        -p '{"spec":{"backups":{"pgbackrest":{"env":[{"name":"MY_ENV","value":"1000"}]}}}}'
+        -p '{"spec":{"backups":{"pgbackrest":{"env":[{"name": "FIRST_ENV", "value": "1000"}, {"name": "SECOND_ENV", "value": "2000"}]}}}}'
     
       sleep 20  
       wait_cluster_consistency custom-envs 
-      check_env_in_pod add repohost MY_ENV 1000
+      check_envs_for_component add repohost FIRST_ENV=1000 SECOND_ENV=2000
 

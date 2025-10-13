@@ -1085,11 +1085,55 @@ wait_for_generation() {
 	done
 }
 
+# Reads all environment variables from a pod (single kubectl exec call)
+get_envs_from_pod() {
+  local namespace=$1
+  local pod=$2
+  local container=$3
+
+  if [ -n "$container" ]; then
+    kubectl exec -n "$namespace" "$pod" -c "$container" -- printenv 2>/dev/null || true
+  else
+    kubectl exec -n "$namespace" "$pod" -- printenv 2>/dev/null || true
+  fi
+}
+
+# Verifies a single variable in given env content
 check_env_in_pod() {
+  local check_type=$1
+  local pod=$2
+  local var_name=$3
+  local expected_value=$4
+  local env_content=$5
+
+  local actual_value
+  actual_value=$(echo "$env_content" | grep -E "^${var_name}=" | cut -d'=' -f2- || true)
+
+  if [[ "$check_type" == "add" ]]; then
+    if [ "$actual_value" != "$expected_value" ]; then
+      echo "ERROR: $var_name in $pod — expected '$expected_value', got '${actual_value:-<missing>}'"
+      return 1
+    else
+      echo "OK: $var_name=$actual_value in $pod"
+    fi
+  elif [[ "$check_type" == "delete" ]]; then
+    if [ -n "$actual_value" ]; then
+      echo "ERROR: $var_name exists in $pod (should not exist)"
+      return 1
+    else
+      echo "OK: $var_name deleted in $pod"
+    fi
+  else
+    echo "ERROR: unknown check type '$check_type'"
+    return 1
+  fi
+}
+
+# Checks multiple env vars in one or more components
+check_envs_for_component() {
   local check_type=$1      # add | delete
   local component=$2       # instance | pgbouncer | repohost
-  local var_name=$3        # e.g. MY_ENV
-  local expected_value=$4  # used only for 'add'
+  local vars=("${@:3}")    # everything after the 2nd argument
 
   case "$component" in
     instance)
@@ -1098,37 +1142,37 @@ check_env_in_pod() {
       ;;
     pgbouncer)
       POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER="-c pgbouncer"
+      CONTAINER="pgbouncer"
       ;;
     repohost)
       POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER="-c pgbackrest"
+      CONTAINER="pgbackrest"
       ;;
     *)
       echo "ERROR: unknown component '$component'"
-      exit 1
+      return 1
       ;;
   esac
 
-  VALUE=$(kubectl exec -n "${NAMESPACE}" $POD $CONTAINER -- printenv "$var_name" || true)
+  echo "Fetching environment variables for $component pod $POD..."
+  local env_content
+  env_content=$(get_envs_from_pod "${NAMESPACE}" "$POD" "$CONTAINER")
 
-  if [[ "$check_type" == "add" ]]; then
-    if [ "$VALUE" != "$expected_value" ]; then
-      echo "ERROR: $var_name is missing or incorrect in pod $POD (expected '$expected_value', got '$VALUE')"
-      exit 1
+  local errors=0
+  for var_entry in "${vars[@]}"; do
+    if [[ "$check_type" == "add" ]]; then
+      local var_name="${var_entry%%=*}"
+      local var_expected="${var_entry#*=}"
+      check_env_in_pod add "$POD" "$var_name" "$var_expected" "$env_content" || errors=$((errors+1))
     else
-      echo "$var_name exists and is set to: $VALUE in pod $POD"
+      check_env_in_pod delete "$POD" "$var_entry" "" "$env_content" || errors=$((errors+1))
     fi
-  elif [[ "$check_type" == "delete" ]]; then
-    if [ -n "$VALUE" ]; then
-      echo "ERROR: $var_name exists in pod $POD (should not exist)"
-      exit 1
-    else
-      echo "$var_name is missing as expected in pod $POD"
-    fi
+  done
+
+  if (( errors > 0 )); then
+    echo "$errors environment check(s) failed for component '$component'"
+    return 1
   else
-    echo "ERROR: unknown check type '$check_type'"
-    exit 1
+    echo "All environment checks passed for component '$component'"
   fi
 }
-

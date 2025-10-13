@@ -7,14 +7,16 @@ commands:
       set -o xtrace
       
       source ../../functions
-      
-      kubectl get pg custom-envs -n "${NAMESPACE}" -o yaml | \
+       
+      kubectl -n "${NAMESPACE}" get pg custom-envs -o yaml | \
         yq eval '
-        .spec.proxy.pgBouncer.env |= map(select(.name != "MY_ENV"))
+        .spec.proxy.pgBouncer.env |= map(select(.name != "FIRST_ENV" and .name != "SECOND_ENV"))
         ' - | kubectl apply -f -
-      
-      sleep 10 
+          
+          
+          
+      sleep 30 
       wait_cluster_consistency custom-envs
         
-      check_env_in_pod delete pgbouncer MY_ENV
+      check_envs_for_component delete pgbouncer FIRST_ENV SECOND_ENV
 

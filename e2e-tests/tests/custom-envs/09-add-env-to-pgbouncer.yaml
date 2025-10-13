@@ -9,9 +9,9 @@ commands:
       source ../../functions
       kubectl -n "${NAMESPACE}" patch pg custom-envs \
         --type merge \
-        -p '{"spec":{"proxy":{"pgBouncer":{"replicas":1,"env":[{"name":"MY_ENV","value":"1000"}]}}}}'
+        -p '{"spec":{"proxy":{"pgBouncer":{"replicas":1,"env":[{"name": "FIRST_ENV", "value": "1000"}, {"name": "SECOND_ENV", "value": "2000"}]}}}}'
           
       sleep 10  
       wait_cluster_consistency custom-envs
-      
-      check_env_in_pod add pgbouncer MY_ENV 1000
+        
+      check_envs_for_component add pgbouncer FIRST_ENV=1000 SECOND_ENV=2000

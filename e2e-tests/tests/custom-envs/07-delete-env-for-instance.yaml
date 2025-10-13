@@ -10,13 +10,12 @@ commands:
             
           kubectl get pg custom-envs -n ${NAMESPACE} -o yaml | \
             yq eval '
-            .spec.instances[].env |= map(select(.name != "MY_ENV"))
+            .spec.instances[].env |= map(select(.name != "FIRST_ENV" and .name != "SECOND_ENV"))
             ' - | kubectl apply -f -
-            
-            
-          sleep 10 
+              
+          sleep 20 
           wait_cluster_consistency custom-envs
-          check_env_in_pod delete instance MY_ENV
+          check_envs_for_component delete instance FIRST_ENV SECOND_ENV
 
 
           

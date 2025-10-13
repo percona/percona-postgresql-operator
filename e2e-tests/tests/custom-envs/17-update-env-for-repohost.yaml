@@ -10,11 +10,11 @@ commands:
       kubectl -n ${NAMESPACE} get pg custom-envs -o yaml | \
         yq eval '
         .spec.backups.pgbackrest.env[] |=
-        (select(.name == "MY_ENV").value = "2000")' - | \
+        (select(.name == "FIRST_ENV").value = "2000")' - | \
         kubectl apply -f -
         
       sleep 30  
       wait_cluster_consistency custom-envs
         
-      check_env_in_pod add repohost MY_ENV 2000
+      check_envs_for_component add repohost FIRST_ENV=2000 SECOND_ENV=2000
 
