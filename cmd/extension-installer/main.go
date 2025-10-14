@@ -7,7 +7,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/percona/percona-postgresql-operator/percona/extensions"
+	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 )
 
 func main() {

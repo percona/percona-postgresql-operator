@@ -7344,6 +7344,9 @@ spec:
                     required:
                     - volumeSnapshotClassName
                     type: object
+                  trackLatestRestorableTime:
+                    description: Enable tracking latest restorable time
+                    type: boolean
                 type: object
               config:
                 properties:
