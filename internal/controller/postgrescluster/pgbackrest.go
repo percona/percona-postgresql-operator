@@ -943,23 +943,23 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		if postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit != nil {
 			jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
 		}
+	}
 
-		// K8SPG-833
-		if postgresCluster.CompareVersion("2.8.0") >= 0 {
-			for i := range jobSpec.Template.Spec.Containers {
-				pgbackrest := postgresCluster.Spec.Backups.PGBackRest
+	// K8SPG-833
+	if postgresCluster.CompareVersion("2.8.0") >= 0 {
+		for i := range jobSpec.Template.Spec.Containers {
+			pgbackrest := postgresCluster.Spec.Backups.PGBackRest
 
-				if len(pgbackrest.Manual.Env) != 0 {
-					jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, pgbackrest.Manual.Env...)
-				} else if len(pgbackrest.Env) != 0 {
-					jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, pgbackrest.Env...)
-				}
+			if pgbackrest.Manual != nil && len(pgbackrest.Manual.Env) != 0 {
+				jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, pgbackrest.Manual.Env...)
+			} else if len(pgbackrest.Env) != 0 {
+				jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, pgbackrest.Env...)
+			}
 
-				if len(pgbackrest.Manual.EnvFrom) != 0 {
-					jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, pgbackrest.Manual.EnvFrom...)
-				} else if len(pgbackrest.EnvFrom) != 0 {
-					jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, pgbackrest.EnvFrom...)
-				}
+			if pgbackrest.Manual != nil && len(pgbackrest.Manual.EnvFrom) != 0 {
+				jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, pgbackrest.Manual.EnvFrom...)
+			} else if len(pgbackrest.EnvFrom) != 0 {
+				jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, pgbackrest.EnvFrom...)
 			}
 		}
 	}
@@ -1475,13 +1475,13 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 		for i := range job.Spec.Template.Spec.Containers {
 			pgbackrest := cluster.Spec.Backups.PGBackRest
 
-			if len(pgbackrest.Manual.Env) != 0 {
+			if pgbackrest.Restore != nil && len(pgbackrest.Restore.Env) != 0 {
 				job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, pgbackrest.Restore.Env...)
 			} else if len(pgbackrest.Env) != 0 {
 				job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, pgbackrest.Env...)
 			}
 
-			if len(pgbackrest.Manual.EnvFrom) != 0 {
+			if pgbackrest.Restore != nil && len(pgbackrest.Restore.EnvFrom) != 0 {
 				job.Spec.Template.Spec.Containers[i].EnvFrom = append(job.Spec.Template.Spec.Containers[i].EnvFrom, pgbackrest.Restore.EnvFrom...)
 			} else if len(pgbackrest.EnvFrom) != 0 {
 				job.Spec.Template.Spec.Containers[i].EnvFrom = append(job.Spec.Template.Spec.Containers[i].EnvFrom, pgbackrest.EnvFrom...)

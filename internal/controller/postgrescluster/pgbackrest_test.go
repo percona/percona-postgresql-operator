@@ -2857,6 +2857,190 @@ volumes:
 			assert.Check(t, envVarFound == false)
 		})
 	})
+
+	t.Run("Env/EnvFrom", func(t *testing.T) {
+		t.Run(">= 2.8.0", func(t *testing.T) {
+			t.Run("Manual", func(t *testing.T) {
+				cluster := &v1beta1.PostgresCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							naming.LabelVersion: "2.8.0",
+						},
+					},
+					Spec: v1beta1.PostgresClusterSpec{
+						Backups: v1beta1.Backups{
+							PGBackRest: v1beta1.PGBackRestArchive{
+								Manual: &v1beta1.PGBackRestManualBackup{
+									Env: []corev1.EnvVar{
+										{
+											Name:  "TEST_ENV",
+											Value: "VALUE2",
+										},
+									},
+									EnvFrom: []corev1.EnvFromSource{
+										{
+											SecretRef: &corev1.SecretEnvSource{
+												Optional: ptr.To(true),
+											},
+										},
+									},
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "TEST_ENV",
+										Value: "VALUE",
+									},
+								},
+								EnvFrom: []corev1.EnvFromSource{
+									{
+										SecretRef: &corev1.SecretEnvSource{
+											Optional: ptr.To(false),
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				job := generateBackupJobSpecIntent(ctx,
+					cluster, v1beta1.PGBackRestRepo{},
+					"", "",
+					nil, nil,
+				)
+
+				container := job.Template.Spec.Containers[0]
+
+				var envVar corev1.EnvVar
+				for _, env := range container.Env {
+					if env.Name == "TEST_ENV" {
+						envVar = env
+					}
+				}
+
+				assert.Equal(t, envVar.Name, "TEST_ENV")
+				assert.Equal(t, envVar.Value, "VALUE2")
+				assert.DeepEqual(t, container.EnvFrom, []corev1.EnvFromSource{
+					{
+						SecretRef: &corev1.SecretEnvSource{
+							Optional: ptr.To(true),
+						},
+					},
+				})
+			})
+			t.Run("Without manual", func(t *testing.T) {
+				cluster := &v1beta1.PostgresCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							naming.LabelVersion: "2.8.0",
+						},
+					},
+					Spec: v1beta1.PostgresClusterSpec{
+						Backups: v1beta1.Backups{
+							PGBackRest: v1beta1.PGBackRestArchive{
+								Env: []corev1.EnvVar{
+									{
+										Name:  "TEST_ENV",
+										Value: "VALUE",
+									},
+								},
+								EnvFrom: []corev1.EnvFromSource{
+									{
+										SecretRef: &corev1.SecretEnvSource{
+											Optional: ptr.To(false),
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				job := generateBackupJobSpecIntent(ctx,
+					cluster, v1beta1.PGBackRestRepo{},
+					"", "",
+					nil, nil,
+				)
+
+				container := job.Template.Spec.Containers[0]
+
+				var envVar corev1.EnvVar
+				for _, env := range container.Env {
+					if env.Name == "TEST_ENV" {
+						envVar = env
+					}
+				}
+
+				assert.Equal(t, envVar.Name, "TEST_ENV")
+				assert.Equal(t, envVar.Value, "VALUE")
+				assert.DeepEqual(t, container.EnvFrom, []corev1.EnvFromSource{
+					{
+						SecretRef: &corev1.SecretEnvSource{
+							Optional: ptr.To(false),
+						},
+					},
+				})
+			})
+		})
+		t.Run("< 2.8.0", func(t *testing.T) {
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						naming.LabelVersion: "2.7.0",
+					},
+				},
+				Spec: v1beta1.PostgresClusterSpec{
+					Backups: v1beta1.Backups{
+						PGBackRest: v1beta1.PGBackRestArchive{
+							Env: []corev1.EnvVar{
+								{
+									Name:  "TEST_ENV",
+									Value: "VALUE",
+								},
+							},
+							EnvFrom: []corev1.EnvFromSource{
+								{
+									SecretRef: &corev1.SecretEnvSource{
+										Optional: ptr.To(false),
+									},
+								},
+							},
+							Manual: &v1beta1.PGBackRestManualBackup{
+								Env: []corev1.EnvVar{
+									{
+										Name:  "TEST_ENV",
+										Value: "VALUE",
+									},
+								},
+								EnvFrom: []corev1.EnvFromSource{
+									{
+										SecretRef: &corev1.SecretEnvSource{
+											Optional: ptr.To(false),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			job := generateBackupJobSpecIntent(ctx,
+				cluster, v1beta1.PGBackRestRepo{},
+				"", "",
+				nil, nil,
+			)
+
+			container := job.Template.Spec.Containers[0]
+
+			var envVar *corev1.EnvVar
+			for _, env := range container.Env {
+				if env.Name == "TEST_ENV" {
+					envVar = &env
+				}
+			}
+
+			assert.Assert(t, envVar == nil)
+			assert.Assert(t, container.EnvFrom == nil)
+		})
+	})
 }
 
 func TestGenerateRepoHostIntent(t *testing.T) {
@@ -3124,6 +3308,240 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 			})
 		})
 	}
+	t.Run("Env/EnvFrom", func(t *testing.T) {
+		t.Run(">= 2.8.0", func(t *testing.T) {
+			t.Run("Manual", func(t *testing.T) {
+				cluster := &v1beta1.PostgresCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							naming.LabelVersion: "2.8.0",
+						},
+					},
+					Spec: v1beta1.PostgresClusterSpec{
+						Backups: v1beta1.Backups{
+							PGBackRest: v1beta1.PGBackRestArchive{
+								Restore: &v1beta1.PGBackRestRestore{
+									PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{
+										Env: []corev1.EnvVar{
+											{
+												Name:  "TEST_ENV",
+												Value: "VALUE3",
+											},
+										},
+										EnvFrom: []corev1.EnvFromSource{
+											{
+												Prefix: "restore",
+												SecretRef: &corev1.SecretEnvSource{
+													Optional: ptr.To(true),
+												},
+											},
+										},
+									},
+								},
+								Manual: &v1beta1.PGBackRestManualBackup{
+									Env: []corev1.EnvVar{
+										{
+											Name:  "TEST_ENV",
+											Value: "VALUE2",
+										},
+									},
+									EnvFrom: []corev1.EnvFromSource{
+										{
+											SecretRef: &corev1.SecretEnvSource{
+												Optional: ptr.To(true),
+											},
+										},
+									},
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "TEST_ENV",
+										Value: "VALUE",
+									},
+								},
+								EnvFrom: []corev1.EnvFromSource{
+									{
+										SecretRef: &corev1.SecretEnvSource{
+											Optional: ptr.To(false),
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				job := &batchv1.Job{}
+				err := r.generateRestoreJobIntent(cluster, configHash, instanceName,
+					cmd, volumeMounts, volumes, dataSource, job)
+				assert.NilError(t, err, job)
+
+				container := job.Spec.Template.Spec.Containers[0]
+
+				var envVar corev1.EnvVar
+				for _, env := range container.Env {
+					if env.Name == "TEST_ENV" {
+						envVar = env
+					}
+				}
+
+				assert.Equal(t, envVar.Name, "TEST_ENV")
+				assert.Equal(t, envVar.Value, "VALUE3")
+				assert.DeepEqual(t, container.EnvFrom,
+					[]corev1.EnvFromSource{
+						{
+							Prefix: "restore",
+							SecretRef: &corev1.SecretEnvSource{
+								Optional: ptr.To(true),
+							},
+						},
+					},
+				)
+			})
+			t.Run("Without manual", func(t *testing.T) {
+				cluster := &v1beta1.PostgresCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							naming.LabelVersion: "2.8.0",
+						},
+					},
+					Spec: v1beta1.PostgresClusterSpec{
+						Backups: v1beta1.Backups{
+							PGBackRest: v1beta1.PGBackRestArchive{
+								Manual: &v1beta1.PGBackRestManualBackup{
+									Env: []corev1.EnvVar{
+										{
+											Name:  "TEST_ENV",
+											Value: "VALUE2",
+										},
+									},
+									EnvFrom: []corev1.EnvFromSource{
+										{
+											SecretRef: &corev1.SecretEnvSource{
+												Optional: ptr.To(true),
+											},
+										},
+									},
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "TEST_ENV",
+										Value: "VALUE",
+									},
+								},
+								EnvFrom: []corev1.EnvFromSource{
+									{
+										SecretRef: &corev1.SecretEnvSource{
+											Optional: ptr.To(false),
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				job := &batchv1.Job{}
+				err := r.generateRestoreJobIntent(cluster, configHash, instanceName,
+					cmd, volumeMounts, volumes, dataSource, job)
+				assert.NilError(t, err, job)
+
+				container := job.Spec.Template.Spec.Containers[0]
+
+				var envVar corev1.EnvVar
+				for _, env := range container.Env {
+					if env.Name == "TEST_ENV" {
+						envVar = env
+					}
+				}
+
+				assert.Equal(t, envVar.Name, "TEST_ENV")
+				assert.Equal(t, envVar.Value, "VALUE")
+				assert.DeepEqual(t, container.EnvFrom, []corev1.EnvFromSource{
+					{
+						SecretRef: &corev1.SecretEnvSource{
+							Optional: ptr.To(false),
+						},
+					},
+				})
+			})
+		})
+		t.Run("< 2.8.0", func(t *testing.T) {
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						naming.LabelVersion: "2.7.0",
+					},
+				},
+				Spec: v1beta1.PostgresClusterSpec{
+					Backups: v1beta1.Backups{
+						PGBackRest: v1beta1.PGBackRestArchive{
+							Restore: &v1beta1.PGBackRestRestore{
+								PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{
+									Env: []corev1.EnvVar{
+										{
+											Name:  "TEST_ENV",
+											Value: "VALUE3",
+										},
+									},
+									EnvFrom: []corev1.EnvFromSource{
+										{
+											Prefix: "restore",
+											SecretRef: &corev1.SecretEnvSource{
+												Optional: ptr.To(true),
+											},
+										},
+									},
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "TEST_ENV",
+									Value: "VALUE",
+								},
+							},
+							EnvFrom: []corev1.EnvFromSource{
+								{
+									SecretRef: &corev1.SecretEnvSource{
+										Optional: ptr.To(false),
+									},
+								},
+							},
+							Manual: &v1beta1.PGBackRestManualBackup{
+								Env: []corev1.EnvVar{
+									{
+										Name:  "TEST_ENV",
+										Value: "VALUE",
+									},
+								},
+								EnvFrom: []corev1.EnvFromSource{
+									{
+										SecretRef: &corev1.SecretEnvSource{
+											Optional: ptr.To(false),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			job := &batchv1.Job{}
+			err := r.generateRestoreJobIntent(cluster, configHash, instanceName,
+				cmd, volumeMounts, volumes, dataSource, job)
+			assert.NilError(t, err, job)
+
+			container := job.Spec.Template.Spec.Containers[0]
+
+			var envVar *corev1.EnvVar
+			for _, env := range container.Env {
+				if env.Name == "TEST_ENV" {
+					envVar = &env
+				}
+			}
+
+			assert.Assert(t, envVar == nil)
+			assert.Assert(t, container.EnvFrom == nil)
+		})
+	})
 }
 
 func TestObserveRestoreEnv(t *testing.T) {
