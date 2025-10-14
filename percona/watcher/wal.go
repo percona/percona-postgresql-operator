@@ -38,6 +38,10 @@ func GetWALWatcher(cr *pgv2.PerconaPGCluster) (string, WALWatcher) {
 func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan chan event.GenericEvent, stopChan chan event.DeleteEvent, cr *pgv2.PerconaPGCluster) {
 	log := logging.FromContext(ctx).WithName("WALWatcher")
 
+	if !cr.Spec.Backups.IsEnabled() {
+		return
+	}
+
 	log.Info("Watching commit timestamps")
 
 	execCli, err := clientcmd.NewClient()
@@ -69,7 +73,6 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 
 				continue
 			}
-
 			ts, err := GetLatestCommitTimestamp(ctx, cli, execCli, localCr, latestBackup)
 			if err != nil {
 				switch {
