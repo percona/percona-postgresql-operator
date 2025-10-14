@@ -16,7 +16,7 @@ void createCluster(String CLUSTER_SUFFIX) {
                     --preemptible \
                     --zone=${region} \
                     --machine-type='n1-standard-4' \
-                    --cluster-version='1.30' \
+                    --cluster-version='1.31' \
                     --num-nodes=3 \
                     --labels='delete-cluster-after-hours=6' \
                     --disk-size=30 \

@@ -11,3 +11,5 @@ commands:
         | yq '.metadata.annotations."pgv2.percona.com/authorizeBackupRemoval"="true"' \
         | yq '.spec.backups.enabled=false' \
         | kubectl -n "${NAMESPACE}" apply -f -
+
+      wait_for_ready_containers "some-name-instance1" 2
