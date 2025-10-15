@@ -65,6 +65,11 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 				return
 			}
 
+			if !localCr.Spec.Backups.IsEnabled() {
+				log.Info("Backups are disabled, stopping WAL watcher")
+				return
+			}
+
 			latestBackup, err := getLatestBackup(ctx, cli, localCr)
 			if err != nil {
 				if !errors.Is(err, errRunningBackup) && !errors.Is(err, errNoBackups) {
