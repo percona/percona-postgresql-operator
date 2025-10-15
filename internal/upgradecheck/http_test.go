@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -163,18 +165,46 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 	cfg := &rest.Config{Host: server.URL}
 
 	t.Run("panic from checkForUpgrades doesn't bubble up", func(t *testing.T) {
+		// Debug: Print comprehensive environment information
+		t.Logf("=== ENVIRONMENT DEBUG INFO ===")
+		t.Logf("Go Version: %s", runtime.Version())
+		t.Logf("GOOS: %s", runtime.GOOS)
+		t.Logf("GOARCH: %s", runtime.GOARCH)
+		t.Logf("NumCPU: %d", runtime.NumCPU())
+		t.Logf("Compiler: %s", runtime.Compiler)
+
+		// Log relevant environment variables
+		envVars := []string{
+			"CI", "GITHUB_ACTIONS", "GITHUB_WORKFLOW", "GITHUB_RUN_ID",
+			"RUNNER_OS", "RUNNER_ARCH", "RUNNER_TEMP",
+			"GOMAXPROCS", "GODEBUG", "GOTRACEBACK",
+			"TEST_TMPDIR", "TMPDIR", "TMP", "TEMP",
+		}
+		for _, envVar := range envVars {
+			if val := os.Getenv(envVar); val != "" {
+				t.Logf("ENV %s=%s", envVar, val)
+			}
+		}
+
 		ctx := context.Background()
 
 		// capture logs
 		var calls []string
+		var loggerCallCount int
 		ctx = logging.NewContext(ctx, funcr.NewJSON(func(object string) {
+			loggerCallCount++
+			t.Logf("Logger callback invoked #%d: %s", loggerCallCount, object)
 			calls = append(calls, object)
 		}, funcr.Options{
 			Verbosity: 1,
 		}))
 
+		// Track if panic was actually triggered
+		var panicTriggered bool
 		// A panicking call
 		funcFoo = func() (*http.Response, error) {
+			panicTriggered = true
+			t.Logf("funcFoo called - about to panic")
 			panic(fmt.Errorf("oh no!"))
 		}
 
@@ -182,10 +212,35 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 			Client: fakeClient,
 			Config: cfg,
 		}
-		s.check(ctx)
 
-		assert.Equal(t, len(calls), 2)
-		assert.Assert(t, cmp.Contains(calls[1], `encountered panic in upgrade check`))
+		t.Logf("About to call s.check(ctx)")
+		s.check(ctx)
+		t.Logf("s.check(ctx) returned normally")
+
+		// Debug: Print all captured log calls
+		t.Logf("=== TEST RESULTS ===")
+		t.Logf("Panic was triggered: %v", panicTriggered)
+		t.Logf("Total logger callbacks: %d", loggerCallCount)
+		t.Logf("Total calls captured in slice: %d", len(calls))
+		for i, call := range calls {
+			t.Logf("Call[%d]: %s", i, call)
+		}
+
+		// Debug: Check environment differences
+		t.Logf("Server URL: %s", server.URL)
+		t.Logf("Config Host: %s", cfg.Host)
+
+		// Debug: Check scheduler state
+		t.Logf("Scheduler Client: %v", s.Client != nil)
+		t.Logf("Scheduler Config: %v", s.Config != nil)
+
+		assert.Equal(t, len(calls), 2, "expected exactly 2 log calls")
+		if len(calls) > 1 {
+			assert.Assert(t, cmp.Contains(calls[1], `encountered panic in upgrade check`),
+				"expected second log to contain panic message, got: %s", calls[1])
+		} else {
+			t.Fatalf("expected at least 2 calls but got %d", len(calls))
+		}
 	})
 
 	t.Run("successful log each loop, ticker works", func(t *testing.T) {
