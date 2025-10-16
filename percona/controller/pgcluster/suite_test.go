@@ -49,6 +49,7 @@ var _ = BeforeSuite(func() {
 		},
 	}
 
+	// PodLevelResources feature gate is enabled by default on k8s 1.34.
 	testEnv.ControlPlane.APIServer.Configure().Set("feature-gates", "PodLevelResources=true")
 
 	var err error
