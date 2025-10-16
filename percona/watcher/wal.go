@@ -56,8 +56,6 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 	for {
 		select {
 		case <-ticker.C:
-			log.V(1).Info("Running WAL watcher")
-
 			localCr := cr.DeepCopy()
 			err := cli.Get(ctx, client.ObjectKeyFromObject(cr), localCr)
 			if err != nil {
@@ -66,9 +64,9 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 			}
 
 			if !localCr.Spec.Backups.IsEnabled() {
-				log.Info("Backups are disabled, stopping WAL watcher")
-				return
+				continue
 			}
+			log.V(1).Info("Running WAL watcher")
 
 			latestBackup, err := getLatestBackup(ctx, cli, localCr)
 			if err != nil {
