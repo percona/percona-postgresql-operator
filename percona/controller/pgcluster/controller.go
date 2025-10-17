@@ -983,6 +983,8 @@ func (r *PGClusterReconciler) reconcileExternalWatchers(ctx context.Context, cr 
 }
 
 func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+
 	if !cr.Spec.Backups.IsEnabled() {
 		return nil
 	}
@@ -990,8 +992,6 @@ func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.
 	if !*cr.Spec.Backups.TrackLatestRestorableTime {
 		return nil
 	}
-
-	log := logging.FromContext(ctx)
 
 	watcherName, watcherFunc := watcher.GetWALWatcher(cr)
 	if r.Watchers.IsExist(watcherName) {

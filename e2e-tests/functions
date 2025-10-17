@@ -55,6 +55,7 @@ deploy_operator() {
 	fi
 	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' "${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "'${disable_telemetry}'"' - \
+		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="LOG_LEVEL") | .value) = "DEBUG"' - \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
