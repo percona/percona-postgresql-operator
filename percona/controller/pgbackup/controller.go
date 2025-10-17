@@ -297,7 +297,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to create exec client")
 		}
-
 		latestRestorableTime, err := watcher.GetLatestCommitTimestamp(ctx, r.Client, execCli, pgCluster, pgBackup)
 		if err == nil {
 			log.Info("Got latest restorable timestamp", "timestamp", latestRestorableTime)

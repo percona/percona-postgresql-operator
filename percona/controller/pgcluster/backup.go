@@ -39,6 +39,10 @@ func (r *PGClusterReconciler) reconcileBackups(ctx context.Context, cr *v2.Perco
 func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
+	if !cr.Spec.Backups.IsEnabled() {
+		return nil
+	}
+
 	if cr.Status.State != v2.AppStateReady {
 		return nil
 	}

@@ -2191,6 +2191,26 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(pod.Spec.Containers[0].Image).To(Equal(cr2.Spec.Image))
 			Expect(pod.Spec.Containers[0].Command).To(Equal([]string{"bash"}))
 			Expect(pod.Spec.Containers[0].Args).To(Equal([]string{"-c", "sleep 60"}))
+			Expect(pod.Spec.Containers[0].Resources).To(Equal(corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("32Mi"),
+				},
+			}))
+			Expect(pod.Spec.Resources).To(Equal(&corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("32Mi"),
+				},
+			}))
 
 			uid := int64(1001)
 			expectedSecurityContext := &corev1.PodSecurityContext{
