@@ -7,6 +7,7 @@ package runtime
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -26,6 +27,7 @@ var _ client.Reader = ClientReader{}
 
 // Types that implement single methods of the [client.Writer] interface.
 type (
+	ClientApply     func(context.Context, runtime.ApplyConfiguration, ...client.ApplyOption) error
 	ClientCreate    func(context.Context, client.Object, ...client.CreateOption) error
 	ClientDelete    func(context.Context, client.Object, ...client.DeleteOption) error
 	ClientPatch     func(context.Context, client.Object, client.Patch, ...client.PatchOption) error
@@ -33,13 +35,17 @@ type (
 	ClientUpdate    func(context.Context, client.Object, ...client.UpdateOption) error
 )
 
-// ClientWriter implements [client.Writer] by composing assignable functions.
 type ClientWriter struct {
 	ClientCreate
 	ClientDelete
 	ClientDeleteAll
 	ClientPatch
 	ClientUpdate
+	ClientApply
+}
+
+func (fn ClientApply) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
+	return fn(ctx, obj, opts...)
 }
 
 var _ client.Writer = ClientWriter{}
