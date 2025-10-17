@@ -52,6 +52,8 @@ type PerconaPGRestoreSpec struct {
 	// https://pgbackrest.org/command.html#command-restore
 	// +optional
 	Options []string `json:"options,omitempty"`
+
+	ContainerOptions ContainerOptions `json:"containerOptions"`
 }
 
 type PGRestoreState string
