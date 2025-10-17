@@ -44,7 +44,13 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
+		ControlPlane: envtest.ControlPlane{
+			APIServer: &envtest.APIServer{},
+		},
 	}
+
+	// PodLevelResources feature gate is enabled by default on k8s 1.34.
+	testEnv.ControlPlane.APIServer.Configure().Set("feature-gates", "PodLevelResources=true")
 
 	var err error
 	cfg, err = testEnv.Start()

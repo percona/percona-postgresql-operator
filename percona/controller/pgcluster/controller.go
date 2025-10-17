@@ -456,6 +456,20 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		if len(cr.Spec.InstanceSets) == 0 {
 			return errors.New(".spec.instances is a required value") // shouldn't happen as the value is required in the crd.yaml
 		}
+
+		// Using minimal resources since the patroni version check pod is performing a very simple
+		// operation i.e. "patronictl version"
+		resources := corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("32Mi"),
+			},
+		}
+
 		p = &corev1.Pod{
 			ObjectMeta: meta,
 			Spec: corev1.PodSpec{
@@ -469,7 +483,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 						Args: []string{
 							"-c", "sleep 60",
 						},
-						Resources:       cr.Spec.InstanceSets[0].Resources,
+						Resources:       resources,
 						SecurityContext: initialize.RestrictedSecurityContext(cr.CompareVersion("2.8.0") >= 0),
 					},
 				},
@@ -477,16 +491,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 				Affinity:                      cr.Spec.InstanceSets[0].Affinity,
 				TerminationGracePeriodSeconds: ptr.To(int64(5)),
 				ImagePullSecrets:              cr.Spec.ImagePullSecrets,
-				Resources: &corev1.ResourceRequirements{
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("64Mi"),
-					},
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("50m"),
-						corev1.ResourceMemory: resource.MustParse("32Mi"),
-					},
-				},
+				Resources:                     &resources,
 			},
 		}
 
