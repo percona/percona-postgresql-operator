@@ -2333,6 +2333,74 @@ var _ = Describe("CR Validations", Ordered, func() {
 			})
 		})
 	})
+
+	Context("Backup repository validations", Ordered, func() {
+		When("creating a CR with valid backup configurations", func() {
+			It("should accept backups disabled with no repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-1", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &f
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept backups enabled with at least one repository", func() {
+				cr, err := readDefaultCR("cr-validation-backup-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &t
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
+					{Name: "repo1"},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept backups enabled (nil - default true) with repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-3", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = nil // defaults to enabled
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
+					{Name: "repo1"},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+		})
+
+		When("creating a CR with invalid backup configurations", func() {
+			It("should reject backups enabled with no repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-4", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &t
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"At least one repository must be configured when backups are enabled",
+				))
+			})
+
+			It("should reject backups enabled (nil - default true) with no repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-5", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = nil // defaults to enabled
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"At least one repository must be configured when backups are enabled",
+				))
+			})
+		})
+	})
 })
 
 var _ = Describe("Init Container", Ordered, func() {

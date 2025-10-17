@@ -477,7 +477,7 @@ type Patroni struct {
 }
 
 // Backups struct.
-// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || self.enabled == false || size(self.pgbackrest.repos) > 0",message="At least one repository must be configured when backups are enabled"
+// +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || size(self.pgbackrest.repos) > 0",message="At least one repository must be configured when backups are enabled"
 type Backups struct {
 	Enabled *bool `json:"enabled,omitempty"`
 

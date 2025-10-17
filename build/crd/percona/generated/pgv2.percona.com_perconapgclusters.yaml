@@ -7093,8 +7093,8 @@ spec:
                 x-kubernetes-validations:
                 - message: At least one repository must be configured when backups
                     are enabled
-                  rule: '!has(self.enabled) || self.enabled == false || size(self.pgbackrest.repos)
-                    > 0'
+                  rule: (has(self.enabled) && self.enabled == false) || size(self.pgbackrest.repos)
+                    > 0
               crVersion:
                 description: |-
                   Version of the operator. Update this to new version after operator
