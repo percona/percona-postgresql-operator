@@ -477,7 +477,7 @@ type Patroni struct {
 }
 
 // Backups struct.
-// +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || size(self.pgbackrest.repos) > 0",message="At least one repository must be configured when backups are enabled"
+// +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
 type Backups struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
@@ -566,6 +566,7 @@ type PGBackRestArchive struct {
 	// Defines a pgBackRest repository
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	Repos []crunchyv1beta1.PGBackRestRepo `json:"repos"`
 
 	// Defines configuration for a pgBackRest dedicated repository host.  This section is only

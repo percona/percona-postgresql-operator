@@ -2401,11 +2401,21 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 			})
+
+			It("should accept backups disabled with repositories not existing (nil)", func() {
+				cr, err := readDefaultCR("cr-validation-backup-5", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &f
+				cr.Spec.Backups.PGBackRest.Repos = nil
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
 		})
 
 		When("creating a CR with invalid backup configurations", func() {
 			It("should reject backups enabled with no repositories", func() {
-				cr, err := readDefaultCR("cr-validation-backup-5", ns)
+				cr, err := readDefaultCR("cr-validation-backup-1", ns)
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.Backups.Enabled = &t
@@ -2419,7 +2429,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 			})
 
 			It("should reject backups enabled (nil - default true) with no repositories", func() {
-				cr, err := readDefaultCR("cr-validation-backup-6", ns)
+				cr, err := readDefaultCR("cr-validation-backup-2", ns)
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.Backups.Enabled = nil // defaults to enabled
