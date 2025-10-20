@@ -2428,8 +2428,22 @@ var _ = Describe("CR Validations", Ordered, func() {
 				))
 			})
 
-			It("should reject backups enabled (nil - default true) with no repositories", func() {
+			It("should reject backups enabled with no repositories (nil)", func() {
 				cr, err := readDefaultCR("cr-validation-backup-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &t
+				cr.Spec.Backups.PGBackRest.Repos = nil
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"At least one repository must be configured when backups are enabled",
+				))
+			})
+
+			It("should reject backups enabled (nil - default true) with no repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-3", ns)
 				Expect(err).NotTo(HaveOccurred())
 
 				cr.Spec.Backups.Enabled = nil // defaults to enabled
