@@ -8,5 +8,9 @@ commands:
 
       source ../../functions
 
-      kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=json -p '[{"op":"add", "path":"/spec/autoCreateUserSchema","value":true},{"op":"add", "path":"/spec/users","value":[{"name":"chico","databases":["spain"],"password":{"type":"ASCII"},"secretName":"chico-credentials", "grantPublicSchemaAccess": true}]}]'
-      sleep 10
+      if [[ $PG_VER < 15 ]]; then
+        echo "grantPublicSchemaAccess is not supported before PPG15. Skipping check"
+      else
+        kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=json -p '[{"op":"add", "path":"/spec/autoCreateUserSchema","value":true},{"op":"add", "path":"/spec/users","value":[{"name":"chico","databases":["spain"],"password":{"type":"ASCII"},"secretName":"chico-credentials", "grantPublicSchemaAccess": true}]}]'
+        sleep 10
+      fi
