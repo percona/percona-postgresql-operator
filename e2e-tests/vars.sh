@@ -23,7 +23,11 @@ fi
 
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
-export PG_VER="${PG_VER:-17}"
+if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
+	export PG_VER=$(echo $IMAGE_POSTGRESQL | sed -E 's/.*:(.*ppg)?([0-9]+).*/\2/')
+else
+	export PG_VER="${PG_VER:-17}"
+fi
 export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
 export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"perconalab/percona-distribution-postgresql:$PG_VER"}
 export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
