@@ -444,6 +444,11 @@ type PerconaPGClusterStatus struct {
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
+	// Deprecated: Use Patroni instead. This field will be removed in a future release.
+	PatroniVersion string `json:"patroniVersion"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Patroni Patroni `json:"patroni,omitempty"`
 
 	// Status information for pgBackRest

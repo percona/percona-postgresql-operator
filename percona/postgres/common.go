@@ -17,7 +17,13 @@ func GetPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGClust
 	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
 	//            We should use "primary" instead
 	role := "primary"
-	patroniVer, err := gover.NewVersion(cr.Status.Patroni.Version)
+
+	patroniVersion := cr.Status.PatroniVersion
+	if cr.CompareVersion("2.8.0") >= 0 {
+		patroniVersion = cr.Status.Patroni.Version
+	}
+
+	patroniVer, err := gover.NewVersion(patroniVersion)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get patroni version")
 	}
