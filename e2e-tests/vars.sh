@@ -24,7 +24,7 @@ fi
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
 if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
-	export PG_VER=$(echo $IMAGE_POSTGRESQL | sed -E 's/.*:(.*ppg)?([0-9]+).*/\2/')
+	export PG_VER=$(echo "$IMAGE_POSTGRESQL" | sed -E 's/.*:(.*ppg)?([0-9]+).*/\2/')
 else
 	export PG_VER="${PG_VER:-17}"
 fi
