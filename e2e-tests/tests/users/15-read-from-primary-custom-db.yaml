@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
       if [[ $PG_VER < 15 ]]; then
-        echo "grantPublicSchemaAccess is not supported before PPG15. Creating dummy configmap to pass check"
+        echo "grantPublicSchemaAccess is not supported before PPG15. Current PG_VER = $PG_VER. Creating dummy configmap to pass check"
         kubectl create configmap -n "${NAMESPACE}" 10-read-from-primary-custom-db --from-literal=data=' 100500'
       else
         password=$(get_psql_user_pass chico-credentials)

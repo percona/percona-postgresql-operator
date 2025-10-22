@@ -8,7 +8,7 @@ commands:
       source ../../functions
 
       if [[ $PG_VER < 15 ]]; then
-        echo "grantPublicSchemaAccess is not supported before PPG15. Skipping check"
+        echo "grantPublicSchemaAccess is not supported before PPG15.  Current PG_VER = $PG_VER. Skipping check"
       else
         password=$(get_psql_user_pass chico-credentials)
         user='chico'
