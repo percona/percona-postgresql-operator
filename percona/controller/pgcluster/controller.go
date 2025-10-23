@@ -374,8 +374,6 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 	}
 
 	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
-		cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
-
 		patroniVersionUpdateFunc := func() error {
 			cluster := &v2.PerconaPGCluster{}
 			if err := r.Client.Get(ctx, types.NamespacedName{
@@ -388,10 +386,17 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 			orig := cluster.DeepCopy()
 
 			cluster.Status.Patroni.Version = patroniVersion
+			cluster.Status.PatroniVersion = patroniVersion
 
 			if err := r.Client.Status().Patch(ctx, cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
 				return errors.Wrap(err, "failed to patch patroni version")
 			}
+
+			err := r.patchPatroniVersionAnnotation(ctx, cr, patroniVersion)
+			if err != nil {
+				return errors.Wrap(err, "failed to patch patroni version annotation")
+			}
+
 			return nil
 		}
 
@@ -403,40 +408,29 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		return nil
 	}
 
-	getImageIDFromPod := func(pod *corev1.Pod, containerName string) string {
-		idx := slices.IndexFunc(pod.Status.ContainerStatuses, func(s corev1.ContainerStatus) bool {
-			return s.Name == containerName
-		})
-		if idx == -1 {
-			return ""
-		}
-		return pod.Status.ContainerStatuses[idx].ImageID
-	}
-
-	pods := new(corev1.PodList)
-	instances, err := naming.AsSelector(naming.ClusterInstances(cr.Name))
+	imageIDs, err := r.instanceImageIDs(ctx, cr)
 	if err != nil {
-		return err
-	}
-	if err = r.Client.List(ctx, pods, client.InNamespace(cr.Namespace), client.MatchingLabelsSelector{Selector: instances}); err != nil {
-		return err
-	}
-
-	// Collecting all image IDs from instance pods. Under normal conditions, this slice will contain a single image ID, as all pods typically use the same image.
-	// During an image update, it may contain multiple different image IDs as the update progresses.
-	imageIDs := []string{}
-	for _, pod := range pods.Items {
-		imageID := getImageIDFromPod(&pod, naming.ContainerDatabase)
-		if imageID != "" && !slices.Contains(imageIDs, imageID) {
-			imageIDs = append(imageIDs, imageID)
-		}
+		return errors.Wrap(err, "get image IDs")
 	}
 
 	// If the imageIDs slice contains the imageID from the status, we skip checking the Patroni version.
 	// This ensures that the Patroni version is only checked after all pods have been updated.
-	if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.Patroni.Version != "" {
-		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.Patroni.Version
-		return nil
+	if cr.CompareVersion("2.8.0") >= 0 {
+		if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.Patroni.Version != "" {
+			err = r.patchPatroniVersionAnnotation(ctx, cr, cr.Status.Patroni.Version)
+			if err != nil {
+				return errors.Wrap(err, "failed to patch patroni version annotation")
+			}
+			return nil
+		}
+	} else {
+		if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.PatroniVersion != "" {
+			err = r.patchPatroniVersionAnnotation(ctx, cr, cr.Status.PatroniVersion)
+			if err != nil {
+				return errors.Wrap(err, "failed to patch patroni version annotation")
+			}
+			return nil
+		}
 	}
 
 	meta := metav1.ObjectMeta{
@@ -535,6 +529,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 	orig := cr.DeepCopy()
 
 	cr.Status.Patroni.Version = patroniVersion
+	cr.Status.PatroniVersion = patroniVersion
 	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
 	cr.Status.Postgres.ImageID = getImageIDFromPod(p, pNaming.ContainerPatroniVersionCheck)
 
@@ -542,12 +537,58 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, 
 		return errors.Wrap(err, "failed to patch patroni version")
 	}
 
+	err = r.patchPatroniVersionAnnotation(ctx, cr, patroniVersion)
+	if err != nil {
+		return errors.Wrap(err, "failed to patch patroni version annotation")
+	}
+
 	if err := r.Client.Delete(ctx, p); err != nil {
 		return errors.Wrap(err, "failed to delete patroni version check pod")
 	}
-	cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
 
 	return nil
+}
+
+func (r *PGClusterReconciler) patchPatroniVersionAnnotation(ctx context.Context, cr *v2.PerconaPGCluster, patroniVersion string) error {
+	orig := cr.DeepCopy()
+	cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
+	if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "failed to patch the pg cluster")
+	}
+	return nil
+}
+
+func (r *PGClusterReconciler) instanceImageIDs(ctx context.Context, cr *v2.PerconaPGCluster) ([]string, error) {
+	pods := new(corev1.PodList)
+	instances, err := naming.AsSelector(naming.ClusterInstances(cr.Name))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create a selector for instance pods")
+	}
+	if err = r.Client.List(ctx, pods, client.InNamespace(cr.Namespace), client.MatchingLabelsSelector{Selector: instances}); err != nil {
+		return nil, errors.Wrap(err, "failed to list instances")
+	}
+
+	// Collecting all image IDs from instance pods. Under normal conditions, this slice will contain a single image ID, as all pods typically use the same image.
+	// During an image update, it may contain multiple different image IDs as the update progresses.
+	var imageIDs []string
+	for _, pod := range pods.Items {
+		imageID := getImageIDFromPod(&pod, naming.ContainerDatabase)
+		if imageID != "" && !slices.Contains(imageIDs, imageID) {
+			imageIDs = append(imageIDs, imageID)
+		}
+	}
+
+	return imageIDs, nil
+}
+
+func getImageIDFromPod(pod *corev1.Pod, containerName string) string {
+	idx := slices.IndexFunc(pod.Status.ContainerStatuses, func(s corev1.ContainerStatus) bool {
+		return s.Name == containerName
+	})
+	if idx == -1 {
+		return ""
+	}
+	return pod.Status.ContainerStatuses[idx].ImageID
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -342,6 +343,9 @@ func TestGetLatestCommitTimestamp(t *testing.T) {
 					Patroni: pgv2.Patroni{
 						Version: "error",
 					},
+				},
+				Spec: pgv2.PerconaPGClusterSpec{
+					CRVersion: version.Version(),
 				},
 			},
 			expectedErr: errors.New("failed to get patroni version: Malformed version: error: primary pod not found"),
