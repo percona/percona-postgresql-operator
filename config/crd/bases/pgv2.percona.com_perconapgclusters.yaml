@@ -21548,6 +21548,10 @@ spec:
                   version:
                     type: string
                 type: object
+              patroniVersion:
+                description: 'Deprecated: Use Patroni instead. This field will be
+                  removed in a future release.'
+                type: string
               pgbackrest:
                 description: Status information for pgBackRest
                 properties:

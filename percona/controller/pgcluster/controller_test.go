@@ -2079,6 +2079,8 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(k8sClient.Get(ctx, crNamespacedName, updatedCR)).Should(Succeed())
 
 			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.2.1"))
+			Expect(updatedCR.Status.PatroniVersion).To(Equal("3.2.1"))
+			Expect(updatedCR.Annotations[pNaming.AnnotationPatroniVersion]).To(Equal("3.2.1"))
 		})
 	})
 
@@ -2134,7 +2136,9 @@ var _ = Describe("patroni version check", Ordered, func() {
 			}
 
 			cr2.Status.Patroni.Version = "3.1.0"
+			cr2.Status.PatroniVersion = "3.1.0"
 			cr2.Status.Postgres.ImageID = "some-image-id"
+			cr2.Annotations[pNaming.AnnotationPatroniVersion] = "3.1.0"
 
 			status := cr2.Status
 			Expect(k8sClient.Create(ctx, cr2)).Should(Succeed())
@@ -2240,6 +2244,8 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(k8sClient.Get(ctx, crNamespacedName2, updatedCR)).Should(Succeed())
 
 			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.1.0"))
+			Expect(updatedCR.Status.PatroniVersion).To(Equal("3.1.0"))
+			Expect(updatedCR.Annotations[pNaming.AnnotationPatroniVersion]).To(Equal("3.1.0"))
 		})
 	})
 })
