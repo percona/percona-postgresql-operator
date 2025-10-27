@@ -3,11 +3,16 @@ package pgcluster
 import (
 	"bytes"
 	"context"
-	"io"
 	"slices"
 	"strings"
 	"time"
 
+	gover "github.com/hashicorp/go-version"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,39 +24,14 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
-	gover "github.com/hashicorp/go-version"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
 var errPatroniVersionCheckWait = errors.New("waiting for pod to initialize")
 
-// ExecClient is an interface for executing commands in pods
-type ExecClient interface {
-	Exec(ctx context.Context, pod *corev1.Pod, containerName string, stdin io.Reader, stdout, stderr io.Writer, command ...string) error
-}
-
-// execClientFactoryFunc is a function that creates an ExecClient
-type execClientFactoryFunc func() (ExecClient, error)
-
-// defaultExecClientFactory is the default factory that creates a real clientcmd.Client
-var defaultExecClientFactory execClientFactoryFunc = func() (ExecClient, error) {
-	return clientcmd.NewClient()
-}
-
 func (r *PGClusterReconciler) reconcilePatroniVersion(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	log := logf.FromContext(ctx)
-
 	if cr.Annotations == nil {
 		cr.Annotations = make(map[string]string)
 	}
-
-	log.Info("reconciling PatroniVersion")
 
 	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
 		patroniVersionUpdateFunc := func() error {
@@ -88,8 +68,8 @@ func (r *PGClusterReconciler) reconcilePatroniVersion(ctx context.Context, cr *v
 		return nil
 	}
 
+	// Starting from version 2.8.0, the patroni version check pod should not be executed.
 	if cr.CompareVersion("2.8.0") >= 0 {
-		log := logf.FromContext(ctx)
 
 		pods, err := r.getInstancePods(ctx, cr)
 		if err != nil {
@@ -109,8 +89,6 @@ func (r *PGClusterReconciler) reconcilePatroniVersion(ctx context.Context, cr *v
 		if err != nil {
 			return errors.Wrap(err, "failed to get patroni version")
 		}
-
-		log.Info("patroni version detected", "version", patroniVersion)
 
 		orig := cr.DeepCopy()
 
