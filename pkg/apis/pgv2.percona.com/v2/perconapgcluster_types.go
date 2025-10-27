@@ -444,6 +444,11 @@ type PerconaPGClusterStatus struct {
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
+	// Deprecated: Use Patroni instead. This field will be removed in a future release.
+	PatroniVersion string `json:"patroniVersion"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Patroni Patroni `json:"patroni,omitempty"`
 
 	// Status information for pgBackRest
@@ -476,6 +481,8 @@ type Patroni struct {
 	Version string `json:"version"`
 }
 
+// Backups struct.
+// +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
 type Backups struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
@@ -562,9 +569,9 @@ type PGBackRestArchive struct {
 	Jobs *crunchyv1beta1.BackupJobs `json:"jobs,omitempty"`
 
 	// Defines a pgBackRest repository
-	// +kubebuilder:validation:MinItems=1
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	Repos []crunchyv1beta1.PGBackRestRepo `json:"repos"`
 
 	// Defines configuration for a pgBackRest dedicated repository host.  This section is only

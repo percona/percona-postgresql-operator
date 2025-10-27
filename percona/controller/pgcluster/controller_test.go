@@ -2079,6 +2079,8 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(k8sClient.Get(ctx, crNamespacedName, updatedCR)).Should(Succeed())
 
 			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.2.1"))
+			Expect(updatedCR.Status.PatroniVersion).To(Equal("3.2.1"))
+			Expect(updatedCR.Annotations[pNaming.AnnotationPatroniVersion]).To(Equal("3.2.1"))
 		})
 	})
 
@@ -2134,7 +2136,9 @@ var _ = Describe("patroni version check", Ordered, func() {
 			}
 
 			cr2.Status.Patroni.Version = "3.1.0"
+			cr2.Status.PatroniVersion = "3.1.0"
 			cr2.Status.Postgres.ImageID = "some-image-id"
+			cr2.Annotations[pNaming.AnnotationPatroniVersion] = "3.1.0"
 
 			status := cr2.Status
 			Expect(k8sClient.Create(ctx, cr2)).Should(Succeed())
@@ -2191,6 +2195,26 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(pod.Spec.Containers[0].Image).To(Equal(cr2.Spec.Image))
 			Expect(pod.Spec.Containers[0].Command).To(Equal([]string{"bash"}))
 			Expect(pod.Spec.Containers[0].Args).To(Equal([]string{"-c", "sleep 60"}))
+			Expect(pod.Spec.Containers[0].Resources).To(Equal(corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("32Mi"),
+				},
+			}))
+			Expect(pod.Spec.Resources).To(Equal(&corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("32Mi"),
+				},
+			}))
 
 			uid := int64(1001)
 			expectedSecurityContext := &corev1.PodSecurityContext{
@@ -2220,6 +2244,8 @@ var _ = Describe("patroni version check", Ordered, func() {
 			Expect(k8sClient.Get(ctx, crNamespacedName2, updatedCR)).Should(Succeed())
 
 			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.1.0"))
+			Expect(updatedCR.Status.PatroniVersion).To(Equal("3.1.0"))
+			Expect(updatedCR.Annotations[pNaming.AnnotationPatroniVersion]).To(Equal("3.1.0"))
 		})
 	})
 })
@@ -2329,6 +2355,110 @@ var _ = Describe("CR Validations", Ordered, func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(
 					"PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true",
+				))
+			})
+		})
+	})
+
+	Context("Backup repository validations", Ordered, func() {
+		When("creating a CR with valid backup configurations", func() {
+			It("should accept backups disabled with no repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-1", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &f
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept backups enabled with at least one repository", func() {
+				cr, err := readDefaultCR("cr-validation-backup-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &t
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
+					{Name: "repo1"},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept backups disabled with at least one repository", func() {
+				cr, err := readDefaultCR("cr-validation-backup-3", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &f
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
+					{Name: "repo1"},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept backups enabled (nil - default true) with repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-4", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = nil // defaults to enabled
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
+					{Name: "repo1"},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept backups disabled with repositories not existing (nil)", func() {
+				cr, err := readDefaultCR("cr-validation-backup-5", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &f
+				cr.Spec.Backups.PGBackRest.Repos = nil
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+		})
+
+		When("creating a CR with invalid backup configurations", func() {
+			It("should reject backups enabled with no repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-1", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &t
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"At least one repository must be configured when backups are enabled",
+				))
+			})
+
+			It("should reject backups enabled with no repositories (nil)", func() {
+				cr, err := readDefaultCR("cr-validation-backup-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = &t
+				cr.Spec.Backups.PGBackRest.Repos = nil
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"At least one repository must be configured when backups are enabled",
+				))
+			})
+
+			It("should reject backups enabled (nil - default true) with no repositories", func() {
+				cr, err := readDefaultCR("cr-validation-backup-3", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.Backups.Enabled = nil // defaults to enabled
+				cr.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"At least one repository must be configured when backups are enabled",
 				))
 			})
 		})

@@ -6,7 +6,6 @@ database-init-sql
 demand-backup
 finalizers
 init-deploy
-major-upgrade
 monitoring
 monitoring-pmm3
 one-pod
