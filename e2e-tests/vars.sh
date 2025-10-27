@@ -23,7 +23,12 @@ fi
 
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
-export PG_VER="${PG_VER:-17}"
+if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
+	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -E 's/.*:(.*ppg)?([0-9]+).*/\2/')
+	export PG_VER="${pg_version_value}"
+else
+	export PG_VER="${PG_VER:-17}"
+fi
 export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
 export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"perconalab/percona-distribution-postgresql:$PG_VER"}
 export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
@@ -49,10 +54,10 @@ for var in $(printenv | grep -E '^IMAGE' | awk -F'=' '{print $1}'); do
 	fi
 	if [[ $var_value == percona/* || $var_value == perconalab/* ]]; then
 		new_value="${REGISTRY_NAME_FULL}${var_value}"
-		export "$var=$new_value"
-		echo $var=$new_value
+		export "$var"="$new_value"
+		echo "$var"="$new_value"
 	fi
-	echo $IMAGE
+	echo "$IMAGE"
 done
 
 # shellcheck disable=SC2034

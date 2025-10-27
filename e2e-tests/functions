@@ -55,6 +55,7 @@ deploy_operator() {
 	fi
 	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' "${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "'${disable_telemetry}'"' - \
+		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="LOG_LEVEL") | .value) = "DEBUG"' - \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
@@ -113,6 +114,64 @@ remove_all_finalizers() {
 			kubectl -n "${NAMESPACE}" patch "$resource" "$name" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
 		done
 	done
+}
+
+wait_for_ready_containers() {
+    local pod_prefix="$1"
+    local target_count="$2"
+    local namespace="${NAMESPACE}"
+    local max_wait_seconds=300
+    local check_interval=5
+    local elapsed_time=0
+
+    if [[ -z "$pod_prefix" || -z "$target_count" || -z "$namespace" ]]; then
+        echo "Error: Missing arguments." >&2
+        echo "Usage: wait_for_ready_containers <pod_name_prefix> <target_ready_count> <namespace>" >&2
+        return 1
+    fi
+
+    echo "Waiting for pods starting with '$pod_prefix' in namespace '$namespace' to have $target_count ready containers (Max ${max_wait_seconds}s)..."
+
+    while [[ "$elapsed_time" -lt "$max_wait_seconds" ]]; do
+        local target_pods
+        # Get pods that match the prefix AND are running
+        target_pods=$(kubectl get pods -n "$namespace" --field-selector=status.phase=Running --output=json | \
+                      jq -r ".items[] | select(.metadata.name | startswith(\"$pod_prefix\")) | .metadata.name")
+        # If no running pods match the prefix, something might be wrong, but we'll keep waiting.
+        if [[ -z "$target_pods" ]]; then
+            echo "No running pods found with prefix '$pod_prefix'. Waiting..."
+            sleep "$check_interval"
+            elapsed_time=$((elapsed_time + check_interval))
+            continue
+        fi
+
+        local ready_count=0
+        local total_matches=0
+
+        # Check each pod individually
+        for pod_name in $target_pods; do
+            total_matches=$((total_matches + 1))
+            current_ready=$(kubectl get pod "$pod_name" -n "$namespace" -o json 2>/dev/null | \
+                            jq '.status.containerStatuses | map(select(.ready == true)) | length')
+
+            if [[ "$current_ready" -eq "$target_count" ]]; then
+                ready_count=$((ready_count + 1))
+            fi
+        done
+
+        if [[ "$ready_count" -eq "$total_matches" ]]; then
+            echo "Success: All $total_matches pods now have $target_count ready containers."
+            return 0
+        fi
+
+        echo "Current status: $ready_count of $total_matches pods have $target_count ready containers. Waiting ${check_interval}s..."
+
+        sleep "$check_interval"
+        elapsed_time=$((elapsed_time + check_interval))
+    done
+
+    echo "Error: Timeout reached! After ${max_wait_seconds} seconds, not all pods reached $target_count ready containers." >&2
+    return 1
 }
 
 destroy_operator() {
