@@ -259,16 +259,17 @@ func (r *Reconciler) Reconcile(
 	}
 
 	pgParameters := postgres.NewParameters()
+	// K8SPG-577
+	// K8SPG-884: pg_stat_statements must come before pg_stat_monitor
+	if cluster.Spec.Extensions.PGStatStatements {
+		pgstatstatements.PostgreSQLParameters(&pgParameters)
+	}
 	// K8SPG-375
 	if cluster.Spec.Extensions.PGStatMonitor {
 		pgstatmonitor.PostgreSQLParameters(&pgParameters)
 	}
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
-	}
-	// K8SPG-577
-	if cluster.Spec.Extensions.PGStatStatements {
-		pgstatstatements.PostgreSQLParameters(&pgParameters)
 	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
