@@ -38,7 +38,6 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 }
 
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
-
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_stat_statements")
 	outParameters.Mandatory.Add("pg_stat_statements.track", "all")
 }
