@@ -290,7 +290,6 @@ spec:
                 pattern: ^repo[1-4]
                 type: string
             required:
-            - containerOptions
             - pgCluster
             - repoName
             type: object
@@ -22912,7 +22911,6 @@ spec:
                 pattern: ^repo[1-4]
                 type: string
             required:
-            - containerOptions
             - pgCluster
             - repoName
             type: object

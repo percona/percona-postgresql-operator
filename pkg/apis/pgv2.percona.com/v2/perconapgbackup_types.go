@@ -60,6 +60,7 @@ type PerconaPGBackupSpec struct {
 	// +optional
 	Options []string `json:"options,omitempty"`
 
+	// +optional
 	ContainerOptions ContainerOptions `json:"containerOptions"`
 }
 
