@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -59,12 +58,5 @@ func determineVersion(cr *v2.PerconaPGCluster) string {
 	if cr.CompareVersion("2.7.0") <= 0 {
 		return cr.Status.PatroniVersion
 	}
-	patroniVersion, ok := cr.Annotations[pNaming.AnnotationPatroniVersion]
-	if !ok {
-		// If the annotation is non-existing, the operator is assuming version 4.x.x by default
-		// in order to enforce the use of "primary" role. Patroni version after 4.x.x will also
-		// use "primary", so the operator will be compatible with them as well.
-		return patroniVersion4
-	}
-	return patroniVersion
+	return patroniVersion4
 }

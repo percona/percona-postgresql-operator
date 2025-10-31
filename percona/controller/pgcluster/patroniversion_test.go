@@ -18,62 +18,6 @@ import (
 var _ = Describe("patroni version check", Ordered, func() {
 	ctx := context.Background()
 
-	const crName = "patroni-version-test"
-	const ns = crName
-	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
-
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      crName,
-			Namespace: ns,
-		},
-	}
-
-	BeforeAll(func() {
-		By("Creating the Namespace to perform the tests")
-		err := k8sClient.Create(ctx, namespace)
-		Expect(err).To(Not(HaveOccurred()))
-	})
-
-	AfterAll(func() {
-		By("Deleting the Namespace to perform the tests")
-		_ = k8sClient.Delete(ctx, namespace)
-	})
-
-	Context("With custom patroni version annotation", func() {
-		cr, err := readDefaultCR(crName, ns)
-		It("should read default cr.yaml", func() {
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should create PerconaPGCluster with custom patroni version", func() {
-			if cr.Annotations == nil {
-				cr.Annotations = make(map[string]string)
-			}
-			cr.Annotations[pNaming.AnnotationCustomPatroniVersion] = "3.2.1"
-
-			status := cr.Status
-			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
-			cr.Status = status
-			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
-		})
-
-		It("should successfully reconcile patroni version check", func() {
-			reconcilerInstance := reconciler(cr)
-			err := reconcilerInstance.reconcilePatroniVersion(ctx, cr)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should copy custom patroni version to status", func() {
-			updatedCR := &v2.PerconaPGCluster{}
-			Expect(k8sClient.Get(ctx, crNamespacedName, updatedCR)).Should(Succeed())
-
-			Expect(updatedCR.Status.Patroni.Version).To(Equal("3.2.1"))
-			Expect(updatedCR.Status.PatroniVersion).To(Equal("3.2.1"))
-			Expect(updatedCR.Annotations[pNaming.AnnotationPatroniVersion]).To(Equal("3.2.1"))
-		})
-	})
-
 	Context("Without custom patroni version annotation for cr version <=2.7", func() {
 		const crName2 = "patroni-version-test-2"
 		const ns2 = crName2
