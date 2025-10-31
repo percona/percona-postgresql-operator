@@ -31,9 +31,15 @@ var errPatroniVersionCheckWait = errors.New("waiting for pod to initialize")
 
 func (r *PGClusterReconciler) reconcilePatroniVersion(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if cr.CompareVersion("2.7.0") <= 0 {
-		err := r.handleCustomPatroniVersionAnnotation(ctx, cr)
-		if err != nil {
-			return errors.Wrap(err, "handle patroni annotation")
+		if cr.Annotations == nil {
+			cr.Annotations = make(map[string]string)
+		}
+		if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
+			err := r.handleCustomPatroniVersionAnnotation(ctx, cr, patroniVersion)
+			if err != nil {
+				return errors.Wrap(err, "handle patroni annotation")
+			}
+			return nil
 		}
 	}
 
@@ -228,44 +234,37 @@ func (r *PGClusterReconciler) getPatroniVersion(ctx context.Context, pod *corev1
 	return patroniVersion, nil
 }
 
-func (r *PGClusterReconciler) handleCustomPatroniVersionAnnotation(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Annotations == nil {
-		cr.Annotations = make(map[string]string)
-	}
-
-	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
-		patroniVersionUpdateFunc := func() error {
-			cluster := &v2.PerconaPGCluster{}
-			if err := r.Client.Get(ctx, types.NamespacedName{
-				Name:      cr.Name,
-				Namespace: cr.Namespace,
-			}, cluster); err != nil {
-				return errors.Wrap(err, "get PerconaPGCluster")
-			}
-
-			orig := cluster.DeepCopy()
-
-			cluster.Status.Patroni.Version = patroniVersion
-			cluster.Status.PatroniVersion = patroniVersion
-
-			if err := r.Client.Status().Patch(ctx, cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
-				return errors.Wrap(err, "failed to patch patroni version")
-			}
-
-			err := r.patchPatroniVersionAnnotation(ctx, cr, patroniVersion)
-			if err != nil {
-				return errors.Wrap(err, "failed to patch patroni version annotation")
-			}
-
-			return nil
+func (r *PGClusterReconciler) handleCustomPatroniVersionAnnotation(ctx context.Context, cr *v2.PerconaPGCluster, patroniVersion string) error {
+	patroniVersionUpdateFunc := func() error {
+		cluster := &v2.PerconaPGCluster{}
+		if err := r.Client.Get(ctx, types.NamespacedName{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+		}, cluster); err != nil {
+			return errors.Wrap(err, "get PerconaPGCluster")
 		}
 
-		// To ensure that the update was done given that conflicts can be caused by
-		// other code making unrelated updates to the same resource at the same time.
-		if err := retry.RetryOnConflict(retry.DefaultRetry, patroniVersionUpdateFunc); err != nil {
+		orig := cluster.DeepCopy()
+
+		cluster.Status.Patroni.Version = patroniVersion
+		cluster.Status.PatroniVersion = patroniVersion
+
+		if err := r.Client.Status().Patch(ctx, cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "failed to patch patroni version")
 		}
+
+		err := r.patchPatroniVersionAnnotation(ctx, cr, patroniVersion)
+		if err != nil {
+			return errors.Wrap(err, "failed to patch patroni version annotation")
+		}
+
 		return nil
+	}
+
+	// To ensure that the update was done given that conflicts can be caused by
+	// other code making unrelated updates to the same resource at the same time.
+	if err := retry.RetryOnConflict(retry.DefaultRetry, patroniVersionUpdateFunc); err != nil {
+		return errors.Wrap(err, "failed to patch patroni version")
 	}
 	return nil
 }
