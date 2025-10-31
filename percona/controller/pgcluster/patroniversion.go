@@ -30,10 +30,10 @@ import (
 var errPatroniVersionCheckWait = errors.New("waiting for pod to initialize")
 
 func (r *PGClusterReconciler) reconcilePatroniVersion(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if cr.Annotations == nil {
+		cr.Annotations = make(map[string]string)
+	}
 	if cr.CompareVersion("2.7.0") <= 0 {
-		if cr.Annotations == nil {
-			cr.Annotations = make(map[string]string)
-		}
 		if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
 			err := r.handleCustomPatroniVersionAnnotation(ctx, cr, patroniVersion)
 			if err != nil {
@@ -45,7 +45,6 @@ func (r *PGClusterReconciler) reconcilePatroniVersion(ctx context.Context, cr *v
 
 	// Starting from version 2.8.0, the patroni version check pod should not be executed.
 	if cr.CompareVersion("2.8.0") >= 0 {
-
 		pods, err := r.getInstancePods(ctx, cr)
 		if err != nil {
 			return errors.Wrap(err, "failed to get instance pods")
