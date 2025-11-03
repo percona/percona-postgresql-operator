@@ -93,6 +93,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: |
+      - name: check on release branch
+        if: ${{ contains(github.head_ref, 'release-') || contains(github.base_ref, 'release-') }}
+        run: |
+          make generate VERSION="$(cat percona/version/version.txt)" IMAGE_TAG_BASE="percona/percona-postgresql-operator"
+          git diff --exit-code
+      - name: check on non release branches
+        if: ${{ ! (contains(github.head_ref, 'release-') || contains(github.base_ref, 'release-')) }}
+        run: |
           make generate VERSION=main
           git diff --exit-code
