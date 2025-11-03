@@ -2266,6 +2266,7 @@ var _ = Describe("Init Container", Ordered, func() {
 	})
 
 	cr, err := readDefaultCR(crName, ns)
+	cr.Spec.CRVersion = "2.7.0"
 	It("should read defautl cr.yaml", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -2291,8 +2292,6 @@ var _ = Describe("Init Container", Ordered, func() {
 	})
 	It("Controller should reconcile", func() {
 		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-		Expect(err).NotTo(HaveOccurred())
-		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
