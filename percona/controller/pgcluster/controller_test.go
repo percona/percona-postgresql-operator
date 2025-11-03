@@ -2294,6 +2294,8 @@ var _ = Describe("Init Container", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 		Expect(err).NotTo(HaveOccurred())
+		_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Context("check init containers", func() {
