@@ -11,7 +11,7 @@ metadata:
 spec:
   crVersion: 2.7.0
 #  initContainer:
-#    image: docker.io/percona/percona-postgresql-operator:2.7.0-ppg17.5.2-postgres
+#    image: docker.io/percona/percona-postgresql-operator:2.7.0
 #    resources:
 #      limits:
 #        cpu: 2.0
