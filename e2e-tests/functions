@@ -1043,13 +1043,15 @@ get_ready_replicas() {
 wait_sts_rollout() {
 	local sts=$1
 	local ready_replicas=$(get_ready_replicas $sts)
+	local updated_replicas=$(get_updated_replicas $sts)
 	local desired_replicas=$(get_desired_replicas $sts)
   echo "ready_replicas $ready_replicas desired_replicas $desired_replicas"
 
-	until [[ $ready_replicas -eq $desired_replicas ]]; do
+	until [[ $ready_replicas -eq $desired_replicas && $updated_replicas -eq $desired_replicas ]]; do
 		ready_replicas=$(get_ready_replicas $sts)
 		desired_replicas=$(get_desired_replicas $sts)
-		echo "Waiting for sts/$sts to update... $ready_replicas/$desired_replicas pods updated."
+		updated_replicas=$(get_updated_replicas $sts)
+		echo "Waiting for sts/$sts to update... $ready_replicas/$updated_replicas/$desired_replicas pods updated."
 		sleep 10
 	done
 }
