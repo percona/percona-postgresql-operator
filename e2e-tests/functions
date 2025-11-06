@@ -1037,14 +1037,14 @@ get_desired_replicas() {
 }
 
 get_ready_replicas() {
-  kubectl get sts "$1" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}'
+	kubectl get sts "$1" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}'
 }
 
 wait_sts_rollout() {
 	local sts=$1
 	local ready_replicas=$(get_ready_replicas $sts)
 	local desired_replicas=$(get_desired_replicas $sts)
-  echo "ready_replicas $ready_replicas desired_replicas $desired_replicas"
+	echo "ready_replicas $ready_replicas desired_replicas $desired_replicas"
 
 	until [[ $ready_replicas -eq $desired_replicas ]]; do
 		ready_replicas=$(get_ready_replicas $sts)
