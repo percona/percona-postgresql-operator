@@ -118,6 +118,17 @@ func WALStorage(instance *v1beta1.PostgresInstanceSetSpec) string {
 // utilities.
 func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 	env := []corev1.EnvVar{
+		// Critical for major upgrades to avoid lc_collate mismatches.
+		// - https://www.postgresql.org/docs/current/locale.html
+		{
+			Name:  "LC_ALL",
+			Value: "en_US.utf-8",
+		},
+		{
+			Name:  "LANG",
+			Value: "en_US.utf-8",
+		},
+
 		// - https://www.postgresql.org/docs/current/reference-server.html
 		{
 			Name:  "PGDATA",
