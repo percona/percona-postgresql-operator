@@ -126,6 +126,10 @@ func TestInstancePod(t *testing.T) {
 	assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
 - env:
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
@@ -277,6 +281,10 @@ initContainers:
   - /pgdata/pg11_wal
   - /pgdata/pgbackrest/log
   env:
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
@@ -769,6 +777,10 @@ func TestInstancePodAllowVolumeGrow(t *testing.T) {
 	assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
 - env:
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
@@ -934,6 +946,10 @@ initContainers:
   - /pgdata/pg11_wal
   - /pgdata/pgbackrest/log
   env:
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
