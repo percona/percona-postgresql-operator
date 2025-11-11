@@ -1114,7 +1114,11 @@ get_container_image() {
 		operatorVersion=main
 	fi
 
-	echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
+	if [[ $component == 'pgbouncer' || $component == 'pgbackrest' ]]; then
+		echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+	else
+		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
+	fi
 }
 
 get_postgresql_logs() {
