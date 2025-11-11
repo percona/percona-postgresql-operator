@@ -203,6 +203,9 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 		SecurityContext: database.SecurityContext,
 		VolumeMounts:    volumeMounts, // K8SPG-254
 
+		// K8SPG-893 Copying environment variables from the database container to ensure consistent locale settings.
+		Env: database.Env,
+
 		// Use our upgrade command and the specified image and resources.
 		Command: upgradeCommand(
 			upgrade.Spec.FromPostgresVersion,
