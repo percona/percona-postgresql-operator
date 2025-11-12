@@ -213,6 +213,11 @@ spec:
         - upgrade
         - "19"
         - "25"
+        env:
+        - name: LC_ALL
+          value: en_US.utf-8
+        - name: LANG
+          value: en_US.utf-8
         image: img4
         name: database
         resources:
