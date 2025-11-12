@@ -4,6 +4,6 @@ metadata:
   name: backup-after-13-to-14
 spec:
   pgCluster: major-upgrade
-  repoName: repo3
+  repoName: repo2
   options:
     - --type=full

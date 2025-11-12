@@ -32,7 +32,7 @@ metadata:
     postgres-operator.crunchydata.com/cluster: major-upgrade
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo3
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo2
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGBackup

@@ -16,6 +16,6 @@ status:
   pgbackrest:
     repos:
     - bound: true
-      name: repo4
+      name: repo3
       replicaCreateBackupComplete: true
       stanzaCreated: true

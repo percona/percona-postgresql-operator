@@ -9,4 +9,4 @@ commands:
         -n $NAMESPACE \
         perconapgcluster major-upgrade \
         --type='json' \
-        -p='[{"op": "replace", "path": "/spec/backups/pgbackrest/repos/0/name", "value": "repo4"}]'
+        -p='[{"op": "replace", "path": "/spec/backups/pgbackrest/repos/0/name", "value": "repo3"}]'
