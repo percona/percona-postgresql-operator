@@ -138,6 +138,10 @@ containers:
     value: /tmp
   - name: LDAPTLS_CACERT
     value: /etc/postgres/ldap/ca.crt
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   imagePullPolicy: Always
   name: database
   ports:
@@ -289,6 +293,10 @@ initContainers:
     value: /tmp
   - name: LDAPTLS_CACERT
     value: /etc/postgres/ldap/ca.crt
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   imagePullPolicy: Always
   name: postgres-startup
   resources:
@@ -713,7 +721,7 @@ func TestInstancePodAllowVolumeGrow(t *testing.T) {
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 	cluster.Spec.PostgresVersion = 11
 	cluster.SetLabels(map[string]string{
-		naming.LabelVersion: "2.7.0",
+		naming.LabelVersion: version.Version(),
 	})
 
 	dataVolume := new(corev1.PersistentVolumeClaim)
@@ -781,6 +789,10 @@ containers:
     value: /tmp
   - name: LDAPTLS_CACERT
     value: /etc/postgres/ldap/ca.crt
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   imagePullPolicy: Always
   name: database
   ports:
@@ -946,6 +958,10 @@ initContainers:
     value: /tmp
   - name: LDAPTLS_CACERT
     value: /etc/postgres/ldap/ca.crt
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   imagePullPolicy: Always
   name: postgres-startup
   resources:
