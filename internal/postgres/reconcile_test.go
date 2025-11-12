@@ -721,7 +721,7 @@ func TestInstancePodAllowVolumeGrow(t *testing.T) {
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 	cluster.Spec.PostgresVersion = 11
 	cluster.SetLabels(map[string]string{
-		naming.LabelVersion: "2.7.0",
+		naming.LabelVersion: version.Version(),
 	})
 
 	dataVolume := new(corev1.PersistentVolumeClaim)
