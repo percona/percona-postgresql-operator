@@ -110,6 +110,11 @@ func TestGenerateUpgradeJob(t *testing.T) {
 	upgrade.Spec.Resources.Requests = corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("3.14"),
 	}
+	upgrade.Spec.InitContainers = []corev1.Container{
+		{
+			Name: "upgrade-init-container",
+		},
+	}
 
 	startup := &appsv1.StatefulSet{}
 	startup.Spec.Template.Spec = corev1.PodSpec{
@@ -219,6 +224,8 @@ spec:
         - mountPath: /mnt/some/such
           name: vm1
       initContainers:
+      - name: upgrade-init-container
+        resources: {}
       - name: database-init
         resources: {}
       restartPolicy: Never
