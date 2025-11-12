@@ -189,8 +189,22 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 	// Replace all containers with one that does the upgrade.
 	job.Spec.Template.Spec.EphemeralContainers = nil
 
-	// K8SPG-254: Major upgrade support
-	job.Spec.Template.Spec.InitContainers = upgrade.Spec.InitContainers
+	// K8SPG-894: Ensure database init container is included for required scripts
+	var initContainers []corev1.Container
+
+	dbInitContainerName := ContainerDatabase + "-init"
+	for _, container := range startup.Spec.Template.Spec.InitContainers {
+		if container.Name == dbInitContainerName {
+			initContainers = append(initContainers, container)
+			break
+		}
+	}
+
+	if len(upgrade.Spec.InitContainers) > 0 {
+		initContainers = append(initContainers, upgrade.Spec.InitContainers...)
+	}
+
+	job.Spec.Template.Spec.InitContainers = initContainers
 
 	volumeMounts := database.VolumeMounts
 	volumeMounts = append(volumeMounts, upgrade.Spec.VolumeMounts...)
