@@ -113,6 +113,11 @@ func TestGenerateUpgradeJob(t *testing.T) {
 
 	startup := &appsv1.StatefulSet{}
 	startup.Spec.Template.Spec = corev1.PodSpec{
+		InitContainers: []corev1.Container{
+			{
+				Name: ContainerDatabase + "-init",
+			},
+		},
 		Containers: []corev1.Container{{
 			Name: ContainerDatabase,
 
@@ -213,6 +218,9 @@ spec:
         volumeMounts:
         - mountPath: /mnt/some/such
           name: vm1
+      initContainers:
+      - name: database-init
+        resources: {}
       restartPolicy: Never
       volumes:
       - hostPath:
