@@ -280,7 +280,7 @@ initContainers:
   - "11"
   - /pgdata/pg11_wal
   - /pgdata/pgbackrest/log
-  env
+  env:
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
