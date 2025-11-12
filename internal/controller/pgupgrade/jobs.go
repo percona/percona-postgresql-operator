@@ -203,8 +203,19 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 		SecurityContext: database.SecurityContext,
 		VolumeMounts:    volumeMounts, // K8SPG-254
 
-		// K8SPG-893 Copying environment variables from the database container to ensure consistent locale settings.
-		Env: database.Env,
+		// K8SPG-893
+		Env: []corev1.EnvVar{
+			// Critical for major upgrades to avoid lc_collate mismatches.
+			// - https://www.postgresql.org/docs/current/locale.html
+			{
+				Name:  "LC_ALL",
+				Value: "en_US.utf-8",
+			},
+			{
+				Name:  "LANG",
+				Value: "en_US.utf-8",
+			},
+		},
 
 		// Use our upgrade command and the specified image and resources.
 		Command: upgradeCommand(
