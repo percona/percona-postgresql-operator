@@ -224,9 +224,9 @@ spec:
         - mountPath: /mnt/some/such
           name: vm1
       initContainers:
-      - name: upgrade-init-container
-        resources: {}
       - name: database-init
+        resources: {}
+      - name: upgrade-init-container
         resources: {}
       restartPolicy: Never
       volumes:
