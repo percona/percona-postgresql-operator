@@ -192,6 +192,20 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 	// K8SPG-254: Major upgrade support
 	job.Spec.Template.Spec.InitContainers = upgrade.Spec.InitContainers
 
+	// K8SPG-894
+	var initContainer *corev1.Container
+	for i := range startup.Spec.Template.Spec.InitContainers {
+		container := startup.Spec.Template.Spec.InitContainers[i]
+		if container.Name == ContainerDatabase+"-init" {
+			initContainer = &container
+			break
+		}
+	}
+
+	if initContainer != nil {
+		job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, *initContainer)
+	}
+
 	volumeMounts := database.VolumeMounts
 	volumeMounts = append(volumeMounts, upgrade.Spec.VolumeMounts...)
 
