@@ -126,10 +126,6 @@ func TestInstancePod(t *testing.T) {
 	assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
 - env:
-  - name: LC_ALL
-    value: en_US.utf-8
-  - name: LANG
-    value: en_US.utf-8
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
@@ -142,6 +138,10 @@ containers:
     value: /tmp
   - name: LDAPTLS_CACERT
     value: /etc/postgres/ldap/ca.crt
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   imagePullPolicy: Always
   name: database
   ports:
@@ -280,11 +280,7 @@ initContainers:
   - "11"
   - /pgdata/pg11_wal
   - /pgdata/pgbackrest/log
-  env:
-  - name: LC_ALL
-    value: en_US.utf-8
-  - name: LANG
-    value: en_US.utf-8
+  env
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
@@ -297,6 +293,10 @@ initContainers:
     value: /tmp
   - name: LDAPTLS_CACERT
     value: /etc/postgres/ldap/ca.crt
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   imagePullPolicy: Always
   name: postgres-startup
   resources:
@@ -777,10 +777,6 @@ func TestInstancePodAllowVolumeGrow(t *testing.T) {
 	assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
 - env:
-  - name: LC_ALL
-    value: en_US.utf-8
-  - name: LANG
-    value: en_US.utf-8
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
@@ -793,6 +789,10 @@ containers:
     value: /tmp
   - name: LDAPTLS_CACERT
     value: /etc/postgres/ldap/ca.crt
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   imagePullPolicy: Always
   name: database
   ports:
@@ -946,10 +946,6 @@ initContainers:
   - /pgdata/pg11_wal
   - /pgdata/pgbackrest/log
   env:
-  - name: LC_ALL
-    value: en_US.utf-8
-  - name: LANG
-    value: en_US.utf-8
   - name: PGDATA
     value: /pgdata/pg11
   - name: PGHOST
@@ -962,6 +958,10 @@ initContainers:
     value: /tmp
   - name: LDAPTLS_CACERT
     value: /etc/postgres/ldap/ca.crt
+  - name: LC_ALL
+    value: en_US.utf-8
+  - name: LANG
+    value: en_US.utf-8
   imagePullPolicy: Always
   name: postgres-startup
   resources:
