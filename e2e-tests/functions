@@ -500,8 +500,8 @@ get_version_images() {
 	local component="$2"
 	local release_versions_file="${TEMP_DIR}/release_version_${cr_version}"
 
-	if [[ ! -f "$release_versions_file" ]]; then
-		curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/refs/tags/v${cr_version}/e2e-tests/release_versions" > $release_versions_file
+	if [[ ! -f $release_versions_file ]]; then
+		curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/refs/tags/v${cr_version}/e2e-tests/release_versions" >$release_versions_file
 	fi
 
 	grep -i ${component} $release_versions_file | cut -d'=' -f2
