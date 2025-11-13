@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      cr_version="2.7.0"
+      cr_version="2.8.0"
       get_cr \
         | yq eval ".spec.crVersion=\"$cr_version\"" - \ - \
         | yq eval ".spec.image=\"${IMAGE_BASE}:pg-operator-$cr_version-ppg$PG_VER-postgres\"" - \
