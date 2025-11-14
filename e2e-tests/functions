@@ -2,7 +2,7 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-CERT_MANAGER_VER="1.18.2"
+CERT_MANAGER_VER="1.19.1"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
@@ -493,6 +493,18 @@ get_service_ip() {
 	done
 	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].ip}'
 	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].hostname}'
+}
+
+get_version_images() {
+	local cr_version="$1"
+	local component="$2"
+	local release_versions_file="${TEMP_DIR}/release_version_${cr_version}"
+
+	if [[ ! -f $release_versions_file ]]; then
+		curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/refs/tags/v${cr_version}/e2e-tests/release_versions" >$release_versions_file
+	fi
+
+	grep -i ${component} $release_versions_file | cut -d'=' -f2
 }
 
 wait_for_delete() {
@@ -1114,7 +1126,11 @@ get_container_image() {
 		operatorVersion=main
 	fi
 
-	echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
+	if [[ $component == 'pgbouncer' || $component == 'pgbackrest' ]]; then
+		echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+	else
+		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
+	fi
 }
 
 get_postgresql_logs() {

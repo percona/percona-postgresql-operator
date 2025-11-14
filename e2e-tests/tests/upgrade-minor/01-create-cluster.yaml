@@ -28,10 +28,9 @@ commands:
           $sed -E -i "s|^( *image: *)(.*)|\1${REGISTRY_NAME_FULL}\2|" ${TEMP_DIR}/cr_lower.yaml
       fi
 
-      lower_ver_images=$(curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/refs/tags/v${lower_ver}/e2e-tests/release_versions)
-      backrest_image=$(echo "$lower_ver_images" | grep BACKREST${pg_ver} | cut -d'=' -f2 )
-      pgbouncer_image=$(echo "$lower_ver_images" | grep PGBOUNCER${pg_ver} | cut -d'=' -f2 )
-      postgres_image=$(echo "$lower_ver_images" | grep POSTGRESQL${pg_ver} | cut -d'=' -f2 )
+      backrest_image=$(get_version_images $lower_ver BACKREST${pg_ver})
+      pgbouncer_image=$(get_version_images $lower_ver PGBOUNCER${pg_ver})
+      postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
 
       yq -i eval '
           .metadata.name = "'${test_name}'" |

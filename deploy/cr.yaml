@@ -9,7 +9,7 @@ metadata:
 #  - percona.com/delete-ssl
 #  - percona.com/delete-backups
 spec:
-  crVersion: 2.8.0
+  crVersion: 2.9.0
 #  initContainer:
 #    image: docker.io/perconalab/percona-postgresql-operator:main
 #    resources:
