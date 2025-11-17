@@ -11,7 +11,7 @@ kind: PerconaPGCluster
 metadata:
   name: major-upgrade
 spec:
-  postgresVersion: 14
+  postgresVersion: 15
 status:
   pgbouncer:
     ready: 3
