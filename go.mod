@@ -5,11 +5,11 @@ go 1.25.1
 require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
 	github.com/go-logr/logr v1.4.3
-	github.com/go-openapi/errors v0.22.3
-	github.com/go-openapi/runtime v0.29.0
-	github.com/go-openapi/strfmt v0.24.0
+	github.com/go-openapi/errors v0.22.4
+	github.com/go-openapi/runtime v0.29.2
+	github.com/go-openapi/strfmt v0.25.0
 	github.com/go-openapi/swag v0.25.1
-	github.com/go-openapi/validate v0.25.0
+	github.com/go-openapi/validate v0.25.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.7.0
@@ -74,7 +74,6 @@ require (
 )
 
 require (
-	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -85,11 +84,11 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
-	github.com/go-openapi/analysis v0.24.0 // indirect
+	github.com/go-openapi/analysis v0.24.1 // indirect
 	github.com/go-openapi/jsonpointer v0.22.1 // indirect
-	github.com/go-openapi/jsonreference v0.21.2 // indirect
-	github.com/go-openapi/loads v0.23.1 // indirect
-	github.com/go-openapi/spec v0.22.0 // indirect
+	github.com/go-openapi/jsonreference v0.21.3 // indirect
+	github.com/go-openapi/loads v0.23.2 // indirect
+	github.com/go-openapi/spec v0.22.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -117,7 +116,7 @@ require (
 	github.com/swaggest/assertjson v1.9.0 // indirect
 	github.com/yudai/gojsondiff v1.0.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
-	go.mongodb.org/mongo-driver v1.17.4 // indirect
+	go.mongodb.org/mongo-driver v1.17.6 // indirect
 	go.nhat.io/matcher/v2 v2.0.0 // indirect
 	go.nhat.io/wait v0.1.0 // indirect
 	go.opentelemetry.io/otel/metric v1.38.0 // indirect
@@ -125,7 +124,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.46.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/term v0.36.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
