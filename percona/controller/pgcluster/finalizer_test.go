@@ -19,9 +19,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 var _ = Describe("Finalizers", Ordered, func() {

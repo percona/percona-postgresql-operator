@@ -16,11 +16,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/percona/extensions"
-	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
+	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -35,7 +34,7 @@ type PGUpgradeReconciler struct {
 
 // SetupWithManager adds the PerconaPerconaPGUpgrade controller to the provided runtime manager
 func (r *PGUpgradeReconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGUpgrade{}).Complete(r)
+	return builder.ControllerManagedBy(mgr).For(&pgv2.PerconaPGUpgrade{}).Complete(r)
 }
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades,verbs=get;list;create;update;patch;watch

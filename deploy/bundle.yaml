@@ -297,7 +297,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
   labels:
-    pgv2.percona.com/version: v2.8.0
+    pgv2.percona.com/version: v2.9.0
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -705,7 +705,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
   labels:
-    pgv2.percona.com/version: v2.8.0
+    pgv2.percona.com/version: v2.9.0
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -6572,7 +6572,6 @@ spec:
                           required:
                           - name
                           type: object
-                        minItems: 1
                         type: array
                         x-kubernetes-list-map-keys:
                         - name
@@ -7786,13 +7785,16 @@ spec:
                                 type: object
                             type: object
                         type: object
-                    required:
-                    - repos
                     type: object
                   trackLatestRestorableTime:
                     description: Enable tracking latest restorable time
                     type: boolean
                 type: object
+                x-kubernetes-validations:
+                - message: At least one repository must be configured when backups
+                    are enabled
+                  rule: (has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos)
+                    && size(self.pgbackrest.repos) > 0)
               crVersion:
                 description: |-
                   Version of the operator. Update this to new version after operator
@@ -11005,11 +11007,11 @@ spec:
                       bucket:
                         type: string
                       disableSSL:
-                        type: string
+                        type: boolean
                       endpoint:
                         type: string
                       forcePathStyle:
-                        type: string
+                        type: boolean
                       region:
                         type: string
                       secret:
@@ -21843,6 +21845,10 @@ spec:
                   version:
                     type: string
                 type: object
+              patroniVersion:
+                description: 'Deprecated: Use Patroni instead. This field will be
+                  removed in a future release.'
+                type: string
               pgbackrest:
                 description: Status information for pgBackRest
                 properties:
@@ -22103,7 +22109,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
   labels:
-    pgv2.percona.com/version: v2.8.0
+    pgv2.percona.com/version: v2.9.0
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -22203,7 +22209,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
   labels:
-    pgv2.percona.com/version: v2.8.0
+    pgv2.percona.com/version: v2.9.0
   name: perconapgupgrades.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -36721,6 +36727,9 @@ spec:
                     required:
                     - volumeSnapshotClassName
                     type: object
+                  trackLatestRestorableTime:
+                    description: Enable tracking latest restorable time
+                    type: boolean
                 type: object
               config:
                 properties:

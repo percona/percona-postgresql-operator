@@ -20,8 +20,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -44,7 +44,13 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
+		ControlPlane: envtest.ControlPlane{
+			APIServer: &envtest.APIServer{},
+		},
 	}
+
+	// PodLevelResources feature gate is enabled by default on k8s 1.34.
+	testEnv.ControlPlane.APIServer.Configure().Set("feature-gates", "PodLevelResources=true")
 
 	var err error
 	cfg, err = testEnv.Start()

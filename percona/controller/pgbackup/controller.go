@@ -23,15 +23,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
-	"github.com/percona/percona-postgresql-operator/percona/controller"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	"github.com/percona/percona-postgresql-operator/percona/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/percona/watcher"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -297,7 +297,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to create exec client")
 		}
-
 		latestRestorableTime, err := watcher.GetLatestCommitTimestamp(ctx, r.Client, execCli, pgCluster, pgBackup)
 		if err == nil {
 			log.Info("Got latest restorable timestamp", "timestamp", latestRestorableTime)

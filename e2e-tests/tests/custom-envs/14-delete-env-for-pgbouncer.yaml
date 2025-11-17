@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+      
+      source ../../functions
+       
+      kubectl -n "${NAMESPACE}" get pg custom-envs -o yaml | \
+        yq eval '
+        .spec.proxy.pgBouncer.env |= map(select(.name != "FIRST_ENV" and .name != "SECOND_ENV"))
+        ' - | kubectl apply -f -
+          
+          
+          
+      sleep 30 
+      wait_cluster_consistency custom-envs
+        
+      check_envs_for_component delete pgbouncer FIRST_ENV SECOND_ENV
+

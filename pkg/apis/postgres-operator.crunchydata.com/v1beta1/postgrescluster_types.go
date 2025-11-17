@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 )
 
 // PostgresClusterSpec defines the desired state of PostgresCluster
@@ -365,6 +365,9 @@ type Backups struct {
 	// VolumeSnapshot configuration
 	// +optional
 	Snapshots *VolumeSnapshots `json:"snapshots,omitempty"`
+
+	// Enable tracking latest restorable time
+	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
 }
 
 // PostgresClusterStatus defines the observed state of PostgresCluster

@@ -11,11 +11,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/percona/extensions"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
-	"github.com/percona/percona-postgresql-operator/percona/version"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
 func (r *PGClusterReconciler) reconcileVersion(ctx context.Context, cr *v2.PerconaPGCluster) error {

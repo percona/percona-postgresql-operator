@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/percona/testutils"
-	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/percona/testutils"
+	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
 func mustParseTime(layout string, value string) time.Time {
@@ -343,8 +344,11 @@ func TestGetLatestCommitTimestamp(t *testing.T) {
 						Version: "error",
 					},
 				},
+				Spec: pgv2.PerconaPGClusterSpec{
+					CRVersion: version.Version(),
+				},
 			},
-			expectedErr: errors.New("failed to get patroni version: Malformed version: error: primary pod not found"),
+			expectedErr: errors.New("primary pod not found"),
 		},
 	}
 	for name, tt := range tests {
@@ -353,7 +357,7 @@ func TestGetLatestCommitTimestamp(t *testing.T) {
 
 			_, err := GetLatestCommitTimestamp(ctx, c, nil, tt.cluster, tt.backup)
 
-			assert.EqualError(t, err, tt.expectedErr.Error())
+			assert.ErrorContains(t, err, tt.expectedErr.Error())
 		})
 	}
 }

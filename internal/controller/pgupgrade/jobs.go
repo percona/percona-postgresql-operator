@@ -16,10 +16,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	"github.com/percona/percona-postgresql-operator/internal/feature"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 // Upgrade job
@@ -189,8 +189,22 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 	// Replace all containers with one that does the upgrade.
 	job.Spec.Template.Spec.EphemeralContainers = nil
 
-	// K8SPG-254: Major upgrade support
-	job.Spec.Template.Spec.InitContainers = upgrade.Spec.InitContainers
+	// K8SPG-894: Ensure database init container is included for required scripts
+	var initContainers []corev1.Container
+
+	dbInitContainerName := ContainerDatabase + "-init"
+	for _, container := range startup.Spec.Template.Spec.InitContainers {
+		if container.Name == dbInitContainerName {
+			initContainers = append(initContainers, container)
+			break
+		}
+	}
+
+	if len(upgrade.Spec.InitContainers) > 0 {
+		initContainers = append(initContainers, upgrade.Spec.InitContainers...)
+	}
+
+	job.Spec.Template.Spec.InitContainers = initContainers
 
 	volumeMounts := database.VolumeMounts
 	volumeMounts = append(volumeMounts, upgrade.Spec.VolumeMounts...)
@@ -202,6 +216,20 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 		Name:            database.Name,
 		SecurityContext: database.SecurityContext,
 		VolumeMounts:    volumeMounts, // K8SPG-254
+
+		// K8SPG-893
+		Env: []corev1.EnvVar{
+			// Critical for major upgrades to avoid lc_collate mismatches.
+			// - https://www.postgresql.org/docs/current/locale.html
+			{
+				Name:  "LC_ALL",
+				Value: "en_US.utf-8",
+			},
+			{
+				Name:  "LANG",
+				Value: "en_US.utf-8",
+			},
+		},
 
 		// Use our upgrade command and the specified image and resources.
 		Command: upgradeCommand(

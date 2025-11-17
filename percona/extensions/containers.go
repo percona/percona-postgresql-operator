@@ -6,8 +6,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/percona/percona-postgresql-operator/percona/naming"
-	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
 func GetExtensionKey(pgMajor int, name, version string) string {
@@ -106,17 +106,17 @@ func InstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int, spec *pg
 	if cr.CompareVersion("2.8.0") >= 0 {
 		// Check whether the configuration exists so that existing e2e tests
 		// that do not set these values are not affected.
-		if spec.Storage.DisableSSL != "" {
+		if spec.Storage.DisableSSL {
 			container.Env = append(container.Env, corev1.EnvVar{
 				Name:  "STORAGE_DISABLE_SSL",
-				Value: spec.Storage.DisableSSL,
+				Value: strconv.FormatBool(spec.Storage.DisableSSL),
 			})
 		}
 
-		if spec.Storage.ForcePathStyle != "" {
+		if spec.Storage.ForcePathStyle {
 			container.Env = append(container.Env, corev1.EnvVar{
 				Name:  "STORAGE_FORCE_PATH_STYLE",
-				Value: spec.Storage.ForcePathStyle,
+				Value: strconv.FormatBool(spec.Storage.ForcePathStyle),
 			})
 		}
 	}

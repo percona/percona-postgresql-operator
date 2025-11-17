@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Client struct {
@@ -72,6 +73,9 @@ func (c *Client) Exec(ctx context.Context, pod *corev1.Pod, containerName string
 	if err != nil {
 		return errors.Wrap(err, "failed to create executor")
 	}
+
+	log := logf.FromContext(ctx)
+	log.V(1).Info("Running command in pod", "pod", pod.Name, "container", containerName, "command", command)
 
 	retryErr := retry.OnError(retry.DefaultRetry, func(err error) bool {
 		return true // Retry on all errors

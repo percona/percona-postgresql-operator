@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+    - script: |-
+          set -o errexit
+          set -o xtrace
+          
+          source ../../functions
+            
+          kubectl get pg custom-envs -n ${NAMESPACE} -o yaml | \
+            yq eval '
+            .spec.instances[].env |= map(select(.name != "FIRST_ENV" and .name != "SECOND_ENV"))
+            ' - | kubectl apply -f -
+              
+          sleep 20 
+          wait_cluster_consistency custom-envs
+          check_envs_for_component delete instance FIRST_ENV SECOND_ENV
+
+
+          
+
+

@@ -12,8 +12,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestPerconaPGCluster_Default(t *testing.T) {
@@ -135,7 +136,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 				Spec: PerconaPGClusterSpec{
-					CRVersion:       "2.8.0",
+					CRVersion:       version.Version(),
 					PostgresVersion: 15,
 					Expose: &ServiceExpose{
 						Type:              "LoadBalancer",
@@ -180,6 +181,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				assert.Equal(t, actual.Spec.ReplicaService.Type, expected.Spec.ExposeReplicas.Type)
 				assert.Assert(t, actual.Spec.ReplicaService.LoadBalancerClass != nil)
 				assert.Equal(t, actual.Spec.ReplicaService.LoadBalancerClass, expected.Spec.ExposeReplicas.LoadBalancerClass)
+				assert.Equal(t, *actual.Spec.Backups.TrackLatestRestorableTime, true)
 			},
 		},
 		"updates existing PostgresCluster": {

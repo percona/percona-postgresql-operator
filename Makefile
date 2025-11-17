@@ -443,17 +443,21 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
+update-version:
+	echo $(NEXT_VER) > percona/version/version.txt
+
 # Prepare release
 PG_VER ?= $(shell grep -o "postgresVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+")
 include e2e-tests/release_versions
 release: generate
 	$(SED) -i \
-    	-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
-        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL17)#}" \
-        -e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER17)#}" \
-        -e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST17)#}" \
-        -e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
-        -e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
+		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
+		-e "/^spec:/,/^  image:/{/^#/! s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL17)#}" \
+		-e "s|    image: docker.io/perconalab/percona-postgresql-operator:main|    image: $(IMAGE)|" \
+		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER17)#}" \
+		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST17)#}" \
+		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
@@ -468,11 +472,11 @@ MINOR_VER       := $(word 2,$(subst ., ,$(CURRENT_VERSION)))
 NEXT_VER        := $(MAJOR_VER).$(shell expr $(MINOR_VER) + 1).0
 PREV1_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 1).0
 PREV2_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 2).0
-after-release: generate
-	echo $(NEXT_VER) > percona/version/version.txt
+after-release: update-version generate
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
+		-e "/initContainer:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
@@ -483,6 +487,8 @@ after-release: generate
 		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
 		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" deploy/upgrade.yaml
+
+# Update upgrade-consistency
 	$(SED) -i "s/$(PREV2_VERSION)/$(PREV1_VERSION)/g" e2e-tests/tests/upgrade-consistency/01-*.yaml
 	$(SED) -i "s/$(PREV1_VERSION)/$(CURRENT_VERSION)/g" e2e-tests/tests/upgrade-consistency/02-*.yaml
 	$(SED) -i "s/$(CURRENT_VERSION)/$(NEXT_VER)/g" e2e-tests/tests/upgrade-consistency/03-*.yaml e2e-tests/tests/init-deploy/05-assert.yaml

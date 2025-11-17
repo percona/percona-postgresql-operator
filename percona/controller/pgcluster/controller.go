@@ -1,7 +1,6 @@
 package pgcluster
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5"
 	"fmt"
@@ -11,21 +10,17 @@ import (
 	"strings"
 	"time"
 
-	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,23 +33,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/percona/clientcmd"
-	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/percona/extensions"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	"github.com/percona/percona-postgresql-operator/percona/pmm"
-	perconaPG "github.com/percona/percona-postgresql-operator/percona/postgres"
-	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
-	"github.com/percona/percona-postgresql-operator/percona/version"
-	"github.com/percona/percona-postgresql-operator/percona/watcher"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/pmm"
+	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
+	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -272,7 +265,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 	}
 
-	if err := r.reconcilePatroniVersionCheck(ctx, cr); err != nil {
+	if err := r.reconcilePatroniVersion(ctx, cr); err != nil {
 		if errors.Is(err, errPatroniVersionCheckWait) {
 			return reconcile.Result{
 				RequeueAfter: 5 * time.Second,
@@ -364,185 +357,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return ctrl.Result{}, nil
-}
-
-var errPatroniVersionCheckWait = errors.New("waiting for pod to initialize")
-
-func (r *PGClusterReconciler) reconcilePatroniVersionCheck(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Annotations == nil {
-		cr.Annotations = make(map[string]string)
-	}
-
-	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
-		cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
-
-		patroniVersionUpdateFunc := func() error {
-			cluster := &v2.PerconaPGCluster{}
-			if err := r.Client.Get(ctx, types.NamespacedName{
-				Name:      cr.Name,
-				Namespace: cr.Namespace,
-			}, cluster); err != nil {
-				return errors.Wrap(err, "get PerconaPGCluster")
-			}
-
-			orig := cluster.DeepCopy()
-
-			cluster.Status.Patroni.Version = patroniVersion
-
-			if err := r.Client.Status().Patch(ctx, cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
-				return errors.Wrap(err, "failed to patch patroni version")
-			}
-			return nil
-		}
-
-		// To ensure that the update was done given that conflicts can be caused by
-		// other code making unrelated updates to the same resource at the same time.
-		if err := retry.RetryOnConflict(retry.DefaultRetry, patroniVersionUpdateFunc); err != nil {
-			return errors.Wrap(err, "failed to patch patroni version")
-		}
-		return nil
-	}
-
-	getImageIDFromPod := func(pod *corev1.Pod, containerName string) string {
-		idx := slices.IndexFunc(pod.Status.ContainerStatuses, func(s corev1.ContainerStatus) bool {
-			return s.Name == containerName
-		})
-		if idx == -1 {
-			return ""
-		}
-		return pod.Status.ContainerStatuses[idx].ImageID
-	}
-
-	pods := new(corev1.PodList)
-	instances, err := naming.AsSelector(naming.ClusterInstances(cr.Name))
-	if err != nil {
-		return err
-	}
-	if err = r.Client.List(ctx, pods, client.InNamespace(cr.Namespace), client.MatchingLabelsSelector{Selector: instances}); err != nil {
-		return err
-	}
-
-	// Collecting all image IDs from instance pods. Under normal conditions, this slice will contain a single image ID, as all pods typically use the same image.
-	// During an image update, it may contain multiple different image IDs as the update progresses.
-	imageIDs := []string{}
-	for _, pod := range pods.Items {
-		imageID := getImageIDFromPod(&pod, naming.ContainerDatabase)
-		if imageID != "" && !slices.Contains(imageIDs, imageID) {
-			imageIDs = append(imageIDs, imageID)
-		}
-	}
-
-	// If the imageIDs slice contains the imageID from the status, we skip checking the Patroni version.
-	// This ensures that the Patroni version is only checked after all pods have been updated.
-	if (len(imageIDs) == 0 || slices.Contains(imageIDs, cr.Status.Postgres.ImageID)) && cr.Status.Patroni.Version != "" {
-		cr.Annotations[pNaming.AnnotationPatroniVersion] = cr.Status.Patroni.Version
-		return nil
-	}
-
-	meta := metav1.ObjectMeta{
-		Name:      cr.Name + "-patroni-version-check",
-		Namespace: cr.Namespace,
-	}
-
-	p := &corev1.Pod{
-		ObjectMeta: meta,
-	}
-
-	err = r.Client.Get(ctx, client.ObjectKeyFromObject(p), p)
-	if client.IgnoreNotFound(err) != nil {
-		return errors.Wrap(err, "failed to get patroni version check pod")
-	}
-	if k8serrors.IsNotFound(err) {
-		if len(cr.Spec.InstanceSets) == 0 {
-			return errors.New(".spec.instances is a required value") // shouldn't happen as the value is required in the crd.yaml
-		}
-		p = &corev1.Pod{
-			ObjectMeta: meta,
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  pNaming.ContainerPatroniVersionCheck,
-						Image: cr.PostgresImage(),
-						Command: []string{
-							"bash",
-						},
-						Args: []string{
-							"-c", "sleep 60",
-						},
-						Resources:       cr.Spec.InstanceSets[0].Resources,
-						SecurityContext: initialize.RestrictedSecurityContext(cr.CompareVersion("2.8.0") >= 0),
-					},
-				},
-				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
-				Affinity:                      cr.Spec.InstanceSets[0].Affinity,
-				TerminationGracePeriodSeconds: ptr.To(int64(5)),
-				ImagePullSecrets:              cr.Spec.ImagePullSecrets,
-				Resources: &corev1.ResourceRequirements{
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("64Mi"),
-					},
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("50m"),
-						corev1.ResourceMemory: resource.MustParse("32Mi"),
-					},
-				},
-			},
-		}
-
-		if err := controllerutil.SetControllerReference(cr, p, r.Client.Scheme()); err != nil {
-			return errors.Wrap(err, "set controller reference")
-		}
-		if err := r.Client.Create(ctx, p); client.IgnoreAlreadyExists(err) != nil {
-			return errors.Wrap(err, "failed to create pod to check patroni version")
-		}
-
-		return errPatroniVersionCheckWait
-	}
-
-	if p.Status.Phase != corev1.PodRunning {
-		return errPatroniVersionCheckWait
-	}
-
-	var stdout, stderr bytes.Buffer
-	execCli, err := clientcmd.NewClient()
-	if err != nil {
-		return errors.Wrap(err, "failed to create exec client")
-	}
-	b := wait.Backoff{
-		Duration: 5 * time.Second,
-		Factor:   1.0,
-		Steps:    12,
-		Cap:      time.Minute,
-	}
-	if err := retry.OnError(b, func(err error) bool { return err != nil && strings.Contains(err.Error(), "container not found") }, func() error {
-		return execCli.Exec(ctx, p, pNaming.ContainerPatroniVersionCheck, nil, &stdout, &stderr, "patronictl", "version")
-	}); err != nil {
-		return errors.Wrap(err, "exec")
-	}
-
-	patroniVersion := strings.TrimSpace(strings.TrimPrefix(stdout.String(), "patronictl version "))
-
-	if _, err := gover.NewVersion(patroniVersion); err != nil {
-		return errors.Wrap(err, "failed to validate patroni version")
-	}
-
-	orig := cr.DeepCopy()
-
-	cr.Status.Patroni.Version = patroniVersion
-	cr.Status.Postgres.Version = cr.Spec.PostgresVersion
-	cr.Status.Postgres.ImageID = getImageIDFromPod(p, pNaming.ContainerPatroniVersionCheck)
-
-	if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "failed to patch patroni version")
-	}
-
-	if err := r.Client.Delete(ctx, p); err != nil {
-		return errors.Wrap(err, "failed to delete patroni version check pod")
-	}
-	cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
-
-	return nil
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {
@@ -978,6 +792,8 @@ func (r *PGClusterReconciler) reconcileExternalWatchers(ctx context.Context, cr 
 }
 
 func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	log := logging.FromContext(ctx)
+
 	if !cr.Spec.Backups.IsEnabled() {
 		return nil
 	}
@@ -985,8 +801,6 @@ func (r *PGClusterReconciler) startExternalWatchers(ctx context.Context, cr *v2.
 	if !*cr.Spec.Backups.TrackLatestRestorableTime {
 		return nil
 	}
-
-	log := logging.FromContext(ctx)
 
 	watcherName, watcherFunc := watcher.GetWALWatcher(cr)
 	if r.Watchers.IsExist(watcherName) {
