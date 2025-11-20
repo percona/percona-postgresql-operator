@@ -33,7 +33,7 @@ require (
 	google.golang.org/grpc v1.76.0
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.34.1
-	k8s.io/apimachinery v0.34.1
+	k8s.io/apimachinery v0.34.2
 	k8s.io/client-go v0.34.1
 	k8s.io/component-base v0.34.1
 	sigs.k8s.io/controller-runtime v0.21.0
