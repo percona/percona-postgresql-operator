@@ -651,4 +651,119 @@ spec:
 			Expect(event).To(ContainSubstring("PG 12 will no longer receive updates. We recommend upgrading."))
 		})
 	})
+
+	Context("PG Extensions", func() {
+		var cluster *v1beta1.PostgresCluster
+
+		BeforeEach(func() {
+			cluster = create(`
+metadata:
+  name: test-cluster
+spec:
+  postgresVersion: 13
+  image: postgres
+  instances:
+  - name: instance1
+    initContainer:
+      image: pg-operator
+    dataVolumeClaimSpec:
+      accessModes:
+      - "ReadWriteMany"
+      resources:
+        requests:
+          storage: 1Gi
+  extensions:
+    pgStatMonitor: false
+    pgStatStatements: false
+    pgAudit: false
+`)
+			Expect(reconcile(cluster)).To(BeZero())
+		})
+
+		AfterEach(func() {
+			ctx := context.Background()
+
+			if cluster != nil {
+				Expect(client.IgnoreNotFound(
+					suite.Client.Delete(ctx, cluster),
+				)).To(Succeed())
+
+				// Remove finalizers, if any, so the namespace can terminate.
+				Expect(client.IgnoreNotFound(
+					suite.Client.Patch(ctx, cluster, client.RawPatch(
+						client.Merge.Type(), []byte(`{"metadata":{"finalizers":[]}}`))),
+				)).To(Succeed())
+			}
+		})
+
+		getSharedLibraries := func(cfg map[string]any) string {
+			Expect(cfg["bootstrap"]).ToNot(BeZero())
+			bootstrap, ok := cfg["bootstrap"].(map[string]any)
+			Expect(ok).To(BeTrue())
+
+			Expect(bootstrap["dcs"]).ToNot(BeZero())
+			dcs, ok := bootstrap["dcs"].(map[string]any)
+			Expect(ok).To(BeTrue())
+
+			Expect(dcs["postgresql"]).ToNot(BeZero())
+			postgresql, ok := dcs["postgresql"].(map[string]any)
+			Expect(ok).To(BeTrue())
+
+			Expect(postgresql["parameters"]).ToNot(BeZero())
+			parameters, ok := postgresql["parameters"].(map[string]any)
+			Expect(ok).To(BeTrue())
+
+			Expect(parameters["shared_preload_libraries"]).ToNot(BeZero())
+			libraries, ok := parameters["shared_preload_libraries"].(string)
+			Expect(ok).To(BeTrue())
+
+			return libraries
+		}
+
+		It("appends pg_stat_monitor after pg_stat_statements", func() {
+			ctx := context.Background()
+			orig := cluster.DeepCopy()
+
+			cluster.Spec.Extensions.PGStatMonitor = true
+			cluster.Spec.Extensions.PGAudit = true
+
+			Expect(suite.Client.Patch(ctx, cluster, client.MergeFrom(orig))).To(Succeed())
+			Expect(reconcile(cluster)).To(BeZero())
+			Expect(cluster.Status.Patroni.SystemIdentifier).To(BeZero())
+
+			ccm := &corev1.ConfigMap{}
+			Expect(suite.Client.Get(ctx, client.ObjectKey{
+				Namespace: test.Namespace.Name, Name: cluster.Name + "-config",
+			}, ccm)).To(Succeed())
+			Expect(ccm.Data["patroni.yaml"]).ToNot(BeZero())
+
+			var cfg map[string]any
+			Expect(yaml.Unmarshal([]byte(ccm.Data["patroni.yaml"]), &cfg)).To(Succeed())
+
+			libraries := getSharedLibraries(cfg)
+			Expect(libraries).To(Equal("pg_stat_monitor,pgaudit"))
+
+			orig = cluster.DeepCopy()
+
+			cluster.Spec.Extensions.PGStatStatements = true
+			cluster.Spec.Extensions.PGStatMonitor = true
+			cluster.Spec.Extensions.PGAudit = true
+
+			Expect(suite.Client.Patch(ctx, cluster, client.MergeFrom(orig))).To(Succeed())
+			Expect(reconcile(cluster)).To(BeZero())
+			Expect(cluster.Status.Patroni.SystemIdentifier).To(BeZero())
+
+			ccm = &corev1.ConfigMap{}
+			Expect(suite.Client.Get(ctx, client.ObjectKey{
+				Namespace: test.Namespace.Name, Name: cluster.Name + "-config",
+			}, ccm)).To(Succeed())
+			Expect(ccm.Data["patroni.yaml"]).ToNot(BeZero())
+
+			var cfg2 map[string]any
+			Expect(yaml.Unmarshal([]byte(ccm.Data["patroni.yaml"]), &cfg2)).To(Succeed())
+
+			libraries = getSharedLibraries(cfg2)
+			Expect(libraries).To(Equal("pg_stat_statements,pg_stat_monitor,pgaudit"))
+		})
+	})
 })
