@@ -3,8 +3,8 @@ package pgstatstatements
 import (
 	"context"
 
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 )
 
 func EnableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
@@ -38,7 +38,6 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 }
 
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
-
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_stat_statements")
 	outParameters.Mandatory.Add("pg_stat_statements.track", "all")
 }

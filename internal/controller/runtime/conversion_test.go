@@ -10,7 +10,7 @@ import (
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 )
 
 func TestConvertUnstructured(t *testing.T) {

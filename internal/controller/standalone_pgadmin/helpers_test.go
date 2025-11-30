@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 )
 
 // Scale extends d according to PGO_TEST_TIMEOUT_SCALE.

@@ -11,12 +11,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	"github.com/percona/percona-postgresql-operator/percona/version"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/config"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func init() {
@@ -444,6 +444,11 @@ type PerconaPGClusterStatus struct {
 
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
+	// Deprecated: Use Patroni instead. This field will be removed in a future release.
+	PatroniVersion string `json:"patroniVersion"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Patroni Patroni `json:"patroni,omitempty"`
 
 	// Status information for pgBackRest
@@ -476,6 +481,8 @@ type Patroni struct {
 	Version string `json:"version"`
 }
 
+// Backups struct.
+// +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
 type Backups struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
@@ -505,7 +512,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 		sc = b.PGBackRest.Sidecars
 	}
 
-	return crunchyv1beta1.Backups{
+	backups := crunchyv1beta1.Backups{
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
 			Metadata:      b.PGBackRest.Metadata,
 			Configuration: b.PGBackRest.Configuration,
@@ -522,6 +529,12 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 			EnvFrom:       b.PGBackRest.EnvFrom,
 		},
 	}
+
+	if currVersion != nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.8.0"))) {
+		backups.TrackLatestRestorableTime = b.TrackLatestRestorableTime
+	}
+
+	return backups
 }
 
 type PGBackRestArchive struct {
@@ -556,9 +569,9 @@ type PGBackRestArchive struct {
 	Jobs *crunchyv1beta1.BackupJobs `json:"jobs,omitempty"`
 
 	// Defines a pgBackRest repository
-	// +kubebuilder:validation:MinItems=1
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	Repos []crunchyv1beta1.PGBackRestRepo `json:"repos"`
 
 	// Defines configuration for a pgBackRest dedicated repository host.  This section is only
@@ -653,8 +666,8 @@ type CustomExtensionsStorageSpec struct {
 	Bucket         string                   `json:"bucket,omitempty"`
 	Region         string                   `json:"region,omitempty"`
 	Endpoint       string                   `json:"endpoint,omitempty"`
-	ForcePathStyle string                   `json:"forcePathStyle,omitempty"`
-	DisableSSL     string                   `json:"disableSSL,omitempty"`
+	ForcePathStyle bool                     `json:"forcePathStyle,omitempty"`
+	DisableSSL     bool                     `json:"disableSSL,omitempty"`
 	Secret         *corev1.SecretProjection `json:"secret,omitempty"`
 }
 

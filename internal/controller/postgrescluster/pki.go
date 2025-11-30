@@ -15,9 +15,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/pki"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -176,7 +176,17 @@ func (r *Reconciler) reconcileClusterCertificate(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
 
 	leaf := &pki.LeafCertificate{}
-	dnsNames := append(naming.ServiceDNSNames(ctx, primaryService), naming.ServiceDNSNames(ctx, replicaService)...)
+	primaryServiceDNSNames, err := naming.ServiceDNSNames(ctx, primaryService)
+	if err != nil {
+		return nil, errors.Wrap(err, "get primary service dns names")
+	}
+
+	replicaServiceDNSNames, err := naming.ServiceDNSNames(ctx, replicaService)
+	if err != nil {
+		return nil, errors.Wrap(err, "get replica service dns names")
+	}
+
+	dnsNames := append(primaryServiceDNSNames, replicaServiceDNSNames...)
 	dnsFQDN := dnsNames[0]
 
 	if err == nil {

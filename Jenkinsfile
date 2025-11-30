@@ -16,7 +16,7 @@ void createCluster(String CLUSTER_SUFFIX) {
                     --preemptible \
                     --zone=${region} \
                     --machine-type='n1-standard-4' \
-                    --cluster-version='1.30' \
+                    --cluster-version='1.31' \
                     --num-nodes=3 \
                     --labels='delete-cluster-after-hours=6' \
                     --disk-size=30 \
@@ -205,7 +205,10 @@ void makeReport() {
         TestsReport = TestsReport + "\r\n| " + testName + " | [" + testResult + "](" + testUrl + ") | " + formatTime(testTime) + " |"
         TestsReportXML = TestsReportXML + '<testcase name=\\"' + testName + '\\" time=\\"' + testTime + '\\"><'+ testResult +'/></testcase>\n'
     }
-    TestsReport = TestsReport + "\r\n| We run $startedTestAmount out of $wholeTestAmount | | " + formatTime(totalTestTime) + " |"
+    TestsReport = TestsReport + "\r\n\r\n| Summary | Value |\r\n| ------- | ----- |"
+    TestsReport = TestsReport + "\r\n| Tests Run | $startedTestAmount/$wholeTestAmount |"
+    TestsReport = TestsReport + "\r\n| Job Duration | " + formatTime(currentBuild.duration / 1000) + " |"
+    TestsReport = TestsReport + "\r\n| Total Test Time | "  + formatTime(totalTestTime) + " |"
     TestsReportXML = TestsReportXML + '</testsuite>\n'
 
     sh """
@@ -498,7 +501,7 @@ pipeline {
                                  -e GO111MODULE=on \
                                  golang:1.25.1 sh -c '
                                      go install github.com/google/go-licenses@latest;
-                                     /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/cmd/postgres-operator \
+                                     /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/v2/cmd/postgres-operator \
                                          | cut -d , -f 3 \
                                          | sort -u \
                                          > go-licenses-new || :
