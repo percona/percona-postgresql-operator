@@ -5,5 +5,12 @@ metadata:
 spec:
   pgCluster: cluster1
   repoName: repo1
+#  containerOptions:
+#    env:
+#    - name: MY_ENV
+#      value: "1000"
+#    envFrom:
+#    - secretRef:
+#        name: backup-env-secret
 #  options:
 #  - --type=full
