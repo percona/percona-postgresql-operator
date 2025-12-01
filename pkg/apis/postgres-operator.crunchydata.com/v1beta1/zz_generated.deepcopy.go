@@ -2394,12 +2394,12 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 	}
 	if in.InternalTrafficPolicy != nil {
 		in, out := &in.InternalTrafficPolicy, &out.InternalTrafficPolicy
-		*out = new(corev1.ServiceInternalTrafficPolicy)
+		*out = new(corev1.ServiceInternalTrafficPolicyType)
 		**out = **in
 	}
 	if in.ExternalTrafficPolicy != nil {
 		in, out := &in.ExternalTrafficPolicy, &out.ExternalTrafficPolicy
-		*out = new(corev1.ServiceExternalTrafficPolicy)
+		*out = new(corev1.ServiceExternalTrafficPolicyType)
 		**out = **in
 	}
 }
