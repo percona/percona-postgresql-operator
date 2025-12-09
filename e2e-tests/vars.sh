@@ -29,13 +29,10 @@ if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
 else
 	export PG_VER="${PG_VER:-18}"
 fi
-export IMAGE_POSTGRESQL=percona/percona-distribution-postgresql:18
-export IMAGE_BACKREST=perconalab/percona-postgresql-operator:main-ppg18-pgbackrest
-export IMAGE_PGBOUNCER=perconalab/percona-postgresql-operator:main-ppg18-pgbouncer
 
-#export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
-#export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
-#export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
+export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
+export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
+export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
 export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade"}
 export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
