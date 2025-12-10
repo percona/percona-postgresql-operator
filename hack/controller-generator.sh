@@ -22,6 +22,6 @@ set -eu
 # Find `controller-gen` on the current PATH or install it to the Go install path.
 tool="$(command -v controller-gen || true)"
 [ -n "$tool" ] || tool="$GOBIN/controller-gen"
-[ -x "$tool" ] || go install 'sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5'
+[ -x "$tool" ] || go install 'sigs.k8s.io/controller-tools/cmd/controller-gen@v0.18.0'
 
 "$tool" "$@"
