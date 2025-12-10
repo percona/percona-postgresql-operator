@@ -27,7 +27,7 @@ if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
 	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -E 's/.*:(.*ppg)?([0-9]+).*/\2/')
 	export PG_VER="${pg_version_value}"
 else
-	export PG_VER="${PG_VER:-18}"
+	export PG_VER="${PG_VER:-17}"
 fi
 
 export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
