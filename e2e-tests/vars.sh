@@ -29,6 +29,7 @@ if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
 else
 	export PG_VER="${PG_VER:-17}"
 fi
+
 export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
 export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"perconalab/percona-distribution-postgresql:$PG_VER"}
 export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
