@@ -1,0 +1,77 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: target-cluster-percona
+  annotations:
+    pgv2.percona.com/patroni-version: "4"
+spec:
+  crVersion: 2.8.0
+      # Custom certificates that were obtained from source-cluster should be used in case of “Streaming replication”. It can be avoid if you use only “pgBackrest repo based standby” replication.
+  secrets:
+    customReplicationTLSSecret:
+      name: source-cluster-replication-cert
+    customTLSSecret:
+      name: source-cluster-cluster-cert
+
+  standby:
+    enabled: true
+        # Public IP of source-cluster-percona-ha service from source-cluster for “Streaming replication”
+    host: 104.198.246.82
+        # PostgreSQL port of source-cluster-percona-ha service from source-cluster for “Streaming replication”
+    port: 5432
+        # AWS pgBackrest repo, which is used by source-cluster
+    repoName: repo1
+
+  image: docker.io/percona/percona-distribution-postgresql:17.6-1
+  imagePullPolicy: Always
+  postgresVersion: 17
+
+  instances:
+  - name: instance1
+    replicas: 3
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                postgres-operator.crunchydata.com/data: postgres
+            topologyKey: kubernetes.io/hostname
+    dataVolumeClaimSpec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+
+  proxy:
+    pgBouncer:
+      replicas: 3
+      image: docker.io/percona/percona-pgbouncer:1.24.1-1
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  postgres-operator.crunchydata.com/role: pgbouncer
+              topologyKey: kubernetes.io/hostname
+
+  backups:
+    pgbackrest:
+      repos:
+            # AWS pgBackrest repo, which is used by source-cluster
+        - name: repo1
+          s3:
+            bucket: pg-operator-testing
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+      image: docker.io/percona/percona-pgbackrest:2.56.0-1
+      configuration:
+        - secret:
+            name: pgo-s3-creds
+      global:
+        repo1-path: /pg-operator-testing/crunchydata
