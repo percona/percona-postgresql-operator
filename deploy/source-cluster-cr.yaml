@@ -1,0 +1,40 @@
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: source-cluster
+spec:
+  service:
+    type: LoadBalancer
+  postgresVersion: 17
+  instances:
+    - name: instance1
+      replicas: 3
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  proxy:
+    pgBouncer:
+      service:
+        type: LoadBalancer
+      replicas: 3
+      config:
+        global:
+          pool_mode: transaction 
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: pgo-s3-creds
+      global:
+        repo1-path: /pgo-migration-testing/crunchydata
+      repos:
+        - name: repo1
+          s3:
+            bucket: pgo-migration-testing
+            endpoint: s3.amazonaws.com
+            region:  us-east-1
+          schedules:
+            full: "0 0 * * 0"
