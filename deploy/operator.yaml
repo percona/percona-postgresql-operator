@@ -47,7 +47,7 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
-        image: docker.io/percona/percona-postgresql-operator:2.8.1
+        image: docker.io/perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
