@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# tis is check for test check
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 CERT_MANAGER_VER="1.19.1"
