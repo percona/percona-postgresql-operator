@@ -9,11 +9,16 @@ commands:
       source ../../functions
 
       cr_version="2.8.1"
+
+      backrest_image=$(get_version_images $cr_version BACKREST${PG_VER} )
+      pgbouncer_image=$(get_version_images $cr_version PGBOUNCER${PG_VER})
+      postgres_image=$(get_version_images $cr_version POSTGRESQL${PG_VER})
+
       get_cr \
-        | yq eval ".spec.crVersion=\"$cr_version\"" - \ - \
-        | yq eval ".spec.image=\"${IMAGE_BASE}:pg-operator-$cr_version-ppg$PG_VER-postgres\"" - \
-        | yq eval ".spec.backups.pgbackrest.image=\"${IMAGE_BASE}:pg-operator-$cr_version-pgbackrest$PG_VER\"" - \
-        | yq eval ".spec.proxy.pgBouncer.image=\"${IMAGE_BASE}:pg-operator-$cr_version-pgbouncer$PG_VER\"" - \
+        | yq eval ".spec.crVersion=\"$cr_version\"" - \
+        | yq eval ".spec.image=\"${REGISTRY_NAME_FULL}${postgres_image}\"" - \
+        | yq eval ".spec.backups.pgbackrest.image=\"${REGISTRY_NAME_FULL}${backrest_image}\"" - \
+        | yq eval ".spec.proxy.pgBouncer.image=\"${REGISTRY_NAME_FULL}${pgbouncer_image}\"" - \
         | kubectl -n "${NAMESPACE}" apply -f -
 
       sleep 10
