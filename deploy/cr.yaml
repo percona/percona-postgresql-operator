@@ -9,9 +9,9 @@ metadata:
 #  - percona.com/delete-ssl
 #  - percona.com/delete-backups
 spec:
-  crVersion: 2.8.1
+  crVersion: 2.8.2
 #  initContainer:
-#    image: docker.io/percona/percona-postgresql-operator:2.8.1
+#    image: docker.io/percona/percona-postgresql-operator:2.8.2
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -154,7 +154,7 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/percona/percona-distribution-postgresql:17.7-1
+  image: docker.io/percona/percona-distribution-postgresql:17.7-2
   imagePullPolicy: Always
   postgresVersion: 17
 #  port: 5432
@@ -188,7 +188,7 @@ spec:
 #    - secretRef:
 #        name: instance-env-secret
 #    initContainer:
-#      image: docker.io/percona/percona-postgresql-operator:2.8.1
+#      image: docker.io/percona/percona-postgresql-operator:2.8.2
 #      resources:
 #        limits:
 #          cpu: 2.0
@@ -417,7 +417,7 @@ spec:
 #      - secretRef:
 #          name: repo-host-env-secret
 #      initContainer:
-#        image: docker.io/percona/percona-postgresql-operator:2.8.1
+#        image: docker.io/percona/percona-postgresql-operator:2.8.2
 #        resources:
 #          limits:
 #            cpu: 2.0
@@ -647,7 +647,7 @@ spec:
 #    - basebackup
 
 #  extensions:
-#    image: docker.io/percona/percona-postgresql-operator:2.8.1
+#    image: docker.io/percona/percona-postgresql-operator:2.8.2
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
