@@ -297,7 +297,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
   labels:
-    pgv2.percona.com/version: v2.8.1
+    pgv2.percona.com/version: v2.8.2
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -705,7 +705,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
   labels:
-    pgv2.percona.com/version: v2.8.1
+    pgv2.percona.com/version: v2.8.2
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -22109,7 +22109,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
   labels:
-    pgv2.percona.com/version: v2.8.1
+    pgv2.percona.com/version: v2.8.2
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -22209,7 +22209,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
   labels:
-    pgv2.percona.com/version: v2.8.1
+    pgv2.percona.com/version: v2.8.2
   name: perconapgupgrades.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -23160,7 +23160,7 @@ spec:
                 type: object
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
-                maximum: 16
+                maximum: 17
                 minimum: 12
                 type: integer
               image:
@@ -53964,7 +53964,7 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
-        image: docker.io/percona/percona-postgresql-operator:2.8.1
+        image: docker.io/percona/percona-postgresql-operator:2.8.2
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
