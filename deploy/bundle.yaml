@@ -297,7 +297,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
   labels:
-    pgv2.percona.com/version: v2.8.2
+    pgv2.percona.com/version: v2.9.0
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -705,7 +705,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
   labels:
-    pgv2.percona.com/version: v2.8.2
+    pgv2.percona.com/version: v2.9.0
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -22109,7 +22109,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
   labels:
-    pgv2.percona.com/version: v2.8.2
+    pgv2.percona.com/version: v2.9.0
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -22209,7 +22209,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
   labels:
-    pgv2.percona.com/version: v2.8.2
+    pgv2.percona.com/version: v2.9.0
   name: perconapgupgrades.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -53964,7 +53964,7 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
-        image: docker.io/percona/percona-postgresql-operator:2.8.2
+        image: docker.io/perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
