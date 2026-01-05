@@ -1,4 +1,5 @@
 # Images versions
+# to check snyc scan
 IMAGE_OPERATOR=percona/percona-postgresql-operator:2.8.1
 
 IMAGE_POSTGRESQL18=percona/percona-distribution-postgresql:18.1-1
