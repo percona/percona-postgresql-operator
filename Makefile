@@ -473,7 +473,6 @@ NEXT_VER        := $(MAJOR_VER).$(shell expr $(MINOR_VER) + 1).0
 PREV1_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 1).0
 PREV2_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 2).0
 after-release: update-version generate
-	echo $(NEXT_VER) > percona/version/version.txt
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
@@ -488,6 +487,8 @@ after-release: update-version generate
 		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
 		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" deploy/upgrade.yaml
+
+# Update upgrade-consistency
 	$(SED) -i "s/$(PREV2_VERSION)/$(PREV1_VERSION)/g" e2e-tests/tests/upgrade-consistency/01-*.yaml
 	$(SED) -i "s/$(PREV1_VERSION)/$(CURRENT_VERSION)/g" e2e-tests/tests/upgrade-consistency/02-*.yaml
 	$(SED) -i "s/$(CURRENT_VERSION)/$(NEXT_VER)/g" e2e-tests/tests/upgrade-consistency/03-*.yaml e2e-tests/tests/init-deploy/05-assert.yaml
