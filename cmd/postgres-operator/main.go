@@ -334,6 +334,8 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 		}
 	}
 
+	options.PprofBindAddress = os.Getenv("PPROF_BIND_ADDRESS")
+
 	return options, nil
 }
 
