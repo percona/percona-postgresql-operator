@@ -22,14 +22,14 @@ require (
 	github.com/xdg-go/stringprep v1.0.4
 	go.nhat.io/grpcmock v0.33.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
-	go.opentelemetry.io/otel v1.38.0
+	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.38.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.38.0
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.38.0
-	go.opentelemetry.io/otel/sdk v1.38.0
-	go.opentelemetry.io/otel/trace v1.38.0
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.39.0
+	go.opentelemetry.io/otel/sdk v1.39.0
+	go.opentelemetry.io/otel/trace v1.39.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/crypto v0.45.0
+	golang.org/x/crypto v0.46.0
 	google.golang.org/grpc v1.77.0
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.34.2
@@ -119,15 +119,15 @@ require (
 	go.mongodb.org/mongo-driver v1.17.6 // indirect
 	go.nhat.io/matcher/v2 v2.0.0 // indirect
 	go.nhat.io/wait v0.1.0 // indirect
-	go.opentelemetry.io/otel/metric v1.38.0 // indirect
+	go.opentelemetry.io/otel/metric v1.39.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/term v0.37.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/term v0.38.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.39.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
