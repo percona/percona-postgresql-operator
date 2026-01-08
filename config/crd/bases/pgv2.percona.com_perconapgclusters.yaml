@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.5
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: perconapgbackups.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -614,7 +614,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.5
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: perconapgclusters.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -18093,7 +18093,7 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 17
+                maximum: 18
                 minimum: 12
                 type: integer
               proxy:
@@ -22639,7 +22639,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.5
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: perconapgrestores.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -22943,7 +22943,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.5
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: perconapgupgrades.pgv2.percona.com
 spec:
   group: pgv2.percona.com
@@ -23894,7 +23894,7 @@ spec:
                 type: object
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
-                maximum: 16
+                maximum: 17
                 minimum: 12
                 type: integer
               image:
@@ -25545,7 +25545,7 @@ spec:
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
-                maximum: 17
+                maximum: 18
                 minimum: 13
                 type: integer
               tolerations:

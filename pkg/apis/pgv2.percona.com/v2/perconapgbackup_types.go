@@ -132,7 +132,7 @@ func (t *PITRestoreDateTime) UnmarshalJSON(b []byte) (err error) {
 	return nil
 }
 
-func (t *PITRestoreDateTime) MarshalJSON() ([]byte, error) {
+func (t PITRestoreDateTime) MarshalJSON() ([]byte, error) {
 	if t.Time == nil {
 		return []byte("null"), nil
 	}
