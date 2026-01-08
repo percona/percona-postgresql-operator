@@ -402,7 +402,7 @@ $(info $(IMAGE))
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.3)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.8.0)
 
 ENVTEST ?= hack/tools/setup-envtest
 tools: tools/setup-envtest

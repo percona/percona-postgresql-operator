@@ -250,6 +250,20 @@ func (in *PGBouncerSpec) DeepCopyInto(out *PGBouncerSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.SidecarVolumes != nil {
+		in, out := &in.SidecarVolumes, &out.SidecarVolumes
+		*out = make([]v1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.SidecarPVCs != nil {
+		in, out := &in.SidecarPVCs, &out.SidecarPVCs
+		*out = make([]v1beta1.SidecarPVC, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Containers != nil {
 		in, out := &in.Containers, &out.Containers
 		*out = new(v1beta1.PGBouncerSidecars)
@@ -362,6 +376,20 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	if in.Sidecars != nil {
 		in, out := &in.Sidecars, &out.Sidecars
 		*out = make([]v1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.SidecarVolumes != nil {
+		in, out := &in.SidecarVolumes, &out.SidecarVolumes
+		*out = make([]v1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.SidecarPVCs != nil {
+		in, out := &in.SidecarPVCs, &out.SidecarPVCs
+		*out = make([]v1beta1.SidecarPVC, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

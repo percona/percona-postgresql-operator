@@ -265,6 +265,11 @@ type PGBackRestRepoHost struct {
 	// PostgreSQL to restart.
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
+
+	// K8SPG-864
+	SidecarVolumes []corev1.Volume `json:"sidecarVolumes,omitempty"`
+	// K8SPG-864
+	SidecarPVCs []SidecarPVC `json:"sidecarPVCs,omitempty"`
 }
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.

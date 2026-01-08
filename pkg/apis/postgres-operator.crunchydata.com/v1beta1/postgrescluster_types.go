@@ -488,6 +488,11 @@ type PostgresInstanceSetSpec struct {
 	// +optional
 	Containers []corev1.Container `json:"containers,omitempty"`
 
+	// K8SPG-864
+	SidecarVolumes []corev1.Volume `json:"sidecarVolumes,omitempty"`
+	// K8SPG-864
+	SidecarPVCs []SidecarPVC `json:"sidecarPVCs,omitempty"`
+
 	// Additional init containers for PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
 	// +optional
@@ -802,4 +807,11 @@ func (cr *PostgresCluster) IsPatroniVer4() (bool, error) {
 
 func (cr *PostgresCluster) BackupSpecFound() bool {
 	return !reflect.DeepEqual(cr.Spec.Backups, Backups{PGBackRest: PGBackRestArchive{}})
+}
+
+// K8SPG-864
+type SidecarPVC struct {
+	Name string `json:"name"`
+
+	Spec corev1.PersistentVolumeClaimSpec `json:"spec"`
 }
