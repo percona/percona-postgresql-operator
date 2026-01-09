@@ -21462,6 +21462,10 @@ spec:
                 and is true
               rule: '!has(self.users) || self.postgresVersion >= 15 || self.users.all(u,
                 !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)'
+            - message: spec.backups.pgbackrest.image is required when spec.dataSource
+                is set
+              rule: '!has(self.dataSource) || (has(self.backups.pgbackrest.image)
+                && self.backups.pgbackrest.image != "")'
           status:
             properties:
               conditions:

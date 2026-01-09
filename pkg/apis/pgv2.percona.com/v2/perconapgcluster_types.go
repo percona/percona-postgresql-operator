@@ -45,6 +45,7 @@ type PerconaPGCluster struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
+// +kubebuilder:validation:XValidation:rule="!has(self.dataSource) || (has(self.backups.pgbackrest.image) && self.backups.pgbackrest.image != \"\")",message="spec.backups.pgbackrest.image is required when spec.dataSource is set"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
