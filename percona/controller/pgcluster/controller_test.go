@@ -1379,6 +1379,20 @@ var _ = Describe("Sidecars", Ordered, func() {
 		cr.Spec.Proxy.PGBouncer.SidecarPVCs = []v1beta1.SidecarPVC{
 			{
 				Name: "sidecar-pgbouncer-pvc",
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName: "some-name",
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteMany,
+					},
+					Resources: corev1.VolumeResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("2G"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("2G"),
+						},
+					},
+				},
 			},
 		}
 		cr.Spec.Backups.PGBackRest.RepoHost.Sidecars = []corev1.Container{
