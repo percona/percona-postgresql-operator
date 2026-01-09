@@ -1,4 +1,5 @@
 backup-enable-disable
+custom-envs
 custom-extensions
 custom-tls
 database-init-sql
