@@ -1,0 +1,12 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: builtin-extensions
+spec:
+  extensions:
+    builtin:
+      pg_stat_monitor: false
+      pg_stat_statements: false
+      pg_audit: false
+      pgvector: false
+      pg_repack: false

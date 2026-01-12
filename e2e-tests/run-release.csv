@@ -1,4 +1,5 @@
 backup-enable-disable
+builtin-extensions
 custom-extensions
 custom-tls
 database-init-sql
