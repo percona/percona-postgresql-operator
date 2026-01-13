@@ -5,6 +5,7 @@ import (
 
 	gover "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -103,7 +104,7 @@ type PerconaPGClusterSpec struct {
 
 	// Run this cluster as a read-only copy of an existing cluster or archive.
 	// +optional
-	Standby *crunchyv1beta1.PostgresStandbySpec `json:"standby,omitempty"`
+	Standby *StandbySpec `json:"standby,omitempty"`
 
 	// Whether or not the PostgreSQL cluster is being deployed to an OpenShift
 	// environment. If the field is unset, the operator will automatically
@@ -173,6 +174,15 @@ type PerconaPGClusterSpec struct {
 	// specified in `spec.users` across all databases associated with that user.
 	// +optional
 	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
+}
+
+type StandbySpec struct {
+	*crunchyv1beta1.PostgresStandbySpec `json:",inline"`
+
+	// +optional
+	// MaxLag is the maximum WAL lag allowed for the standby cluster.
+	// If the lag exceeds this value, the standby cluster is marked as unready.
+	MaxLag resource.Quantity `json:"maxLag,omitempty"`
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -245,6 +255,10 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
 	}
+
+	if cr.Spec.Standby != nil && cr.Spec.Standby.MaxLag.IsZero() {
+		cr.Spec.Standby.MaxLag = resource.MustParse("10Gi")
+	}
 }
 
 func (cr *PerconaPGCluster) PostgresImage() string {
@@ -304,7 +318,10 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
 	postgresCluster.Spec.Paused = cr.Spec.Unmanaged
 	postgresCluster.Spec.Shutdown = cr.Spec.Pause
-	postgresCluster.Spec.Standby = cr.Spec.Standby
+
+	if cr.Spec.Standby != nil {
+		postgresCluster.Spec.Standby = cr.Spec.Standby.PostgresStandbySpec
+	}
 	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy(cr.Spec.CRVersion)
 	postgresCluster.Spec.ReplicaService = cr.Spec.ExposeReplicas.ToCrunchy(cr.Spec.CRVersion)
 
@@ -470,6 +487,15 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	Standby *StandbyStatus `json:"standby,omitempty"`
+}
+
+type StandbyStatus struct {
+	LagLastComputedAt *metav1.Time `json:"lagLastComputedAt,omitempty"`
+	LagBytes          int64        `json:"lagBytes,omitempty"`
 }
 
 type Patroni struct {

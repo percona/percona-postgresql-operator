@@ -21658,6 +21658,15 @@ spec:
                     description: Network address of the PostgreSQL server to follow
                       via streaming replication.
                     type: string
+                  maxLag:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: |-
+                      MaxLag is the maximum WAL lag allowed for the standby cluster.
+                      If the lag exceeds this value, the standby cluster is marked as unready.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
                   port:
                     description: Network port of the PostgreSQL server to follow via
                       streaming replication.
@@ -22090,6 +22099,15 @@ spec:
                     type: integer
                   version:
                     type: integer
+                type: object
+              standby:
+                properties:
+                  lagBytes:
+                    format: int64
+                    type: integer
+                  lagLastComputedAt:
+                    format: date-time
+                    type: string
                 type: object
               state:
                 type: string

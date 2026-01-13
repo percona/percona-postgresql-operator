@@ -70,6 +70,10 @@ const (
 	// and in-place pgBackRest restore is in progress
 	ConditionPGBackRestRestoreProgressing = "PGBackRestoreProgressing"
 
+	// ConditionReplicationLagDetected is the type used in a condition to indicate whether or not
+	// the replication lag has been detected
+	ConditionReplicationLagDetected = "ReplicationLagDetected"
+
 	// EventRepoHostNotFound is used to indicate that a pgBackRest repository was not
 	// found when reconciling
 	EventRepoHostNotFound = "RepoDeploymentNotFound"

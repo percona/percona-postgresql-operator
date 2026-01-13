@@ -59,7 +59,7 @@ func TestExecutorExec(t *testing.T) {
 			"lots":      "of",
 			"different": "vars",
 			"CASE":      "sEnSiTiVe",
-		})
+		}, nil)
 
 	assert.Equal(t, expected, err, "expected function to be called")
 	assert.Equal(t, stdout, "some stdout")

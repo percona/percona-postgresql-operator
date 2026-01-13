@@ -156,7 +156,7 @@ SELECT pg_catalog.format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I',
 		map[string]string{
 			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
 			"QUIET":         "on", // Do not print successful statements to stdout.
-		})
+		}, nil)
 
 	log.V(1).Info("wrote PostgreSQL users", "stdout", stdout, "stderr", stderr)
 
