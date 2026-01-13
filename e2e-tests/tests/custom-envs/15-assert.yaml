@@ -1,0 +1,44 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: custom-envs
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: custom-envs
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 1
+      replicas: 1
+      updatedReplicas: 1
+  observedGeneration: 15
+  proxy:
+    pgBouncer:
+      readyReplicas: 1
+      replicas: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: custom-envs
+status:
+  pgbouncer:
+    ready: 1
+    size: 1
+  postgres:
+    instances:
+      - name: instance1
+        ready: 1
+        size: 1
+    ready: 1
+    size: 1
+  state: ready

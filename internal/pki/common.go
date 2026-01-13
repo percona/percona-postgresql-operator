@@ -10,8 +10,11 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"math/big"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // certificateSignatureAlgorithm is ECDSA with SHA-384, the recommended
@@ -59,9 +62,12 @@ func generateLeafCertificate(
 
 	bytes, err := x509.CreateCertificate(rand.Reader, template, signer,
 		signeePublic, signerPrivate)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating certificate")
+	}
 
-	parsed, _ := x509.ParseCertificate(bytes)
-	return parsed, err
+	parsed, err := x509.ParseCertificate(bytes)
+	return parsed, errors.Wrap(err, fmt.Sprintf("error parsing certificate with dns names: %s", dnsNames))
 }
 
 func generateRootCertificate(
@@ -89,7 +95,10 @@ func generateRootCertificate(
 	// A root certificate is self-signed, so pass in the template twice.
 	bytes, err := x509.CreateCertificate(rand.Reader, template, template,
 		privateKey.Public(), privateKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating certificate")
+	}
 
-	parsed, _ := x509.ParseCertificate(bytes)
-	return parsed, err
+	parsed, err := x509.ParseCertificate(bytes)
+	return parsed, errors.Wrap(err, "error parsing certificate")
 }

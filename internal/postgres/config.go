@@ -11,10 +11,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
-	"github.com/percona/percona-postgresql-operator/internal/feature"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/config"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -162,6 +162,21 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 			Name:  "LDAPTLS_CACERT",
 			Value: configMountPath + "/ldap/ca.crt",
 		})
+	}
+
+	if cluster.CompareVersion("2.8.0") >= 0 {
+		env = append(env, []corev1.EnvVar{
+			// Critical for major upgrades to avoid lc_collate mismatches.
+			// - https://www.postgresql.org/docs/current/locale.html
+			{
+				Name:  "LC_ALL",
+				Value: "en_US.utf-8",
+			},
+			{
+				Name:  "LANG",
+				Value: "en_US.utf-8",
+			},
+		}...)
 	}
 
 	return env

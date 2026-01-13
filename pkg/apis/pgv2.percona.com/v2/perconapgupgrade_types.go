@@ -4,7 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func init() {
@@ -59,13 +59,13 @@ type PerconaPGUpgradeSpec struct {
 	// The major version of PostgreSQL before the upgrade.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=16
+	// +kubebuilder:validation:Maximum=17
 	FromPostgresVersion int `json:"fromPostgresVersion"`
 
 	// The major version of PostgreSQL to be upgraded to.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=13
-	// +kubebuilder:validation:Maximum=17
+	// +kubebuilder:validation:Maximum=18
 	ToPostgresVersion int `json:"toPostgresVersion"`
 
 	// The image to use for PostgreSQL containers after upgrade.
