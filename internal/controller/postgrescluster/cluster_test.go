@@ -264,9 +264,11 @@ func TestCustomLabels(t *testing.T) {
 			MatchLabels: map[string]string{
 				naming.LabelCluster: cluster.Name,
 			},
-			MatchExpressions: []metav1.LabelSelectorRequirement{{
-				Key:      naming.LabelPGBackRest,
-				Operator: metav1.LabelSelectorOpExists},
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      naming.LabelPGBackRest,
+					Operator: metav1.LabelSelectorOpExists,
+				},
 			},
 		})
 		assert.NilError(t, err)
@@ -515,9 +517,11 @@ func TestCustomAnnotations(t *testing.T) {
 			MatchLabels: map[string]string{
 				naming.LabelCluster: cluster.Name,
 			},
-			MatchExpressions: []metav1.LabelSelectorRequirement{{
-				Key:      naming.LabelPGBackRest,
-				Operator: metav1.LabelSelectorOpExists},
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      naming.LabelPGBackRest,
+					Operator: metav1.LabelSelectorOpExists,
+				},
 			},
 		})
 		assert.NilError(t, err)
@@ -634,7 +638,12 @@ ownerReferences:
 			"got %v", service.Spec.Selector)
 
 		assert.Assert(t, cmp.MarshalMatches(endpointSlice, `
+addressType: IPv4
 apiVersion: discovery.k8s.io/v1
+endpoints:
+- addresses:
+  - 1.9.8.3
+  conditions: {}
 kind: EndpointSlice
 metadata:
   labels:
@@ -655,10 +664,6 @@ metadata:
     kind: PostgresCluster
     name: pg5
     uid: ""
-addressType: IPv4
-endpoints:
-- addresses:
-  - 1.9.8.3
 ports:
 - name: postgres
   port: 2600
