@@ -38,6 +38,8 @@ create_namespace() {
 }
 
 deploy_operator() {
+	deploy_coredns
+
 	local cw_prefix=""
 
 	destroy_operator
@@ -117,61 +119,61 @@ remove_all_finalizers() {
 }
 
 wait_for_ready_containers() {
-    local pod_prefix="$1"
-    local target_count="$2"
-    local namespace="${NAMESPACE}"
-    local max_wait_seconds=300
-    local check_interval=5
-    local elapsed_time=0
+	local pod_prefix="$1"
+	local target_count="$2"
+	local namespace="${NAMESPACE}"
+	local max_wait_seconds=300
+	local check_interval=5
+	local elapsed_time=0
 
-    if [[ -z "$pod_prefix" || -z "$target_count" || -z "$namespace" ]]; then
-        echo "Error: Missing arguments." >&2
-        echo "Usage: wait_for_ready_containers <pod_name_prefix> <target_ready_count> <namespace>" >&2
-        return 1
-    fi
+	if [[ -z $pod_prefix || -z $target_count || -z $namespace ]]; then
+		echo "Error: Missing arguments." >&2
+		echo "Usage: wait_for_ready_containers <pod_name_prefix> <target_ready_count> <namespace>" >&2
+		return 1
+	fi
 
-    echo "Waiting for pods starting with '$pod_prefix' in namespace '$namespace' to have $target_count ready containers (Max ${max_wait_seconds}s)..."
+	echo "Waiting for pods starting with '$pod_prefix' in namespace '$namespace' to have $target_count ready containers (Max ${max_wait_seconds}s)..."
 
-    while [[ "$elapsed_time" -lt "$max_wait_seconds" ]]; do
-        local target_pods
-        # Get pods that match the prefix AND are running
-        target_pods=$(kubectl get pods -n "$namespace" --field-selector=status.phase=Running --output=json | \
-                      jq -r ".items[] | select(.metadata.name | startswith(\"$pod_prefix\")) | .metadata.name")
-        # If no running pods match the prefix, something might be wrong, but we'll keep waiting.
-        if [[ -z "$target_pods" ]]; then
-            echo "No running pods found with prefix '$pod_prefix'. Waiting..."
-            sleep "$check_interval"
-            elapsed_time=$((elapsed_time + check_interval))
-            continue
-        fi
+	while [[ $elapsed_time -lt $max_wait_seconds ]]; do
+		local target_pods
+		# Get pods that match the prefix AND are running
+		target_pods=$(kubectl get pods -n "$namespace" --field-selector=status.phase=Running --output=json \
+			| jq -r ".items[] | select(.metadata.name | startswith(\"$pod_prefix\")) | .metadata.name")
+		# If no running pods match the prefix, something might be wrong, but we'll keep waiting.
+		if [[ -z $target_pods ]]; then
+			echo "No running pods found with prefix '$pod_prefix'. Waiting..."
+			sleep "$check_interval"
+			elapsed_time=$((elapsed_time + check_interval))
+			continue
+		fi
 
-        local ready_count=0
-        local total_matches=0
+		local ready_count=0
+		local total_matches=0
 
-        # Check each pod individually
-        for pod_name in $target_pods; do
-            total_matches=$((total_matches + 1))
-            current_ready=$(kubectl get pod "$pod_name" -n "$namespace" -o json 2>/dev/null | \
-                            jq '.status.containerStatuses | map(select(.ready == true)) | length')
+		# Check each pod individually
+		for pod_name in $target_pods; do
+			total_matches=$((total_matches + 1))
+			current_ready=$(kubectl get pod "$pod_name" -n "$namespace" -o json 2>/dev/null \
+				| jq '.status.containerStatuses | map(select(.ready == true)) | length')
 
-            if [[ "$current_ready" -eq "$target_count" ]]; then
-                ready_count=$((ready_count + 1))
-            fi
-        done
+			if [[ $current_ready -eq $target_count ]]; then
+				ready_count=$((ready_count + 1))
+			fi
+		done
 
-        if [[ "$ready_count" -eq "$total_matches" ]]; then
-            echo "Success: All $total_matches pods now have $target_count ready containers."
-            return 0
-        fi
+		if [[ $ready_count -eq $total_matches ]]; then
+			echo "Success: All $total_matches pods now have $target_count ready containers."
+			return 0
+		fi
 
-        echo "Current status: $ready_count of $total_matches pods have $target_count ready containers. Waiting ${check_interval}s..."
+		echo "Current status: $ready_count of $total_matches pods have $target_count ready containers. Waiting ${check_interval}s..."
 
-        sleep "$check_interval"
-        elapsed_time=$((elapsed_time + check_interval))
-    done
+		sleep "$check_interval"
+		elapsed_time=$((elapsed_time + check_interval))
+	done
 
-    echo "Error: Timeout reached! After ${max_wait_seconds} seconds, not all pods reached $target_count ready containers." >&2
-    return 1
+	echo "Error: Timeout reached! After ${max_wait_seconds} seconds, not all pods reached $target_count ready containers." >&2
+	return 1
 }
 
 destroy_operator() {
@@ -1097,7 +1099,7 @@ deploy_cert_manager() {
 	echo 'deploy cert manager'
 	kubectl create namespace cert-manager || :
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false > /dev/null 2>&1 || :
+	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false >/dev/null 2>&1 || :
 
 	kubectl wait deployment cert-manager cert-manager-webhook cert-manager-cainjector \
 		--for=condition=available \
@@ -1111,8 +1113,8 @@ deploy_cert_manager() {
 }
 
 destroy_cert_manager() {
-	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml > /dev/null 2>&1 || :
-	kubectl delete --grace-period=0 --force=true namespace cert-manager > /dev/null 2>&1 || :
+	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml >/dev/null 2>&1 || :
+	kubectl delete --grace-period=0 --force=true namespace cert-manager >/dev/null 2>&1 || :
 }
 
 get_container_image() {
@@ -1168,92 +1170,103 @@ wait_for_generation() {
 
 # Reads all environment variables from a pod (single kubectl exec call)
 get_envs_from_pod() {
-  local namespace=$1
-  local pod=$2
-  local container=$3
+	local namespace=$1
+	local pod=$2
+	local container=$3
 
-  if [ -n "$container" ]; then
-    kubectl exec -n "$namespace" "$pod" -c "$container" -- printenv 2>/dev/null || true
-  else
-    kubectl exec -n "$namespace" "$pod" -- printenv 2>/dev/null || true
-  fi
+	if [ -n "$container" ]; then
+		kubectl exec -n "$namespace" "$pod" -c "$container" -- printenv 2>/dev/null || true
+	else
+		kubectl exec -n "$namespace" "$pod" -- printenv 2>/dev/null || true
+	fi
 }
 
 # Verifies a single variable in given env content
 check_env_in_pod() {
-  local check_type=$1
-  local pod=$2
-  local var_name=$3
-  local expected_value=$4
-  local env_content=$5
+	local check_type=$1
+	local pod=$2
+	local var_name=$3
+	local expected_value=$4
+	local env_content=$5
 
-  local actual_value
-  actual_value=$(echo "$env_content" | grep -E "^${var_name}=" | cut -d'=' -f2- || true)
+	local actual_value
+	actual_value=$(echo "$env_content" | grep -E "^${var_name}=" | cut -d'=' -f2- || true)
 
-  if [[ "$check_type" == "add" ]]; then
-    if [ "$actual_value" != "$expected_value" ]; then
-      echo "ERROR: $var_name in $pod — expected '$expected_value', got '${actual_value:-<missing>}'"
-      return 1
-    else
-      echo "OK: $var_name=$actual_value in $pod"
-    fi
-  elif [[ "$check_type" == "delete" ]]; then
-    if [ -n "$actual_value" ]; then
-      echo "ERROR: $var_name exists in $pod (should not exist)"
-      return 1
-    else
-      echo "OK: $var_name deleted in $pod"
-    fi
-  else
-    echo "ERROR: unknown check type '$check_type'"
-    return 1
-  fi
+	if [[ $check_type == "add" ]]; then
+		if [ "$actual_value" != "$expected_value" ]; then
+			echo "ERROR: $var_name in $pod — expected '$expected_value', got '${actual_value:-<missing>}'"
+			return 1
+		else
+			echo "OK: $var_name=$actual_value in $pod"
+		fi
+	elif [[ $check_type == "delete" ]]; then
+		if [ -n "$actual_value" ]; then
+			echo "ERROR: $var_name exists in $pod (should not exist)"
+			return 1
+		else
+			echo "OK: $var_name deleted in $pod"
+		fi
+	else
+		echo "ERROR: unknown check type '$check_type'"
+		return 1
+	fi
 }
 
 # Checks multiple env vars in one or more components
 check_envs_for_component() {
-  local check_type=$1      # add | delete
-  local component=$2       # instance | pgbouncer | repohost
-  local vars=("${@:3}")    # everything after the 2nd argument
+	local check_type=$1   # add | delete
+	local component=$2    # instance | pgbouncer | repohost
+	local vars=("${@:3}") # everything after the 2nd argument
 
-  case "$component" in
-    instance)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER=""
-      ;;
-    pgbouncer)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER="pgbouncer"
-      ;;
-    repohost)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER="pgbackrest"
-      ;;
-    *)
-      echo "ERROR: unknown component '$component'"
-      return 1
-      ;;
-  esac
+	case "$component" in
+		instance)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER=""
+			;;
+		pgbouncer)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER="pgbouncer"
+			;;
+		repohost)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER="pgbackrest"
+			;;
+		*)
+			echo "ERROR: unknown component '$component'"
+			return 1
+			;;
+	esac
 
-  echo "Fetching environment variables for $component pod $POD..."
-  local env_content
-  env_content=$(get_envs_from_pod "${NAMESPACE}" "$POD" "$CONTAINER")
+	echo "Fetching environment variables for $component pod $POD..."
+	local env_content
+	env_content=$(get_envs_from_pod "${NAMESPACE}" "$POD" "$CONTAINER")
 
-  local errors=0
-  for var_entry in "${vars[@]}"; do
-    if [[ "$check_type" == "add" ]]; then
-      local var_name="${var_entry%%=*}"
-      local var_expected="${var_entry#*=}"
-      check_env_in_pod add "$POD" "$var_name" "$var_expected" "$env_content" || errors=$((errors+1))
-    else
-      check_env_in_pod delete "$POD" "$var_entry" "" "$env_content" || errors=$((errors+1))
-    fi
-  done
+	local errors=0
+	for var_entry in "${vars[@]}"; do
+		if [[ $check_type == "add" ]]; then
+			local var_name="${var_entry%%=*}"
+			local var_expected="${var_entry#*=}"
+			check_env_in_pod add "$POD" "$var_name" "$var_expected" "$env_content" || errors=$((errors + 1))
+		else
+			check_env_in_pod delete "$POD" "$var_entry" "" "$env_content" || errors=$((errors + 1))
+		fi
+	done
 
-  if (( errors > 0 )); then
-    echo "$errors environment check(s) failed for component '$component'"
-    return 1
-  else
-    echo "All environment checks passed for component '$component'"
-  fi
+	if ((errors > 0)); then
+		echo "$errors environment check(s) failed for component '$component'"
+		return 1
+	else
+		echo "All environment checks passed for component '$component'"
+	fi
+}
+
+deploy_coredns() {
+	kubectl -n "kube-system" get deploy coredns && return
+
+	helm repo add coredns https://coredns.github.io/helm
+	helm uninstall coredns -n kube-system
+	helm install coredns coredns/coredns \
+		-n kube-system \
+		--set k8sAppLabelOverride=kube-dns
+	kubectl scale deployment --replicas=0 kube-dns-autoscaler kube-dns --namespace=kube-system
 }
