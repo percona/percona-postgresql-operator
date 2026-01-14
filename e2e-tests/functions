@@ -1264,7 +1264,6 @@ deploy_coredns() {
 	kubectl -n "kube-system" get deploy coredns && return
 
 	helm repo add coredns https://coredns.github.io/helm
-	helm uninstall coredns -n kube-system
 	helm install coredns coredns/coredns \
 		-n kube-system \
 		--set k8sAppLabelOverride=kube-dns
