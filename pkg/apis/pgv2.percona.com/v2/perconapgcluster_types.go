@@ -313,7 +313,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 	postgresCluster.Spec.CustomRootCATLSSecret = cr.Spec.Secrets.CustomRootCATLSSecret
 
-	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion)
+	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion, postgresCluster.Spec.DataSource != nil)
 	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		repo := postgresCluster.Spec.Backups.PGBackRest.Repos[i]
 
@@ -499,8 +499,11 @@ func (b Backups) IsEnabled() bool {
 	return b.Enabled == nil || *b.Enabled
 }
 
-func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
+func (b Backups) ToCrunchy(version string, hasDataSource bool) crunchyv1beta1.Backups {
 	if b.Enabled != nil && !*b.Enabled {
+		if !hasDataSource {
+			return crunchyv1beta1.Backups{}
+		}
 		return crunchyv1beta1.Backups{
 			PGBackRest: crunchyv1beta1.PGBackRestArchive{
 				Image: b.PGBackRest.Image,
