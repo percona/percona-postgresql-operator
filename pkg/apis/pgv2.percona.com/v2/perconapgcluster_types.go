@@ -180,9 +180,15 @@ type StandbySpec struct {
 	*crunchyv1beta1.PostgresStandbySpec `json:",inline"`
 
 	// +optional
-	// MaxLag is the maximum WAL lag allowed for the standby cluster.
+	// MaxAcceptableLag is the maximum WAL lag allowed for the standby cluster, measured in bytes of WAL data.
+	// This represents the maximum amount of WAL data that the standby can be behind the primary.
 	// If the lag exceeds this value, the standby cluster is marked as unready.
-	MaxLag resource.Quantity `json:"maxLag,omitempty"`
+	// If unset, lag is not checked.
+	MaxAcceptableLag *resource.Quantity `json:"maxAcceptableLag,omitempty"`
+}
+
+func (cr *PerconaPGCluster) ShouldCheckReplicationLag() bool {
+	return cr.Spec.Standby != nil && cr.Spec.Standby.Enabled && cr.Spec.Standby.MaxAcceptableLag != nil
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -254,10 +260,6 @@ func (cr *PerconaPGCluster) Default() {
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
-	}
-
-	if cr.Spec.Standby != nil && cr.Spec.Standby.MaxLag.IsZero() {
-		cr.Spec.Standby.MaxLag = resource.MustParse("10Gi")
 	}
 }
 

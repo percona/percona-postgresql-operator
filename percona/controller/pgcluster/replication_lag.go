@@ -38,7 +38,7 @@ const replicationLagSignalFile = "/pgdata/replication-lag-detected"
 
 func (r *PGClusterReconciler) reconcileReplicationLagStatus(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	// TODO: support streaming replication lag detection
-	if cr.Spec.Standby == nil || !cr.Spec.Standby.Enabled || cr.Spec.Standby.RepoName == "" {
+	if !cr.ShouldCheckReplicationLag() || cr.Spec.Standby.RepoName == "" {
 		return nil
 	}
 
@@ -46,7 +46,9 @@ func (r *PGClusterReconciler) reconcileReplicationLagStatus(ctx context.Context,
 		return nil
 	}
 
-	if cr.Status.State != v2.AppStateReady && meta.IsStatusConditionFalse(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) {
+	// Do not try to calculate if the cluster is still initializing. We do not know the primary.
+	isCondPresent := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) != nil
+	if cr.Status.State != v2.AppStateReady && !isCondPresent {
 		return nil
 	}
 
@@ -78,7 +80,10 @@ func (r *PGClusterReconciler) reconcileReplicationLagStatus(ctx context.Context,
 	}
 
 	// We compute the lag at intervals because this is an expensive operation (requires pod execs and database queries).
-	interval := r.getStandbyLagDetectionInterval(cr)
+	interval := defaultReplicationLagDetectionInterval
+	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) {
+		interval = laggedReplicationInterval
+	}
 	if !cr.Status.Standby.LagLastComputedAt.IsZero() && cr.Status.Standby.LagLastComputedAt.Add(interval).After(time.Now()) {
 		return nil
 	}
@@ -87,7 +92,7 @@ func (r *PGClusterReconciler) reconcileReplicationLagStatus(ctx context.Context,
 	if err != nil {
 		return errors.Wrap(err, "calculate replication lag bytes")
 	}
-	maxLag := cr.Spec.Standby.MaxLag.AsDec().UnscaledBig().Int64()
+	maxLag := cr.Spec.Standby.MaxAcceptableLag.AsDec().UnscaledBig().Int64()
 	lagDetected := lagBytes > maxLag
 
 	if lagDetected {
@@ -109,16 +114,6 @@ func (r *PGClusterReconciler) reconcileReplicationLagStatus(ctx context.Context,
 	return nil
 }
 
-func (r *PGClusterReconciler) getStandbyLagDetectionInterval(cr *v2.PerconaPGCluster) time.Duration {
-	if cr.Spec.Standby == nil || !cr.Spec.Standby.Enabled {
-		return 0
-	}
-	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) {
-		return laggedReplicationInterval
-	}
-	return defaultReplicationLagDetectionInterval
-}
-
 func (r *PGClusterReconciler) setPodReplicationReadinessSignal(
 	ctx context.Context,
 	cr *v2.PerconaPGCluster,
@@ -135,7 +130,7 @@ func (r *PGClusterReconciler) setPodReplicationReadinessSignal(
 		cmd = []string{"touch", replicationLagSignalFile}
 	}
 
-	log.V(1).Info("Setting pod replication readiness signal", "pod", primary.Name, "ready", ready)
+	log.V(1).Info("Setting pod replication lag readiness signal", "pod", primary.Name, "ready", ready)
 	return r.PodExec(ctx, primary.GetNamespace(), primary.GetName(), naming.ContainerDatabase, nil, io.Discard, nil, cmd...)
 }
 
@@ -220,10 +215,6 @@ func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context
 		return nil
 	}
 
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(cr), cr); err != nil {
-		return errors.Wrap(err, "get cluster")
-	}
-
 	mainSite, ok := cr.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
 	if ok {
 		return nil
@@ -239,14 +230,19 @@ func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context
 		log.V(1).Info("Main site not found in Kubernetes, cannot detect replication lag")
 	}
 
-	annots := cr.GetAnnotations()
+	crCopy := cr.DeepCopy()
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(crCopy), crCopy); err != nil {
+		return errors.Wrap(err, "get cluster for main site annotation update")
+	}
+
+	annots := crCopy.GetAnnotations()
 	if annots == nil {
 		annots = make(map[string]string)
 	}
 	annots[pNaming.AnnotationReplicationMainSite] = mainSite
-	cr.SetAnnotations(annots)
-	if err := r.Client.Update(ctx, cr); err != nil {
-		return errors.Wrap(err, "update cluster")
+	crCopy.SetAnnotations(annots)
+	if err := r.Client.Update(ctx, crCopy); err != nil {
+		return errors.Wrap(err, "update replication main site annotation")
 	}
 	return nil
 }

@@ -75,6 +75,7 @@ type PGClusterReconciler struct {
 	Watchers             *registry.Registry
 	ExternalChan         chan event.GenericEvent
 	StopExternalWatchers chan event.DeleteEvent
+	WatchNamespace       []string
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
@@ -363,13 +364,20 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	rr := ctrl.Result{}
-
-	// We have replication lag, we need to check again soon.
-	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) {
-		rr.RequeueAfter = laggedReplicationInterval
-	}
+	rr.RequeueAfter = r.requeueAfter(cr)
 
 	return rr, nil
+}
+
+func (r *PGClusterReconciler) requeueAfter(cr *v2.PerconaPGCluster) time.Duration {
+	if cr.ShouldCheckReplicationLag() {
+		if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) {
+			// standy is lagging, need to check again soon.
+			return laggedReplicationInterval
+		}
+		return defaultReplicationLagDetectionInterval
+	}
+	return 0
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {
