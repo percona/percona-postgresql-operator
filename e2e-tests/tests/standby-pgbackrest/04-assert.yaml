@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  - script: |-
+      set -o errexit
+
+      kubectl wait --for=jsonpath='{.status.state}'=initializing --timeout=420s -n "${NAMESPACE}" pg/standby-cluster
+
+      lagBytes=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.standby.lagBytes}')
+      condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="ReplicationLagDetected")].status}')
+      condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="ReplicationLagDetected")].reason}')
+      condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="ReplicationLagDetected")].message}')
+      test "$condStatus" = "True"
+      test "$condReason" = "LagDetected"
+      test "$condMsg" = "WAL is lagging by '$lagBytes' bytes"

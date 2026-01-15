@@ -255,7 +255,7 @@ deploy_s3_secrets() {
 			yq eval '.stringData["credentials.json"]' ${TESTS_CONFIG_DIR}/cloud-secret-minio-gw.yml >${TEMP_DIR}/gcs-key.json
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini" --from-file=gcs-key.json=${TEMP_DIR}/gcs-key.json
 			;;
-		"custom-extensions" | "major-upgrade")
+		"custom-extensions" | "major-upgrade" )
 			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
 			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
 			;;
@@ -304,7 +304,7 @@ get_cr() {
 	fi
 
 	case $test_name in
-		"demand-backup" | "start-from-backup")
+		"demand-backup" | "start-from-backup" | "standby-pgbackrest")
 			yq eval -i '
 				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
 				.spec.backups.pgbackrest.manual.repoName = "repo1" |
