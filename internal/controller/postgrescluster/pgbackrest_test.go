@@ -50,7 +50,8 @@ import (
 var testCronSchedule string = "*/15 * * * *"
 
 func fakePostgresCluster(clusterName, namespace, clusterUID string,
-	includeDedicatedRepo bool) *v1beta1.PostgresCluster {
+	includeDedicatedRepo bool,
+) *v1beta1.PostgresCluster {
 	postgresCluster := &v1beta1.PostgresCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
@@ -90,8 +91,10 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 					Jobs: &v1beta1.BackupJobs{
 						PriorityClassName: initialize.String("some-priority-class"),
 					},
-					Global: map[string]string{"repo2-test": "config",
-						"repo3-test": "config", "repo4-test": "config"},
+					Global: map[string]string{
+						"repo2-test": "config",
+						"repo3-test": "config", "repo4-test": "config",
+					},
 					Repos: []v1beta1.PGBackRestRepo{{
 						Name: "repo1",
 						S3: &v1beta1.RepoS3{
@@ -173,7 +176,9 @@ func fakeObservedCronJobs() []*batchv1.CronJob {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "fake-cronjob",
-			}}}
+			},
+		},
+	}
 }
 
 func TestReconcilePGBackRest(t *testing.T) {
@@ -211,7 +216,8 @@ func TestReconcilePGBackRest(t *testing.T) {
 
 		// create the 'observed' instances and set the leader
 		instances := &observedInstances{
-			forCluster: []*Instance{{Name: "instance1",
+			forCluster: []*Instance{{
+				Name: "instance1",
 				Pods: []*corev1.Pod{{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{naming.LabelRole: naming.RolePatroniLeader},
@@ -226,7 +232,8 @@ func TestReconcilePGBackRest(t *testing.T) {
 			Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 			PGBackRest: &v1beta1.PGBackRestStatus{
 				RepoHost: &v1beta1.RepoHostStatus{Ready: true},
-				Repos:    []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos:    []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		}
 
 		// set conditions
@@ -236,7 +243,8 @@ func TestReconcilePGBackRest(t *testing.T) {
 		}
 		for condition, status := range clusterConditions {
 			meta.SetStatusCondition(&postgresCluster.Status.Conditions, metav1.Condition{
-				Type: condition, Reason: "testing", Status: status})
+				Type: condition, Reason: "testing", Status: status,
+			})
 		}
 
 		rootCA, err := pki.NewRootCertificateAuthority()
@@ -252,7 +260,6 @@ func TestReconcilePGBackRest(t *testing.T) {
 
 		// test that the repo was created properly
 		t.Run("verify pgbackrest dedicated repo StatefulSet", func(t *testing.T) {
-
 			// get the pgBackRest repo sts using the labels we expect it to have
 			dedicatedRepos := &appsv1.StatefulSetList{}
 			if err := tClient.List(ctx, dedicatedRepos, client.InNamespace(ns.Name),
@@ -432,7 +439,6 @@ topologySpreadConstraints:
 		})
 
 		t.Run("verify pgbackrest repo volumes", func(t *testing.T) {
-
 			// get the pgBackRest repo sts using the labels we expect it to have
 			repoVols := &corev1.PersistentVolumeClaimList{}
 			if err := tClient.List(ctx, repoVols, client.InNamespace(ns.Name),
@@ -462,7 +468,6 @@ topologySpreadConstraints:
 		})
 
 		t.Run("verify pgbackrest configuration", func(t *testing.T) {
-
 			config := &corev1.ConfigMap{}
 			if err := tClient.Get(ctx, types.NamespacedName{
 				Name:      naming.PGBackRestConfig(postgresCluster).Name,
@@ -487,12 +492,12 @@ topologySpreadConstraints:
 		})
 
 		t.Run("verify pgbackrest schedule cronjob", func(t *testing.T) {
-
 			// set status
 			postgresCluster.Status = v1beta1.PostgresClusterStatus{
 				Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+				},
 			}
 
 			// set conditions
@@ -503,7 +508,8 @@ topologySpreadConstraints:
 
 			for condition, status := range clusterConditions {
 				meta.SetStatusCondition(&postgresCluster.Status.Conditions, metav1.Condition{
-					Type: condition, Reason: "testing", Status: status})
+					Type: condition, Reason: "testing", Status: status,
+				})
 			}
 
 			requeue := r.reconcileScheduledBackups(ctx, postgresCluster, serviceAccount, fakeObservedCronJobs())
@@ -524,11 +530,9 @@ topologySpreadConstraints:
 			assert.Equal(t, returnedCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Name,
 				"pgbackrest")
 			assert.Assert(t, returnedCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].SecurityContext != &corev1.SecurityContext{})
-
 		})
 
 		t.Run("verify pgbackrest schedule found", func(t *testing.T) {
-
 			assert.Assert(t, backupScheduleFound(repo, "full"))
 
 			testrepo := v1beta1.PGBackRestRepo{
@@ -537,25 +541,22 @@ topologySpreadConstraints:
 					Full:         &testCronSchedule,
 					Differential: &testCronSchedule,
 					Incremental:  &testCronSchedule,
-				}}
+				},
+			}
 
 			assert.Assert(t, backupScheduleFound(testrepo, "full"))
 			assert.Assert(t, backupScheduleFound(testrepo, "diff"))
 			assert.Assert(t, backupScheduleFound(testrepo, "incr"))
-
 		})
 
 		t.Run("verify pgbackrest schedule not found", func(t *testing.T) {
-
 			assert.Assert(t, !backupScheduleFound(repo, "notabackuptype"))
 
 			noscheduletestrepo := v1beta1.PGBackRestRepo{Name: "repo1"}
 			assert.Assert(t, !backupScheduleFound(noscheduletestrepo, "full"))
-
 		})
 
 		t.Run("pgbackrest schedule suspended status", func(t *testing.T) {
-
 			returnedCronJob := &batchv1.CronJob{}
 			if err := tClient.Get(ctx, types.NamespacedName{
 				Name:      postgresCluster.Name + "-repo1-full",
@@ -615,7 +616,8 @@ topologySpreadConstraints:
 
 		// create the 'observed' instances and set the leader
 		instances := &observedInstances{
-			forCluster: []*Instance{{Name: "instance1",
+			forCluster: []*Instance{{
+				Name: "instance1",
 				Pods: []*corev1.Pod{{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{naming.LabelRole: naming.RolePatroniLeader},
@@ -635,7 +637,6 @@ topologySpreadConstraints:
 		assert.Equal(t, result, reconcile.Result{})
 
 		t.Run("verify pgbackrest dedicated repo StatefulSet", func(t *testing.T) {
-
 			// Verify the sts doesn't exist
 			dedicatedRepos := &appsv1.StatefulSetList{}
 			if err := tClient.List(ctx, dedicatedRepos, client.InNamespace(ns.Name),
@@ -651,7 +652,6 @@ topologySpreadConstraints:
 		})
 
 		t.Run("verify pgbackrest repo volumes", func(t *testing.T) {
-
 			// get the pgBackRest repo sts using the labels we expect it to have
 			repoVols := &corev1.PersistentVolumeClaimList{}
 			if err := tClient.List(ctx, repoVols, client.InNamespace(ns.Name),
@@ -667,7 +667,6 @@ topologySpreadConstraints:
 		})
 
 		t.Run("verify pgbackrest configuration", func(t *testing.T) {
-
 			config := &corev1.ConfigMap{}
 			err := tClient.Get(ctx, types.NamespacedName{
 				Name:      naming.PGBackRestConfig(postgresCluster).Name,
@@ -776,12 +775,14 @@ func TestReconcileStanzaCreate(t *testing.T) {
 	}})
 
 	stanzaCreateFail := func(ctx context.Context, namespace, pod, container string, stdin io.Reader,
-		stdout, stderr io.Writer, command ...string) error {
+		stdout, stderr io.Writer, command ...string,
+	) error {
 		return errors.New("fake stanza create failed")
 	}
 
 	stanzaCreateSuccess := func(ctx context.Context, namespace, pod, container string, stdin io.Reader,
-		stdout, stderr io.Writer, command ...string) error {
+		stdout, stderr io.Writer, command ...string,
+	) error {
 		return nil
 	}
 
@@ -1105,7 +1106,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		standby: true,
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1117,7 +1119,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		clusterConditions: map[string]metav1.ConditionStatus{},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1132,7 +1135,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1146,7 +1150,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1162,7 +1167,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1177,7 +1183,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1192,7 +1199,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   nil,
@@ -1208,8 +1216,10 @@ func TestReconcileManualBackup(t *testing.T) {
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
 				ManualBackup: &v1beta1.PGBackRestJobStatus{
-					ID: backupId, Finished: true},
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					ID: backupId, Finished: true,
+				},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   nil,
@@ -1224,7 +1234,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 "",
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1239,7 +1250,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{}},
+				Repos: []v1beta1.RepoStatus{},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1255,7 +1267,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1270,7 +1283,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 defaultBackupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1285,7 +1299,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1301,7 +1316,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1317,7 +1333,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		},
 		status: &v1beta1.PostgresClusterStatus{
 			PGBackRest: &v1beta1.PGBackRestStatus{
-				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
 		},
 		backupId:                 backupId,
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
@@ -1335,7 +1352,6 @@ func TestReconcileManualBackup(t *testing.T) {
 				clusterName = "manual-backup-" + strconv.Itoa(i)
 			}
 			t.Run(tc.testDesc, func(t *testing.T) {
-
 				if tc.dedicatedOnly && !dedicated {
 					t.Skip()
 				}
@@ -1350,7 +1366,8 @@ func TestReconcileManualBackup(t *testing.T) {
 				postgresCluster.Status = *tc.status
 				for condition, status := range tc.clusterConditions {
 					meta.SetStatusCondition(&postgresCluster.Status.Conditions, metav1.Condition{
-						Type: condition, Reason: "testing", Status: status})
+						Type: condition, Reason: "testing", Status: status,
+					})
 				}
 				assert.NilError(t, tClient.Status().Update(ctx, postgresCluster))
 
@@ -1652,7 +1669,14 @@ func TestGetPGBackRestResources(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: naming.PGBackRestDedicatedLabels(clusterName),
 						},
-						Spec: corev1.PodSpec{},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "some-container",
+									Image: "some-image",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1690,7 +1714,14 @@ func TestGetPGBackRestResources(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: naming.PGBackRestDedicatedLabels(clusterName),
 						},
-						Spec: corev1.PodSpec{},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "some-container",
+									Image: "some-image",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1899,7 +1930,6 @@ func TestReconcilePostgresClusterDataSource(t *testing.T) {
 				tc.desc += "-no-repo"
 			}
 			t.Run(tc.desc, func(t *testing.T) {
-
 				clusterName := "hippocluster-" + strconv.Itoa(i)
 				if !dedicated {
 					clusterName = clusterName + "-no-repo"
@@ -2125,7 +2155,6 @@ func TestReconcileCloudBasedDataSource(t *testing.T) {
 
 		for i, tc := range testCases {
 			t.Run(tc.desc, func(t *testing.T) {
-
 				clusterName := "hippocluster-" + strconv.Itoa(i)
 				if !dedicated {
 					clusterName = clusterName + "-no-repo"
@@ -2259,17 +2288,20 @@ func TestCopyConfigurationResources(t *testing.T) {
 				}},
 				Backups: v1beta1.Backups{
 					PGBackRest: v1beta1.PGBackRestArchive{
-						Configuration: []corev1.VolumeProjection{{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "source-secret" + testNum,
+						Configuration: []corev1.VolumeProjection{
+							{
+								Secret: &corev1.SecretProjection{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "source-secret" + testNum,
+									},
 								},
-							}}, {
-							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "source-configmap" + testNum,
+							}, {
+								ConfigMap: &corev1.ConfigMapProjection{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "source-configmap" + testNum,
+									},
 								},
-							}},
+							},
 						},
 						Image: "example.com/crunchy-pgbackrest:test",
 						Repos: []v1beta1.PGBackRestRepo{{
@@ -2605,7 +2637,8 @@ volumes:
 				corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU: resource.MustParse("1m"),
-					}},
+					},
+				},
 			)
 		})
 	})
@@ -3135,7 +3168,6 @@ func TestObserveRestoreEnv(t *testing.T) {
 	namespace := setupNamespace(t, tClient).Name
 
 	generateJob := func(clusterName string, completed, failed *bool) *batchv1.Job {
-
 		cluster := &v1beta1.PostgresCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterName,
@@ -3334,7 +3366,6 @@ func TestObserveRestoreEnv(t *testing.T) {
 
 		for i, tc := range testCases {
 			t.Run(tc.desc, func(t *testing.T) {
-
 				clusterName := "observe-restore-env" + strconv.Itoa(i)
 				if !dedicated {
 					clusterName = clusterName + "-no-repo"
@@ -3372,7 +3403,6 @@ func TestPrepareForRestore(t *testing.T) {
 	namespace := setupNamespace(t, tClient).Name
 
 	generateJob := func(clusterName string) *batchv1.Job {
-
 		cluster := &v1beta1.PostgresCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterName,
@@ -3423,7 +3453,8 @@ func TestPrepareForRestore(t *testing.T) {
 		}{{
 			desc: "remove restore jobs",
 			createResources: func(t *testing.T,
-				cluster *v1beta1.PostgresCluster) (*batchv1.Job, []corev1.Endpoints) {
+				cluster *v1beta1.PostgresCluster,
+			) (*batchv1.Job, []corev1.Endpoints) {
 				job := generateJob(cluster.Name)
 				assert.NilError(t, r.Client.Create(ctx, job))
 				return job, nil
@@ -3441,7 +3472,8 @@ func TestPrepareForRestore(t *testing.T) {
 		}, {
 			desc: "remove patroni endpoints",
 			createResources: func(t *testing.T,
-				cluster *v1beta1.PostgresCluster) (*batchv1.Job, []corev1.Endpoints) {
+				cluster *v1beta1.PostgresCluster,
+			) (*batchv1.Job, []corev1.Endpoints) {
 				fakeLeaderEP := corev1.Endpoints{}
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
 				fakeLeaderEP.ObjectMeta.Namespace = namespace
@@ -3469,7 +3501,8 @@ func TestPrepareForRestore(t *testing.T) {
 		}, {
 			desc: "cluster fully prepared",
 			createResources: func(t *testing.T,
-				cluster *v1beta1.PostgresCluster) (*batchv1.Job, []corev1.Endpoints) {
+				cluster *v1beta1.PostgresCluster,
+			) (*batchv1.Job, []corev1.Endpoints) {
 				return nil, []corev1.Endpoints{}
 			},
 			result: testResult{
@@ -3484,17 +3517,20 @@ func TestPrepareForRestore(t *testing.T) {
 			},
 		}, {
 			desc: "primary as startup instance",
-			fakeObserved: &observedInstances{forCluster: []*Instance{{
-				Name: primaryInstanceName,
-				Spec: &v1beta1.PostgresInstanceSetSpec{Name: primaryInstanceSetName},
-				Pods: []*corev1.Pod{{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{naming.LabelRole: naming.RolePatroniLeader},
-					},
-				}}},
+			fakeObserved: &observedInstances{forCluster: []*Instance{
+				{
+					Name: primaryInstanceName,
+					Spec: &v1beta1.PostgresInstanceSetSpec{Name: primaryInstanceSetName},
+					Pods: []*corev1.Pod{{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{naming.LabelRole: naming.RolePatroniLeader},
+						},
+					}},
+				},
 			}},
 			createResources: func(t *testing.T,
-				cluster *v1beta1.PostgresCluster) (*batchv1.Job, []corev1.Endpoints) {
+				cluster *v1beta1.PostgresCluster,
+			) (*batchv1.Job, []corev1.Endpoints) {
 				return nil, []corev1.Endpoints{}
 			},
 			result: testResult{
@@ -3515,7 +3551,6 @@ func TestPrepareForRestore(t *testing.T) {
 				name = tc.desc + "-no-repo"
 			}
 			t.Run(name, func(t *testing.T) {
-
 				clusterName := "prepare-for-restore-" + strconv.Itoa(i)
 				if !dedicated {
 					clusterName = clusterName + "-no-repo"
@@ -3659,7 +3694,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			status: &v1beta1.PostgresClusterStatus{
 				Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+				},
 			},
 			expectReconcile: true,
 			expectRequeue:   false,
@@ -3672,7 +3708,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			status: &v1beta1.PostgresClusterStatus{
 				Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+				},
 			},
 			expectReconcile: true,
 			expectRequeue:   false,
@@ -3681,7 +3718,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			testDesc: "cluster not bootstrapped, should not reconcile",
 			status: &v1beta1.PostgresClusterStatus{
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+				},
 			},
 			expectReconcile: false,
 			expectRequeue:   false,
@@ -3691,7 +3729,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			status: &v1beta1.PostgresClusterStatus{
 				Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+				},
 			},
 			expectReconcile: false,
 			expectRequeue:   false,
@@ -3700,7 +3739,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			status: &v1beta1.PostgresClusterStatus{
 				Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+				},
 			},
 			expectReconcile: false,
 			expectRequeue:   false,
@@ -3710,7 +3750,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			status: &v1beta1.PostgresClusterStatus{
 				Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+				},
 			},
 			expectReconcile: false,
 			expectRequeue:   false,
@@ -3719,7 +3760,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			status: &v1beta1.PostgresClusterStatus{
 				Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}}},
+					Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+				},
 			},
 			expectReconcile: false,
 			expectRequeue:   false,
@@ -3732,12 +3774,14 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			status: &v1beta1.PostgresClusterStatus{
 				Patroni: v1beta1.PatroniStatus{SystemIdentifier: "12345abcde"},
 				PGBackRest: &v1beta1.PGBackRestStatus{
-					Repos: []v1beta1.RepoStatus{}},
+					Repos: []v1beta1.RepoStatus{},
+				},
 			},
 			expectReconcile:     false,
 			expectRequeue:       false,
 			expectedEventReason: "InvalidBackupRepo",
-		}}
+		},
+	}
 
 	for _, dedicated := range []bool{true, false} {
 		for i, tc := range testCases {
@@ -3751,7 +3795,6 @@ func TestReconcileScheduledBackups(t *testing.T) {
 			}
 
 			t.Run(tc.testDesc, func(t *testing.T) {
-
 				if tc.dedicatedOnly && !dedicated {
 					t.Skip()
 				}
@@ -3763,7 +3806,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 				postgresCluster.Status = *tc.status
 				for condition, status := range tc.clusterConditions {
 					meta.SetStatusCondition(&postgresCluster.Status.Conditions, metav1.Condition{
-						Type: condition, Reason: "testing", Status: status})
+						Type: condition, Reason: "testing", Status: status,
+					})
 				}
 				assert.NilError(t, tClient.Status().Update(ctx, postgresCluster))
 
@@ -3777,7 +3821,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 									naming.LabelCluster:           clusterName,
 									naming.LabelPGBackRestCronJob: "full",
 									naming.LabelPGBackRestRepo:    "repo1",
-								}},
+								},
+							},
 						}, {
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "existingcronjob-repo1-incr",
@@ -3785,7 +3830,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 									naming.LabelCluster:           clusterName,
 									naming.LabelPGBackRestCronJob: "incr",
 									naming.LabelPGBackRestRepo:    "repo1",
-								}},
+								},
+							},
 						}, {
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "existingcronjob-repo1-diff",
@@ -3793,7 +3839,8 @@ func TestReconcileScheduledBackups(t *testing.T) {
 									naming.LabelCluster:           clusterName,
 									naming.LabelPGBackRestCronJob: "diff",
 									naming.LabelPGBackRestRepo:    "repo1",
-								}},
+								},
+							},
 						},
 					}
 					requeue = r.reconcileScheduledBackups(ctx, postgresCluster, sa, existingCronJobs)
@@ -3988,7 +4035,8 @@ func TestBackupsEnabled(t *testing.T) {
 
 		// create the 'observed' instances and set the leader
 		instances := &observedInstances{
-			forCluster: []*Instance{{Name: "instance1",
+			forCluster: []*Instance{{
+				Name: "instance1",
 				Pods: []*corev1.Pod{{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{naming.LabelRole: naming.RolePatroniLeader},
@@ -4039,7 +4087,8 @@ func TestBackupsEnabled(t *testing.T) {
 
 		// create the 'observed' instances and set the leader
 		instances := &observedInstances{
-			forCluster: []*Instance{{Name: "instance1",
+			forCluster: []*Instance{{
+				Name: "instance1",
 				Pods: []*corev1.Pod{{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{naming.LabelRole: naming.RolePatroniLeader},
@@ -4075,7 +4124,8 @@ func TestBackupsEnabled(t *testing.T) {
 
 		// create the 'observed' instances and set the leader
 		instances := &observedInstances{
-			forCluster: []*Instance{{Name: "instance1",
+			forCluster: []*Instance{{
+				Name: "instance1",
 				Pods: []*corev1.Pod{{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{naming.LabelRole: naming.RolePatroniLeader},
