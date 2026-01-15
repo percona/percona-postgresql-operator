@@ -599,7 +599,7 @@ func TestGenerateClusterPrimaryService(t *testing.T) {
 	leader := &corev1.Service{}
 	leader.Spec.ClusterIP = "1.9.8.3"
 
-	_, _, err := reconciler.generateClusterPrimaryService(cluster, nil)
+	_, _, _, err := reconciler.generateClusterPrimaryService(cluster, nil)
 	assert.ErrorContains(t, err, "not implemented")
 
 	alwaysExpect := func(t testing.TB, service *corev1.Service, endpointSlice *discoveryv1.EndpointSlice) {
@@ -671,7 +671,7 @@ ports:
 		`))
 	}
 
-	service, endpointSlice, err := reconciler.generateClusterPrimaryService(cluster, leader)
+	service, endpointSlice, _, err := reconciler.generateClusterPrimaryService(cluster, leader)
 	assert.NilError(t, err)
 	alwaysExpect(t, service, endpointSlice)
 
@@ -684,7 +684,7 @@ ports:
 			{IP: "1.2.3.4", Hostname: "only.the.first"},
 		}
 
-		service, endpointSlice, err := reconciler.generateClusterPrimaryService(cluster, leader)
+		service, endpointSlice, _, err := reconciler.generateClusterPrimaryService(cluster, leader)
 		assert.NilError(t, err)
 		alwaysExpect(t, service, endpointSlice)
 
