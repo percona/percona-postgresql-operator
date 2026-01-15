@@ -151,6 +151,12 @@ func TestServerSideApply(t *testing.T) {
 				MatchLabels: map[string]string{"select": name},
 			}
 			sts.Spec.Template.Labels = map[string]string{"select": name}
+			sts.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "some-container",
+					Image: "some-image",
+				},
+			}
 			return &sts
 		}
 
