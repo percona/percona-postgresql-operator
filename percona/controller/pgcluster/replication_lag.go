@@ -19,7 +19,6 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -59,19 +58,26 @@ func (r *PGClusterReconciler) reconcileReplicationLagStatus(ctx context.Context,
 	}
 
 	// Find the main site for the standby cluster.
-	mainSiteName, ok := cr.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
-	if !ok || mainSiteName == "" {
+	mainSiteNN, ok := cr.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
+	if !ok || mainSiteNN == "" {
 		cond.Status = metav1.ConditionUnknown
 		cond.Reason = "MainSiteNotFound"
 		cond.Message = "Cannot find main site for replication lag calculation"
+		meta.SetStatusCondition(&cr.Status.Conditions, cond)
 		return nil
 	}
 
+	mainSiteSplit := strings.Split(mainSiteNN, "/")
+	if len(mainSiteSplit) != 2 {
+		return errors.New("invalid main site annotation format")
+	}
+
 	mainSite := &v2.PerconaPGCluster{}
-	if err := r.Client.Get(ctx, types.NamespacedName{
-		Name:      mainSiteName,
-		Namespace: cr.GetNamespace(),
-	}, mainSite); err != nil {
+	objKey := client.ObjectKey{
+		Name:      mainSiteSplit[1],
+		Namespace: mainSiteSplit[0],
+	}
+	if err := r.Client.Get(ctx, objKey, mainSite); err != nil {
 		return errors.Wrap(err, "get main site for replication lag calculation")
 	}
 
@@ -211,12 +217,11 @@ func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context
 		return nil
 	}
 
-	if cr.Spec.Standby == nil || !cr.Spec.Standby.Enabled || cr.Spec.Standby.RepoName == "" {
+	if !cr.ShouldCheckReplicationLag() || cr.Spec.Standby.RepoName == "" {
 		return nil
 	}
 
-	mainSite, ok := cr.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
-	if ok {
+	if _, ok := cr.GetAnnotations()[pNaming.AnnotationReplicationMainSite]; ok {
 		return nil
 	}
 
@@ -226,7 +231,7 @@ func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context
 	}
 
 	log := logging.FromContext(ctx)
-	if mainSite == "" {
+	if mainSite == nil {
 		log.V(1).Info("Main site not found in Kubernetes, cannot detect replication lag")
 	}
 
@@ -239,7 +244,7 @@ func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context
 	if annots == nil {
 		annots = make(map[string]string)
 	}
-	annots[pNaming.AnnotationReplicationMainSite] = mainSite
+	annots[pNaming.AnnotationReplicationMainSite] = mainSite.GetNamespace() + "/" + mainSite.GetName()
 	crCopy.SetAnnotations(annots)
 	if err := r.Client.Update(ctx, crCopy); err != nil {
 		return errors.Wrap(err, "update replication main site annotation")
@@ -248,9 +253,9 @@ func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context
 }
 
 // getReplicationMainSite returns the name of the main site for the standby cluster (based on pgbackrest only)
-func (r *PGClusterReconciler) getReplicationMainSite(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
-	if cr.Spec.Standby == nil || !cr.Spec.Standby.Enabled || cr.Spec.Standby.RepoName == "" {
-		return "", errors.New("standby cluster is not enabled or repo name is not specified")
+func (r *PGClusterReconciler) getReplicationMainSite(ctx context.Context, cr *v2.PerconaPGCluster) (*v2.PerconaPGCluster, error) {
+	if !cr.ShouldCheckReplicationLag() || cr.Spec.Standby.RepoName == "" {
+		return nil, errors.New("standby cluster is not enabled or repo name is not specified")
 	}
 
 	targetRepo := v1beta1.PGBackRestRepo{}
@@ -262,13 +267,16 @@ func (r *PGClusterReconciler) getReplicationMainSite(ctx context.Context, cr *v2
 	}
 
 	if targetRepo.Name == "" {
-		return "", errors.New("standby repo name not found in list of repos")
+		return nil, errors.New("standby repo name not found in list of repos")
 	}
 
-	// TODO: support multi-namespaces mode
+	listOptions := []client.ListOption{}
+	if len(r.WatchNamespace) <= 1 {
+		listOptions = append(listOptions, client.InNamespace(cr.Namespace))
+	}
 	clusters := &v2.PerconaPGClusterList{}
-	if err := r.Client.List(ctx, clusters, client.InNamespace(cr.Namespace)); err != nil {
-		return "", errors.Wrap(err, "list clusters")
+	if err := r.Client.List(ctx, clusters, listOptions...); err != nil {
+		return nil, errors.Wrap(err, "list clusters")
 	}
 
 	for _, cluster := range clusters.Items {
@@ -280,9 +288,9 @@ func (r *PGClusterReconciler) getReplicationMainSite(ctx context.Context, cr *v2
 		}
 		for _, repo := range cluster.Spec.Backups.PGBackRest.Repos {
 			if targetRepo.StorageEquals(&repo) {
-				return cluster.Name, nil
+				return cluster.DeepCopy(), nil
 			}
 		}
 	}
-	return "", nil
+	return nil, nil
 }
