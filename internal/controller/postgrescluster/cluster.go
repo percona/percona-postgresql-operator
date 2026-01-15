@@ -94,7 +94,7 @@ func (r *Reconciler) reconcileClusterPodService(
 // resolve to the PostgreSQL primary instance.
 func (r *Reconciler) generateClusterPrimaryService(
 	cluster *v1beta1.PostgresCluster, leader *corev1.Service,
-) (*corev1.Service, *discoveryv1.EndpointSlice, error) {
+) (*corev1.Service, *discoveryv1.EndpointSlice, *corev1.Endpoints, error) {
 	// We want to name and label our primary Service consistently. When Patroni is
 	// using Endpoints for its DCS, however, they and any Service that uses them
 	// must use the same name as the Patroni "scope" which has its own constraints.
@@ -118,6 +118,10 @@ func (r *Reconciler) generateClusterPrimaryService(
 
 	err := errors.WithStack(r.setControllerReference(cluster, service))
 
+	deprecatedEndpoints := &corev1.Endpoints{}
+	service.ObjectMeta.DeepCopyInto(&deprecatedEndpoints.ObjectMeta)
+	deprecatedEndpoints.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Endpoints"))
+
 	// EndpointSlice for a Service. Copy labels, annotations, and ownership.
 	endpointSlice := &discoveryv1.EndpointSlice{}
 	service.ObjectMeta.DeepCopyInto(&endpointSlice.ObjectMeta)
@@ -130,7 +134,7 @@ func (r *Reconciler) generateClusterPrimaryService(
 
 	if leader == nil {
 		// TODO(cbandy): We need to build a different kind of Service here.
-		return nil, nil, errors.New("Patroni DCS other than Kubernetes EndpointSlices is not implemented")
+		return nil, nil, nil, errors.New("Patroni DCS other than Kubernetes EndpointSlices is not implemented")
 	}
 
 	// Allocate no IP address (headless) and manage the EndpointSlice ourselves.
@@ -146,6 +150,11 @@ func (r *Reconciler) generateClusterPrimaryService(
 		TargetPort: intstr.FromString(naming.PortPostgreSQL),
 	}}
 
+	// Resolve to the ClusterIP for which Patroni has configured the Endpoints.
+	deprecatedEndpoints.Subsets = []corev1.EndpointSubset{{
+		Addresses: []corev1.EndpointAddress{{IP: leader.Spec.ClusterIP}},
+	}}
+
 	// Set the address type for the EndpointSlice
 	endpointSlice.AddressType = discoveryv1.AddressTypeIPv4
 
@@ -154,6 +163,13 @@ func (r *Reconciler) generateClusterPrimaryService(
 	}}
 
 	for _, sp := range service.Spec.Ports {
+		deprecatedEndpoints.Subsets[0].Ports = append(deprecatedEndpoints.Subsets[0].Ports,
+			corev1.EndpointPort{
+				Name:     sp.Name,
+				Port:     sp.Port,
+				Protocol: sp.Protocol,
+			},
+		)
 		port := sp.Port
 		endpointSlice.Ports = append(endpointSlice.Ports,
 			discoveryv1.EndpointPort{
@@ -163,24 +179,34 @@ func (r *Reconciler) generateClusterPrimaryService(
 			})
 	}
 
-	return service, endpointSlice, err
+	return service, endpointSlice, deprecatedEndpoints, err
 }
 
+// +kubebuilder:rbac:groups="",resources="endpoints",verbs={create,patch}
 // +kubebuilder:rbac:groups="discovery.k8s.io",resources="endpointslices",verbs={create,patch}
 // +kubebuilder:rbac:groups="",resources="services",verbs={create,patch}
+
+// The OpenShift RestrictedEndpointsAdmission plugin requires special
+// authorization to create Endpoints that contain ClusterIPs.
+// - https://github.com/openshift/origin/pull/9383
+// +kubebuilder:rbac:groups="",resources="endpoints/restricted",verbs={create}
 
 // reconcileClusterPrimaryService writes the Service and EndpointSlice that resolve
 // to the PostgreSQL primary instance.
 func (r *Reconciler) reconcileClusterPrimaryService(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, leader *corev1.Service,
 ) (*corev1.Service, error) {
-	service, endpointSlice, err := r.generateClusterPrimaryService(cluster, leader)
+	service, endpointSlice, deprecatedEndpoints, err := r.generateClusterPrimaryService(cluster, leader)
 
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, service))
 	}
 	if err == nil {
-		err = errors.WithStack(r.apply(ctx, endpointSlice))
+		if cluster.CompareVersion("2.9.0") >= 0 {
+			err = errors.WithStack(r.apply(ctx, endpointSlice))
+		} else {
+			err = errors.WithStack(r.apply(ctx, deprecatedEndpoints))
+		}
 	}
 	return service, err
 }
@@ -289,7 +315,6 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	rootCA *pki.RootCertificateAuthority,
 	backupsSpecFound bool,
 ) (bool, error) {
-
 	// a hash func to hash the pgBackRest restore options
 	hashFunc := func(jobConfigs []string) (string, error) {
 		return safeHash32(func(w io.Writer) (err error) {
@@ -382,8 +407,7 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	}
 	var configChanged bool
 	if restoreJob != nil {
-		configChanged =
-			(configHash != restoreJob.GetAnnotations()[naming.PGBackRestConfigHash])
+		configChanged = (configHash != restoreJob.GetAnnotations()[naming.PGBackRestConfigHash])
 	}
 
 	// Proceed with preparing the cluster for restore (e.g. tearing down runners, the DCS,

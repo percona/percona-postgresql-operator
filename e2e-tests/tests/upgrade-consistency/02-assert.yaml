@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 300
+timeout: 120
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -133,3 +133,83 @@ status:
     ready: 3
     size: 3
   state: ready
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/patroni: upgrade-consistency-ha
+  name: upgrade-consistency-ha
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/patroni: upgrade-consistency-ha
+  name: upgrade-consistency-ha-config
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/patroni: upgrade-consistency-ha
+  name: upgrade-consistency-ha-failover
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    app.kubernetes.io/component: pgbouncer
+    app.kubernetes.io/instance: upgrade-consistency
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+    pgv2.percona.com/version: 2.8.2
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/role: pgbouncer
+  name: upgrade-consistency-pgbouncer
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    service.kubernetes.io/headless: ""
+  name: upgrade-consistency-pods
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    app.kubernetes.io/component: pg
+    app.kubernetes.io/instance: upgrade-consistency
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/role: primary
+  name: upgrade-consistency-primary
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: PostgresCluster
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    app.kubernetes.io/component: pg
+    app.kubernetes.io/instance: upgrade-consistency
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/role: replica
+  name: upgrade-consistency-replicas

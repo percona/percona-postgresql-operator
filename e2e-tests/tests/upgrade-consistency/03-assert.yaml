@@ -133,3 +133,196 @@ status:
     ready: 3
     size: 3
   state: ready
+---
+addressType: IPv4
+apiVersion: discovery.k8s.io/v1
+endpoints:
+  - conditions:
+      ready: true
+    targetRef:
+      kind: Pod
+kind: EndpointSlice
+metadata:
+  labels:
+    endpointslice.kubernetes.io/managed-by: endpointslicemirroring-controller.k8s.io
+    kubernetes.io/service-name: upgrade-consistency-ha
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/patroni: upgrade-consistency-ha
+  ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Endpoints
+ports:
+  - name: postgres
+    port: 5432
+    protocol: TCP
+---
+addressType: IPv4
+apiVersion: discovery.k8s.io/v1
+endpoints:
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+kind: EndpointSlice
+metadata:
+  generateName: upgrade-consistency-pgbouncer-
+  labels:
+    app.kubernetes.io/component: pgbouncer
+    app.kubernetes.io/instance: upgrade-consistency
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+    kubernetes.io/service-name: upgrade-consistency-pgbouncer
+    pgv2.percona.com/version: 2.9.0
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/role: pgbouncer
+  ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+ports:
+  - name: pgbouncer
+    port: 5432
+    protocol: TCP
+---
+addressType: IPv4
+apiVersion: discovery.k8s.io/v1
+endpoints:
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+kind: EndpointSlice
+metadata:
+  generateName: upgrade-consistency-pods-
+  labels:
+    endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+    kubernetes.io/service-name: upgrade-consistency-pods
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    service.kubernetes.io/headless: ""
+  ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+ports: null
+---
+addressType: IPv4
+apiVersion: discovery.k8s.io/v1
+endpoints:
+  - conditions: {}
+kind: EndpointSlice
+metadata:
+  name: upgrade-consistency-primary
+  labels:
+    app.kubernetes.io/component: pg
+    app.kubernetes.io/instance: upgrade-consistency
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    kubernetes.io/service-name: upgrade-consistency-primary
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/role: primary
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: PostgresCluster
+ports:
+  - name: postgres
+    port: 5432
+    protocol: TCP
+---
+addressType: IPv4
+apiVersion: discovery.k8s.io/v1
+endpoints:
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+  - conditions:
+      ready: true
+      serving: true
+      terminating: false
+    targetRef:
+      kind: Pod
+kind: EndpointSlice
+metadata:
+  generateName: upgrade-consistency-replicas-
+  labels:
+    app.kubernetes.io/component: pg
+    app.kubernetes.io/instance: upgrade-consistency
+    app.kubernetes.io/managed-by: percona-postgresql-operator
+    app.kubernetes.io/name: percona-postgresql
+    app.kubernetes.io/part-of: percona-postgresql
+    endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+    kubernetes.io/service-name: upgrade-consistency-replicas
+    postgres-operator.crunchydata.com/cluster: upgrade-consistency
+    postgres-operator.crunchydata.com/role: replica
+  ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+ports:
+  - name: postgres
+    port: 5432
+    protocol: TCP

@@ -209,6 +209,8 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
+// +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=list;delete
+// +kubebuilder:rbac:groups="",resources="endpoints",verbs=get;delete
 // +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -314,6 +316,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
 	}
 
+	if err := r.reconcileEndpoints(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile deprecated endpoints")
+	}
+
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
 		if err != nil {
@@ -357,6 +363,52 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// reconcileEndpoints ensures that the deprecated `Endpoints` resource created by the operator in previous versions
+// is removed once version 2.9.0 is reached.
+//
+// In earlier versions, `endpointslicemirroring-controller.k8s.io` mirrored this deprecated `Endpoints` resource to
+// `EndpointSlices`. Since the operator now creates a new `EndpointSlice`, we should remove the mirrored `EndpointSlice`
+// created from the deprecated `Endpoints` resource.
+func (r *PGClusterReconciler) reconcileEndpoints(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if cr.CompareVersion("2.9.0") < 0 {
+		return nil
+	}
+
+	e := new(corev1.Endpoints)
+	err := r.Client.Get(ctx, types.NamespacedName{
+		Namespace: cr.Namespace,
+		Name:      cr.Name + "-primary",
+	}, e)
+	if client.IgnoreNotFound(err) != nil {
+		return errors.Wrap(err, "failed to get deprecated primary endpoints")
+	}
+	if !k8serrors.IsNotFound(err) {
+		if err := r.Client.Delete(ctx, e); err != nil {
+			return errors.Wrap(err, "failed to delete deprecated endpoint")
+		}
+	}
+
+	endpoints := new(corev1.EndpointsList)
+	if err := r.Client.List(ctx, endpoints,
+		client.InNamespace(cr.Namespace),
+		client.MatchingLabels(map[string]string{naming.LabelCluster: cr.Name}),
+	); err != nil {
+		return errors.Wrap(err, "failed to list endpoints")
+	}
+
+	for _, e := range endpoints.Items {
+		if e.GenerateName != cr.Name+"-primary-" {
+			continue
+		}
+
+		if err := r.Client.Delete(ctx, &e); err != nil {
+			return errors.Wrap(err, "failed to delete deprecated endpoint")
+		}
+	}
+
+	return nil
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {

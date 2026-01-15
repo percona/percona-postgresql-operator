@@ -98,7 +98,10 @@ rules:
   - endpointslices
   verbs:
   - create
+  - delete
+  - list
   - patch
+  - watch
 - apiGroups:
   - pgv2.percona.com
   resources:
