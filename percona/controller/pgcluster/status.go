@@ -122,7 +122,7 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 
-		if err := r.reconcileReplicationLagStatus(ctx, cluster); err != nil {
+		if err := r.reconcileStandbyLag(ctx, cluster); err != nil {
 			return errors.Wrap(err, "reconcile replication lag status")
 		}
 

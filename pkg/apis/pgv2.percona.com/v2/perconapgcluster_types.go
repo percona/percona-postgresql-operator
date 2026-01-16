@@ -187,8 +187,11 @@ type StandbySpec struct {
 	MaxAcceptableLag *resource.Quantity `json:"maxAcceptableLag,omitempty"`
 }
 
-func (cr *PerconaPGCluster) ShouldCheckReplicationLag() bool {
-	return cr.Spec.Standby != nil && cr.Spec.Standby.Enabled && cr.Spec.Standby.MaxAcceptableLag != nil
+func (cr *PerconaPGCluster) ShouldCheckStandbyLag() bool {
+	return cr.CompareVersion("2.9.0") >= 0 &&
+		cr.Spec.Standby != nil &&
+		cr.Spec.Standby.Enabled &&
+		cr.Spec.Standby.MaxAcceptableLag != nil
 }
 
 func (cr *PerconaPGCluster) Default() {

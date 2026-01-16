@@ -35,13 +35,9 @@ const (
 // data is lagging behind, and the pod readiness should fail.
 const replicationLagSignalFile = "/pgdata/replication-lag-detected"
 
-func (r *PGClusterReconciler) reconcileReplicationLagStatus(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	// TODO: support streaming replication lag detection
-	if !cr.ShouldCheckReplicationLag() || cr.Spec.Standby.RepoName == "" {
-		return nil
-	}
-
-	if cr.CompareVersion("2.9.0") < 0 {
+	if !cr.ShouldCheckStandbyLag() || cr.Spec.Standby.RepoName == "" {
 		return nil
 	}
 
@@ -213,11 +209,7 @@ func (r *PGClusterReconciler) getCurrentWALLSN(ctx context.Context, cr *v2.Perco
 }
 
 func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.CompareVersion("2.9.0") < 0 {
-		return nil
-	}
-
-	if !cr.ShouldCheckReplicationLag() || cr.Spec.Standby.RepoName == "" {
+	if !cr.ShouldCheckStandbyLag() || cr.Spec.Standby.RepoName == "" {
 		return nil
 	}
 
@@ -225,14 +217,14 @@ func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context
 		return nil
 	}
 
-	mainSite, err := r.getReplicationMainSite(ctx, cr)
+	mainSite, err := r.getStandbyMainSite(ctx, cr)
 	if err != nil {
-		return errors.Wrap(err, "get replication main site")
+		return errors.Wrap(err, "get standby main site")
 	}
 
 	log := logging.FromContext(ctx)
 	if mainSite == nil {
-		log.V(1).Info("Main site not found in Kubernetes, cannot detect replication lag")
+		log.V(1).Info("Main site not found in Kubernetes, cannot detect standby lag")
 	}
 
 	crCopy := cr.DeepCopy()
@@ -247,14 +239,14 @@ func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context
 	annots[pNaming.AnnotationReplicationMainSite] = mainSite.GetNamespace() + "/" + mainSite.GetName()
 	crCopy.SetAnnotations(annots)
 	if err := r.Client.Update(ctx, crCopy); err != nil {
-		return errors.Wrap(err, "update replication main site annotation")
+		return errors.Wrap(err, "update standby main site annotation")
 	}
 	return nil
 }
 
-// getReplicationMainSite returns the name of the main site for the standby cluster (based on pgbackrest only)
-func (r *PGClusterReconciler) getReplicationMainSite(ctx context.Context, cr *v2.PerconaPGCluster) (*v2.PerconaPGCluster, error) {
-	if !cr.ShouldCheckReplicationLag() || cr.Spec.Standby.RepoName == "" {
+// getStandbyMainSite returns the name of the main site for the standby cluster (based on pgbackrest only)
+func (r *PGClusterReconciler) getStandbyMainSite(ctx context.Context, cr *v2.PerconaPGCluster) (*v2.PerconaPGCluster, error) {
+	if !cr.ShouldCheckStandbyLag() || cr.Spec.Standby.RepoName == "" {
 		return nil, errors.New("standby cluster is not enabled or repo name is not specified")
 	}
 

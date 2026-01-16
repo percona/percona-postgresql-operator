@@ -21,7 +21,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestReconcileReplicationLagStatus(t *testing.T) {
+func TestReconcileStandbyLag(t *testing.T) {
 	sourceCluster, err := readDefaultCR("source-cluster", "default")
 	require.NoError(t, err)
 	sourceCluster.Default()
@@ -40,6 +40,29 @@ func TestReconcileReplicationLagStatus(t *testing.T) {
 	}
 	standbyCluster.Status.State = v2.AppStateReady
 
+	mockPodExec := func(wantLagBytes int64) func(context.Context, string, string, string, io.Reader, io.Writer, io.Writer, ...string) error {
+		return func(ctx context.Context, namespace, pod, container string,
+			stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+
+			if stdin == nil {
+				return nil
+			}
+
+			sqlB, err := io.ReadAll(stdin)
+			if err != nil {
+				return err
+			}
+
+			query := strings.TrimSpace(string(sqlB))
+			if strings.Contains(query, "pg_current_wal_lsn") {
+				fmt.Fprint(stdout, "0/12345678\n")
+			} else if strings.Contains(query, "pg_wal_lsn_diff") {
+				fmt.Fprintf(stdout, "%d\n", wantLagBytes)
+			}
+			return nil
+		}
+	}
+
 	cl, err := buildFakeClient(t.Context(), sourceCluster, standbyCluster, sourcePrimary, standbyPrimary)
 	require.NoError(t, err)
 
@@ -47,10 +70,36 @@ func TestReconcileReplicationLagStatus(t *testing.T) {
 		Client: cl,
 	}
 
-	t.Run("main site not found", func(t *testing.T) {
-		r.PodExec = mockPodExecForLag(0)
+	t.Run("CRVersion < 2.9.0", func(t *testing.T) {
+		cluster := standbyCluster.DeepCopy()
+		cluster.Spec.CRVersion = "2.8.0"
+		r.PodExec = mockPodExec(0)
 
-		err := r.reconcileReplicationLagStatus(t.Context(), standbyCluster)
+		err := r.reconcileStandbyLag(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		assert.Nil(t, cond)
+		assert.Nil(t, cluster.Status.Standby)
+	})
+
+	t.Run("Standby not enabled", func(t *testing.T) {
+		cluster := standbyCluster.DeepCopy()
+		cluster.Spec.Standby.Enabled = false
+		r.PodExec = mockPodExec(0)
+
+		err := r.reconcileStandbyLag(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		assert.Nil(t, cond)
+		assert.Nil(t, cluster.Status.Standby)
+	})
+
+	t.Run("main site not found", func(t *testing.T) {
+		r.PodExec = mockPodExec(0)
+
+		err := r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
@@ -59,74 +108,83 @@ func TestReconcileReplicationLagStatus(t *testing.T) {
 		assert.Equal(t, "MainSiteNotFound", cond.Reason)
 	})
 
+	// Set the annotation for the main site
+	standbyCluster.SetAnnotations(map[string]string{
+		pNaming.AnnotationReplicationMainSite: sourceCluster.GetNamespace() + "/" + sourceCluster.GetName(),
+	})
+
 	t.Run("lag not detected", func(t *testing.T) {
-		standbyCluster.SetAnnotations(map[string]string{
-			pNaming.AnnotationReplicationMainSite: sourceCluster.GetNamespace() + "/" + sourceCluster.GetName(),
-		})
 		err := r.Client.Update(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
-		r.PodExec = mockPodExecForLag(0)
+		r.PodExec = mockPodExec(0)
 
-		err = r.reconcileReplicationLagStatus(t.Context(), standbyCluster)
+		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
+
+		assert.NotNil(t, standbyCluster.Status.Standby)
+		assert.NotNil(t, standbyCluster.Status.Standby.LagLastComputedAt)
+		assert.Equal(t, int64(0), standbyCluster.Status.Standby.LagBytes)
 	})
 
+	lastLagComputedAt := standbyCluster.Status.Standby.LagLastComputedAt
 	t.Run("lag below threshold", func(t *testing.T) {
 		now := time.Now()
 		now = now.Add(-defaultReplicationLagDetectionInterval)
 		standbyCluster.Status.Standby = &v2.StandbyStatus{
 			LagLastComputedAt: &metav1.Time{Time: now},
 		}
-		r.PodExec = mockPodExecForLag(1024)
+		r.PodExec = mockPodExec(1024)
 
-		err = r.reconcileReplicationLagStatus(t.Context(), standbyCluster)
+		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
-
+		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))
 		assert.Equal(t, int64(1024), standbyCluster.Status.Standby.LagBytes)
 	})
 
+	lastLagComputedAt = standbyCluster.Status.Standby.LagLastComputedAt
 	t.Run("lag above threshold", func(t *testing.T) {
 		now := time.Now()
 		now = now.Add(-defaultReplicationLagDetectionInterval)
 		standbyCluster.Status.Standby = &v2.StandbyStatus{
 			LagLastComputedAt: &metav1.Time{Time: now},
 		}
-		r.PodExec = mockPodExecForLag(3 * 1024 * 1024)
+		r.PodExec = mockPodExec(3 * 1024 * 1024)
 
-		err = r.reconcileReplicationLagStatus(t.Context(), standbyCluster)
+		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionTrue, cond.Status)
-
+		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))
 		assert.Equal(t, int64(3*1024*1024), standbyCluster.Status.Standby.LagBytes)
 	})
 
+	lastLagComputedAt = standbyCluster.Status.Standby.LagLastComputedAt
 	t.Run("cluster has caught up", func(t *testing.T) {
 		now := time.Now()
 		now = now.Add(-defaultReplicationLagDetectionInterval)
 		standbyCluster.Status.Standby = &v2.StandbyStatus{
 			LagLastComputedAt: &metav1.Time{Time: now},
 		}
-		r.PodExec = mockPodExecForLag(0)
+		r.PodExec = mockPodExec(0)
 
-		err = r.reconcileReplicationLagStatus(t.Context(), standbyCluster)
+		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
-
+		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))
 		assert.Equal(t, int64(0), standbyCluster.Status.Standby.LagBytes)
 	})
 }
@@ -141,28 +199,5 @@ func primaryPodForCluster(cluster *v2.PerconaPGCluster) *corev1.Pod {
 				"postgres-operator.crunchydata.com/role": "primary",
 			},
 		},
-	}
-}
-
-func mockPodExecForLag(wantLagBytes int64) func(context.Context, string, string, string, io.Reader, io.Writer, io.Writer, ...string) error {
-	return func(ctx context.Context, namespace, pod, container string,
-		stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
-
-		if stdin == nil {
-			return nil
-		}
-
-		sqlB, err := io.ReadAll(stdin)
-		if err != nil {
-			return err
-		}
-
-		query := strings.TrimSpace(string(sqlB))
-		if strings.Contains(query, "pg_current_wal_lsn") {
-			fmt.Fprint(stdout, "0/12345678\n")
-		} else if strings.Contains(query, "pg_wal_lsn_diff") {
-			fmt.Fprintf(stdout, "%d\n", wantLagBytes)
-		}
-		return nil
 	}
 }

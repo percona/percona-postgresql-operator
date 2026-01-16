@@ -370,7 +370,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 }
 
 func (r *PGClusterReconciler) requeueAfter(cr *v2.PerconaPGCluster) time.Duration {
-	if cr.ShouldCheckReplicationLag() {
+	if cr.ShouldCheckStandbyLag() {
 		if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) {
 			// standy is lagging, need to check again soon.
 			return laggedReplicationInterval
