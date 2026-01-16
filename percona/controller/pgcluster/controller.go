@@ -317,7 +317,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
 	}
 
-	if err := r.reconcileReplicationMainSiteAnnotation(ctx, cr); err != nil {
+	if err := r.reconcileStandbyMainSiteAnnotation(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile replication main site annotation")
 	}
 

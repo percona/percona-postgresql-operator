@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
@@ -201,4 +202,155 @@ func primaryPodForCluster(cluster *v2.PerconaPGCluster) *corev1.Pod {
 			},
 		},
 	}
+}
+
+func TestGetStandbyMainSite(t *testing.T) {
+	// Prepare mocks objects
+	sourceCluster, err := readDefaultCR("source-cluster", "default")
+	require.NoError(t, err)
+	sourceCluster.Default()
+	sourceCluster.Spec.Backups.PGBackRest.Repos = []crunchyv1beta1.PGBackRestRepo{
+		{
+			Name: "repo1",
+			S3: &crunchyv1beta1.RepoS3{
+				Bucket:   "some-bucket",
+				Endpoint: "some-endpoint",
+				Region:   "some-region",
+			},
+		},
+	}
+
+	standbyCluster, err := readDefaultCR("standby-cluster", "default")
+	require.NoError(t, err)
+	standbyCluster.Default()
+	standbyCluster.Spec.Backups.PGBackRest.Repos = []crunchyv1beta1.PGBackRestRepo{
+		{
+			Name: "repo1",
+			S3: &crunchyv1beta1.RepoS3{
+				Bucket:   "some-bucket",
+				Endpoint: "some-endpoint",
+				Region:   "some-region",
+			},
+		},
+	}
+	standbyCluster.Spec.Standby = &v2.StandbySpec{
+		PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
+			Enabled:  true,
+			RepoName: "repo1",
+		},
+		MaxAcceptableLag: ptr.To(resource.MustParse("1Mi")),
+	}
+
+	t.Run("standby not enabled", func(t *testing.T) {
+		standby := standbyCluster.DeepCopy()
+		standby.Spec.Standby.Enabled = false
+
+		cl, err := buildFakeClient(t.Context(), standbyCluster, []client.Object{sourceCluster}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		_, err = r.getStandbyMainSite(t.Context(), standby)
+		assert.Error(t, err)
+	})
+
+	t.Run("standby repo not specified", func(t *testing.T) {
+		standby := standbyCluster.DeepCopy()
+		standby.Spec.Standby.RepoName = ""
+
+		cl, err := buildFakeClient(t.Context(), standbyCluster, []client.Object{sourceCluster}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		_, err = r.getStandbyMainSite(t.Context(), standby)
+		assert.Error(t, err)
+	})
+
+	t.Run("source cluster with different repo configuration", func(t *testing.T) {
+		source := sourceCluster.DeepCopy()
+		standby := standbyCluster.DeepCopy()
+
+		source.Spec.Backups.PGBackRest.Repos = []crunchyv1beta1.PGBackRestRepo{
+			{
+				Name: "repo1",
+				S3: &crunchyv1beta1.RepoS3{
+					Bucket:   "different-bucket",
+					Endpoint: "some-endpoint",
+					Region:   "some-region",
+				},
+			},
+		}
+
+		cl, err := buildFakeClient(t.Context(), standby, []client.Object{source}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		mainSite, err := r.getStandbyMainSite(t.Context(), standby)
+		assert.NoError(t, err)
+		assert.Nil(t, mainSite)
+	})
+
+	t.Run("source cluster in same namespace", func(t *testing.T) {
+		source := sourceCluster.DeepCopy()
+		standby := standbyCluster.DeepCopy()
+
+		cl, err := buildFakeClient(t.Context(), standby, []client.Object{source}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		mainSite, err := r.getStandbyMainSite(t.Context(), standby)
+		assert.NoError(t, err)
+		assert.NotNil(t, mainSite)
+		assert.Equal(t, source.GetNamespace(), mainSite.GetNamespace())
+		assert.Equal(t, source.GetName(), mainSite.GetName())
+	})
+
+	t.Run("source cluster in different namespace", func(t *testing.T) {
+		source := sourceCluster.DeepCopy()
+		standby := standbyCluster.DeepCopy()
+		source.Namespace = "different-namespace"
+
+		cl, err := buildFakeClient(t.Context(), standby, []client.Object{source}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		mainSite, err := r.getStandbyMainSite(t.Context(), standby)
+		assert.NoError(t, err)
+		assert.NotNil(t, mainSite)
+		assert.Equal(t, "different-namespace", mainSite.GetNamespace())
+		assert.Equal(t, source.GetName(), mainSite.GetName())
+	})
+
+	t.Run("non-cluster-wide mode", func(t *testing.T) {
+		source := sourceCluster.DeepCopy()
+		standby := standbyCluster.DeepCopy()
+
+		source.Namespace = "different-namespace"
+
+		cl, err := buildFakeClient(t.Context(), standby, []client.Object{source}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client:         cl,
+			WatchNamespace: []string{"default"},
+		}
+
+		mainSite, err := r.getStandbyMainSite(t.Context(), standby)
+		assert.NoError(t, err)
+		assert.Nil(t, mainSite)
+	})
 }

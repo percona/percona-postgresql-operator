@@ -209,7 +209,7 @@ func (r *PGClusterReconciler) getCurrentWALLSN(ctx context.Context, cr *v2.Perco
 	return lsn, nil
 }
 
-func (r *PGClusterReconciler) reconcileReplicationMainSiteAnnotation(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcileStandbyMainSiteAnnotation(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if !cr.ShouldCheckStandbyLag() || cr.Spec.Standby.RepoName == "" {
 		return nil
 	}
@@ -264,7 +264,7 @@ func (r *PGClusterReconciler) getStandbyMainSite(ctx context.Context, cr *v2.Per
 	}
 
 	listOptions := []client.ListOption{}
-	if len(r.WatchNamespace) <= 1 {
+	if len(r.WatchNamespace) == 1 {
 		listOptions = append(listOptions, client.InNamespace(cr.Namespace))
 	}
 	clusters := &v2.PerconaPGClusterList{}
