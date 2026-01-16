@@ -8,10 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
