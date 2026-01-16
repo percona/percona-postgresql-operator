@@ -1,6 +1,9 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 480
+command:
+  - script: |-
+      kubectl wait --for=jsonpath='{.metadata.annotations["pgv2.percona.com/replication-main-site"]}'="${NAMESPACE}"/source-cluster --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -72,8 +75,6 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: standby-cluster
-  annotations:
-    pgv2.percona.com/replication-main-site: source-cluster
 status:
   pgbouncer:
     ready: 3
