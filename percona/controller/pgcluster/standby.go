@@ -43,13 +43,13 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 	}
 
 	// Do not try to calculate if the cluster is still initializing. We do not know the primary.
-	isCondPresent := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) != nil
+	isCondPresent := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) != nil
 	if cr.Status.State != v2.AppStateReady && !isCondPresent {
 		return nil
 	}
 
 	cond := metav1.Condition{
-		Type:   postgrescluster.ConditionReplicationLagDetected,
+		Type:   postgrescluster.ConditionStandbyLagging,
 		Reason: "LagNotDetected",
 		Status: metav1.ConditionFalse,
 	}
@@ -84,7 +84,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 
 	// We compute the lag at intervals because this is an expensive operation (requires pod execs and database queries).
 	interval := defaultReplicationLagDetectionInterval
-	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected) {
+	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) {
 		interval = laggedReplicationInterval
 	}
 	if !cr.Status.Standby.LagLastComputedAt.IsZero() && cr.Status.Standby.LagLastComputedAt.Add(interval).After(time.Now()) {
@@ -105,7 +105,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 	}
 
 	// Set pod readiness when the lag state transitions.
-	if !meta.IsStatusConditionPresentAndEqual(cr.Status.Conditions, postgrescluster.ConditionReplicationLagDetected, cond.Status) {
+	if !meta.IsStatusConditionPresentAndEqual(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging, cond.Status) {
 		if err := r.setPodReplicationReadinessSignal(ctx, cr, !lagDetected); err != nil {
 			return errors.Wrap(err, "set pod replication readiness signal")
 		}

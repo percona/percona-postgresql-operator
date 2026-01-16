@@ -80,7 +80,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err := r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.Nil(t, cond)
 		assert.Nil(t, cluster.Status.Standby)
 	})
@@ -93,7 +93,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err := r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.Nil(t, cond)
 		assert.Nil(t, cluster.Status.Standby)
 	})
@@ -104,7 +104,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err := r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
 		assert.Equal(t, "MainSiteNotFound", cond.Reason)
@@ -124,7 +124,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
 
@@ -145,7 +145,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
 		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))
@@ -164,7 +164,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionTrue, cond.Status)
 		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))
@@ -183,7 +183,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionReplicationLagDetected)
+		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
 		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))

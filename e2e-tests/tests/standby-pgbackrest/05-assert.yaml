@@ -8,8 +8,8 @@ commands:
       kubectl wait --for=jsonpath='{.status.state}'=ready --timeout=420s -n "${NAMESPACE}" pg/standby-cluster
 
       lagBytes=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.standby.lagBytes}')
-      condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="ReplicationLagDetected")].status}')
-      condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="ReplicationLagDetected")].reason}')
-      condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="ReplicationLagDetected")].message}')
+      condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].status}')
+      condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].reason}')
+      condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].message}')
       test "$condStatus" = "False"
       test "$condReason" = "LagNotDetected"
