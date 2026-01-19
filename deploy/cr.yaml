@@ -63,6 +63,7 @@ spec:
 #    host: "<primary-ip>"
 #    port: "<primary-port>"
 #    repoName: repo1
+#    maxAcceptableLag: 1Gi
 
 #  openshift: true
 
