@@ -294,7 +294,7 @@ func TestGetStandbyMainSite(t *testing.T) {
 		}
 
 		mainSite, err := r.getStandbyMainSite(t.Context(), standby)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, mainSite)
 	})
 
@@ -310,7 +310,7 @@ func TestGetStandbyMainSite(t *testing.T) {
 		}
 
 		mainSite, err := r.getStandbyMainSite(t.Context(), standby)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, mainSite)
 		assert.Equal(t, source.GetNamespace(), mainSite.GetNamespace())
 		assert.Equal(t, source.GetName(), mainSite.GetName())
@@ -329,7 +329,7 @@ func TestGetStandbyMainSite(t *testing.T) {
 		}
 
 		mainSite, err := r.getStandbyMainSite(t.Context(), standby)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, mainSite)
 		assert.Equal(t, "different-namespace", mainSite.GetNamespace())
 		assert.Equal(t, source.GetName(), mainSite.GetName())
@@ -350,7 +350,7 @@ func TestGetStandbyMainSite(t *testing.T) {
 		}
 
 		mainSite, err := r.getStandbyMainSite(t.Context(), standby)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, mainSite)
 	})
 }
