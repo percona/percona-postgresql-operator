@@ -148,7 +148,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
-		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))
+		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.After(lastLagComputedAt.Time))
 		assert.Equal(t, int64(1024), standbyCluster.Status.Standby.LagBytes)
 	})
 
@@ -167,7 +167,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionTrue, cond.Status)
-		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))
+		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.After(lastLagComputedAt.Time))
 		assert.Equal(t, int64(3*1024*1024), standbyCluster.Status.Standby.LagBytes)
 	})
 
@@ -186,7 +186,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
-		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.Time.After(lastLagComputedAt.Time))
+		assert.True(t, standbyCluster.Status.Standby.LagLastComputedAt.After(lastLagComputedAt.Time))
 		assert.Equal(t, int64(0), standbyCluster.Status.Standby.LagBytes)
 	})
 }
