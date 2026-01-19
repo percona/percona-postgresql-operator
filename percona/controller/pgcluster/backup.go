@@ -2,6 +2,8 @@ package pgcluster
 
 import (
 	"context"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
@@ -25,6 +27,13 @@ func (r *PGClusterReconciler) reconcileBackups(ctx context.Context, cr *v2.Perco
 
 	if err := r.reconcileBackupJobs(ctx, cr); err != nil {
 		return errors.Wrap(err, "reconcile backup jobs")
+	}
+
+	repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
+	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
+		log.Info("pgBackRest repo host not ready, skipping backup cleanup")
+		return nil
+
 	}
 
 	if err := r.cleanupOutdatedBackups(ctx, cr); err != nil {
