@@ -27,12 +27,10 @@ func TestReconcileStandbyLag(t *testing.T) {
 	sourceCluster, err := readDefaultCR("source-cluster", "default")
 	require.NoError(t, err)
 	sourceCluster.Default()
-	sourcePrimary := primaryPodForCluster(sourceCluster)
 
 	standbyCluster, err := readDefaultCR("standby-cluster", "default")
 	require.NoError(t, err)
 	standbyCluster.Default()
-	standbyPrimary := primaryPodForCluster(standbyCluster)
 	standbyCluster.Spec.Standby = &v2.StandbySpec{
 		PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
 			Enabled:  true,
@@ -41,6 +39,9 @@ func TestReconcileStandbyLag(t *testing.T) {
 		MaxAcceptableLag: ptr.To(resource.MustParse("1Mi")),
 	}
 	standbyCluster.Status.State = v2.AppStateReady
+	standbyCluster.SetAnnotations(map[string]string{
+		pNaming.AnnotationReplicationMainSite: sourceCluster.GetNamespace() + "/" + sourceCluster.GetName(),
+	})
 
 	mockPodExec := func(wantLagBytes int64) func(context.Context, string, string, string, io.Reader, io.Writer, io.Writer, ...string) error {
 		return func(ctx context.Context, namespace, pod, container string,
@@ -65,16 +66,30 @@ func TestReconcileStandbyLag(t *testing.T) {
 		}
 	}
 
-	cl, err := buildFakeClient(t.Context(), sourceCluster, standbyCluster, sourcePrimary, standbyPrimary)
-	require.NoError(t, err)
+	newReconciler := func(
+		sourceCluster *v2.PerconaPGCluster,
+		standbyCluster *v2.PerconaPGCluster,
+		sourcePrimary *corev1.Pod,
+		standbyPrimary *corev1.Pod,
+	) *PGClusterReconciler {
+		cl, err := buildFakeClient(t.Context(), sourceCluster, standbyCluster, sourcePrimary, standbyPrimary)
+		require.NoError(t, err)
 
-	r := &PGClusterReconciler{
-		Client: cl,
+		return &PGClusterReconciler{
+			Client: cl,
+		}
 	}
 
 	t.Run("CRVersion < 2.9.0", func(t *testing.T) {
 		cluster := standbyCluster.DeepCopy()
 		cluster.Spec.CRVersion = "2.8.0"
+
+		r := newReconciler(
+			sourceCluster,
+			cluster,
+			primaryPodForCluster(sourceCluster),
+			primaryPodForCluster(cluster),
+		)
 		r.PodExec = mockPodExec(0)
 
 		err := r.reconcileStandbyLag(t.Context(), cluster)
@@ -88,6 +103,13 @@ func TestReconcileStandbyLag(t *testing.T) {
 	t.Run("Standby not enabled", func(t *testing.T) {
 		cluster := standbyCluster.DeepCopy()
 		cluster.Spec.Standby.Enabled = false
+
+		r := newReconciler(
+			sourceCluster,
+			cluster,
+			primaryPodForCluster(sourceCluster),
+			primaryPodForCluster(cluster),
+		)
 		r.PodExec = mockPodExec(0)
 
 		err := r.reconcileStandbyLag(t.Context(), cluster)
@@ -99,9 +121,18 @@ func TestReconcileStandbyLag(t *testing.T) {
 	})
 
 	t.Run("main site not found", func(t *testing.T) {
+		cluster := standbyCluster.DeepCopy()
+		cluster.SetAnnotations(map[string]string{})
+
+		r := newReconciler(
+			sourceCluster,
+			cluster,
+			primaryPodForCluster(sourceCluster),
+			primaryPodForCluster(cluster),
+		)
 		r.PodExec = mockPodExec(0)
 
-		err := r.reconcileStandbyLag(t.Context(), standbyCluster)
+		err := r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
 		cond := meta.FindStatusCondition(standbyCluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
@@ -110,15 +141,13 @@ func TestReconcileStandbyLag(t *testing.T) {
 		assert.Equal(t, "MainSiteNotFound", cond.Reason)
 	})
 
-	// Set the annotation for the main site
-	standbyCluster.SetAnnotations(map[string]string{
-		pNaming.AnnotationReplicationMainSite: sourceCluster.GetNamespace() + "/" + sourceCluster.GetName(),
-	})
-
 	t.Run("lag not detected", func(t *testing.T) {
-		err := r.Client.Update(t.Context(), standbyCluster)
-		require.NoError(t, err)
-
+		r := newReconciler(
+			sourceCluster,
+			standbyCluster,
+			primaryPodForCluster(sourceCluster),
+			primaryPodForCluster(standbyCluster),
+		)
 		r.PodExec = mockPodExec(0)
 
 		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
@@ -135,12 +164,16 @@ func TestReconcileStandbyLag(t *testing.T) {
 
 	lastLagComputedAt := standbyCluster.Status.Standby.LagLastComputedAt
 	t.Run("lag below threshold", func(t *testing.T) {
-		now := time.Now()
-		now = now.Add(-defaultReplicationLagDetectionInterval)
-		standbyCluster.Status.Standby = &v2.StandbyStatus{
-			LagLastComputedAt: &metav1.Time{Time: now},
-		}
+		r := newReconciler(
+			sourceCluster,
+			standbyCluster,
+			primaryPodForCluster(sourceCluster),
+			primaryPodForCluster(standbyCluster),
+		)
 		r.PodExec = mockPodExec(1024)
+
+		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
+		require.NoError(t, err)
 
 		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
 		require.NoError(t, err)
@@ -154,11 +187,18 @@ func TestReconcileStandbyLag(t *testing.T) {
 
 	lastLagComputedAt = standbyCluster.Status.Standby.LagLastComputedAt
 	t.Run("lag above threshold", func(t *testing.T) {
+		cluster := standbyCluster.DeepCopy()
 		now := time.Now()
 		now = now.Add(-defaultReplicationLagDetectionInterval)
-		standbyCluster.Status.Standby = &v2.StandbyStatus{
-			LagLastComputedAt: &metav1.Time{Time: now},
+		cluster.Status.Standby = &v2.StandbyStatus{
+			LagLastComputedAt: ptr.To(metav1.Time{Time: now}),
 		}
+		r := newReconciler(
+			sourceCluster,
+			cluster,
+			primaryPodForCluster(sourceCluster),
+			primaryPodForCluster(cluster),
+		)
 		r.PodExec = mockPodExec(3 * 1024 * 1024)
 
 		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
@@ -173,11 +213,18 @@ func TestReconcileStandbyLag(t *testing.T) {
 
 	lastLagComputedAt = standbyCluster.Status.Standby.LagLastComputedAt
 	t.Run("cluster has caught up", func(t *testing.T) {
+		cluster := standbyCluster.DeepCopy()
 		now := time.Now()
 		now = now.Add(-defaultReplicationLagDetectionInterval)
-		standbyCluster.Status.Standby = &v2.StandbyStatus{
-			LagLastComputedAt: &metav1.Time{Time: now},
+		cluster.Status.Standby = &v2.StandbyStatus{
+			LagLastComputedAt: ptr.To(metav1.Time{Time: now}),
 		}
+		r := newReconciler(
+			sourceCluster,
+			cluster,
+			primaryPodForCluster(sourceCluster),
+			primaryPodForCluster(cluster),
+		)
 		r.PodExec = mockPodExec(0)
 
 		err = r.reconcileStandbyLag(t.Context(), standbyCluster)
