@@ -33,7 +33,6 @@ func (r *PGClusterReconciler) reconcileBackups(ctx context.Context, cr *v2.Perco
 	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
 		log.Info("pgBackRest repo host not ready, skipping backup cleanup")
 		return nil
-
 	}
 
 	if err := r.cleanupOutdatedBackups(ctx, cr); err != nil {
