@@ -15,7 +15,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -79,7 +77,7 @@ type PGClusterReconciler struct {
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
-func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
+func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.Manager) error {
 	if r.PodExec == nil {
 		var err error
 		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
@@ -98,6 +96,13 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		return errors.Wrap(err, "unable to watch pg-backups")
 	}
 
+	watchNamespace := ""
+	if len(r.WatchNamespace) == 1 {
+		watchNamespace = r.WatchNamespace[0]
+	}
+	standbyClusterEvents := make(chan event.GenericEvent)
+	go pollAndRequeueStandbys(ctx, standbyClusterEvents, r.Client, watchNamespace)
+
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
@@ -106,6 +111,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
+		WatchesRawSource(source.Channel(standbyClusterEvents, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }
 
@@ -363,21 +369,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return ctrl.Result{}, errors.Wrap(err, "update status")
 	}
 
-	rr := ctrl.Result{}
-	rr.RequeueAfter = r.requeueAfter(cr)
-
-	return rr, nil
-}
-
-func (r *PGClusterReconciler) requeueAfter(cr *v2.PerconaPGCluster) time.Duration {
-	if cr.ShouldCheckStandbyLag() {
-		if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) {
-			// standy is lagging, need to check again soon.
-			return laggedReplicationInterval
-		}
-		return defaultReplicationLagDetectionInterval
-	}
-	return 0
+	return ctrl.Result{}, nil
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {

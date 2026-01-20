@@ -197,7 +197,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		pc.WatchNamespace = strings.Split(namespaces, ",")
 	}
 
-	if err := pc.SetupWithManager(mgr); err != nil {
+	if err := pc.SetupWithManager(ctx, mgr); err != nil {
 		return err
 	}
 
