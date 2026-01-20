@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
@@ -37,9 +38,26 @@ const (
 const replicationLagSignalFile = "/pgdata/replication-lag-detected"
 
 func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	// TODO: support streaming replication lag detection
-	if !cr.ShouldCheckStandbyLag() || cr.Spec.Standby.RepoName == "" {
+	if !cr.ShouldCheckStandbyLag() {
 		return nil
+	}
+
+	if cr.Status.Standby == nil {
+		cr.Status.Standby = &v2.StandbyStatus{}
+	}
+
+	// If pgbackrest repo is the only source, we cannot get the lag if the primary cluster is not in k8s.
+	if cr.Spec.Standby.RepoName != "" && cr.Spec.Standby.Host == "" {
+		mainSiteNN, ok := cr.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
+		if !ok || mainSiteNN == "" {
+			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+				Type:    postgrescluster.ConditionStandbyLagging,
+				Status:  metav1.ConditionUnknown,
+				Reason:  "MainSiteNotFound",
+				Message: "Cannot find main site for replication lag calculation",
+			})
+			return nil
+		}
 	}
 
 	// Do not try to calculate if the cluster is still initializing. We do not know the primary.
@@ -48,65 +66,34 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 		return nil
 	}
 
+	// Check if we should skip this reconciliation cycle based on the interval.
+	if shouldSkipLagCheck(cr) {
+		return nil
+	}
+
+	lagBytes, err := r.getStandbyLag(ctx, cr)
+	if err != nil {
+		return errors.Wrap(err, "calculate replication lag bytes")
+	}
+
+	maxLag := cr.Spec.Standby.MaxAcceptableLag.AsDec().UnscaledBig().Int64()
+	lagDetected := lagBytes > maxLag
+
 	cond := metav1.Condition{
 		Type:   postgrescluster.ConditionStandbyLagging,
 		Reason: "LagNotDetected",
 		Status: metav1.ConditionFalse,
 	}
 
-	// Find the main site for the standby cluster.
-	mainSiteNN, ok := cr.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
-	if !ok || mainSiteNN == "" {
-		cond.Status = metav1.ConditionUnknown
-		cond.Reason = "MainSiteNotFound"
-		cond.Message = "Cannot find main site for replication lag calculation"
-		meta.SetStatusCondition(&cr.Status.Conditions, cond)
-		return nil
-	}
-
-	mainSiteSplit := strings.Split(mainSiteNN, "/")
-	if len(mainSiteSplit) != 2 {
-		return errors.New("invalid main site annotation format")
-	}
-
-	mainSite := &v2.PerconaPGCluster{}
-	objKey := client.ObjectKey{
-		Name:      mainSiteSplit[1],
-		Namespace: mainSiteSplit[0],
-	}
-	if err := r.Client.Get(ctx, objKey, mainSite); err != nil {
-		return errors.Wrap(err, "get main site for replication lag calculation")
-	}
-
-	if cr.Status.Standby == nil {
-		cr.Status.Standby = &v2.StandbyStatus{}
-	}
-
-	// We compute the lag at intervals because this is an expensive operation (requires pod execs and database queries).
-	interval := defaultReplicationLagDetectionInterval
-	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) {
-		interval = laggedReplicationInterval
-	}
-	if !cr.Status.Standby.LagLastComputedAt.IsZero() && cr.Status.Standby.LagLastComputedAt.Add(interval).After(time.Now()) {
-		return nil
-	}
-
-	lagBytes, err := r.calculatePGBackRestReplicationLagBytes(ctx, mainSite, cr)
-	if err != nil {
-		return errors.Wrap(err, "calculate replication lag bytes")
-	}
-	maxLag := cr.Spec.Standby.MaxAcceptableLag.AsDec().UnscaledBig().Int64()
-	lagDetected := lagBytes > maxLag
-
 	if lagDetected {
 		cond.Status = metav1.ConditionTrue
 		cond.Reason = "LagDetected"
-		cond.Message = fmt.Sprintf("WAL is lagging by '%d' bytes", lagBytes)
+		cond.Message = fmt.Sprintf("WAL is lagging by %d bytes (threshold: %d bytes)", lagBytes, maxLag)
 	}
 
-	// Set pod readiness when the lag state transitions.
+	// Set pod readiness only when the lag state transitions.
 	if !meta.IsStatusConditionPresentAndEqual(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging, cond.Status) {
-		if err := r.setPodReplicationReadinessSignal(ctx, cr, !lagDetected); err != nil {
+		if err := r.setPodReplicationLagSignal(ctx, cr, !lagDetected); err != nil {
 			return errors.Wrap(err, "set pod replication readiness signal")
 		}
 	}
@@ -117,7 +104,23 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 	return nil
 }
 
-func (r *PGClusterReconciler) setPodReplicationReadinessSignal(
+// shouldSkipLagCheck determines if lag checking should be skipped based on the configured interval.
+// We compute the lag at intervals because this is an expensive operation (requires pod execs and database queries).
+func shouldSkipLagCheck(cr *v2.PerconaPGCluster) bool {
+	interval := defaultReplicationLagDetectionInterval
+	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) {
+		interval = laggedReplicationInterval
+	}
+
+	if cr.Status.Standby.LagLastComputedAt == nil || cr.Status.Standby.LagLastComputedAt.IsZero() {
+		return false
+	}
+
+	nextCheckTime := cr.Status.Standby.LagLastComputedAt.Add(interval)
+	return time.Now().Before(nextCheckTime)
+}
+
+func (r *PGClusterReconciler) setPodReplicationLagSignal(
 	ctx context.Context,
 	cr *v2.PerconaPGCluster,
 	ready bool,
@@ -137,10 +140,60 @@ func (r *PGClusterReconciler) setPodReplicationReadinessSignal(
 	return r.PodExec(ctx, primary.GetNamespace(), primary.GetName(), naming.ContainerDatabase, nil, io.Discard, nil, cmd...)
 }
 
-func (r *PGClusterReconciler) calculatePGBackRestReplicationLagBytes(
-	ctx context.Context,
-	mainSite, standby *v2.PerconaPGCluster,
-) (int64, error) {
+func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
+	if standby.Spec.Standby.Host != "" {
+		return r.getLagFromStreamingHost(ctx, standby)
+	}
+	return r.getLagFromMainSite(ctx, standby)
+}
+
+func (r *PGClusterReconciler) getLagFromStreamingHost(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
+	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, standby)
+	if err != nil {
+		return 0, errors.Wrap(err, "get primary pod")
+	}
+
+	podExecutor := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+		return r.PodExec(ctx, primary.GetNamespace(), primary.GetName(), naming.ContainerDatabase, stdin, stdout, stderr, command...)
+	})
+
+	sql := "SELECT latest_end_lsn - pg_last_wal_replay_lsn() AS value from pg_catalog.pg_stat_wal_receiver;"
+	stdout, stderr, err := podExecutor.Exec(ctx, strings.NewReader(sql), map[string]string{
+		"ON_ERROR_STOP": "on",
+		"QUIET":         "on",
+	}, []string{"-t"})
+	if err != nil {
+		return 0, errors.Wrapf(err, "execute query: stderr=%s", stderr)
+	}
+
+	lagStr := strings.TrimSpace(stdout)
+	lagBytes, err := strconv.ParseInt(lagStr, 10, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "parse lag bytes: %s", lagStr)
+	}
+	return lagBytes, nil
+}
+
+func (r *PGClusterReconciler) getLagFromMainSite(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
+	// Find the main site for the standby cluster.
+	mainSiteNN, ok := standby.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
+	if !ok || mainSiteNN == "" {
+		return 0, fmt.Errorf("annotation '%s' is missing or empty", pNaming.AnnotationReplicationMainSite)
+	}
+
+	mainSiteParts := strings.Split(mainSiteNN, "/")
+	if len(mainSiteParts) != 2 {
+		return 0, fmt.Errorf("invalid format for annotation '%s': expected 'namespace/name', got '%s'", pNaming.AnnotationReplicationMainSite, mainSiteNN)
+	}
+
+	mainSite := &v2.PerconaPGCluster{}
+	objKey := client.ObjectKey{
+		Name:      mainSiteParts[1],
+		Namespace: mainSiteParts[0],
+	}
+	if err := r.Client.Get(ctx, objKey, mainSite); err != nil {
+		return 0, errors.Wrap(err, "get main site for replication lag calculation")
+	}
 	curWALLSN, err := r.getCurrentWALLSN(ctx, mainSite)
 	if err != nil {
 		return 0, errors.Wrap(err, "get current WAL SN")
@@ -286,4 +339,42 @@ func (r *PGClusterReconciler) getStandbyMainSite(ctx context.Context, cr *v2.Per
 		}
 	}
 	return nil, nil
+}
+
+// pollAndRequeueStandbys periodically polls the clusters and requeues those standbys that need to be checked for lag.
+func pollAndRequeueStandbys(
+	ctx context.Context,
+	events chan event.GenericEvent,
+	cl client.Client,
+	namespace string) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	log := logging.FromContext(ctx).WithName("PollStandbys")
+	for {
+		select {
+		case <-ticker.C:
+			clusters := &v2.PerconaPGClusterList{}
+
+			listOptions := []client.ListOption{}
+			if namespace != "" {
+				listOptions = append(listOptions, client.InNamespace(namespace))
+			}
+			if err := cl.List(ctx, clusters, listOptions...); err != nil {
+				log.Error(err, "list clusters")
+				continue
+			}
+
+			for _, cluster := range clusters.Items {
+				status := cluster.Status
+				if !cluster.ShouldCheckStandbyLag() || status.Standby == nil || shouldSkipLagCheck(&cluster) {
+					continue
+				}
+				log.Info("Requeuing standby cluster for lag check", "cluster", cluster.Name)
+				events <- event.GenericEvent{Object: cluster.DeepCopy()}
+			}
+		case <-ctx.Done():
+			log.Info("Stopping poll and requeue standbys")
+			return
+		}
+	}
 }
