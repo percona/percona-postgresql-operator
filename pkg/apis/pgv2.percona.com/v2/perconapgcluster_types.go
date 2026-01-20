@@ -1142,7 +1142,7 @@ func (cr *PerconaPGCluster) EnvFromSecrets() []string {
 		}
 	}
 
-	if len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
+	if cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil && len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
 		for _, envFrom := range cr.Spec.Proxy.PGBouncer.EnvFrom {
 			if envFrom.SecretRef == nil {
 				continue
