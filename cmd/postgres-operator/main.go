@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/percona/percona-postgresql-operator/percona/certmanager"
 	"os"
 	goruntime "runtime"
 	"strconv"
@@ -27,12 +26,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	certmanagerscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/standalone_pgadmin"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"

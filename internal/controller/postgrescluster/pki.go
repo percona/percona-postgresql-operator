@@ -6,8 +6,8 @@ package postgrescluster
 
 import (
 	"context"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	gover "github.com/hashicorp/go-version"

@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: latest
@@ -295,7 +295,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     pgv2.percona.com/version: v2.9.0
   name: perconapgbackups.pgv2.percona.com
@@ -703,7 +703,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     pgv2.percona.com/version: v2.9.0
   name: perconapgclusters.pgv2.percona.com
@@ -22179,7 +22179,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     pgv2.percona.com/version: v2.9.0
   name: perconapgrestores.pgv2.percona.com
@@ -22279,7 +22279,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     pgv2.percona.com/version: v2.9.0
   name: perconapgupgrades.pgv2.percona.com
@@ -25086,7 +25086,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: latest
@@ -27104,7 +27104,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: latest
@@ -29898,7 +29898,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: 5.4.2
@@ -53957,6 +53957,22 @@ rules:
   verbs:
   - create
   - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cert-manager.io
+  - certmanager.k8s.io
+  resources:
+  - certificaterequests
+  - certificates
+  - issuers
+  verbs:
+  - create
+  - delete
+  - deletecollection
   - get
   - list
   - patch

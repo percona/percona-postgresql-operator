@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/percona/percona-postgresql-operator/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"io"
 	"k8s.io/client-go/rest"
 	"time"
