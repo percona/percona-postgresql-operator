@@ -1,4 +1,3 @@
-# To simulate broken replication, we will block the standby primary from accessing the S3 bucket.
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 timeout: 20
@@ -16,7 +15,8 @@ commands:
       fi
 
       sleep 270
-      
+
+      # Rate limit the standby network traffic so that replication is slow. This will lead to lag.
       source_cluster_ip=$(kubectl get svc -n "${NAMESPACE}" source-cluster-ha -o jsonpath='{.spec.clusterIP}')
       kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c "iptables -A OUTPUT -p tcp -d ${source_cluster_ip} --dport 5432 -m limit --limit 1/s --limit-burst 1 -j ACCEPT"
       kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c "iptables -A OUTPUT -p tcp -d ${source_cluster_ip} --dport 5432 -j DROP"
