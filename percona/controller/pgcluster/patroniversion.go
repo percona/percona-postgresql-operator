@@ -48,7 +48,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionFromCluster(ctx context.Con
 	// we don't need to check the patroni version again.
 	if cr.Status.Patroni.Version != "" &&
 		cr.Status.Postgres.ImageID == imageID &&
-		pgVersion == cr.Status.Postgres.Version {
+		cr.Status.Postgres.Version == pgVersion {
 		return nil
 	}
 
