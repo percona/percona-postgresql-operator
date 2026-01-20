@@ -2,7 +2,7 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-CERT_MANAGER_VER="1.17.1"
+CERT_MANAGER_VER="1.19.1"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
@@ -55,6 +55,7 @@ deploy_operator() {
 	fi
 	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' "${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "'${disable_telemetry}'"' - \
+		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="LOG_LEVEL") | .value) = "DEBUG"' - \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
@@ -92,7 +93,8 @@ deploy_operator_gh() {
 
 	curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/${cw_prefix}operator.yaml" >"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml"
 
-	yq eval '.spec.template.spec.containers[0].image = "percona/percona-postgresql-operator:'${git_tag#v}'"' \
+	local docker_hub_org=$(echo "$IMAGE" | sed -E 's|(.*/)?([^/]+)/[^/]+(:.*)?|\2|')
+	yq eval '.spec.template.spec.containers[0].image = "'${REGISTRY_NAME_FULL}''$docker_hub_org'/percona-postgresql-operator:'${git_tag#v}'"' \
 		"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml" \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
@@ -114,6 +116,64 @@ remove_all_finalizers() {
 	done
 }
 
+wait_for_ready_containers() {
+    local pod_prefix="$1"
+    local target_count="$2"
+    local namespace="${NAMESPACE}"
+    local max_wait_seconds=300
+    local check_interval=5
+    local elapsed_time=0
+
+    if [[ -z "$pod_prefix" || -z "$target_count" || -z "$namespace" ]]; then
+        echo "Error: Missing arguments." >&2
+        echo "Usage: wait_for_ready_containers <pod_name_prefix> <target_ready_count> <namespace>" >&2
+        return 1
+    fi
+
+    echo "Waiting for pods starting with '$pod_prefix' in namespace '$namespace' to have $target_count ready containers (Max ${max_wait_seconds}s)..."
+
+    while [[ "$elapsed_time" -lt "$max_wait_seconds" ]]; do
+        local target_pods
+        # Get pods that match the prefix AND are running
+        target_pods=$(kubectl get pods -n "$namespace" --field-selector=status.phase=Running --output=json | \
+                      jq -r ".items[] | select(.metadata.name | startswith(\"$pod_prefix\")) | .metadata.name")
+        # If no running pods match the prefix, something might be wrong, but we'll keep waiting.
+        if [[ -z "$target_pods" ]]; then
+            echo "No running pods found with prefix '$pod_prefix'. Waiting..."
+            sleep "$check_interval"
+            elapsed_time=$((elapsed_time + check_interval))
+            continue
+        fi
+
+        local ready_count=0
+        local total_matches=0
+
+        # Check each pod individually
+        for pod_name in $target_pods; do
+            total_matches=$((total_matches + 1))
+            current_ready=$(kubectl get pod "$pod_name" -n "$namespace" -o json 2>/dev/null | \
+                            jq '.status.containerStatuses | map(select(.ready == true)) | length')
+
+            if [[ "$current_ready" -eq "$target_count" ]]; then
+                ready_count=$((ready_count + 1))
+            fi
+        done
+
+        if [[ "$ready_count" -eq "$total_matches" ]]; then
+            echo "Success: All $total_matches pods now have $target_count ready containers."
+            return 0
+        fi
+
+        echo "Current status: $ready_count of $total_matches pods have $target_count ready containers. Waiting ${check_interval}s..."
+
+        sleep "$check_interval"
+        elapsed_time=$((elapsed_time + check_interval))
+    done
+
+    echo "Error: Timeout reached! After ${max_wait_seconds} seconds, not all pods reached $target_count ready containers." >&2
+    return 1
+}
+
 destroy_operator() {
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" delete deployment percona-postgresql-operator --force --grace-period=0 || true
 	if [[ $OPERATOR_NS ]]; then
@@ -123,6 +183,56 @@ destroy_operator() {
 
 get_operator_pod() {
 	echo $(kubectl get pods -n "${OPERATOR_NS:-$NAMESPACE}" --selector=app.kubernetes.io/name=percona-postgresql-operator -o jsonpath='{.items[].metadata.name}')
+}
+
+retry() {
+	local max=$1
+	local delay=$2
+	shift 2 # cut delay and max args
+	local n=1
+
+	until "$@"; do
+		if [[ $n -ge $max ]]; then
+			echo "The command ${*} has failed after $n attempts."
+			exit 1
+		fi
+		((n++))
+		sleep $delay
+	done
+}
+
+deploy_minio() {
+	local access_key
+	local secret_key
+	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+	helm uninstall -n "${NAMESPACE}" minio-service || :
+	helm repo remove minio || :
+	helm repo add minio https://charts.min.io/
+	retry 10 60 helm install minio-service \
+		-n "${NAMESPACE}" \
+		--version "${MINIO_VER}" \
+		--set replicas=1 \
+		--set mode=standalone \
+		--set resources.requests.memory=256Mi \
+		--set rootUser=rootuser \
+		--set rootPassword=rootpass123 \
+		--set "users[0].accessKey"="$(printf '%q' "$(printf '%q' "$access_key")")" \
+		--set "users[0].secretKey"="$(printf '%q' "$(printf '%q' "$secret_key")")" \
+		--set "users[0].policy"=consoleAdmin \
+		--set service.type=ClusterIP \
+		--set configPathmc=/tmp/.minio/ \
+		--set persistence.size=2G \
+		--set securityContext.enabled=false \
+		minio/minio
+	MINIO_POD=$(kubectl -n "${NAMESPACE}" get pods --selector=release=minio-service -o 'jsonpath={.items[].metadata.name}')
+	wait_pod $MINIO_POD
+
+	# create bucket
+	kubectl -n "${NAMESPACE}" run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
+		bash -c "AWS_ACCESS_KEY_ID='$access_key' AWS_SECRET_ACCESS_KEY='$secret_key' AWS_DEFAULT_REGION=us-east-1 \
+		/usr/bin/aws --endpoint-url http://minio-service:9000 s3 mb s3://operator-testing"
 }
 
 deploy_s3_secrets() {
@@ -147,6 +257,7 @@ deploy_s3_secrets() {
 			;;
 		"custom-extensions" | "major-upgrade")
 			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
+			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
 			;;
 		*)
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini"
@@ -229,11 +340,18 @@ get_cr() {
 				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
 			;;
-		"custom-extensions" | "major-upgrade")
+		"major-upgrade")
 			yq eval -i '
 				.spec.extensions.image = "'$IMAGE'" |
 				.spec.extensions.imagePullPolicy = "Always" |
 				.spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
+			    ' $TEMP_DIR/cr.yaml
+			;;
+		"custom-extensions")
+			yq eval -i '
+				.spec.extensions.image = "'$IMAGE'" |
+				.spec.extensions.imagePullPolicy = "Always" |
+				.spec.extensions.storage = {"type": "s3", "bucket": "operator-testing", "region": "us-east-1", "endpoint": "http://minio-service:9000", "forcePathStyle": true, "disableSSL": true, "secret": {"name": "minio-secret"}}
 			    ' $TEMP_DIR/cr.yaml
 			;;
 	esac
@@ -283,10 +401,50 @@ get_psql_user_host() {
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.host | base64decode }}'
 }
 
+get_aws_access_key() {
+	local secret_name=${1}
+
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.AWS_SECRET_ACCESS_KEY | base64decode }}'
+}
+
+get_aws_access_key_id() {
+	local secret_name=${1}
+
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.AWS_ACCESS_KEY_ID | base64decode }}'
+}
+
+get_psql_user_host() {
+	local secret_name=${1}
+
+	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.host | base64decode }}'
+}
 get_instance_set_pods() {
 	local instance=${1:-instance1}
 
 	kubectl get pods -n ${NAMESPACE} --selector postgres-operator.crunchydata.com/instance-set=${instance} -o custom-columns='NAME:.metadata.name' --no-headers
+}
+
+copy_custom_extensions_form_aws() {
+	set +o xtrace
+
+	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+	kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
+		--image=perconalab/awscli \
+		--restart=Never -- \
+		bash -c "
+		AWS_ACCESS_KEY_ID=$(get_aws_access_key_id aws-s3-secret) \
+		AWS_SECRET_ACCESS_KEY=$(get_aws_access_key aws-s3-secret) \
+		AWS_DEFAULT_REGION=eu-central-1 \
+		/usr/bin/aws --endpoint-url https://s3.amazonaws.com s3 cp s3://pg-extensions/ /tmp/ --recursive &&
+
+		AWS_ACCESS_KEY_ID='${access_key}' \
+		AWS_SECRET_ACCESS_KEY='${secret_key}' \
+		AWS_DEFAULT_REGION=us-east-1 \
+		/usr/bin/aws --endpoint-url http://minio-service:9000 s3 cp /tmp/ s3://operator-testing/ --recursive
+	  "
+	set -o xtrace
 }
 
 get_psql_pod_host() {
@@ -335,6 +493,18 @@ get_service_ip() {
 	done
 	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].ip}'
 	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].hostname}'
+}
+
+get_version_images() {
+	local cr_version="$1"
+	local component="$2"
+	local release_versions_file="${TEMP_DIR}/release_version_${cr_version}"
+
+	if [[ ! -f $release_versions_file ]]; then
+		curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/refs/tags/v${cr_version}/e2e-tests/release_versions" >$release_versions_file
+	fi
+
+	grep -i ${component} $release_versions_file | cut -d'=' -f2
 }
 
 wait_for_delete() {
@@ -878,16 +1048,22 @@ get_desired_replicas() {
 	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}'
 }
 
+get_ready_replicas() {
+	kubectl get sts "$1" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}'
+}
+
 wait_sts_rollout() {
 	local sts=$1
+	local ready_replicas=$(get_ready_replicas $sts)
 	local updated_replicas=$(get_updated_replicas $sts)
 	local desired_replicas=$(get_desired_replicas $sts)
+	echo "ready_replicas $ready_replicas desired_replicas $desired_replicas"
 
-	until [[ $updated_replicas -eq $desired_replicas ]]; do
-		updated_replicas=$(get_updated_replicas $sts)
+	until [[ $ready_replicas -eq $desired_replicas && $updated_replicas -eq $desired_replicas ]]; do
+		ready_replicas=$(get_ready_replicas $sts)
 		desired_replicas=$(get_desired_replicas $sts)
-
-		echo "Waiting for sts/$sts to update... $updated_replicas/$desired_replicas pods updated."
+		updated_replicas=$(get_updated_replicas $sts)
+		echo "Waiting for sts/$sts to update... $ready_replicas/$updated_replicas/$desired_replicas pods updated."
 		sleep 10
 	done
 }
@@ -950,7 +1126,11 @@ get_container_image() {
 		operatorVersion=main
 	fi
 
-	echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
+	if [[ $component == 'pgbouncer' || $component == 'pgbackrest' ]]; then
+		echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+	else
+		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
+	fi
 }
 
 get_postgresql_logs() {
@@ -965,4 +1145,115 @@ get_postgresql_logs() {
 		echo "find /pgdata/pg${pgVersion}/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
 			| kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
 	done
+}
+
+wait_for_generation() {
+	local resource="$1"
+	local target_generation="$2"
+
+	echo "Waiting for $resource to reach generation $target_generation..."
+
+	while true; do
+		current_generation=$(kubectl -n ${NAMESPACE} get "$resource" -o jsonpath='{.metadata.generation}')
+
+		if [ "$current_generation" -eq "$target_generation" ]; then
+			echo "Resource $resource has reached generation $target_generation."
+			break
+		else
+			echo "Resource $resource is at generation $current_generation. Waiting..."
+			sleep 5
+		fi
+	done
+}
+
+# Reads all environment variables from a pod (single kubectl exec call)
+get_envs_from_pod() {
+  local namespace=$1
+  local pod=$2
+  local container=$3
+
+  if [ -n "$container" ]; then
+    kubectl exec -n "$namespace" "$pod" -c "$container" -- printenv 2>/dev/null || true
+  else
+    kubectl exec -n "$namespace" "$pod" -- printenv 2>/dev/null || true
+  fi
+}
+
+# Verifies a single variable in given env content
+check_env_in_pod() {
+  local check_type=$1
+  local pod=$2
+  local var_name=$3
+  local expected_value=$4
+  local env_content=$5
+
+  local actual_value
+  actual_value=$(echo "$env_content" | grep -E "^${var_name}=" | cut -d'=' -f2- || true)
+
+  if [[ "$check_type" == "add" ]]; then
+    if [ "$actual_value" != "$expected_value" ]; then
+      echo "ERROR: $var_name in $pod — expected '$expected_value', got '${actual_value:-<missing>}'"
+      return 1
+    else
+      echo "OK: $var_name=$actual_value in $pod"
+    fi
+  elif [[ "$check_type" == "delete" ]]; then
+    if [ -n "$actual_value" ]; then
+      echo "ERROR: $var_name exists in $pod (should not exist)"
+      return 1
+    else
+      echo "OK: $var_name deleted in $pod"
+    fi
+  else
+    echo "ERROR: unknown check type '$check_type'"
+    return 1
+  fi
+}
+
+# Checks multiple env vars in one or more components
+check_envs_for_component() {
+  local check_type=$1      # add | delete
+  local component=$2       # instance | pgbouncer | repohost
+  local vars=("${@:3}")    # everything after the 2nd argument
+
+  case "$component" in
+    instance)
+      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[0].metadata.name}')
+      CONTAINER=""
+      ;;
+    pgbouncer)
+      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
+      CONTAINER="pgbouncer"
+      ;;
+    repohost)
+      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
+      CONTAINER="pgbackrest"
+      ;;
+    *)
+      echo "ERROR: unknown component '$component'"
+      return 1
+      ;;
+  esac
+
+  echo "Fetching environment variables for $component pod $POD..."
+  local env_content
+  env_content=$(get_envs_from_pod "${NAMESPACE}" "$POD" "$CONTAINER")
+
+  local errors=0
+  for var_entry in "${vars[@]}"; do
+    if [[ "$check_type" == "add" ]]; then
+      local var_name="${var_entry%%=*}"
+      local var_expected="${var_entry#*=}"
+      check_env_in_pod add "$POD" "$var_name" "$var_expected" "$env_content" || errors=$((errors+1))
+    else
+      check_env_in_pod delete "$POD" "$var_entry" "" "$env_content" || errors=$((errors+1))
+    fi
+  done
+
+  if (( errors > 0 )); then
+    echo "$errors environment check(s) failed for component '$component'"
+    return 1
+  else
+    echo "All environment checks passed for component '$component'"
+  fi
 }

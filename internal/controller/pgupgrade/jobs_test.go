@@ -16,10 +16,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/internal/feature"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestLargestWholeCPU(t *testing.T) {
@@ -110,9 +110,19 @@ func TestGenerateUpgradeJob(t *testing.T) {
 	upgrade.Spec.Resources.Requests = corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("3.14"),
 	}
+	upgrade.Spec.InitContainers = []corev1.Container{
+		{
+			Name: "upgrade-init-container",
+		},
+	}
 
 	startup := &appsv1.StatefulSet{}
 	startup.Spec.Template.Spec = corev1.PodSpec{
+		InitContainers: []corev1.Container{
+			{
+				Name: ContainerDatabase + "-init",
+			},
+		},
 		Containers: []corev1.Container{{
 			Name: ContainerDatabase,
 
@@ -138,7 +148,6 @@ kind: Job
 metadata:
   annotations:
     kubectl.kubernetes.io/default-container: database
-  creationTimestamp: null
   labels:
     postgres-operator.crunchydata.com/cluster: pg5
     postgres-operator.crunchydata.com/pgupgrade: pgu2
@@ -159,7 +168,6 @@ spec:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: database
-      creationTimestamp: null
       labels:
         postgres-operator.crunchydata.com/cluster: pg5
         postgres-operator.crunchydata.com/pgupgrade: pgu2
@@ -205,6 +213,11 @@ spec:
         - upgrade
         - "19"
         - "25"
+        env:
+        - name: LC_ALL
+          value: en_US.utf-8
+        - name: LANG
+          value: en_US.utf-8
         image: img4
         name: database
         resources:
@@ -215,6 +228,11 @@ spec:
         volumeMounts:
         - mountPath: /mnt/some/such
           name: vm1
+      initContainers:
+      - name: database-init
+        resources: {}
+      - name: upgrade-init-container
+        resources: {}
       restartPolicy: Never
       volumes:
       - hostPath:
@@ -283,7 +301,6 @@ kind: Job
 metadata:
   annotations:
     kubectl.kubernetes.io/default-container: database
-  creationTimestamp: null
   labels:
     postgres-operator.crunchydata.com/cluster: pg5
     postgres-operator.crunchydata.com/pgupgrade: pgu2
@@ -303,7 +320,6 @@ spec:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: database
-      creationTimestamp: null
       labels:
         postgres-operator.crunchydata.com/cluster: pg5
         postgres-operator.crunchydata.com/pgupgrade: pgu2

@@ -19,13 +19,17 @@ spec:
   template:
     spec:
       initContainers:
+      - command:
+        - /usr/local/bin/init-entrypoint.sh
       - name: postgres-startup
       - command:
-        - /usr/local/bin/relocate-extensions.sh
+        - /opt/crunchy/bin/relocate-extensions.sh
         resources: {}
         volumeMounts:
         - mountPath: /pgdata
           name: postgres-data
+        - mountPath: /opt/crunchy
+          name: crunchy-bin
         - mountPath: /tmp
           name: tmp
       - command:
@@ -35,15 +39,19 @@ spec:
           value: s3
         - name: STORAGE_ENDPOINT
         - name: STORAGE_REGION
-          value: eu-central-1
+          value: us-east-1
         - name: STORAGE_BUCKET
-          value: pg-extensions
+          value: operator-testing
         - name: INSTALL_EXTENSIONS
         - name: PG_VERSION
         - name: PGDATA_EXTENSIONS
+        - name: STORAGE_DISABLE_SSL
+          value: "true"
+        - name: STORAGE_FORCE_PATH_STYLE
+          value: "true"
         envFrom:
         - secretRef:
-            name: aws-s3-secret
+            name: minio-secret
         resources: {}
         volumeMounts:
         - mountPath: /pgdata
@@ -52,8 +60,6 @@ spec:
         - name: postgres-data
         - mountPath: /tmp
           name: tmp
-      - command:
-        - /usr/local/bin/init-entrypoint.sh
       - name: nss-wrapper-init
 status:
   observedGeneration: 2

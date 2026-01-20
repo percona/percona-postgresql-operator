@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 type testGetCluster func() *v1beta1.PostgresCluster
@@ -266,6 +266,19 @@ func TestInitImage(t *testing.T) {
 			func() *v1beta1.PostgresCluster { return crunchyCr.DeepCopy() },
 			getPGBackrestComponent,
 			"operator-image",
+		},
+		{
+			"pgbackrest not specified init image with different versions",
+			func() *v1beta1.PostgresCluster {
+				cr := crunchyCr.DeepCopy()
+
+				oldVersion := "1.2.0"
+
+				cr.Labels = map[string]string{v1beta1.LabelVersion: oldVersion}
+				return cr
+			},
+			getPGBackrestComponent,
+			"operator-image:1.2.0",
 		},
 		{
 			"pgbackrest general init image",

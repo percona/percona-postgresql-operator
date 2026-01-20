@@ -2,7 +2,6 @@ package pgcluster
 
 import (
 	"context"
-
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -10,10 +9,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
-	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
@@ -147,6 +146,12 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 		}
 	}
 
+	syncConditionsFromPostgresToPercona(cr, status)
+
+	syncPatroniFromPostgresToPercona(cr, status)
+
+	syncPgbackrestFromPostgresToPercona(cr, status)
+
 	repoCondition := meta.FindStatusCondition(status.Conditions, postgrescluster.ConditionRepoHostReady)
 	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
 		setClusterNotReadyCondition(metav1.ConditionFalse, postgrescluster.ConditionRepoHostReady)
@@ -160,4 +165,49 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 	}
 
 	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
+
+}
+
+func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
+	for _, pcCond := range postgresStatus.Conditions {
+		existing := meta.FindStatusCondition(cr.Status.Conditions, pcCond.Type)
+		if existing != nil {
+			continue
+		}
+
+		newCond := metav1.Condition{
+			Type:               pcCond.Type,
+			Status:             pcCond.Status,
+			Reason:             pcCond.Reason,
+			Message:            pcCond.Message,
+			LastTransitionTime: pcCond.LastTransitionTime,
+			ObservedGeneration: cr.Generation,
+		}
+
+		cr.Status.Conditions = append(cr.Status.Conditions, newCond)
+	}
+}
+
+func syncPatroniFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
+
+	if cr.Status.Patroni.Status == nil {
+		cr.Status.Patroni.Status = &v1beta1.PatroniStatus{}
+	}
+
+	if postgresStatus.Patroni.SystemIdentifier != "" {
+		cr.Status.Patroni.Status.SystemIdentifier = postgresStatus.Patroni.SystemIdentifier
+	}
+	if postgresStatus.Patroni.SwitchoverTimeline != nil {
+		cr.Status.Patroni.Status.SwitchoverTimeline = postgresStatus.Patroni.SwitchoverTimeline
+	}
+	if postgresStatus.Patroni.Switchover != nil {
+		cr.Status.Patroni.Status.Switchover = postgresStatus.Patroni.Switchover
+	}
+}
+
+func syncPgbackrestFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
+	if postgresStatus.PGBackRest != nil {
+		cr.Status.PGBackRest = postgresStatus.PGBackRest.DeepCopy()
+	}
+
 }

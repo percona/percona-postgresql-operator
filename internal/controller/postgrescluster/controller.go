@@ -35,22 +35,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/pgaudit"
-	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/internal/pgbouncer"
-	"github.com/percona/percona-postgresql-operator/internal/pgmonitor"
-	"github.com/percona/percona-postgresql-operator/internal/pgstatmonitor"
-	"github.com/percona/percona-postgresql-operator/internal/pgstatstatements"
-	"github.com/percona/percona-postgresql-operator/internal/pki"
-	"github.com/percona/percona-postgresql-operator/internal/pmm"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/internal/registration"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/config"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -265,16 +265,17 @@ func (r *Reconciler) Reconcile(
 	}
 
 	pgParameters := postgres.NewParameters()
+	// K8SPG-577
+	// K8SPG-884: pg_stat_statements must come before pg_stat_monitor
+	if cluster.Spec.Extensions.PGStatStatements {
+		pgstatstatements.PostgreSQLParameters(&pgParameters)
+	}
 	// K8SPG-375
 	if cluster.Spec.Extensions.PGStatMonitor {
 		pgstatmonitor.PostgreSQLParameters(&pgParameters)
 	}
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
-	}
-	// K8SPG-577
-	if cluster.Spec.Extensions.PGStatStatements {
-		pgstatstatements.PostgreSQLParameters(&pgParameters)
 	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)

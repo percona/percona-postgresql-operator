@@ -29,20 +29,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/internal/feature"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/patroni"
-	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/internal/pki"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/config"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -730,12 +730,31 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 
 	// K8SPG-435
 	resources := corev1.ResourceRequirements{}
-	if postgresCluster.Spec.Backups.PGBackRest.RepoHost != nil {
+	if repoHost := postgresCluster.Spec.Backups.PGBackRest.RepoHost; repoHost != nil {
 		resources = postgresCluster.Spec.Backups.PGBackRest.RepoHost.Resources
+
+		// K8SPG-832
+		// If the PGBackrestRepoHostSidecars feature gate is enabled and instance sidecars are
+		// defined, add the defined container to the Pod.
+		if feature.Enabled(ctx, feature.PGBackrestRepoHostSidecars) && repoHost.Sidecars != nil {
+			repo.Spec.Template.Spec.Containers = append(repo.Spec.Template.Spec.Containers, repoHost.Sidecars...)
+		}
 	}
 	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
 
 	addTMPEmptyDir(&repo.Spec.Template, sizeLimit)
+
+	// K8SPG-833
+	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; postgresCluster.CompareVersion("2.8.0") >= 0 {
+		for i := range repo.Spec.Template.Spec.Containers {
+			if len(pgbackrest.Env) != 0 {
+				repo.Spec.Template.Spec.Containers[i].Env = append(repo.Spec.Template.Spec.Containers[i].Env, pgbackrest.Env...)
+			}
+			if len(pgbackrest.EnvFrom) != 0 {
+				repo.Spec.Template.Spec.Containers[i].EnvFrom = append(repo.Spec.Template.Spec.Containers[i].EnvFrom, pgbackrest.EnvFrom...)
+			}
+		}
+	}
 
 	// set ownership references
 	if err := r.setControllerReference(postgresCluster, repo); err != nil {
@@ -923,6 +942,18 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		// K8SPG-619
 		if postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit != nil {
 			jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
+		}
+
+		// K8SPG-833
+		if postgresCluster.CompareVersion("2.8.0") >= 0 {
+			for i := range jobSpec.Template.Spec.Containers {
+				if len(postgresCluster.Spec.Backups.PGBackRest.Env) != 0 {
+					jobSpec.Template.Spec.Containers[i].Env = append(jobSpec.Template.Spec.Containers[i].Env, postgresCluster.Spec.Backups.PGBackRest.Env...)
+				}
+				if len(postgresCluster.Spec.Backups.PGBackRest.EnvFrom) != 0 {
+					jobSpec.Template.Spec.Containers[i].EnvFrom = append(jobSpec.Template.Spec.Containers[i].EnvFrom, postgresCluster.Spec.Backups.PGBackRest.EnvFrom...)
+				}
+			}
 		}
 	}
 

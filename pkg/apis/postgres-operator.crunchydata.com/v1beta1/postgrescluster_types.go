@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 )
 
 // PostgresClusterSpec defines the desired state of PostgresCluster
@@ -129,7 +129,7 @@ type PostgresClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=17
+	// +kubebuilder:validation:Maximum=18
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -365,6 +365,9 @@ type Backups struct {
 	// VolumeSnapshot configuration
 	// +optional
 	Snapshots *VolumeSnapshots `json:"snapshots,omitempty"`
+
+	// Enable tracking latest restorable time
+	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
 }
 
 // PostgresClusterStatus defines the observed state of PostgresCluster
@@ -556,6 +559,11 @@ type PostgresInstanceSetSpec struct {
 	// InitContainer defines the init container for the instance container of a PostgreSQL pod.
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"`
+
+	// K8SPG-833
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-833
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // K8SPG-708

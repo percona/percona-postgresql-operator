@@ -6,5 +6,5 @@ resources:
 - ../manager/namespace
 images:
 - name: postgres-operator
-  newName: perconalab/percona-postgresql-operator
-  newTag: K8SPG-552-5
+  newName: docker.io/perconalab/percona-postgresql-operator
+  newTag: main

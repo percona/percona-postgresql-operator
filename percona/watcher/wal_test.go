@@ -2,16 +2,18 @@ package watcher
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/percona/testutils"
-	pgv2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/percona/testutils"
+	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
 func mustParseTime(layout string, value string) time.Time {
@@ -307,6 +309,55 @@ func TestGetLatestBackup(t *testing.T) {
 				assert.NotNil(t, latest)
 				assert.Equal(t, latest.Name, tt.latestBackupName)
 			}
+		})
+	}
+}
+
+func TestGetLatestCommitTimestamp(t *testing.T) {
+	ctx := context.Background()
+
+	tests := map[string]struct {
+		pods        []client.Object
+		backup      *pgv2.PerconaPGBackup
+		cluster     *pgv2.PerconaPGCluster
+		expectedErr error
+	}{
+		"primary pod not found due to invalid patroni version": {
+			pods: []client.Object{},
+			backup: &pgv2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup1",
+					Namespace: "test-ns",
+				},
+				Spec: pgv2.PerconaPGBackupSpec{
+					PGCluster: "test-cluster",
+					RepoName:  "repo1",
+				},
+			},
+			cluster: &pgv2.PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-ns",
+				},
+				Status: pgv2.PerconaPGClusterStatus{
+					Patroni: pgv2.Patroni{
+						Version: "error",
+					},
+				},
+				Spec: pgv2.PerconaPGClusterSpec{
+					CRVersion: version.Version(),
+				},
+			},
+			expectedErr: errors.New("primary pod not found"),
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := testutils.BuildFakeClient(tt.pods...)
+
+			_, err := GetLatestCommitTimestamp(ctx, c, nil, tt.cluster, tt.backup)
+
+			assert.ErrorContains(t, err, tt.expectedErr.Error())
 		})
 	}
 }

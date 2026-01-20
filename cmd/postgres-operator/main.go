@@ -28,25 +28,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	certmanagerscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
-	"github.com/percona/percona-postgresql-operator/internal/controller/pgupgrade"
-	"github.com/percona/percona-postgresql-operator/internal/controller/postgrescluster"
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/internal/controller/standalone_pgadmin"
-	"github.com/percona/percona-postgresql-operator/internal/feature"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/upgradecheck"
-	perconaController "github.com/percona/percona-postgresql-operator/percona/controller"
-	"github.com/percona/percona-postgresql-operator/percona/controller/pgbackup"
-	"github.com/percona/percona-postgresql-operator/percona/controller/pgcluster"
-	"github.com/percona/percona-postgresql-operator/percona/controller/pgrestore"
-	perconaPGUpgrade "github.com/percona/percona-postgresql-operator/percona/controller/pgupgrade"
-	perconaRuntime "github.com/percona/percona-postgresql-operator/percona/runtime"
-	"github.com/percona/percona-postgresql-operator/percona/utils/registry"
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/pgupgrade"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/standalone_pgadmin"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
+	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgcluster"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore"
+	perconaPGUpgrade "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgupgrade"
+	perconaRuntime "github.com/percona/percona-postgresql-operator/v2/percona/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 var (
@@ -86,9 +85,10 @@ func main() {
 
 	features := feature.NewGate()
 	err = features.SetFromMap(map[string]bool{
-		string(feature.InstanceSidecars):  true, // needed for PMM
-		string(feature.PGBouncerSidecars): true, // K8SPG-645
-		string(feature.TablespaceVolumes): true,
+		feature.InstanceSidecars:           true, // needed for PMM
+		feature.PGBouncerSidecars:          true, // K8SPG-645
+		feature.PGBackrestRepoHostSidecars: true, // K8SPG-832
+		feature.TablespaceVolumes:          true,
 	})
 	assertNoError(err)
 
@@ -169,6 +169,15 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	}
 	if cm.Controller() == nil {
 		return errors.New("missing controller in manager")
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v2.PerconaPGCluster{},
+		v2.IndexFieldEnvFromSecrets,
+		v2.EnvFromSecretsIndexerFunc,
+	); err != nil {
+		return err
 	}
 
 	externalEvents := make(chan event.GenericEvent)

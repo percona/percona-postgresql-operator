@@ -7,12 +7,12 @@ import (
 	"os"
 	"path"
 
-	"github.com/percona/percona-postgresql-operator/percona/extensions"
+	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 )
 
 func main() {
 	var storageType, endpoint, region, bucket, key, extensionPath string
-	var install, uninstall bool
+	var install, uninstall, forcePathStyle, disableSSL bool
 
 	flag.StringVar(&storageType, "type", "", "Storage type")
 	flag.StringVar(&endpoint, "endpoint", "", "Storage endpoint")
@@ -23,6 +23,8 @@ func main() {
 
 	flag.BoolVar(&install, "install", false, "Install extension")
 	flag.BoolVar(&uninstall, "uninstall", false, "Uninstall extension")
+	flag.BoolVar(&forcePathStyle, "force-path-style", false, "Force path style")
+	flag.BoolVar(&disableSSL, "disable-ssl", false, "Disable SSL")
 	flag.Parse()
 
 	if (install && uninstall) || (!install && !uninstall) {
@@ -31,7 +33,7 @@ func main() {
 
 	log.Printf("starting extension installer for %s/%s (%s) in %s", bucket, key, storageType, region)
 
-	storage := initStorage(extensions.StorageType(storageType), endpoint, bucket, region)
+	storage := initStorage(extensions.StorageType(storageType), endpoint, bucket, region, forcePathStyle, disableSSL)
 
 	packageName := key + ".tar.gz"
 
@@ -70,10 +72,10 @@ func main() {
 	}
 }
 
-func initStorage(storageType extensions.StorageType, endpoint, bucket, region string) extensions.ObjectGetter {
+func initStorage(storageType extensions.StorageType, endpoint, bucket, region string, s3ForcePathStyle, disableSSL bool) extensions.ObjectGetter {
 	switch storageType {
 	case extensions.StorageTypeS3:
-		return extensions.NewS3(endpoint, region, bucket)
+		return extensions.NewS3(endpoint, region, bucket, s3ForcePathStyle, disableSSL)
 	default:
 		log.Fatalf("unknown storage type: %s", os.Getenv("STORAGE_TYPE"))
 	}

@@ -10,7 +10,7 @@ commands:
 
       get_cr \
         | yq eval '
-            .spec.crVersion="2.6.0"' - \
+            .spec.crVersion="2.8.2"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
 
       sleep 10

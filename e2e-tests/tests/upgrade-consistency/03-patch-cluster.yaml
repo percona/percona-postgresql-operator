@@ -10,8 +10,7 @@ commands:
 
       get_cr \
         | yq eval '
-            .spec.crVersion="2.7.0"' - \
-        | yq eval ".spec.backups.pgbackrest.image=\"$IMAGE_BACKREST\"" - \
+            .spec.crVersion="2.9.0"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
 
       sleep 10

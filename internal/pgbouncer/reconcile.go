@@ -11,13 +11,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
-	"github.com/percona/percona-postgresql-operator/internal/feature"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/pki"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/config"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 // ConfigMap populates the PgBouncer ConfigMap.
@@ -73,7 +73,10 @@ func Secret(ctx context.Context,
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		leaf := &pki.LeafCertificate{}
-		dnsNames := naming.ServiceDNSNames(ctx, inService)
+		dnsNames, err := naming.ServiceDNSNames(ctx, inService)
+		if err != nil {
+			return errors.Wrap(err, "get service dns names")
+		}
 		dnsFQDN := dnsNames[0]
 
 		if err == nil {
@@ -187,6 +190,18 @@ func Pod(
 	}
 
 	outPod.Volumes = []corev1.Volume{configVolume}
+
+	// K8SPG-833
+	if pgbouncer := inCluster.Spec.Proxy.PGBouncer; inCluster.CompareVersion("2.8.0") >= 0 && pgbouncer != nil {
+		for i := range outPod.Containers {
+			if len(pgbouncer.Env) != 0 {
+				outPod.Containers[i].Env = append(outPod.Containers[i].Env, pgbouncer.Env...)
+			}
+			if len(pgbouncer.EnvFrom) != 0 {
+				outPod.Containers[i].EnvFrom = append(outPod.Containers[i].EnvFrom, pgbouncer.EnvFrom...)
+			}
+		}
+	}
 }
 
 // PostgreSQL populates outHBAs with any records needed to run PgBouncer.

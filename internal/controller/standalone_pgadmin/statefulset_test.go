@@ -12,13 +12,14 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestReconcilePGAdminStatefulSet(t *testing.T) {
@@ -35,6 +36,7 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 	pgadmin := new(v1beta1.PGAdmin)
 	pgadmin.Name = "test-standalone-pgadmin"
 	pgadmin.Namespace = ns.Name
+	pgadmin.Spec.Image = ptr.To("some-image")
 
 	assert.NilError(t, cc.Create(ctx, pgadmin))
 	t.Cleanup(func() { assert.Check(t, cc.Delete(ctx, pgadmin)) })
@@ -75,7 +77,6 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 		assert.Assert(t, cmp.MarshalMatches(template.ObjectMeta, `
 annotations:
   kubectl.kubernetes.io/default-container: pgadmin
-creationTimestamp: null
 labels:
   postgres-operator.crunchydata.com/data: pgadmin
   postgres-operator.crunchydata.com/pgadmin: test-standalone-pgadmin
@@ -99,7 +100,6 @@ terminationGracePeriodSeconds: 30
 	})
 
 	t.Run("verify customized deployment", func(t *testing.T) {
-
 		custompgadmin := new(v1beta1.PGAdmin)
 
 		// add pod level customizations
@@ -137,9 +137,11 @@ terminationGracePeriodSeconds: 30
 			custompgadmin.Spec.PriorityClassName = initialize.String("testpriorityclass")
 		}
 
+		custompgadmin.Spec.Image = ptr.To("someimage")
 		// set an image pull secret
 		custompgadmin.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{
-			Name: "myImagePullSecret"}}
+			Name: "myImagePullSecret",
+		}}
 
 		assert.NilError(t, cc.Create(ctx, custompgadmin))
 		t.Cleanup(func() { assert.Check(t, cc.Delete(ctx, custompgadmin)) })
@@ -173,7 +175,6 @@ terminationGracePeriodSeconds: 30
 annotations:
   annotation1: annotationvalue
   kubectl.kubernetes.io/default-container: pgadmin
-creationTimestamp: null
 labels:
   label1: labelvalue
   postgres-operator.crunchydata.com/data: pgadmin

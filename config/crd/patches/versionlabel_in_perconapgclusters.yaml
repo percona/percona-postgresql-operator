@@ -3,4 +3,4 @@ kind: CustomResourceDefinition
 metadata:
   name: perconapgclusters.pgv2.percona.com
   labels:
-    pgv2.percona.com/version: v2.7.0
+    pgv2.percona.com/version: v2.9.0

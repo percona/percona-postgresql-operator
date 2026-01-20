@@ -12,14 +12,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/internal/pki"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
-	pNaming "github.com/percona/percona-postgresql-operator/percona/naming"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 // ClusterBootstrapped returns a bool indicating whether or not Patroni has successfully
@@ -147,14 +147,21 @@ func InstancePod(ctx context.Context,
 
 // K8SPG-708 instanceInitContainer adds the instance init container
 func instanceInitContainer(cluster *v1beta1.PostgresCluster, container *corev1.Container, instancePod *corev1.PodTemplateSpec, inInstanceSpec *v1beta1.PostgresInstanceSetSpec, initImage string) {
-	instancePod.Spec.InitContainers = append(instancePod.Spec.InitContainers, k8s.InitContainer(
+	initContainer := k8s.InitContainer(
 		cluster,
 		naming.ContainerDatabase,
 		initImage,
 		cluster.Spec.ImagePullPolicy,
 		initialize.RestrictedSecurityContext(true),
 		container.Resources,
-		inInstanceSpec))
+		inInstanceSpec)
+
+	if cluster.CompareVersion("2.8.0") >= 0 {
+		// The operator's init container must be the first one to run so that the other init containers can use the installed scripts.
+		instancePod.Spec.InitContainers = append([]corev1.Container{initContainer}, instancePod.Spec.InitContainers...)
+	} else {
+		instancePod.Spec.InitContainers = append(instancePod.Spec.InitContainers, initContainer)
+	}
 
 	instancePod.Spec.Volumes = append(instancePod.Spec.Volumes, corev1.Volume{
 		Name: pNaming.CrunchyBinVolumeName,
@@ -171,7 +178,6 @@ func instanceInitContainer(cluster *v1beta1.PostgresCluster, container *corev1.C
 
 // instanceProbes adds Patroni liveness and readiness probes to container.
 func instanceProbes(cluster *v1beta1.PostgresCluster, container *corev1.Container) {
-
 	// Patroni uses a watchdog to ensure that PostgreSQL does not accept commits
 	// after the leader lock expires, even if Patroni becomes unresponsive.
 	// - https://github.com/zalando/patroni/blob/v2.0.1/docs/watchdog.rst

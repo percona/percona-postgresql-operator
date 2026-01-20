@@ -9,8 +9,8 @@ import (
 
 	"gotest.tools/v3/assert"
 
-	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestService(t *testing.T) {
@@ -39,7 +39,6 @@ kind: Service
 	assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
 annotations:
   test-annotation: test-annotation-val
-creationTimestamp: null
 labels:
   postgres-operator.crunchydata.com/pgadmin: daisy
   postgres-operator.crunchydata.com/role: pgadmin

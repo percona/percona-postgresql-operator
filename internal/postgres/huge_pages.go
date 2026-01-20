@@ -5,12 +5,10 @@
 package postgres
 
 import (
-	"strings"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 // This function looks for a valid huge_pages resource request. If it finds one,
@@ -24,12 +22,12 @@ func SetHugePages(cluster *v1beta1.PostgresCluster, pgParameters *Parameters) {
 	}
 }
 
-// This helper function checks to see if a huge_pages value greater than zero has
+// This helper function checks to see if a hugepages-2Mi value greater than zero has
 // been set in any of the PostgresCluster's instances' resource specs
-func HugePagesRequested(cluster *v1beta1.PostgresCluster) bool {
+func HugePages2MiRequested(cluster *v1beta1.PostgresCluster) bool {
 	for _, instance := range cluster.Spec.InstanceSets {
 		for resourceName := range instance.Resources.Limits {
-			if strings.HasPrefix(resourceName.String(), corev1.ResourceHugePagesPrefix) {
+			if resourceName == corev1.ResourceHugePagesPrefix+"2Mi" {
 				resourceQuantity := instance.Resources.Limits.Name(resourceName, resource.BinarySI)
 
 				if resourceQuantity != nil && resourceQuantity.Value() > 0 {
@@ -40,4 +38,28 @@ func HugePagesRequested(cluster *v1beta1.PostgresCluster) bool {
 	}
 
 	return false
+}
+
+// This helper function checks to see if a hugepages-1Gi value greater than zero has
+// been set in any of the PostgresCluster's instances' resource specs
+func HugePages1GiRequested(cluster *v1beta1.PostgresCluster) bool {
+	for _, instance := range cluster.Spec.InstanceSets {
+		for resourceName := range instance.Resources.Limits {
+			if resourceName == corev1.ResourceHugePagesPrefix+"1Gi" {
+				resourceQuantity := instance.Resources.Limits.Name(resourceName, resource.BinarySI)
+
+				if resourceQuantity != nil && resourceQuantity.Value() > 0 {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// This helper function checks to see if a huge_pages value greater than zero has
+// been set in any of the PostgresCluster's instances' resource specs
+func HugePagesRequested(cluster *v1beta1.PostgresCluster) bool {
+	return HugePages2MiRequested(cluster) || HugePages1GiRequested(cluster)
 }

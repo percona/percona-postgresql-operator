@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} golang:1.24 AS go_builder
+FROM --platform=${BUILDPLATFORM} golang:1.25 AS go_builder
 WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
 COPY go.mod go.sum ./
@@ -45,7 +45,7 @@ RUN mkdir -p build/_output/bin \
 RUN ./bin/license_aggregator.sh ./cmd/...; \
 	cp -r ./licenses /licenses
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal AS ubi9
+FROM registry.access.redhat.com/ubi10/ubi-minimal AS ubi10
 RUN microdnf update -y && microdnf clean all -y
 
 LABEL name="Percona Postgres Operator" \
@@ -62,6 +62,7 @@ COPY --from=go_builder /usr/local/bin/extension-installer /usr/local/bin
 COPY --from=go_builder /usr/local/bin/pgbackrest /usr/local/bin/
 COPY --from=go_builder /licenses /licenses
 COPY build/postgres-operator/install-extensions.sh /usr/local/bin
+COPY build/postgres-operator/relocate-extensions.sh /usr/local/bin
 COPY build/postgres-operator/init-entrypoint.sh /usr/local/bin
 COPY build/postgres-operator/postgres-entrypoint.sh /usr/local/bin
 COPY build/postgres-operator/postgres-liveness-check.sh /usr/local/bin

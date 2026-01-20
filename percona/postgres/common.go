@@ -9,15 +9,22 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v2 "github.com/percona/percona-postgresql-operator/pkg/apis/pgv2.percona.com/v2"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
+const (
+	patroniVersion4 = "4.0.0"
+)
+
+// GetPrimaryPod returns the primary pod.
+// K8SPG-882
 func GetPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGCluster) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	// K8SPG-648: patroni v4.0.0 deprecated "master" role.
 	//            We should use "primary" instead
 	role := "primary"
-	patroniVer, err := gover.NewVersion(cr.Status.PatroniVersion)
+
+	patroniVer, err := gover.NewVersion(determineVersion(cr))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get patroni version")
 	}
@@ -33,7 +40,7 @@ func GetPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGClust
 		}),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to list pods")
 	}
 
 	if len(podList.Items) == 0 {
@@ -45,4 +52,11 @@ func GetPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGClust
 	}
 
 	return &podList.Items[0], nil
+}
+
+func determineVersion(cr *v2.PerconaPGCluster) string {
+	if cr.CompareVersion("2.7.0") <= 0 {
+		return cr.Status.PatroniVersion
+	}
+	return patroniVersion4
 }

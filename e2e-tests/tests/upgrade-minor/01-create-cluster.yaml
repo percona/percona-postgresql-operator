@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
+timeout: 100
 commands:
   - script: |-
       set -o errexit
@@ -17,21 +17,29 @@ commands:
       pg_exists=0
       pg_exists=$(curl -s https://check.percona.com/versions/v1/pg-operator/${lower_ver} | jq '.versions[].matrix.postgresql | with_entries(select(.key | startswith("'$pg_ver'"))) | length')
       # if the lower version of operator doesn't have new PG version we will use lower PG version
-      # but in that case not the intended targer PG database image will be tested
+      # but in that case not the intended target PG database image will be tested
       # (this should happen once a year on major PG version release, but only for this latest version)
       if [ $pg_exists -eq 0 ]; then
           pg_ver=$((pg_ver - 1))
       fi
       echo $pg_ver >"${TEMP_DIR}/pg_ver.txt"
 
+      if [[ $OPENSHIFT ]]; then
+          $sed -E -i "s|^( *image: *)(.*)|\1${REGISTRY_NAME_FULL}\2|" ${TEMP_DIR}/cr_lower.yaml
+      fi
+
+      backrest_image=$(get_version_images $lower_ver BACKREST${pg_ver})
+      pgbouncer_image=$(get_version_images $lower_ver PGBOUNCER${pg_ver})
+      postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
+
       yq -i eval '
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |
-          .spec.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-postgres" |
+          .spec.image = "'${REGISTRY_NAME_FULL}''${postgres_image}'" |
           .spec.postgresVersion = '$pg_ver' |
-          .spec.proxy.pgBouncer.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-pgbouncer" |
+          .spec.proxy.pgBouncer.image = "'${REGISTRY_NAME_FULL}''${pgbouncer_image}'" |
           .spec.backups.pgbackrest.repos[0].schedules = null |
-          .spec.backups.pgbackrest.image = "percona/percona-postgresql-operator:'${lower_ver}'-ppg'$pg_ver'-pgbackrest" |
+          .spec.backups.pgbackrest.image = "'${REGISTRY_NAME_FULL}''${backrest_image}'" |
           .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
           .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' "${TEMP_DIR}/cr_lower.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"

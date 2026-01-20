@@ -26,18 +26,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/internal/config"
-	"github.com/percona/percona-postgresql-operator/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/internal/feature"
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/logging"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/patroni"
-	"github.com/percona/percona-postgresql-operator/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/internal/pki"
-	"github.com/percona/percona-postgresql-operator/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/percona/k8s"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/config"
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 // Instance represents a single PostgreSQL instance of a PostgresCluster.
@@ -1241,6 +1241,18 @@ func (r *Reconciler) reconcileInstance(
 	// mount shared memory to the Postgres instance
 	if err == nil {
 		addDevSHM(&instance.Spec.Template)
+	}
+
+	// K8SPG-833
+	if cluster.CompareVersion("2.8.0") >= 0 {
+		for i := range instance.Spec.Template.Spec.Containers {
+			if len(spec.Env) != 0 {
+				instance.Spec.Template.Spec.Containers[i].Env = append(instance.Spec.Template.Spec.Containers[i].Env, spec.Env...)
+			}
+			if len(spec.EnvFrom) != 0 {
+				instance.Spec.Template.Spec.Containers[i].EnvFrom = append(instance.Spec.Template.Spec.Containers[i].EnvFrom, spec.EnvFrom...)
+			}
+		}
 	}
 
 	if err == nil {

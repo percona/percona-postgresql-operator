@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 )
 
 func TestServerSideApply(t *testing.T) {
@@ -151,6 +151,12 @@ func TestServerSideApply(t *testing.T) {
 				MatchLabels: map[string]string{"select": name},
 			}
 			sts.Spec.Template.Labels = map[string]string{"select": name}
+			sts.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "some-container",
+					Image: "some-image",
+				},
+			}
 			return &sts
 		}
 

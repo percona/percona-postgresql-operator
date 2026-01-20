@@ -19,11 +19,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/internal/naming"
-	"github.com/percona/percona-postgresql-operator/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestGeneratePGBouncerService(t *testing.T) {
@@ -55,7 +55,6 @@ func TestGeneratePGBouncerService(t *testing.T) {
 			assert.Assert(t, !specified)
 
 			assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
-creationTimestamp: null
 name: pg7-pgbouncer
 namespace: ns5
 			`))
@@ -74,7 +73,6 @@ apiVersion: v1
 kind: Service
 		`))
 		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
-creationTimestamp: null
 labels:
   app.kubernetes.io/component: pgbouncer
   app.kubernetes.io/instance: pg7
@@ -399,7 +397,6 @@ func TestGeneratePGBouncerDeployment(t *testing.T) {
 			assert.Assert(t, !specified)
 
 			assert.Assert(t, cmp.MarshalMatches(deploy.ObjectMeta, `
-creationTimestamp: null
 name: test-cluster-pgbouncer
 namespace: ns3
 			`))

@@ -1,0 +1,74 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: custom-extensions
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: custom-extensions
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  template:
+    spec:
+      initContainers:
+      - command:
+        - /usr/local/bin/init-entrypoint.sh
+      - name: postgres-startup
+      - command:
+        - /opt/crunchy/bin/relocate-extensions.sh
+      - command:
+        - /usr/local/bin/install-extensions.sh
+        env:
+        - name: STORAGE_TYPE
+          value: s3
+        - name: STORAGE_ENDPOINT
+        - name: STORAGE_REGION
+          value: eu-central-1
+        - name: STORAGE_BUCKET
+          value: pg-extensions
+        - name: INSTALL_EXTENSIONS
+        - name: PG_VERSION
+        - name: PGDATA_EXTENSIONS
+        envFrom:
+        - secretRef:
+            name: aws-s3-secret
+        resources: {}
+        volumeMounts:
+        - mountPath: /pgdata
+          name: postgres-data
+        - name: postgres-data
+        - name: postgres-data
+        - mountPath: /tmp
+          name: tmp
+      - name: nss-wrapper-init
+status:
+  observedGeneration: 6
+  replicas: 1
+  updatedReplicas: 1
+  readyReplicas: 1
+  availableReplicas: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: custom-extensions
+status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready

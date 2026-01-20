@@ -1,4 +1,5 @@
 backup-enable-disable
+custom-envs
 custom-extensions
 custom-tls
 database-init-sql
@@ -6,7 +7,6 @@ demand-backup
 finalizers
 init-deploy
 major-upgrade
-migration-backup-s3
 monitoring
 monitoring-pmm3
 one-pod
