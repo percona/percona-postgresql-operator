@@ -1,0 +1,22 @@
+# To simulate broken replication, we will block the standby primary from accessing the S3 bucket.
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      standby_primary=$(kubectl get pod -n "${NAMESPACE}" -l postgres-operator.crunchydata.com/cluster=standby-cluster,postgres-operator.crunchydata.com/role=primary -o jsonpath='{.items[0].metadata.name}')
+      if [ -z "${standby_primary}" ]; then
+        echo "ERROR: standby primary pod not found"
+        exit 1
+      fi
+
+      sleep 270
+      
+      source_cluster_ip=$(kubectl get svc -n "${NAMESPACE}" source-cluster-ha -o jsonpath='{.spec.clusterIP}')
+      kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c "iptables -A OUTPUT -p tcp -d ${source_cluster_ip} --dport 5432 -m limit --limit 1/s --limit-burst 1 -j ACCEPT"
+      kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c "iptables -A OUTPUT -p tcp -d ${source_cluster_ip} --dport 5432 -j DROP"

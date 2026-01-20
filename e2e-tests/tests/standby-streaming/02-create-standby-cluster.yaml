@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      repo_path=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.spec.backups.pgbackrest.global.repo1-path}')
+      get_cr "standby-cluster" \
+        | yq eval '.metadata.annotations += {"pgv2.percona.com/patroni-version": "4.1.0"}' - \
+        | yq eval '.spec.instances[0].sidecars = [{"name": "netshoot", "image": "docker.io/nicolaka/netshoot:latest", "command": ["sleep", "infinity"], "securityContext": {"capabilities": {"add": ["NET_ADMIN", "NET_RAW"]}, "privileged": false}, "resources": {"limits": {"cpu": "100m", "memory": "128Mi"}}}]' - \
+        | yq eval ".spec.backups.pgbackrest.global.repo1-path = \"${repo_path}\"" - \
+        | yq eval '.spec.standby.enabled = true' - \
+        | yq eval ".spec.standby.host = \"source-cluster-ha.${NAMESPACE}.svc.cluster.local\"" - \
+        | yq eval '.spec.standby.maxAcceptableLag = "1Ki"' - \
+        | yq eval '.spec.secrets.customTLSSecret.name = "source-cluster-cluster-cert"' - \
+        | yq eval '.spec.secrets.customReplicationTLSSecret.name = "source-cluster-replication-cert"' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
