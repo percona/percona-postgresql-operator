@@ -1,12 +1,15 @@
 package v2
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	v "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -198,4 +201,17 @@ func (b *PerconaPGBackup) CompareVersion(ver string) int {
 	}
 	backupVersion := v.Must(v.NewVersion(b.Status.CRVersion))
 	return backupVersion.Compare(v.Must(v.NewVersion(ver)))
+}
+
+func (pgBackup *PerconaPGBackup) UpdateStatus(ctx context.Context, cl client.Client, updateFunc func(bcp *PerconaPGBackup)) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		bcp := new(PerconaPGBackup)
+		if err := cl.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
+			return errors.Wrap(err, "get PGBackup")
+		}
+
+		updateFunc(bcp)
+
+		return cl.Status().Update(ctx, bcp)
+	})
 }

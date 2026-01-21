@@ -507,7 +507,7 @@ const (
 )
 
 type VolumeSnapshots struct {
-	Enabled *bool `json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
 
 	// Mode of the VolumeSnapshot.
 	// +kubebuilder:validation:Enum={offline}
