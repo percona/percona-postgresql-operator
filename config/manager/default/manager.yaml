@@ -37,6 +37,8 @@ spec:
             value: "false"
           - name: PGO_WORKERS
             value: "1"
+          - name: PPROF_BIND_ADDRESS
+            value: "0"
         ports:
           - containerPort: 8080
             name: metrics

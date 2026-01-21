@@ -137,4 +137,15 @@ func TestInitManager(t *testing.T) {
 				})
 		})
 	})
+
+	t.Run("PPROF_BIND_ADDRESS", func(t *testing.T) {
+		options, err := initManager(ctx)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, options.PprofBindAddress, "")
+
+		t.Setenv("PPROF_BIND_ADDRESS", "pprof-addr")
+		options, err = initManager(ctx)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, options.PprofBindAddress, "pprof-addr")
+	})
 }
