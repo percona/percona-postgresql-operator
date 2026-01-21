@@ -83,6 +83,8 @@ const (
 	OverrideConfigAnnotation = perconaAnnotationPrefix + "override-config"
 
 	// K8SPG-771
-	// FencedInstancesAnnotation is an annotation used to mark instances as fenced.
-	FencedInstancesAnnotation = perconaAnnotationPrefix + "fenced-instances"
+	// SuspendedInstancesAnnotation is an annotation set on the PerconaPGCluster to suspend one or more instances.
+	// The instance names represent the names of the StatefulSets.
+	// Example: "pgv2.percona.com/suspended-instances=cluster1-abc,cluster2-xyz"
+	SuspendedInstancesAnnotation = perconaAnnotationPrefix + "suspended-instances"
 )

@@ -1266,16 +1266,16 @@ func (r *Reconciler) reconcileInstance(
 	return err
 }
 
-func getFencedInstances(cluster *v1beta1.PostgresCluster) []string {
-	annotations := cluster.GetAnnotations()[pNaming.ToCrunchyAnnotation(naming.FencedInstancesAnnotation)]
+func getSuspendedInstances(cluster *v1beta1.PostgresCluster) []string {
+	annotations := cluster.GetAnnotations()[pNaming.ToCrunchyAnnotation(naming.SuspendedInstancesAnnotation)]
 	if annotations == "" {
 		return []string{}
 	}
 	return strings.Split(annotations, ",")
 }
 
-func isInstanceFenced(cluster *v1beta1.PostgresCluster, instanceName string) bool {
-	fencedInstances := getFencedInstances(cluster)
+func isInstanceSuspended(cluster *v1beta1.PostgresCluster, instanceName string) bool {
+	fencedInstances := getSuspendedInstances(cluster)
 	for _, fencedInstance := range fencedInstances {
 		if instanceName != "" && fencedInstance == instanceName {
 			return true
@@ -1389,8 +1389,8 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	}
 
 	// K8SPG-771
-	// TODO (mayanshah1607): perform checkpoint before scaling down.
-	if isInstanceFenced(cluster, sts.GetName()) {
+	// TODO (mayanshah1607): perform checkpoint before scaling down, especially for primary.
+	if isInstanceSuspended(cluster, sts.GetName()) {
 		sts.Spec.Replicas = initialize.Int32(0)
 	}
 
