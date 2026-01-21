@@ -77,10 +77,8 @@ func Reconcile(
 		return handleStateStarting(ctx, log, cl, exec, pgBackup, pgCluster)
 	case v2.BackupRunning:
 		return handleStateRunning(ctx, log, exec, cl, pgBackup, pgCluster)
-	case v2.BackupFailed:
-		log.Info("Backup failed")
-	case v2.BackupSucceeded:
-		log.Info("Backup succeeded")
+	case v2.BackupFailed, v2.BackupSucceeded:
+		return reconcile.Result{}, nil
 	}
 	return reconcile.Result{}, nil
 }
