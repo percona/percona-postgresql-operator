@@ -277,7 +277,11 @@ func (r *PGClusterReconciler) reconcileStandbyMainSiteAnnotation(ctx context.Con
 	}
 
 	log := logging.FromContext(ctx)
-	if mainSite == nil {
+
+	mainSiteVal := ""
+	if mainSite != nil {
+		mainSiteVal = mainSite.GetNamespace() + "/" + mainSite.GetName()
+	} else {
 		log.V(1).Info("Main site not found in Kubernetes, cannot detect standby lag")
 	}
 
@@ -290,7 +294,7 @@ func (r *PGClusterReconciler) reconcileStandbyMainSiteAnnotation(ctx context.Con
 	if annots == nil {
 		annots = make(map[string]string)
 	}
-	annots[pNaming.AnnotationReplicationMainSite] = mainSite.GetNamespace() + "/" + mainSite.GetName()
+	annots[pNaming.AnnotationReplicationMainSite] = mainSiteVal
 	crCopy.SetAnnotations(annots)
 	if err := r.Client.Update(ctx, crCopy); err != nil {
 		return errors.Wrap(err, "update standby main site annotation")

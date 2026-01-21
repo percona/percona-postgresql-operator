@@ -369,3 +369,176 @@ func TestGetStandbyMainSite(t *testing.T) {
 		assert.Nil(t, mainSite)
 	})
 }
+
+func TestReconcileStandbyMainSiteAnnotation(t *testing.T) {
+	// Prepare mocks objects
+	sourceCluster, err := readDefaultCR("source-cluster", "default")
+	require.NoError(t, err)
+	sourceCluster.Default()
+	sourceCluster.Spec.Backups.PGBackRest.Repos = []crunchyv1beta1.PGBackRestRepo{
+		{
+			Name: "repo1",
+			S3: &crunchyv1beta1.RepoS3{
+				Bucket:   "some-bucket",
+				Endpoint: "some-endpoint",
+				Region:   "some-region",
+			},
+		},
+	}
+
+	standbyCluster, err := readDefaultCR("standby-cluster", "default")
+	require.NoError(t, err)
+	standbyCluster.Default()
+	standbyCluster.Spec.Backups.PGBackRest.Repos = []crunchyv1beta1.PGBackRestRepo{
+		{
+			Name: "repo1",
+			S3: &crunchyv1beta1.RepoS3{
+				Bucket:   "some-bucket",
+				Endpoint: "some-endpoint",
+				Region:   "some-region",
+			},
+		},
+	}
+	standbyCluster.Spec.Standby = &v2.StandbySpec{
+		PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
+			Enabled:  true,
+			RepoName: "repo1",
+		},
+		MaxAcceptableLag: ptr.To(resource.MustParse("1Mi")),
+	}
+
+	t.Run("standby not enabled", func(t *testing.T) {
+		standby := standbyCluster.DeepCopy()
+		standby.Spec.Standby.Enabled = false
+
+		cl, err := buildFakeClient(t.Context(), standbyCluster, []client.Object{sourceCluster}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		err = r.reconcileStandbyMainSiteAnnotation(t.Context(), standby)
+		require.NoError(t, err)
+
+		observedCR := &v2.PerconaPGCluster{}
+		err = cl.Get(t.Context(), client.ObjectKeyFromObject(standby), observedCR)
+		require.NoError(t, err)
+		assert.Empty(t, observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
+	})
+
+	t.Run("standby repo not specified", func(t *testing.T) {
+		standby := standbyCluster.DeepCopy()
+		standby.Spec.Standby.RepoName = ""
+
+		cl, err := buildFakeClient(t.Context(), standbyCluster, []client.Object{sourceCluster}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		err = r.reconcileStandbyMainSiteAnnotation(t.Context(), standby)
+		require.NoError(t, err)
+
+		observedCR := &v2.PerconaPGCluster{}
+		err = cl.Get(t.Context(), client.ObjectKeyFromObject(standby), observedCR)
+		require.NoError(t, err)
+		assert.Empty(t, observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
+	})
+
+	t.Run("source cluster with different repo configuration", func(t *testing.T) {
+		source := sourceCluster.DeepCopy()
+		standby := standbyCluster.DeepCopy()
+
+		source.Spec.Backups.PGBackRest.Repos = []crunchyv1beta1.PGBackRestRepo{
+			{
+				Name: "repo1",
+				S3: &crunchyv1beta1.RepoS3{
+					Bucket:   "different-bucket",
+					Endpoint: "some-endpoint",
+					Region:   "some-region",
+				},
+			},
+		}
+
+		cl, err := buildFakeClient(t.Context(), standby, []client.Object{source}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		err = r.reconcileStandbyMainSiteAnnotation(t.Context(), standby)
+		require.NoError(t, err)
+
+		observedCR := &v2.PerconaPGCluster{}
+		err = cl.Get(t.Context(), client.ObjectKeyFromObject(standby), observedCR)
+		require.NoError(t, err)
+		assert.Equal(t, "", observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
+	})
+
+	t.Run("source cluster in same namespace", func(t *testing.T) {
+		source := sourceCluster.DeepCopy()
+		standby := standbyCluster.DeepCopy()
+
+		cl, err := buildFakeClient(t.Context(), standby, []client.Object{source}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		err = r.reconcileStandbyMainSiteAnnotation(t.Context(), standby)
+		require.NoError(t, err)
+
+		observedCR := &v2.PerconaPGCluster{}
+		err = cl.Get(t.Context(), client.ObjectKeyFromObject(standby), observedCR)
+		require.NoError(t, err)
+		assert.Equal(t, source.GetNamespace()+"/"+source.GetName(), observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
+	})
+
+	t.Run("source cluster in different namespace", func(t *testing.T) {
+		source := sourceCluster.DeepCopy()
+		standby := standbyCluster.DeepCopy()
+		source.Namespace = "different-namespace"
+
+		cl, err := buildFakeClient(t.Context(), standby, []client.Object{source}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client: cl,
+		}
+
+		err = r.reconcileStandbyMainSiteAnnotation(t.Context(), standby)
+		require.NoError(t, err)
+
+		observedCR := &v2.PerconaPGCluster{}
+		err = cl.Get(t.Context(), client.ObjectKeyFromObject(standby), observedCR)
+		require.NoError(t, err)
+		assert.Equal(t, source.GetNamespace()+"/"+source.GetName(), observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
+	})
+
+	t.Run("non-cluster-wide mode", func(t *testing.T) {
+		source := sourceCluster.DeepCopy()
+		standby := standbyCluster.DeepCopy()
+
+		source.Namespace = "different-namespace"
+
+		cl, err := buildFakeClient(t.Context(), standby, []client.Object{source}...)
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{
+			Client:         cl,
+			WatchNamespace: []string{"default"},
+		}
+
+		err = r.reconcileStandbyMainSiteAnnotation(t.Context(), standby)
+		require.NoError(t, err)
+
+		observedCR := &v2.PerconaPGCluster{}
+		err = cl.Get(t.Context(), client.ObjectKeyFromObject(standby), observedCR)
+		require.NoError(t, err)
+		assert.Equal(t, "", observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
+	})
+}
