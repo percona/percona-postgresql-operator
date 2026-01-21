@@ -81,4 +81,8 @@ const (
 	// is present, the controller will not update the ConfigMap, allowing users to make custom
 	// modifications that won't be overwritten during reconciliation.
 	OverrideConfigAnnotation = perconaAnnotationPrefix + "override-config"
+
+	// K8SPG-771
+	// FencedInstancesAnnotation is an annotation used to mark instances as fenced.
+	FencedInstancesAnnotation = perconaAnnotationPrefix + "fenced-instances"
 )
