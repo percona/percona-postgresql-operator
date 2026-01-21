@@ -401,8 +401,8 @@ spec:
               snapshot:
                 properties:
                   pvcName:
-                    description: PVCName is the name of the PVC that contains the
-                      snapshotted data.
+                    description: VolumeSnapshotName is the name of the VolumeSnapshot
+                      that contains the snapshotted data.
                     type: string
                   targetPvcName:
                     description: TargetPVCName is the name of the source PVC that

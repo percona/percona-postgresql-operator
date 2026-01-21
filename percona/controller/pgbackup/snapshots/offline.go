@@ -39,8 +39,12 @@ func (e *offlineExec) prepare(ctx context.Context, pgCluster *v2.PerconaPGCluste
 	}
 
 	targetPod := replicas[0]
-	annotations := targetPod.GetAnnotations()
-	targetInstanceName := annotations[naming.LabelInstance]
+	labels := targetPod.GetLabels()
+
+	targetInstanceName := labels[naming.LabelInstance]
+	if targetInstanceName == "" {
+		return "", errors.New("target instance name not found on pod labels")
+	}
 
 	if err := e.suspendInstanceAndWait(ctx, targetInstanceName, pgCluster); err != nil {
 		return "", errors.Wrap(err, "failed to suspend instance")
@@ -64,7 +68,6 @@ func (e *offlineExec) complete(ctx context.Context, pgCluster *v2.PerconaPGClust
 func (e *offlineExec) suspendInstanceAndWait(ctx context.Context, instanceName string, pgCluster *v2.PerconaPGCluster) error {
 	// suspend the instance
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		pgCluster := &v2.PerconaPGCluster{}
 		if err := e.cl.Get(ctx, client.ObjectKeyFromObject(pgCluster), pgCluster); err != nil {
 			return errors.Wrap(err, "failed to get PGCluster")
 		}

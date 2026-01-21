@@ -114,8 +114,8 @@ type PerconaPGBackupStatus struct {
 }
 
 type SnapshotStatus struct {
-	// PVCName is the name of the PVC that contains the snapshotted data.
-	PVCName string `json:"pvcName"`
+	// VolumeSnapshotName is the name of the VolumeSnapshot that contains the snapshotted data.
+	VolumeSnapshotName string `json:"pvcName"`
 	// TargetPVCName is the name of the source PVC that is being snapshotted.
 	TargetPVCName string `json:"targetPvcName"`
 }

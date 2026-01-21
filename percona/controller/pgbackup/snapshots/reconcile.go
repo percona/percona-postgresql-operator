@@ -2,11 +2,10 @@ package snapshots
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
-	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
@@ -38,7 +37,7 @@ func Reconcile(
 		WithValues("backup", pgBackup.Name, "cluster", pgCluster.Name)
 
 	// Do nothing if the feature is not enabled.
-	if !feature.Enabled(ctx, feature.VolumeSnapshots) {
+	if !feature.Enabled(ctx, feature.BackupSnapshots) {
 		log.Info(fmt.Sprintf("Feature gate '%s' is not enabled, skipping snapshot reconciliation", feature.BackupSnapshots))
 		return reconcile.Result{}, nil
 	}
@@ -83,7 +82,6 @@ func Reconcile(
 	return reconcile.Result{}, nil
 }
 
-// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;list;watch
 func handleStateNew(
 	ctx context.Context,
 	log logging.Logger,
@@ -91,23 +89,6 @@ func handleStateNew(
 	backup *v2.PerconaPGBackup,
 	pgCluster *v2.PerconaPGCluster,
 ) (reconcile.Result, error) {
-	// Ensure that the volume snapshot class exists.
-	className := pgCluster.Spec.Backups.VolumeSnapshots.ClassName
-	if className == "" {
-		return reconcile.Result{}, errors.New("volume snapshot class name is not set")
-	}
-	volumeSnapshotClass := &volumesnapshotv1.VolumeSnapshotClass{}
-	if err := cl.Get(ctx, client.ObjectKey{Name: className}, volumeSnapshotClass); err != nil {
-		stsErr := fmt.Errorf("failed to get volume snapshot class: %w", err)
-		if updErr := backup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
-			bcp.Status.State = v2.BackupFailed
-			bcp.Status.Error = stsErr.Error()
-		}); updErr != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
-		}
-		return reconcile.Result{}, stsErr
-	}
-
 	if pgCluster.Status.State != v2.AppStateReady {
 		log.Info("Waiting for cluster to be ready before creating snapshot")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
@@ -173,7 +154,10 @@ func handleStateRunning(
 		return reconcile.Result{}, fmt.Errorf("failed to set owner reference on volume snapshot: %w", err)
 	}
 
-	if err := cl.Create(ctx, volumeSnapshot); client.IgnoreAlreadyExists(err) != nil {
+	if err := cl.Create(ctx, volumeSnapshot); err == nil {
+		log.Info("Volume snapshot created successfully")
+		return reconcile.Result{}, nil
+	} else if client.IgnoreAlreadyExists(err) != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to create volume snapshot: %w", err)
 	}
 
@@ -181,9 +165,9 @@ func handleStateRunning(
 		return reconcile.Result{}, fmt.Errorf("failed to get volume snapshot: %w", err)
 	}
 
-	if backup.Status.Snapshot.PVCName == "" {
+	if backup.Status.Snapshot.VolumeSnapshotName == "" {
 		if updErr := backup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
-			bcp.Status.Snapshot.PVCName = volumeSnapshot.GetName()
+			bcp.Status.Snapshot.VolumeSnapshotName = volumeSnapshot.GetName()
 		}); updErr != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
 		}
@@ -191,7 +175,7 @@ func handleStateRunning(
 
 	switch {
 	// snapshot is complete and ready to be restored.
-	case ptr.Deref(volumeSnapshot.Status.ReadyToUse, false):
+	case volumeSnapshot.Status != nil && ptr.Deref(volumeSnapshot.Status.ReadyToUse, false):
 		if err := exec.complete(ctx, pgCluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to complete snapshot: %w", err)
 		}
