@@ -364,7 +364,7 @@ spec:
             type: object
           spec:
             properties:
-              backupMethod:
+              method:
                 default: pgbackrest
                 description: Method with which to perform the backup
                 enum:
@@ -694,17 +694,17 @@ spec:
                 type: object
               snapshot:
                 properties:
-                  pvcName:
-                    description: PVCName is the name of the PVC that contains the
-                      snapshotted data.
-                    type: string
                   targetPvcName:
                     description: TargetPVCName is the name of the source PVC that
                       is being snapshotted.
                     type: string
+                  volumeSnapshotName:
+                    description: VolumeSnapshotName is the name of the VolumeSnapshot
+                      that contains the snapshotted data.
+                    type: string
                 required:
-                - pvcName
                 - targetPvcName
+                - volumeSnapshotName
                 type: object
               state:
                 type: string

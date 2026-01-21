@@ -77,6 +77,7 @@ func Reconcile(
 	case v2.BackupRunning:
 		return handleStateRunning(ctx, log, exec, cl, pgBackup, pgCluster)
 	case v2.BackupFailed, v2.BackupSucceeded:
+		// TODO: call exec.complete() here?
 		return reconcile.Result{}, nil
 	}
 	return reconcile.Result{}, nil
@@ -150,7 +151,7 @@ func handleStateRunning(
 			},
 		},
 	}
-	if err := controllerutil.SetOwnerReference(backup, volumeSnapshot, cl.Scheme()); err != nil {
+	if err := controllerutil.SetControllerReference(backup, volumeSnapshot, cl.Scheme()); err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to set owner reference on volume snapshot: %w", err)
 	}
 
@@ -174,8 +175,13 @@ func handleStateRunning(
 	}
 
 	switch {
+	// no status reported, requeue.
+	// Note: no need to set a RequeuAfter because the controller watches the child VolumeSnapshot object.
+	case volumeSnapshot.Status == nil:
+		return reconcile.Result{}, nil
+
 	// snapshot is complete and ready to be restored.
-	case volumeSnapshot.Status != nil && ptr.Deref(volumeSnapshot.Status.ReadyToUse, false):
+	case ptr.Deref(volumeSnapshot.Status.ReadyToUse, false):
 		if err := exec.complete(ctx, pgCluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to complete snapshot: %w", err)
 		}

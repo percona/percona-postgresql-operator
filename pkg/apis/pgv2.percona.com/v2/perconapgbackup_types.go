@@ -69,7 +69,7 @@ type PerconaPGBackupSpec struct {
 	// +kubebuilder:validation:Enum={pgbackrest,volumeSnapshot}
 	// +kubebuilder:default=pgbackrest
 	// +optional
-	BackupMethod BackupMethod `json:"backupMethod"`
+	Method BackupMethod `json:"method"`
 
 	// Command line options to include when running the pgBackRest backup command.
 	// https://pgbackrest.org/command.html#command-backup
@@ -115,7 +115,7 @@ type PerconaPGBackupStatus struct {
 
 type SnapshotStatus struct {
 	// VolumeSnapshotName is the name of the VolumeSnapshot that contains the snapshotted data.
-	VolumeSnapshotName string `json:"pvcName"`
+	VolumeSnapshotName string `json:"volumeSnapshotName"`
 	// TargetPVCName is the name of the source PVC that is being snapshotted.
 	TargetPVCName string `json:"targetPvcName"`
 }
