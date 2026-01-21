@@ -45,6 +45,7 @@ type PerconaPGCluster struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
+// +kubebuilder:validation:XValidation:rule="!has(self.dataSource) || (has(self.backups.pgbackrest.image) && self.backups.pgbackrest.image != \"\")",message="spec.backups.pgbackrest.image is required when spec.dataSource is set"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
@@ -312,7 +313,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 	postgresCluster.Spec.CustomRootCATLSSecret = cr.Spec.Secrets.CustomRootCATLSSecret
 
-	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion)
+	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion, postgresCluster.Spec.DataSource != nil)
 	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		repo := postgresCluster.Spec.Backups.PGBackRest.Repos[i]
 
@@ -498,9 +499,16 @@ func (b Backups) IsEnabled() bool {
 	return b.Enabled == nil || *b.Enabled
 }
 
-func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
+func (b Backups) ToCrunchy(version string, hasDataSource bool) crunchyv1beta1.Backups {
 	if b.Enabled != nil && !*b.Enabled {
-		return crunchyv1beta1.Backups{}
+		if !hasDataSource {
+			return crunchyv1beta1.Backups{}
+		}
+		return crunchyv1beta1.Backups{
+			PGBackRest: crunchyv1beta1.PGBackRestArchive{
+				Image: b.PGBackRest.Image,
+			},
+		}
 	}
 
 	var sc *crunchyv1beta1.PGBackRestSidecars

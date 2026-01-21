@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr "some-name-datasource" ${RANDOM} \
+        | yq '
+            .spec.backups.enabled = false |
+            .spec.dataSource = {
+                "postgresCluster": {
+                  "clusterName": "some-name",
+                  "repoName": "repo1"
+                }
+            }
+          ' \
+        | kubectl -n "${NAMESPACE}" apply -f -
