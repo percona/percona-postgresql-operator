@@ -53,8 +53,8 @@ type PerconaPGBackupList struct {
 type BackupMethod string
 
 const (
-	BackupMethodPhysical         BackupMethod = "pgbackrest"
-	BackupMethodPhysicalSnapshot BackupMethod = "volumeSnapshot"
+	BackupMethodPGBackrest     BackupMethod = "pgbackrest"
+	BackupMethodVolumeSnapshot BackupMethod = "volumeSnapshot"
 )
 
 type PerconaPGBackupSpec struct {

@@ -2,7 +2,6 @@ package snapshots
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"time"
 
@@ -28,6 +27,9 @@ func newOfflineExec(cl client.Client) *offlineExec {
 }
 
 func (e *offlineExec) prepare(ctx context.Context, pgCluster *v2.PerconaPGCluster) (string, error) {
+	// TODO: for single node clusters, we should use the primary,
+	// but this is unsafe as it results in downtime during backup.
+	// We should at least let the user explicilty opt-in for this behaviour.
 	replicas, err := perconaPG.GetReplicaPods(ctx, e.cl, pgCluster)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get replica pods")
@@ -35,11 +37,6 @@ func (e *offlineExec) prepare(ctx context.Context, pgCluster *v2.PerconaPGCluste
 	if len(replicas) == 0 {
 		return "", errors.New("no replica pods found")
 	}
-
-	// sort by name to always get a predictable result
-	slices.SortFunc(replicas, func(x, y corev1.Pod) int {
-		return strings.Compare(x.GetName(), y.GetName())
-	})
 
 	targetPod := replicas[0]
 	annotations := targetPod.GetAnnotations()

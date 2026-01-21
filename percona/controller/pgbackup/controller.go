@@ -91,7 +91,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		pgCluster = nil
 	}
 
-	if pgBackup.Spec.BackupMethod == v2.BackupMethodPhysicalSnapshot {
+	if pgBackup.Spec.BackupMethod == v2.BackupMethodVolumeSnapshot {
 		return snapshots.Reconcile(ctx, r.Client, pgBackup, pgCluster)
 	}
 

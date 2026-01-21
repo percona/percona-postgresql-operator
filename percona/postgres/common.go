@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -57,13 +58,12 @@ func GetPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGClust
 // GetReplicaPods lists the replica pods for a given cluster.
 func GetReplicaPods(ctx context.Context, cli client.Client, cr *v2.PerconaPGCluster) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
-	role := "replica"
 
 	err := cli.List(ctx, podList, &client.ListOptions{
 		Namespace: cr.Namespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"app.kubernetes.io/instance":             cr.GetName(),
-			"postgres-operator.crunchydata.com/role": role,
+			"postgres-operator.crunchydata.com/role": naming.RolePatroniReplica,
 		}),
 	})
 	if err != nil {
