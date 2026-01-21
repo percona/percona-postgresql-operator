@@ -17,6 +17,8 @@ scaling
 scheduled-backup
 self-healing
 sidecars
+standby-pgbackrest
+standby-streaming
 start-from-backup
 tablespaces
 telemetry-transfer

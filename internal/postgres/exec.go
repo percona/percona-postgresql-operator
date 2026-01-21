@@ -22,12 +22,15 @@ type Executor func(
 // - https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-VARIABLES
 func (exec Executor) Exec(
 	ctx context.Context, sql io.Reader, variables map[string]string,
+	psqlArgs []string,
 ) (string, string, error) {
 	// Convert variables into `psql` arguments.
-	args := make([]string, 0, len(variables))
+	args := make([]string, 0, len(variables)+len(psqlArgs))
 	for k, v := range variables {
 		args = append(args, "--set="+k+"="+v)
 	}
+
+	args = append(args, psqlArgs...)
 
 	// The map iteration above is nondeterministic. Sort the arguments so that
 	// calls to exec are deterministic.

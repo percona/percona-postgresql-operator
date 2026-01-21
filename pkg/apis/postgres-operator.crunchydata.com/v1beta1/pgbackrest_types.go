@@ -5,6 +5,8 @@
 package v1beta1
 
 import (
+	"reflect"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -485,4 +487,35 @@ type PGBackRestDataSource struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+func (r *PGBackRestRepo) StorageEquals(other *PGBackRestRepo) bool {
+	switch {
+	case r.Azure != nil && other.Azure != nil:
+		return r.Azure.Equals(other.Azure)
+	case r.GCS != nil && other.GCS != nil:
+		return r.GCS.Equals(other.GCS)
+	case r.S3 != nil && other.S3 != nil:
+		return r.S3.Equals(other.S3)
+	case r.Volume != nil && other.Volume != nil:
+		return r.Volume.Equals(other.Volume)
+	default:
+		return false
+	}
+}
+
+func (r *RepoAzure) Equals(other *RepoAzure) bool {
+	return r.Container == other.Container
+}
+
+func (r *RepoGCS) Equals(other *RepoGCS) bool {
+	return r.Bucket == other.Bucket
+}
+
+func (r *RepoS3) Equals(other *RepoS3) bool {
+	return r.Bucket == other.Bucket && r.Endpoint == other.Endpoint && r.Region == other.Region
+}
+
+func (r *RepoPVC) Equals(other *RepoPVC) bool {
+	return reflect.DeepEqual(r.VolumeClaimSpec, other.VolumeClaimSpec)
 }

@@ -46,4 +46,9 @@ const (
 
 	// Special annotation to disable `patroni-version-check` by overriding the patroni version with a custom value.
 	AnnotationCustomPatroniVersion = PrefixPerconaPGV2 + "custom-patroni-version"
+
+	// AnnotationReplicationMainSite is the annotation that is added to a standby PerconaPGCluster to
+	// indicate the name of the main site.
+	// This annotation is set on standby clusters based on pgbackrest only. This is needed to calculate the replication lag.
+	AnnotationReplicationMainSite = PrefixPerconaPGV2 + "replication-main-site"
 )

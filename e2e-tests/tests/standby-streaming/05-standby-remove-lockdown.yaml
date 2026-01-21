@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      standby_primary=$(kubectl get pod -n "${NAMESPACE}" -l postgres-operator.crunchydata.com/cluster=standby-cluster,postgres-operator.crunchydata.com/role=primary -o jsonpath='{.items[0].metadata.name}')
+      if [ -z "${standby_primary}" ]; then
+        echo "ERROR: standby primary pod not found"
+        exit 1
+      fi
+      
+      kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c 'iptables -F OUTPUT'

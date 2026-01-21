@@ -57,7 +57,7 @@ func DisableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor) er
 		\gexec`),
 		map[string]string{
 			"username": MonitoringUser,
-		})
+		}, nil)
 
 	log.V(1).Info("monitoring user disabled", "stdout", stdout, "stderr", stderr)
 
