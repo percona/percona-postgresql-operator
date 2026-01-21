@@ -54,6 +54,25 @@ func GetPrimaryPod(ctx context.Context, cli client.Client, cr *v2.PerconaPGClust
 	return &podList.Items[0], nil
 }
 
+// GetReplicaPods lists the replica pods for a given cluster.
+func GetReplicaPods(ctx context.Context, cli client.Client, cr *v2.PerconaPGCluster) ([]corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	role := "replica"
+
+	err := cli.List(ctx, podList, &client.ListOptions{
+		Namespace: cr.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"app.kubernetes.io/instance":             cr.GetName(),
+			"postgres-operator.crunchydata.com/role": role,
+		}),
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list pods")
+	}
+
+	return podList.Items, nil
+}
+
 func determineVersion(cr *v2.PerconaPGCluster) string {
 	if cr.CompareVersion("2.7.0") <= 0 {
 		return cr.Status.PatroniVersion

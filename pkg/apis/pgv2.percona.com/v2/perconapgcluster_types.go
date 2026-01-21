@@ -492,6 +492,32 @@ type Backups struct {
 
 	// Enable tracking latest restorable time
 	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
+
+	// VolumeSnapshots configuration
+	// +optional
+	VolumeSnapshots *VolumeSnapshots `json:"volumeSnapshots,omitempty"`
+}
+
+type VolumeSnapshotMode string
+
+const (
+	// VolumeSnapshotModeOffline is the mode for taking offline VolumeSnapshots.
+	// With this mode, the operator will stop a replica and take a snapshot of the PVC.
+	VolumeSnapshotModeOffline VolumeSnapshotMode = "offline"
+)
+
+type VolumeSnapshots struct {
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Mode of the VolumeSnapshot.
+	// +kubebuilder:validation:Enum={offline}
+	// +kubebuilder:default=offline
+	// +optional
+	Mode VolumeSnapshotMode `json:"mode,omitempty"`
+
+	// Name of the VolumeSnapshotClass to use.
+	// +kubebuilder:validation:Required
+	ClassName string `json:"className"`
 }
 
 func (b Backups) IsEnabled() bool {

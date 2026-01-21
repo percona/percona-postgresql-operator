@@ -47,6 +47,13 @@ type PerconaPGBackupList struct {
 	Items           []PerconaPGBackup `json:"items"`
 }
 
+type BackupMethod string
+
+const (
+	BackupMethodPhysical         BackupMethod = "pgbackrest"
+	BackupMethodPhysicalSnapshot BackupMethod = "volumeSnapshot"
+)
+
 type PerconaPGBackupSpec struct {
 	PGCluster string `json:"pgCluster"`
 
@@ -54,6 +61,12 @@ type PerconaPGBackupSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
 	RepoName string `json:"repoName"`
+
+	// Method with which to perform the backup
+	// +kubebuilder:validation:Enum={pgbackrest,volumeSnapshot}
+	// +kubebuilder:default=pgbackrest
+	// +optional
+	BackupMethod BackupMethod `json:"backupMethod"`
 
 	// Command line options to include when running the pgBackRest backup command.
 	// https://pgbackrest.org/command.html#command-backup
@@ -94,6 +107,14 @@ type PerconaPGBackupStatus struct {
 	BackupName           string                         `json:"backupName,omitempty"`
 	CRVersion            string                         `json:"crVersion,omitempty"`
 	LatestRestorableTime PITRestoreDateTime             `json:"latestRestorableTime,omitempty"`
+	Snapshot             *SnapshotStatus                `json:"snapshot,omitempty"`
+}
+
+type SnapshotStatus struct {
+	// PVCName is the name of the PVC that contains the snapshotted data.
+	PVCName string `json:"pvcName"`
+	// TargetPVCName is the name of the source PVC that is being snapshotted.
+	TargetPVCName string `json:"targetPvcName"`
 }
 
 // +kubebuilder:validation:Type=string

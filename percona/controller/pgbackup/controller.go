@@ -27,6 +27,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup/snapshots"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
@@ -80,6 +81,18 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 	pgBackup.Default()
 
+	pgCluster := new(v2.PerconaPGCluster)
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+		}
+		pgCluster = nil
+	}
+
+	if pgBackup.Spec.BackupMethod == v2.BackupMethodPhysicalSnapshot {
+		return snapshots.Reconcile(ctx, r.Client, pgBackup, pgCluster)
+	}
+
 	if !pgBackup.DeletionTimestamp.IsZero() || pgBackup.Status.State == v2.BackupFailed {
 		if _, err := runFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
@@ -91,14 +104,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 		}
-	}
-
-	pgCluster := new(v2.PerconaPGCluster)
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster); err != nil {
-		if !k8serrors.IsNotFound(err) {
-			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
-		}
-		pgCluster = nil
 	}
 
 	switch pgBackup.Status.State {

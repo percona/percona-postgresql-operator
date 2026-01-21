@@ -70,6 +70,13 @@ spec:
             type: object
           spec:
             properties:
+              backupMethod:
+                default: pgbackrest
+                description: Method with which to perform the backup
+                enum:
+                - pgbackrest
+                - volumeSnapshot
+                type: string
               options:
                 description: |-
                   Command line options to include when running the pgBackRest backup command.
@@ -390,6 +397,20 @@ spec:
                     type: object
                 required:
                 - name
+                type: object
+              snapshot:
+                properties:
+                  pvcName:
+                    description: PVCName is the name of the PVC that contains the
+                      snapshotted data.
+                    type: string
+                  targetPvcName:
+                    description: TargetPVCName is the name of the source PVC that
+                      is being snapshotted.
+                    type: string
+                required:
+                - pvcName
+                - targetPvcName
                 type: object
               state:
                 type: string
