@@ -24,8 +24,8 @@ import (
 // AddRepoVolumesToPod adds pgBackRest repository volumes to the provided Pod template spec, while
 // also adding associated volume mounts to the containers specified.
 func AddRepoVolumesToPod(postgresCluster *v1beta1.PostgresCluster, template *corev1.PodTemplateSpec,
-	repoPVCNames map[string]string, containerNames ...string) error {
-
+	repoPVCNames map[string]string, containerNames ...string,
+) error {
 	for _, repo := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		// we only care about repos created using PVCs
 		if repo.Volume == nil {
@@ -45,7 +45,8 @@ func AddRepoVolumesToPod(postgresCluster *v1beta1.PostgresCluster, template *cor
 			Name: repo.Name,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: repoVolName},
+					ClaimName: repoVolName,
+				},
 			},
 		})
 
@@ -62,11 +63,10 @@ func AddRepoVolumesToPod(postgresCluster *v1beta1.PostgresCluster, template *cor
 				"Unable to find init container %q when adding pgBackRest repo volumes",
 				naming.ContainerPGBackRestLogDirInit)
 		}
-		template.Spec.InitContainers[index].VolumeMounts =
-			append(template.Spec.InitContainers[index].VolumeMounts, corev1.VolumeMount{
-				Name:      repo.Name,
-				MountPath: "/pgbackrest/" + repo.Name,
-			})
+		template.Spec.InitContainers[index].VolumeMounts = append(template.Spec.InitContainers[index].VolumeMounts, corev1.VolumeMount{
+			Name:      repo.Name,
+			MountPath: "/pgbackrest/" + repo.Name,
+		})
 
 		for _, name := range containerNames {
 			var containerFound bool
@@ -81,11 +81,10 @@ func AddRepoVolumesToPod(postgresCluster *v1beta1.PostgresCluster, template *cor
 				return errors.Errorf("Unable to find container %q when adding pgBackRest repo volumes",
 					name)
 			}
-			template.Spec.Containers[index].VolumeMounts =
-				append(template.Spec.Containers[index].VolumeMounts, corev1.VolumeMount{
-					Name:      repo.Name,
-					MountPath: "/pgbackrest/" + repo.Name,
-				})
+			template.Spec.Containers[index].VolumeMounts = append(template.Spec.Containers[index].VolumeMounts, corev1.VolumeMount{
+				Name:      repo.Name,
+				MountPath: "/pgbackrest/" + repo.Name,
+			})
 		}
 	}
 
@@ -551,7 +550,7 @@ func Secret(ctx context.Context,
 		// The client verifies the "pg-host" or "repo-host" option it used is
 		// present in the DNS names of the server certificate.
 		leaf := &pki.LeafCertificate{}
-		dnsNames, err := naming.RepoHostPodDNSNames(ctx, inRepoHost)
+		dnsNames, err := naming.RepoHostPodDNSNames(ctx, inRepoHost, inCluster.Spec.ClusterServiceDNSSuffix)
 		if err != nil {
 			return errors.Wrap(err, "failed to resolve repo host pod DNS names")
 		}

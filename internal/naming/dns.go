@@ -16,9 +16,9 @@ import (
 
 // InstancePodDNSNames returns the possible DNS names for instance. The first
 // name is the fully qualified domain name (FQDN).
-func InstancePodDNSNames(ctx context.Context, instance *appsv1.StatefulSet) []string {
+func InstancePodDNSNames(ctx context.Context, instance *appsv1.StatefulSet, dnsSuffix string) []string {
 	var (
-		domain    = KubernetesClusterDomain(ctx)
+		domain    = KubernetesClusterDomain(ctx, dnsSuffix)
 		namespace = instance.Namespace
 		name      = instance.Name + "-0." + instance.Spec.ServiceName
 	)
@@ -36,7 +36,7 @@ func InstancePodDNSNames(ctx context.Context, instance *appsv1.StatefulSet) []st
 
 // RepoHostPodDNSNames returns the possible DNS names for a pgBackRest repository host Pod.
 // The first name is the fully qualified domain name (FQDN).
-func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) ([]string, error) {
+func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet, dnsSuffix string) ([]string, error) {
 	if repoHost.Namespace == "" {
 		return nil, errors.New("repoHost.Namespace is empty")
 	}
@@ -48,7 +48,7 @@ func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) ([]s
 	}
 
 	var (
-		domain    = KubernetesClusterDomain(ctx)
+		domain    = KubernetesClusterDomain(ctx, dnsSuffix)
 		namespace = repoHost.Namespace
 		name      = repoHost.Name + "-0." + repoHost.Spec.ServiceName
 	)
@@ -66,7 +66,7 @@ func RepoHostPodDNSNames(ctx context.Context, repoHost *appsv1.StatefulSet) ([]s
 
 // ServiceDNSNames returns the possible DNS names for service. The first name
 // is the fully qualified domain name (FQDN).
-func ServiceDNSNames(ctx context.Context, service *corev1.Service) ([]string, error) {
+func ServiceDNSNames(ctx context.Context, service *corev1.Service, dnsSuffix string) ([]string, error) {
 	if service.Name == "" {
 		return nil, errors.New("service.Name is empty")
 	}
@@ -75,7 +75,7 @@ func ServiceDNSNames(ctx context.Context, service *corev1.Service) ([]string, er
 		return nil, errors.New("service.Namespace is empty")
 	}
 
-	domain := KubernetesClusterDomain(ctx)
+	domain := KubernetesClusterDomain(ctx, dnsSuffix)
 
 	return []string{
 		service.Name + "." + service.Namespace + ".svc." + domain,
@@ -86,7 +86,13 @@ func ServiceDNSNames(ctx context.Context, service *corev1.Service) ([]string, er
 }
 
 // KubernetesClusterDomain looks up the Kubernetes cluster domain name.
-func KubernetesClusterDomain(ctx context.Context) string {
+// K8SPG-694: If the override parameter is provided, it is returned without performing any operations
+func KubernetesClusterDomain(ctx context.Context, override string) string {
+	// K8SPG-694
+	if override != "" {
+		return override
+	}
+
 	ctx, span := tracer.Start(ctx, "kubernetes-domain-lookup")
 	defer span.End()
 

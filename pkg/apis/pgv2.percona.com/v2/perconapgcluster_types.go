@@ -173,6 +173,8 @@ type PerconaPGClusterSpec struct {
 	// specified in `spec.users` across all databases associated with that user.
 	// +optional
 	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
+
+	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -377,6 +379,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
 	postgresCluster.Spec.InitContainer = cr.Spec.InitContainer
+	postgresCluster.Spec.ClusterServiceDNSSuffix = cr.Spec.ClusterServiceDNSSuffix
 
 	return postgresCluster, nil
 }

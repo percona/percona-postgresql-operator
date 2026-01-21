@@ -35,7 +35,7 @@ func TestCreatePGBackRestConfigMapIntent(t *testing.T) {
 		naming.LabelVersion: "2.3.0",
 	}
 
-	domain := naming.KubernetesClusterDomain(context.Background())
+	domain := naming.KubernetesClusterDomain(context.Background(), "")
 
 	t.Run("NoVolumeRepo", func(t *testing.T) {
 		cluster := cluster.DeepCopy()
@@ -254,14 +254,16 @@ func TestMakePGBackrestLogDir(t *testing.T) {
 			{Name: "test"},
 		},
 		Containers: []corev1.Container{
-			{Name: "pgbackrest",
+			{
+				Name: "pgbackrest",
 				Resources: corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU: resource.MustParse("23m"),
 					},
 				},
 			},
-		}}}
+		},
+	}}
 
 	cluster := &v1beta1.PostgresCluster{
 		Spec: v1beta1.PostgresClusterSpec{
@@ -271,7 +273,8 @@ func TestMakePGBackrestLogDir(t *testing.T) {
 					Image: "test-image",
 					Repos: []v1beta1.PGBackRestRepo{
 						{Name: "repo1"},
-						{Name: "repo2",
+						{
+							Name:   "repo2",
 							Volume: &v1beta1.RepoPVC{},
 						},
 					},
@@ -336,7 +339,8 @@ func TestRestoreCommand(t *testing.T) {
 	pgdata := "/pgdata/pg13"
 	opts := []string{
 		"--stanza=" + DefaultStanzaName, "--pg1-path=" + pgdata,
-		"--repo=1"}
+		"--repo=1",
+	}
 	command := RestoreCommand(pgdata, "try", "", nil, strings.Join(opts, " "))
 
 	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
@@ -375,7 +379,8 @@ func TestDedicatedSnapshotVolumeRestoreCommand(t *testing.T) {
 	pgdata := "/pgdata/pg13"
 	opts := []string{
 		"--stanza=" + DefaultStanzaName, "--pg1-path=" + pgdata,
-		"--repo=1"}
+		"--repo=1",
+	}
 	command := DedicatedSnapshotVolumeRestoreCommand(pgdata, strings.Join(opts, " "))
 
 	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})

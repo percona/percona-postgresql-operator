@@ -191,6 +191,9 @@ type PostgresClusterSpec struct {
 
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+
+	// K8SPG-694
+	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
 type InitContainerSpec struct {

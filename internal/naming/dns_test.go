@@ -24,7 +24,7 @@ func TestInstancePodDNSNames(t *testing.T) {
 	instance.Name = "cluster-name-id"
 	instance.Spec.ServiceName = "cluster-pods"
 
-	names := InstancePodDNSNames(ctx, instance)
+	names := InstancePodDNSNames(ctx, instance, "")
 	assert.Assert(t, len(names) > 0)
 
 	assert.DeepEqual(t, names[1:], []string{
@@ -46,7 +46,7 @@ func TestServiceDNSNames(t *testing.T) {
 	service.Namespace = "baltia"
 	service.Name = "the-primary"
 
-	names, err := ServiceDNSNames(ctx, service)
+	names, err := ServiceDNSNames(ctx, service, "")
 	assert.NilError(t, err)
 	assert.Assert(t, len(names) > 0)
 

@@ -3,13 +3,14 @@ kind: PerconaPGCluster
 metadata:
   name: cluster1
 #  annotations:
-#    test-annotation: value
+#    pgv2.percona.com/custom-patroni-version: "4"
 #  finalizers:
 #  - percona.com/delete-pvc
 #  - percona.com/delete-ssl
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.9.0
+#  clusterServiceDNSSuffix: svc.cluster.local
 #  initContainer:
 #    image: docker.io/perconalab/percona-postgresql-operator:main
 #    resources:
@@ -319,7 +320,7 @@ spec:
 #      envFrom:
 #      - secretRef:
 #          name: pgbouncer-env-secret
-#      exposeSuperusers: false
+#      exposeSuperusers: true
 #      resources:
 #        limits:
 #          cpu: 200m

@@ -73,7 +73,7 @@ func Secret(ctx context.Context,
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		leaf := &pki.LeafCertificate{}
-		dnsNames, err := naming.ServiceDNSNames(ctx, inService)
+		dnsNames, err := naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
 		if err != nil {
 			return errors.Wrap(err, "get service dns names")
 		}
