@@ -265,13 +265,13 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 	}
 
-	if err := r.reconcilePatroniVersion(ctx, cr); err != nil {
+	if err := r.reconcilePatroniVersionCheckPod(ctx, cr); err != nil {
 		if errors.Is(err, errPatroniVersionCheckWait) {
 			return reconcile.Result{
 				RequeueAfter: 5 * time.Second,
 			}, nil
 		}
-		return reconcile.Result{}, errors.Wrap(err, "check patroni version")
+		return reconcile.Result{}, errors.Wrap(err, "check patroni version pod")
 	}
 
 	if err := r.reconcileTLS(ctx, cr); err != nil {
@@ -354,6 +354,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.updateStatus(ctx, cr, &postgresCluster.Status); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update status")
+	}
+
+	if err := r.reconcilePatroniVersionFromCluster(ctx, cr); err != nil {
+		if errors.Is(err, errPatroniVersionCheckWait) {
+			return reconcile.Result{
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		return reconcile.Result{}, errors.Wrap(err, "check patroni version from instance pods")
 	}
 
 	return ctrl.Result{}, nil

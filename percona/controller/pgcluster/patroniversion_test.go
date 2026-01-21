@@ -114,7 +114,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 
 		It("should create patroni version check pod and return errPatroniVersionCheckWait", func() {
 			reconcilerInstance := reconciler(cr2)
-			err := reconcilerInstance.reconcilePatroniVersion(ctx, cr2)
+			err := reconcilerInstance.reconcilePatroniVersionCheckPod(ctx, cr2)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("waiting for pod to initialize"))
 		})
