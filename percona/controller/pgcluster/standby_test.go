@@ -475,7 +475,7 @@ func TestReconcileStandbyMainSiteAnnotation(t *testing.T) {
 		observedCR := &v2.PerconaPGCluster{}
 		err = cl.Get(t.Context(), client.ObjectKeyFromObject(standby), observedCR)
 		require.NoError(t, err)
-		assert.Equal(t, "", observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
+		assert.Empty(t, observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
 	})
 
 	t.Run("source cluster in same namespace", func(t *testing.T) {
@@ -539,6 +539,6 @@ func TestReconcileStandbyMainSiteAnnotation(t *testing.T) {
 		observedCR := &v2.PerconaPGCluster{}
 		err = cl.Get(t.Context(), client.ObjectKeyFromObject(standby), observedCR)
 		require.NoError(t, err)
-		assert.Equal(t, "", observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
+		assert.Empty(t, observedCR.GetAnnotations()[pNaming.AnnotationReplicationMainSite])
 	})
 }
