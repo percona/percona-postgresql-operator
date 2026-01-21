@@ -13,4 +13,4 @@ commands:
       condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].message}')
       test "$condStatus" = "True"
       test "$condReason" = "LagDetected"
-      test "$condMsg" = "WAL is lagging by '$lagBytes' bytes (threshold: 1024 bytes)"
+      test "$condMsg" = "WAL is lagging by $lagBytes bytes (threshold: 1024 bytes)"
