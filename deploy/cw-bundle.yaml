@@ -389,6 +389,10 @@ spec:
             - pgCluster
             - repoName
             type: object
+            x-kubernetes-validations:
+            - message: repoName is required when method is 'pgbackrest'
+              rule: (self.method == "" || self.method == "pgbackrest") && self.repoName
+                == ""
           status:
             properties:
               backupName:
