@@ -30,7 +30,7 @@ func newOfflineExec(cl client.Client) *offlineExec {
 func (e *offlineExec) prepare(ctx context.Context, pgCluster *v2.PerconaPGCluster) (string, error) {
 	// TODO: for single node clusters, we should use the primary,
 	// but this is unsafe as it results in downtime during backup.
-	// We should at least let the user explicilty opt-in for this behaviour.
+	// We should at least let the user explicitly opt-in for this behavior.
 	replicas, err := perconaPG.GetReplicaPods(ctx, e.cl, pgCluster)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get replica pods")
