@@ -8,7 +8,9 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,6 +26,39 @@ type snapshotExecutor interface {
 	complete(ctx context.Context, pgCluster *v2.PerconaPGCluster) error
 }
 
+type snapshotReconciler struct {
+	cl      client.Client
+	log     logging.Logger
+	cluster *v2.PerconaPGCluster
+	backup  *v2.PerconaPGBackup
+	exec    snapshotExecutor
+}
+
+func newSnapshotReconciler(
+	cl client.Client,
+	log logging.Logger,
+	cluster *v2.PerconaPGCluster,
+	backup *v2.PerconaPGBackup,
+	exec snapshotExecutor,
+) *snapshotReconciler {
+	return &snapshotReconciler{
+		cl:      cl,
+		log:     log,
+		cluster: cluster,
+		backup:  backup,
+		exec:    exec,
+	}
+}
+
+func newSnapshotExec(mode v2.VolumeSnapshotMode, cl client.Client) (snapshotExecutor, error) {
+	switch mode {
+	case v2.VolumeSnapshotModeOffline:
+		return newOfflineExec(cl), nil
+	default:
+		return nil, fmt.Errorf("invalid or unsupported volume snapshot mode: %s", mode)
+	}
+}
+
 // Reconcile backup snapshot
 func Reconcile(
 	ctx context.Context,
@@ -31,6 +66,9 @@ func Reconcile(
 	pgBackup *v2.PerconaPGBackup,
 	pgCluster *v2.PerconaPGCluster,
 ) (reconcile.Result, error) {
+	if pgBackup == nil || pgCluster == nil {
+		return reconcile.Result{}, errors.New("pgBackup or pgCluster is nil")
+	}
 
 	log := logging.FromContext(ctx).
 		WithName("SnapshotReconciler").
@@ -53,12 +91,8 @@ func Reconcile(
 		return reconcile.Result{}, nil
 	}
 
-	var exec snapshotExecutor
-
-	switch pgCluster.Spec.Backups.VolumeSnapshots.Mode {
-	case v2.VolumeSnapshotModeOffline:
-		exec = newOfflineExec(cl)
-	default:
+	exec, err := newSnapshotExec(pgCluster.Spec.Backups.VolumeSnapshots.Mode, cl)
+	if err != nil {
 		stsErr := fmt.Errorf("invalid or unsupported volume snapshot mode: %s", pgCluster.Spec.Backups.VolumeSnapshots.Mode)
 		if updErr := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupFailed
@@ -69,142 +103,178 @@ func Reconcile(
 		return reconcile.Result{}, stsErr
 	}
 
-	switch pgBackup.Status.State {
+	r := newSnapshotReconciler(cl, log, pgCluster, pgBackup, exec)
+	return r.reconcile(ctx)
+}
+
+func (r *snapshotReconciler) reconcile(ctx context.Context) (reconcile.Result, error) {
+	if !r.backup.GetDeletionTimestamp().IsZero() {
+		return reconcile.Result{}, r.complete(ctx)
+	}
+
+	switch r.backup.Status.State {
 	case v2.BackupNew:
-		return handleStateNew(ctx, log, cl, pgBackup, pgCluster)
+		return r.reconcileNew(ctx)
 	case v2.BackupStarting:
-		return handleStateStarting(ctx, log, cl, exec, pgBackup, pgCluster)
+		return r.reconcileStarting(ctx)
 	case v2.BackupRunning:
-		return handleStateRunning(ctx, log, exec, cl, pgBackup, pgCluster)
-	case v2.BackupFailed, v2.BackupSucceeded:
-		// TODO: call exec.complete() here?
+		return r.reconcileRunning(ctx)
+	case v2.BackupFailed:
+		return reconcile.Result{}, r.complete(ctx)
+	case v2.BackupSucceeded:
 		return reconcile.Result{}, nil
 	}
 	return reconcile.Result{}, nil
 }
 
-func handleStateNew(
-	ctx context.Context,
-	log logging.Logger,
-	cl client.Client,
-	backup *v2.PerconaPGBackup,
-	pgCluster *v2.PerconaPGCluster,
-) (reconcile.Result, error) {
-	if pgCluster.Status.State != v2.AppStateReady {
-		log.Info("Waiting for cluster to be ready before creating snapshot")
+func (r *snapshotReconciler) reconcileNew(ctx context.Context) (reconcile.Result, error) {
+	if r.cluster.Status.State != v2.AppStateReady {
+		r.log.Info("Waiting for cluster to be ready before creating snapshot")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if updErr := backup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
+	if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupStarting
 	}); updErr != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
 	}
-	log.Info("Backup is starting")
+	r.log.Info("Snapshot is starting")
 	return reconcile.Result{}, nil
 }
 
-func handleStateStarting(
-	ctx context.Context,
-	log logging.Logger,
-	cl client.Client,
-	exec snapshotExecutor,
-	backup *v2.PerconaPGBackup,
-	pgCluster *v2.PerconaPGCluster) (reconcile.Result, error) {
-
-	pvcTarget, err := exec.prepare(ctx, pgCluster)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to prepare for snapshot: %w", err)
+func (r *snapshotReconciler) reconcileStarting(ctx context.Context) (reconcile.Result, error) {
+	if err := r.prepare(ctx); err != nil {
+		return reconcile.Result{}, err
 	}
 
-	if updErr := backup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
+	if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupRunning
-		bcp.Status.Snapshot = &v2.SnapshotStatus{
-			TargetPVCName: pvcTarget,
-		}
 	}); updErr != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
 	}
-
-	log.Info("Creating snapshot")
+	r.log.Info("Snapshot is running")
 	return reconcile.Result{}, nil
 }
 
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create
-func handleStateRunning(
-	ctx context.Context,
-	log logging.Logger,
-	exec snapshotExecutor,
-	cl client.Client,
-	backup *v2.PerconaPGBackup,
-	pgCluster *v2.PerconaPGCluster,
-) (reconcile.Result, error) {
+func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Result, error) {
 	volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      backup.GetName(),
-			Namespace: backup.GetNamespace(),
+			Name:      r.backup.GetName(),
+			Namespace: r.backup.GetNamespace(),
 		},
 		Spec: volumesnapshotv1.VolumeSnapshotSpec{
-			VolumeSnapshotClassName: ptr.To(pgCluster.Spec.Backups.VolumeSnapshots.ClassName),
+			VolumeSnapshotClassName: ptr.To(r.cluster.Spec.Backups.VolumeSnapshots.ClassName),
 			Source: volumesnapshotv1.VolumeSnapshotSource{
-				PersistentVolumeClaimName: &backup.Status.Snapshot.TargetPVCName,
+				PersistentVolumeClaimName: &r.backup.Status.Snapshot.TargetPVCName,
 			},
 		},
 	}
-	if err := controllerutil.SetControllerReference(backup, volumeSnapshot, cl.Scheme()); err != nil {
+	if err := controllerutil.SetControllerReference(r.backup, volumeSnapshot, r.cl.Scheme()); err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to set owner reference on volume snapshot: %w", err)
 	}
 
-	if err := cl.Create(ctx, volumeSnapshot); err == nil {
-		log.Info("Volume snapshot created successfully")
-		return reconcile.Result{}, nil
-	} else if client.IgnoreAlreadyExists(err) != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to create volume snapshot: %w", err)
+	created, err := r.ensureSnapshot(ctx, volumeSnapshot)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to ensure snapshot: %w", err)
+	}
+	if created {
+		r.log.Info("Volume snapshot created successfully", "snapshot", volumeSnapshot.GetName())
+		return reconcile.Result{}, nil // return back later to observe the status
 	}
 
-	if err := cl.Get(ctx, client.ObjectKeyFromObject(volumeSnapshot), volumeSnapshot); err != nil {
+	if err := r.cl.Get(ctx, client.ObjectKeyFromObject(volumeSnapshot), volumeSnapshot); err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to get volume snapshot: %w", err)
 	}
 
-	if backup.Status.Snapshot.VolumeSnapshotName == "" {
-		if updErr := backup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
-			bcp.Status.Snapshot.VolumeSnapshotName = volumeSnapshot.GetName()
-		}); updErr != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
-		}
-	}
-
 	switch {
-	// no status reported, requeue.
-	// Note: no need to set a RequeuAfter because the controller watches the child VolumeSnapshot object.
+	// no status reported
 	case volumeSnapshot.Status == nil:
 		return reconcile.Result{}, nil
 
 	// snapshot is complete and ready to be restored.
 	case ptr.Deref(volumeSnapshot.Status.ReadyToUse, false):
-		if err := exec.complete(ctx, pgCluster); err != nil {
+		if err := r.exec.complete(ctx, r.cluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to complete snapshot: %w", err)
 		}
-		log.Info("Snapshot is complete and ready to be used")
 
-		if updErr := backup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
+		if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupSucceeded
 			bcp.Status.CompletedAt = ptr.To(metav1.Now())
 		}); updErr != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
 		}
+		r.log.Info("Snapshot is complete and ready to be used")
 
 	// error occurred while creating the snapshot.
 	case volumeSnapshot.Status.Error != nil:
 		message := ptr.Deref(volumeSnapshot.Status.Error.Message, "")
-		log.Error(nil, "volume snapshot failed", "error", message)
-		if updErr := backup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
+		stsErr := fmt.Errorf("volume snapshot failed: %s", message)
+		r.log.Error(stsErr, "Volume snapshot failed")
+		if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupFailed
-			bcp.Status.Error = message
+			bcp.Status.Error = stsErr.Error()
 		}); updErr != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
 		}
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *snapshotReconciler) ensureSnapshot(ctx context.Context, volumeSnapshot *volumesnapshotv1.VolumeSnapshot) (bool, error) {
+	if err := r.cl.Create(ctx, volumeSnapshot); err != nil {
+		return false, client.IgnoreAlreadyExists(err)
+	}
+
+	if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
+		if bcp.Status.Snapshot == nil {
+			bcp.Status.Snapshot = &v2.SnapshotStatus{}
+		}
+		bcp.Status.Snapshot.VolumeSnapshotName = volumeSnapshot.GetName()
+	}); updErr != nil {
+		return true, fmt.Errorf("failed to update volumeSnapshot name in backup status: %w", updErr)
+	}
+	return true, nil
+}
+
+func (r *snapshotReconciler) prepare(ctx context.Context) error {
+	if controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot) {
+		return nil
+	}
+
+	pvcTarget, err := r.exec.prepare(ctx, r.cluster)
+	if err != nil {
+		return fmt.Errorf("failed to prepare for snapshot: %w", err)
+	}
+	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
+		if bcp.Status.Snapshot == nil {
+			bcp.Status.Snapshot = &v2.SnapshotStatus{}
+		}
+		bcp.Status.Snapshot.TargetPVCName = pvcTarget
+	}); err != nil {
+		return fmt.Errorf("failed to update backup status: %w", err)
+	}
+	controllerutil.AddFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot)
+	if err := r.cl.Update(ctx, r.backup); err != nil {
+		return fmt.Errorf("failed to update backup: %w", err)
+	}
+	r.log.Info("Prepared for snapshot")
+	return nil
+}
+
+func (r *snapshotReconciler) complete(ctx context.Context) error {
+	if !controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot) {
+		return nil
+	}
+
+	if err := r.exec.complete(ctx, r.cluster); err != nil {
+		return fmt.Errorf("complete failed: %w", err)
+	}
+
+	controllerutil.RemoveFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot)
+	if err := r.cl.Update(ctx, r.backup); err != nil {
+		return fmt.Errorf("failed to update backup: %w", err)
+	}
+	return nil
 }

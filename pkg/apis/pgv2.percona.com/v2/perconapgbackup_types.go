@@ -57,11 +57,11 @@ const (
 	BackupMethodVolumeSnapshot BackupMethod = "volumeSnapshot"
 )
 
+// +kubebuilder:validation:XValidation:rule="(self.method == \"\" || self.method == \"pgbackrest\") && self.repoName == \"\"",message="repoName is required when method is 'pgbackrest'"
 type PerconaPGBackupSpec struct {
 	PGCluster string `json:"pgCluster"`
 
 	// The name of the pgBackRest repo to run the backup command against.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
 	RepoName string `json:"repoName"`
 
