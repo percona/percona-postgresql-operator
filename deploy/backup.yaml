@@ -5,5 +5,6 @@ metadata:
 spec:
   pgCluster: cluster1
   repoName: repo1
+#  method: volumeSnapshot
 #  options:
 #  - --type=full

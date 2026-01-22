@@ -406,6 +406,10 @@ spec:
 
   backups:
 #    trackLatestRestorableTime: true
+#    volumeSnapshots:
+#      enabled: true
+#      mode: offline
+#      className: VOLUME-SNAPSHOT-CLASS
     pgbackrest:
 #      metadata:
 #        labels:
