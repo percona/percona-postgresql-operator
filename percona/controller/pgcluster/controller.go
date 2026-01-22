@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -372,7 +373,7 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 // `EndpointSlices`. Since the operator now creates a new `EndpointSlice`, we should remove the mirrored `EndpointSlice`
 // created from the deprecated `Endpoints` resource.
 func (r *PGClusterReconciler) reconcileEndpoints(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.CompareVersion("2.9.0") < 0 {
+	if cr.CompareVersion("2.9.0") < 0 || !feature.Enabled(ctx, feature.EndpointSlices) {
 		return nil
 	}
 

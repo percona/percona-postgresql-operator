@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
@@ -202,7 +203,7 @@ func (r *Reconciler) reconcileClusterPrimaryService(
 		err = errors.WithStack(r.apply(ctx, service))
 	}
 	if err == nil {
-		if cluster.CompareVersion("2.9.0") >= 0 {
+		if cluster.CompareVersion("2.9.0") >= 0 && feature.Enabled(ctx, feature.EndpointSlices) {
 			err = errors.WithStack(r.apply(ctx, endpointSlice))
 		} else {
 			err = errors.WithStack(r.apply(ctx, deprecatedEndpoints))

@@ -9,4 +9,4 @@ commands:
       source ../../functions
       init_temp_dir # do this only in the first TestStep
 
-      deploy_operator
+      deploy_operator 'EndpointSlices=true'

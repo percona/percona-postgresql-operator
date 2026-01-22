@@ -38,6 +38,7 @@ create_namespace() {
 }
 
 deploy_operator() {
+	local feature_gates=$1
 	deploy_coredns
 
 	local cw_prefix=""
@@ -58,6 +59,13 @@ deploy_operator() {
 	yq eval '.spec.template.spec.containers[0].image = "'${IMAGE}'"' "${DEPLOY_DIR}/${cw_prefix}operator.yaml" \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "'${disable_telemetry}'"' - \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="LOG_LEVEL") | .value) = "DEBUG"' - \
+		| {
+			if [[ -n ${feature_gates:-} ]]; then
+				yq eval '.spec.template.spec.containers[0].env += [{"name":"PGO_FEATURE_GATES","value":"'"${feature_gates}"'"}]' -
+			else
+				cat
+			fi
+		} \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
@@ -1261,7 +1269,20 @@ check_envs_for_component() {
 }
 
 deploy_coredns() {
-	kubectl -n "kube-system" get deploy coredns && return
+	# Only the "upgrade-consistency" test needs CoreDNS to be installed.
+	# For all other tests, if CoreDNS was installed by this script earlier, uninstall it.
+	if [[ $test_name != "upgrade-consistency" ]]; then
+		kubectl -n kube-system get deploy coredns >/dev/null 2>&1 || {
+			return
+		}
+
+		helm uninstall coredns -n kube-system >/dev/null 2>&1 || true
+		kubectl scale deployment --replicas=2 kube-dns --namespace=kube-system
+		kubectl scale deployment --replicas=1 kube-dns-autoscaler --namespace=kube-system
+		return
+	fi
+
+	kubectl -n kube-system get deploy coredns && return
 
 	helm repo add coredns https://coredns.github.io/helm
 	helm install coredns coredns/coredns \
