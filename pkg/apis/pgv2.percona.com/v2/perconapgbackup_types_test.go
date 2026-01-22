@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestPITRestoreDateTime_MarshalJSON(t *testing.T) {
@@ -29,25 +30,25 @@ func TestPITRestoreDateTime_MarshalJSON(t *testing.T) {
 		},
 		"non-pointer zero date time": {
 			data: PITRestoreDateTime{
-				Time: ptr(metav1.NewTime(time.Time{})),
+				Time: ptr.To(metav1.NewTime(time.Time{})),
 			},
 			expected: `"0001-01-01 00:00:00.000000+0000"`,
 		},
 		"pointer zero date time": {
 			data: &PITRestoreDateTime{
-				Time: ptr(metav1.NewTime(time.Time{})),
+				Time: ptr.To(metav1.NewTime(time.Time{})),
 			},
 			expected: `"0001-01-01 00:00:00.000000+0000"`,
 		},
 		"non-pointer with date time": {
 			data: PITRestoreDateTime{
-				Time: ptr(metav1.NewTime(time.Date(2025, time.November, 21, 13, 14, 15, 345600000, time.UTC))),
+				Time: ptr.To(metav1.NewTime(time.Date(2025, time.November, 21, 13, 14, 15, 345600000, time.UTC))),
 			},
 			expected: `"2025-11-21 13:14:15.345600+0000"`,
 		},
 		"pointer with date time": {
 			data: &PITRestoreDateTime{
-				Time: ptr(metav1.NewTime(time.Date(2025, time.November, 21, 13, 14, 15, 345600000, time.UTC))),
+				Time: ptr.To(metav1.NewTime(time.Date(2025, time.November, 21, 13, 14, 15, 345600000, time.UTC))),
 			},
 			expected: `"2025-11-21 13:14:15.345600+0000"`,
 		},
@@ -62,8 +63,4 @@ func TestPITRestoreDateTime_MarshalJSON(t *testing.T) {
 			})
 		})
 	}
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }

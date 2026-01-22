@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
@@ -22,9 +23,9 @@ import (
 type snapshotExecutor interface {
 	// Prepare the cluster for performing a snapshot.
 	// Returns the name of the PVC that will be snapshotted.
-	prepare(ctx context.Context, pgCluster *v2.PerconaPGCluster) (string, error)
+	prepare(ctx context.Context) (string, error)
 	// Complete the snapshot.
-	complete(ctx context.Context, pgCluster *v2.PerconaPGCluster) error
+	complete(ctx context.Context) error
 }
 
 type snapshotReconciler struct {
@@ -51,10 +52,15 @@ func newSnapshotReconciler(
 	}
 }
 
-func newSnapshotExec(mode v2.VolumeSnapshotMode, cl client.Client) (snapshotExecutor, error) {
-	switch mode {
+func newSnapshotExec(
+	cl client.Client,
+	podExec runtime.PodExecutor,
+	cluster *v2.PerconaPGCluster,
+	backup *v2.PerconaPGBackup,
+) (snapshotExecutor, error) {
+	switch mode := cluster.Spec.Backups.VolumeSnapshots.Mode; mode {
 	case v2.VolumeSnapshotModeOffline:
-		return newOfflineExec(cl), nil
+		return newOfflineExec(cl, podExec, cluster, backup), nil
 	default:
 		return nil, fmt.Errorf("invalid or unsupported volume snapshot mode: %s", mode)
 	}
@@ -64,11 +70,12 @@ func newSnapshotExec(mode v2.VolumeSnapshotMode, cl client.Client) (snapshotExec
 func Reconcile(
 	ctx context.Context,
 	cl client.Client,
+	podExec runtime.PodExecutor,
 	pgBackup *v2.PerconaPGBackup,
 	pgCluster *v2.PerconaPGCluster,
 ) (reconcile.Result, error) {
 	if pgBackup == nil || pgCluster == nil {
-		return reconcile.Result{}, errors.New("pgBackup or pgCluster is nil")
+		return reconcile.Result{}, errors.New("pgBackup or pgCluster is nil or not found")
 	}
 
 	log := logging.FromContext(ctx).
@@ -92,7 +99,7 @@ func Reconcile(
 		return reconcile.Result{}, nil
 	}
 
-	exec, err := newSnapshotExec(pgCluster.Spec.Backups.VolumeSnapshots.Mode, cl)
+	exec, err := newSnapshotExec(cl, podExec, pgCluster, pgBackup)
 	if err != nil {
 		stsErr := fmt.Errorf("invalid or unsupported volume snapshot mode: %s", pgCluster.Spec.Backups.VolumeSnapshots.Mode)
 		if updErr := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
@@ -120,10 +127,8 @@ func (r *snapshotReconciler) reconcile(ctx context.Context) (reconcile.Result, e
 		return r.reconcileStarting(ctx)
 	case v2.BackupRunning:
 		return r.reconcileRunning(ctx)
-	case v2.BackupFailed:
+	case v2.BackupFailed, v2.BackupSucceeded:
 		return reconcile.Result{}, r.complete(ctx)
-	case v2.BackupSucceeded:
-		return reconcile.Result{}, nil
 	}
 	return reconcile.Result{}, nil
 }
@@ -195,7 +200,7 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 
 	// snapshot is complete and ready to be restored.
 	case ptr.Deref(volumeSnapshot.Status.ReadyToUse, false):
-		if err := r.exec.complete(ctx, r.cluster); err != nil {
+		if err := r.exec.complete(ctx); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to complete snapshot: %w", err)
 		}
 
@@ -244,7 +249,7 @@ func (r *snapshotReconciler) prepare(ctx context.Context) error {
 		return nil
 	}
 
-	pvcTarget, err := r.exec.prepare(ctx, r.cluster)
+	pvcTarget, err := r.exec.prepare(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to prepare for snapshot: %w", err)
 	}
@@ -269,7 +274,7 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 		return nil
 	}
 
-	if err := r.exec.complete(ctx, r.cluster); err != nil {
+	if err := r.exec.complete(ctx); err != nil {
 		return fmt.Errorf("complete failed: %w", err)
 	}
 

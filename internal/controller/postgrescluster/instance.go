@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -1266,24 +1265,6 @@ func (r *Reconciler) reconcileInstance(
 	return err
 }
 
-func getSuspendedInstances(cluster *v1beta1.PostgresCluster) []string {
-	annotations := cluster.GetAnnotations()[pNaming.ToCrunchyAnnotation(naming.SuspendedInstancesAnnotation)]
-	if annotations == "" {
-		return []string{}
-	}
-	return strings.Split(annotations, ",")
-}
-
-func isInstanceSuspended(cluster *v1beta1.PostgresCluster, instanceName string) bool {
-	fencedInstances := getSuspendedInstances(cluster)
-	for _, fencedInstance := range fencedInstances {
-		if instanceName != "" && fencedInstance == instanceName {
-			return true
-		}
-	}
-	return false
-}
-
 func generateInstanceStatefulSetIntent(_ context.Context,
 	cluster *v1beta1.PostgresCluster,
 	spec *v1beta1.PostgresInstanceSetSpec,
@@ -1386,12 +1367,6 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 		// - others are still running during shutdown, or
 		// - it is time to startup.
 		sts.Spec.Replicas = initialize.Int32(1)
-	}
-
-	// K8SPG-771
-	// TODO (mayanshah1607): perform checkpoint before scaling down, especially for primary.
-	if isInstanceSuspended(cluster, sts.GetName()) {
-		sts.Spec.Replicas = initialize.Int32(0)
 	}
 
 	// Restart containers any time they stop, die, are killed, etc.

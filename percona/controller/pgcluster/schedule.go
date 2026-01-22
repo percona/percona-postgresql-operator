@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
@@ -120,7 +121,7 @@ func (r *PGClusterReconciler) createScheduledBackup(log logr.Logger, backupName,
 		},
 		Spec: v2.PerconaPGBackupSpec{
 			PGCluster: cr.Name,
-			RepoName:  repoName,
+			RepoName:  ptr.To(repoName),
 			Options:   []string{"--type=" + backupType},
 		},
 	}

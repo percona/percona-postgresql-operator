@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -39,6 +40,11 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 	log := logging.FromContext(ctx).WithName("WALWatcher")
 
 	if !cr.Spec.Backups.IsEnabled() {
+		return
+	}
+
+	// TODO: add support
+	if cr.Spec.Backups.VolumeSnapshots != nil && cr.Spec.Backups.VolumeSnapshots.Enabled {
 		return
 	}
 
@@ -213,7 +219,7 @@ func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv2.Pe
 		return time.Time{}, errors.Wrap(PrimaryPodNotFound, err.Error())
 	}
 
-	pgbackrestInfo, err := pgbackrest.GetInfo(ctx, primary, backup.Spec.RepoName)
+	pgbackrestInfo, err := pgbackrest.GetInfo(ctx, primary, ptr.Deref(backup.Spec.RepoName, ""))
 	if err != nil {
 		return time.Time{}, errors.Wrap(err, "get pgbackrest info")
 	}

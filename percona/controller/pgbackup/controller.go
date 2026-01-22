@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -24,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
@@ -45,13 +47,21 @@ var ErrBackupJobNotFound = errors.New("backup Job not found")
 
 // Reconciler holds resources for the PerconaPGBackup reconciler
 type PGBackupReconciler struct {
-	Client client.Client
+	Client  client.Client
+	PodExec runtime.PodExecutor
 
 	ExternalChan chan event.GenericEvent
 }
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
 func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
+	if r.PodExec == nil {
+		var err error
+		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
+		if err != nil {
+			return err
+		}
+	}
 	return (builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGBackup{}).
 		WatchesRawSource(source.Channel(r.ExternalChan, &handler.EnqueueRequestForObject{})).
@@ -91,8 +101,8 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		pgCluster = nil
 	}
 
-	if pgBackup.Spec.Method == v2.BackupMethodVolumeSnapshot {
-		return snapshots.Reconcile(ctx, r.Client, pgBackup, pgCluster)
+	if *pgBackup.Spec.Method == v2.BackupMethodVolumeSnapshot {
+		return snapshots.Reconcile(ctx, r.Client, r.PodExec, pgBackup, pgCluster)
 	}
 
 	if !pgBackup.DeletionTimestamp.IsZero() || pgBackup.Status.State == v2.BackupFailed {
@@ -418,7 +428,7 @@ func getBackupInProgress(ctx context.Context, c client.Client, clusterName, ns s
 }
 
 func getRepo(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) *v1beta1.PGBackRestRepo {
-	repoName := pb.Spec.RepoName
+	repoName := ptr.Deref(pb.Spec.RepoName, "")
 	for i, r := range pg.Spec.Backups.PGBackRest.Repos {
 		if repoName == r.Name {
 			return &pg.Spec.Backups.PGBackRest.Repos[i]
@@ -451,7 +461,7 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 }
 
 func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod, pgBackup *v2.PerconaPGBackup) error {
-	info, err := pgbackrest.GetInfo(ctx, pod, pgBackup.Spec.RepoName)
+	info, err := pgbackrest.GetInfo(ctx, pod, ptr.Deref(pgBackup.Spec.RepoName, ""))
 	if err != nil {
 		return errors.Wrap(err, "get pgBackRest info")
 	}
@@ -488,7 +498,7 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 				}
 			}
 
-			if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, pgBackup.Spec.RepoName, map[string]string{
+			if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, ptr.Deref(pgBackup.Spec.RepoName, ""), map[string]string{
 				v2.PGBackrestAnnotationJobName: pgBackup.Status.JobName,
 			}); err != nil {
 				return errors.Wrap(err, "set annotations to backup")
@@ -643,7 +653,7 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 			pg.Spec.Backups.PGBackRest.Manual = new(v1beta1.PGBackRestManualBackup)
 		}
 
-		pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
+		pg.Spec.Backups.PGBackRest.Manual.RepoName = ptr.Deref(pb.Spec.RepoName, "")
 		pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options
 
 		return c.Update(ctx, pg)
@@ -671,7 +681,7 @@ func findBackupJob(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup)
 	err := c.List(ctx, jobList,
 		client.InNamespace(pb.Namespace),
 		client.MatchingLabelsSelector{
-			Selector: naming.PGBackRestBackupJobSelector(pb.Spec.PGCluster, pb.Spec.RepoName, naming.BackupManual),
+			Selector: naming.PGBackRestBackupJobSelector(pb.Spec.PGCluster, ptr.Deref(pb.Spec.RepoName, ""), naming.BackupManual),
 		})
 	if err != nil {
 		return nil, errors.Wrap(err, "get backup jobs")

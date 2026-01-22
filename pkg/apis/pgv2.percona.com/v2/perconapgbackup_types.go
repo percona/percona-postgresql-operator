@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -38,6 +39,7 @@ type PerconaPGBackup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
+	// +kubebuilder:validation:XValidation:rule="self.method == \"volumeSnapshot\" || has(self.repoName)",message="repoName is required when method is 'pgbackrest'"
 	Spec   PerconaPGBackupSpec   `json:"spec"`
 	Status PerconaPGBackupStatus `json:"status,omitempty"`
 }
@@ -57,19 +59,20 @@ const (
 	BackupMethodVolumeSnapshot BackupMethod = "volumeSnapshot"
 )
 
-// +kubebuilder:validation:XValidation:rule="(self.method == \"\" || self.method == \"pgbackrest\") && self.repoName == \"\"",message="repoName is required when method is 'pgbackrest'"
 type PerconaPGBackupSpec struct {
 	PGCluster string `json:"pgCluster"`
 
+	// +optional
 	// The name of the pgBackRest repo to run the backup command against.
+	// This is required when method is 'pgbackrest'.
 	// +kubebuilder:validation:Pattern=^repo[1-4]
-	RepoName string `json:"repoName"`
+	RepoName *string `json:"repoName,omitempty"`
 
 	// Method with which to perform the backup
 	// +kubebuilder:validation:Enum={pgbackrest,volumeSnapshot}
 	// +kubebuilder:default=pgbackrest
 	// +optional
-	Method BackupMethod `json:"method"`
+	Method *BackupMethod `json:"method,omitempty"`
 
 	// Command line options to include when running the pgBackRest backup command.
 	// https://pgbackrest.org/command.html#command-backup
@@ -192,7 +195,13 @@ const (
 )
 
 func (b *PerconaPGBackup) Default() {
-	b.Spec.Options = append(b.Spec.Options, fmt.Sprintf(`--annotation="%s"="%s"`, PGBackrestAnnotationBackupName, b.Name))
+	if b.Spec.Method == nil {
+		b.Spec.Method = ptr.To(BackupMethodPGBackrest)
+	}
+
+	if b.Spec.Method == ptr.To(BackupMethodPGBackrest) {
+		b.Spec.Options = append(b.Spec.Options, fmt.Sprintf(`--annotation="%s"="%s"`, PGBackrestAnnotationBackupName, b.Name))
+	}
 }
 
 func (b *PerconaPGBackup) CompareVersion(ver string) int {

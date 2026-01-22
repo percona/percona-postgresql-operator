@@ -20,7 +20,7 @@ import (
 
 // podExecutor runs command on container in pod in namespace. Non-nil streams
 // (stdin, stdout, and stderr) are attached the to the remote process.
-type podExecutor func(
+type PodExecutor func(
 	ctx context.Context, namespace, pod, container string,
 	stdin io.Reader, stdout, stderr io.Writer, command ...string,
 ) error
@@ -37,7 +37,7 @@ func newPodClient(config *rest.Config) (rest.Interface, error) {
 
 // +kubebuilder:rbac:groups="",resources="pods/exec",verbs={create}
 
-func NewPodExecutor(config *rest.Config) (podExecutor, error) {
+func NewPodExecutor(config *rest.Config) (PodExecutor, error) {
 	// Create a copy of the config to avoid modifying the original
 	configCopy := rest.CopyConfig(config)
 

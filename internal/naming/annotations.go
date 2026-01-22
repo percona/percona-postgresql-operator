@@ -81,10 +81,4 @@ const (
 	// is present, the controller will not update the ConfigMap, allowing users to make custom
 	// modifications that won't be overwritten during reconciliation.
 	OverrideConfigAnnotation = perconaAnnotationPrefix + "override-config"
-
-	// K8SPG-771
-	// SuspendedInstancesAnnotation is an annotation set on the PerconaPGCluster to suspend one or more instances.
-	// The instance names represent the names of the StatefulSets.
-	// Example: "pgv2.percona.com/suspended-instances=cluster1-abc,cluster2-xyz"
-	SuspendedInstancesAnnotation = perconaAnnotationPrefix + "suspended-instances"
 )
