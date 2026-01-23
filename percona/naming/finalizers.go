@@ -7,11 +7,6 @@ const (
 	FinalizerStopWatchers  = PrefixPerconaInternal + "stop-watchers" //nolint:gosec
 	FinalizerDeleteBackups = PrefixPercona + "delete-backups"
 
-	// FinalizerCompleteSnapshot is set on PerconaPGBackup objects.
-	// It ensures that any changes made to the PGCluster are reverted upon
-	// snapshot completion (success or failure) or pre-mature deletion of the PGBackup.
-	FinalizerCompleteSnapshot = PrefixPercona + "complete-snapshot"
-
 	FinalizerStopWatchersDeprecated = PrefixPercona + "stop-watchers" //nolint:gosec
 )
 
@@ -23,6 +18,11 @@ const (
 // PerconaPGBackup finalizers
 const (
 	FinalizerDeleteBackup = PrefixPerconaInternal + "delete-backup" //nolint:gosec
+
+	// FinalizerSnapshotInProgress is set on PerconaPGBackup objects.
+	// It ensures that any changes made to the PGCluster are reverted upon
+	// snapshot completion (success or failure) or pre-mature deletion of the PGBackup.
+	FinalizerSnapshotInProgress = PrefixPercona + "snapshot-in-progress" //nolint:gosec
 )
 
 // PerconaPGBackup job finalizers

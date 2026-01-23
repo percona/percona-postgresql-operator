@@ -246,7 +246,7 @@ func (r *snapshotReconciler) ensureSnapshot(ctx context.Context, volumeSnapshot 
 
 func (r *snapshotReconciler) prepare(ctx context.Context) error {
 	// finalizer already present, prepare already completed
-	if controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot) {
+	if controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerSnapshotInProgress) {
 		return nil
 	}
 
@@ -273,7 +273,7 @@ func (r *snapshotReconciler) prepare(ctx context.Context) error {
 			return err
 		}
 		orig := bcp.DeepCopy()
-		controllerutil.AddFinalizer(bcp, pNaming.FinalizerCompleteSnapshot)
+		controllerutil.AddFinalizer(bcp, pNaming.FinalizerSnapshotInProgress)
 		return r.cl.Patch(ctx, bcp, client.MergeFrom(orig))
 	}); err != nil {
 		return fmt.Errorf("failed to add backup finalizer: %w", err)
@@ -284,7 +284,7 @@ func (r *snapshotReconciler) prepare(ctx context.Context) error {
 
 func (r *snapshotReconciler) complete(ctx context.Context) error {
 	// already finalized
-	if !controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot) {
+	if !controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerSnapshotInProgress) {
 		return nil
 	}
 
@@ -300,7 +300,7 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 			return err
 		}
 		orig := bcp.DeepCopy()
-		controllerutil.RemoveFinalizer(bcp, pNaming.FinalizerCompleteSnapshot)
+		controllerutil.RemoveFinalizer(bcp, pNaming.FinalizerSnapshotInProgress)
 		return r.cl.Patch(ctx, bcp, client.MergeFrom(orig))
 	}); err != nil {
 		return fmt.Errorf("failed to add remove finalizer: %w", err)
