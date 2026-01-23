@@ -168,10 +168,10 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 	}
 
 	for _, pvc := range clusterPVCs {
-		if ok, err := r.replacePVC(ctx, &pvc, volumeSnapshotName); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "replace PVC")
+		if ok, err := r.restorePVCFromSnapshot(ctx, &pvc, volumeSnapshotName); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "restore PVC from snapshot")
 		} else if !ok {
-			r.log.Info("Waiting for PVC to be replaced", "pvc", pvc.GetName())
+			r.log.Info("Waiting for PVC to restored", "pvc", pvc.GetName())
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 	}
@@ -200,18 +200,19 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 // listPVCs returns the list of PostgreSQL data PVCs that need to be restored.
 //
 // Instead of listing existing PVCs directly, this function derives the PVC names
-// from the cluster's StatefulSets. This approach is necessary because during restore,
-// PVCs are deleted and recreated from snapshots. Listing live PVCs would miss PVCs that are
-// currently being deleted or recreated.
+// from the cluster instance statefulsets. This is necessary because during restore,
+// PVCs are deleted and recreated. Listing live PVCs would miss PVCs that are
+// currently being recreated and lead to an inconsistent state.
 //
-// The function returns PVC objects with only metadata populated (name and namespace),
-// which is sufficient for tracking which PVCs need to be replaced.
+// The function returns PVC objects with only metadata populated,
+// which is sufficient for getting the job done.
 func (r *snapshotRestorer) listPVCs(ctx context.Context) ([]corev1.PersistentVolumeClaim, error) {
 	instances := &appsv1.StatefulSetList{}
 	if err := r.cl.List(ctx, instances, &client.ListOptions{
-		Namespace: r.cluster.Namespace,
+		Namespace: r.cluster.GetNamespace(),
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			naming.LabelCluster: r.cluster.Name,
+			naming.LabelData:    naming.DataPostgres,
 		}),
 	}); err != nil {
 		return nil, errors.Wrap(err, "list instances")
@@ -219,8 +220,12 @@ func (r *snapshotRestorer) listPVCs(ctx context.Context) ([]corev1.PersistentVol
 
 	result := []corev1.PersistentVolumeClaim{}
 	for _, instance := range instances.Items {
+		objectMeta := naming.InstancePostgresDataVolume(&instance)
+		objectMeta.SetLabels(map[string]string{
+			naming.LabelInstanceSet: instance.Labels[naming.LabelInstanceSet], // needed for createPVCFromSnapshot
+		})
 		result = append(result, corev1.PersistentVolumeClaim{
-			ObjectMeta: naming.InstancePostgresDataVolume(&instance),
+			ObjectMeta: objectMeta,
 		})
 	}
 
@@ -231,7 +236,7 @@ func (r *snapshotRestorer) listPVCs(ctx context.Context) ([]corev1.PersistentVol
 	return result, nil
 }
 
-func (r *snapshotRestorer) replacePVC(
+func (r *snapshotRestorer) restorePVCFromSnapshot(
 	ctx context.Context,
 	pvc *corev1.PersistentVolumeClaim,
 	snapshotName string,
@@ -251,7 +256,7 @@ func (r *snapshotRestorer) replacePVC(
 
 	// Check if the PVC is already using the snapshot
 	if dataSource := observedPVC.Spec.DataSource; dataSource != nil {
-		if dataSource.Kind == "VolumeSnapshot" &&
+		if dataSource.Kind == pNaming.KindVolumeSnapshot &&
 			ptr.Deref(dataSource.APIGroup, "") == volumesnapshotv1.GroupName &&
 			dataSource.Name == snapshotName {
 			return true, nil
@@ -287,7 +292,7 @@ func (r *snapshotRestorer) createPVCFromSnapshot(ctx context.Context, pvc *corev
 	}
 	volumeClaimSpec.DataSource = &corev1.TypedLocalObjectReference{
 		APIGroup: ptr.To(volumesnapshotv1.GroupName),
-		Kind:     "VolumeSnapshot",
+		Kind:     pNaming.KindVolumeSnapshot,
 		Name:     snapshotName,
 	}
 	newPVC := &corev1.PersistentVolumeClaim{

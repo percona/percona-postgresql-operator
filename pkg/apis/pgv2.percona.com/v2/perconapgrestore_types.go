@@ -29,7 +29,7 @@ type PerconaPGRestore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	// +kubebuilder:validation:XValidation:rule="has(self.repoName) || self.volumeSnapshotName != \"\"",message="either repoName or volumeSnapshotName must be set"
+	// +kubebuilder:validation:XValidation:rule="has(self.repoName) || self.repoName != \"\" || self.volumeSnapshotName != \"\"",message="either repoName or volumeSnapshotName must be set"
 	Spec   PerconaPGRestoreSpec   `json:"spec"`
 	Status PerconaPGRestoreStatus `json:"status,omitempty"`
 }
@@ -45,16 +45,19 @@ type PerconaPGRestoreList struct {
 type PerconaPGRestoreSpec struct {
 	// The name of the PerconaPGCluster to perform restore.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="pgCluster is an immutable field"
 	PGCluster string `json:"pgCluster"`
 
 	// The name of the pgBackRest repo within the source PostgresCluster that contains the backups
 	// that should be utilized to perform a pgBackRest restore when initializing the data source
 	// for the new PostgresCluster.
 	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="repoName is an immutable field"
 	RepoName *string `json:"repoName,omitempty"`
 
 	// The name of the VolumeSnapshot to perform restore from.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="volumeSnapshotName is an immutable field"
 	VolumeSnapshotName string `json:"volumeSnapshotName,omitempty"`
 
 	// Command line options to include when running the pgBackRest restore command.
