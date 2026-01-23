@@ -295,7 +295,7 @@ func (r *snapshotRestorer) replacePVC(
 	return false, nil
 }
 
-func (r snapshotRestorer) createPVCWithSnapshot(ctx context.Context, pvc *corev1.PersistentVolumeClaim, snapshotName string) error {
+func (r *snapshotRestorer) createPVCWithSnapshot(ctx context.Context, pvc *corev1.PersistentVolumeClaim, snapshotName string) error {
 	instanceName := pvc.GetLabels()[naming.LabelInstanceSet]
 	if instanceName == "" {
 		return errors.New("instance not known for PVC")
