@@ -1,7 +1,12 @@
 package v2
 
 import (
+	"context"
+
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
@@ -24,6 +29,7 @@ type PerconaPGRestore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
+	// +kubebuilder:validation:XValidation:rule="has(self.repoName) || self.volumeSnapshotName != \"\"",message="either repoName or volumeSnapshotName must be set"
 	Spec   PerconaPGRestoreSpec   `json:"spec"`
 	Status PerconaPGRestoreStatus `json:"status,omitempty"`
 }
@@ -44,9 +50,12 @@ type PerconaPGRestoreSpec struct {
 	// The name of the pgBackRest repo within the source PostgresCluster that contains the backups
 	// that should be utilized to perform a pgBackRest restore when initializing the data source
 	// for the new PostgresCluster.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
-	RepoName string `json:"repoName"`
+	RepoName *string `json:"repoName,omitempty"`
+
+	// The name of the VolumeSnapshot to perform restore from.
+	// +optional
+	VolumeSnapshotName string `json:"volumeSnapshotName,omitempty"`
 
 	// Command line options to include when running the pgBackRest restore command.
 	// https://pgbackrest.org/command.html#command-restore
@@ -68,4 +77,21 @@ type PerconaPGRestoreStatus struct {
 	JobName     string         `json:"jobName,omitempty"`
 	State       PGRestoreState `json:"state,omitempty"`
 	CompletedAt *metav1.Time   `json:"completed,omitempty"`
+}
+
+func (r *PerconaPGRestore) IsCompleted() bool {
+	return r.Status.State == RestoreSucceeded || r.Status.State == RestoreFailed
+}
+
+func (pgRestore *PerconaPGRestore) UpdateStatus(ctx context.Context, cl client.Client, updateFunc func(restore *PerconaPGRestore)) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		restore := new(PerconaPGRestore)
+		if err := cl.Get(ctx, client.ObjectKeyFromObject(pgRestore), restore); err != nil {
+			return errors.Wrap(err, "get PGRestore")
+		}
+
+		updateFunc(restore)
+
+		return cl.Status().Update(ctx, restore)
+	})
 }

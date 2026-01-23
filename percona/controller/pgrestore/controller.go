@@ -10,6 +10,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -19,6 +20,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/snapshot"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -62,6 +64,17 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	pgCluster := &v2.PerconaPGCluster{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: pgRestore.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+	}
+
+	if pgRestore.Spec.VolumeSnapshotName != "" {
+		// Delegate to snapshot restore reconciliation
+		return snapshot.Reconcile(ctx, r.Client, pgCluster, pgRestore)
+	}
+
 	if pgRestore.DeletionTimestamp != nil {
 		if err := runFinalizers(ctx, r.Client, pgRestore); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
@@ -71,12 +84,6 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if pgRestore.Status.State == v2.RestoreSucceeded || pgRestore.Status.State == v2.RestoreFailed {
 		return reconcile.Result{}, nil
-	}
-
-	pgCluster := &v2.PerconaPGCluster{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: pgRestore.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
 	switch pgRestore.Status.State {
@@ -228,7 +235,7 @@ func startRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster,
 
 	tvar := true
 	pg.Spec.Backups.PGBackRest.Restore.Enabled = &tvar
-	pg.Spec.Backups.PGBackRest.Restore.RepoName = pr.Spec.RepoName
+	pg.Spec.Backups.PGBackRest.Restore.RepoName = ptr.Deref(pr.Spec.RepoName, "")
 	pg.Spec.Backups.PGBackRest.Restore.Options = pr.Spec.Options
 
 	if err := c.Patch(ctx, pg, client.MergeFrom(orig)); err != nil {

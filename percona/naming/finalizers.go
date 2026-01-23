@@ -27,5 +27,6 @@ const (
 
 // PerconaPGBackup job finalizers
 const (
-	FinalizerKeepJob = PrefixPerconaInternal + "keep-job" //nolint:gosec
+	FinalizerKeepJob         = PrefixPerconaInternal + "keep-job"         //nolint:gosec
+	FinalizerSnapshotRestore = PrefixPerconaInternal + "snapshot-restore" //nolint:gosec
 )

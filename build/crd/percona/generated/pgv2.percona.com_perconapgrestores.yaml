@@ -74,10 +74,15 @@ spec:
                   for the new PostgresCluster.
                 pattern: ^repo[1-4]
                 type: string
+              volumeSnapshotName:
+                description: The name of the VolumeSnapshot to perform restore from.
+                type: string
             required:
             - pgCluster
-            - repoName
             type: object
+            x-kubernetes-validations:
+            - message: either repoName or volumeSnapshotName must be set
+              rule: has(self.repoName) || self.volumeSnapshotName != ""
           status:
             properties:
               completed:
