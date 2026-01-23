@@ -500,7 +500,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 		// Create instance set and volumes for reconcile
 		sts := &appsv1.StatefulSet{}
-		generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1)
+		generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1, false)
 		clusterVolumes := []corev1.PersistentVolumeClaim{}
 
 		// Reconcile
@@ -597,7 +597,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 		// Create instance set and volumes for reconcile
 		sts := &appsv1.StatefulSet{}
-		generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1)
+		generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1, false)
 		clusterVolumes := []corev1.PersistentVolumeClaim{}
 
 		// Reconcile
@@ -696,7 +696,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 		// Setup instances and volumes for reconcile
 		sts := &appsv1.StatefulSet{}
-		generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1)
+		generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1, false)
 		clusterVolumes := []corev1.PersistentVolumeClaim{}
 
 		// Reconcile
@@ -764,7 +764,7 @@ func TestDedicatedSnapshotVolumeRestore(t *testing.T) {
 	}
 
 	sts := &appsv1.StatefulSet{}
-	generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1)
+	generateInstanceStatefulSetIntent(ctx, cluster, &cluster.Spec.InstanceSets[0], "pod-service", "service-account", sts, 1, false)
 	currentTime := metav1.Now()
 	backupJob := testBackupJob(cluster, "backup-job-dedicated-snapshot-exists-1")
 	backupJob.Status.CompletionTime = &currentTime

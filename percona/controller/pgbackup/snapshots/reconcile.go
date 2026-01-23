@@ -8,6 +8,7 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -25,7 +26,7 @@ type snapshotExecutor interface {
 	// Returns the name of the PVC that will be snapshotted.
 	prepare(ctx context.Context) (string, error)
 	// Complete the snapshot.
-	complete(ctx context.Context) error
+	finalize(ctx context.Context) error
 }
 
 type snapshotReconciler struct {
@@ -54,13 +55,12 @@ func newSnapshotReconciler(
 
 func newSnapshotExec(
 	cl client.Client,
-	podExec runtime.PodExecutor,
 	cluster *v2.PerconaPGCluster,
 	backup *v2.PerconaPGBackup,
 ) (snapshotExecutor, error) {
 	switch mode := cluster.Spec.Backups.VolumeSnapshots.Mode; mode {
 	case v2.VolumeSnapshotModeOffline:
-		return newOfflineExec(cl, podExec, cluster, backup), nil
+		return newOfflineExec(cl, cluster, backup), nil
 	default:
 		return nil, fmt.Errorf("invalid or unsupported volume snapshot mode: %s", mode)
 	}
@@ -99,7 +99,7 @@ func Reconcile(
 		return reconcile.Result{}, nil
 	}
 
-	exec, err := newSnapshotExec(cl, podExec, pgCluster, pgBackup)
+	exec, err := newSnapshotExec(cl, pgCluster, pgBackup)
 	if err != nil {
 		stsErr := fmt.Errorf("invalid or unsupported volume snapshot mode: %s", pgCluster.Spec.Backups.VolumeSnapshots.Mode)
 		if updErr := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
@@ -200,7 +200,7 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 
 	// snapshot is complete and ready to be restored.
 	case ptr.Deref(volumeSnapshot.Status.ReadyToUse, false):
-		if err := r.exec.complete(ctx); err != nil {
+		if err := r.exec.finalize(ctx); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to complete snapshot: %w", err)
 		}
 
@@ -245,14 +245,18 @@ func (r *snapshotReconciler) ensureSnapshot(ctx context.Context, volumeSnapshot 
 }
 
 func (r *snapshotReconciler) prepare(ctx context.Context) error {
+	// finalizer already present, prepare already completed
 	if controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot) {
 		return nil
 	}
 
+	// prepare the cluster
 	pvcTarget, err := r.exec.prepare(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to prepare for snapshot: %w", err)
 	}
+
+	// update snapshot status
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		if bcp.Status.Snapshot == nil {
 			bcp.Status.Snapshot = &v2.SnapshotStatus{}
@@ -261,26 +265,45 @@ func (r *snapshotReconciler) prepare(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("failed to update backup status: %w", err)
 	}
-	controllerutil.AddFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot)
-	if err := r.cl.Update(ctx, r.backup); err != nil {
-		return fmt.Errorf("failed to update backup: %w", err)
+
+	// add finalizer
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		bcp := r.backup.DeepCopy()
+		if err := r.cl.Get(ctx, client.ObjectKeyFromObject(bcp), bcp); err != nil {
+			return err
+		}
+		orig := bcp.DeepCopy()
+		controllerutil.AddFinalizer(bcp, pNaming.FinalizerCompleteSnapshot)
+		return r.cl.Patch(ctx, bcp, client.MergeFrom(orig))
+	}); err != nil {
+		return fmt.Errorf("failed to add backup finalizer: %w", err)
 	}
 	r.log.Info("Prepared for snapshot")
 	return nil
 }
 
 func (r *snapshotReconciler) complete(ctx context.Context) error {
+	// already finalized
 	if !controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot) {
 		return nil
 	}
 
-	if err := r.exec.complete(ctx); err != nil {
-		return fmt.Errorf("complete failed: %w", err)
+	// run finalize
+	if err := r.exec.finalize(ctx); err != nil {
+		return fmt.Errorf("finalize failed: %w", err)
 	}
 
-	controllerutil.RemoveFinalizer(r.backup, pNaming.FinalizerCompleteSnapshot)
-	if err := r.cl.Update(ctx, r.backup); err != nil {
-		return fmt.Errorf("failed to update backup: %w", err)
+	// remove finalizer
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		bcp := r.backup.DeepCopy()
+		if err := r.cl.Get(ctx, client.ObjectKeyFromObject(bcp), bcp); err != nil {
+			return err
+		}
+		orig := bcp.DeepCopy()
+		controllerutil.RemoveFinalizer(bcp, pNaming.FinalizerCompleteSnapshot)
+		return r.cl.Patch(ctx, bcp, client.MergeFrom(orig))
+	}); err != nil {
+		return fmt.Errorf("failed to add remove finalizer: %w", err)
 	}
 	return nil
 }
