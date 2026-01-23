@@ -89,7 +89,7 @@ func Reconcile(
 	}
 
 	// Check if volume snapshots are enabled for this cluster.
-	if pgCluster.Spec.Backups.VolumeSnapshots == nil || !pgCluster.Spec.Backups.VolumeSnapshots.Enabled {
+	if !pgCluster.Spec.Backups.IsVolumeSnapshotsEnabled() {
 		if updErr := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = "Volume snapshots are not enabled for this cluster"

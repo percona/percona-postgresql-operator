@@ -7842,8 +7842,6 @@ spec:
                       className:
                         description: Name of the VolumeSnapshotClass to use.
                         type: string
-                      enabled:
-                        type: boolean
                       mode:
                         default: offline
                         description: Mode of the VolumeSnapshot.

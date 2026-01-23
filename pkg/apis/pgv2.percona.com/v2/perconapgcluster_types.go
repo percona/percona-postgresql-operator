@@ -507,8 +507,6 @@ const (
 )
 
 type VolumeSnapshots struct {
-	Enabled bool `json:"enabled,omitempty"`
-
 	// Mode of the VolumeSnapshot.
 	// +kubebuilder:validation:Enum={offline}
 	// +kubebuilder:default=offline
@@ -518,6 +516,10 @@ type VolumeSnapshots struct {
 	// Name of the VolumeSnapshotClass to use.
 	// +kubebuilder:validation:Required
 	ClassName string `json:"className"`
+}
+
+func (b Backups) IsVolumeSnapshotsEnabled() bool {
+	return b.VolumeSnapshots != nil && b.VolumeSnapshots.ClassName != ""
 }
 
 func (b Backups) IsEnabled() bool {

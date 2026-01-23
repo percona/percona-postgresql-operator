@@ -44,7 +44,7 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 	}
 
 	// TODO: add support
-	if cr.Spec.Backups.VolumeSnapshots != nil && cr.Spec.Backups.VolumeSnapshots.Enabled {
+	if cr.Spec.Backups.IsVolumeSnapshotsEnabled() {
 		return
 	}
 
