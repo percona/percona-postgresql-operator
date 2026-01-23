@@ -3,10 +3,13 @@ package snapshot
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
@@ -165,7 +167,7 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 		return reconcile.Result{}, errors.Wrap(err, "list PVCs")
 	}
 
-	for _, pvc := range clusterPVCs.Items {
+	for _, pvc := range clusterPVCs {
 		if ok, err := r.replacePVC(ctx, &pvc, volumeSnapshotName); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "replace PVC")
 		} else if !ok {
@@ -195,65 +197,38 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 	return reconcile.Result{}, nil
 }
 
-func (r *snapshotRestorer) pvcStateConfigMapName(restoreName string) metav1.ObjectMeta {
-	return metav1.ObjectMeta{
+// listPVCs returns the list of PostgreSQL data PVCs that need to be restored.
+//
+// Instead of listing existing PVCs directly, this function derives the PVC names
+// from the cluster's StatefulSets. This approach is necessary because during restore,
+// PVCs are deleted and recreated from snapshots. Listing live PVCs would miss PVCs that are
+// currently being deleted or recreated.
+//
+// The function returns PVC objects with only metadata populated (name and namespace),
+// which is sufficient for tracking which PVCs need to be replaced.
+func (r *snapshotRestorer) listPVCs(ctx context.Context) ([]corev1.PersistentVolumeClaim, error) {
+	instances := &appsv1.StatefulSetList{}
+	if err := r.cl.List(ctx, instances, &client.ListOptions{
 		Namespace: r.cluster.Namespace,
-		Name:      fmt.Sprintf("pvc-state-%s-%s", r.cluster.Name, restoreName),
-	}
-}
-
-// listPVCs retrieves the list of PVCs that need to be restored from snapshots.
-//
-// This function maintains a ConfigMap that stores the PVC specifications before
-// they are deleted and recreated. This serves two critical purposes:
-//
-//  1. If the operator restarts during a restore operation, the
-//     ConfigMap preserves the list of PVCs that still need to be processed,
-//     allowing the restore to continue seamlessly.
-//  2. During restore, PVCs are deleted and recreated from
-//     snapshots. Once deleted, the original PVC specifications are lost. By storing
-//     the state externally, the operator can identidy which PVCs need to be tracked.
-func (r *snapshotRestorer) listPVCs(
-	ctx context.Context,
-) (*corev1.PersistentVolumeClaimList, error) {
-	cm := &corev1.ConfigMap{
-		ObjectMeta: r.pvcStateConfigMapName(r.restore.Name),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelCluster: r.cluster.Name,
+		}),
+	}); err != nil {
+		return nil, errors.Wrap(err, "list instances")
 	}
 
-	result := &corev1.PersistentVolumeClaimList{}
-
-	cmKey := "pvcs.yaml"
-	err := r.cl.Get(ctx, client.ObjectKeyFromObject(cm), cm)
-
-	switch {
-	// ConfigMap was found.
-	case err == nil:
-		data := cm.Data[cmKey]
-		if err := yaml.Unmarshal([]byte(data), result); err != nil {
-			return nil, errors.Wrap(err, "unmarshal PVC state")
-		}
-		return result, nil
-
-	// ConfigMap was not found, list the PVCs and create the ConfigMap.
-	case k8serrors.IsNotFound(err):
-		if err := r.cl.List(ctx, result, &client.ListOptions{
-			Namespace: r.cluster.GetNamespace(),
-			LabelSelector: labels.SelectorFromSet(map[string]string{
-				naming.LabelCluster: r.cluster.GetName(),
-				naming.LabelRole:    naming.RolePostgresData,
-			}),
-		}); err != nil {
-			return nil, errors.Wrap(err, "list instance PVCs")
-		}
-		data, err := yaml.Marshal(result)
-		if err != nil {
-			return nil, errors.Wrap(err, "marshal PVC state")
-		}
-		cm.Data = map[string]string{cmKey: string(data)}
-		// TODO: add a finalizer on this configmap?
-		return result, r.cl.Create(ctx, cm)
+	result := []corev1.PersistentVolumeClaim{}
+	for _, instance := range instances.Items {
+		result = append(result, corev1.PersistentVolumeClaim{
+			ObjectMeta: naming.InstancePostgresDataVolume(&instance),
+		})
 	}
-	return nil, err
+
+	// sort to ensure consistent ordering
+	slices.SortStableFunc(result, func(a, b corev1.PersistentVolumeClaim) int {
+		return strings.Compare(a.GetName(), b.GetName())
+	})
+	return result, nil
 }
 
 func (r *snapshotRestorer) replacePVC(
@@ -266,7 +241,7 @@ func (r *snapshotRestorer) replacePVC(
 
 	if k8serrors.IsNotFound(err) {
 		// PVC doesn't exist, create it from the snapshot
-		if err := r.createPVCWithSnapshot(ctx, pvc, snapshotName); err != nil {
+		if err := r.createPVCFromSnapshot(ctx, pvc, snapshotName); err != nil {
 			return false, errors.Wrap(err, "create PVC with snapshot")
 		}
 		return false, nil
@@ -295,7 +270,7 @@ func (r *snapshotRestorer) replacePVC(
 	return false, nil
 }
 
-func (r *snapshotRestorer) createPVCWithSnapshot(ctx context.Context, pvc *corev1.PersistentVolumeClaim, snapshotName string) error {
+func (r *snapshotRestorer) createPVCFromSnapshot(ctx context.Context, pvc *corev1.PersistentVolumeClaim, snapshotName string) error {
 	instanceName := pvc.GetLabels()[naming.LabelInstanceSet]
 	if instanceName == "" {
 		return errors.New("instance not known for PVC")
@@ -316,11 +291,8 @@ func (r *snapshotRestorer) createPVCWithSnapshot(ctx context.Context, pvc *corev
 		Name:     snapshotName,
 	}
 	newPVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvc.GetName(),
-			Namespace: pvc.GetNamespace(),
-		},
-		Spec: *volumeClaimSpec,
+		ObjectMeta: pvc.ObjectMeta,
+		Spec:       *volumeClaimSpec,
 	}
 	return r.cl.Create(ctx, newPVC)
 }
@@ -405,19 +377,11 @@ func (r *snapshotRestorer) runFinalizers(ctx context.Context) (bool, error) {
 	return finished, nil
 }
 
-func (r *snapshotRestorer) finalizeSnapshotRestore(c client.Client, _ *v2.PerconaPGRestore) func(ctx context.Context, restore *v2.PerconaPGRestore) error {
+func (r *snapshotRestorer) finalizeSnapshotRestore(_ client.Client, _ *v2.PerconaPGRestore) func(ctx context.Context, restore *v2.PerconaPGRestore) error {
 	return func(ctx context.Context, restore *v2.PerconaPGRestore) error {
 		// Resume the cluster if it was paused during restore
 		if _, err := r.resumeCluster(ctx); err != nil {
 			return errors.Wrap(err, "resume cluster")
-		}
-
-		// Always clean up the PVC state ConfigMap regardless of restore success or failure
-		cm := &corev1.ConfigMap{
-			ObjectMeta: r.pvcStateConfigMapName(restore.Name),
-		}
-		if err := c.Delete(ctx, cm); client.IgnoreNotFound(err) != nil {
-			return errors.Wrap(err, "delete PVC state configmap")
 		}
 		return nil
 	}
