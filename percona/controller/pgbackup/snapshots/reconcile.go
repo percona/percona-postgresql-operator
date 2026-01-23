@@ -221,7 +221,7 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = stsErr.Error()
 		}); updErr != nil {
-			return reconcile.Result{}, nil
+			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
 		}
 	}
 

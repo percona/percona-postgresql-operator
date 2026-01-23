@@ -218,7 +218,7 @@ func (r *PGClusterReconciler) reconcileScheduledSnapshots(
 
 	if err := r.Cron.ApplyBackupJob(name.Name, name.Namespace, *schedule, createBackupFunc); err != nil {
 		log.Error(err, "failed to create a cron for a scheduled snapshot job")
-		return nil
+		return err
 	}
 
 	return nil
