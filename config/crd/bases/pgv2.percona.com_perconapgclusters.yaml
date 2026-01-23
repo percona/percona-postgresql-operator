@@ -7551,6 +7551,13 @@ spec:
                         enum:
                         - offline
                         type: string
+                      schedule:
+                        description: |-
+                          Defines the Cron schedule for a VolumeSnapshot.
+                          Follows the standard Cron schedule syntax:
+                          https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
+                        minLength: 6
+                        type: string
                     required:
                     - className
                     type: object

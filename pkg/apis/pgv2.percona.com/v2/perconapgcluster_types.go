@@ -516,6 +516,13 @@ type VolumeSnapshots struct {
 	// Name of the VolumeSnapshotClass to use.
 	// +kubebuilder:validation:Required
 	ClassName string `json:"className"`
+
+	// Defines the Cron schedule for a VolumeSnapshot.
+	// Follows the standard Cron schedule syntax:
+	// https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
+	// +optional
+	// +kubebuilder:validation:MinLength=6
+	Schedule *string `json:"schedule,omitempty"`
 }
 
 func (b Backups) IsVolumeSnapshotsEnabled() bool {
