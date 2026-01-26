@@ -14,14 +14,13 @@ commands:
 
         result=$(run_psql_local \
           "SELECT * FROM pg_extension WHERE extname = '\''vector'\'';" \
-          "postgres:$(get_psql_user_pass pgvector-extension-pguser-postgres)@$(get_psql_user_host pgvector-extension-pguser-postgres)/postgres")
+          "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres")
 
         if [[ "$result" = *"vector"* ]]; then
           echo "pgvector extension is enabled, verifying extension"
           run_psql_local \
             "SELECT '\''[1,2,3]'\''::vector <-> '\''[3,2,1]'\''::vector;" \
-            "postgres:$(get_psql_user_pass pgvector-extension-pguser-postgres)@$(get_psql_user_host pgvector-extension-pguser-postgres)/postgres"
-
+            "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres"
           exit 0
         fi
 

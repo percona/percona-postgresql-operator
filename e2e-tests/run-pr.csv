@@ -11,7 +11,6 @@ monitoring
 monitoring-pmm3
 one-pod
 operator-self-healing
-pgvector-extension
 pitr
 scaling
 scheduled-backup
