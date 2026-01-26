@@ -1271,10 +1271,13 @@ check_envs_for_component() {
 deploy_coredns() {
 	# Only the "upgrade-consistency" test needs CoreDNS to be installed.
 	# For all other tests, if CoreDNS was installed by this script earlier, uninstall it.
+	local coredns_found=false
+	if kubectl -n kube-system get deploy coredns >/dev/null 2>&1; then
+		coredns_found=true
+	fi
+
 	if [[ $test_name != "upgrade-consistency" ]]; then
-		kubectl -n kube-system get deploy coredns >/dev/null 2>&1 || {
-			return
-		}
+		! $coredns_found && return
 
 		helm uninstall coredns -n kube-system >/dev/null 2>&1 || true
 		kubectl scale deployment --replicas=2 kube-dns --namespace=kube-system
@@ -1282,7 +1285,7 @@ deploy_coredns() {
 		return
 	fi
 
-	kubectl -n kube-system get deploy coredns && return
+	$coredns_found && return
 
 	helm repo add coredns https://coredns.github.io/helm
 	helm install coredns coredns/coredns \
