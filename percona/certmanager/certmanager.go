@@ -2,21 +2,23 @@ package certmanager
 
 import (
 	"context"
-	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"regexp"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
+	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/cert-manager/cert-manager/pkg/util/cmapichecker"
 	"github.com/pkg/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 type Controller interface {
@@ -24,7 +26,19 @@ type Controller interface {
 	ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyCAIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyCACertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
+
+	ApplyClusterCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
+	ApplyInstanceCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, instanceName string, dnsNames []string) error
+	ApplyPGBouncerCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 }
+
+const (
+	// DefaultCertDuration is the default certificate duration: 1 year
+	DefaultCertDuration = 365 * 24 * time.Hour
+
+	// DefaultRenewBefore is the default renewal time: 30 days before expiry
+	DefaultRenewBefore = 30 * 24 * time.Hour
+)
 
 type controller struct {
 	cl     client.Client
@@ -148,6 +162,179 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 		return errors.Wrap(err, "failed to create the issuer")
 	}
 
+	return nil
+}
+
+// ApplyClusterCertificate creates a cert-manager Certificate resource for the cluster's
+// primary and replica services TLS certificate.
+func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error {
+	log := logf.FromContext(ctx).WithName("ApplyClusterCertificate")
+
+	if len(dnsNames) == 0 {
+		return errors.New("dnsNames cannot be empty")
+	}
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.PostgresTLSSecret(cluster).Name,
+			Namespace: cluster.Namespace,
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: naming.PostgresTLSSecret(cluster).Name,
+			CommonName: dnsNames[0],
+			DNSNames:   dnsNames,
+			IssuerRef: cmmeta.ObjectReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			Usages: []v1.KeyUsage{
+				v1.UsageServerAuth,
+				v1.UsageClientAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster:            cluster.Name,
+					naming.LabelClusterCertificate: "postgres-tls",
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	err := c.cl.Create(ctx, cert)
+	if err != nil {
+		if k8serrors.IsAlreadyExists(err) {
+			log.V(1).Info("cluster certificate already exists", "name", cert.Name)
+			return nil
+		}
+		return errors.Wrap(err, "failed to create cluster certificate")
+	}
+
+	log.Info("created cluster certificate", "name", cert.Name)
+	return nil
+}
+
+// ApplyInstanceCertificate creates a cert-manager Certificate resource for a specific
+// PostgreSQL instance.
+func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, instanceName string, dnsNames []string) error {
+	log := logf.FromContext(ctx).WithName("ApplyInstanceCertificate")
+
+	if len(dnsNames) == 0 {
+		return errors.New("dnsNames cannot be empty")
+	}
+
+	certName := instanceName + "-cert"
+	secretName := instanceName + "-certs"
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: cluster.Namespace,
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: secretName,
+			CommonName: dnsNames[0],
+			DNSNames:   dnsNames,
+			IssuerRef: cmmeta.ObjectReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			Usages: []v1.KeyUsage{
+				v1.UsageServerAuth,
+				v1.UsageClientAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster:  cluster.Name,
+					naming.LabelInstance: instanceName,
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	err := c.cl.Create(ctx, cert)
+	if err != nil {
+		if k8serrors.IsAlreadyExists(err) {
+			log.V(1).Info("instance certificate already exists", "name", cert.Name)
+			return nil
+		}
+		return errors.Wrap(err, "failed to create instance certificate")
+	}
+
+	log.Info("created instance certificate", "name", cert.Name, "instance", instanceName)
+	return nil
+}
+
+// ApplyPGBouncerCertificate creates a cert-manager Certificate resource for PgBouncer.
+func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error {
+	log := logf.FromContext(ctx).WithName("ApplyPGBouncerCertificate")
+
+	if len(dnsNames) == 0 {
+		return errors.New("dnsNames cannot be empty")
+	}
+
+	secretMeta := naming.ClusterPGBouncer(cluster)
+	certName := cluster.Name + "-pgbouncer-cert"
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: cluster.Namespace,
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: secretMeta.Name + "-frontend-tls",
+			CommonName: dnsNames[0],
+			DNSNames:   dnsNames,
+			IssuerRef: cmmeta.ObjectReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			Usages: []v1.KeyUsage{
+				v1.UsageServerAuth,
+				v1.UsageClientAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster: cluster.Name,
+					naming.LabelRole:    naming.RolePGBouncer,
+				}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	err := c.cl.Create(ctx, cert)
+	if err != nil {
+		if k8serrors.IsAlreadyExists(err) {
+			log.V(1).Info("pgbouncer certificate already exists", "name", cert.Name)
+			return nil
+		}
+		return errors.Wrap(err, "failed to create pgbouncer certificate")
+	}
+
+	log.Info("created pgbouncer certificate", "name", cert.Name)
 	return nil
 }
 

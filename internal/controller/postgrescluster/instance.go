@@ -1456,8 +1456,134 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
 // reconcileInstanceCertificates writes the Secret that contains certificates
-// and private keys for instance of cluster.
+// and private keys for instance of cluster. When cert-manager is installed,
+// it creates a Certificate CR and augments the resulting secret with Patroni
+// and pgBackRest keys. Otherwise, it uses internal PKI.
 func (r *Reconciler) reconcileInstanceCertificates(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
+	rootCertificateAuth *pki.RootCertificateAuthority,
+) (*corev1.Secret, error) {
+	// Check if cert-manager is installed
+	certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
+	}
+
+	if certManagerInstalled {
+		return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+	}
+
+	// Fall back to internal certificate generation
+	return r.reconcileInternalInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+}
+
+// reconcileCertManagerInstanceCertificates creates instance certificates using cert-manager
+// and augments the resulting secret with Patroni and pgBackRest keys.
+func (r *Reconciler) reconcileCertManagerInstanceCertificates(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
+	rootCertificateAuth *pki.RootCertificateAuthority,
+) (*corev1.Secret, error) {
+	log := logging.FromContext(ctx)
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+	dnsNames := naming.InstancePodDNSNames(ctx, instance)
+
+	err := c.ApplyInstanceCertificate(ctx, cluster, instance.Name, dnsNames)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to apply instance certificate")
+	}
+
+	log.V(1).Info("cert-manager instance certificate applied", "instance", instance.Name)
+
+	existing := &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
+	err = r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, errors.WithStack(err)
+		}
+		existing = &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
+		existing.Data = make(map[string][]byte)
+	}
+
+	instanceCerts := &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
+	instanceCerts.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+
+	instanceCerts.Annotations = naming.Merge(
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+		spec.Metadata.GetAnnotationsOrNil())
+	instanceCerts.Labels = naming.Merge(
+		cluster.Spec.Metadata.GetLabelsOrNil(),
+		spec.Metadata.GetLabelsOrNil(),
+		naming.WithPerconaLabels(map[string]string{
+			naming.LabelCluster:     cluster.Name,
+			naming.LabelInstanceSet: spec.Name,
+			naming.LabelInstance:    instance.Name,
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+
+	instanceCerts.Type = corev1.SecretTypeOpaque
+	instanceCerts.Data = make(map[string][]byte)
+
+	if existing.Data != nil {
+		if tlsCrt, ok := existing.Data["tls.crt"]; ok {
+			instanceCerts.Data["dns.crt"] = tlsCrt
+		}
+		if tlsKey, ok := existing.Data["tls.key"]; ok {
+			instanceCerts.Data["dns.key"] = tlsKey
+		}
+	}
+
+	if len(instanceCerts.Data["dns.crt"]) > 0 && len(instanceCerts.Data["dns.key"]) > 0 {
+		leafCert := &pki.LeafCertificate{}
+		_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
+		_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
+
+		err = patroni.InstanceCertificates(ctx,
+			rootCertificateAuth.Certificate, leafCert.Certificate,
+			leafCert.PrivateKey, instanceCerts)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to add patroni certificates")
+		}
+
+		err = pgbackrest.InstanceCertificates(ctx, cluster,
+			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
+			instanceCerts)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
+		}
+	} else {
+		var leafCert *pki.LeafCertificate
+		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate instance certificate")
+		}
+
+		err = patroni.InstanceCertificates(ctx,
+			rootCertificateAuth.Certificate, leafCert.Certificate,
+			leafCert.PrivateKey, instanceCerts)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to add patroni certificates")
+		}
+
+		err = pgbackrest.InstanceCertificates(ctx, cluster,
+			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
+			instanceCerts)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
+		}
+	}
+
+	err = errors.WithStack(r.apply(ctx, instanceCerts))
+	if err != nil {
+		return nil, err
+	}
+
+	return instanceCerts, nil
+}
+
+// reconcileInternalInstanceCertificates creates instance certificates using internal PKI.
+func (r *Reconciler) reconcileInternalInstanceCertificates(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	rootCertificateAuth *pki.RootCertificateAuthority,
