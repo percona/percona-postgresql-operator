@@ -196,10 +196,14 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,delete,patch}
 
 // reconcilePGBouncerSecret writes the Secret for a PgBouncer Pod.
+// When cert-manager is installed and no custom TLS secret is provided,
+// it creates a Certificate CR for PgBouncer frontend TLS.
 func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
 ) (*corev1.Secret, error) {
+	log := logging.FromContext(ctx)
+
 	existing := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	err := errors.WithStack(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
@@ -216,6 +220,29 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	}
 
 	err = client.IgnoreNotFound(err)
+
+	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
+		certManagerInstalled, certErr := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		if certErr != nil {
+			return nil, errors.Wrap(certErr, "failed to check if cert-manager is installed")
+		}
+
+		if certManagerInstalled {
+			c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+			dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service)
+			if dnsErr != nil {
+				return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
+			}
+
+			certErr = c.ApplyPGBouncerCertificate(ctx, cluster, dnsNames)
+			if certErr != nil {
+				return nil, errors.Wrap(certErr, "failed to apply pgbouncer certificate")
+			}
+
+			log.V(1).Info("cert-manager pgbouncer certificate applied")
+		}
+	}
 
 	intent := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))

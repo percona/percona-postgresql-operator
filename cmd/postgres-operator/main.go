@@ -26,12 +26,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	certmanagerscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/standalone_pgadmin"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -124,6 +126,10 @@ func main() {
 	// Add Percona custom resource types to scheme
 	assertNoError(v2.AddToScheme(mgr.GetScheme()))
 
+	// K8SPG-552
+	// Add Scheme for cert-manager resources like Issuer and Certificate.
+	assertNoError(certmanagerscheme.AddToScheme(mgr.GetScheme()))
+
 	// add all PostgreSQL Operator controllers to the runtime manager
 	err = addControllersToManager(ctx, mgr)
 	assertNoError(err)
@@ -149,11 +155,14 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	os.Setenv("REGISTRATION_REQUIRED", "false")
 
 	r := &postgrescluster.Reconciler{
-		Client:      mgr.GetClient(),
-		Owner:       postgrescluster.ControllerName,
-		Recorder:    mgr.GetEventRecorderFor(postgrescluster.ControllerName),
-		Tracer:      otel.Tracer(postgrescluster.ControllerName),
-		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		Owner:               postgrescluster.ControllerName,
+		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName),
+		Tracer:              otel.Tracer(postgrescluster.ControllerName),
+		IsOpenShift:         isOpenshift(ctx, mgr.GetConfig()),
+		CertManagerCtrlFunc: certmanager.NewController,
+		RestConfig:          mgr.GetConfig(),
 	}
 	cm := &perconaController.CustomManager{Manager: mgr}
 	if err := r.SetupWithManager(cm); err != nil {
