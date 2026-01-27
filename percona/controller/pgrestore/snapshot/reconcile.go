@@ -179,8 +179,7 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 
 	// Start the cluster
 	if ok, err := r.resumeCluster(ctx); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "resume cluster")
-	} else if !ok {
+	} else if !ok && !r.isPITRInProgress() {
 		r.log.Info("Waiting for cluster to be ready")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
@@ -411,7 +410,7 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 	}
 
 	switch {
-	case k8serrors.IsNotFound(err):
+	case k8serrors.IsNotFound(err) && !r.isPITRInProgress():
 		return false, pgbackrestRestore.Start(ctx)
 	case status == v2.RestoreRunning:
 		return false, nil
@@ -426,4 +425,7 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+func (r *snapshotRestorer) isPITRInProgress() bool {
+	return r.cluster.GetAnnotations()[naming.PGBackRestRestore] != ""
 }
