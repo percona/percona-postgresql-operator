@@ -25,6 +25,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	restoreutils "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/utils"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
@@ -184,7 +185,13 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	// TODO: Implement PiTR
+	// Restore PITR
+	if ok, err := r.restorePITR(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "restore PITR")
+	} else if !ok {
+		r.log.Info("Waiting for PITR to be restored")
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
 
 	if err := r.restore.UpdateStatus(ctx, r.cl, func(restore *v2.PerconaPGRestore) {
 		restore.Status.State = v2.RestoreSucceeded
@@ -390,4 +397,33 @@ func (r *snapshotRestorer) finalizeSnapshotRestore(_ client.Client, _ *v2.Percon
 		}
 		return nil
 	}
+}
+
+func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
+	if r.restore.Spec.RepoName == nil {
+		return true, nil
+	}
+
+	pgbackrestRestore := restoreutils.NewPGBackRestRestore(r.cl, r.cluster, r.restore)
+	status, _, err := pgbackrestRestore.ObserveStatus(ctx)
+	if client.IgnoreNotFound(err) != nil { // ignore NotFound, we handle it below
+		return false, errors.Wrap(err, "observe PITR status")
+	}
+
+	switch {
+	case k8serrors.IsNotFound(err):
+		return false, pgbackrestRestore.Start(ctx)
+	case status == v2.RestoreRunning:
+		return false, nil
+	case status == v2.RestoreSucceeded:
+		return true, pgbackrestRestore.DisableRestore(ctx)
+	case status == v2.RestoreFailed:
+		if err := r.restore.UpdateStatus(ctx, r.cl, func(restore *v2.PerconaPGRestore) {
+			restore.Status.State = v2.RestoreFailed
+		}); err != nil {
+			return false, errors.Wrap(err, "update restore status")
+		}
+		return true, nil
+	}
+	return false, nil
 }
