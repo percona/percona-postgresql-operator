@@ -40,7 +40,7 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 	r.pgCluster.Annotations[naming.PGBackRestRestore] = r.pgRestore.Name
 
 	postgresCluster := new(v1beta1.PostgresCluster)
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(r.pgCluster), postgresCluster); err != nil {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(r.pgCluster), postgresCluster); err != nil {
 		return errors.Wrap(err, "get PostgresCluster")
 	}
 
@@ -48,7 +48,7 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 
 	postgresCluster.Status.PGBackRest.Restore = new(v1beta1.PGBackRestJobStatus)
 
-	if err := r.Client.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
+	if err := r.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")
 	}
 
@@ -62,7 +62,7 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.RepoName = ptr.Deref(r.pgRestore.Spec.RepoName, "")
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Options = r.pgRestore.Spec.Options
 
-	if err := r.Client.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {
+	if err := r.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")
 	}
 
@@ -85,7 +85,7 @@ func (r *PGBackRestRestore) DisableRestore(ctx context.Context) error {
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = ptr.To(false)
 	delete(r.pgCluster.Annotations, naming.LabelPGBackRestRestore)
 
-	if err := r.Client.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {
+	if err := r.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")
 	}
 
@@ -94,7 +94,7 @@ func (r *PGBackRestRestore) DisableRestore(ctx context.Context) error {
 
 func (r *PGBackRestRestore) ObserveStatus(ctx context.Context) (v2.PGRestoreState, *metav1.Time, error) {
 	job := &batchv1.Job{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: r.pgCluster.Name + "-pgbackrest-restore", Namespace: r.pgCluster.Namespace}, job)
+	err := r.Get(ctx, types.NamespacedName{Name: r.pgCluster.Name + "-pgbackrest-restore", Namespace: r.pgCluster.Namespace}, job)
 	if err != nil {
 		return v2.RestoreNew, nil, errors.Wrap(err, "get restore job")
 	}
