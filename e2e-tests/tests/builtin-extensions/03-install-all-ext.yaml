@@ -3,6 +3,13 @@ kind: PerconaPGCluster
 metadata:
   name: builtin-extensions
 spec:
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          pgaudit.log: 'ddl,write,role'
+          pgaudit.log_level: 'warning'
+          logging_collector: 'off'
   extensions:
     builtin:
       pg_stat_monitor: true
