@@ -188,7 +188,7 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 	if ok, err := r.restorePITR(ctx); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "restore PITR")
 	} else if !ok {
-		r.log.Info("Waiting for PITR to be restored")
+		r.log.Info("Waiting for PiTR to complete")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -242,6 +242,8 @@ func (r *snapshotRestorer) listPVCs(ctx context.Context) ([]corev1.PersistentVol
 	return result, nil
 }
 
+// restorePVCFromSnapshot restores a PVC from a snapshot.
+// pvc is a partial object derived from the cluster instance statefulsets (see listPVCs method).
 func (r *snapshotRestorer) restorePVCFromSnapshot(
 	ctx context.Context,
 	pvc *corev1.PersistentVolumeClaim,
