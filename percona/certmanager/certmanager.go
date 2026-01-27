@@ -150,6 +150,10 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 			},
 			Duration:    &metav1.Duration{Duration: time.Hour * 24 * 365},
 			RenewBefore: &metav1.Duration{Duration: 730 * time.Hour},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm: v1.ECDSAKeyAlgorithm,
+				Size:      256,
+			},
 		},
 	}
 
@@ -181,7 +185,7 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: naming.PostgresTLSSecret(cluster).Name,
-			CommonName: dnsNames[0],
+			CommonName: cluster.Name + "-postgres",
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.ObjectReference{
 				Name: naming.TLSIssuer(cluster).Name,
@@ -189,6 +193,10 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 			},
 			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm: v1.ECDSAKeyAlgorithm,
+				Size:      256,
+			},
 			Usages: []v1.KeyUsage{
 				v1.UsageServerAuth,
 				v1.UsageClientAuth,
@@ -240,7 +248,7 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretName,
-			CommonName: dnsNames[0],
+			CommonName: instanceName,
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.ObjectReference{
 				Name: naming.TLSIssuer(cluster).Name,
@@ -248,6 +256,10 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 			},
 			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm: v1.ECDSAKeyAlgorithm,
+				Size:      256,
+			},
 			Usages: []v1.KeyUsage{
 				v1.UsageServerAuth,
 				v1.UsageClientAuth,
@@ -298,7 +310,7 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretMeta.Name + "-frontend-tls",
-			CommonName: dnsNames[0],
+			CommonName: cluster.Name + "-pgbouncer",
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.ObjectReference{
 				Name: naming.TLSIssuer(cluster).Name,
@@ -306,6 +318,10 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 			},
 			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm: v1.ECDSAKeyAlgorithm,
+				Size:      256,
+			},
 			Usages: []v1.KeyUsage{
 				v1.UsageServerAuth,
 				v1.UsageClientAuth,
