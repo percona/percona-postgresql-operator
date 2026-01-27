@@ -199,7 +199,7 @@ func (b *PerconaPGBackup) Default() {
 		b.Spec.Method = ptr.To(BackupMethodPGBackrest)
 	}
 
-	if b.Spec.Method == ptr.To(BackupMethodPGBackrest) {
+	if *b.Spec.Method == BackupMethodPGBackrest {
 		b.Spec.Options = append(b.Spec.Options, fmt.Sprintf(`--annotation="%s"="%s"`, PGBackrestAnnotationBackupName, b.Name))
 	}
 }
