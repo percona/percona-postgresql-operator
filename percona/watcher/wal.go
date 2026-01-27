@@ -43,11 +43,6 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 		return
 	}
 
-	// TODO: add support
-	if cr.Spec.Backups.IsVolumeSnapshotsEnabled() {
-		return
-	}
-
 	log.Info("Watching commit timestamps")
 
 	execCli, err := clientcmd.NewClient()
@@ -142,7 +137,9 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 	latest := &pgv2.PerconaPGBackup{}
 	runningBackupExists := false
 	for _, backup := range backupList.Items {
-		backup := backup
+		if ptr.Deref(backup.Spec.Method, pgv2.BackupMethodPGBackrest) == pgv2.BackupMethodVolumeSnapshot {
+			continue
+		}
 
 		switch backup.Status.State {
 		case pgv2.BackupSucceeded:
