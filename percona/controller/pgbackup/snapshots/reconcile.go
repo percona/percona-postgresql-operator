@@ -21,6 +21,10 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
+const (
+	defaultSnapshotErrorDeadline = 5 * time.Minute
+)
+
 type snapshotExecutor interface {
 	// Prepare the cluster for performing a snapshot.
 	// Returns the name of the PVC that will be snapshotted.
@@ -214,18 +218,29 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 
 	// error occurred while creating the snapshot.
 	case volumeSnapshot.Status.Error != nil:
+		// Some errors can be transient, so we should wait for a while before giving up.
 		message := ptr.Deref(volumeSnapshot.Status.Error.Message, "")
-		stsErr := fmt.Errorf("volume snapshot failed: %s", message)
+		if !shouldFailSnapshot(volumeSnapshot) {
+			r.log.Info("Snapshot is in error state, but within deadline. Retrying.", "message", message)
+			return reconcile.Result{}, nil
+		}
+
+		// Snapshot has failed, update the status to failed.
+		stsErr := fmt.Errorf("snapshot error: %s", message)
 		r.log.Error(stsErr, "Volume snapshot failed")
 		if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = stsErr.Error()
 		}); updErr != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
+			return reconcile.Result{}, nil
 		}
 	}
-
 	return reconcile.Result{}, nil
+}
+
+func shouldFailSnapshot(volumeSnapshot *volumesnapshotv1.VolumeSnapshot) bool {
+	errAt := volumeSnapshot.Status.Error.Time
+	return !errAt.IsZero() && time.Now().After(errAt.Add(defaultSnapshotErrorDeadline))
 }
 
 func (r *snapshotReconciler) ensureSnapshot(ctx context.Context, volumeSnapshot *volumesnapshotv1.VolumeSnapshot) (bool, error) {
