@@ -246,6 +246,26 @@ spec:
 #      securityContext: {}
 #    - name: testcontainer2
 #      image: mycontainer1:latest
+#    sidecarVolumes:
+#    - name: sidecar-secret
+#      secret:
+#        secretName: mysecret
+#    - name: sidecar-config
+#      configMap:
+#        name: myconfigmap
+#    - name: backup-nfs
+#      nfs:
+#        server: "nfs-service.storage.svc.cluster.local"
+#        path: "/pg-some-name"
+#    sidecarPVCs:
+#    - name: sidecar-volume-claim
+#      spec:
+#        resources:
+#          requests:
+#            storage: 1Gi
+#        volumeMode: Filesystem
+#        accessModes:
+#          - ReadWriteOnce
 #
 #    topologySpreadConstraints:
 #      - maxSkew: 1
@@ -396,6 +416,26 @@ spec:
 #        image: busybox:latest
 #        command: ["sleep", "30d"]
 #        securityContext: {}
+#      sidecarVolumes:
+#      - name: sidecar-secret
+#        secret:
+#          secretName: mysecret
+#      - name: sidecar-config
+#        configMap:
+#          name: myconfigmap
+#      - name: backup-nfs
+#        nfs:
+#          server: "nfs-service.storage.svc.cluster.local"
+#          path: "/pg-some-name"
+#      sidecarPVCs:
+#      - name: sidecar-volume-claim
+#        spec:
+#          resources:
+#            requests:
+#              storage: 1Gi
+#          volumeMode: Filesystem
+#          accessModes:
+#            - ReadWriteOnce
 #
 #      customTLSSecret:
 #        name: keycloakdb-pgbouncer.tls
@@ -521,6 +561,26 @@ spec:
 #          securityContext: {}
 #        - name: testcontainer2
 #          image: mycontainer1:latest
+#        sidecarVolumes:
+#        - name: sidecar-secret
+#          secret:
+#            secretName: mysecret
+#        - name: sidecar-config
+#          configMap:
+#            name: myconfigmap
+#        - name: backup-nfs
+#          nfs:
+#            server: "nfs-service.storage.svc.cluster.local"
+#            path: "/pg-some-name"
+#        sidecarPVCs:
+#        - name: sidecar-volume-claim
+#          spec:
+#            resources:
+#              requests:
+#                storage: 1Gi
+#            volumeMode: Filesystem
+#            accessModes:
+#              - ReadWriteOnce
 #        resources:
 #          limits:
 #            cpu: 200m

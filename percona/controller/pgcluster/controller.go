@@ -314,6 +314,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
 	}
 
+	if err := r.reconcilePVCs(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile pvcs")
+	}
+
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
 		if err != nil {

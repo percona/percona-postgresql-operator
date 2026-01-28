@@ -738,6 +738,20 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 		// defined, add the defined container to the Pod.
 		if feature.Enabled(ctx, feature.PGBackrestRepoHostSidecars) && repoHost.Sidecars != nil {
 			repo.Spec.Template.Spec.Containers = append(repo.Spec.Template.Spec.Containers, repoHost.Sidecars...)
+			if postgresCluster.CompareVersion("2.9.0") >= 0 {
+				repo.Spec.Template.Spec.Volumes = append(repo.Spec.Template.Spec.Volumes, repoHost.SidecarVolumes...)
+
+				for _, v := range repoHost.SidecarPVCs {
+					repo.Spec.Template.Spec.Volumes = append(repo.Spec.Template.Spec.Volumes, corev1.Volume{
+						Name: v.Name,
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: v.Name,
+							},
+						},
+					})
+				}
+			}
 		}
 	}
 	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
