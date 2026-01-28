@@ -1257,10 +1257,14 @@ func (r *Reconciler) reconcileInstance(
 
 	// K8SPG-864
 	if cluster.CompareVersion("2.9.0") >= 0 {
-		for _, p := range spec.SidecarPVCs {
-			instance.Spec.VolumeClaimTemplates = append(instance.Spec.VolumeClaimTemplates, corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: p.Name},
-				Spec:       p.Spec,
+		for _, v := range spec.SidecarPVCs {
+			instance.Spec.Template.Spec.Volumes = append(instance.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: v.Name,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: v.Name,
+					},
+				},
 			})
 		}
 	}

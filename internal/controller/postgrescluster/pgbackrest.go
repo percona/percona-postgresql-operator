@@ -741,10 +741,14 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 			if postgresCluster.CompareVersion("2.9.0") >= 0 {
 				repo.Spec.Template.Spec.Volumes = append(repo.Spec.Template.Spec.Volumes, repoHost.SidecarVolumes...)
 
-				for _, p := range repoHost.SidecarPVCs {
-					repo.Spec.VolumeClaimTemplates = append(repo.Spec.VolumeClaimTemplates, corev1.PersistentVolumeClaim{
-						ObjectMeta: metav1.ObjectMeta{Name: p.Name},
-						Spec:       p.Spec,
+				for _, v := range repoHost.SidecarPVCs {
+					repo.Spec.Template.Spec.Volumes = append(repo.Spec.Template.Spec.Volumes, corev1.Volume{
+						Name: v.Name,
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: v.Name,
+							},
+						},
 					})
 				}
 			}

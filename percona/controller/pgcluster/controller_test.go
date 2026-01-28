@@ -1470,17 +1470,13 @@ var _ = Describe("Sidecars", Ordered, func() {
 			Expect(sidecar.Image).To(Equal("instance-image"))
 
 			var sidecarVolume corev1.Volume
-			var sidecarPVCVolume corev1.PersistentVolumeClaim
+			var sidecarPVCVolume corev1.Volume
 			for _, v := range sts.Spec.Template.Spec.Volumes {
-				if v.Name == "sidecar-instance-vol" {
+				switch v.Name {
+				case "sidecar-instance-vol":
 					sidecarVolume = v
-					break
-				}
-			}
-			for _, v := range sts.Spec.VolumeClaimTemplates {
-				if v.Name == "sidecar-instance-pvc" {
+				case "sidecar-instance-pvc":
 					sidecarPVCVolume = v
-					break
 				}
 			}
 
@@ -1490,19 +1486,11 @@ var _ = Describe("Sidecars", Ordered, func() {
 					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
 			}))
-			Expect(sidecarPVCVolume.Name).To(Equal("sidecar-instance-pvc"))
-			Expect(sidecarPVCVolume.Spec).To(Equal(corev1.PersistentVolumeClaimSpec{
-				VolumeName: "some-name",
-				VolumeMode: ptr.To(corev1.PersistentVolumeFilesystem),
-				AccessModes: []corev1.PersistentVolumeAccessMode{
-					corev1.ReadWriteMany,
-				},
-				Resources: corev1.VolumeResourceRequirements{
-					Limits: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("2G"),
-					},
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("2G"),
+			Expect(sidecarPVCVolume).To(Equal(corev1.Volume{
+				Name: "sidecar-instance-pvc",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "sidecar-instance-pvc",
 					},
 				},
 			}))
@@ -1526,11 +1514,10 @@ var _ = Describe("Sidecars", Ordered, func() {
 		var sidecarVolume corev1.Volume
 		var sidecarPVCVolume corev1.Volume
 		for _, v := range deployment.Spec.Template.Spec.Volumes {
-			if v.Name == "sidecar-pgbouncer-vol" {
+			switch v.Name {
+			case "sidecar-pgbouncer-vol":
 				sidecarVolume = v
-				continue
-			}
-			if v.Name == "sidecar-pgbouncer-pvc" {
+			case "sidecar-pgbouncer-pvc":
 				sidecarPVCVolume = v
 			}
 		}
@@ -1566,17 +1553,13 @@ var _ = Describe("Sidecars", Ordered, func() {
 		Expect(sidecar.Image).To(Equal("repohost-image"))
 
 		var sidecarVolume corev1.Volume
-		var sidecarPVCVolume corev1.PersistentVolumeClaim
+		var sidecarPVCVolume corev1.Volume
 		for _, v := range sts.Spec.Template.Spec.Volumes {
-			if v.Name == "sidecar-repohost-vol" {
+			switch v.Name {
+			case "sidecar-repohost-vol":
 				sidecarVolume = v
-				break
-			}
-		}
-		for _, v := range sts.Spec.VolumeClaimTemplates {
-			if v.Name == "sidecar-repohost-pvc" {
+			case "sidecar-repohost-pvc":
 				sidecarPVCVolume = v
-				break
 			}
 		}
 
@@ -1586,19 +1569,11 @@ var _ = Describe("Sidecars", Ordered, func() {
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		}))
-		Expect(sidecarPVCVolume.Name).To(Equal("sidecar-repohost-pvc"))
-		Expect(sidecarPVCVolume.Spec).To(Equal(corev1.PersistentVolumeClaimSpec{
-			VolumeName: "some-name",
-			VolumeMode: ptr.To(corev1.PersistentVolumeFilesystem),
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteMany,
-			},
-			Resources: corev1.VolumeResourceRequirements{
-				Limits: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("2G"),
-				},
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("2G"),
+		Expect(sidecarPVCVolume).To(Equal(corev1.Volume{
+			Name: "sidecar-repohost-pvc",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "sidecar-repohost-pvc",
 				},
 			},
 		}))

@@ -16,8 +16,17 @@ func (r *PGClusterReconciler) reconcilePVCs(ctx context.Context, cr *v2.PerconaP
 	if cr.CompareVersion("2.9.0") < 0 {
 		return nil
 	}
+	for _, set := range cr.Spec.InstanceSets {
+		if err := ensureSidecarPVCs(ctx, r.Client, cr.Namespace, set.SidecarPVCs); err != nil {
+			return errors.Wrap(err, "failed to create instance set pvcs")
+		}
+	}
+	if cr.Spec.Backups.PGBackRest.RepoHost != nil && len(cr.Spec.Backups.PGBackRest.RepoHost.SidecarPVCs) > 0 {
+		if err := ensureSidecarPVCs(ctx, r.Client, cr.Namespace, cr.Spec.Backups.PGBackRest.RepoHost.SidecarPVCs); err != nil {
+			return errors.Wrap(err, "failed to create repo host sidecar pvcs")
+		}
+	}
 	if cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil && len(cr.Spec.Proxy.PGBouncer.SidecarPVCs) > 0 {
-		// PGBouncer is a deployment. Operator should manually create a PVC
 		if err := ensureSidecarPVCs(ctx, r.Client, cr.Namespace, cr.Spec.Proxy.PGBouncer.SidecarPVCs); err != nil {
 			return errors.Wrap(err, "failed to create pgbouncer sidecar pvcs")
 		}
