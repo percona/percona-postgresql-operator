@@ -5,6 +5,7 @@ metadata:
 spec:
   pgCluster: cluster1
   repoName: repo1
+#  volumeSnapshotName: backup1
 #  options:
 #  - --type=time
 #  - --target="2022-11-30 15:12:11+03"

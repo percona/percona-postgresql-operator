@@ -70,6 +70,13 @@ spec:
             type: object
           spec:
             properties:
+              method:
+                default: pgbackrest
+                description: Method with which to perform the backup
+                enum:
+                - pgbackrest
+                - volumeSnapshot
+                type: string
               options:
                 description: |-
                   Command line options to include when running the pgBackRest backup command.
@@ -80,14 +87,17 @@ spec:
               pgCluster:
                 type: string
               repoName:
-                description: The name of the pgBackRest repo to run the backup command
-                  against.
+                description: |-
+                  The name of the pgBackRest repo to run the backup command against.
+                  This is required when method is 'pgbackrest'.
                 pattern: ^repo[1-4]
                 type: string
             required:
             - pgCluster
-            - repoName
             type: object
+            x-kubernetes-validations:
+            - message: repoName is required when method is 'pgbackrest'
+              rule: self.method == "volumeSnapshot" || has(self.repoName)
           status:
             properties:
               backupName:
@@ -390,6 +400,20 @@ spec:
                     type: object
                 required:
                 - name
+                type: object
+              snapshot:
+                properties:
+                  targetPvcName:
+                    description: TargetPVCName is the name of the source PVC that
+                      is being snapshotted.
+                    type: string
+                  volumeSnapshotName:
+                    description: VolumeSnapshotName is the name of the VolumeSnapshot
+                      that contains the snapshotted data.
+                    type: string
+                required:
+                - targetPvcName
+                - volumeSnapshotName
                 type: object
               state:
                 type: string

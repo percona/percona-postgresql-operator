@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -156,7 +157,7 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 			},
 			Spec: v2.PerconaPGBackupSpec{
 				PGCluster: cr.Name,
-				RepoName:  repoName,
+				RepoName:  ptr.To(repoName),
 			},
 		}
 		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
@@ -217,7 +218,7 @@ func listPGBackups(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluste
 	// we should not filter by label, because the user can create the resource without the label
 	list := []v2.PerconaPGBackup{}
 	for _, pgBackup := range pbList.Items {
-		if pgBackup.Spec.PGCluster != cr.Name || pgBackup.Spec.RepoName != repoName {
+		if pgBackup.Spec.PGCluster != cr.Name || ptr.Deref(pgBackup.Spec.RepoName, "") != repoName {
 			continue
 		}
 		list = append(list, pgBackup)

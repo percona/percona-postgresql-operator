@@ -473,6 +473,14 @@ func PGBackRestCronJob(cluster *v1beta1.PostgresCluster, backuptype, repoName st
 	}
 }
 
+// PGBackRestCronJob returns the ObjectMeta for a pgBackRest CronJob
+func VolumeSnapshotCronJob(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.GetNamespace(),
+		Name:      cluster.Name + "-snapshot",
+	}
+}
+
 // PGBackRestRestoreJob returns the ObjectMeta for a pgBackRest restore Job
 func PGBackRestRestoreJob(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{

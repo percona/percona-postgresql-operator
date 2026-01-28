@@ -37,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -1158,6 +1159,7 @@ func (r *Reconciler) reconcileInstance(
 	ctx = logging.NewContext(ctx, log)
 
 	existing := instance.DeepCopy()
+	_, suspended := existing.GetAnnotations()[pNaming.AnnotationInstanceSuspended]
 	*instance = appsv1.StatefulSet{}
 	instance.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("StatefulSet"))
 	instance.Namespace, instance.Name = existing.Namespace, existing.Name
@@ -1165,7 +1167,7 @@ func (r *Reconciler) reconcileInstance(
 	if err == nil {
 		generateInstanceStatefulSetIntent(ctx, cluster, spec,
 			clusterPodService.Name, instanceServiceAccount.Name, instance,
-			numInstancePods)
+			numInstancePods, suspended)
 	}
 
 	var (
@@ -1272,6 +1274,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	instanceServiceAccountName string,
 	sts *appsv1.StatefulSet,
 	numInstancePods int,
+	suspend bool,
 ) {
 	sts.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
@@ -1367,6 +1370,11 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 		// - others are still running during shutdown, or
 		// - it is time to startup.
 		sts.Spec.Replicas = initialize.Int32(1)
+	}
+
+	// K8SPG-771
+	if suspend {
+		sts.Spec.Replicas = initialize.Int32(0)
 	}
 
 	// Restart containers any time they stop, die, are killed, etc.

@@ -364,6 +364,13 @@ spec:
             type: object
           spec:
             properties:
+              method:
+                default: pgbackrest
+                description: Method with which to perform the backup
+                enum:
+                - pgbackrest
+                - volumeSnapshot
+                type: string
               options:
                 description: |-
                   Command line options to include when running the pgBackRest backup command.
@@ -374,14 +381,17 @@ spec:
               pgCluster:
                 type: string
               repoName:
-                description: The name of the pgBackRest repo to run the backup command
-                  against.
+                description: |-
+                  The name of the pgBackRest repo to run the backup command against.
+                  This is required when method is 'pgbackrest'.
                 pattern: ^repo[1-4]
                 type: string
             required:
             - pgCluster
-            - repoName
             type: object
+            x-kubernetes-validations:
+            - message: repoName is required when method is 'pgbackrest'
+              rule: self.method == "volumeSnapshot" || has(self.repoName)
           status:
             properties:
               backupName:
@@ -684,6 +694,20 @@ spec:
                     type: object
                 required:
                 - name
+                type: object
+              snapshot:
+                properties:
+                  targetPvcName:
+                    description: TargetPVCName is the name of the source PVC that
+                      is being snapshotted.
+                    type: string
+                  volumeSnapshotName:
+                    description: VolumeSnapshotName is the name of the VolumeSnapshot
+                      that contains the snapshotted data.
+                    type: string
+                required:
+                - targetPvcName
+                - volumeSnapshotName
                 type: object
               state:
                 type: string
@@ -7812,6 +7836,28 @@ spec:
                   trackLatestRestorableTime:
                     description: Enable tracking latest restorable time
                     type: boolean
+                  volumeSnapshots:
+                    description: VolumeSnapshots configuration
+                    properties:
+                      className:
+                        description: Name of the VolumeSnapshotClass to use.
+                        type: string
+                      mode:
+                        default: offline
+                        description: Mode of the VolumeSnapshot.
+                        enum:
+                        - offline
+                        type: string
+                      schedule:
+                        description: |-
+                          Defines the Cron schedule for a VolumeSnapshot.
+                          Follows the standard Cron schedule syntax:
+                          https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
+                        minLength: 6
+                        type: string
+                    required:
+                    - className
+                    type: object
                 type: object
                 x-kubernetes-validations:
                 - message: At least one repository must be configured when backups
@@ -22245,6 +22291,9 @@ spec:
               pgCluster:
                 description: The name of the PerconaPGCluster to perform restore.
                 type: string
+                x-kubernetes-validations:
+                - message: pgCluster is an immutable field
+                  rule: self == oldSelf
               repoName:
                 description: |-
                   The name of the pgBackRest repo within the source PostgresCluster that contains the backups
@@ -22252,10 +22301,22 @@ spec:
                   for the new PostgresCluster.
                 pattern: ^repo[1-4]
                 type: string
+                x-kubernetes-validations:
+                - message: repoName is an immutable field
+                  rule: self == oldSelf
+              volumeSnapshotName:
+                description: The name of the VolumeSnapshot to perform restore from.
+                type: string
+                x-kubernetes-validations:
+                - message: volumeSnapshotName is an immutable field
+                  rule: self == oldSelf
             required:
             - pgCluster
-            - repoName
             type: object
+            x-kubernetes-validations:
+            - message: either repoName or volumeSnapshotName must be set
+              rule: has(self.repoName) || self.repoName != "" || self.volumeSnapshotName
+                != ""
           status:
             properties:
               completed:
@@ -54186,6 +54247,8 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
+        - name: PGO_FEATURE_GATES
+          value: ""
         image: docker.io/perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:

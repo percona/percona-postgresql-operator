@@ -7110,6 +7110,28 @@ spec:
                   trackLatestRestorableTime:
                     description: Enable tracking latest restorable time
                     type: boolean
+                  volumeSnapshots:
+                    description: VolumeSnapshots configuration
+                    properties:
+                      className:
+                        description: Name of the VolumeSnapshotClass to use.
+                        type: string
+                      mode:
+                        default: offline
+                        description: Mode of the VolumeSnapshot.
+                        enum:
+                        - offline
+                        type: string
+                      schedule:
+                        description: |-
+                          Defines the Cron schedule for a VolumeSnapshot.
+                          Follows the standard Cron schedule syntax:
+                          https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
+                        minLength: 6
+                        type: string
+                    required:
+                    - className
+                    type: object
                 type: object
                 x-kubernetes-validations:
                 - message: At least one repository must be configured when backups

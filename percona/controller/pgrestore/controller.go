@@ -17,11 +17,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/snapshot"
+	restoreutils "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/utils"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
@@ -62,6 +62,17 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	pgCluster := &v2.PerconaPGCluster{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: pgRestore.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+	}
+
+	if pgRestore.Spec.VolumeSnapshotName != "" {
+		// Delegate to snapshot restore reconciliation
+		return snapshot.Reconcile(ctx, r.Client, pgCluster, pgRestore)
+	}
+
 	if pgRestore.DeletionTimestamp != nil {
 		if err := runFinalizers(ctx, r.Client, pgRestore); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
@@ -73,11 +84,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
-	pgCluster := &v2.PerconaPGCluster{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: pgRestore.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
-	}
+	restorer := restoreutils.NewPGBackRestRestore(r.Client, pgCluster, pgRestore)
 
 	switch pgRestore.Status.State {
 	case v2.RestoreNew:
@@ -87,8 +94,11 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		if _, ok := pgRestore.Annotations[pNaming.AnnotationClusterBootstrapRestore]; !ok {
-			if err := startRestore(ctx, r.Client, pgCluster, pgRestore); err != nil {
+			if err := restorer.Start(ctx); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "start restore")
+			}
+			if err := ensureFinalizers(ctx, r.Client, pgRestore); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 			}
 		}
 
@@ -116,26 +126,23 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 		return reconcile.Result{}, nil
 	case v2.RestoreRunning:
-		job := &batchv1.Job{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: pgCluster.Name + "-pgbackrest-restore", Namespace: pgCluster.Namespace}, job)
+		status, completedAt, err := restorer.ObserveStatus(ctx)
 		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "get restore job")
+			return reconcile.Result{}, errors.Wrap(err, "observe restore status")
 		}
-
-		status := checkRestoreJob(job)
 		switch status {
 		case v2.RestoreFailed:
 			log.Info("Restore failed")
 		case v2.RestoreSucceeded:
 			log.Info("Restore succeeded")
-			pgRestore.Status.CompletedAt = job.Status.CompletionTime
+			pgRestore.Status.CompletedAt = completedAt
 		default:
 			log.Info("Waiting for restore to complete")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
 		if _, ok := pgRestore.Annotations[pNaming.AnnotationClusterBootstrapRestore]; !ok {
-			if err := disableRestore(ctx, r.Client, pgCluster, pgRestore); err != nil {
+			if err := restorer.DisableRestore(ctx); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "disable restore")
 			}
 		}
@@ -167,7 +174,8 @@ func runFinalizers(ctx context.Context, c client.Client, pr *v2.PerconaPGRestore
 			if pg == nil {
 				return nil
 			}
-			return disableRestore(ctx, c, pg, pr)
+			restorer := restoreutils.NewPGBackRestRestore(c, pg, pr)
+			return restorer.DisableRestore(ctx)
 		},
 	}
 
@@ -197,83 +205,4 @@ func ensureFinalizers(ctx context.Context, cl client.Client, pr *v2.PerconaPGRes
 		return errors.Wrap(err, "remove finalizers")
 	}
 	return nil
-}
-
-func startRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pr *v2.PerconaPGRestore) error {
-	orig := pg.DeepCopy()
-
-	if pg.Annotations == nil {
-		pg.Annotations = make(map[string]string)
-	}
-	pg.Annotations[naming.PGBackRestRestore] = pr.Name
-
-	postgresCluster := new(v1beta1.PostgresCluster)
-	if err := c.Get(ctx, client.ObjectKeyFromObject(pg), postgresCluster); err != nil {
-		return errors.Wrap(err, "get PostgresCluster")
-	}
-
-	origPostgres := postgresCluster.DeepCopy()
-
-	postgresCluster.Status.PGBackRest.Restore = new(v1beta1.PGBackRestJobStatus)
-
-	if err := c.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
-		return errors.Wrap(err, "patch PGCluster")
-	}
-
-	if pg.Spec.Backups.PGBackRest.Restore == nil {
-		pg.Spec.Backups.PGBackRest.Restore = &v1beta1.PGBackRestRestore{
-			PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{},
-		}
-	}
-
-	tvar := true
-	pg.Spec.Backups.PGBackRest.Restore.Enabled = &tvar
-	pg.Spec.Backups.PGBackRest.Restore.RepoName = pr.Spec.RepoName
-	pg.Spec.Backups.PGBackRest.Restore.Options = pr.Spec.Options
-
-	if err := c.Patch(ctx, pg, client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "patch PGCluster")
-	}
-
-	if err := ensureFinalizers(ctx, c, pr); err != nil {
-		return errors.Wrap(err, "ensure restore finalizers")
-	}
-
-	return nil
-}
-
-func disableRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster, pr *v2.PerconaPGRestore) error {
-	if pr.Status.State == v2.RestoreSucceeded || pr.Status.State == v2.RestoreFailed {
-		return nil
-	}
-
-	orig := pg.DeepCopy()
-
-	if pg.Spec.Backups.PGBackRest.Restore == nil {
-		pg.Spec.Backups.PGBackRest.Restore = &v1beta1.PGBackRestRestore{
-			PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{},
-		}
-	}
-
-	fvar := false
-	pg.Spec.Backups.PGBackRest.Restore.Enabled = &fvar
-
-	delete(pg.Annotations, naming.LabelPGBackRestRestore)
-
-	if err := c.Patch(ctx, pg, client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "patch PGCluster")
-	}
-
-	return nil
-}
-
-func checkRestoreJob(job *batchv1.Job) v2.PGRestoreState {
-	switch {
-	case controller.JobCompleted(job):
-		return v2.RestoreSucceeded
-	case controller.JobFailed(job):
-		return v2.RestoreFailed
-	default:
-		return v2.RestoreRunning
-	}
 }
