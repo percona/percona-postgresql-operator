@@ -68,8 +68,8 @@ const (
 // pgbackrest_repo.conf is used by the pgBackRest repository pod
 func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 	repoHostName, configHash, serviceName, serviceNamespace string,
-	instanceNames []string) *corev1.ConfigMap {
-
+	instanceNames []string,
+) *corev1.ConfigMap {
 	meta := naming.PGBackRestConfig(postgresCluster)
 	meta.Annotations = naming.Merge(
 		postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
@@ -102,7 +102,7 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 			strconv.Itoa(postgresCluster.Spec.PostgresVersion),
 			pgPort, postgresCluster.Spec.Backups.PGBackRest.Repos,
 			postgresCluster.Spec.Backups.PGBackRest.Global,
-		).String()
+			postgresCluster.Spec.ClusterServiceDNSSuffix).String()
 
 	// PostgreSQL instances that have not rolled out expect to mount a server
 	// config file. Always populate that file so those volumes stay valid and
@@ -123,7 +123,7 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 				pgPort, instanceNames,
 				postgresCluster.Spec.Backups.PGBackRest.Repos,
 				postgresCluster.Spec.Backups.PGBackRest.Global,
-			).String()
+				postgresCluster.Spec.ClusterServiceDNSSuffix).String()
 	}
 
 	cm.Data[ConfigHashKey] = configHash
@@ -134,8 +134,8 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 // MakePGBackrestLogDir creates the pgBackRest default log path directory used when a
 // dedicated repo host is configured.
 func MakePGBackrestLogDir(template *corev1.PodTemplateSpec,
-	cluster *v1beta1.PostgresCluster) {
-
+	cluster *v1beta1.PostgresCluster,
+) {
 	var pgBackRestLogPath string
 	for _, repo := range cluster.Spec.Backups.PGBackRest.Repos {
 		if repo.Volume != nil {
@@ -296,7 +296,6 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 // ensures the configuration from the cluster being restored from is not utilized when bootstrapping a
 // new cluster, and the configuration for the new cluster is utilized instead.
 func DedicatedSnapshotVolumeRestoreCommand(pgdata string, args ...string) []string {
-
 	// The postmaster.pid file is removed, if it exists, before attempting a restore.
 	// This allows the restore to be tried more than once without the causing an
 	// error due to the presence of the file in subsequent attempts.
@@ -332,13 +331,12 @@ func populatePGInstanceConfigurationMap(
 	serviceName, serviceNamespace, repoHostName, pgdataDir,
 	fetchKeyCommand, postgresVersion string,
 	pgPort int32, repos []v1beta1.PGBackRestRepo,
-	globalConfig map[string]string,
+	globalConfig map[string]string, dnsSuffix string,
 ) iniSectionSet {
-
 	// TODO(cbandy): pass a FQDN in already.
 	repoHostFQDN := repoHostName + "-0." +
 		serviceName + "." + serviceNamespace + ".svc." +
-		naming.KubernetesClusterDomain(context.Background())
+		naming.KubernetesClusterDomain(context.Background(), dnsSuffix)
 
 	global := iniMultiSet{}
 	stanza := iniMultiSet{}
@@ -402,9 +400,8 @@ func populateRepoHostConfigurationMap(
 	serviceName, serviceNamespace, pgdataDir,
 	fetchKeyCommand, postgresVersion string,
 	pgPort int32, pgHosts []string, repos []v1beta1.PGBackRestRepo,
-	globalConfig map[string]string,
+	globalConfig map[string]string, dnsSuffix string,
 ) iniSectionSet {
-
 	global := iniMultiSet{}
 	stanza := iniMultiSet{}
 
@@ -445,7 +442,7 @@ func populateRepoHostConfigurationMap(
 		// TODO(cbandy): pass a FQDN in already.
 		pgHostFQDN := pgHost + "-0." +
 			serviceName + "." + serviceNamespace + ".svc." +
-			naming.KubernetesClusterDomain(context.Background())
+			naming.KubernetesClusterDomain(context.Background(), dnsSuffix)
 
 		stanza.Set(fmt.Sprintf("pg%d-host", i+1), pgHostFQDN)
 		stanza.Set(fmt.Sprintf("pg%d-host-type", i+1), "tls")
@@ -473,7 +470,6 @@ func populateRepoHostConfigurationMap(
 // getExternalRepoConfigs returns a map containing the configuration settings for an external
 // pgBackRest repository as defined in the PostgresCluster spec
 func getExternalRepoConfigs(repo v1beta1.PGBackRestRepo) map[string]string {
-
 	repoConfigs := make(map[string]string)
 
 	if repo.Azure != nil {
@@ -561,8 +557,10 @@ done
 		` export directory="$1" authority="$2" filename="$3"; export -f monitor;` +
 		` exec -a "$0" bash -ceu monitor`
 
-	return []string{"bash", "-ceu", "--", wrapper, name,
-		serverMountPath, certAuthorityAbsolutePath, serverConfigAbsolutePath}
+	return []string{
+		"bash", "-ceu", "--", wrapper, name,
+		serverMountPath, certAuthorityAbsolutePath, serverConfigAbsolutePath,
+	}
 }
 
 // serverConfig returns the options needed to run the TLS server for cluster.

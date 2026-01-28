@@ -6955,6 +6955,9 @@ spec:
                     description: Enable tracking latest restorable time
                     type: boolean
                 type: object
+              clusterServiceDNSSuffix:
+                description: K8SPG-694
+                type: string
               config:
                 properties:
                   files:
