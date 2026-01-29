@@ -59,12 +59,13 @@ func newSnapshotReconciler(
 
 func newSnapshotExec(
 	cl client.Client,
+	podExec runtime.PodExecutor,
 	cluster *v2.PerconaPGCluster,
 	backup *v2.PerconaPGBackup,
 ) (snapshotExecutor, error) {
 	switch mode := cluster.Spec.Backups.VolumeSnapshots.Mode; mode {
 	case v2.VolumeSnapshotModeOffline:
-		return newOfflineExec(cl, cluster, backup), nil
+		return newOfflineExec(cl, podExec, cluster, backup), nil
 	default:
 		return nil, fmt.Errorf("invalid or unsupported volume snapshot mode: %s", mode)
 	}
@@ -103,7 +104,7 @@ func Reconcile(
 		return reconcile.Result{}, nil
 	}
 
-	exec, err := newSnapshotExec(cl, pgCluster, pgBackup)
+	exec, err := newSnapshotExec(cl, podExec, pgCluster, pgBackup)
 	if err != nil {
 		stsErr := fmt.Errorf("invalid or unsupported volume snapshot mode: %s", pgCluster.Spec.Backups.VolumeSnapshots.Mode)
 		if updErr := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {

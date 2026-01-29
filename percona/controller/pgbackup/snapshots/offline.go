@@ -2,6 +2,8 @@ package snapshots
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/pkg/errors"
@@ -12,8 +14,10 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
@@ -22,21 +26,24 @@ import (
 const (
 	annotationBackupTarget = pNaming.PrefixPerconaPGV2 + "backup-target"
 
-	waitTimeout   = 5 * time.Minute
-	retryInterval = 3 * time.Second
+	checkpointTimeoutSeconds = 30
+	waitTimeout              = 5 * time.Minute
+	retryInterval            = 3 * time.Second
 )
 
 type offlineExec struct {
 	cl      client.Client
 	cluster *v2.PerconaPGCluster
 	backup  *v2.PerconaPGBackup
+	podExec runtime.PodExecutor
 }
 
-func newOfflineExec(cl client.Client, pgCluster *v2.PerconaPGCluster, pgBackup *v2.PerconaPGBackup) *offlineExec {
+func newOfflineExec(cl client.Client, podExec runtime.PodExecutor, pgCluster *v2.PerconaPGCluster, pgBackup *v2.PerconaPGBackup) *offlineExec {
 	return &offlineExec{
 		cl:      cl,
 		cluster: pgCluster,
 		backup:  pgBackup,
+		podExec: podExec,
 	}
 }
 
@@ -44,6 +51,11 @@ func (e *offlineExec) prepare(ctx context.Context) (string, error) {
 	targetInstance, err := e.getBackupTarget(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get backup target pod")
+	}
+
+	// TODO: should this be optional, since this can take a while on large datasets?
+	if err := e.checkpoint(ctx, targetInstance); err != nil {
+		return "", errors.Wrap(err, "failed to checkpoint instance")
 	}
 
 	if err := e.suspendInstance(ctx, targetInstance); err != nil {
@@ -55,6 +67,32 @@ func (e *offlineExec) prepare(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "failed to get target PVC")
 	}
 	return targetPVC, nil
+}
+
+func (e *offlineExec) checkpoint(ctx context.Context, instanceName string) error {
+	exec := func(_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+		return e.podExec(ctx, e.cluster.GetNamespace(), instanceName+"-0", naming.ContainerDatabase, stdin, stdout, stderr, command...)
+	}
+
+	stdout, stderr, err := postgres.Executor(exec).
+		ExecInDatabasesFromQuery(ctx, `SELECT pg_catalog.current_database()`,
+			`SET statement_timeout = :'timeout'; CHECKPOINT;`,
+			map[string]string{
+				"timeout":       fmt.Sprintf("%ds", checkpointTimeoutSeconds),
+				"ON_ERROR_STOP": "on", // Abort when any one statement fails.
+				"QUIET":         "on", // Do not print successful statements to stdout.
+			})
+	if err != nil {
+		return errors.Wrap(err, "failed to execute checkpoint")
+	}
+
+	if stderr != "" {
+		return fmt.Errorf("checkpoint failed: %s", stderr)
+	}
+
+	log := logging.FromContext(ctx)
+	log.Info("checkpoint executed", "stdout", stdout, "stderr", stderr)
+	return nil
 }
 
 func (e *offlineExec) suspendInstance(ctx context.Context, instanceName string) error {
