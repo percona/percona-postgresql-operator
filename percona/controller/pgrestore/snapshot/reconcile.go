@@ -28,6 +28,7 @@ import (
 	restoreutils "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/utils"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 type snapshotRestorer struct {
@@ -177,6 +178,12 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 		}
 	}
 
+	// Re-create Patroni leader Endpoints so the cluster can be bootstrapped from
+	// the new data.
+	if err := r.deleteLeaderEndpoints(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "delete leader endpoints")
+	}
+
 	// Start the cluster
 	if ok, err := r.resumeCluster(ctx); err != nil {
 	} else if !ok && !r.isPITRInProgress() {
@@ -201,6 +208,20 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 
 	r.log.Info("Snapshot restore complete")
 	return reconcile.Result{}, nil
+}
+
+func (r *snapshotRestorer) deleteLeaderEndpoints(ctx context.Context) error {
+	postgresCluster := &crunchyv1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.cluster.Name,
+			Namespace: r.cluster.Namespace,
+		},
+	}
+	leaderEp := &corev1.Endpoints{ObjectMeta: naming.PatroniLeaderEndpoints(postgresCluster)}
+	if err := r.cl.Get(ctx, client.ObjectKeyFromObject(leaderEp), leaderEp); err != nil {
+		return errors.Wrap(err, "get postgres cluster")
+	}
+	return r.cl.Delete(ctx, leaderEp)
 }
 
 // listPVCs returns the list of PostgreSQL data PVCs that need to be restored.
