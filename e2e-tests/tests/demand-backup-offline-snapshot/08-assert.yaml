@@ -1,0 +1,31 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    pgv2.percona.com/snapshot-restore: restore-pitr
+  labels:
+    postgres-operator.crunchydata.com/cluster: backup-snapshot
+    postgres-operator.crunchydata.com/role: pgdata
+spec:
+  dataSource:
+    apiGroup: snapshot.storage.k8s.io
+    kind: VolumeSnapshot
+    name: backup1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
+metadata:
+  name: restore-pitr
+status:
+  state: Succeeded
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: backup-snapshot
+status:
+  state: ready
