@@ -29944,6 +29944,8 @@ spec:
               backups:
                 description: PostgreSQL backup configuration
                 properties:
+                  enabled:
+                    type: boolean
                   pgbackrest:
                     description: pgBackRest archive configuration
                     properties:
@@ -54192,7 +54194,7 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
-        image: docker.io/perconalab/percona-postgresql-operator:main
+        image: docker.io/perconalab/percona-postgresql-operator:k8spg-904-1
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

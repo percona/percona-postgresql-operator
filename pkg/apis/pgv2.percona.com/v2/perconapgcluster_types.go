@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -313,7 +314,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.CustomTLSSecret = cr.Spec.Secrets.CustomTLSSecret
 	postgresCluster.Spec.CustomRootCATLSSecret = cr.Spec.Secrets.CustomRootCATLSSecret
 
-	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion, postgresCluster.Spec.DataSource != nil)
+	postgresCluster.Spec.Backups = cr.Spec.Backups.ToCrunchy(cr.Spec.CRVersion)
 	for i := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		repo := postgresCluster.Spec.Backups.PGBackRest.Repos[i]
 
@@ -499,12 +500,10 @@ func (b Backups) IsEnabled() bool {
 	return b.Enabled == nil || *b.Enabled
 }
 
-func (b Backups) ToCrunchy(version string, hasDataSource bool) crunchyv1beta1.Backups {
+func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	if b.Enabled != nil && !*b.Enabled {
-		if !hasDataSource {
-			return crunchyv1beta1.Backups{}
-		}
 		return crunchyv1beta1.Backups{
+			Enabled: ptr.To(false),
 			PGBackRest: crunchyv1beta1.PGBackRestArchive{
 				Image: b.PGBackRest.Image,
 			},
@@ -521,6 +520,7 @@ func (b Backups) ToCrunchy(version string, hasDataSource bool) crunchyv1beta1.Ba
 	}
 
 	backups := crunchyv1beta1.Backups{
+		Enabled: b.Enabled,
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
 			Metadata:      b.PGBackRest.Metadata,
 			Configuration: b.PGBackRest.Configuration,
