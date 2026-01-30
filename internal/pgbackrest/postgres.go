@@ -78,7 +78,7 @@ func PostgreSQL(
 	// Fetch WAL files from any configured repository during recovery.
 	// - https://pgbackrest.org/command.html#command-archive-get
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
-	restore := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"`
+	restore := "sh /opt/crunchy/bin/restore_command.sh"
 	if inCluster.Spec.Patroni != nil && inCluster.Spec.Patroni.DynamicConfiguration != nil {
 		postgresql, ok := inCluster.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
 		if ok {
