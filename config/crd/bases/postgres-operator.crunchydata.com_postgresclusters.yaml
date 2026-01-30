@@ -10670,6 +10670,53 @@ spec:
                 type: boolean
               extensions:
                 properties:
+                  pg_tde:
+                    properties:
+                      enabled:
+                        type: boolean
+                      vault:
+                        properties:
+                          caSecret:
+                            description: Name of the secret that contains the CA certificate
+                              for SSL verification.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          host:
+                            description: Host of Vault server.
+                            type: string
+                          mountPath:
+                            default: secret/data
+                            description: The mount point on the Vault server where
+                              the key provider should store the keys.
+                            type: string
+                          namespace:
+                            description: The path of the namespace when using Vault
+                              with namespaces.
+                            type: string
+                          tokenSecret:
+                            description: Name of the secret that contains the access
+                              token with read and write access to the mount path.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        required:
+                        - host
+                        - tokenSecret
+                        type: object
+                    type: object
                   pgAudit:
                     type: boolean
                   pgRepack:
@@ -23715,6 +23762,10 @@ spec:
                     description: The PostgreSQL system identifier reported by Patroni.
                     type: string
                 type: object
+              pgTDERevision:
+                description: Identifies the pg_tde configuration that have been installed
+                  into PostgreSQL.
+                type: string
               pgbackrest:
                 description: Status information for pgBackRest
                 properties:

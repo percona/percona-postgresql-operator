@@ -10317,6 +10317,8 @@ spec:
                 description: The specification of extensions.
                 properties:
                   builtin:
+                    description: 'Deprecated: Use extensions.<extension> instead.
+                      This field will be removed after 2.11.0.'
                     properties:
                       pg_audit:
                         type: boolean
@@ -10346,6 +10348,88 @@ spec:
                     description: PullPolicy describes a policy for if/when to pull
                       a container image
                     type: string
+                  pg_audit:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  pg_repack:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  pg_stat_monitor:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  pg_stat_statements:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  pg_tde:
+                    properties:
+                      enabled:
+                        type: boolean
+                      vault:
+                        properties:
+                          caSecret:
+                            description: Name of the secret that contains the CA certificate
+                              for SSL verification.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          host:
+                            description: Host of Vault server.
+                            type: string
+                          mountPath:
+                            default: secret/data
+                            description: The mount point on the Vault server where
+                              the key provider should store the keys.
+                            type: string
+                          namespace:
+                            description: The path of the namespace when using Vault
+                              with namespaces.
+                            type: string
+                          tokenSecret:
+                            description: Name of the secret that contains the access
+                              token with read and write access to the mount path.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        required:
+                        - host
+                        - tokenSecret
+                        type: object
+                    type: object
+                  pgvector:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
                   storage:
                     properties:
                       bucket:

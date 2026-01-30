@@ -659,12 +659,27 @@ spec:
 #      disableSSL: false
 #      secret:
 #        name: cluster1-extensions-secret
-#    builtin:
-#      pg_stat_monitor: true
-#      pg_stat_statements: false
-#      pg_audit: true
-#      pgvector: false
-#      pg_repack: false
+#    pg_stat_monitor:
+#      enabled: true
+#    pg_stat_statements:
+#      enabled: false
+#    pg_audit:
+#      enabled: true
+#    pgvector:
+#      enabled: false
+#    pg_repack:
+#      enabled: false
+#    pg_tde:
+#      enabled: false
+#      vault:
+#        host: https://vault-service:8200
+#        mountPath: tde
+#        tokenSecret:
+#          name: pg-tde-vault-secret
+#          key: token
+#        caSecret:
+#          name: pg-tde-vault-secret
+#          key: ca.crt
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1
