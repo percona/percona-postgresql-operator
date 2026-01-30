@@ -1,0 +1,119 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: pg-tde
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: pg-tde
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  template:
+    metadata:
+      annotations:
+        pgv2.percona.com/tde-installed: "true"
+    spec:
+      containers:
+      - name: database
+        volumeMounts:
+        - mountPath: /pgconf/tls
+          name: cert-volume
+          readOnly: true
+        - mountPath: /pgdata
+          name: postgres-data
+        - mountPath: /etc/database-containerinfo
+          name: database-containerinfo
+          readOnly: true
+        - mountPath: /pgconf/tde
+          name: pg-tde
+          readOnly: true
+        - mountPath: /etc/pgbackrest/conf.d
+          name: pgbackrest-config
+          readOnly: true
+        - mountPath: /etc/patroni
+          name: patroni-config
+          readOnly: true
+        - mountPath: /opt/crunchy
+          name: crunchy-bin
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /dev/shm
+          name: dshm
+      - name: replication-cert-copy
+      - name: pgbackrest
+      - name: pgbackrest-config
+      volumes:
+      - name: cert-volume
+      - name: postgres-data
+      - name: database-containerinfo
+      - name: pg-tde
+        projected:
+          defaultMode: 384
+          sources:
+          - secret:
+              items:
+              - key: token
+                path: token
+              name: vault-secret
+          - secret:
+              items:
+              - key: ca.crt
+                path: ca.crt
+              name: vault-secret
+      - name: pgbackrest-server
+      - name: pgbackrest-config
+      - name: patroni-config
+      - name: crunchy-bin
+      - name: tmp
+      - name: dshm
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: pg-tde
+status:
+  state: ready
+  conditions:
+  - type: ReadyForBackup
+    status: "True"
+  - type: PGBackRestRepoHostReady
+    status: "True"
+  - type: PGBackRestReplicaRepoReady
+    status: "True"
+  - type: PGBackRestReplicaCreate
+    status: "True"
+  - type: ProxyAvailable
+    status: "True"
+  - message: pg_tde is enabled in PerconaPGCluster
+    observedGeneration: 1
+    reason: Enabled
+    status: "True"
+    type: PGTDEEnabled
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: pg-tde
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
