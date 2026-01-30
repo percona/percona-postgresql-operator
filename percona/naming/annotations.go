@@ -50,4 +50,8 @@ const (
 	// AnnotationInstanceSuspended must be set on the instance StatefulSet to mark
 	// the instance as suspended.
 	AnnotationInstanceSuspended = PrefixPerconaPGV2 + "instance-suspended"
+
+	// AnnotationSnapshotRestore is the annotation added to the data PVCs of a cluster
+	// to indicate the name of the PerconaPGRestore that is restoring the PVC from a snapshot.
+	AnnotationSnapshotRestore = PrefixPerconaPGV2 + "snapshot-restore"
 )

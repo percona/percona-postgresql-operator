@@ -4,14 +4,11 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -33,6 +30,10 @@ func NewPGBackRestRestore(c client.Client, pgCluster *v2.PerconaPGCluster, pgRes
 
 func (r *PGBackRestRestore) Start(ctx context.Context) error {
 	orig := r.pgCluster.DeepCopy()
+
+	if val, ok := r.pgCluster.GetAnnotations()[naming.PGBackRestRestore]; ok && val == r.pgRestore.Name {
+		return nil // already started
+	}
 
 	if r.pgCluster.Annotations == nil {
 		r.pgCluster.Annotations = make(map[string]string)
@@ -93,21 +94,22 @@ func (r *PGBackRestRestore) DisableRestore(ctx context.Context) error {
 }
 
 func (r *PGBackRestRestore) ObserveStatus(ctx context.Context) (v2.PGRestoreState, *metav1.Time, error) {
-	job := &batchv1.Job{}
-	err := r.Get(ctx, types.NamespacedName{Name: r.pgCluster.Name + "-pgbackrest-restore", Namespace: r.pgCluster.Namespace}, job)
-	if err != nil {
-		return v2.RestoreNew, nil, errors.Wrap(err, "get restore job")
+	cluster := &v2.PerconaPGCluster{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(r.pgCluster), cluster); err != nil {
+		return v2.RestoreStarting, nil, errors.Wrap(err, "get PostgresCluster")
 	}
-	return checkRestoreJob(job), job.Status.CompletionTime, nil
-}
 
-func checkRestoreJob(job *batchv1.Job) v2.PGRestoreState {
+	if cluster.Status.PGBackRest == nil || cluster.Status.PGBackRest.Restore == nil {
+		return v2.RestoreStarting, nil, nil
+	}
+	restoreStatus := cluster.Status.PGBackRest.Restore
+
 	switch {
-	case controller.JobCompleted(job):
-		return v2.RestoreSucceeded
-	case controller.JobFailed(job):
-		return v2.RestoreFailed
+	case restoreStatus.Finished && restoreStatus.Succeeded > 0:
+		return v2.RestoreSucceeded, restoreStatus.CompletionTime, nil
+	case restoreStatus.Finished && restoreStatus.Failed > 0:
+		return v2.RestoreFailed, nil, nil
 	default:
-		return v2.RestoreRunning
+		return v2.RestoreRunning, nil, nil
 	}
 }

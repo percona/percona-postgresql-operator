@@ -178,9 +178,8 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 		}
 	}
 
-	// Re-create Patroni leader Endpoints so the cluster can be bootstrapped from
-	// the new data.
-	if err := r.deleteLeaderEndpoints(ctx); err != nil {
+	// Re-create (if needed) Patroni leader Endpoints so the cluster can be bootstrapped from the new data.
+	if err := r.reconcileLeaderEndpoints(ctx); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "delete leader endpoints")
 	}
 
@@ -210,18 +209,27 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 	return reconcile.Result{}, nil
 }
 
-func (r *snapshotRestorer) deleteLeaderEndpoints(ctx context.Context) error {
+func (r *snapshotRestorer) reconcileLeaderEndpoints(ctx context.Context) error {
 	postgresCluster := &crunchyv1beta1.PostgresCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.cluster.Name,
 			Namespace: r.cluster.Namespace,
 		},
 	}
+
 	leaderEp := &corev1.Endpoints{ObjectMeta: naming.PatroniLeaderEndpoints(postgresCluster)}
 	if err := r.cl.Get(ctx, client.ObjectKeyFromObject(leaderEp), leaderEp); err != nil {
-		return errors.Wrap(err, "get postgres cluster")
+		return client.IgnoreNotFound(err)
 	}
-	return r.cl.Delete(ctx, leaderEp)
+
+	if len(leaderEp.Subsets) > 0 {
+		return nil
+	}
+
+	if err := r.cl.Delete(ctx, leaderEp); client.IgnoreNotFound(err) != nil {
+		return errors.Wrap(err, "delete leader endpoints")
+	}
+	return nil
 }
 
 // listPVCs returns the list of PostgreSQL data PVCs that need to be restored.
@@ -284,12 +292,8 @@ func (r *snapshotRestorer) restorePVCFromSnapshot(
 	}
 
 	// Check if the PVC is already using the snapshot
-	if dataSource := observedPVC.Spec.DataSource; dataSource != nil {
-		if dataSource.Kind == pNaming.KindVolumeSnapshot &&
-			ptr.Deref(dataSource.APIGroup, "") == volumesnapshotv1.GroupName &&
-			dataSource.Name == snapshotName {
-			return true, nil
-		}
+	if val, ok := observedPVC.GetAnnotations()[pNaming.AnnotationSnapshotRestore]; ok && val == r.restore.GetName() {
+		return true, nil
 	}
 
 	// If deleting, wait for it to be deleted before recreating
@@ -328,6 +332,10 @@ func (r *snapshotRestorer) createPVCFromSnapshot(ctx context.Context, pvc *corev
 		ObjectMeta: pvc.ObjectMeta,
 		Spec:       *volumeClaimSpec,
 	}
+
+	newPVC.SetAnnotations(map[string]string{
+		pNaming.AnnotationSnapshotRestore: r.restore.GetName(),
+	})
 	return r.cl.Create(ctx, newPVC)
 }
 
@@ -428,18 +436,18 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 
 	pgbackrestRestore := restoreutils.NewPGBackRestRestore(r.cl, r.cluster, r.restore)
 	status, _, err := pgbackrestRestore.ObserveStatus(ctx)
-	if client.IgnoreNotFound(err) != nil { // ignore NotFound, we handle it below
+	if err != nil {
 		return false, errors.Wrap(err, "observe PITR status")
 	}
 
-	switch {
-	case k8serrors.IsNotFound(err) && !r.isPITRInProgress():
+	switch status {
+	case v2.RestoreStarting:
 		return false, pgbackrestRestore.Start(ctx)
-	case status == v2.RestoreRunning:
+	case v2.RestoreRunning:
 		return false, nil
-	case status == v2.RestoreSucceeded:
+	case v2.RestoreSucceeded:
 		return true, pgbackrestRestore.DisableRestore(ctx)
-	case status == v2.RestoreFailed:
+	case v2.RestoreFailed:
 		if err := r.restore.UpdateStatus(ctx, r.cl, func(restore *v2.PerconaPGRestore) {
 			restore.Status.State = v2.RestoreFailed
 		}); err != nil {
@@ -449,6 +457,7 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 	}
 	return false, nil
 }
+
 func (r *snapshotRestorer) isPITRInProgress() bool {
 	return r.cluster.GetAnnotations()[naming.PGBackRestRestore] != ""
 }
