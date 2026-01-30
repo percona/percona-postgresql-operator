@@ -15,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -27,7 +26,9 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	restoreutils "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/utils"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -141,10 +142,10 @@ func (r *snapshotRestorer) reconcileStarting(ctx context.Context) (reconcile.Res
 	}
 
 	// pausing the cluster so the PVCs are unmounted and can be re-created.
-	if ok, err := r.pauseCluster(ctx); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "pause cluster")
+	if ok, err := r.suspendAllInstances(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "suspend all instances")
 	} else if !ok {
-		r.log.Info("Waiting for cluster to be paused")
+		r.log.Info("Waiting for all instances to be suspended")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -169,6 +170,7 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 		return reconcile.Result{}, errors.Wrap(err, "list PVCs")
 	}
 
+	// Restore PVCs
 	for _, pvc := range clusterPVCs {
 		if ok, err := r.restorePVCFromSnapshot(ctx, &pvc, volumeSnapshotName); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "restore PVC from snapshot")
@@ -178,23 +180,23 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 		}
 	}
 
+	// Restore PITR (if needed)
+	if ok, err := r.restorePITR(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "restore PITR")
+	} else if !ok {
+		r.log.Info("Waiting for PiTR to complete")
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
 	// Re-create (if needed) Patroni leader Endpoints so the cluster can be bootstrapped from the new data.
 	if err := r.reconcileLeaderEndpoints(ctx); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "delete leader endpoints")
 	}
 
 	// Start the cluster
-	if ok, err := r.resumeCluster(ctx); err != nil {
+	if ok, err := r.unsuspendAllInstances(ctx); err != nil {
 	} else if !ok && !r.isPITRInProgress() {
-		r.log.Info("Waiting for cluster to be ready")
-		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
-	}
-
-	// Restore PITR
-	if ok, err := r.restorePITR(ctx); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "restore PITR")
-	} else if !ok {
-		r.log.Info("Waiting for PiTR to complete")
+		r.log.Info("Waiting for all instances to be unsuspended")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -339,46 +341,50 @@ func (r *snapshotRestorer) createPVCFromSnapshot(ctx context.Context, pvc *corev
 	return r.cl.Create(ctx, newPVC)
 }
 
-func (r *snapshotRestorer) pauseCluster(ctx context.Context) (bool, error) {
-	// Check if already paused
-	if r.cluster.Spec.Pause != nil && *r.cluster.Spec.Pause {
-		return r.cluster.Status.State == v2.AppStatePaused, nil
+func (r *snapshotRestorer) suspendAllInstances(ctx context.Context) (bool, error) {
+	instances := &appsv1.StatefulSetList{}
+	if err := r.cl.List(ctx, instances, &client.ListOptions{
+		Namespace: r.cluster.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelCluster: r.cluster.Name,
+			naming.LabelData:    naming.DataPostgres,
+		}),
+	}); err != nil {
+		return false, errors.Wrap(err, "list instances")
 	}
 
-	// Pause the cluster
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		orig := r.cluster.DeepCopy()
-		updated := orig.DeepCopy()
-		if err := r.cl.Get(ctx, client.ObjectKeyFromObject(updated), updated); err != nil {
-			return err
+	allSuspended := true
+	for _, instance := range instances.Items {
+		if suspended, err := perconaPG.SuspendInstance(ctx, r.cl, client.ObjectKeyFromObject(&instance)); err != nil {
+			return false, errors.Wrap(err, "suspend instance")
+		} else if !suspended {
+			allSuspended = false
 		}
-		updated.Spec.Pause = ptr.To(true)
-		return r.cl.Patch(ctx, updated, client.MergeFrom(orig))
-	}); err != nil {
-		return false, err
 	}
-	return false, nil
+	return allSuspended, nil
 }
 
-func (r *snapshotRestorer) resumeCluster(ctx context.Context) (bool, error) {
-	// Check if already resumed
-	if r.cluster.Spec.Pause == nil || !*r.cluster.Spec.Pause {
-		return r.cluster.Status.State == v2.AppStateReady, nil
+func (r *snapshotRestorer) unsuspendAllInstances(ctx context.Context) (bool, error) {
+	instances := &appsv1.StatefulSetList{}
+	if err := r.cl.List(ctx, instances, &client.ListOptions{
+		Namespace: r.cluster.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelCluster: r.cluster.Name,
+			naming.LabelData:    naming.DataPostgres,
+		}),
+	}); err != nil {
+		return false, errors.Wrap(err, "list instances")
 	}
 
-	// Resume the cluster
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		orig := r.cluster.DeepCopy()
-		updated := orig.DeepCopy()
-		if err := r.cl.Get(ctx, client.ObjectKeyFromObject(updated), updated); err != nil {
-			return err
+	allUnsuspended := true
+	for _, instance := range instances.Items {
+		if unsuspended, err := perconaPG.UnsuspendInstance(ctx, r.cl, client.ObjectKeyFromObject(&instance)); err != nil {
+			return false, errors.Wrap(err, "unsuspend instance")
+		} else if !unsuspended {
+			allUnsuspended = false
 		}
-		updated.Spec.Pause = nil
-		return r.cl.Patch(ctx, updated, client.MergeFrom(orig))
-	}); err != nil {
-		return false, err
 	}
-	return false, nil
+	return allUnsuspended, nil
 }
 
 func (r *snapshotRestorer) ensureFinalizers(ctx context.Context) error {
@@ -421,9 +427,12 @@ func (r *snapshotRestorer) runFinalizers(ctx context.Context) (bool, error) {
 
 func (r *snapshotRestorer) finalizeSnapshotRestore(_ client.Client, _ *v2.PerconaPGRestore) func(ctx context.Context, restore *v2.PerconaPGRestore) error {
 	return func(ctx context.Context, restore *v2.PerconaPGRestore) error {
+		if err := r.enableWALArchiveRecovery(ctx); err != nil {
+			return errors.Wrap(err, "enable WAL archive recovery")
+		}
 		// Resume the cluster if it was paused during restore
-		if _, err := r.resumeCluster(ctx); err != nil {
-			return errors.Wrap(err, "resume cluster")
+		if _, err := r.unsuspendAllInstances(ctx); err != nil {
+			return errors.Wrap(err, "unsuspend all instances")
 		}
 		return nil
 	}
@@ -431,6 +440,10 @@ func (r *snapshotRestorer) finalizeSnapshotRestore(_ client.Client, _ *v2.Percon
 
 func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 	if r.restore.Spec.RepoName == nil {
+		// PiTR is not needed, no need to recover WAL archives to maintain snapshot consistency.
+		if err := r.disableWALArchiveRecovery(ctx); err != nil {
+			return false, errors.Wrap(err, "disable WAL archive recovery")
+		}
 		return true, nil
 	}
 
@@ -460,4 +473,38 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 
 func (r *snapshotRestorer) isPITRInProgress() bool {
 	return r.cluster.GetAnnotations()[naming.PGBackRestRestore] != ""
+}
+
+func (r *snapshotRestorer) disableWALArchiveRecovery(ctx context.Context) error {
+	orig := r.cluster.DeepCopy()
+	for i := range r.cluster.Spec.InstanceSets {
+		if r.cluster.Spec.InstanceSets[i].Metadata == nil {
+			r.cluster.Spec.InstanceSets[i].Metadata = &v1beta1.Metadata{}
+		}
+		if r.cluster.Spec.InstanceSets[i].Metadata.Annotations == nil {
+			r.cluster.Spec.InstanceSets[i].Metadata.Annotations = make(map[string]string)
+		}
+		r.cluster.Spec.InstanceSets[i].Metadata.Annotations[naming.DisableWALArchiveRecoveryAnnotation] = "true"
+	}
+	if err := r.cl.Patch(ctx, r.cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "patch cluster")
+	}
+	return nil
+}
+
+func (r *snapshotRestorer) enableWALArchiveRecovery(ctx context.Context) error {
+	orig := r.cluster.DeepCopy()
+	for i := range r.cluster.Spec.InstanceSets {
+		if r.cluster.Spec.InstanceSets[i].Metadata == nil {
+			continue
+		}
+		if r.cluster.Spec.InstanceSets[i].Metadata.Annotations == nil {
+			continue
+		}
+		delete(r.cluster.Spec.InstanceSets[i].Metadata.Annotations, naming.DisableWALArchiveRecoveryAnnotation)
+	}
+	if err := r.cl.Patch(ctx, r.cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "patch cluster")
+	}
+	return nil
 }

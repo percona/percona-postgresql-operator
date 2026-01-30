@@ -5,11 +5,14 @@ import (
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -78,4 +81,57 @@ func determineVersion(cr *v2.PerconaPGCluster) string {
 		return cr.Status.PatroniVersion
 	}
 	return patroniVersion4
+}
+
+// SuspendInstance suspends an instance by setting the AnnotationInstanceSuspended annotation on the StatefulSet.
+// Returns true if the instance was suspended.
+// Caller is responsible for waiting for the instance to be suspended.
+func SuspendInstance(ctx context.Context, cli client.Client, instanceKey client.ObjectKey) (bool, error) {
+	sts := &appsv1.StatefulSet{}
+	if err := cli.Get(ctx, instanceKey, sts); err != nil {
+		return false, errors.Wrap(err, "failed to get stateful set")
+	}
+
+	if _, ok := sts.GetAnnotations()[pNaming.AnnotationInstanceSuspended]; ok {
+		return sts.Status.Replicas == 0 && sts.Status.ReadyReplicas == 0, nil
+	}
+
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		orig := sts.DeepCopy()
+		annots := sts.GetAnnotations()
+		if annots == nil {
+			annots = make(map[string]string)
+		}
+		annots[pNaming.AnnotationInstanceSuspended] = ""
+		sts.SetAnnotations(annots)
+		return cli.Patch(ctx, sts, client.MergeFrom(orig))
+	}); err != nil {
+		return false, errors.Wrap(err, "failed to update stateful set annotations")
+	}
+	return false, nil
+}
+
+// UnsuspendInstance unsuspends an instance by removing the AnnotationInstanceSuspended annotation on the StatefulSet.
+// Returns true if the instance was unsuspended.
+// Caller is responsible for waiting for the instance to be unsuspended.
+func UnsuspendInstance(ctx context.Context, cli client.Client, instanceKey client.ObjectKey) (bool, error) {
+	sts := &appsv1.StatefulSet{}
+	if err := cli.Get(ctx, instanceKey, sts); err != nil {
+		return false, errors.Wrap(err, "failed to get stateful set")
+	}
+
+	if _, ok := sts.GetAnnotations()[pNaming.AnnotationInstanceSuspended]; !ok {
+		return sts.Status.Replicas > 0 && sts.Status.ReadyReplicas > 0, nil
+	}
+
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		orig := sts.DeepCopy()
+		annots := sts.GetAnnotations()
+		delete(annots, pNaming.AnnotationInstanceSuspended)
+		sts.SetAnnotations(annots)
+		return cli.Patch(ctx, sts, client.MergeFrom(orig))
+	}); err != nil {
+		return false, errors.Wrap(err, "failed to update stateful set annotations")
+	}
+	return false, nil
 }
