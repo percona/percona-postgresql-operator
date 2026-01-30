@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"time"
 
 	"github.com/pkg/errors"
@@ -21,14 +22,17 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 const (
 	annotationBackupTarget = pNaming.PrefixPerconaPGV2 + "backup-target"
 
-	checkpointTimeoutSeconds = 30
+	checkpointTimeoutSeconds = 30 // TODO: make this configurable
 	waitTimeout              = 5 * time.Minute
 	retryInterval            = 3 * time.Second
+
+	snapshotSignalFile = "restored-from-snapshot"
 )
 
 type offlineExec struct {
@@ -58,6 +62,10 @@ func (e *offlineExec) prepare(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "failed to checkpoint instance")
 	}
 
+	if err := e.createSnapshotSignal(ctx, targetInstance); err != nil {
+		return "", errors.Wrap(err, "failed to create snapshot signal")
+	}
+
 	if err := e.suspendInstance(ctx, targetInstance); err != nil {
 		return "", errors.Wrap(err, "failed to suspend instance")
 	}
@@ -67,6 +75,44 @@ func (e *offlineExec) prepare(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "failed to get target PVC")
 	}
 	return targetPVC, nil
+}
+
+// After a snapshot restored and cluster resumed, Patroni will start the instance in recovery mode,
+// so PostgreSQL invokes restore_command to fetch WAL from pgbackrest repo. We want the instance to remain at
+// the snapshot-consistent state instead of advancing past it. We create this special file
+// in PGDATA before taking the snapshot so it is included in the snapshot; when the instance
+// starts after a restore, the restore_command wrapper checks for this file and, if present, exits without
+// fetching WAL (so recovery stops at local WAL) and then removes the file.
+func (e *offlineExec) createSnapshotSignal(ctx context.Context, instanceName string) error {
+	postgresCluster := &crunchyv1beta1.PostgresCluster{}
+	if err := e.cl.Get(ctx, client.ObjectKeyFromObject(e.cluster), postgresCluster); err != nil {
+		return errors.Wrap(err, "failed to get postgres cluster")
+	}
+
+	snapshotSignalFile := path.Join(postgres.DataDirectory(postgresCluster), snapshotSignalFile)
+	cmd := []string{"touch", snapshotSignalFile}
+	err := e.podExec(ctx, e.cluster.GetNamespace(),
+		instanceName+"-0", naming.ContainerDatabase, nil, io.Discard, io.Discard, cmd...)
+	if err != nil {
+		return errors.Wrap(err, "pod exec failed")
+	}
+	return nil
+}
+
+func (e *offlineExec) removeSnapshotSignal(ctx context.Context, instanceName string) error {
+	postgresCluster := &crunchyv1beta1.PostgresCluster{}
+	if err := e.cl.Get(ctx, client.ObjectKeyFromObject(e.cluster), postgresCluster); err != nil {
+		return errors.Wrap(err, "failed to get postgres cluster")
+	}
+
+	snapshotSignalFile := path.Join(postgres.DataDirectory(postgresCluster), snapshotSignalFile)
+	cmd := []string{"rm", "-f", snapshotSignalFile}
+	err := e.podExec(ctx, e.cluster.GetNamespace(),
+		instanceName+"-0", naming.ContainerDatabase, nil, io.Discard, io.Discard, cmd...)
+	if err != nil {
+		return errors.Wrap(err, "pod exec failed")
+	}
+	return nil
 }
 
 func (e *offlineExec) checkpoint(ctx context.Context, instanceName string) error {
@@ -168,6 +214,10 @@ func (e *offlineExec) finalize(ctx context.Context) error {
 
 	if err := e.resumeInstance(ctx, targetInstance); err != nil {
 		return errors.Wrap(err, "failed to resume instance")
+	}
+
+	if err := e.removeSnapshotSignal(ctx, targetInstance); err != nil {
+		return errors.Wrap(err, "failed to remove snapshot signal")
 	}
 	return nil
 }
