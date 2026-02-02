@@ -29,12 +29,6 @@ func (r *PGClusterReconciler) reconcileBackups(ctx context.Context, cr *v2.Perco
 		return errors.Wrap(err, "reconcile backup jobs")
 	}
 
-	repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
-	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
-		log.Info("pgBackRest repo host not ready, skipping backup cleanup")
-		return nil
-	}
-
 	if err := r.cleanupOutdatedBackups(ctx, cr); err != nil {
 		// If the user has invalid pgbackrest credentials, this could stop the reconcile.
 		// We should just print an error message.
@@ -52,6 +46,12 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 	}
 
 	if cr.Status.State != v2.AppStateReady {
+		return nil
+	}
+
+	repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
+	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
+		log.Info("pgBackRest repo host not ready, skipping backup cleanup")
 		return nil
 	}
 
