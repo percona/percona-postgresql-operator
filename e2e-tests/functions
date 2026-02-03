@@ -354,9 +354,9 @@ get_cr() {
 				.spec.extensions.storage = {"type": "s3", "bucket": "operator-testing", "region": "us-east-1", "endpoint": "http://minio-service:9000", "forcePathStyle": true, "disableSSL": true, "secret": {"name": "minio-secret"}}
 			    ' $TEMP_DIR/cr.yaml
 			;;
-	  "huge-pages")
-	    if [ "${platform}" == "aks" ] ; then
-	      yq eval -i '
+		"huge-pages")
+			if [ "${platform}" == "aks" ]; then
+				yq eval -i '
           .spec.instances |= (
             .[] |= (
               .affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms =
@@ -364,7 +364,8 @@ get_cr() {
             )
           )
         ' "$TEMP_DIR/cr.yaml"
-      fi
+			fi
+			;;
 	esac
 	cat $TEMP_DIR/cr.yaml
 }
@@ -1270,215 +1271,214 @@ check_envs_for_component() {
 }
 
 detect_k8s_platform() {
-    local platform=""
+	local platform=""
 
-    if kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "gce://"; then
-        platform="gke"
+	if kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "gce://"; then
+		platform="gke"
 
-    elif oc get projects >/dev/null 2>&1; then
-            platform="openshift"
+	elif oc get projects >/dev/null 2>&1; then
+		platform="openshift"
 
-    elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "aws://"; then
-        platform="eks"
+	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "aws://"; then
+		platform="eks"
 
-    elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "azure://"; then
-        platform="aks"
+	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "azure://"; then
+		platform="aks"
 
-    else
-        platform="unknown"
-    fi
+	else
+		platform="unknown"
+	fi
 
-    echo "${platform}"
+	echo "${platform}"
 }
 
 enable_hugepages() {
-    local platform=$1
-    local hugepage_count=${2:-1024}
+	local platform=$1
+	local hugepage_count=${2:-1024}
 
-    echo "Detected platform: ${platform}"
+	echo "Detected platform: ${platform}"
 
-    case ${platform} in
-        gke)
-            enable_hugepages_gke "${hugepage_count}"
-            ;;
-        openshift)
-            enable_hugepages_openshift "${hugepage_count}"
-            ;;
-        eks)
-            enable_hugepages_eks "${hugepage_count}"
-            ;;
-        aks)
-            enable_hugepages_aks "${hugepage_count}"
-            ;;
-        *)
-            echo "Unknown platform, cannot configure hugepages"
-            return 1
-            ;;
-    esac
+	case ${platform} in
+		gke)
+			enable_hugepages_gke "${hugepage_count}"
+			;;
+		openshift)
+			enable_hugepages_openshift "${hugepage_count}"
+			;;
+		eks)
+			enable_hugepages_eks "${hugepage_count}"
+			;;
+		aks)
+			enable_hugepages_aks "${hugepage_count}"
+			;;
+		*)
+			echo "Unknown platform, cannot configure hugepages"
+			return 1
+			;;
+	esac
 }
 
 enable_hugepages_gke() {
-    local hugepage_count=$1
+	local hugepage_count=$1
 
-    echo "Configuring hugepages on GKE"
+	echo "Configuring hugepages on GKE"
 
-    # Get node info
-    local node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-    echo "Sample node: ${node_name}"
+	# Get node info
+	local node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+	echo "Sample node: ${node_name}"
 
-    local provider_id=$(kubectl get node ${node_name} -o jsonpath='{.spec.providerID}')
-    echo "Provider ID: ${provider_id}"
+	local provider_id=$(kubectl get node ${node_name} -o jsonpath='{.spec.providerID}')
+	echo "Provider ID: ${provider_id}"
 
-    # Parse providerID
-    local gke_project=""
-    local gke_zone=""
-    local instance_name=""
+	# Parse providerID
+	local gke_project=""
+	local gke_zone=""
+	local instance_name=""
 
-    if [[ "${provider_id}" =~ ^gce://([^/]+)/([^/]+)/(.+)$ ]]; then
-        gke_project="${BASH_REMATCH[1]}"
-        gke_zone="${BASH_REMATCH[2]}"
-        instance_name="${BASH_REMATCH[3]}"
-    else
-        echo "Could not parse providerID: ${provider_id}"
-        return 1
-    fi
+	if [[ ${provider_id} =~ ^gce://([^/]+)/([^/]+)/(.+)$ ]]; then
+		gke_project="${BASH_REMATCH[1]}"
+		gke_zone="${BASH_REMATCH[2]}"
+		instance_name="${BASH_REMATCH[3]}"
+	else
+		echo "Could not parse providerID: ${provider_id}"
+		return 1
+	fi
 
-    local gke_cluster=""
-    if [[ "${instance_name}" =~ ^gke-([^-]+-[^-]+)-.*$ ]]; then
-        gke_cluster="${BASH_REMATCH[1]}"
-    elif [[ "${instance_name}" =~ ^gke-([^-]+)-.*$ ]]; then
-        gke_cluster="${BASH_REMATCH[1]}"
-    else
-        echo "Could not extract cluster name from instance: ${instance_name}"
-        return 1
-    fi
+	local gke_cluster=""
+	if [[ ${instance_name} =~ ^gke-([^-]+-[^-]+)-.*$ ]]; then
+		gke_cluster="${BASH_REMATCH[1]}"
+	elif [[ ${instance_name} =~ ^gke-([^-]+)-.*$ ]]; then
+		gke_cluster="${BASH_REMATCH[1]}"
+	else
+		echo "Could not extract cluster name from instance: ${instance_name}"
+		return 1
+	fi
 
-    local gke_location="${gke_zone%-*}"
+	local gke_location="${gke_zone%-*}"
 
-    if [ -z "${gke_cluster}" ] || [ -z "${gke_location}" ] || [ -z "${gke_project}" ]; then
-        echo "Could not determine GKE cluster information"
-        echo "Cluster: ${gke_cluster}"
-        echo "Location: ${gke_location}"
-        echo "Zone: ${gke_zone}"
-        echo "Project: ${gke_project}"
-        return 1
-    fi
+	if [ -z "${gke_cluster}" ] || [ -z "${gke_location}" ] || [ -z "${gke_project}" ]; then
+		echo "Could not determine GKE cluster information"
+		echo "Cluster: ${gke_cluster}"
+		echo "Location: ${gke_location}"
+		echo "Zone: ${gke_zone}"
+		echo "Project: ${gke_project}"
+		return 1
+	fi
 
-    local node_pool=${GKE_NODE_POOL:-default-pool}
+	local node_pool=${GKE_NODE_POOL:-default-pool}
 
-    echo "Project: ${gke_project}"
-    echo "Zone: ${gke_zone}"
-    echo "Region: ${gke_location}"
-    echo "Cluster: ${gke_cluster}"
-    echo "Node pool: ${node_pool}"
-    echo "Hugepages (2Mi): ${hugepage_count}"
+	echo "Project: ${gke_project}"
+	echo "Zone: ${gke_zone}"
+	echo "Region: ${gke_location}"
+	echo "Cluster: ${gke_cluster}"
+	echo "Node pool: ${node_pool}"
+	echo "Hugepages (2Mi): ${hugepage_count}"
 
-    cat > /tmp/node-pool-config.yaml <<EOF
+	cat >/tmp/node-pool-config.yaml <<EOF
 linuxConfig:
   hugepageConfig:
     hugepage_size2m: ${hugepage_count}
 EOF
 
-    echo "Updating node pool with hugepages configuration..."
+	echo "Updating node pool with hugepages configuration..."
 
-    if gcloud container node-pools update ${node_pool} \
-        --cluster ${gke_cluster} \
-        --region ${gke_location} \
-        --project ${gke_project} \
-        --system-config-from-file=/tmp/node-pool-config.yaml 2>/dev/null; then
+	if gcloud container node-pools update ${node_pool} \
+		--cluster ${gke_cluster} \
+		--region ${gke_location} \
+		--project ${gke_project} \
+		--system-config-from-file=/tmp/node-pool-config.yaml 2>/dev/null; then
 
-        echo "Node pool updated (regional cluster)"
+		echo "Node pool updated (regional cluster)"
 
-    elif gcloud container node-pools update ${node_pool} \
-        --cluster ${gke_cluster} \
-        --zone ${gke_zone} \
-        --project ${gke_project} \
-        --system-config-from-file=/tmp/node-pool-config.yaml 2>/dev/null; then
+	elif gcloud container node-pools update ${node_pool} \
+		--cluster ${gke_cluster} \
+		--zone ${gke_zone} \
+		--project ${gke_project} \
+		--system-config-from-file=/tmp/node-pool-config.yaml 2>/dev/null; then
 
-        echo "Node pool updated (zonal cluster)"
-    else
-        echo "Failed to update node pool"
-        rm -f /tmp/node-pool-config.yaml
-        return 1
-    fi
+		echo "Node pool updated (zonal cluster)"
+	else
+		echo "Failed to update node pool"
+		rm -f /tmp/node-pool-config.yaml
+		return 1
+	fi
 
-    echo "Waiting for nodes to restart..."
-    sleep 60
-    kubectl wait --for=condition=Ready nodes --all --timeout=300s
+	echo "Waiting for nodes to restart..."
+	sleep 60
+	kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
-    rm -f /tmp/node-pool-config.yaml
-    echo "Hugepages configured on GKE"
-    return 0
+	rm -f /tmp/node-pool-config.yaml
+	echo "Hugepages configured on GKE"
+	return 0
 }
 
 enable_hugepages_eks() {
-    local hugepage_count=$1
+	local hugepage_count=$1
 
-    echo "Configuring hugepages on EKS"
+	echo "Configuring hugepages on EKS"
 
-    if verify_hugepages_on_nodes; then
-        echo "Hugepages already configured"
-        return 0
-    fi
+	if verify_hugepages_on_nodes; then
+		echo "Hugepages already configured"
+		return 0
+	fi
 }
 
 enable_hugepages_aks() {
-  local hugepage_count="${1:-2048}"
-  local nodepool_name="${AKS_HUGEPAGES_NODEPOOL:-hp2m}"
-  local vm_size="${AKS_HUGEPAGES_VM_SIZE:-Standard_D4_v2}"
-  local node_count="${AKS_HUGEPAGES_NODE_COUNT:-1}"
+	local hugepage_count="${1:-2048}"
+	local nodepool_name="${AKS_HUGEPAGES_NODEPOOL:-hp2m}"
+	local vm_size="${AKS_HUGEPAGES_VM_SIZE:-Standard_D4_v2}"
+	local node_count="${AKS_HUGEPAGES_NODE_COUNT:-1}"
 
-  echo "Checking hugepages on AKS..."
+	echo "Checking hugepages on AKS..."
 
-  if verify_hugepages_on_nodes 2>/dev/null; then
-    echo "Hugepages already configured"
-    return 0
-  fi
+	if verify_hugepages_on_nodes 2>/dev/null; then
+		echo "Hugepages already configured"
+		return 0
+	fi
 
-  local cluster_name
-  node_rg="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.azure\.com/cluster}' 2>/dev/null || true)"
-    [[ -n "$node_rg" ]] || return 1
+	local cluster_name
+	node_rg="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.azure\.com/cluster}' 2>/dev/null || true)"
+	[[ -n $node_rg ]] || return 1
 
+	aks_id="$(az aks list --subscription "${AZURE_SUBSCRIPTION:-eng-cloud-dev}" \
+		--query "[?nodeResourceGroup=='$node_rg'] | [0].id" \
+		-o tsv 2>/dev/null || true)"
+	[[ -n $aks_id ]] || return 1
 
-  aks_id="$(az aks list --subscription "${AZURE_SUBSCRIPTION:-eng-cloud-dev}" \
-    --query "[?nodeResourceGroup=='$node_rg'] | [0].id" \
-    -o tsv 2>/dev/null || true)"
-  [[ -n "$aks_id" ]] || return 1
+	cluster_name="$(echo "$aks_id" | sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
+	[[ -n $cluster_name ]] || return 1
 
-  cluster_name="$(echo "$aks_id" | sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
-  [[ -n "$cluster_name" ]] || return 1
+	if [[ -z ${cluster_name} ]]; then
+		echo "AKS: can't detect cluster name from node labels."
+		echo "Skipping hugepages test."
+		return 1
+	fi
 
-  if [[ -z "${cluster_name}"  ]]; then
-    echo "AKS: can't detect cluster name from node labels."
-    echo "Skipping hugepages test."
-    return 1
-  fi
+	echo "AKS cluster detected: ${cluster_name}"
 
-  echo "AKS cluster detected: ${cluster_name}"
+	if ! az aks nodepool show -g percona-operators --cluster-name "${cluster_name}" -n "${nodepool_name}" >/dev/null 2>&1; then
+		echo "Creating nodepool '${nodepool_name}' (${vm_size}, count=${node_count}) with label hugepages=enabled..."
+		az aks nodepool add \
+			--subscription "${AZURE_SUBSCRIPTION:-eng-cloud-dev}" \
+			-g "${AKS_RG:-percona-operators}" \
+			--cluster-name "${cluster_name}" \
+			-n "${nodepool_name}" \
+			--node-count "${node_count}" \
+			--node-vm-size "${vm_size}" \
+			--labels hugepages=enabled \
+			--mode User
+	else
+		echo "Nodepool '${nodepool_name}' already exists."
+	fi
 
-  if ! az aks nodepool show -g percona-operators --cluster-name "${cluster_name}" -n "${nodepool_name}" >/dev/null 2>&1; then
-    echo "Creating nodepool '${nodepool_name}' (${vm_size}, count=${node_count}) with label hugepages=enabled..."
-    az aks nodepool add \
-      --subscription "${AZURE_SUBSCRIPTION:-eng-cloud-dev}" \
-      -g "${AKS_RG:-percona-operators}" \
-      --cluster-name "${cluster_name}" \
-      -n "${nodepool_name}" \
-      --node-count "${node_count}" \
-      --node-vm-size "${vm_size}" \
-      --labels hugepages=enabled \
-      --mode User
-  else
-    echo "Nodepool '${nodepool_name}' already exists."
-  fi
+	echo "Waiting for hugepages node(s) to be Ready..."
+	kubectl wait node -l hugepages=enabled --for=condition=Ready --timeout=15m || {
+		echo "AKS: hugepages node(s) not ready in time. Skipping test."
+		return 1
+	}
 
-  echo "Waiting for hugepages node(s) to be Ready..."
-  kubectl wait node -l hugepages=enabled --for=condition=Ready --timeout=15m || {
-    echo "AKS: hugepages node(s) not ready in time. Skipping test."
-    return 1
-  }
-
-  echo "Applying DaemonSet to allocate hugepages on hugepages=enabled nodes (HP_2M=${hugepage_count})..."
-  cat <<EOF | kubectl apply -f -
+	echo "Applying DaemonSet to allocate hugepages on hugepages=enabled nodes (HP_2M=${hugepage_count})..."
+	cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -1531,35 +1531,35 @@ spec:
             path: /sys
 EOF
 
-  kubectl -n kube-system rollout status ds/hugepages-2mi-enable --timeout=10m || {
-    echo "AKS: DaemonSet rollout did not complete. Skipping test."
-    return 1
-  }
+	kubectl -n kube-system rollout status ds/hugepages-2mi-enable --timeout=10m || {
+		echo "AKS: DaemonSet rollout did not complete. Skipping test."
+		return 1
+	}
 
-  echo "Re-checking hugepages on nodes..."
-  if verify_hugepages_on_nodes 2>/dev/null; then
-    echo "Hugepages configured successfully"
-    return 0
-  fi
+	echo "Re-checking hugepages on nodes..."
+	if verify_hugepages_on_nodes 2>/dev/null; then
+		echo "Hugepages configured successfully"
+		return 0
+	fi
 
-  echo "AKS: Hugepages still not visible after configuration."
-  echo "Skipping hugepages test."
-  return 1
+	echo "AKS: Hugepages still not visible after configuration."
+	echo "Skipping hugepages test."
+	return 1
 }
 
 enable_hugepages_openshift() {
-    local hugepage_count=$1
+	local hugepage_count=$1
 
-    echo "Configuring hugepages on OpenShift"
+	echo "Configuring hugepages on OpenShift"
 
-    if verify_hugepages_on_nodes; then
-        echo "Hugepages already configured"
-        return 0
-    fi
+	if verify_hugepages_on_nodes; then
+		echo "Hugepages already configured"
+		return 0
+	fi
 
-    echo "Creating MachineConfig..."
+	echo "Creating MachineConfig..."
 
-    cat <<EOF | kubectl apply -f -
+	cat <<EOF | kubectl apply -f -
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
