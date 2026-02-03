@@ -39,6 +39,9 @@ func TestInitManager(t *testing.T) {
 
 		assert.Assert(t, options.Cache.DefaultNamespaces == nil)
 		assert.Assert(t, options.LeaderElection == true)
+		assert.Assert(t, options.LeaseDuration.Seconds() == 60)
+		assert.Assert(t, options.RenewDeadline.Seconds() == 40)
+		assert.Assert(t, options.RetryPeriod.Seconds() == 10)
 
 		{
 			options.Cache.SyncPeriod = nil
@@ -46,6 +49,9 @@ func TestInitManager(t *testing.T) {
 			options.HealthProbeBindAddress = ""
 			options.LeaderElection = false
 			options.LeaderElectionID = ""
+			options.LeaseDuration = nil
+			options.RenewDeadline = nil
+			options.RetryPeriod = nil
 
 			assert.Assert(t, reflect.ValueOf(options).IsZero(),
 				"expected remaining fields to be unset:\n%+v", options)
