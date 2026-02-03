@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	cruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -288,6 +289,36 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 		options.LeaderElection = true
 		options.LeaderElectionID = perconaRuntime.ElectionID
 	}
+
+	// K8SPG-915
+	getEnvDuration := func(name string, defaultDur time.Duration) (time.Duration, error) {
+		s, ok := os.LookupEnv(name)
+		if !ok || s == "" {
+			return defaultDur, nil
+		}
+
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get duration from %s env var: invalid value: %s", name, s)
+		}
+
+		return time.Second * time.Duration(v), nil
+	}
+	leaseDuration, err := getEnvDuration("PGO_CONTROLLER_LEASE_DURATION", 60*time.Second)
+	if err != nil {
+		return options, err
+	}
+	options.LeaseDuration = ptr.To(leaseDuration)
+	renewDeadline, err := getEnvDuration("PGO_CONTROLLER_RENEW_DEADLINE", 40*time.Second)
+	if err != nil {
+		return options, err
+	}
+	options.RenewDeadline = ptr.To(renewDeadline)
+	retryPeriod, err := getEnvDuration("PGO_CONTROLLER_RETRY_PERIOD", 10*time.Second)
+	if err != nil {
+		return options, err
+	}
+	options.RetryPeriod = ptr.To(retryPeriod)
 
 	// Check PGO_TARGET_NAMESPACE for backwards compatibility with
 	// "singlenamespace" installations
