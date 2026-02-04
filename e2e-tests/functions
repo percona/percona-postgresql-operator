@@ -1413,7 +1413,6 @@ EOF
 }
 
 enable_hugepages_eks() {
-	local hugepage_count=$1
 
 	echo "Configuring hugepages on EKS"
 
