@@ -28,4 +28,14 @@ kind: PerconaPGCluster
 metadata:
   name: backup-snapshot
 status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
   state: ready
