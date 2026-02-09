@@ -1,4 +1,5 @@
 backup-enable-disable
+cert-manager-tls
 custom-envs
 custom-extensions
 custom-tls

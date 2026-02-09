@@ -89,6 +89,18 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
+	// If the secret is managed by cert-manager, parse it using cert-manager key names
+	// (tls.crt/tls.key) and return without overwriting the secret with internal PKI.
+	if err == nil && existing.Annotations["cert-manager.io/certificate-name"] != "" {
+		root := &pki.RootCertificateAuthority{}
+		_ = root.Certificate.UnmarshalText(existing.Data["tls.crt"])
+		_ = root.PrivateKey.UnmarshalText(existing.Data["tls.key"])
+		if pki.RootIsValid(root) {
+			return root, nil
+		}
+		return nil, errors.New("waiting for cert-manager to issue a valid CA certificate")
+	}
+
 	root := &pki.RootCertificateAuthority{}
 
 	if err == nil {
@@ -173,15 +185,25 @@ func (r *Reconciler) reconcileCertManagerRootCertificate(
 	}
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
 	err = c.ApplyCAIssuer(ctx, cluster)
-	if err != nil {
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		return nil, errors.Wrap(err, "error applying CA issuer")
 	}
 	err = c.ApplyCACertificate(ctx, cluster)
-	if err != nil {
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		return nil, errors.Wrap(err, "error applying CA certificate")
 	}
 
-	return nil, nil
+	// Try to fetch the CA secret created by cert-manager.
+	secret := &corev1.Secret{ObjectMeta: naming.PostgresRootCASecret(cluster)}
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+		if k8serrors.IsNotFound(err) {
+			log.Info("waiting for cert-manager to issue CA certificate")
+			return nil, errors.New("waiting for cert-manager to issue CA certificate")
+		}
+		return nil, errors.Wrap(err, "error getting cert-manager CA secret")
+	}
+
+	return secret, nil
 }
 
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
