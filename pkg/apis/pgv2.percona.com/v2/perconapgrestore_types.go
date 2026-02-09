@@ -29,7 +29,7 @@ type PerconaPGRestore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	// +kubebuilder:validation:XValidation:rule="has(self.repoName) || self.repoName != \"\" || self.volumeSnapshotName != \"\"",message="either repoName or volumeSnapshotName must be set"
+	// +kubebuilder:validation:XValidation:rule="has(self.repoName) || self.repoName != \"\" || self.volumeSnapshotBackupName != \"\"",message="either repoName or volumeSnapshotBackupName must be set"
 	Spec   PerconaPGRestoreSpec   `json:"spec"`
 	Status PerconaPGRestoreStatus `json:"status,omitempty"`
 }
@@ -55,10 +55,10 @@ type PerconaPGRestoreSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="repoName is an immutable field"
 	RepoName *string `json:"repoName,omitempty"`
 
-	// The name of the VolumeSnapshot to perform restore from.
+	// The name of the backup to perform in-place volume snapshot restores from.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="volumeSnapshotName is an immutable field"
-	VolumeSnapshotName string `json:"volumeSnapshotName,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="volumeSnapshotBackupName is an immutable field"
+	VolumeSnapshotBackupName string `json:"volumeSnapshotBackupName,omitempty"`
 
 	// Command line options to include when running the pgBackRest restore command.
 	// https://pgbackrest.org/command.html#command-restore

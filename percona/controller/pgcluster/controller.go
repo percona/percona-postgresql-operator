@@ -414,7 +414,7 @@ func (r *PGClusterReconciler) reconcileWALRecoveryOnStart(ctx context.Context, c
 		if restore.IsCompleted() {
 			continue
 		}
-		if restore.Spec.VolumeSnapshotName != "" && (restore.Spec.RepoName == nil || *restore.Spec.RepoName == "") {
+		if restore.Spec.VolumeSnapshotBackupName != "" && (restore.Spec.RepoName == nil || *restore.Spec.RepoName == "") {
 			disableRecovery()
 		}
 	}

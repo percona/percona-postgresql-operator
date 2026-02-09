@@ -28,8 +28,6 @@ const (
 	checkpointTimeoutSeconds = 30 // TODO: make this configurable
 	waitTimeout              = 5 * time.Minute
 	retryInterval            = 3 * time.Second
-
-	snapshotSignalFile = "restored-from-snapshot"
 )
 
 type offlineExec struct {
@@ -62,12 +60,7 @@ func (e *offlineExec) prepare(ctx context.Context) (string, error) {
 	if err := e.suspendInstance(ctx, targetInstance); err != nil {
 		return "", errors.Wrap(err, "failed to suspend instance")
 	}
-
-	targetPVC, err := e.getTargetPVC(ctx, targetInstance)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get target PVC")
-	}
-	return targetPVC, nil
+	return targetInstance, nil
 }
 
 func (e *offlineExec) checkpoint(ctx context.Context, instanceName string) error {

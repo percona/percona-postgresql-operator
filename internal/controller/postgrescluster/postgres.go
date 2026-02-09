@@ -964,7 +964,7 @@ func (r *Reconciler) reconcileTablespaceVolumes(
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: instanceSpec.Name,
 			naming.LabelInstance:    instance.Name,
-			naming.LabelRole:        "tablespace",
+			naming.LabelRole:        naming.RoleTablespace,
 			naming.LabelData:        vol.Name,
 		}
 

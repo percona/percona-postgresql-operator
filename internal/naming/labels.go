@@ -123,6 +123,9 @@ const (
 
 	// RoleSnapshot is the LabelRole applied to Snapshot resources.
 	RoleSnapshot = "snapshot"
+
+	// RoleTablespace is the LabelRole applied to tablespace volumes.
+	RoleTablespace = "tablespace"
 )
 
 const (

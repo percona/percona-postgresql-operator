@@ -403,17 +403,38 @@ spec:
                 type: object
               snapshot:
                 properties:
-                  targetPvcName:
-                    description: TargetPVCName is the name of the source PVC that
-                      is being snapshotted.
-                    type: string
-                  volumeSnapshotName:
-                    description: VolumeSnapshotName is the name of the VolumeSnapshot
-                      that contains the snapshotted data.
-                    type: string
-                required:
-                - targetPvcName
-                - volumeSnapshotName
+                  dataVolume:
+                    properties:
+                      pvcName:
+                        type: string
+                      snapshotName:
+                        type: string
+                    required:
+                    - pvcName
+                    - snapshotName
+                    type: object
+                  tablespaceVolumes:
+                    additionalProperties:
+                      properties:
+                        pvcName:
+                          type: string
+                        snapshotName:
+                          type: string
+                      required:
+                      - pvcName
+                      - snapshotName
+                      type: object
+                    type: object
+                  walVolume:
+                    properties:
+                      pvcName:
+                        type: string
+                      snapshotName:
+                        type: string
+                    required:
+                    - pvcName
+                    - snapshotName
+                    type: object
                 type: object
               state:
                 type: string

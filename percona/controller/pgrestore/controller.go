@@ -68,7 +68,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
 	}
 
-	if pgRestore.Spec.VolumeSnapshotName != "" {
+	if pgRestore.Spec.VolumeSnapshotBackupName != "" {
 		// Delegate to snapshot restore reconciliation
 		return snapshot.Reconcile(ctx, r.Client, pgCluster, pgRestore)
 	}

@@ -697,17 +697,38 @@ spec:
                 type: object
               snapshot:
                 properties:
-                  targetPvcName:
-                    description: TargetPVCName is the name of the source PVC that
-                      is being snapshotted.
-                    type: string
-                  volumeSnapshotName:
-                    description: VolumeSnapshotName is the name of the VolumeSnapshot
-                      that contains the snapshotted data.
-                    type: string
-                required:
-                - targetPvcName
-                - volumeSnapshotName
+                  dataVolume:
+                    properties:
+                      pvcName:
+                        type: string
+                      snapshotName:
+                        type: string
+                    required:
+                    - pvcName
+                    - snapshotName
+                    type: object
+                  tablespaceVolumes:
+                    additionalProperties:
+                      properties:
+                        pvcName:
+                          type: string
+                        snapshotName:
+                          type: string
+                      required:
+                      - pvcName
+                      - snapshotName
+                      type: object
+                    type: object
+                  walVolume:
+                    properties:
+                      pvcName:
+                        type: string
+                      snapshotName:
+                        type: string
+                    required:
+                    - pvcName
+                    - snapshotName
+                    type: object
                 type: object
               state:
                 type: string
@@ -22304,18 +22325,19 @@ spec:
                 x-kubernetes-validations:
                 - message: repoName is an immutable field
                   rule: self == oldSelf
-              volumeSnapshotName:
-                description: The name of the VolumeSnapshot to perform restore from.
+              volumeSnapshotBackupName:
+                description: The name of the backup to perform in-place volume snapshot
+                  restores from.
                 type: string
                 x-kubernetes-validations:
-                - message: volumeSnapshotName is an immutable field
+                - message: volumeSnapshotBackupName is an immutable field
                   rule: self == oldSelf
             required:
             - pgCluster
             type: object
             x-kubernetes-validations:
-            - message: either repoName or volumeSnapshotName must be set
-              rule: has(self.repoName) || self.repoName != "" || self.volumeSnapshotName
+            - message: either repoName or volumeSnapshotBackupName must be set
+              rule: has(self.repoName) || self.repoName != "" || self.volumeSnapshotBackupName
                 != ""
           status:
             properties:

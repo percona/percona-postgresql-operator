@@ -33,6 +33,7 @@ type snapshotRestorer struct {
 	cl      client.Client
 	log     logging.Logger
 	cluster *v2.PerconaPGCluster
+	backup  *v2.PerconaPGBackup
 	restore *v2.PerconaPGRestore
 }
 
@@ -40,12 +41,14 @@ func newSnapshotRestorer(
 	cl client.Client,
 	log logging.Logger,
 	cluster *v2.PerconaPGCluster,
+	backup *v2.PerconaPGBackup,
 	restore *v2.PerconaPGRestore,
 ) *snapshotRestorer {
 	return &snapshotRestorer{
 		cl:      cl,
 		log:     log,
 		cluster: cluster,
+		backup:  backup,
 		restore: restore,
 	}
 }
@@ -63,7 +66,12 @@ func Reconcile(
 		return reconcile.Result{}, nil
 	}
 
-	r := newSnapshotRestorer(c, log, pg, restore)
+	backup := &v2.PerconaPGBackup{}
+	if err := c.Get(ctx, types.NamespacedName{Name: restore.Spec.VolumeSnapshotBackupName, Namespace: pg.Namespace}, backup); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "get backup")
+	}
+
+	r := newSnapshotRestorer(c, log, pg, backup, restore)
 
 	if !restore.GetDeletionTimestamp().IsZero() {
 		if ok, err := r.runFinalizers(ctx); err != nil {
@@ -122,22 +130,6 @@ func (r *snapshotRestorer) reconcileNew(ctx context.Context) (reconcile.Result, 
 }
 
 func (r *snapshotRestorer) reconcileStarting(ctx context.Context) (reconcile.Result, error) {
-	// Check if specified volume snapshot exists
-	volumeSnapshotName := r.restore.Spec.VolumeSnapshotName
-	volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{}
-	if err := r.cl.Get(ctx, types.NamespacedName{Name: volumeSnapshotName, Namespace: r.cluster.Namespace}, volumeSnapshot); err != nil {
-		if k8serrors.IsNotFound(err) {
-			r.log.Info("Volume snapshot not found, failing restore")
-			if err := r.restore.UpdateStatus(ctx, r.cl, func(restore *v2.PerconaPGRestore) {
-				restore.Status.State = v2.RestoreFailed
-			}); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "update restore status")
-			}
-			return reconcile.Result{}, nil
-		}
-		return reconcile.Result{}, errors.Wrap(err, "get volume snapshot")
-	}
-
 	if ok, err := r.suspendAllInstances(ctx); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "shutdown cluster")
 	} else if !ok {
@@ -160,7 +152,7 @@ func (r *snapshotRestorer) reconcileStarting(ctx context.Context) (reconcile.Res
 }
 
 func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Result, error) {
-	if ok, err := r.reconcileInstancePVCs(ctx); err != nil {
+	if ok, err := r.reconcileInstances(ctx); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile instances")
 	} else if !ok {
 		r.log.Info("Waiting for instances PVCs to be reconciled")
@@ -198,7 +190,7 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 	return reconcile.Result{}, nil
 }
 
-func (r *snapshotRestorer) reconcileInstancePVCs(ctx context.Context) (bool, error) {
+func (r *snapshotRestorer) reconcileInstances(ctx context.Context) (bool, error) {
 	instances := &appsv1.StatefulSetList{}
 	if err := r.cl.List(ctx, instances, &client.ListOptions{
 		Namespace: r.cluster.GetNamespace(),
@@ -212,9 +204,74 @@ func (r *snapshotRestorer) reconcileInstancePVCs(ctx context.Context) (bool, err
 
 	done := true
 	for _, instance := range instances.Items {
-		if ok, err := r.reconcileInstancePVC(ctx, &instance); err != nil {
-			return false, errors.Wrap(err, "reconcile instance PVC")
+		if ok, err := r.reconcileInstance(ctx, &instance); err != nil {
+			return false, errors.Wrap(err, "reconcile instance")
 		} else if !ok {
+			done = false
+		}
+	}
+	return done, nil
+}
+
+func (r *snapshotRestorer) reconcileInstance(ctx context.Context, instance *appsv1.StatefulSet) (bool, error) {
+	dataOk, err := r.reconcileDataVolume(ctx, instance)
+	if err != nil {
+		return false, errors.Wrap(err, "reconcile data volume")
+	}
+
+	walOk, err := r.reconcileWALVolume(ctx, instance)
+	if err != nil {
+		return false, errors.Wrap(err, "reconcile WAL volume")
+	}
+
+	tablespaceOk, err := r.reconcileTablespaceVolumes(ctx, instance)
+	if err != nil {
+		return false, errors.Wrap(err, "reconcile tablespace volumes")
+	}
+
+	return dataOk && walOk && tablespaceOk, nil
+}
+
+func (r *snapshotRestorer) reconcileDataVolume(
+	ctx context.Context,
+	instance *appsv1.StatefulSet,
+) (bool, error) {
+	if r.backup.Status.Snapshot == nil || r.backup.Status.Snapshot.DataVolume == nil || r.backup.Status.Snapshot.DataVolume.SnapshotName == "" {
+		return false, errors.New("data volume snapshot not known")
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresDataVolume(instance)}
+	snapshotName := r.backup.Status.Snapshot.DataVolume.SnapshotName
+	return r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
+}
+
+func (r *snapshotRestorer) reconcileWALVolume(
+	ctx context.Context,
+	instance *appsv1.StatefulSet,
+) (bool, error) {
+	if r.backup.Status.Snapshot == nil || r.backup.Status.Snapshot.WALVolume == nil || r.backup.Status.Snapshot.WALVolume.SnapshotName == "" {
+		return true, nil
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresWALVolume(instance)}
+	snapshotName := r.backup.Status.Snapshot.WALVolume.SnapshotName
+	return r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
+}
+
+func (r *snapshotRestorer) reconcileTablespaceVolumes(ctx context.Context, instance *appsv1.StatefulSet) (bool, error) {
+	if r.backup.Status.Snapshot == nil || r.backup.Status.Snapshot.TablespaceVolumes == nil || len(r.backup.Status.Snapshot.TablespaceVolumes) == 0 {
+		return true, nil
+	}
+
+	done := true
+	for tsName, info := range r.backup.Status.Snapshot.TablespaceVolumes {
+		pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstanceTablespaceDataVolume(instance, tsName)}
+		snapshotName := info.SnapshotName
+		ok, err := r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
+		if err != nil {
+			return false, errors.Wrap(err, "reconcile tablespace PVC")
+		}
+		if !ok {
 			done = false
 		}
 	}
@@ -223,14 +280,14 @@ func (r *snapshotRestorer) reconcileInstancePVCs(ctx context.Context) (bool, err
 
 func (r *snapshotRestorer) reconcileInstancePVC(
 	ctx context.Context,
+	pvc *corev1.PersistentVolumeClaim,
 	instance *appsv1.StatefulSet,
+	snapshotName string,
 ) (bool, error) {
-	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresDataVolume(instance)}
 	observedPVC := &corev1.PersistentVolumeClaim{}
-
 	err := r.cl.Get(ctx, client.ObjectKeyFromObject(pvc), observedPVC)
 	if k8serrors.IsNotFound(err) {
-		if err := r.createPVCFromSnapshot(ctx, pvc, instance); err != nil {
+		if err := r.createPVCFromSnapshot(ctx, pvc, instance, snapshotName); err != nil {
 			return false, errors.Wrap(err, "create PVC from data source")
 		}
 		return true, nil
@@ -257,6 +314,7 @@ func (r *snapshotRestorer) createPVCFromSnapshot(
 	ctx context.Context,
 	pvc *corev1.PersistentVolumeClaim,
 	instance *appsv1.StatefulSet,
+	snapshotName string,
 ) error {
 	instanceSetName := instance.GetLabels()[naming.LabelInstanceSet]
 	if instanceSetName == "" {
@@ -266,7 +324,7 @@ func (r *snapshotRestorer) createPVCFromSnapshot(
 	dataSource := &corev1.TypedLocalObjectReference{
 		APIGroup: ptr.To(volumesnapshotv1.GroupName),
 		Kind:     pNaming.KindVolumeSnapshot,
-		Name:     r.restore.Spec.VolumeSnapshotName,
+		Name:     snapshotName,
 	}
 	spec, err := r.pvcSpecFromDataSource(instanceSetName, dataSource)
 	if err != nil {
