@@ -25,7 +25,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-// TODO: make these configurable?
 const (
 	// default interval for checking for lag when no lag was previously detected
 	defaultReplicationLagDetectionInterval = 5 * time.Minute
