@@ -39,7 +39,7 @@ commands:
       spec:
         pgCluster: backup-snapshot
         repoName: repo1
-        volumeSnapshotName: backup1
+        volumeSnapshotName: backup3
         options:
         - --type=time
         - --target="${latest_restorable_time}"
