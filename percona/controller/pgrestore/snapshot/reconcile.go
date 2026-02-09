@@ -3,8 +3,6 @@ package snapshot
 import (
 	"context"
 	"fmt"
-	"slices"
-	"strings"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -28,7 +26,6 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -141,11 +138,10 @@ func (r *snapshotRestorer) reconcileStarting(ctx context.Context) (reconcile.Res
 		return reconcile.Result{}, errors.Wrap(err, "get volume snapshot")
 	}
 
-	// pausing the cluster so the PVCs are unmounted and can be re-created.
 	if ok, err := r.suspendAllInstances(ctx); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "suspend all instances")
+		return reconcile.Result{}, errors.Wrap(err, "shutdown cluster")
 	} else if !ok {
-		r.log.Info("Waiting for all instances to be suspended")
+		r.log.Info("Waiting for instances to be suspended")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -164,51 +160,143 @@ func (r *snapshotRestorer) reconcileStarting(ctx context.Context) (reconcile.Res
 }
 
 func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Result, error) {
-	volumeSnapshotName := r.restore.Spec.VolumeSnapshotName
-	clusterPVCs, err := r.listPVCs(ctx)
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "list PVCs")
-	}
-
-	// Restore PVCs
-	for _, pvc := range clusterPVCs {
-		if ok, err := r.restorePVCFromSnapshot(ctx, &pvc, volumeSnapshotName); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "restore PVC from snapshot")
-		} else if !ok {
-			r.log.Info("Waiting for PVC to restored", "pvc", pvc.GetName())
-			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
-		}
-	}
-
-	// Restore PITR (if needed)
-	if ok, err := r.restorePITR(ctx); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "restore PITR")
+	if ok, err := r.reconcileInstancePVCs(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile instances")
 	} else if !ok {
-		r.log.Info("Waiting for PiTR to complete")
+		r.log.Info("Waiting for instances PVCs to be reconciled")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	// Re-create (if needed) Patroni leader Endpoints so the cluster can be bootstrapped from the new data.
+	// Recreate DCS so that cluster can be bootstrapped with new data.
 	if err := r.reconcileLeaderEndpoints(ctx); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "delete leader endpoints")
+		return reconcile.Result{}, errors.Wrap(err, "reconcile leader endpoints")
 	}
 
-	// Start the cluster
 	if ok, err := r.unsuspendAllInstances(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "resume cluster")
 	} else if !ok && !r.isPITRInProgress() {
-		r.log.Info("Waiting for all instances to be unsuspended")
+		r.log.Info("Waiting for instances to be unsuspended")
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
+	// Perform PITR if needed.
+	if ok, err := r.restorePITR(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "restore PITR")
+	} else if !ok {
+		r.log.Info("Waiting for PITR to complete")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
 	if err := r.restore.UpdateStatus(ctx, r.cl, func(restore *v2.PerconaPGRestore) {
 		restore.Status.State = v2.RestoreSucceeded
-		restore.Status.CompletedAt = ptr.To(metav1.Now())
+		restore.Status.CompletedAt = &metav1.Time{Time: time.Now()}
 	}); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "update restore status")
 	}
 
-	r.log.Info("Snapshot restore complete")
+	r.log.Info("Snapshot restore is complete")
 	return reconcile.Result{}, nil
+}
+
+func (r *snapshotRestorer) reconcileInstancePVCs(ctx context.Context) (bool, error) {
+	instances := &appsv1.StatefulSetList{}
+	if err := r.cl.List(ctx, instances, &client.ListOptions{
+		Namespace: r.cluster.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelCluster: r.cluster.Name,
+			naming.LabelData:    naming.DataPostgres,
+		}),
+	}); err != nil {
+		return false, errors.Wrap(err, "list instances")
+	}
+
+	done := true
+	for _, instance := range instances.Items {
+		if ok, err := r.reconcileInstancePVC(ctx, &instance); err != nil {
+			return false, errors.Wrap(err, "reconcile instance PVC")
+		} else if !ok {
+			done = false
+		}
+	}
+	return done, nil
+}
+
+func (r *snapshotRestorer) reconcileInstancePVC(
+	ctx context.Context,
+	instance *appsv1.StatefulSet,
+) (bool, error) {
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresDataVolume(instance)}
+	observedPVC := &corev1.PersistentVolumeClaim{}
+
+	err := r.cl.Get(ctx, client.ObjectKeyFromObject(pvc), observedPVC)
+	if k8serrors.IsNotFound(err) {
+		if err := r.createPVCFromSnapshot(ctx, pvc, instance); err != nil {
+			return false, errors.Wrap(err, "create PVC from data source")
+		}
+		return true, nil
+	} else if err != nil {
+		return false, errors.Wrap(err, "get observed PVC")
+	}
+
+	if observedPVC.GetAnnotations()[pNaming.AnnotationSnapshotRestore] == r.restore.GetName() {
+		return true, nil
+	}
+
+	if !observedPVC.GetDeletionTimestamp().IsZero() {
+		return false, nil
+	}
+
+	// Delete it so we can recreate
+	if err := r.cl.Delete(ctx, observedPVC); err != nil {
+		return false, errors.Wrap(err, "delete PVC")
+	}
+	return false, nil
+}
+
+func (r *snapshotRestorer) createPVCFromSnapshot(
+	ctx context.Context,
+	pvc *corev1.PersistentVolumeClaim,
+	instance *appsv1.StatefulSet,
+) error {
+	instanceSetName := instance.GetLabels()[naming.LabelInstanceSet]
+	if instanceSetName == "" {
+		return errors.New("instance set name is not known")
+	}
+
+	dataSource := &corev1.TypedLocalObjectReference{
+		APIGroup: ptr.To(volumesnapshotv1.GroupName),
+		Kind:     pNaming.KindVolumeSnapshot,
+		Name:     r.restore.Spec.VolumeSnapshotName,
+	}
+	spec, err := r.pvcSpecFromDataSource(instanceSetName, dataSource)
+	if err != nil {
+		return errors.Wrap(err, "get PVC spec from data source")
+	}
+	pvc.Spec = spec
+	pvc.SetAnnotations(map[string]string{
+		pNaming.AnnotationSnapshotRestore: r.restore.GetName(),
+	})
+	if err := r.cl.Create(ctx, pvc); err != nil {
+		return errors.Wrap(err, "create PVC")
+	}
+	return nil
+}
+
+func (r *snapshotRestorer) pvcSpecFromDataSource(instanceSetName string, dataSource *corev1.TypedLocalObjectReference) (corev1.PersistentVolumeClaimSpec, error) {
+	var instanceSetSpec *v2.PGInstanceSetSpec
+	for _, instanceSet := range r.cluster.Spec.InstanceSets {
+		if instanceSet.Name == instanceSetName {
+			instanceSetSpec = &instanceSet
+			break
+		}
+	}
+	if instanceSetSpec == nil {
+		return corev1.PersistentVolumeClaimSpec{}, errors.New("instance set not found")
+	}
+
+	dataVolSpec := instanceSetSpec.DataVolumeClaimSpec
+	dataVolSpec.DataSource = dataSource
+	return dataVolSpec, nil
 }
 
 func (r *snapshotRestorer) reconcileLeaderEndpoints(ctx context.Context) error {
@@ -232,113 +320,6 @@ func (r *snapshotRestorer) reconcileLeaderEndpoints(ctx context.Context) error {
 		return errors.Wrap(err, "delete leader endpoints")
 	}
 	return nil
-}
-
-// listPVCs returns the list of PostgreSQL data PVCs that need to be restored.
-//
-// Instead of listing existing PVCs directly, this function derives the PVC names
-// from the cluster instance statefulsets. This is necessary because during restore,
-// PVCs are deleted and recreated. Listing live PVCs would miss PVCs that are
-// currently being recreated and lead to an inconsistent state.
-//
-// The function returns PVC objects with only metadata populated,
-// which is sufficient for getting the job done.
-func (r *snapshotRestorer) listPVCs(ctx context.Context) ([]corev1.PersistentVolumeClaim, error) {
-	instances := &appsv1.StatefulSetList{}
-	if err := r.cl.List(ctx, instances, &client.ListOptions{
-		Namespace: r.cluster.GetNamespace(),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			naming.LabelCluster: r.cluster.Name,
-			naming.LabelData:    naming.DataPostgres,
-		}),
-	}); err != nil {
-		return nil, errors.Wrap(err, "list instances")
-	}
-
-	result := []corev1.PersistentVolumeClaim{}
-	for _, instance := range instances.Items {
-		objectMeta := naming.InstancePostgresDataVolume(&instance)
-		objectMeta.SetLabels(map[string]string{
-			naming.LabelInstanceSet: instance.Labels[naming.LabelInstanceSet], // needed for createPVCFromSnapshot
-		})
-		result = append(result, corev1.PersistentVolumeClaim{
-			ObjectMeta: objectMeta,
-		})
-	}
-
-	// sort to ensure consistent ordering
-	slices.SortStableFunc(result, func(a, b corev1.PersistentVolumeClaim) int {
-		return strings.Compare(a.GetName(), b.GetName())
-	})
-	return result, nil
-}
-
-// restorePVCFromSnapshot restores a PVC from a snapshot.
-// pvc is a partial object derived from the cluster instance statefulsets (see listPVCs method).
-func (r *snapshotRestorer) restorePVCFromSnapshot(
-	ctx context.Context,
-	pvc *corev1.PersistentVolumeClaim,
-	snapshotName string,
-) (bool, error) {
-	observedPVC := &corev1.PersistentVolumeClaim{}
-	err := r.cl.Get(ctx, client.ObjectKeyFromObject(pvc), observedPVC)
-
-	if k8serrors.IsNotFound(err) {
-		// PVC doesn't exist, create it from the snapshot
-		if err := r.createPVCFromSnapshot(ctx, pvc, snapshotName); err != nil {
-			return false, errors.Wrap(err, "create PVC with snapshot")
-		}
-		return false, nil
-	} else if err != nil {
-		return false, errors.Wrap(err, "get observed PVC")
-	}
-
-	// Check if the PVC is already using the snapshot
-	if val, ok := observedPVC.GetAnnotations()[pNaming.AnnotationSnapshotRestore]; ok && val == r.restore.GetName() {
-		return true, nil
-	}
-
-	// If deleting, wait for it to be deleted before recreating
-	if !observedPVC.GetDeletionTimestamp().IsZero() {
-		return false, nil
-	}
-
-	// Delete the existing PVC so we can recreate it from the snapshot
-	if err := r.cl.Delete(ctx, observedPVC); err != nil {
-		return false, errors.Wrap(err, "delete PVC")
-	}
-	return false, nil
-}
-
-func (r *snapshotRestorer) createPVCFromSnapshot(ctx context.Context, pvc *corev1.PersistentVolumeClaim, snapshotName string) error {
-	instanceName := pvc.GetLabels()[naming.LabelInstanceSet]
-	if instanceName == "" {
-		return errors.New("instance not known for PVC")
-	}
-	var volumeClaimSpec *corev1.PersistentVolumeClaimSpec
-	for _, instanceSet := range r.cluster.Spec.InstanceSets {
-		if instanceSet.Name == instanceName {
-			volumeClaimSpec = &instanceSet.DataVolumeClaimSpec
-			break
-		}
-	}
-	if volumeClaimSpec == nil {
-		return fmt.Errorf("instance set '%s' either not found or has no data volume claim spec", instanceName)
-	}
-	volumeClaimSpec.DataSource = &corev1.TypedLocalObjectReference{
-		APIGroup: ptr.To(volumesnapshotv1.GroupName),
-		Kind:     pNaming.KindVolumeSnapshot,
-		Name:     snapshotName,
-	}
-	newPVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: pvc.ObjectMeta,
-		Spec:       *volumeClaimSpec,
-	}
-
-	newPVC.SetAnnotations(map[string]string{
-		pNaming.AnnotationSnapshotRestore: r.restore.GetName(),
-	})
-	return r.cl.Create(ctx, newPVC)
 }
 
 func (r *snapshotRestorer) suspendAllInstances(ctx context.Context) (bool, error) {
@@ -427,12 +408,8 @@ func (r *snapshotRestorer) runFinalizers(ctx context.Context) (bool, error) {
 
 func (r *snapshotRestorer) finalizeSnapshotRestore(_ client.Client, _ *v2.PerconaPGRestore) func(ctx context.Context, restore *v2.PerconaPGRestore) error {
 	return func(ctx context.Context, restore *v2.PerconaPGRestore) error {
-		if err := r.enableWALArchiveRecovery(ctx); err != nil {
-			return errors.Wrap(err, "enable WAL archive recovery")
-		}
-		// Resume the cluster if it was paused during restore
 		if _, err := r.unsuspendAllInstances(ctx); err != nil {
-			return errors.Wrap(err, "unsuspend all instances")
+			return errors.Wrap(err, "resume cluster")
 		}
 		return nil
 	}
@@ -440,10 +417,6 @@ func (r *snapshotRestorer) finalizeSnapshotRestore(_ client.Client, _ *v2.Percon
 
 func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 	if r.restore.Spec.RepoName == nil {
-		// PiTR is not needed, no need to recover WAL archives to maintain snapshot consistency.
-		if err := r.disableWALArchiveRecovery(ctx); err != nil {
-			return false, errors.Wrap(err, "disable WAL archive recovery")
-		}
 		return true, nil
 	}
 
@@ -472,39 +445,6 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 }
 
 func (r *snapshotRestorer) isPITRInProgress() bool {
-	return r.cluster.GetAnnotations()[naming.PGBackRestRestore] != ""
-}
-
-func (r *snapshotRestorer) disableWALArchiveRecovery(ctx context.Context) error {
-	orig := r.cluster.DeepCopy()
-	for i := range r.cluster.Spec.InstanceSets {
-		if r.cluster.Spec.InstanceSets[i].Metadata == nil {
-			r.cluster.Spec.InstanceSets[i].Metadata = &v1beta1.Metadata{}
-		}
-		if r.cluster.Spec.InstanceSets[i].Metadata.Annotations == nil {
-			r.cluster.Spec.InstanceSets[i].Metadata.Annotations = make(map[string]string)
-		}
-		r.cluster.Spec.InstanceSets[i].Metadata.Annotations[naming.DisableWALArchiveRecoveryAnnotation] = "true"
-	}
-	if err := r.cl.Patch(ctx, r.cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "patch cluster")
-	}
-	return nil
-}
-
-func (r *snapshotRestorer) enableWALArchiveRecovery(ctx context.Context) error {
-	orig := r.cluster.DeepCopy()
-	for i := range r.cluster.Spec.InstanceSets {
-		if r.cluster.Spec.InstanceSets[i].Metadata == nil {
-			continue
-		}
-		if r.cluster.Spec.InstanceSets[i].Metadata.Annotations == nil {
-			continue
-		}
-		delete(r.cluster.Spec.InstanceSets[i].Metadata.Annotations, naming.DisableWALArchiveRecoveryAnnotation)
-	}
-	if err := r.cl.Patch(ctx, r.cluster.DeepCopy(), client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "patch cluster")
-	}
-	return nil
+	_, ok := r.cluster.GetAnnotations()[naming.PGBackRestRestore]
+	return ok
 }

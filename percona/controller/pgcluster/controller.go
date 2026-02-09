@@ -103,7 +103,23 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
+		Watches(&v2.PerconaPGRestore{}, handler.EnqueueRequestsFromMapFunc(r.watchRestores)).
 		Complete(r)
+}
+
+func (r *PGClusterReconciler) watchRestores(ctx context.Context, o client.Object) []reconcile.Request {
+	restore, ok := o.(*v2.PerconaPGRestore)
+	if !ok {
+		return nil
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: client.ObjectKey{
+				Namespace: restore.GetNamespace(),
+				Name:      restore.Spec.PGCluster,
+			},
+		},
+	}
 }
 
 func (r *PGClusterReconciler) watchServices() handler.TypedFuncs[*corev1.Service, reconcile.Request] {
@@ -314,6 +330,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
 	}
 
+	if err := r.reconcileWALRecoveryOnStart(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile WAL recovery on start")
+	}
+
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
 		if err != nil {
@@ -366,6 +386,39 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// When a snapshot restore is executed without PiTR, we must disable recovery from WAL on startup
+// to ensure that data is consistent with the snapshot.
+func (r *PGClusterReconciler) reconcileWALRecoveryOnStart(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	var restores v2.PerconaPGRestoreList
+	if err := r.Client.List(ctx, &restores, client.MatchingFields{
+		v2.IndexFieldPGCluster: cr.GetName(),
+	}, client.InNamespace(cr.Namespace)); err != nil {
+		return errors.Wrap(err, "failed to list restores")
+	}
+
+	disableRecovery := func() {
+		for i := range cr.Spec.InstanceSets {
+			if len(cr.Spec.InstanceSets[i].Env) == 0 {
+				cr.Spec.InstanceSets[i].Env = make([]corev1.EnvVar, 0)
+			}
+			cr.Spec.InstanceSets[i].Env = append(cr.Spec.InstanceSets[i].Env, corev1.EnvVar{
+				Name:  "DISABLE_WAL_ARCHIVE_RECOVERY",
+				Value: "1",
+			})
+		}
+	}
+
+	for _, restore := range restores.Items {
+		if restore.IsCompleted() {
+			continue
+		}
+		if restore.Spec.VolumeSnapshotName != "" && (restore.Spec.RepoName == nil || *restore.Spec.RepoName == "") {
+			disableRecovery()
+		}
+	}
+	return nil
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {

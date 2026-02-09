@@ -1,5 +1,6 @@
 package naming
 
 const (
-	KindVolumeSnapshot = "VolumeSnapshot"
+	KindVolumeSnapshot        = "VolumeSnapshot"
+	KindPersistentVolumeClaim = "PersistentVolumeClaim"
 )

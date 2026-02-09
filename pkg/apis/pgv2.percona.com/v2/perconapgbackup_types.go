@@ -84,10 +84,15 @@ const IndexFieldPGCluster = "spec.pgCluster"
 
 var PGClusterIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
 	backup, ok := obj.(*PerconaPGBackup)
-	if !ok {
-		return nil
+	if ok {
+		return []string{backup.Spec.PGCluster}
 	}
-	return []string{backup.Spec.PGCluster}
+
+	restore, ok := obj.(*PerconaPGRestore)
+	if ok {
+		return []string{restore.Spec.PGCluster}
+	}
+	return nil
 }
 
 type PGBackupState string

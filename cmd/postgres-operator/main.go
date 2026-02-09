@@ -215,6 +215,15 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
+		&v2.PerconaPGRestore{},
+		v2.IndexFieldPGCluster,
+		v2.PGClusterIndexerFunc,
+	); err != nil {
+		return err
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
 		&v2.PerconaPGBackup{},
 		"status.state",
 		func(rawObj client.Object) []string {

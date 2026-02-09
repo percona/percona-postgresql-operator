@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-if [[ -f $PGDATA/restored-from-snapshot ]]; then
-    rm -f $PGDATA/restored-from-snapshot
+
+if [[ "${DISABLE_WAL_ARCHIVE_RECOVERY:-}" == "1" ]]; then
     exit 1
 fi
 
-pgbackrest --stanza=db archive-get %f "%p"
+exec "$@"
