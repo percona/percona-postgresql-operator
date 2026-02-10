@@ -78,7 +78,7 @@ func PostgreSQL(
 	// Fetch WAL files from any configured repository during recovery.
 	// - https://pgbackrest.org/command.html#command-archive-get
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
-	restore := "sh /opt/crunchy/bin/restore_command.sh "
+	restore := "sh /opt/crunchy/bin/restore-command-wrapper.sh "
 	restore += `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"`
 	if inCluster.Spec.Patroni != nil && inCluster.Spec.Patroni.DynamicConfiguration != nil {
 		postgresql, ok := inCluster.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
@@ -92,17 +92,15 @@ func PostgreSQL(
 			}
 		}
 	}
-	outParameters.Mandatory.Add("restore_command", restore)
-
 	if inCluster.Spec.Standby != nil && inCluster.Spec.Standby.Enabled && inCluster.Spec.Standby.RepoName != "" {
-
-		// Fetch WAL files from the designated repository. The repository name
-		// is validated by the Kubernetes API, so it does not need to be quoted
-		// nor escaped.
-		repoName := inCluster.Spec.Standby.RepoName
-		restore += " --repo=" + strings.TrimPrefix(repoName, "repo")
-		outParameters.Mandatory.Add("restore_command", restore)
+		// Append --repo only when using the default pgbackrest restore command;
+		// a custom restore_command (e.g. "exit 1") should not be modified.
+		if strings.HasPrefix(restore, "sh /opt/crunchy/bin/restore-command-wrapper.sh ") {
+			repoName := inCluster.Spec.Standby.RepoName
+			restore += " --repo=" + strings.TrimPrefix(repoName, "repo")
+		}
 	}
+	outParameters.Mandatory.Add("restore_command", restore)
 }
 
 func updateCommandRestorableTime(archive *string) {

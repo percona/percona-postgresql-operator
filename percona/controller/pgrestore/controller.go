@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/snapshot"
@@ -35,10 +36,18 @@ type PGRestoreReconciler struct {
 	Owner    client.FieldOwner
 	Recorder record.EventRecorder
 	Tracer   trace.Tracer
+	PodExec  runtime.PodExecutor
 }
 
 // SetupWithManager adds the perconapgrestore controller to the provided runtime manager
 func (r *PGRestoreReconciler) SetupWithManager(mgr manager.Manager) error {
+	if r.PodExec == nil {
+		var err error
+		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
+		if err != nil {
+			return err
+		}
+	}
 	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGRestore{}).Complete(r)
 }
 
@@ -70,7 +79,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if pgRestore.Spec.VolumeSnapshotBackupName != "" {
 		// Delegate to snapshot restore reconciliation
-		return snapshot.Reconcile(ctx, r.Client, pgCluster, pgRestore)
+		return snapshot.Reconcile(ctx, r.Client, r.PodExec, pgCluster, pgRestore)
 	}
 
 	if pgRestore.DeletionTimestamp != nil {

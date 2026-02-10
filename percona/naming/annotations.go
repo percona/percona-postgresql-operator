@@ -54,4 +54,8 @@ const (
 	// AnnotationSnapshotRestore is the annotation added to the data PVCs of a cluster
 	// to indicate the name of the PerconaPGRestore that is restoring the PVC from a snapshot.
 	AnnotationSnapshotRestore = PrefixPerconaPGV2 + "snapshot-restore"
+
+	// AnnotationPVCsPreparedAt is the annotation added to the PerconaPGRestore which
+	// prepares the PVCs for a snapshot restore.
+	AnnotationPVCsPreparedAt = PrefixPerconaPGV2 + "pvcs-prepared-at"
 )

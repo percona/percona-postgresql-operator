@@ -330,10 +330,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
 	}
 
-	if err := r.reconcileWALRecoveryOnStart(ctx, cr); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "reconcile WAL recovery on start")
-	}
-
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
 		if err != nil {
@@ -386,39 +382,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// When a snapshot restore is executed without PiTR, we must disable recovery from WAL on startup
-// to ensure that data is consistent with the snapshot.
-func (r *PGClusterReconciler) reconcileWALRecoveryOnStart(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	var restores v2.PerconaPGRestoreList
-	if err := r.Client.List(ctx, &restores, client.MatchingFields{
-		v2.IndexFieldPGCluster: cr.GetName(),
-	}, client.InNamespace(cr.Namespace)); err != nil {
-		return errors.Wrap(err, "failed to list restores")
-	}
-
-	disableRecovery := func() {
-		for i := range cr.Spec.InstanceSets {
-			if len(cr.Spec.InstanceSets[i].Env) == 0 {
-				cr.Spec.InstanceSets[i].Env = make([]corev1.EnvVar, 0)
-			}
-			cr.Spec.InstanceSets[i].Env = append(cr.Spec.InstanceSets[i].Env, corev1.EnvVar{
-				Name:  "DISABLE_WAL_ARCHIVE_RECOVERY",
-				Value: "1",
-			})
-		}
-	}
-
-	for _, restore := range restores.Items {
-		if restore.IsCompleted() {
-			continue
-		}
-		if restore.Spec.VolumeSnapshotBackupName != "" && (restore.Spec.RepoName == nil || *restore.Spec.RepoName == "") {
-			disableRecovery()
-		}
-	}
-	return nil
 }
 
 func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPGCluster) error {

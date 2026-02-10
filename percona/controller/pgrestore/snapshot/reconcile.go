@@ -3,13 +3,18 @@ package snapshot
 import (
 	"context"
 	"fmt"
+	"io"
+	"path"
+	"strings"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -35,6 +41,7 @@ type snapshotRestorer struct {
 	cluster *v2.PerconaPGCluster
 	backup  *v2.PerconaPGBackup
 	restore *v2.PerconaPGRestore
+	podExec runtime.PodExecutor
 }
 
 func newSnapshotRestorer(
@@ -43,6 +50,7 @@ func newSnapshotRestorer(
 	cluster *v2.PerconaPGCluster,
 	backup *v2.PerconaPGBackup,
 	restore *v2.PerconaPGRestore,
+	exec runtime.PodExecutor,
 ) *snapshotRestorer {
 	return &snapshotRestorer{
 		cl:      cl,
@@ -50,12 +58,14 @@ func newSnapshotRestorer(
 		cluster: cluster,
 		backup:  backup,
 		restore: restore,
+		podExec: exec,
 	}
 }
 
 func Reconcile(
 	ctx context.Context,
 	c client.Client,
+	exec runtime.PodExecutor,
 	pg *v2.PerconaPGCluster,
 	restore *v2.PerconaPGRestore,
 ) (reconcile.Result, error) {
@@ -71,7 +81,7 @@ func Reconcile(
 		return reconcile.Result{}, errors.Wrap(err, "get backup")
 	}
 
-	r := newSnapshotRestorer(c, log, pg, backup, restore)
+	r := newSnapshotRestorer(c, log, pg, backup, restore, exec)
 
 	if !restore.GetDeletionTimestamp().IsZero() {
 		if ok, err := r.runFinalizers(ctx); err != nil {
@@ -152,10 +162,40 @@ func (r *snapshotRestorer) reconcileStarting(ctx context.Context) (reconcile.Res
 }
 
 func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Result, error) {
-	if ok, err := r.reconcileInstances(ctx); err != nil {
+	instances := &appsv1.StatefulSetList{}
+	if err := r.cl.List(ctx, instances, &client.ListOptions{
+		Namespace: r.cluster.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelCluster: r.cluster.Name,
+			naming.LabelData:    naming.DataPostgres,
+		}),
+	}); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "list instances")
+	}
+
+	if ok, err := r.reconcileInstances(ctx, instances); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile instances")
 	} else if !ok {
 		r.log.Info("Waiting for instances PVCs to be reconciled")
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
+	// Prepare PVCs
+	if ok, err := r.runPrepareJob(ctx, instances); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "run prepare job")
+	} else if !ok {
+		r.log.Info("Preparing PVCs")
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
+	if err := r.reconcilePrepareJobAnnotation(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile prepare job annotation")
+	}
+
+	// Run PITR if needed
+	if ok, err := r.restorePITR(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "restore PITR")
+	} else if !ok {
+		r.log.Info("Waiting for PITR to complete")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -171,14 +211,6 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	// Perform PITR if needed.
-	if ok, err := r.restorePITR(ctx); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "restore PITR")
-	} else if !ok {
-		r.log.Info("Waiting for PITR to complete")
-		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
-	}
-
 	if err := r.restore.UpdateStatus(ctx, r.cl, func(restore *v2.PerconaPGRestore) {
 		restore.Status.State = v2.RestoreSucceeded
 		restore.Status.CompletedAt = &metav1.Time{Time: time.Now()}
@@ -190,18 +222,7 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 	return reconcile.Result{}, nil
 }
 
-func (r *snapshotRestorer) reconcileInstances(ctx context.Context) (bool, error) {
-	instances := &appsv1.StatefulSetList{}
-	if err := r.cl.List(ctx, instances, &client.ListOptions{
-		Namespace: r.cluster.GetNamespace(),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			naming.LabelCluster: r.cluster.Name,
-			naming.LabelData:    naming.DataPostgres,
-		}),
-	}); err != nil {
-		return false, errors.Wrap(err, "list instances")
-	}
-
+func (r *snapshotRestorer) reconcileInstances(ctx context.Context, instances *appsv1.StatefulSetList) (bool, error) {
 	done := true
 	for _, instance := range instances.Items {
 		if ok, err := r.reconcileInstance(ctx, &instance); err != nil {
@@ -466,8 +487,14 @@ func (r *snapshotRestorer) runFinalizers(ctx context.Context) (bool, error) {
 
 func (r *snapshotRestorer) finalizeSnapshotRestore(_ client.Client, _ *v2.PerconaPGRestore) func(ctx context.Context, restore *v2.PerconaPGRestore) error {
 	return func(ctx context.Context, restore *v2.PerconaPGRestore) error {
-		if _, err := r.unsuspendAllInstances(ctx); err != nil {
+		if done, err := r.unsuspendAllInstances(ctx); err != nil {
 			return errors.Wrap(err, "resume cluster")
+		} else if !done {
+			return controller.ErrFinalizerPending
+		}
+
+		if err := r.cleanupSkipRecoveryFile(ctx); err != nil {
+			return errors.Wrap(err, "cleanup")
 		}
 		return nil
 	}
@@ -505,4 +532,166 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 func (r *snapshotRestorer) isPITRInProgress() bool {
 	_, ok := r.cluster.GetAnnotations()[naming.PGBackRestRestore]
 	return ok
+}
+
+func (r *snapshotRestorer) reconcilePrepareJobAnnotation(ctx context.Context) error {
+	if _, ok := r.restore.GetAnnotations()[pNaming.AnnotationPVCsPreparedAt]; ok {
+		return nil
+	}
+
+	orig := r.restore.DeepCopy()
+	annotations := r.restore.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[pNaming.AnnotationPVCsPreparedAt] = time.Now().Format(time.RFC3339)
+	r.restore.SetAnnotations(annotations)
+	if err := r.cl.Patch(ctx, r.restore.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "patch restore annotations")
+	}
+	return nil
+}
+
+// prepares PVCs before starting the cluster.
+func (r *snapshotRestorer) runPrepareJob(ctx context.Context, instances *appsv1.StatefulSetList) (bool, error) {
+	jobName := r.restore.GetName() + "-prepare"
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: r.cluster.GetNamespace(),
+		},
+	}
+
+	// PVC already prepared, delete and return.
+	if _, ok := r.restore.GetAnnotations()[pNaming.AnnotationPVCsPreparedAt]; ok {
+		return true, client.IgnoreNotFound(r.cl.Delete(ctx, job,
+			client.PropagationPolicy(metav1.DeletePropagationForeground)))
+	}
+
+	err := r.cl.Get(ctx, client.ObjectKeyFromObject(job), job)
+	if k8serrors.IsNotFound(err) {
+		generatePrepareJob(job, instances, r.cluster, r.restore)
+		if err := controllerutil.SetControllerReference(r.restore, job, r.cl.Scheme()); err != nil {
+			return false, errors.Wrap(err, "set controller reference")
+		}
+		if err := r.cl.Create(ctx, job); err != nil {
+			return false, errors.Wrap(err, "create prepare job")
+		}
+		return false, nil
+	} else if err != nil {
+		return false, errors.Wrap(err, "get prepare job")
+	}
+
+	if !job.Status.CompletionTime.IsZero() && job.Status.Succeeded > 0 {
+		return true, nil
+	}
+
+	if job.Status.Failed > 0 {
+		if err := r.restore.UpdateStatus(ctx, r.cl, func(restore *v2.PerconaPGRestore) {
+			restore.Status.State = v2.RestoreFailed
+		}); err != nil {
+			return false, errors.Wrap(err, "update restore status")
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func generatePrepareJob(
+	job *batchv1.Job,
+	instances *appsv1.StatefulSetList,
+	cluster *v2.PerconaPGCluster,
+	restore *v2.PerconaPGRestore,
+) {
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+
+	for _, instance := range instances.Items {
+		volName := instance.GetName() + "-pgdata"
+		volumes = append(volumes, corev1.Volume{
+			Name: volName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: naming.InstancePostgresDataVolume(&instance).Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      volName,
+			MountPath: path.Join(instance.GetName(), "pgdata"),
+		})
+	}
+
+	scriptParts := []string{"set -e"}
+	for _, mount := range volumeMounts {
+		if restore.Spec.RepoName == nil || restore.Spec.VolumeSnapshotBackupName == "" { // no PITR
+			// PVCs are not needed, signal the restore_command to skip WAL recovery in order
+			// to maintain consistency with the snapshot data.
+			dataDir := path.Join(mount.MountPath, fmt.Sprintf("pg%d", cluster.Spec.PostgresVersion))
+			signalFile := path.Join(dataDir, "skip-wal-recovery")
+			scriptParts = append(scriptParts, fmt.Sprintf("touch %q", signalFile))
+		} else {
+			//  PITR is needed, clear local WAL files since they may belong to a different timeline.
+			// PITR restore job will fetch the required WAL files from the repo.
+			walDir := path.Join(mount.MountPath, fmt.Sprintf("pg%d_wal", cluster.Spec.PostgresVersion))
+			scriptParts = append(scriptParts, fmt.Sprintf("find %q -mindepth 1 -delete", walDir))
+		}
+	}
+	script := strings.Join(scriptParts, "\n")
+
+	container := corev1.Container{
+		Name:  "snapshot-prepare",
+		Image: cluster.Spec.Image,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+		},
+		VolumeMounts: volumeMounts,
+		Command:      []string{"bash", "-c", script},
+	}
+	job.Spec = batchv1.JobSpec{
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					naming.DefaultContainerAnnotation: "prepare",
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers:    []corev1.Container{container},
+				Volumes:       volumes,
+				RestartPolicy: corev1.RestartPolicyNever,
+			},
+		},
+	}
+
+}
+
+// We create a $PGDATA/skip-wal-recovery file during the snapshot restore when no PITR is specified.
+// This method will cleanup this file after the restore is completed.
+func (r *snapshotRestorer) cleanupSkipRecoveryFile(ctx context.Context) error {
+	if r.restore.Spec.RepoName != nil {
+		return nil
+	}
+
+	pods := &corev1.PodList{}
+	if err := r.cl.List(ctx, pods, &client.ListOptions{
+		Namespace: r.cluster.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelCluster: r.cluster.Name,
+			naming.LabelData:    naming.DataPostgres,
+		}),
+	}); err != nil {
+		return errors.Wrap(err, "list pods")
+	}
+
+	rmScript := `rm -f "${PGDATA}/skip-wal-recovery"`
+	for _, pod := range pods.Items {
+		if err := r.podExec(ctx, r.cluster.GetNamespace(), pod.GetName(), naming.ContainerDatabase, nil, io.Discard, nil, "sh", "-c", rmScript); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
