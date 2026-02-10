@@ -386,6 +386,7 @@ func (r *snapshotRestorer) reconcileLeaderEndpoints(ctx context.Context) error {
 		},
 	}
 
+	//nolint:staticcheck
 	leaderEp := &corev1.Endpoints{ObjectMeta: naming.PatroniLeaderEndpoints(postgresCluster)}
 	if err := r.cl.Get(ctx, client.ObjectKeyFromObject(leaderEp), leaderEp); err != nil {
 		return client.IgnoreNotFound(err)
@@ -512,6 +513,7 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 	}
 
 	switch status {
+	case v2.RestoreNew:
 	case v2.RestoreStarting:
 		return false, pgbackrestRestore.Start(ctx)
 	case v2.RestoreRunning:
