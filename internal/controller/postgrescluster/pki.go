@@ -363,6 +363,9 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 }
 
 func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (bool, error) {
+	if r.RestConfig == nil {
+		return false, nil
+	}
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, true)
 	err := c.Check(ctx, r.RestConfig, ns)
 	if err != nil {
