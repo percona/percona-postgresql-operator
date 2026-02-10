@@ -1319,97 +1319,21 @@ enable_hugepages() {
 }
 
 enable_hugepages_gke() {
-	local hugepage_count=$1
+  local hugepage_count=$1
 
-	echo "Configuring hugepages on GKE"
+  echo "Hugepages configuration is now handled during cluster creation"
+  echo "Skipping runtime configuration for GKE"
 
-	# Get node info
-	local node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-	echo "Sample node: ${node_name}"
+  echo "Verifying hugepages configuration..."
+  local node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
 
-	local provider_id=$(kubectl get node ${node_name} -o jsonpath='{.spec.providerID}')
-	echo "Provider ID: ${provider_id}"
-
-	# Parse providerID
-	local gke_project=""
-	local gke_zone=""
-	local instance_name=""
-
-	if [[ ${provider_id} =~ ^gce://([^/]+)/([^/]+)/(.+)$ ]]; then
-		gke_project="${BASH_REMATCH[1]}"
-		gke_zone="${BASH_REMATCH[2]}"
-		instance_name="${BASH_REMATCH[3]}"
-	else
-		echo "Could not parse providerID: ${provider_id}"
-		return 1
-	fi
-
-	local gke_cluster=""
-	if [[ ${instance_name} =~ ^gke-([^-]+-[^-]+)-.*$ ]]; then
-		gke_cluster="${BASH_REMATCH[1]}"
-	elif [[ ${instance_name} =~ ^gke-([^-]+)-.*$ ]]; then
-		gke_cluster="${BASH_REMATCH[1]}"
-	else
-		echo "Could not extract cluster name from instance: ${instance_name}"
-		return 1
-	fi
-
-	local gke_location="${gke_zone%-*}"
-
-	if [ -z "${gke_cluster}" ] || [ -z "${gke_location}" ] || [ -z "${gke_project}" ]; then
-		echo "Could not determine GKE cluster information"
-		echo "Cluster: ${gke_cluster}"
-		echo "Location: ${gke_location}"
-		echo "Zone: ${gke_zone}"
-		echo "Project: ${gke_project}"
-		return 1
-	fi
-
-	local node_pool=${GKE_NODE_POOL:-default-pool}
-
-	echo "Project: ${gke_project}"
-	echo "Zone: ${gke_zone}"
-	echo "Region: ${gke_location}"
-	echo "Cluster: ${gke_cluster}"
-	echo "Node pool: ${node_pool}"
-	echo "Hugepages (2Mi): ${hugepage_count}"
-
-	cat >/tmp/node-pool-config.yaml <<EOF
-linuxConfig:
-  hugepageConfig:
-    hugepage_size2m: ${hugepage_count}
-EOF
-
-	echo "Updating node pool with hugepages configuration..."
-
-	if gcloud container node-pools update ${node_pool} \
-		--cluster ${gke_cluster} \
-		--region ${gke_location} \
-		--project ${gke_project} \
-		--system-config-from-file=/tmp/node-pool-config.yaml 2>/dev/null; then
-
-		echo "Node pool updated (regional cluster)"
-
-	elif gcloud container node-pools update ${node_pool} \
-		--cluster ${gke_cluster} \
-		--zone ${gke_zone} \
-		--project ${gke_project} \
-		--system-config-from-file=/tmp/node-pool-config.yaml 2>/dev/null; then
-
-		echo "Node pool updated (zonal cluster)"
-	else
-		echo "Failed to update node pool"
-		rm -f /tmp/node-pool-config.yaml
-		return 1
-	fi
-
-	echo "Waiting for nodes to restart..."
-	sleep 60
-	kubectl wait --for=condition=Ready nodes --all --timeout=300s
-
-	rm -f /tmp/node-pool-config.yaml
-	echo "Hugepages configured on GKE"
-	return 0
+  if kubectl get node ${node_name} -o jsonpath='{.status.allocatable.hugepages-2Mi}' | grep -q '[0-9]'; then
+    echo "✓ Hugepages are already configured on nodes"
+    return 0
+  else
+    echo "✗ Warning: Hugepages not found in node allocatable resources"
+    return 1
+  fi
 }
 
 enable_hugepages_eks() {
