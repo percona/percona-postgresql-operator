@@ -1,0 +1,58 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      sleep 30
+
+      # pg_stat_monitor
+      run_psql_local \
+        "SELECT pg_stat_monitor_reset();" \
+        "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres"
+
+      # pg_stat_statements
+      run_psql_local \
+        "SELECT pg_stat_statements_reset();" \
+        "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres"
+
+      # pg_audit
+      run_psql_local \
+        "CREATE TEMP TABLE pgaudit_test(x int);DROP TABLE pgaudit_test;" \
+        "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres"
+
+      if [[ $(kubectl logs -n ${NAMESPACE} -l "postgres-operator.crunchydata.com/instance-set=instance1" --tail=-1 | grep -c 'AUDIT:') == 0 ]]; then
+        echo "Expected `AUDIT:` logs"
+        exit 1
+      fi
+
+      # pgvector
+      run_psql_local \
+        "SELECT '\''[1,2,3]'\''::vector <-> '\''[3,2,1]'\''::vector;" \
+        "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres"
+
+      # pg_repack
+      prev_relfilenode=$(run_psql_local \
+        "CREATE TABLE public.repack_smoke(id int PRIMARY KEY, t text);
+        INSERT INTO public.repack_smoke
+        SELECT i, repeat('\''x'\'',200) FROM generate_series(1,5000) i;
+        DELETE FROM public.repack_smoke WHERE id %% 2 = 0;
+        SELECT relfilenode FROM pg_class WHERE oid='\''public.repack_smoke'\''::regclass;" \
+        "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres")
+
+      kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
+        pg_repack -d "postgres://postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres" -t "public.repack_smoke"
+
+      cur_relfilenode=$(run_psql_local \
+        "SELECT relfilenode FROM pg_class WHERE oid='\''public.repack_smoke'\''::regclass;" \
+        "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres")
+      if [[ $prev_relfilenode == $cur_relfilenode ]]; then
+        echo "pg_repack check failed"
+        exit 1
+      fi
+
+    timeout: 360
+
