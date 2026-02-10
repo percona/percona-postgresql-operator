@@ -27,59 +27,72 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
+func (r *PGClusterReconciler) reconcilePatroniVersionFromCluster(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	if cr.CompareVersion("2.8.0") < 0 {
+		return nil
+	}
+
+	pods, err := r.getInstancePods(ctx, cr)
+	if err != nil {
+		return errors.Wrap(err, "failed to get instance pods")
+	}
+	if len(pods.Items) == 0 || pods.Items[0].Status.Phase != corev1.PodRunning {
+		return errPatroniVersionCheckWait
+	}
+
+	p := pods.Items[0]
+	imageID := getImageIDFromPod(&p, naming.ContainerDatabase)
+	pgVersion := cr.Spec.PostgresVersion
+
+	// If patroni version is set, and neither imageID nor PG version have changed,
+	// we don't need to check the patroni version again.
+	if cr.Status.Patroni.Version != "" &&
+		cr.Status.Postgres.ImageID == imageID &&
+		cr.Status.Postgres.Version == pgVersion {
+		return nil
+	}
+
+	patroniVersion, err := r.getPatroniVersion(ctx, &p, naming.ContainerDatabase)
+	if err != nil {
+		return errors.Wrap(err, "failed to get patroni version")
+	}
+
+	orig := cr.DeepCopy()
+
+	cr.Status.Patroni.Version = patroniVersion
+	cr.Status.PatroniVersion = patroniVersion
+	cr.Status.Postgres.Version = pgVersion
+	cr.Status.Postgres.ImageID = imageID
+
+	if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return errors.Wrap(err, "failed to patch patroni version")
+	}
+
+	err = r.patchPatroniVersionAnnotation(ctx, cr, patroniVersion)
+	if err != nil {
+		return errors.Wrap(err, "failed to patch patroni version annotation")
+	}
+
+	return nil
+}
+
 var errPatroniVersionCheckWait = errors.New("waiting for pod to initialize")
 
-func (r *PGClusterReconciler) reconcilePatroniVersion(ctx context.Context, cr *v2.PerconaPGCluster) error {
+func (r *PGClusterReconciler) reconcilePatroniVersionCheckPod(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	// Starting from version 2.8.0, the patroni version check pod should not be executed.
+	if cr.CompareVersion("2.8.0") >= 0 {
+		return nil
+	}
+
 	if cr.Annotations == nil {
 		cr.Annotations = make(map[string]string)
 	}
-	if cr.CompareVersion("2.7.0") <= 0 {
-		if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
-			err := r.handleCustomPatroniVersionAnnotation(ctx, cr, patroniVersion)
-			if err != nil {
-				return errors.Wrap(err, "handle patroni annotation")
-			}
-			return nil
-		}
-	}
 
-	// Starting from version 2.8.0, the patroni version check pod should not be executed.
-	if cr.CompareVersion("2.8.0") >= 0 {
-		pods, err := r.getInstancePods(ctx, cr)
+	if patroniVersion, ok := cr.Annotations[pNaming.AnnotationCustomPatroniVersion]; ok {
+		err := r.handleCustomPatroniVersionAnnotation(ctx, cr, patroniVersion)
 		if err != nil {
-			return errors.Wrap(err, "failed to get instance pods")
+			return errors.Wrap(err, "handle patroni annotation")
 		}
-		if len(pods.Items) == 0 {
-			return errors.Wrap(err, "instance pods not available")
-		}
-
-		p := pods.Items[0]
-
-		if p.Status.Phase != corev1.PodRunning {
-			return errPatroniVersionCheckWait
-		}
-
-		patroniVersion, err := r.getPatroniVersion(ctx, &p, naming.ContainerDatabase)
-		if err != nil {
-			return errors.Wrap(err, "failed to get patroni version")
-		}
-
-		orig := cr.DeepCopy()
-
-		cr.Status.Patroni.Version = patroniVersion
-		cr.Status.PatroniVersion = patroniVersion
-		cr.Status.Postgres.Version = cr.Spec.PostgresVersion
-		cr.Status.Postgres.ImageID = getImageIDFromPod(&p, naming.ContainerDatabase)
-
-		if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
-			return errors.Wrap(err, "failed to patch patroni version")
-		}
-
-		err = r.patchPatroniVersionAnnotation(ctx, cr, patroniVersion)
-		if err != nil {
-			return errors.Wrap(err, "failed to patch patroni version annotation")
-		}
-
 		return nil
 	}
 

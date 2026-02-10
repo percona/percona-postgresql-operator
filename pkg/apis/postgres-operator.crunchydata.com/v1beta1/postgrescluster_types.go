@@ -791,6 +791,10 @@ func (cr *PostgresCluster) CompareVersion(ver string) int {
 func (cr *PostgresCluster) IsPatroniVer4() (bool, error) {
 	patroniVerStr, ok := cr.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
 	if !ok {
+		// Assume Patroni v4 for CR versions greater than 2.7.0
+		if cr.CompareVersion("2.7.0") >= 0 {
+			return true, nil
+		}
 		return false, errors.New("patroni version annotation was not found")
 	}
 	patroniVer, err := gover.NewVersion(patroniVerStr)
