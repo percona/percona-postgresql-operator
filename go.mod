@@ -4,7 +4,7 @@ go 1.25.1
 
 require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
-	github.com/cert-manager/cert-manager v1.19.2
+	github.com/cert-manager/cert-manager v1.19.3
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/errors v0.22.6
 	github.com/go-openapi/runtime v0.29.2
