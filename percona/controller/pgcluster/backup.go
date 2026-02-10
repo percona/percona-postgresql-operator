@@ -50,7 +50,6 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 	}
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
-
 		if repo.Volume != nil {
 			repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
 			if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
