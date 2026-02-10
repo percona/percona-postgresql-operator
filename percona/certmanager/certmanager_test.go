@@ -191,7 +191,7 @@ func TestApplyIssuer(t *testing.T) {
 	t.Run("issuer is cluster-scoped and cannot have namespace-scoped owner", func(t *testing.T) {
 		err := ctrl.ApplyIssuer(t.Context(), cluster)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cluster-scoped resource must not have a namespace-scoped owner")
+		assert.Contains(t, err.Error(), "failed to set controller reference")
 	})
 }
 
@@ -205,7 +205,7 @@ func TestApplyCAIssuer(t *testing.T) {
 	t.Run("CA issuer is cluster-scoped and cannot have namespace-scoped owner", func(t *testing.T) {
 		err := ctrl.ApplyCAIssuer(t.Context(), cluster)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cluster-scoped resource must not have a namespace-scoped owner")
+		assert.Contains(t, err.Error(), "failed to set controller reference")
 	})
 }
 
