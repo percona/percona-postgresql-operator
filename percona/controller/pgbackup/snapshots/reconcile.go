@@ -187,18 +187,21 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 		return reconcile.Result{}, fmt.Errorf("failed to reconcile tablespace snapshot: %w", err)
 	}
 
-	if dataOk && walOk && tablespaceOk {
-		if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
-			bcp.Status.State = v2.BackupSucceeded
-			bcp.Status.CompletedAt = ptr.To(metav1.Now())
-		}); err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", err)
-		}
-		return reconcile.Result{}, nil
+	if !dataOk || !walOk || !tablespaceOk {
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	// Check again later
-	return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	if err := r.complete(ctx); err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to complete snapshot: %w", err)
+	}
+
+	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
+		bcp.Status.State = v2.BackupSucceeded
+		bcp.Status.CompletedAt = ptr.To(metav1.Now())
+	}); err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", err)
+	}
+	return reconcile.Result{}, nil
 }
 
 func (r *snapshotReconciler) reconcileSnapshot(ctx context.Context, volumeSnapshot *volumesnapshotv1.VolumeSnapshot) (bool, error) {
@@ -277,6 +280,10 @@ func (r *snapshotReconciler) reconcileDataSnapshot(ctx context.Context) (bool, e
 }
 
 func (r *snapshotReconciler) reconcileWALSnapshot(ctx context.Context) (bool, error) {
+	if r.backup.Status.Snapshot.WALVolume == nil || r.backup.Status.Snapshot.WALVolume.PVCName == "" {
+		return true, nil
+	}
+
 	snapshotName := r.backup.GetName() + "-" + naming.RolePostgresWAL
 	volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
@@ -307,6 +314,10 @@ func (r *snapshotReconciler) reconcileWALSnapshot(ctx context.Context) (bool, er
 }
 
 func (r *snapshotReconciler) reconcileTablespaceSnapshot(ctx context.Context) (bool, error) {
+	if len(r.backup.Status.Snapshot.TablespaceVolumes) == 0 {
+		return true, nil
+	}
+
 	done := true
 	for tsName, info := range r.backup.Status.Snapshot.TablespaceVolumes {
 		snapshotName := r.backup.GetName() + "-" + tsName + "-" + naming.RoleTablespace
@@ -472,7 +483,7 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 		controllerutil.RemoveFinalizer(bcp, pNaming.FinalizerSnapshotInProgress)
 		return r.cl.Patch(ctx, bcp, client.MergeFrom(orig))
 	}); err != nil {
-		return fmt.Errorf("failed to add remove finalizer: %w", err)
+		return fmt.Errorf("failed to remove finalizer: %w", err)
 	}
 	return nil
 }

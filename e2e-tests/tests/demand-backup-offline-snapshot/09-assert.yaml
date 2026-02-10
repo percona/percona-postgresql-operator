@@ -14,7 +14,7 @@ spec:
   dataSource:
     apiGroup: snapshot.storage.k8s.io
     kind: VolumeSnapshot
-    name: backup3
+    name: backup3-pgdata
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore

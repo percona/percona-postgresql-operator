@@ -18,6 +18,6 @@ commands:
         name: restore1
       spec:
         pgCluster: backup-snapshot
-        volumeSnapshotName: backup1
+        volumeSnapshotBackupName: backup1
       EOF
     timeout: 360
