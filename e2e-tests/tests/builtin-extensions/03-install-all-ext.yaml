@@ -1,0 +1,19 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: builtin-extensions
+spec:
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          pgaudit.log: 'ddl,write,role'
+          pgaudit.log_level: 'warning'
+          logging_collector: 'off'
+  extensions:
+    builtin:
+      pg_stat_monitor: true
+      pg_stat_statements: true
+      pg_audit: true
+      pgvector: true
+      pg_repack: true
