@@ -4,11 +4,11 @@ delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
-    name: pgvector-extension
+    name: builtin-extensions
 - apiVersion: postgres-operator.crunchydata.com/v1beta1
   kind: PostgresCluster
   metadata:
-    name: pgvector-extension
+    name: builtin-extensions
 commands:
   - script: |-
       set -o errexit

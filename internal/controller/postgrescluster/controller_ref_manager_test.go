@@ -46,12 +46,19 @@ func TestManageControllerRefs(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"label1": "val1"},
 				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "some-name",
+							Image: "some-image",
+						},
+					},
+				},
 			},
 		},
 	}
 
 	t.Run("adopt Object", func(t *testing.T) {
-
 		obj := objBase.DeepCopy()
 		obj.Name = "adopt"
 		obj.Labels = map[string]string{naming.LabelCluster: clusterName}
@@ -84,7 +91,6 @@ func TestManageControllerRefs(t *testing.T) {
 	})
 
 	t.Run("release Object", func(t *testing.T) {
-
 		isTrue := true
 		obj := objBase.DeepCopy()
 		obj.Name = "release"
@@ -115,7 +121,6 @@ func TestManageControllerRefs(t *testing.T) {
 	})
 
 	t.Run("ignore Object: no matching labels or owner refs", func(t *testing.T) {
-
 		obj := objBase.DeepCopy()
 		obj.Name = "ignore-no-labels-refs"
 		obj.Labels = map[string]string{"ignore-label": "ignore-value"}
@@ -138,7 +143,6 @@ func TestManageControllerRefs(t *testing.T) {
 	})
 
 	t.Run("ignore Object: PostgresCluster does not exist", func(t *testing.T) {
-
 		obj := objBase.DeepCopy()
 		obj.Name = "ignore-no-postgrescluster"
 		obj.Labels = map[string]string{naming.LabelCluster: "nonexistent"}
