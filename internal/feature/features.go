@@ -94,6 +94,9 @@ const (
 
 	// Support VolumeSnapshots
 	VolumeSnapshots = "VolumeSnapshots"
+
+	// Support EndpointSlices
+	EndpointSlices = "EndpointSlices"
 )
 
 // NewGate returns a MutableGate with the Features defined in this package.
@@ -111,6 +114,7 @@ func NewGate() MutableGate {
 		PGUpgradeCPUConcurrency:    {Default: false, PreRelease: featuregate.Alpha},
 		TablespaceVolumes:          {Default: false, PreRelease: featuregate.Alpha},
 		VolumeSnapshots:            {Default: false, PreRelease: featuregate.Alpha},
+		EndpointSlices:             {Default: false, PreRelease: featuregate.Alpha},
 	}); err != nil {
 		panic(err)
 	}
