@@ -1,0 +1,29 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if ! kubectl -n "${NAMESPACE}" get sts some-name-datasource-repo-host; then
+        echo "expected repo host StatefulSet to exist"
+        exit 1
+      fi
+      
+      if [[ $(kubectl get job -n "${NAMESPACE}" --no-headers -l postgres-operator.crunchydata.com/pgbackrest-backup=replica-create,postgres-operator.crunchydata.com/cluster=some-name-datasource | wc -l) > 0 ]]; then
+        echo "expected pgBackRest backup job to not exist"
+        exit 1
+      fi
+      
+      image=$(kubectl -n "$NAMESPACE" get postgrescluster some-name-datasource -o jsonpath='{.spec.backups.pgbackrest.image}')
+      if [[ -z "$image" ]]; then
+        echo "expected pgBackRest image not to be empty"
+        exit 1
+      fi    
+  
+
+      get_cr "some-name-datasource" ${RANDOM} \
+        | yq 'del(.spec.backups.enabled)' \
+        | kubectl -n "${NAMESPACE}" apply -f -

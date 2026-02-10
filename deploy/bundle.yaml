@@ -21831,6 +21831,10 @@ spec:
                 and is true
               rule: '!has(self.users) || self.postgresVersion >= 15 || self.users.all(u,
                 !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)'
+            - message: spec.backups.pgbackrest.image is required when spec.dataSource
+                is set
+              rule: '!has(self.dataSource) || (has(self.backups.pgbackrest.image)
+                && self.backups.pgbackrest.image != "")'
           status:
             properties:
               conditions:
@@ -29940,6 +29944,8 @@ spec:
               backups:
                 description: PostgreSQL backup configuration
                 properties:
+                  enabled:
+                    type: boolean
                   pgbackrest:
                     description: pgBackRest archive configuration
                     properties:
@@ -54188,7 +54194,7 @@ spec:
           value: "false"
         - name: PGO_WORKERS
           value: "1"
-        image: docker.io/perconalab/percona-postgresql-operator:main
+        image: docker.io/perconalab/percona-postgresql-operator:k8spg-904-1
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -45,6 +46,7 @@ type PerconaPGCluster struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
+// +kubebuilder:validation:XValidation:rule="!has(self.dataSource) || (has(self.backups.pgbackrest.image) && self.backups.pgbackrest.image != \"\")",message="spec.backups.pgbackrest.image is required when spec.dataSource is set"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
@@ -500,7 +502,12 @@ func (b Backups) IsEnabled() bool {
 
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	if b.Enabled != nil && !*b.Enabled {
-		return crunchyv1beta1.Backups{}
+		return crunchyv1beta1.Backups{
+			Enabled: ptr.To(false),
+			PGBackRest: crunchyv1beta1.PGBackRestArchive{
+				Image: b.PGBackRest.Image,
+			},
+		}
 	}
 
 	var sc *crunchyv1beta1.PGBackRestSidecars
@@ -513,6 +520,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	}
 
 	backups := crunchyv1beta1.Backups{
+		Enabled: b.Enabled,
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
 			Metadata:      b.PGBackRest.Metadata,
 			Configuration: b.PGBackRest.Configuration,

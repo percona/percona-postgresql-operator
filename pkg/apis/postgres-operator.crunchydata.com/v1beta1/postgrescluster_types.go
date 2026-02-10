@@ -358,6 +358,8 @@ func (s *PostgresClusterSpec) Default() {
 
 // Backups defines a PostgreSQL archive configuration
 type Backups struct {
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// pgBackRest archive configuration
 	// +optional
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
