@@ -9,8 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8sptr "k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
@@ -381,4 +383,108 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func TestShouldCheckStandbyLag(t *testing.T) {
+	testCases := []struct {
+		descr    string
+		expected bool
+		cr       *PerconaPGCluster
+	}{
+		{
+			descr: "CRVersion < 2.9.0",
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					CRVersion: "2.8.0",
+				},
+			},
+			expected: false,
+		},
+		{
+			descr: "CRVersion < 2.9.0, standby!=nil",
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					CRVersion: "2.8.0",
+					Standby: &StandbySpec{
+						PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			descr: "CRVersion = 2.9.0, standby.enabled=true",
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					CRVersion: "2.8.0",
+					Standby: &StandbySpec{
+						PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			descr: "standby=nil",
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					CRVersion: "2.9.0",
+				},
+			},
+			expected: false,
+		},
+		{
+			descr: "standby.enabled=false",
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					CRVersion: "2.9.0",
+					Standby: &StandbySpec{
+						PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
+							Enabled: false,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			descr: "standby.enabled=true, maxAcceptableLag=nil",
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					CRVersion: "2.9.0",
+					Standby: &StandbySpec{
+						PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
+							Enabled: false,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			descr: "standby.enabled=true, maxAcceptableLag=0",
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					CRVersion: "2.9.0",
+					Standby: &StandbySpec{
+						PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
+							Enabled: true,
+						},
+						MaxAcceptableLag: k8sptr.To(resource.MustParse("0")),
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.descr, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.cr.ShouldCheckStandbyLag())
+		})
+	}
 }
