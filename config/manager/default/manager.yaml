@@ -37,6 +37,8 @@ spec:
             value: "false"
           - name: PGO_WORKERS
             value: "1"
+          - name: PPROF_BIND_ADDRESS
+            value: "0"
           - name: PGO_CONTROLLER_LEASE_NAME
             value: ""
           - name: PGO_CONTROLLER_LEASE_DURATION
