@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -163,28 +161,4 @@ func (e *offlineExec) getBackupTarget(ctx context.Context) (string, error) {
 
 	log.Info("Selected backup target", "instance", instanceName)
 	return instanceName, nil
-}
-
-func (e *offlineExec) getTargetPVC(ctx context.Context, instanceName string) (string, error) {
-	pvcs := &corev1.PersistentVolumeClaimList{}
-	if err := e.cl.List(ctx, pvcs, &client.ListOptions{
-		Namespace: e.cluster.GetNamespace(),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			naming.LabelInstance: instanceName,
-			naming.LabelRole:     naming.RolePostgresData,
-		}),
-	}); err != nil {
-		return "", errors.Wrap(err, "failed to list PVCs")
-	}
-
-	if len(pvcs.Items) == 0 {
-		return "", errors.New("no PVC found")
-	}
-
-	log := logging.FromContext(ctx)
-
-	if len(pvcs.Items) > 1 {
-		log.V(1).Info("Multiple PVCs found, using the first one", "pvc", pvcs.Items[0].GetName())
-	}
-	return pvcs.Items[0].GetName(), nil
 }
