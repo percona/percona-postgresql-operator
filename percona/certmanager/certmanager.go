@@ -41,9 +41,10 @@ const (
 )
 
 type controller struct {
-	cl     client.Client
-	scheme *runtime.Scheme
-	dryRun bool
+	cl         client.Client
+	scheme     *runtime.Scheme
+	dryRun     bool
+	newChecker func(config *rest.Config, ns string) (cmapichecker.Interface, error)
 }
 
 var _ Controller = new(controller)
@@ -55,9 +56,10 @@ func NewController(cl client.Client, scheme *runtime.Scheme, dryRun bool) Contro
 		cl = client.NewDryRunClient(cl)
 	}
 	return &controller{
-		cl:     cl,
-		scheme: scheme,
-		dryRun: dryRun,
+		cl:         cl,
+		scheme:     scheme,
+		dryRun:     dryRun,
+		newChecker: cmapichecker.New,
 	}
 }
 
@@ -68,7 +70,7 @@ var (
 
 func (c *controller) Check(ctx context.Context, config *rest.Config, ns string) error {
 	log := logf.FromContext(ctx)
-	checker, err := cmapichecker.New(config, ns)
+	checker, err := c.newChecker(config, ns)
 	if err != nil {
 		return err
 	}
@@ -144,7 +146,7 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 			SecretName: naming.PostgresRootCASecret(cluster).Name,
 			CommonName: cluster.Name + "-ca",
 			IsCA:       true,
-			IssuerRef: cmmeta.ObjectReference{
+			IssuerRef: cmmeta.IssuerReference{
 				Name: naming.CAIssuer(cluster).Name,
 				Kind: v1.IssuerKind,
 			},
@@ -250,7 +252,7 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 			SecretName: secretName,
 			CommonName: instanceName,
 			DNSNames:   dnsNames,
-			IssuerRef: cmmeta.ObjectReference{
+			IssuerRef: cmmeta.IssuerReference{
 				Name: naming.TLSIssuer(cluster).Name,
 				Kind: v1.IssuerKind,
 			},
@@ -312,7 +314,7 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 			SecretName: secretMeta.Name + "-frontend-tls",
 			CommonName: cluster.Name + "-pgbouncer",
 			DNSNames:   dnsNames,
-			IssuerRef: cmmeta.ObjectReference{
+			IssuerRef: cmmeta.IssuerReference{
 				Name: naming.TLSIssuer(cluster).Name,
 				Kind: v1.IssuerKind,
 			},
