@@ -7555,6 +7555,18 @@ spec:
                         enum:
                         - offline
                         type: string
+                      offlineConfig:
+                        description: |-
+                          Configuration for offline snapshot operations.
+                          Ignored if mode is not offline.
+                        properties:
+                          checkpointTimeoutSeconds:
+                            default: 300
+                            description: Timeout for the checkpoint operation.
+                            format: int32
+                            minimum: 30
+                            type: integer
+                        type: object
                       schedule:
                         description: |-
                           Defines the Cron schedule for a VolumeSnapshot.

@@ -20,24 +20,26 @@ import (
 )
 
 const (
-	checkpointTimeoutSeconds = 300 // 5mins // TODO: make this configurable
-	waitTimeout              = 5 * time.Minute
-	retryInterval            = 3 * time.Second
+	defaultCheckpointTimeoutSeconds int32 = 300 // 5mins
+	waitTimeout                           = 5 * time.Minute
+	retryInterval                         = 3 * time.Second
 )
 
 type offlineExec struct {
-	cl      client.Client
-	cluster *v2.PerconaPGCluster
-	backup  *v2.PerconaPGBackup
-	podExec runtime.PodExecutor
+	cl            client.Client
+	cluster       *v2.PerconaPGCluster
+	backup        *v2.PerconaPGBackup
+	podExec       runtime.PodExecutor
+	offlineConfig *v2.OfflineSnapshotConfig
 }
 
 func newOfflineExec(cl client.Client, podExec runtime.PodExecutor, pgCluster *v2.PerconaPGCluster, pgBackup *v2.PerconaPGBackup) *offlineExec {
 	return &offlineExec{
-		cl:      cl,
-		cluster: pgCluster,
-		backup:  pgBackup,
-		podExec: podExec,
+		cl:            cl,
+		cluster:       pgCluster,
+		backup:        pgBackup,
+		podExec:       podExec,
+		offlineConfig: pgCluster.Spec.Backups.VolumeSnapshots.OfflineConfig,
 	}
 }
 
@@ -63,11 +65,16 @@ func (e *offlineExec) checkpoint(ctx context.Context, instanceName string) error
 		return e.podExec(ctx, e.cluster.GetNamespace(), instanceName+"-0", naming.ContainerDatabase, stdin, stdout, stderr, command...)
 	}
 
+	timeoutSeconds := defaultCheckpointTimeoutSeconds
+	if e.offlineConfig != nil && e.offlineConfig.CheckpointTimeoutSeconds != nil {
+		timeoutSeconds = *e.offlineConfig.CheckpointTimeoutSeconds
+	}
+
 	stdout, stderr, err := postgres.Executor(exec).
 		ExecInDatabasesFromQuery(ctx, `SELECT pg_catalog.current_database()`,
 			`SET statement_timeout = :'timeout'; CHECKPOINT;`,
 			map[string]string{
-				"timeout":       fmt.Sprintf("%ds", checkpointTimeoutSeconds),
+				"timeout":       fmt.Sprintf("%ds", timeoutSeconds),
 				"ON_ERROR_STOP": "on", // Abort when any one statement fails.
 				"QUIET":         "on", // Do not print successful statements to stdout.
 			})

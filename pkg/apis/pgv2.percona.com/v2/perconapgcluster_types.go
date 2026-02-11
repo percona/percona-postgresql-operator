@@ -554,6 +554,19 @@ type VolumeSnapshots struct {
 	// +optional
 	// +kubebuilder:validation:MinLength=6
 	Schedule *string `json:"schedule,omitempty"`
+
+	// Configuration for offline snapshot operations.
+	// Ignored if mode is not offline.
+	// +optional
+	OfflineConfig *OfflineSnapshotConfig `json:"offlineConfig,omitempty"`
+}
+
+type OfflineSnapshotConfig struct {
+	// Timeout for the checkpoint operation.
+	// +optional
+	// +kubebuilder:validation:Minimum=30
+	// +kubebuilder:default=300
+	CheckpointTimeoutSeconds *int32 `json:"checkpointTimeoutSeconds,omitempty"`
 }
 
 func (b Backups) IsVolumeSnapshotsEnabled() bool {
