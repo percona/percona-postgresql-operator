@@ -153,8 +153,9 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 			Duration:    &metav1.Duration{Duration: time.Hour * 24 * 365},
 			RenewBefore: &metav1.Duration{Duration: 730 * time.Hour},
 			PrivateKey: &v1.CertificatePrivateKey{
-				Algorithm: v1.ECDSAKeyAlgorithm,
-				Size:      256,
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
 			},
 		},
 	}
@@ -196,8 +197,9 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
-				Algorithm: v1.ECDSAKeyAlgorithm,
-				Size:      256,
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
 			},
 			Usages: []v1.KeyUsage{
 				v1.UsageServerAuth,
@@ -259,8 +261,9 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
-				Algorithm: v1.ECDSAKeyAlgorithm,
-				Size:      256,
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
 			},
 			Usages: []v1.KeyUsage{
 				v1.UsageServerAuth,
@@ -321,8 +324,9 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
-				Algorithm: v1.ECDSAKeyAlgorithm,
-				Size:      256,
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
 			},
 			Usages: []v1.KeyUsage{
 				v1.UsageServerAuth,

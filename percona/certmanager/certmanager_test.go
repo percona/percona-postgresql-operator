@@ -240,6 +240,7 @@ func TestApplyCACertificate(t *testing.T) {
 		assert.NotNil(t, cert.Spec.PrivateKey)
 		assert.Equal(t, v1.ECDSAKeyAlgorithm, cert.Spec.PrivateKey.Algorithm)
 		assert.Equal(t, 256, cert.Spec.PrivateKey.Size)
+		assert.Equal(t, v1.RotationPolicyNever, cert.Spec.PrivateKey.RotationPolicy)
 
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
@@ -288,6 +289,7 @@ func TestApplyClusterCertificate(t *testing.T) {
 		assert.NotNil(t, cert.Spec.PrivateKey)
 		assert.Equal(t, v1.ECDSAKeyAlgorithm, cert.Spec.PrivateKey.Algorithm)
 		assert.Equal(t, 256, cert.Spec.PrivateKey.Size)
+		assert.Equal(t, v1.RotationPolicyNever, cert.Spec.PrivateKey.RotationPolicy)
 
 		assert.Contains(t, cert.Spec.Usages, v1.UsageServerAuth)
 		assert.Contains(t, cert.Spec.Usages, v1.UsageClientAuth)
