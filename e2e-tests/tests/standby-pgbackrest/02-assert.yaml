@@ -1,40 +1,41 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 300
+timeout: 480
+command:
+  - script: |-
+      kubectl wait --for=jsonpath='{.metadata.annotations["pgv2.percona.com/replication-main-site"]}'="${NAMESPACE}"/source-cluster --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
 ---
-kind: StatefulSet
 apiVersion: apps/v1
+kind: StatefulSet
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: pgvector-extension
+    postgres-operator.crunchydata.com/cluster: standby-cluster
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: pgvector-extension
-      controller: true
-      blockOwnerDeletion: true
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: standby-cluster
 status:
-  observedGeneration: 1
-  replicas: 1
+  availableReplicas: 1
+  currentReplicas: 1
   readyReplicas: 1
+  replicas: 1
   updatedReplicas: 1
-  collisionCount: 0
 ---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: pgvector-extension-pgbouncer
+  name: standby-cluster-pgbouncer
   labels:
-    postgres-operator.crunchydata.com/cluster: pgvector-extension
+    postgres-operator.crunchydata.com/cluster: standby-cluster
     postgres-operator.crunchydata.com/role: pgbouncer
-  annotations:
-    deployment.kubernetes.io/revision: '1'
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
-      name: pgvector-extension
+      name: standby-cluster
       controller: true
       blockOwnerDeletion: true
 status:
@@ -46,18 +47,15 @@ status:
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: pgvector-extension
+  name: standby-cluster
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: pgvector-extension
+      name: standby-cluster
       controller: true
       blockOwnerDeletion: true
   finalizers:
     - postgres-operator.crunchydata.com/finalizer
-spec:
-  backups:
-    pgbackrest: {}
 status:
   instances:
     - name: instance1
@@ -65,6 +63,9 @@ status:
       replicas: 3
       updatedReplicas: 3
   observedGeneration: 1
+  pgbackrest:
+    repos:
+      - name: repo1
   proxy:
     pgBouncer:
       readyReplicas: 3
@@ -73,7 +74,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: pgvector-extension
+  name: standby-cluster
 status:
   pgbouncer:
     ready: 3

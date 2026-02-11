@@ -73,10 +73,11 @@ type PGClusterReconciler struct {
 	Watchers             *registry.Registry
 	ExternalChan         chan event.GenericEvent
 	StopExternalWatchers chan event.DeleteEvent
+	WatchNamespace       []string
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
-func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
+func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.Manager) error {
 	if r.PodExec == nil {
 		var err error
 		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
@@ -95,6 +96,13 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		return errors.Wrap(err, "unable to watch pg-backups")
 	}
 
+	watchNamespace := ""
+	if len(r.WatchNamespace) == 1 {
+		watchNamespace = r.WatchNamespace[0]
+	}
+	standbyClusterEvents := make(chan event.GenericEvent)
+	go pollAndRequeueStandbys(ctx, standbyClusterEvents, r.Client, watchNamespace)
+
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
@@ -103,6 +111,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
+		WatchesRawSource(source.Channel(standbyClusterEvents, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }
 
@@ -265,13 +274,13 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 	}
 
-	if err := r.reconcilePatroniVersion(ctx, cr); err != nil {
+	if err := r.reconcilePatroniVersionCheckPod(ctx, cr); err != nil {
 		if errors.Is(err, errPatroniVersionCheckWait) {
 			return reconcile.Result{
 				RequeueAfter: 5 * time.Second,
 			}, nil
 		}
-		return reconcile.Result{}, errors.Wrap(err, "check patroni version")
+		return reconcile.Result{}, errors.Wrap(err, "check patroni version pod")
 	}
 
 	if err := r.reconcileTLS(ctx, cr); err != nil {
@@ -314,6 +323,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
 	}
 
+	if err := r.reconcileStandbyMainSiteAnnotation(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile replication main site annotation")
+	}
+
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
 		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
 		if err != nil {
@@ -354,6 +367,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.updateStatus(ctx, cr, &postgresCluster.Status); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "update status")
+	}
+
+	if err := r.reconcilePatroniVersionFromCluster(ctx, cr); err != nil {
+		if errors.Is(err, errPatroniVersionCheckWait) {
+			return reconcile.Result{
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		return reconcile.Result{}, errors.Wrap(err, "check patroni version from instance pods")
 	}
 
 	return ctrl.Result{}, nil
