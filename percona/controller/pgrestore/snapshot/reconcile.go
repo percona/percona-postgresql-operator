@@ -263,7 +263,8 @@ func (r *snapshotRestorer) reconcileDataVolume(
 
 	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresDataVolume(instance)}
 	snapshotName := *r.backup.Status.Snapshot.DataVolumeSnapshotRef
-	return r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
+	volCtxInfo := volumeContextInfo{role: naming.RolePostgresData}
+	return r.reconcileInstancePVC(ctx, volCtxInfo, pvc, instance, snapshotName)
 }
 
 func (r *snapshotRestorer) reconcileWALVolume(
@@ -276,7 +277,8 @@ func (r *snapshotRestorer) reconcileWALVolume(
 
 	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresWALVolume(instance)}
 	snapshotName := *r.backup.Status.Snapshot.WALVolumeSnapshotRef
-	return r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
+	volCtxInfo := volumeContextInfo{role: naming.RolePostgresWAL}
+	return r.reconcileInstancePVC(ctx, volCtxInfo, pvc, instance, snapshotName)
 }
 
 func (r *snapshotRestorer) reconcileTablespaceVolumes(ctx context.Context, instance *appsv1.StatefulSet) (bool, error) {
@@ -287,7 +289,8 @@ func (r *snapshotRestorer) reconcileTablespaceVolumes(ctx context.Context, insta
 	done := true
 	for tsName, snapshotName := range r.backup.Status.Snapshot.TablespaceVolumeSnapshotRefs {
 		pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstanceTablespaceDataVolume(instance, tsName)}
-		ok, err := r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
+		volCtxInfo := volumeContextInfo{role: naming.RoleTablespace, tablespaceName: tsName}
+		ok, err := r.reconcileInstancePVC(ctx, volCtxInfo, pvc, instance, snapshotName)
 		if err != nil {
 			return false, errors.Wrap(err, "reconcile tablespace volume")
 		}
@@ -300,6 +303,7 @@ func (r *snapshotRestorer) reconcileTablespaceVolumes(ctx context.Context, insta
 
 func (r *snapshotRestorer) reconcileInstancePVC(
 	ctx context.Context,
+	volCtxInfo volumeContextInfo,
 	pvc *corev1.PersistentVolumeClaim,
 	instance *appsv1.StatefulSet,
 	snapshotName string,
@@ -307,7 +311,7 @@ func (r *snapshotRestorer) reconcileInstancePVC(
 	observedPVC := &corev1.PersistentVolumeClaim{}
 	err := r.cl.Get(ctx, client.ObjectKeyFromObject(pvc), observedPVC)
 	if k8serrors.IsNotFound(err) {
-		if err := r.createPVCFromSnapshot(ctx, pvc, instance, snapshotName); err != nil {
+		if err := r.createPVCFromSnapshot(ctx, volCtxInfo, pvc, instance, snapshotName); err != nil {
 			return false, errors.Wrap(err, "create PVC from data source")
 		}
 		return true, nil
@@ -332,6 +336,7 @@ func (r *snapshotRestorer) reconcileInstancePVC(
 
 func (r *snapshotRestorer) createPVCFromSnapshot(
 	ctx context.Context,
+	volCtxInfo volumeContextInfo,
 	pvc *corev1.PersistentVolumeClaim,
 	instance *appsv1.StatefulSet,
 	snapshotName string,
@@ -346,7 +351,7 @@ func (r *snapshotRestorer) createPVCFromSnapshot(
 		Kind:     pNaming.KindVolumeSnapshot,
 		Name:     snapshotName,
 	}
-	spec, err := r.pvcSpecFromDataSource(instanceSetName, dataSource)
+	spec, err := r.pvcSpecFromDataSource(volCtxInfo, instanceSetName, dataSource)
 	if err != nil {
 		return errors.Wrap(err, "get PVC spec from data source")
 	}
@@ -360,7 +365,16 @@ func (r *snapshotRestorer) createPVCFromSnapshot(
 	return nil
 }
 
-func (r *snapshotRestorer) pvcSpecFromDataSource(instanceSetName string, dataSource *corev1.TypedLocalObjectReference) (corev1.PersistentVolumeClaimSpec, error) {
+type volumeContextInfo struct {
+	role           string
+	tablespaceName string
+}
+
+func (r *snapshotRestorer) pvcSpecFromDataSource(
+	volCtxInfo volumeContextInfo,
+	instanceSetName string,
+	dataSource *corev1.TypedLocalObjectReference,
+) (corev1.PersistentVolumeClaimSpec, error) {
 	var instanceSetSpec *v2.PGInstanceSetSpec
 	for _, instanceSet := range r.cluster.Spec.InstanceSets {
 		if instanceSet.Name == instanceSetName {
@@ -372,7 +386,31 @@ func (r *snapshotRestorer) pvcSpecFromDataSource(instanceSetName string, dataSou
 		return corev1.PersistentVolumeClaimSpec{}, errors.New("instance set not found")
 	}
 
-	dataVolSpec := instanceSetSpec.DataVolumeClaimSpec
+	var volSpec *corev1.PersistentVolumeClaimSpec
+	switch volCtxInfo.role {
+	case naming.RolePostgresData:
+		volSpec = &instanceSetSpec.DataVolumeClaimSpec
+	case naming.RolePostgresWAL:
+		volSpec = instanceSetSpec.WALVolumeClaimSpec
+	case naming.RoleTablespace:
+		tablespaceIdx := -1
+		for i, ts := range instanceSetSpec.TablespaceVolumes {
+			if ts.Name == volCtxInfo.tablespaceName {
+				tablespaceIdx = i
+				break
+			}
+		}
+		if tablespaceIdx == -1 {
+			return corev1.PersistentVolumeClaimSpec{}, errors.New("tablespace not found")
+		}
+		volSpec = &instanceSetSpec.TablespaceVolumes[tablespaceIdx].DataVolumeClaimSpec
+	}
+
+	if volSpec == nil {
+		return corev1.PersistentVolumeClaimSpec{}, errors.New("volume spec not found in instance spec")
+	}
+
+	dataVolSpec := *volSpec
 	dataVolSpec.DataSource = dataSource
 	return dataVolSpec, nil
 }
