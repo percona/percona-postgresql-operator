@@ -8,5 +8,4 @@ commands:
 
       source ../../functions
 
-      get_cr "pgvector-extension" ${RANDOM} \
-        | kubectl -n "${NAMESPACE}" apply -f -
+      get_cr | kubectl -n "${NAMESPACE}" apply -f -

@@ -41,6 +41,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore"
 	perconaPGUpgrade "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgupgrade"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	perconaRuntime "github.com/percona/percona-postgresql-operator/v2/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
@@ -189,7 +190,14 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		StopExternalWatchers: stopChan,
 		Watchers:             registry.New(),
 	}
-	if err := pc.SetupWithManager(mgr); err != nil {
+
+	if namespaces, err := k8s.GetWatchNamespace(); err != nil {
+		return errors.Wrap(err, "check if watching multi namespace")
+	} else {
+		pc.WatchNamespace = strings.Split(namespaces, ",")
+	}
+
+	if err := pc.SetupWithManager(ctx, mgr); err != nil {
 		return err
 	}
 
@@ -333,6 +341,8 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 			log.Error(err, "PGO_WORKERS must be a positive number")
 		}
 	}
+
+	options.PprofBindAddress = os.Getenv("PPROF_BIND_ADDRESS")
 
 	return options, nil
 }
