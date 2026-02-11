@@ -275,7 +275,7 @@ func TestReconcileDataVolume(t *testing.T) {
 		// Verify data source points to the VolumeSnapshot
 		require.NotNil(t, pvc.Spec.DataSource, "PVC should have DataSource")
 		assert.Equal(t, snapshotName, pvc.Spec.DataSource.Name)
-		assert.Equal(t, ptr.Deref(pvc.Spec.DataSource.APIGroup, ""), volumesnapshotv1.GroupName)
+		assert.Equal(t, volumesnapshotv1.GroupName, ptr.Deref(pvc.Spec.DataSource.APIGroup, ""))
 		assert.Equal(t, pNaming.KindVolumeSnapshot, pvc.Spec.DataSource.Kind)
 
 		// Verify spec from instance set
@@ -493,7 +493,7 @@ func TestReconcileWALVolume(t *testing.T) {
 		// Verify data source points to the WAL VolumeSnapshot
 		require.NotNil(t, pvc.Spec.DataSource, "PVC should have DataSource")
 		assert.Equal(t, walSnapshotName, pvc.Spec.DataSource.Name)
-		assert.Equal(t, ptr.Deref(pvc.Spec.DataSource.APIGroup, ""), volumesnapshotv1.GroupName)
+		assert.Equal(t, volumesnapshotv1.GroupName, ptr.Deref(pvc.Spec.DataSource.APIGroup, ""))
 		assert.Equal(t, pNaming.KindVolumeSnapshot, pvc.Spec.DataSource.Kind)
 
 		// Verify spec from WALVolumeClaimSpec (512Mi, not data's 1Gi)
@@ -731,7 +731,7 @@ func TestReconcileTablespaceVolumes(t *testing.T) {
 		// Verify data source points to the tablespace VolumeSnapshot
 		require.NotNil(t, pvc.Spec.DataSource, "PVC should have DataSource")
 		assert.Equal(t, ts1SnapshotName, pvc.Spec.DataSource.Name)
-		assert.Equal(t, ptr.Deref(pvc.Spec.DataSource.APIGroup, ""), volumesnapshotv1.GroupName)
+		assert.Equal(t, volumesnapshotv1.GroupName, ptr.Deref(pvc.Spec.DataSource.APIGroup, ""))
 		assert.Equal(t, pNaming.KindVolumeSnapshot, pvc.Spec.DataSource.Kind)
 
 		// Verify spec from TablespaceVolumes[ts1].DataVolumeClaimSpec (2Gi, not data's 1Gi)

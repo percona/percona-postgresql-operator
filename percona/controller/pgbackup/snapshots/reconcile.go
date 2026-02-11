@@ -85,7 +85,7 @@ func Reconcile(
 	pgCluster *v2.PerconaPGCluster,
 ) (reconcile.Result, error) {
 	if pgBackup == nil || pgCluster == nil {
-		return reconcile.Result{}, errors.New("pgBackup or pgCluster is nil or not found")
+		return reconcile.Result{}, errors.New("PerconaPGBackup or PerconaPGCluster is nil or not found")
 	}
 
 	log := logging.FromContext(ctx).

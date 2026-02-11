@@ -74,7 +74,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 	pgCluster := &v2.PerconaPGCluster{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: pgRestore.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
 	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+		return reconcile.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 	}
 
 	if pgRestore.Spec.VolumeSnapshotBackupName != "" {
@@ -174,7 +174,7 @@ func runFinalizers(ctx context.Context, c client.Client, pr *v2.PerconaPGRestore
 		if k8serrors.IsNotFound(err) {
 			pg = nil
 		} else {
-			return errors.Wrap(err, "get PostgresCluster")
+			return errors.Wrap(err, "get PerconaPGCluster")
 		}
 	}
 

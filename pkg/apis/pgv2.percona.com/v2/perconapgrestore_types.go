@@ -29,7 +29,7 @@ type PerconaPGRestore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	// +kubebuilder:validation:XValidation:rule="has(self.repoName) || self.repoName != \"\" || self.volumeSnapshotBackupName != \"\"",message="either repoName or volumeSnapshotBackupName must be set"
+	// +kubebuilder:validation:XValidation:rule="((has(self.repoName) && self.repoName != \"\") || self.volumeSnapshotBackupName != \"\")",message="either repoName or volumeSnapshotBackupName must be set"
 	Spec   PerconaPGRestoreSpec   `json:"spec"`
 	Status PerconaPGRestoreStatus `json:"status,omitempty"`
 }

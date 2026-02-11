@@ -22340,8 +22340,8 @@ spec:
             type: object
             x-kubernetes-validations:
             - message: either repoName or volumeSnapshotBackupName must be set
-              rule: has(self.repoName) || self.repoName != "" || self.volumeSnapshotBackupName
-                != ""
+              rule: ((has(self.repoName) && self.repoName != "") || self.volumeSnapshotBackupName
+                != "")
           status:
             properties:
               completed:
