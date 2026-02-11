@@ -701,7 +701,7 @@ spec:
                     description: Name of the VolumeSnapshot containing data volume
                       contents.
                     type: string
-                  tablespaceVolumeRefs:
+                  tablespaceVolumeSnapshotRefs:
                     additionalProperties:
                       type: string
                     description: |-

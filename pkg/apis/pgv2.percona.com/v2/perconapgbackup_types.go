@@ -124,7 +124,7 @@ type SnapshotStatus struct {
 	WALVolumeSnapshotRef *string `json:"walVolumeSnapshotRef,omitempty"`
 	// Names of the VolumeSnapshots containing tablespace volume contents.
 	// Key is the name of the tablespace, value is the name of the VolumeSnapshot.
-	TablespaceVolumeSnapshotRefs map[string]string `json:"tablespaceVolumeRefs,omitempty"`
+	TablespaceVolumeSnapshotRefs map[string]string `json:"tablespaceVolumeSnapshotRefs,omitempty"`
 }
 
 // +kubebuilder:validation:Type=string
