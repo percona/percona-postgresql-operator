@@ -97,6 +97,10 @@ func SuspendInstance(ctx context.Context, cli client.Client, instanceKey client.
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := cli.Get(ctx, instanceKey, sts); err != nil {
+			return errors.Wrap(err, "failed to get stateful set")
+		}
+
 		orig := sts.DeepCopy()
 		annots := sts.GetAnnotations()
 		if annots == nil {
@@ -125,6 +129,10 @@ func UnsuspendInstance(ctx context.Context, cli client.Client, instanceKey clien
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := cli.Get(ctx, instanceKey, sts); err != nil {
+			return errors.Wrap(err, "failed to get stateful set")
+		}
+
 		orig := sts.DeepCopy()
 		annots := sts.GetAnnotations()
 		delete(annots, pNaming.AnnotationInstanceSuspended)
