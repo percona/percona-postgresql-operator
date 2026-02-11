@@ -11,10 +11,6 @@ void createCluster(String CLUSTER_SUFFIX) {
 
             printf 'linuxConfig:\n  hugepageConfig:\n    hugepage_size2m: 1024\n' > ${WORKSPACE}/hugepages-config-${CLUSTER_SUFFIX}.yaml
 
-            echo "=== HUGEPAGES CONFIG CONTENT ==="
-                cat ${WORKSPACE}/hugepages-config-${CLUSTER_SUFFIX}.yaml
-                echo "=== END CONFIG ==="
-
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
                 ret_val=0
