@@ -9,11 +9,11 @@ void createCluster(String CLUSTER_SUFFIX) {
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
 
-            cat > "${WORKSPACE}/hugepages-config-${CLUSTER_SUFFIX}.yaml" <<'EOF'
-            linuxConfig:
-              hugepageConfig:
-                hugepage_size2m: 1024
-            EOF
+            printf 'linuxConfig:\n  hugepageConfig:\n    hugepage_size2m: 1024\n' > \${WORKSPACE}/hugepages-config-\${CLUSTER_SUFFIX}.yaml
+
+            echo "=== HUGEPAGES CONFIG CONTENT ==="
+                cat \${WORKSPACE}/hugepages-config-\${CLUSTER_SUFFIX}.yaml
+                echo "=== END CONFIG ==="
 
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
