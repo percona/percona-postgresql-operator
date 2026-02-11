@@ -6,7 +6,6 @@ package pgadmin
 
 import (
 	"context"
-	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -14,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

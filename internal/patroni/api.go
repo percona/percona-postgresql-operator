@@ -8,9 +8,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 )

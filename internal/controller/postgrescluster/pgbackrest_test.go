@@ -6,7 +6,6 @@ package postgrescluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"

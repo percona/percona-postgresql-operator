@@ -7,7 +7,6 @@ package postgres
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"

@@ -180,7 +180,7 @@ func (r *Reconciler) generatePGAdminService(
 				// and event could potentially be removed in favor of that validation
 				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "MisconfiguredClusterIP",
 					"NodePort cannot be set with type ClusterIP on Service %q", service.Name)
-				return nil, true, fmt.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
+				return nil, true, errors.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
 			}
 			servicePort.NodePort = *spec.NodePort
 		}
@@ -301,10 +301,8 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 	// Use scheduling constraints from the cluster spec.
 	sts.Spec.Template.Spec.Affinity = cluster.Spec.UserInterface.PGAdmin.Affinity
 	sts.Spec.Template.Spec.Tolerations = cluster.Spec.UserInterface.PGAdmin.Tolerations
-	sts.Spec.Template.Spec.PriorityClassName =
-		initialize.FromPointer(cluster.Spec.UserInterface.PGAdmin.PriorityClassName)
-	sts.Spec.Template.Spec.TopologySpreadConstraints =
-		cluster.Spec.UserInterface.PGAdmin.TopologySpreadConstraints
+	sts.Spec.Template.Spec.PriorityClassName = initialize.FromPointer(cluster.Spec.UserInterface.PGAdmin.PriorityClassName)
+	sts.Spec.Template.Spec.TopologySpreadConstraints = cluster.Spec.UserInterface.PGAdmin.TopologySpreadConstraints
 
 	// Restart containers any time they stop, die, are killed, etc.
 	// - https://docs.k8s.io/concepts/workloads/pods/pod-lifecycle/#restart-policy
@@ -373,7 +371,6 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 func (r *Reconciler) reconcilePGAdminDataVolume(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) (*corev1.PersistentVolumeClaim, error) {
-
 	labelMap := map[string]string{
 		naming.LabelCluster: cluster.Name,
 		naming.LabelRole:    naming.RolePGAdmin,

@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	goruntime "runtime"
 	"strconv"
@@ -277,7 +276,7 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	// - https://releases.k8s.io/v1.30.0/pkg/apis/coordination/validation/validation.go#L26
 	if lease := os.Getenv("PGO_CONTROLLER_LEASE_NAME"); len(lease) > 0 {
 		if errs := validation.IsDNS1123Subdomain(lease); len(errs) > 0 {
-			return options, fmt.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
+			return options, errors.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
 		}
 
 		options.LeaderElection = true
