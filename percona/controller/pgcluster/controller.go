@@ -112,23 +112,7 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
 		WatchesRawSource(source.Channel(standbyClusterEvents, &handler.EnqueueRequestForObject{})).
-		Watches(&v2.PerconaPGRestore{}, handler.EnqueueRequestsFromMapFunc(r.watchRestores)).
 		Complete(r)
-}
-
-func (r *PGClusterReconciler) watchRestores(ctx context.Context, o client.Object) []reconcile.Request {
-	restore, ok := o.(*v2.PerconaPGRestore)
-	if !ok {
-		return nil
-	}
-	return []reconcile.Request{
-		{
-			NamespacedName: client.ObjectKey{
-				Namespace: restore.GetNamespace(),
-				Name:      restore.Spec.PGCluster,
-			},
-		},
-	}
 }
 
 func (r *PGClusterReconciler) watchServices() handler.TypedFuncs[*corev1.Service, reconcile.Request] {
