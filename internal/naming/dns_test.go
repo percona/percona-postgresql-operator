@@ -16,7 +16,7 @@ import (
 )
 
 func TestInstancePodDNSNames(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 
 	instance := &appsv1.StatefulSet{}
@@ -36,10 +36,24 @@ func TestInstancePodDNSNames(t *testing.T) {
 	assert.Assert(t, len(names[0]) > len(names[1]), "expected FQDN first, got %q", names[0])
 	assert.Assert(t, strings.HasPrefix(names[0], names[1]+"."), "wrong FQDN: %q", names[0])
 	assert.Assert(t, !strings.HasSuffix(names[0], "."), "not expected root, got %q", names[0])
+
+	names = InstancePodDNSNames(ctx, instance, "override.cluster.local")
+	assert.Assert(t, len(names) > 0)
+
+	assert.DeepEqual(t, names, []string{
+		"cluster-name-id-0.cluster-pods.some-place.svc.override.cluster.local",
+		"cluster-name-id-0.cluster-pods.some-place.svc",
+		"cluster-name-id-0.cluster-pods.some-place",
+		"cluster-name-id-0.cluster-pods",
+	})
+
+	assert.Assert(t, len(names[0]) > len(names[1]), "expected FQDN first, got %q", names[0])
+	assert.Assert(t, strings.HasPrefix(names[0], names[1]+"."), "wrong FQDN: %q", names[0])
+	assert.Assert(t, !strings.HasSuffix(names[0], "."), "not expected root, got %q", names[0])
 }
 
 func TestServiceDNSNames(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 
 	service := &corev1.Service{}
@@ -51,6 +65,21 @@ func TestServiceDNSNames(t *testing.T) {
 	assert.Assert(t, len(names) > 0)
 
 	assert.DeepEqual(t, names[1:], []string{
+		"the-primary.baltia.svc",
+		"the-primary.baltia",
+		"the-primary",
+	})
+
+	assert.Assert(t, len(names[0]) > len(names[1]), "expected FQDN first, got %q", names[0])
+	assert.Assert(t, strings.HasPrefix(names[0], names[1]+"."), "wrong FQDN: %q", names[0])
+	assert.Assert(t, !strings.HasSuffix(names[0], "."), "not expected root, got %q", names[0])
+
+	names, err = ServiceDNSNames(ctx, service, "override.cluster.local")
+	assert.NilError(t, err)
+	assert.Assert(t, len(names) > 0)
+
+	assert.DeepEqual(t, names, []string{
+		"the-primary.baltia.svc.override.cluster.local",
 		"the-primary.baltia.svc",
 		"the-primary.baltia",
 		"the-primary",
