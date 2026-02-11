@@ -98,9 +98,7 @@ func TestReconcileDataSnapshot(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
 		Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 		Status: v2.PerconaPGBackupStatus{
-			Snapshot: &v2.SnapshotStatus{
-				DataVolume: &v2.PVCSnapshotRef{PVCName: pvcName},
-			},
+			Snapshot: &v2.SnapshotStatus{},
 		},
 	}
 
@@ -114,7 +112,7 @@ func TestReconcileDataSnapshot(t *testing.T) {
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileDataSnapshot(ctx)
+		ok, err := r.reconcileDataSnapshot(ctx, pvcName)
 		require.NoError(t, err)
 		assert.False(t, ok, "snapshot not ready yet")
 
@@ -127,8 +125,7 @@ func TestReconcileDataSnapshot(t *testing.T) {
 		updated := &v2.PerconaPGBackup{}
 		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
 		require.NotNil(t, updated.Status.Snapshot)
-		require.NotNil(t, updated.Status.Snapshot.DataVolume)
-		assert.Equal(t, vsName, updated.Status.Snapshot.DataVolume.SnapshotName)
+		assert.Equal(t, vsName, *updated.Status.Snapshot.DataVolumeSnapshotRef)
 	})
 
 	t.Run("returns true when existing VolumeSnapshot is ReadyToUse", func(t *testing.T) {
@@ -153,7 +150,7 @@ func TestReconcileDataSnapshot(t *testing.T) {
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileDataSnapshot(ctx)
+		ok, err := r.reconcileDataSnapshot(ctx, pvcName)
 		require.NoError(t, err)
 		assert.True(t, ok, "snapshot ready")
 	})
@@ -186,15 +183,12 @@ func TestReconcileWALSnapshot(t *testing.T) {
 
 	noopExec := &mockSnapshotExecutor{}
 
-	t.Run("returns true when WALVolume is nil", func(t *testing.T) {
+	t.Run("returns true when target PVC is empty", func(t *testing.T) {
 		backup := &v2.PerconaPGBackup{
 			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
 			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 			Status: v2.PerconaPGBackupStatus{
-				Snapshot: &v2.SnapshotStatus{
-					DataVolume: &v2.PVCSnapshotRef{PVCName: "data-pvc"},
-					// WALVolume intentionally nil
-				},
+				Snapshot: &v2.SnapshotStatus{},
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -204,32 +198,9 @@ func TestReconcileWALSnapshot(t *testing.T) {
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileWALSnapshot(ctx)
+		ok, err := r.reconcileWALSnapshot(ctx, "")
 		require.NoError(t, err)
 		assert.True(t, ok, "no WAL volume to snapshot")
-	})
-
-	t.Run("returns true when WALVolume.PVCName is empty", func(t *testing.T) {
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-			Status: v2.PerconaPGBackupStatus{
-				Snapshot: &v2.SnapshotStatus{
-					DataVolume: &v2.PVCSnapshotRef{PVCName: "data-pvc"},
-					WALVolume:  &v2.PVCSnapshotRef{PVCName: ""},
-				},
-			},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup.DeepCopy(), cluster).
-			WithStatusSubresource(backup).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileWALSnapshot(ctx)
-		require.NoError(t, err)
-		assert.True(t, ok, "empty WAL PVC name")
 	})
 
 	t.Run("creates VolumeSnapshot and updates backup status", func(t *testing.T) {
@@ -237,10 +208,7 @@ func TestReconcileWALSnapshot(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
 			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 			Status: v2.PerconaPGBackupStatus{
-				Snapshot: &v2.SnapshotStatus{
-					DataVolume: &v2.PVCSnapshotRef{PVCName: "data-pvc"},
-					WALVolume:  &v2.PVCSnapshotRef{PVCName: walPVCName},
-				},
+				Snapshot: &v2.SnapshotStatus{},
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -250,7 +218,7 @@ func TestReconcileWALSnapshot(t *testing.T) {
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileWALSnapshot(ctx)
+		ok, err := r.reconcileWALSnapshot(ctx, walPVCName)
 		require.NoError(t, err)
 		assert.False(t, ok, "snapshot not ready yet")
 
@@ -263,8 +231,7 @@ func TestReconcileWALSnapshot(t *testing.T) {
 		updated := &v2.PerconaPGBackup{}
 		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
 		require.NotNil(t, updated.Status.Snapshot)
-		require.NotNil(t, updated.Status.Snapshot.WALVolume)
-		assert.Equal(t, vsName, updated.Status.Snapshot.WALVolume.SnapshotName)
+		assert.Equal(t, vsName, *updated.Status.Snapshot.WALVolumeSnapshotRef)
 	})
 
 	t.Run("returns true when existing VolumeSnapshot is ReadyToUse", func(t *testing.T) {
@@ -285,10 +252,7 @@ func TestReconcileWALSnapshot(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
 			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 			Status: v2.PerconaPGBackupStatus{
-				Snapshot: &v2.SnapshotStatus{
-					DataVolume: &v2.PVCSnapshotRef{PVCName: "data-pvc"},
-					WALVolume:  &v2.PVCSnapshotRef{PVCName: walPVCName},
-				},
+				Snapshot: &v2.SnapshotStatus{},
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -298,7 +262,7 @@ func TestReconcileWALSnapshot(t *testing.T) {
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileWALSnapshot(ctx)
+		ok, err := r.reconcileWALSnapshot(ctx, walPVCName)
 		require.NoError(t, err)
 		assert.True(t, ok, "snapshot ready")
 	})
@@ -337,10 +301,7 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
 			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 			Status: v2.PerconaPGBackupStatus{
-				Snapshot: &v2.SnapshotStatus{
-					DataVolume:        &v2.PVCSnapshotRef{PVCName: "data-pvc"},
-					TablespaceVolumes: nil,
-				},
+				Snapshot: &v2.SnapshotStatus{},
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -350,7 +311,7 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileTablespaceSnapshot(ctx)
+		ok, err := r.reconcileTablespaceSnapshot(ctx, nil)
 		require.NoError(t, err)
 		assert.True(t, ok, "no tablespace volumes to snapshot")
 	})
@@ -360,13 +321,7 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
 			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 			Status: v2.PerconaPGBackupStatus{
-				Snapshot: &v2.SnapshotStatus{
-					DataVolume: &v2.PVCSnapshotRef{PVCName: "data-pvc"},
-					TablespaceVolumes: map[string]v2.PVCSnapshotRef{
-						ts1Name: {PVCName: ts1PVC},
-						ts2Name: {PVCName: ts2PVC},
-					},
-				},
+				Snapshot: &v2.SnapshotStatus{},
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -376,7 +331,10 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileTablespaceSnapshot(ctx)
+		ok, err := r.reconcileTablespaceSnapshot(ctx, map[string]string{
+			ts1Name: ts1PVC,
+			ts2Name: ts2PVC,
+		})
 		require.NoError(t, err)
 		assert.False(t, ok, "snapshots not ready yet")
 
@@ -397,9 +355,8 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 		updated := &v2.PerconaPGBackup{}
 		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
 		require.NotNil(t, updated.Status.Snapshot)
-		require.NotNil(t, updated.Status.Snapshot.TablespaceVolumes)
-		assert.Equal(t, backupName+"-"+ts1Name+"-"+naming.RoleTablespace, updated.Status.Snapshot.TablespaceVolumes[ts1Name].SnapshotName)
-		assert.Equal(t, backupName+"-"+ts2Name+"-"+naming.RoleTablespace, updated.Status.Snapshot.TablespaceVolumes[ts2Name].SnapshotName)
+		assert.Equal(t, backupName+"-"+ts1Name+"-"+naming.RoleTablespace, updated.Status.Snapshot.TablespaceVolumeSnapshotRefs[ts1Name])
+		assert.Equal(t, backupName+"-"+ts2Name+"-"+naming.RoleTablespace, updated.Status.Snapshot.TablespaceVolumeSnapshotRefs[ts2Name])
 	})
 
 	t.Run("returns true when all existing VolumeSnapshots are ReadyToUse", func(t *testing.T) {
@@ -429,13 +386,7 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
 			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 			Status: v2.PerconaPGBackupStatus{
-				Snapshot: &v2.SnapshotStatus{
-					DataVolume: &v2.PVCSnapshotRef{PVCName: "data-pvc"},
-					TablespaceVolumes: map[string]v2.PVCSnapshotRef{
-						ts1Name: {PVCName: ts1PVC},
-						ts2Name: {PVCName: ts2PVC},
-					},
-				},
+				Snapshot: &v2.SnapshotStatus{},
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -445,10 +396,94 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		ok, err := r.reconcileTablespaceSnapshot(ctx)
+		ok, err := r.reconcileTablespaceSnapshot(ctx, map[string]string{
+			ts1Name: ts1PVC,
+			ts2Name: ts2PVC,
+		})
 		require.NoError(t, err)
 		assert.True(t, ok, "all tablespace snapshots ready")
 	})
+}
+
+func TestGenerateSnapshotIntent(t *testing.T) {
+	ns := "test-ns"
+	backupName := "my-backup"
+	clusterName := "my-cluster"
+	snapshotClassName := "test-snapshotclass"
+
+	s := scheme.Scheme
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, v2.AddToScheme(s))
+	require.NoError(t, volumesnapshotv1.AddToScheme(s))
+
+	cluster := &v2.PerconaPGCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: ns},
+		Spec: v2.PerconaPGClusterSpec{
+			Backups: v2.Backups{
+				VolumeSnapshots: &v2.VolumeSnapshots{
+					Mode:      v2.VolumeSnapshotModeOffline,
+					ClassName: snapshotClassName,
+				},
+			},
+		},
+	}
+
+	backup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
+		Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+	}
+
+	cl := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(backup, cluster).
+		Build()
+
+	r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, &mockSnapshotExecutor{})
+
+	tests := []struct {
+		name         string
+		snapshotRole string
+		sourcePVC    string
+		wantName     string
+	}{
+		{
+			name:         "data volume",
+			snapshotRole: naming.RolePostgresData,
+			sourcePVC:    "data-pvc",
+			wantName:     backupName + "-" + naming.RolePostgresData,
+		},
+		{
+			name:         "WAL volume",
+			snapshotRole: naming.RolePostgresWAL,
+			sourcePVC:    "wal-pvc",
+			wantName:     backupName + "-" + naming.RolePostgresWAL,
+		},
+		{
+			name:         "tablespace volume",
+			snapshotRole: "ts1-" + naming.RoleTablespace,
+			sourcePVC:    "pvc-ts1",
+			wantName:     backupName + "-" + "ts1-" + naming.RoleTablespace,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vs, err := r.generateSnapshotIntent(tt.snapshotRole, tt.sourcePVC)
+			require.NoError(t, err)
+			require.NotNil(t, vs)
+
+			assert.Equal(t, tt.wantName, vs.Name)
+			assert.Equal(t, ns, vs.Namespace)
+			assert.Equal(t, snapshotClassName, ptr.Deref(vs.Spec.VolumeSnapshotClassName, ""))
+			assert.Equal(t, tt.sourcePVC, ptr.Deref(vs.Spec.Source.PersistentVolumeClaimName, ""))
+
+			// Owner reference should be set to the backup
+			require.True(t, len(vs.OwnerReferences) > 0, "expected owner reference to be set")
+			assert.Equal(t, backupName, vs.OwnerReferences[0].Name)
+			assert.Equal(t, "pgv2.percona.com/v2", vs.OwnerReferences[0].APIVersion)
+			assert.Equal(t, "PerconaPGBackup", vs.OwnerReferences[0].Kind)
+		})
+	}
 }
 
 // mockSnapshotExecutor is a no-op snapshotExecutor for tests.
