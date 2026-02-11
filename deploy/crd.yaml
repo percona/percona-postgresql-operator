@@ -697,38 +697,21 @@ spec:
                 type: object
               snapshot:
                 properties:
-                  dataVolume:
-                    properties:
-                      pvcName:
-                        type: string
-                      snapshotName:
-                        type: string
-                    required:
-                    - pvcName
-                    - snapshotName
-                    type: object
-                  tablespaceVolumes:
+                  dataVolumeSnapshotRef:
+                    description: Name of the VolumeSnapshot containing data volume
+                      contents.
+                    type: string
+                  tablespaceVolumeRefs:
                     additionalProperties:
-                      properties:
-                        pvcName:
-                          type: string
-                        snapshotName:
-                          type: string
-                      required:
-                      - pvcName
-                      - snapshotName
-                      type: object
+                      type: string
+                    description: |-
+                      Names of the VolumeSnapshots containing tablespace volume contents.
+                      Key is the name of the tablespace, value is the name of the VolumeSnapshot.
                     type: object
-                  walVolume:
-                    properties:
-                      pvcName:
-                        type: string
-                      snapshotName:
-                        type: string
-                    required:
-                    - pvcName
-                    - snapshotName
-                    type: object
+                  walVolumeSnapshotRef:
+                    description: Name of the VolumeSnapshot containing WAL volume
+                      contents.
+                    type: string
                 type: object
               state:
                 type: string

@@ -25,6 +25,8 @@ import (
 )
 
 const (
+	annotationBackupTarget = pNaming.PrefixPerconaPGV2 + "backup-target"
+
 	defaultSnapshotErrorDeadline = 5 * time.Minute
 )
 
@@ -163,6 +165,7 @@ func (r *snapshotReconciler) reconcileStarting(ctx context.Context) (reconcile.R
 
 	if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupRunning
+		bcp.Status.Snapshot = &v2.SnapshotStatus{}
 	}); updErr != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
 	}
@@ -172,17 +175,22 @@ func (r *snapshotReconciler) reconcileStarting(ctx context.Context) (reconcile.R
 
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create
 func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Result, error) {
-	dataOk, err := r.reconcileDataSnapshot(ctx)
+	dataPVC, walPVC, tablespacePVCs, err := r.getTargetPVCs(ctx)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to get target PVCs: %w", err)
+	}
+
+	dataOk, err := r.reconcileDataSnapshot(ctx, dataPVC)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to reconcile data snapshot: %w", err)
 	}
 
-	walOk, err := r.reconcileWALSnapshot(ctx)
+	walOk, err := r.reconcileWALSnapshot(ctx, walPVC)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to reconcile WAL snapshot: %w", err)
 	}
 
-	tablespaceOk, err := r.reconcileTablespaceSnapshot(ctx)
+	tablespaceOk, err := r.reconcileTablespaceSnapshot(ctx, tablespacePVCs)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to reconcile tablespace snapshot: %w", err)
 	}
@@ -249,56 +257,52 @@ func (r *snapshotReconciler) reconcileSnapshot(ctx context.Context, volumeSnapsh
 	}
 }
 
-func (r *snapshotReconciler) reconcileDataSnapshot(ctx context.Context) (bool, error) {
-	snapshotName := r.backup.GetName() + "-" + naming.RolePostgresData
+func (r *snapshotReconciler) generateSnapshotIntent(
+	snapshotRole,
+	sourcePVC string) (*volumesnapshotv1.VolumeSnapshot, error) {
+	name := r.backup.GetName() + "-" + snapshotRole
+	namespace := r.backup.GetNamespace()
 	volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      snapshotName,
-			Namespace: r.backup.GetNamespace(),
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: volumesnapshotv1.VolumeSnapshotSpec{
 			VolumeSnapshotClassName: ptr.To(r.cluster.Spec.Backups.VolumeSnapshots.ClassName),
 			Source: volumesnapshotv1.VolumeSnapshotSource{
-				PersistentVolumeClaimName: &r.backup.Status.Snapshot.DataVolume.PVCName,
+				PersistentVolumeClaimName: &sourcePVC,
 			},
 		},
 	}
 	if err := controllerutil.SetControllerReference(r.backup, volumeSnapshot, r.cl.Scheme()); err != nil {
-		return false, fmt.Errorf("failed to set owner reference on volume snapshot: %w", err)
+		return nil, fmt.Errorf("failed to set owner reference on volume snapshot: %w", err)
 	}
+	return volumeSnapshot, nil
+}
 
+func (r *snapshotReconciler) reconcileDataSnapshot(ctx context.Context, targetPVC string) (bool, error) {
+	volumeSnapshot, err := r.generateSnapshotIntent(naming.RolePostgresData, targetPVC)
 	ok, err := r.reconcileSnapshot(ctx, volumeSnapshot)
 	if err != nil {
 		return false, fmt.Errorf("failed to reconcile snapshot: %w", err)
 	}
+
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
-		bcp.Status.Snapshot.DataVolume.SnapshotName = volumeSnapshot.GetName()
+		bcp.Status.Snapshot.DataVolumeSnapshotRef = ptr.To(volumeSnapshot.GetName())
 	}); err != nil {
 		return false, fmt.Errorf("failed to update backup status: %w", err)
 	}
 	return ok, nil
 }
 
-func (r *snapshotReconciler) reconcileWALSnapshot(ctx context.Context) (bool, error) {
-	if r.backup.Status.Snapshot.WALVolume == nil || r.backup.Status.Snapshot.WALVolume.PVCName == "" {
+func (r *snapshotReconciler) reconcileWALSnapshot(ctx context.Context, targetPVC string) (bool, error) {
+	if targetPVC == "" {
 		return true, nil
 	}
 
-	snapshotName := r.backup.GetName() + "-" + naming.RolePostgresWAL
-	volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      snapshotName,
-			Namespace: r.backup.GetNamespace(),
-		},
-		Spec: volumesnapshotv1.VolumeSnapshotSpec{
-			VolumeSnapshotClassName: ptr.To(r.cluster.Spec.Backups.VolumeSnapshots.ClassName),
-			Source: volumesnapshotv1.VolumeSnapshotSource{
-				PersistentVolumeClaimName: &r.backup.Status.Snapshot.WALVolume.PVCName,
-			},
-		},
-	}
-	if err := controllerutil.SetControllerReference(r.backup, volumeSnapshot, r.cl.Scheme()); err != nil {
-		return false, fmt.Errorf("failed to set owner reference on volume snapshot: %w", err)
+	volumeSnapshot, err := r.generateSnapshotIntent(naming.RolePostgresWAL, targetPVC)
+	if err != nil {
+		return false, fmt.Errorf("failed to generate snapshot intent: %w", err)
 	}
 
 	ok, err := r.reconcileSnapshot(ctx, volumeSnapshot)
@@ -306,45 +310,32 @@ func (r *snapshotReconciler) reconcileWALSnapshot(ctx context.Context) (bool, er
 		return false, fmt.Errorf("failed to reconcile snapshot: %w", err)
 	}
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
-		bcp.Status.Snapshot.WALVolume.SnapshotName = volumeSnapshot.GetName()
+		bcp.Status.Snapshot.WALVolumeSnapshotRef = ptr.To(volumeSnapshot.GetName())
 	}); err != nil {
 		return false, fmt.Errorf("failed to update backup status: %w", err)
 	}
 	return ok, nil
 }
 
-func (r *snapshotReconciler) reconcileTablespaceSnapshot(ctx context.Context) (bool, error) {
-	if len(r.backup.Status.Snapshot.TablespaceVolumes) == 0 {
+func (r *snapshotReconciler) reconcileTablespaceSnapshot(ctx context.Context, targetPVCs map[string]string) (bool, error) {
+	if len(targetPVCs) == 0 {
 		return true, nil
 	}
 
 	done := true
-	for tsName, info := range r.backup.Status.Snapshot.TablespaceVolumes {
-		snapshotName := r.backup.GetName() + "-" + tsName + "-" + naming.RoleTablespace
-		volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      snapshotName,
-				Namespace: r.backup.GetNamespace(),
-			},
-			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(r.cluster.Spec.Backups.VolumeSnapshots.ClassName),
-				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: &info.PVCName,
-				},
-			},
-		}
-		if err := controllerutil.SetControllerReference(r.backup, volumeSnapshot, r.cl.Scheme()); err != nil {
-			return false, fmt.Errorf("failed to set owner reference on volume snapshot: %w", err)
-		}
-
+	for tsName, targetPVC := range targetPVCs {
+		role := tsName + "-" + naming.RoleTablespace
+		volumeSnapshot, err := r.generateSnapshotIntent(role, targetPVC)
 		ok, err := r.reconcileSnapshot(ctx, volumeSnapshot)
 		if err != nil {
 			return false, fmt.Errorf("failed to reconcile snapshot: %w", err)
 		}
+
 		if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
-			ref := bcp.Status.Snapshot.TablespaceVolumes[tsName]
-			ref.SnapshotName = volumeSnapshot.GetName()
-			bcp.Status.Snapshot.TablespaceVolumes[tsName] = ref
+			if bcp.Status.Snapshot.TablespaceVolumeSnapshotRefs == nil {
+				bcp.Status.Snapshot.TablespaceVolumeSnapshotRefs = make(map[string]string)
+			}
+			bcp.Status.Snapshot.TablespaceVolumeSnapshotRefs[tsName] = volumeSnapshot.GetName()
 		}); err != nil {
 			return false, fmt.Errorf("failed to update backup status: %w", err)
 		}
@@ -367,6 +358,64 @@ func (r *snapshotReconciler) ensureSnapshot(ctx context.Context, volumeSnapshot 
 	return true, nil
 }
 
+func (r *snapshotReconciler) getTargetPVCs(ctx context.Context) (string, string, map[string]string, error) {
+	targetInstance := r.backup.GetAnnotations()[annotationBackupTarget]
+	if targetInstance == "" {
+		return "", "", nil, fmt.Errorf("backup target instance is not found")
+	}
+
+	dataPVC := ""
+	var dataVolumes corev1.PersistentVolumeClaimList
+	if err := r.cl.List(ctx, &dataVolumes, &client.ListOptions{
+		Namespace: r.cluster.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelInstance: targetInstance,
+			naming.LabelRole:     naming.RolePostgresData,
+		}),
+	}); err != nil {
+		return "", "", nil, fmt.Errorf("failed to list data volumes: %w", err)
+	}
+	if len(dataVolumes.Items) == 1 {
+		dataPVC = dataVolumes.Items[0].GetName()
+	} else {
+		return "", "", nil, fmt.Errorf("unexpected number of data volumes: %d", len(dataVolumes.Items))
+	}
+
+	walPVC := ""
+	var walVolumes corev1.PersistentVolumeClaimList
+	if err := r.cl.List(ctx, &walVolumes, &client.ListOptions{
+		Namespace: r.cluster.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelInstance: targetInstance,
+			naming.LabelRole:     naming.RolePostgresWAL,
+		}),
+	}); err != nil {
+		return "", "", nil, fmt.Errorf("failed to list WAL volumes: %w", err)
+	}
+	if len(walVolumes.Items) == 1 {
+		walPVC = walVolumes.Items[0].GetName()
+	}
+
+	tablespacePVCs := make(map[string]string)
+	var tablespaceVolumes corev1.PersistentVolumeClaimList
+	if err := r.cl.List(ctx, &tablespaceVolumes, &client.ListOptions{
+		Namespace: r.cluster.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			naming.LabelInstance: targetInstance,
+			naming.LabelRole:     naming.RoleTablespace,
+		}),
+	}); err != nil {
+		return "", "", nil, fmt.Errorf("failed to list tablespace volumes: %w", err)
+	}
+
+	for _, vol := range tablespaceVolumes.Items {
+		name := vol.GetLabels()[naming.LabelData]
+		tablespacePVCs[name] = vol.GetName()
+	}
+
+	return dataPVC, walPVC, tablespacePVCs, nil
+}
+
 func (r *snapshotReconciler) prepare(ctx context.Context) error {
 	// finalizer already present, prepare already completed
 	if controllerutil.ContainsFinalizer(r.backup, pNaming.FinalizerSnapshotInProgress) {
@@ -379,71 +428,16 @@ func (r *snapshotReconciler) prepare(ctx context.Context) error {
 		return fmt.Errorf("failed to prepare for snapshot: %w", err)
 	}
 
-	snapshotStatus := &v2.SnapshotStatus{}
-
-	// Find data volume
-	var dataVolumes corev1.PersistentVolumeClaimList
-	if err := r.cl.List(ctx, &dataVolumes, &client.ListOptions{
-		Namespace: r.cluster.GetNamespace(),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			naming.LabelInstance: targetInstance,
-			naming.LabelRole:     naming.RolePostgresData,
-		}),
-	}); err != nil {
-		return fmt.Errorf("failed to list data volumes: %w", err)
+	// Store the backup target instance for later retrieval.
+	orig := r.backup.DeepCopy()
+	annotations := r.backup.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
-	if len(dataVolumes.Items) == 1 {
-		snapshotStatus.DataVolume = &v2.PVCSnapshotRef{
-			PVCName: dataVolumes.Items[0].GetName(),
-		}
-	} else { // we expect 1
-		return fmt.Errorf("unexpected number of data volumes: %d", len(dataVolumes.Items))
-	}
-
-	// Find WAL volume
-	var walVolumes corev1.PersistentVolumeClaimList
-	if err := r.cl.List(ctx, &walVolumes, &client.ListOptions{
-		Namespace: r.cluster.GetNamespace(),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			naming.LabelInstance: targetInstance,
-			naming.LabelRole:     naming.RolePostgresWAL,
-		}),
-	}); err != nil {
-		return fmt.Errorf("failed to list WAL volumes: %w", err)
-	}
-	if len(walVolumes.Items) == 1 {
-		snapshotStatus.WALVolume = &v2.PVCSnapshotRef{
-			PVCName: walVolumes.Items[0].GetName(),
-		}
-	}
-
-	// Find tablespace volumes
-	var tablespaceVolumes corev1.PersistentVolumeClaimList
-	if err := r.cl.List(ctx, &tablespaceVolumes, &client.ListOptions{
-		Namespace: r.cluster.GetNamespace(),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			naming.LabelInstance: targetInstance,
-			naming.LabelRole:     naming.RoleTablespace,
-		}),
-	}); err != nil {
-		return fmt.Errorf("failed to list tablespace volumes: %w", err)
-	}
-
-	if len(tablespaceVolumes.Items) > 0 {
-		snapshotStatus.TablespaceVolumes = make(map[string]v2.PVCSnapshotRef)
-	}
-	for _, vol := range tablespaceVolumes.Items {
-		name := vol.GetLabels()[naming.LabelData]
-		snapshotStatus.TablespaceVolumes[name] = v2.PVCSnapshotRef{
-			PVCName: vol.GetName(),
-		}
-	}
-
-	// update snapshot status
-	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
-		bcp.Status.Snapshot = snapshotStatus
-	}); err != nil {
-		return fmt.Errorf("failed to update backup status: %w", err)
+	annotations[annotationBackupTarget] = targetInstance
+	r.backup.SetAnnotations(annotations)
+	if err := r.cl.Patch(ctx, r.backup.DeepCopy(), client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("failed to patch backup annotations: %w", err)
 	}
 
 	// add finalizer

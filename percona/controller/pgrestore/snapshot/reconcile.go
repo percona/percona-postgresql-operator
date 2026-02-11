@@ -257,12 +257,12 @@ func (r *snapshotRestorer) reconcileDataVolume(
 	ctx context.Context,
 	instance *appsv1.StatefulSet,
 ) (bool, error) {
-	if r.backup.Status.Snapshot == nil || r.backup.Status.Snapshot.DataVolume == nil || r.backup.Status.Snapshot.DataVolume.SnapshotName == "" {
+	if r.backup.Status.Snapshot == nil || r.backup.Status.Snapshot.DataVolumeSnapshotRef == nil {
 		return false, errors.New("data volume snapshot not known")
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresDataVolume(instance)}
-	snapshotName := r.backup.Status.Snapshot.DataVolume.SnapshotName
+	snapshotName := *r.backup.Status.Snapshot.DataVolumeSnapshotRef
 	return r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
 }
 
@@ -270,27 +270,26 @@ func (r *snapshotRestorer) reconcileWALVolume(
 	ctx context.Context,
 	instance *appsv1.StatefulSet,
 ) (bool, error) {
-	if r.backup.Status.Snapshot == nil || r.backup.Status.Snapshot.WALVolume == nil || r.backup.Status.Snapshot.WALVolume.SnapshotName == "" {
+	if r.backup.Status.Snapshot == nil || r.backup.Status.Snapshot.WALVolumeSnapshotRef == nil {
 		return true, nil
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresWALVolume(instance)}
-	snapshotName := r.backup.Status.Snapshot.WALVolume.SnapshotName
+	snapshotName := *r.backup.Status.Snapshot.WALVolumeSnapshotRef
 	return r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
 }
 
 func (r *snapshotRestorer) reconcileTablespaceVolumes(ctx context.Context, instance *appsv1.StatefulSet) (bool, error) {
-	if r.backup.Status.Snapshot == nil || r.backup.Status.Snapshot.TablespaceVolumes == nil || len(r.backup.Status.Snapshot.TablespaceVolumes) == 0 {
+	if r.backup.Status.Snapshot == nil || len(r.backup.Status.Snapshot.TablespaceVolumeSnapshotRefs) == 0 {
 		return true, nil
 	}
 
 	done := true
-	for tsName, info := range r.backup.Status.Snapshot.TablespaceVolumes {
+	for tsName, snapshotName := range r.backup.Status.Snapshot.TablespaceVolumeSnapshotRefs {
 		pvc := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstanceTablespaceDataVolume(instance, tsName)}
-		snapshotName := info.SnapshotName
 		ok, err := r.reconcileInstancePVC(ctx, pvc, instance, snapshotName)
 		if err != nil {
-			return false, errors.Wrap(err, "reconcile tablespace PVC")
+			return false, errors.Wrap(err, "reconcile tablespace volume")
 		}
 		if !ok {
 			done = false
@@ -627,13 +626,13 @@ func generatePrepareJob(
 	scriptParts := []string{"set -e"}
 	for _, mount := range volumeMounts {
 		if restore.Spec.RepoName == nil || restore.Spec.VolumeSnapshotBackupName == "" { // no PITR
-			// PVCs are not needed, signal the restore_command to skip WAL recovery in order
+			// PITR is not needed, signal the restore_command to skip WAL recovery in order
 			// to maintain consistency with the snapshot data.
 			dataDir := path.Join(mount.MountPath, fmt.Sprintf("pg%d", cluster.Spec.PostgresVersion))
 			signalFile := path.Join(dataDir, "skip-wal-recovery")
 			scriptParts = append(scriptParts, fmt.Sprintf("touch %q", signalFile))
 		} else {
-			//  PITR is needed, clear local WAL files since they may belong to a different timeline.
+			// PITR is needed, clear local WAL files since they may belong to a different timeline.
 			// PITR restore job will fetch the required WAL files from the repo.
 			walDir := path.Join(mount.MountPath, fmt.Sprintf("pg%d_wal", cluster.Spec.PostgresVersion))
 			scriptParts = append(scriptParts, fmt.Sprintf("find %q -mindepth 1 -delete", walDir))
@@ -646,8 +645,12 @@ func generatePrepareJob(
 		Image: cluster.Spec.Image,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("32Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("32Mi"),
 			},
 		},
 		VolumeMounts: volumeMounts,

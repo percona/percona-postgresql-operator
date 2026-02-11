@@ -15,14 +15,11 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
 const (
-	annotationBackupTarget = pNaming.PrefixPerconaPGV2 + "backup-target"
-
 	checkpointTimeoutSeconds = 30 // TODO: make this configurable
 	waitTimeout              = 5 * time.Minute
 	retryInterval            = 3 * time.Second

@@ -117,15 +117,14 @@ type PerconaPGBackupStatus struct {
 	Snapshot             *SnapshotStatus                `json:"snapshot,omitempty"`
 }
 
-type PVCSnapshotRef struct {
-	SnapshotName string `json:"snapshotName"`
-	PVCName      string `json:"pvcName"`
-}
-
 type SnapshotStatus struct {
-	DataVolume        *PVCSnapshotRef           `json:"dataVolume,omitempty"`
-	WALVolume         *PVCSnapshotRef           `json:"walVolume,omitempty"`
-	TablespaceVolumes map[string]PVCSnapshotRef `json:"tablespaceVolumes,omitempty"`
+	// Name of the VolumeSnapshot containing data volume contents.
+	DataVolumeSnapshotRef *string `json:"dataVolumeSnapshotRef,omitempty"`
+	// Name of the VolumeSnapshot containing WAL volume contents.
+	WALVolumeSnapshotRef *string `json:"walVolumeSnapshotRef,omitempty"`
+	// Names of the VolumeSnapshots containing tablespace volume contents.
+	// Key is the name of the tablespace, value is the name of the VolumeSnapshot.
+	TablespaceVolumeSnapshotRefs map[string]string `json:"tablespaceVolumeRefs,omitempty"`
 }
 
 // +kubebuilder:validation:Type=string
