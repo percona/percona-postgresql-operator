@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	checkpointTimeoutSeconds = 30 // TODO: make this configurable
+	checkpointTimeoutSeconds = 300 // 5mins // TODO: make this configurable
 	waitTimeout              = 5 * time.Minute
 	retryInterval            = 3 * time.Second
 )
