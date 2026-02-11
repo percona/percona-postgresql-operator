@@ -281,21 +281,44 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 
 	options.HealthProbeBindAddress = ":8081"
 
+	// K8SPG-915
+	getEnvBool := func(name string, defaultVal bool) (bool, error) {
+		s, ok := os.LookupEnv(name)
+		if !ok || s == "" {
+			return defaultVal, nil
+		}
+
+		var err error
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "1", "true":
+			return true, nil
+		case "0", "false":
+			return false, nil
+		default:
+			err = fmt.Errorf("invalid boolean value for %s: expected 0/1/true/false", name)
+		}
+		return defaultVal, err
+	}
+
+	var err error
+	options.LeaderElection, err = getEnvBool("PGO_CONTROLLER_LEADER_ELECTION_ENABLED", true)
+	if err != nil {
+		return options, err
+	}
+	if options.LeaderElection {
+		options.LeaderElectionID = perconaRuntime.ElectionID
+	}
+
 	// Enable leader elections when configured with a valid Lease.coordination.k8s.io name.
 	// - https://docs.k8s.io/concepts/architecture/leases
 	// - https://releases.k8s.io/v1.30.0/pkg/apis/coordination/validation/validation.go#L26
-	if lease := os.Getenv("PGO_CONTROLLER_LEASE_NAME"); len(lease) > 0 {
+	if lease := os.Getenv("PGO_CONTROLLER_LEASE_NAME"); options.LeaderElection && len(lease) > 0 {
 		if errs := validation.IsDNS1123Subdomain(lease); len(errs) > 0 {
 			return options, fmt.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
 		}
 
-		options.LeaderElection = true
 		options.LeaderElectionID = lease
 		options.LeaderElectionNamespace = os.Getenv("PGO_NAMESPACE")
-	} else {
-		// K8SPG-761
-		options.LeaderElection = true
-		options.LeaderElectionID = perconaRuntime.ElectionID
 	}
 
 	// K8SPG-915

@@ -5,7 +5,6 @@
 package main
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -15,7 +14,7 @@ import (
 )
 
 func TestInitManager(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	t.Run("Defaults", func(t *testing.T) {
 		options, err := initManager(ctx)
 		assert.NilError(t, err)
@@ -67,6 +66,13 @@ func TestInitManager(t *testing.T) {
 			options, err := initManager(ctx)
 			assert.ErrorContains(t, err, "PGO_CONTROLLER_LEASE_NAME")
 			assert.ErrorContains(t, err, "invalid")
+
+			assert.Assert(t, options.LeaderElection == true)
+			assert.Equal(t, options.LeaderElectionNamespace, "")
+
+			t.Setenv("PGO_CONTROLLER_LEADER_ELECTION_ENABLED", "false")
+			options, err = initManager(ctx)
+			assert.NilError(t, err)
 
 			assert.Assert(t, options.LeaderElection == false)
 			assert.Equal(t, options.LeaderElectionNamespace, "")
@@ -153,5 +159,17 @@ func TestInitManager(t *testing.T) {
 		options, err = initManager(ctx)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, options.PprofBindAddress, "pprof-addr")
+	})
+
+	t.Run("Duration options", func(t *testing.T) {
+		t.Setenv("PGO_CONTROLLER_LEASE_DURATION", "1")
+		t.Setenv("PGO_CONTROLLER_RENEW_DEADLINE", "2")
+		t.Setenv("PGO_CONTROLLER_RETRY_PERIOD", "3")
+		options, err := initManager(ctx)
+		assert.NilError(t, err)
+
+		assert.Equal(t, options.LeaseDuration.Seconds(), float64(1))
+		assert.Equal(t, options.RenewDeadline.Seconds(), float64(2))
+		assert.Equal(t, options.RetryPeriod.Seconds(), float64(3))
 	})
 }
