@@ -54,7 +54,7 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 	postgresCluster.Status.PGBackRest.Restore = &v1beta1.PGBackRestJobStatus{}
 
 	if err := r.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
-		return errors.Wrap(err, "patch PGCluster")
+		return errors.Wrap(err, "patch PostgresCluster status failed trying to initialize PGBackRest restore status")
 	}
 
 	if r.pgCluster.Spec.Backups.PGBackRest.Restore == nil {
@@ -68,7 +68,7 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Options = r.pgRestore.Spec.Options
 
 	if err := r.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "patch PGCluster")
+		return errors.Wrap(err, "patch PostgresCluster status failed trying to start restore")
 	}
 
 	return nil

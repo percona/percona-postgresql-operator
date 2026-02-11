@@ -2,7 +2,6 @@ package pgbackup
 
 import (
 	"context"
-	"fmt"
 	"path"
 	"slices"
 	"time"
@@ -124,7 +123,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = "repoName is required when method is 'pgbackrest'"
 		}); updErr != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
+			return reconcile.Result{}, errors.Errorf("failed to update backup status: %w", updErr)
 		}
 		return reconcile.Result{}, errors.Errorf("'repoName' is required when method is 'pgbackrest'")
 	}
