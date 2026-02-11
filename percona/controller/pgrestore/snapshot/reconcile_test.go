@@ -90,7 +90,7 @@ func TestGeneratePrepareJob(t *testing.T) {
 
 		require.Len(t, container.VolumeMounts, 1)
 		assert.Equal(t, "my-cluster-instance-0-pgdata", container.VolumeMounts[0].Name)
-		assert.Equal(t, path.Join("my-cluster-instance-0", "pgdata"), container.VolumeMounts[0].MountPath)
+		assert.Equal(t, path.Join("/", "my-cluster-instance-0", "pgdata"), container.VolumeMounts[0].MountPath)
 
 		assert.Equal(t, corev1.RestartPolicyNever, job.Spec.Template.Spec.RestartPolicy)
 	})
@@ -151,6 +151,70 @@ func TestGeneratePrepareJob(t *testing.T) {
 		assert.Contains(t, script, "-delete")
 		assert.Contains(t, script, walDir)
 		assert.NotContains(t, script, "skip-wal-recovery")
+	})
+
+	t.Run("with PITR and dedicated WAL volume clears WAL under pgwal mount", func(t *testing.T) {
+		instanceSetName := "00"
+		instanceName := clusterName + "-" + instanceSetName + "-0"
+
+		clusterWithWAL := cluster.DeepCopy()
+		clusterWithWAL.Spec.InstanceSets = v2.PGInstanceSets{
+			{
+				Name: instanceSetName,
+				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+				WALVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			},
+		}
+
+		instance := makeInstance(instanceName)
+		instance.Labels = map[string]string{
+			naming.LabelInstanceSet: instanceSetName,
+			naming.LabelInstance:    instanceName,
+		}
+
+		job := &batchv1.Job{}
+		instances := &appsv1.StatefulSetList{Items: []appsv1.StatefulSet{instance}}
+		restore := &v2.PerconaPGRestore{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-restore", Namespace: ns},
+			Spec: v2.PerconaPGRestoreSpec{
+				PGCluster:                clusterName,
+				RepoName:                 ptr.To("repo1"),
+				VolumeSnapshotBackupName: "my-backup",
+			},
+		}
+
+		generatePrepareJob(job, instances, clusterWithWAL, restore)
+
+		container := job.Spec.Template.Spec.Containers[0]
+		script := container.Command[2]
+
+		// WAL is on dedicated volume: script should clear /instance/pgwal/pg15_wal, not pgdata
+		walDir := path.Join("/", instanceName, "pgwal", "pg15_wal")
+		assert.Contains(t, script, "find")
+		assert.Contains(t, script, walDir)
+		assert.NotContains(t, script, path.Join("/", instanceName, "pgdata", "pg15_wal"))
+
+		// PITR + dedicated WAL: only WAL PVC is mounted, not data
+		require.Len(t, job.Spec.Template.Spec.Volumes, 1)
+		assert.Equal(t, instanceName+"-pgwal", job.Spec.Template.Spec.Volumes[0].Name)
+
+		require.Len(t, container.VolumeMounts, 1)
+		assert.Equal(t, instanceName+"-pgwal", container.VolumeMounts[0].Name)
+		assert.Equal(t, path.Join("/", instanceName, "pgwal"), container.VolumeMounts[0].MountPath)
 	})
 
 	t.Run("script starts with set -e", func(t *testing.T) {
