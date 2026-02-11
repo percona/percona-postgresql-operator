@@ -206,7 +206,7 @@ func (r *snapshotRestorer) reconcileRunning(ctx context.Context) (reconcile.Resu
 
 	if ok, err := r.unsuspendAllInstances(ctx); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "resume cluster")
-	} else if !ok && !r.isPITRInProgress() {
+	} else if !ok {
 		r.log.Info("Waiting for instances to be unsuspended")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
@@ -566,11 +566,6 @@ func (r *snapshotRestorer) restorePITR(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 	return false, nil
-}
-
-func (r *snapshotRestorer) isPITRInProgress() bool {
-	_, ok := r.cluster.GetAnnotations()[naming.PGBackRestRestore]
-	return ok
 }
 
 func (r *snapshotRestorer) reconcilePrepareJobAnnotation(ctx context.Context) error {
