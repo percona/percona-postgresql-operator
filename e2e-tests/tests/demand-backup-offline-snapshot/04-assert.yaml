@@ -11,6 +11,8 @@ spec:
   method: volumeSnapshot
 status:
   state: Succeeded
+  snapshot:
+    dataVolumeSnapshotRef: backup1-pgdata
 ---
 kind: VolumeSnapshot
 apiVersion: snapshot.storage.k8s.io/v1
