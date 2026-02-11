@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
@@ -143,28 +142,11 @@ func (e *offlineExec) getBackupTarget(ctx context.Context) (string, error) {
 	if len(replicas) == 0 {
 		return "", errors.New("no replica pods found")
 	}
+
 	targetPod := replicas[0]
 	instanceName := targetPod.GetLabels()[naming.LabelInstance]
 	if instanceName == "" {
 		return "", errors.New("cannot determine instance name from pod labels")
-	}
-
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		bcp := e.backup.DeepCopy()
-		if err := e.cl.Get(ctx, client.ObjectKeyFromObject(bcp), bcp); err != nil {
-			return err
-		}
-
-		orig := bcp.DeepCopy()
-		annots := bcp.GetAnnotations()
-		if annots == nil {
-			annots = make(map[string]string)
-		}
-		annots[annotationBackupTarget] = instanceName
-		bcp.SetAnnotations(annots)
-		return e.cl.Patch(ctx, bcp, client.MergeFrom(orig))
-	}); err != nil {
-		return "", errors.Wrap(err, "failed to update backup annotations")
 	}
 
 	log.Info("Selected backup target", "instance", instanceName)
