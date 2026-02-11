@@ -478,7 +478,7 @@ func TestGenerateSnapshotIntent(t *testing.T) {
 			assert.Equal(t, tt.sourcePVC, ptr.Deref(vs.Spec.Source.PersistentVolumeClaimName, ""))
 
 			// Owner reference should be set to the backup
-			require.Positive(t, len(vs.OwnerReferences), "expected owner reference to be set")
+			require.NotEmpty(t, vs.OwnerReferences, "expected owner reference to be set")
 			assert.Equal(t, backupName, vs.OwnerReferences[0].Name)
 			assert.Equal(t, "pgv2.percona.com/v2", vs.OwnerReferences[0].APIVersion)
 			assert.Equal(t, "PerconaPGBackup", vs.OwnerReferences[0].Kind)
