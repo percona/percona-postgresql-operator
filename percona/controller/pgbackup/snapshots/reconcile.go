@@ -355,7 +355,7 @@ func (r *snapshotReconciler) reconcileTablespaceSnapshot(ctx context.Context, ta
 }
 
 func shouldFailSnapshot(volumeSnapshot *volumesnapshotv1.VolumeSnapshot) bool {
-	if volumeSnapshot.Status == nil || volumeSnapshot.Status.Error == nil {
+	if volumeSnapshot.Status == nil || volumeSnapshot.Status.Error == nil || volumeSnapshot.Status.Error.Time.IsZero() {
 		return false
 	}
 	errAt := volumeSnapshot.Status.Error.Time
