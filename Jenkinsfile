@@ -9,11 +9,12 @@ void createCluster(String CLUSTER_SUFFIX) {
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
 
+
             cat > ${WORKSPACE}/hugepages-config-${CLUSTER_SUFFIX}.yaml <<EOF
-kubeletConfig:
-  hugepages:
-    hugepages-2Mi: "1024"
-EOF
+            linuxConfig:
+              hugepageConfig:
+                hugepage_size2m: 1024
+            EOF
 
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
