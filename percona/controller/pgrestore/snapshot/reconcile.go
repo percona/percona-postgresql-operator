@@ -636,65 +636,38 @@ func (r *snapshotRestorer) runPrepareJob(ctx context.Context, instances *appsv1.
 	return false, nil
 }
 
+// instanceSetSpecForName returns the PGInstanceSetSpec for the given instance set name, or nil if not found.
+func instanceSetSpecForName(cluster *v2.PerconaPGCluster, name string) *v2.PGInstanceSetSpec {
+	for i := range cluster.Spec.InstanceSets {
+		if cluster.Spec.InstanceSets[i].Name == name {
+			return &cluster.Spec.InstanceSets[i]
+		}
+	}
+	return nil
+}
+
+// instancePrepareInfo holds mount paths for an instance used by the snapshot prepare job.
+// dataMountPath is empty when PITR + dedicated WAL (data volume not mounted).
+// walMountPath is empty when no dedicated WAL volume.
+type instancePrepareInfo struct {
+	dataMountPath string
+	walMountPath  string
+}
+
 func generatePrepareJob(
 	job *batchv1.Job,
 	instances *appsv1.StatefulSetList,
 	cluster *v2.PerconaPGCluster,
 	restore *v2.PerconaPGRestore,
 ) {
-	volumes := []corev1.Volume{}
-	volumeMounts := []corev1.VolumeMount{}
+	pitrEnabled := restore.Spec.RepoName != nil && restore.Spec.VolumeSnapshotBackupName != ""
+	pgVersion := cluster.Spec.PostgresVersion
 
-	for _, instance := range instances.Items {
-		volName := instance.GetName() + "-pgdata"
-		volumes = append(volumes, corev1.Volume{
-			Name: volName,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: naming.InstancePostgresDataVolume(&instance).Name,
-				},
-			},
-		})
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      volName,
-			MountPath: path.Join(instance.GetName(), "pgdata"),
-		})
-	}
+	volumes, volumeMounts, instanceInfos := buildPrepareJobVolumes(instances, cluster, pitrEnabled)
 
-	scriptParts := []string{"set -e"}
-	for _, mount := range volumeMounts {
-		if restore.Spec.RepoName == nil || restore.Spec.VolumeSnapshotBackupName == "" { // no PITR
-			// PITR is not needed, signal the restore_command to skip WAL recovery in order
-			// to maintain consistency with the snapshot data.
-			dataDir := path.Join(mount.MountPath, fmt.Sprintf("pg%d", cluster.Spec.PostgresVersion))
-			signalFile := path.Join(dataDir, "skip-wal-recovery")
-			scriptParts = append(scriptParts, fmt.Sprintf("touch %q", signalFile))
-		} else {
-			// PITR is needed, clear local WAL files since they may belong to a different timeline.
-			// PITR restore job will fetch the required WAL files from the repo.
-			walDir := path.Join(mount.MountPath, fmt.Sprintf("pg%d_wal", cluster.Spec.PostgresVersion))
-			scriptParts = append(scriptParts, fmt.Sprintf("find %q -mindepth 1 -delete", walDir))
-		}
-	}
-	script := strings.Join(scriptParts, "\n")
+	script := buildPrepareJobScript(instanceInfos, pgVersion, pitrEnabled)
 
 	containerName := "snapshot-prepare"
-	container := corev1.Container{
-		Name:  containerName,
-		Image: cluster.Spec.Image,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("50m"),
-				corev1.ResourceMemory: resource.MustParse("32Mi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("50m"),
-				corev1.ResourceMemory: resource.MustParse("32Mi"),
-			},
-		},
-		VolumeMounts: volumeMounts,
-		Command:      []string{"bash", "-c", script},
-	}
 	job.Spec = batchv1.JobSpec{
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -703,13 +676,115 @@ func generatePrepareJob(
 				},
 			},
 			Spec: corev1.PodSpec{
-				Containers:    []corev1.Container{container},
+				Containers: []corev1.Container{{
+					Name:    containerName,
+					Image:   cluster.Spec.Image,
+					Command: []string{"bash", "-c", script},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("32Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("32Mi"),
+						},
+					},
+					VolumeMounts: volumeMounts,
+				}},
 				Volumes:       volumes,
 				RestartPolicy: corev1.RestartPolicyNever,
 			},
 		},
 	}
+}
 
+func buildPrepareJobVolumes(
+	instances *appsv1.StatefulSetList,
+	cluster *v2.PerconaPGCluster,
+	pitrEnabled bool,
+) ([]corev1.Volume, []corev1.VolumeMount, []instancePrepareInfo) {
+	var volumes []corev1.Volume
+	var volumeMounts []corev1.VolumeMount
+	var instanceInfos []instancePrepareInfo
+
+	for _, instance := range instances.Items {
+		instanceSetSpec := instanceSetSpecForName(cluster, instance.Labels[naming.LabelInstanceSet])
+		hasWALVolume := instanceSetSpec != nil && instanceSetSpec.WALVolumeClaimSpec != nil
+
+		// When PITR + dedicated WAL volumes, we only clear the WAL directory; no need to mount data.
+		needDataVolume := !pitrEnabled || !hasWALVolume
+
+		var info instancePrepareInfo
+
+		if needDataVolume {
+			info.dataMountPath = path.Join("/", instance.GetName(), "pgdata")
+			volumes, volumeMounts = appendDataVolume(volumes, volumeMounts, &instance, info.dataMountPath)
+		}
+
+		if hasWALVolume {
+			info.walMountPath = path.Join("/", instance.GetName(), "pgwal")
+			volumes, volumeMounts = appendWALVolume(volumes, volumeMounts, &instance, info.walMountPath)
+		}
+
+		instanceInfos = append(instanceInfos, info)
+	}
+
+	return volumes, volumeMounts, instanceInfos
+}
+
+func appendDataVolume(volumes []corev1.Volume, mounts []corev1.VolumeMount, instance *appsv1.StatefulSet, mountPath string) ([]corev1.Volume, []corev1.VolumeMount) {
+	name := instance.GetName() + "-pgdata"
+	volumes = append(volumes, corev1.Volume{
+		Name: name,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: naming.InstancePostgresDataVolume(instance).Name,
+			},
+		},
+	})
+	mounts = append(mounts, corev1.VolumeMount{Name: name, MountPath: mountPath})
+	return volumes, mounts
+}
+
+func appendWALVolume(volumes []corev1.Volume, mounts []corev1.VolumeMount, instance *appsv1.StatefulSet, mountPath string) ([]corev1.Volume, []corev1.VolumeMount) {
+	name := instance.GetName() + "-pgwal"
+	volumes = append(volumes, corev1.Volume{
+		Name: name,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: naming.InstancePostgresWALVolume(instance).Name,
+			},
+		},
+	})
+	mounts = append(mounts, corev1.VolumeMount{Name: name, MountPath: mountPath})
+	return volumes, mounts
+}
+
+func buildPrepareJobScript(instanceInfos []instancePrepareInfo, pgVersion int, pitrEnabled bool) string {
+	scriptParts := []string{"set -e"}
+	walDirSuffix := fmt.Sprintf("pg%d_wal", pgVersion)
+	dataDirSuffix := fmt.Sprintf("pg%d", pgVersion)
+
+	for _, info := range instanceInfos {
+		if pitrEnabled {
+			// Clear WAL files so PITR restore can fetch from repo. WAL lives under WAL mount
+			// when dedicated volume is used, otherwise under pgdata.
+			walBase := info.dataMountPath
+			if info.walMountPath != "" {
+				walBase = info.walMountPath
+			}
+			walDir := path.Join(walBase, walDirSuffix)
+			scriptParts = append(scriptParts, fmt.Sprintf("find %q -mindepth 1 -delete", walDir))
+		} else {
+			// Signal restore_command to skip WAL recovery for consistency with snapshot data.
+			dataDir := path.Join(info.dataMountPath, dataDirSuffix)
+			signalFile := path.Join(dataDir, "skip-wal-recovery")
+			scriptParts = append(scriptParts, fmt.Sprintf("touch %q", signalFile))
+		}
+	}
+
+	return strings.Join(scriptParts, "\n")
 }
 
 // We create a $PGDATA/skip-wal-recovery file during the snapshot restore when no PITR is specified.
