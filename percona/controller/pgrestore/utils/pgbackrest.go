@@ -100,7 +100,7 @@ func (r *PGBackRestRestore) DisableRestore(ctx context.Context) error {
 func (r *PGBackRestRestore) ObserveStatus(ctx context.Context) (v2.PGRestoreState, *metav1.Time, error) {
 	cluster := &v2.PerconaPGCluster{}
 	if err := r.Get(ctx, client.ObjectKeyFromObject(r.pgCluster), cluster); err != nil {
-		return v2.RestoreStarting, nil, errors.Wrap(err, "get PostgresCluster")
+		return v2.RestoreStarting, nil, errors.Wrap(err, "get PerconaPGCluster")
 	}
 
 	if cluster.Status.PGBackRest == nil || cluster.Status.PGBackRest.Restore == nil {
