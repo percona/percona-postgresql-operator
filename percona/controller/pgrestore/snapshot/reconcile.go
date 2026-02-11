@@ -113,7 +113,7 @@ func Reconcile(
 }
 
 func (r *snapshotRestorer) reconcileNew(ctx context.Context) (reconcile.Result, error) {
-	if restore := r.cluster.Spec.Backups.PGBackRest.Restore; restore != nil && *restore.Enabled {
+	if restore := r.cluster.Spec.Backups.PGBackRest.Restore; restore != nil && restore.Enabled != nil && *restore.Enabled {
 		r.log.Info("Waiting for another restore to finish")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
@@ -640,8 +640,9 @@ func generatePrepareJob(
 	}
 	script := strings.Join(scriptParts, "\n")
 
+	containerName := "snapshot-prepare"
 	container := corev1.Container{
-		Name:  "snapshot-prepare",
+		Name:  containerName,
 		Image: cluster.Spec.Image,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
@@ -660,7 +661,7 @@ func generatePrepareJob(
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					naming.DefaultContainerAnnotation: "prepare",
+					naming.DefaultContainerAnnotation: containerName,
 				},
 			},
 			Spec: corev1.PodSpec{

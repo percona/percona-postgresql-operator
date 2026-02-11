@@ -47,7 +47,11 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 
 	origPostgres := postgresCluster.DeepCopy()
 
-	postgresCluster.Status.PGBackRest.Restore = new(v1beta1.PGBackRestJobStatus)
+	if postgresCluster.Status.PGBackRest == nil {
+		postgresCluster.Status.PGBackRest = &v1beta1.PGBackRestStatus{}
+	}
+
+	postgresCluster.Status.PGBackRest.Restore = &v1beta1.PGBackRestJobStatus{}
 
 	if err := r.Status().Patch(ctx, postgresCluster, client.MergeFrom(origPostgres)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")
@@ -84,7 +88,7 @@ func (r *PGBackRestRestore) DisableRestore(ctx context.Context) error {
 	}
 
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = ptr.To(false)
-	delete(r.pgCluster.Annotations, naming.LabelPGBackRestRestore)
+	delete(r.pgCluster.Annotations, naming.PGBackRestRestore)
 
 	if err := r.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")

@@ -20,7 +20,11 @@ delete:
 - apiVersion: snapshot.storage.k8s.io/v1
   kind: VolumeSnapshot
   metadata:
-    name: backup1
+    name: backup1-pgdata
+- apiVersion: snapshot.storage.k8s.io/v1
+  kind: VolumeSnapshot
+  metadata:
+    name: backup3-pgdata
 commands:
   - script: |-
       set -o errexit

@@ -85,6 +85,12 @@ func Reconcile(
 	pgCluster *v2.PerconaPGCluster,
 ) (reconcile.Result, error) {
 	if pgBackup == nil || pgCluster == nil {
+		if err := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
+			bcp.Status.State = v2.BackupFailed
+			bcp.Status.Error = "pgBackup or pgCluster is nil or not found"
+		}); err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", err)
+		}
 		return reconcile.Result{}, errors.New("pgBackup or pgCluster is nil or not found")
 	}
 
@@ -282,6 +288,10 @@ func (r *snapshotReconciler) generateSnapshotIntent(
 
 func (r *snapshotReconciler) reconcileDataSnapshot(ctx context.Context, targetPVC string) (bool, error) {
 	volumeSnapshot, err := r.generateSnapshotIntent(naming.RolePostgresData, targetPVC)
+	if err != nil {
+		return false, fmt.Errorf("failed to generate snapshot intent: %w", err)
+	}
+
 	ok, err := r.reconcileSnapshot(ctx, volumeSnapshot)
 	if err != nil {
 		return false, fmt.Errorf("failed to reconcile snapshot: %w", err)
@@ -326,6 +336,10 @@ func (r *snapshotReconciler) reconcileTablespaceSnapshot(ctx context.Context, ta
 	for tsName, targetPVC := range targetPVCs {
 		role := tsName + "-" + naming.RoleTablespace
 		volumeSnapshot, err := r.generateSnapshotIntent(role, targetPVC)
+		if err != nil {
+			return false, fmt.Errorf("failed to generate snapshot intent: %w", err)
+		}
+
 		ok, err := r.reconcileSnapshot(ctx, volumeSnapshot)
 		if err != nil {
 			return false, fmt.Errorf("failed to reconcile snapshot: %w", err)
