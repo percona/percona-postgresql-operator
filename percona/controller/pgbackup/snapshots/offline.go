@@ -150,8 +150,12 @@ func (e *offlineExec) getBackupTarget(ctx context.Context) (string, error) {
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		orig := e.backup.DeepCopy()
 		bcp := e.backup.DeepCopy()
+		if err := e.cl.Get(ctx, client.ObjectKeyFromObject(bcp), bcp); err != nil {
+			return err
+		}
+
+		orig := bcp.DeepCopy()
 		annots := bcp.GetAnnotations()
 		if annots == nil {
 			annots = make(map[string]string)
