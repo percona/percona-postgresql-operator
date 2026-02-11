@@ -85,12 +85,6 @@ func Reconcile(
 	pgCluster *v2.PerconaPGCluster,
 ) (reconcile.Result, error) {
 	if pgBackup == nil || pgCluster == nil {
-		if err := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
-			bcp.Status.State = v2.BackupFailed
-			bcp.Status.Error = "pgBackup or pgCluster is nil or not found"
-		}); err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", err)
-		}
 		return reconcile.Result{}, errors.New("pgBackup or pgCluster is nil or not found")
 	}
 
