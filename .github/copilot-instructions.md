@@ -49,6 +49,8 @@ Kubernetes Operator for PostgreSQL (Operator SDK, controller-runtime). Go + YAML
 ### Testing
 
 - New features: expect unit tests and/or E2E (KUTTL) where appropriate
+- Unit tests should use `assert` and `require` from `github.com/stretchr/testify` wherever applicable
+- Utilize table driven tests when possible
 - Test names should describe the scenario
 
 ## Response Format
