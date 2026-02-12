@@ -458,6 +458,76 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 	})
 })
 
+var _ = Describe("syncConditionsFromPostgresToPercona", func() {
+	Context("When syncing conditions", func() {
+		It("should set ObservedGeneration to current CR generation", func() {
+			cr := &v2.PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-cluster",
+					Namespace:  "test-ns",
+					Generation: 5,
+				},
+				Status: v2.PerconaPGClusterStatus{},
+			}
+
+			postgresStatus := &v1beta1.PostgresClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               postgrescluster.ConditionRepoHostReady,
+						Status:             metav1.ConditionTrue,
+						Reason:             "Ready",
+						Message:            "Repo host is ready",
+						LastTransitionTime: metav1.Now(),
+						ObservedGeneration: 999, // This should be overwritten with CR's generation
+					},
+					{
+						Type:               postgrescluster.ConditionReplicaCreate,
+						Status:             metav1.ConditionTrue,
+						Reason:             "Ready",
+						Message:            "Replica can be created",
+						LastTransitionTime: metav1.Now(),
+						ObservedGeneration: 1, // This should be overwritten with CR's generation
+					},
+				},
+			}
+
+			syncConditionsFromPostgresToPercona(cr, postgresStatus)
+
+			repoHostCond := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
+			Expect(repoHostCond).NotTo(BeNil())
+			Expect(repoHostCond.ObservedGeneration).To(Equal(int64(5)))
+
+			replicaCond := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionReplicaCreate)
+			Expect(replicaCond).NotTo(BeNil())
+			Expect(replicaCond.ObservedGeneration).To(Equal(int64(5)))
+		})
+	})
+
+	Context("When postgres conditions are empty", func() {
+		It("should not panic and result in empty conditions", func() {
+			cr := &v2.PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-cluster",
+					Namespace:  "test-ns",
+					Generation: 1,
+				},
+				Status: v2.PerconaPGClusterStatus{},
+			}
+
+			postgresStatus := &v1beta1.PostgresClusterStatus{
+				Conditions: []metav1.Condition{},
+			}
+
+			// Should not panic
+			Expect(func() {
+				syncConditionsFromPostgresToPercona(cr, postgresStatus)
+			}).NotTo(Panic())
+
+			Expect(cr.Status.Conditions).To(HaveLen(0))
+		})
+	})
+})
+
 func reconcileAndAssertState(ctx context.Context, nn types.NamespacedName, cr *v2.PerconaPGCluster, expectedState v2.AppState) {
 	_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: nn})
 	Expect(err).NotTo(HaveOccurred())
