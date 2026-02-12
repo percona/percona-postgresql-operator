@@ -9,7 +9,7 @@
 
 ## Project Context
 
-Kubernetes Operator for PostgreSQL (Operator SDK, controller-runtime). Go + YAML. Key paths: `internal/`, `percona/`, `pkg/apis`, `e2e-tests/`, `testing/`.
+Kubernetes Operator for PostgreSQL (Operator SDK, controller-runtime). Go + YAML. Key paths: `internal/`, `percona/`, `pkg/apis` and `e2e-tests/`.
 
 ## Priority Areas
 
