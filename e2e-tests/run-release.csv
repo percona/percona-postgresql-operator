@@ -8,6 +8,7 @@ demand-backup
 demand-backup-offline-snapshot
 finalizers
 init-deploy
+huge-pages
 major-upgrade
 monitoring
 monitoring-pmm3

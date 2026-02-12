@@ -8,6 +8,7 @@ demand-backup
 demand-backup-offline-snapshot
 finalizers
 init-deploy
+huge-pages
 monitoring
 monitoring-pmm3
 one-pod
