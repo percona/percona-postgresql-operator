@@ -7857,12 +7857,23 @@ spec:
                           Configuration for offline snapshot operations.
                           Ignored if mode is not offline.
                         properties:
-                          checkpointTimeoutSeconds:
-                            default: 300
-                            description: Timeout for the checkpoint operation.
-                            format: int32
-                            minimum: 30
-                            type: integer
+                          checkpoint:
+                            description: Checkpoint configuration for offline snapshot
+                              operations.
+                            properties:
+                              enabled:
+                                default: true
+                                description: If set, a checkpoint is requested.
+                                type: boolean
+                              timeoutSeconds:
+                                default: 300
+                                description: |-
+                                  Timeout for the checkpoint operation.
+                                  Ignored if checkpoint is not enabled.
+                                format: int32
+                                minimum: 30
+                                type: integer
+                            type: object
                         type: object
                       schedule:
                         description: |-

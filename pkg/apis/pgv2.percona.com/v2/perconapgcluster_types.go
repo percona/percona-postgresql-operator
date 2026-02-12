@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -263,6 +264,12 @@ func (cr *PerconaPGCluster) Default() {
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
+	}
+
+	if cr.Spec.Backups.IsVolumeSnapshotsEnabled() &&
+		cr.Spec.Backups.VolumeSnapshots.Mode == VolumeSnapshotModeOffline &&
+		cr.Spec.Backups.VolumeSnapshots.OfflineConfig == nil {
+		cr.Spec.Backups.VolumeSnapshots.OfflineConfig = DefaultOfflineSnapshotConfig()
 	}
 }
 
@@ -561,12 +568,33 @@ type VolumeSnapshots struct {
 	OfflineConfig *OfflineSnapshotConfig `json:"offlineConfig,omitempty"`
 }
 
+func DefaultOfflineSnapshotConfig() *OfflineSnapshotConfig {
+	return &OfflineSnapshotConfig{
+		Checkpoint: &CheckpointConfig{
+			Enabled:        ptr.To(true),
+			TimeoutSeconds: ptr.To(int32(300)),
+		},
+	}
+}
+
 type OfflineSnapshotConfig struct {
+	// Checkpoint configuration for offline snapshot operations.
+	// +optional
+	Checkpoint *CheckpointConfig `json:"checkpoint,omitempty"`
+}
+
+type CheckpointConfig struct {
+	// If set, a checkpoint is requested.
+	// +optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// Timeout for the checkpoint operation.
+	// Ignored if checkpoint is not enabled.
 	// +optional
 	// +kubebuilder:validation:Minimum=30
 	// +kubebuilder:default=300
-	CheckpointTimeoutSeconds *int32 `json:"checkpointTimeoutSeconds,omitempty"`
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
 }
 
 func (b Backups) IsVolumeSnapshotsEnabled() bool {

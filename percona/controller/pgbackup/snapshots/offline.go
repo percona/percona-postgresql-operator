@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
@@ -19,9 +20,8 @@ import (
 )
 
 const (
-	defaultCheckpointTimeoutSeconds int32 = 300 // 5mins
-	waitTimeout                           = 5 * time.Minute
-	retryInterval                         = 3 * time.Second
+	waitTimeout   = 5 * time.Minute
+	retryInterval = 3 * time.Second
 )
 
 type offlineExec struct {
@@ -32,13 +32,26 @@ type offlineExec struct {
 	offlineConfig *v2.OfflineSnapshotConfig
 }
 
+func newSnapshotConfig(pgCluster *v2.PerconaPGCluster) *v2.OfflineSnapshotConfig {
+	defaultConfig := v2.DefaultOfflineSnapshotConfig()
+	if pgCluster.Spec.Backups.VolumeSnapshots.OfflineConfig == nil {
+		return defaultConfig
+	}
+
+	config := pgCluster.Spec.Backups.VolumeSnapshots.OfflineConfig
+	if config.Checkpoint == nil {
+		config.Checkpoint = defaultConfig.Checkpoint
+	}
+	return config
+}
+
 func newOfflineExec(cl client.Client, podExec runtime.PodExecutor, pgCluster *v2.PerconaPGCluster, pgBackup *v2.PerconaPGBackup) *offlineExec {
 	return &offlineExec{
 		cl:            cl,
 		cluster:       pgCluster,
 		backup:        pgBackup,
 		podExec:       podExec,
-		offlineConfig: pgCluster.Spec.Backups.VolumeSnapshots.OfflineConfig,
+		offlineConfig: newSnapshotConfig(pgCluster),
 	}
 }
 
@@ -48,7 +61,6 @@ func (e *offlineExec) prepare(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "failed to get backup target pod")
 	}
 
-	// TODO: should this be optional, since this can take a while on large datasets?
 	if err := e.checkpoint(ctx, targetInstance); err != nil {
 		return "", errors.Wrap(err, "failed to checkpoint instance")
 	}
@@ -60,15 +72,20 @@ func (e *offlineExec) prepare(ctx context.Context) (string, error) {
 }
 
 func (e *offlineExec) checkpoint(ctx context.Context, instanceName string) error {
+	log := logging.FromContext(ctx)
+	defaults := v2.DefaultOfflineSnapshotConfig().Checkpoint
+
+	skip := !ptr.Deref(e.offlineConfig.Checkpoint.Enabled, *defaults.Enabled)
+	if skip {
+		log.Info("Skipping checkpoint")
+		return nil
+	}
+
 	exec := func(_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
 		return e.podExec(ctx, e.cluster.GetNamespace(), instanceName+"-0", naming.ContainerDatabase, stdin, stdout, stderr, command...)
 	}
 
-	timeoutSeconds := defaultCheckpointTimeoutSeconds
-	if e.offlineConfig != nil && e.offlineConfig.CheckpointTimeoutSeconds != nil {
-		timeoutSeconds = *e.offlineConfig.CheckpointTimeoutSeconds
-	}
-
+	timeoutSeconds := ptr.Deref(e.offlineConfig.Checkpoint.TimeoutSeconds, *defaults.TimeoutSeconds)
 	stdout, stderr, err := postgres.Executor(exec).
 		ExecInDatabasesFromQuery(ctx, `SELECT pg_catalog.current_database()`,
 			`SET statement_timeout = :'timeout'; CHECKPOINT;`,
@@ -85,7 +102,6 @@ func (e *offlineExec) checkpoint(ctx context.Context, instanceName string) error
 		return fmt.Errorf("checkpoint failed: %s", stderr)
 	}
 
-	log := logging.FromContext(ctx)
 	log.Info("checkpoint executed", "stdout", stdout, "stderr", stderr)
 	return nil
 }
