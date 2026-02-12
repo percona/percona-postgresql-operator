@@ -245,9 +245,9 @@ func TestApplyCACertificate(t *testing.T) {
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
-		// fail when CA certificate already exists
+		// return nil when certificate already exists
 		err = ctrl.ApplyCACertificate(t.Context(), cluster)
-		require.Error(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -305,7 +305,6 @@ func TestApplyClusterCertificate(t *testing.T) {
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
 		// return nil when certificate already exists
-		dnsNames = []string{"test.example.com"}
 		err = ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames)
 		require.NoError(t, err)
 	})
@@ -363,12 +362,9 @@ func TestApplyInstanceCertificate(t *testing.T) {
 
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
-	})
 
-	t.Run("return nil when instance certificate already exists", func(t *testing.T) {
-		instanceName := "test-cluster-instance-0"
-		dnsNames := []string{"test.example.com"}
-		err := ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames)
+		// return nil when instance certificate already exists
+		err = ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames)
 		require.NoError(t, err)
 	})
 
@@ -426,7 +422,6 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
 		// return nil when pgbouncer certificate already exists
-		dnsNames = []string{"test.example.com"}
 		err = ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames)
 		require.NoError(t, err)
 	})

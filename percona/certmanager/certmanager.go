@@ -12,6 +12,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -89,8 +90,19 @@ func (c *controller) Check(ctx context.Context, config *rest.Config, ns string) 
 }
 
 func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	meta := naming.TLSIssuer(cluster)
+
+	existing := &v1.Issuer{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name, Namespace: meta.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get issuer")
+	}
+
 	issuer := &v1.Issuer{
-		ObjectMeta: naming.TLSIssuer(cluster),
+		ObjectMeta: meta,
 		Spec: v1.IssuerSpec{
 			IssuerConfig: v1.IssuerConfig{
 				CA: &v1.CAIssuer{
@@ -104,9 +116,8 @@ func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresC
 		return errors.Wrap(err, "failed to set controller reference")
 	}
 
-	err := c.cl.Create(ctx, issuer)
-	if err != nil {
-		return err
+	if err := c.cl.Create(ctx, issuer); err != nil {
+		return errors.Wrap(err, "failed to create issuer")
 	}
 
 	return nil
@@ -114,8 +125,19 @@ func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresC
 
 // ApplyCAIssuer creates a SelfSigned Issuer resource for the given PostgresCluster.
 func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	meta := naming.CAIssuer(cluster)
+
+	existing := &v1.Issuer{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name, Namespace: meta.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get CA issuer")
+	}
+
 	issuer := &v1.Issuer{
-		ObjectMeta: naming.CAIssuer(cluster),
+		ObjectMeta: meta,
 		Spec: v1.IssuerSpec{
 			IssuerConfig: v1.IssuerConfig{
 				SelfSigned: &v1.SelfSignedIssuer{},
@@ -127,23 +149,33 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 		return errors.Wrap(err, "failed to set controller reference")
 	}
 
-	err := c.cl.Create(ctx, issuer)
-	if err != nil {
-		return errors.Wrap(err, "failed to create the issuer")
+	if err := c.cl.Create(ctx, issuer); err != nil {
+		return errors.Wrap(err, "failed to create ca issuer")
 	}
 
 	return nil
 }
 
 func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	certName := naming.PostgresRootCASecret(cluster).Name
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get CA certificate")
+	}
+
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.PostgresRootCASecret(cluster).Name,
+			Name:      certName,
 			Namespace: cluster.Namespace,
 			Labels:    cluster.Labels,
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: naming.PostgresRootCASecret(cluster).Name,
+			SecretName: certName,
 			CommonName: cluster.Name + "-ca",
 			IsCA:       true,
 			IssuerRef: cmmeta.IssuerReference{
@@ -164,9 +196,8 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 		return errors.Wrap(err, "failed to set controller reference")
 	}
 
-	err := c.cl.Create(ctx, cert)
-	if err != nil {
-		return errors.Wrap(err, "failed to create the issuer")
+	if err := c.cl.Create(ctx, cert); err != nil {
+		return errors.Wrap(err, "failed to create ca certificate")
 	}
 
 	return nil
@@ -175,19 +206,28 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 // ApplyClusterCertificate creates a cert-manager Certificate resource for the cluster's
 // primary and replica services TLS certificate.
 func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error {
-	log := logf.FromContext(ctx).WithName("ApplyClusterCertificate")
-
 	if len(dnsNames) == 0 {
 		return errors.New("dnsNames cannot be empty")
 	}
 
+	certName := naming.PostgresTLSSecret(cluster).Name
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get cluster certificate")
+	}
+
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.PostgresTLSSecret(cluster).Name,
+			Name:      certName,
 			Namespace: cluster.Namespace,
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: naming.PostgresTLSSecret(cluster).Name,
+			SecretName: certName,
 			CommonName: cluster.Name + "-postgres",
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.ObjectReference{
@@ -220,30 +260,31 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 		return errors.Wrap(err, "failed to set controller reference")
 	}
 
-	err := c.cl.Create(ctx, cert)
-	if err != nil {
-		if k8serrors.IsAlreadyExists(err) {
-			log.V(1).Info("cluster certificate already exists", "name", cert.Name)
-			return nil
-		}
+	if err := c.cl.Create(ctx, cert); err != nil {
 		return errors.Wrap(err, "failed to create cluster certificate")
 	}
 
-	log.Info("created cluster certificate", "name", cert.Name)
 	return nil
 }
 
 // ApplyInstanceCertificate creates a cert-manager Certificate resource for a specific
 // PostgreSQL instance.
 func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, instanceName string, dnsNames []string) error {
-	log := logf.FromContext(ctx).WithName("ApplyInstanceCertificate")
-
 	if len(dnsNames) == 0 {
 		return errors.New("dnsNames cannot be empty")
 	}
 
 	certName := instanceName + "-cert"
 	secretName := instanceName + "-certs"
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get instance certificate")
+	}
 
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
@@ -284,29 +325,30 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 		return errors.Wrap(err, "failed to set controller reference")
 	}
 
-	err := c.cl.Create(ctx, cert)
-	if err != nil {
-		if k8serrors.IsAlreadyExists(err) {
-			log.V(1).Info("instance certificate already exists", "name", cert.Name)
-			return nil
-		}
+	if err := c.cl.Create(ctx, cert); err != nil {
 		return errors.Wrap(err, "failed to create instance certificate")
 	}
 
-	log.Info("created instance certificate", "name", cert.Name, "instance", instanceName)
 	return nil
 }
 
 // ApplyPGBouncerCertificate creates a cert-manager Certificate resource for PgBouncer.
 func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error {
-	log := logf.FromContext(ctx).WithName("ApplyPGBouncerCertificate")
-
 	if len(dnsNames) == 0 {
 		return errors.New("dnsNames cannot be empty")
 	}
 
 	secretMeta := naming.ClusterPGBouncer(cluster)
 	certName := cluster.Name + "-pgbouncer-cert"
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get pgbouncer certificate")
+	}
 
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
@@ -347,16 +389,10 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 		return errors.Wrap(err, "failed to set controller reference")
 	}
 
-	err := c.cl.Create(ctx, cert)
-	if err != nil {
-		if k8serrors.IsAlreadyExists(err) {
-			log.V(1).Info("pgbouncer certificate already exists", "name", cert.Name)
-			return nil
-		}
+	if err := c.cl.Create(ctx, cert); err != nil {
 		return errors.Wrap(err, "failed to create pgbouncer certificate")
 	}
 
-	log.Info("created pgbouncer certificate", "name", cert.Name)
 	return nil
 }
 
