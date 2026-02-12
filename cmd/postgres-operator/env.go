@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,6 +43,7 @@ func parseEnvVars() (EnvConfig, error) {
 		if raw == "" {
 			raw = sf.Tag.Get("default")
 		}
+		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			continue
 		}

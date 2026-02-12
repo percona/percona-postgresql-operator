@@ -336,7 +336,7 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	}
 
 	if envs.Workers < 0 {
-		log.Error(nil, "PGO_WORKERS must be a positive number")
+		log.Error(nil, "PGO_WORKERS must be a non-negative number; 0 disables the override")
 	} else if envs.Workers > 0 {
 		for kind := range options.Controller.GroupKindConcurrency {
 			options.Controller.GroupKindConcurrency[kind] = envs.Workers
