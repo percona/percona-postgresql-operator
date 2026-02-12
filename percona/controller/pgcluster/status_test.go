@@ -5,11 +5,14 @@ package pgcluster
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	gs "github.com/onsi/gomega/gstruct"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -338,173 +341,303 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 			})
 		})
 	})
-
-	Context("Update PG cluster status.conditions", Ordered, func() {
-		crName := ns + "-conditions"
-		crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
-
-		cr, err := readDefaultCR(crName, ns)
-		It("should read default cr.yaml and create PerconaPGCluster", func() {
-			Expect(err).NotTo(HaveOccurred())
-			status := cr.Status
-			Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
-			cr.Status = status
-			Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
-		})
-
-		It("should reconcile and create Crunchy PostgreCluster", func() {
-			_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		When("conditions are not set", func() {
-			It("should reconcile and update conditions", func() {
-				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-			})
-			It("ReadyForBackup condition should be False", func() {
-				Eventually(func() bool {
-					err := k8sClient.Get(ctx, crNamespacedName, cr)
-					return err == nil
-				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-
-				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
-				Expect(condition).Should(Not(BeNil()))
-				Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
-			})
-		})
-
-		When("ConditionRepoHostReady is false", func() {
-			It("ReadyForBackup condition should be False", func() {
-				updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
-					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
-						Type:   postgrescluster.ConditionRepoHostReady,
-						Status: metav1.ConditionFalse,
-						Reason: "test",
-					})
-					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
-						Type:   postgrescluster.ConditionReplicaCreate,
-						Status: metav1.ConditionTrue,
-						Reason: "test",
-					})
-				})
-				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(func() bool {
-					err := k8sClient.Get(ctx, crNamespacedName, cr)
-					return err == nil
-				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-
-				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
-				Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
-				Expect(cr.Status.ObservedGeneration).Should(Equal(int64(1)))
-			})
-		})
-
-		When("ConditionReplicaCreate is false", func() {
-			It("ReadyForBackup condition should be False", func() {
-				updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
-					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
-						Type:   postgrescluster.ConditionRepoHostReady,
-						Status: metav1.ConditionTrue,
-						Reason: "test",
-					})
-					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
-						Type:   postgrescluster.ConditionReplicaCreate,
-						Status: metav1.ConditionFalse,
-						Reason: "test",
-					})
-				})
-				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(func() bool {
-					err := k8sClient.Get(ctx, crNamespacedName, cr)
-					return err == nil
-				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-
-				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
-				Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
-			})
-		})
-
-		When("both are true", func() {
-			It("ReadyForBackup condition should be True", func() {
-				updateCrunchyPGClusterStatus(ctx, crNamespacedName, func(pgc *v1beta1.PostgresCluster) {
-					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
-						Type:   postgrescluster.ConditionRepoHostReady,
-						Status: metav1.ConditionTrue,
-						Reason: "test",
-					})
-					_ = meta.SetStatusCondition(&pgc.Status.Conditions, metav1.Condition{
-						Type:   postgrescluster.ConditionReplicaCreate,
-						Status: metav1.ConditionTrue,
-						Reason: "test",
-					})
-				})
-				_, err = reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(func() bool {
-					err := k8sClient.Get(ctx, crNamespacedName, cr)
-					return err == nil
-				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
-
-				condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
-				Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
-			})
-		})
-	})
 })
 
-var _ = Describe("syncConditionsFromPostgresToPercona", func() {
-	Context("When syncing conditions", func() {
-		It("should set ObservedGeneration to current CR generation", func() {
-			cr := &v2.PerconaPGCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-cluster",
-					Namespace:  "test-ns",
-					Generation: 5,
+// Unit tests for updateConditions function
+// Test coverage:
+//   - ClusterIsReadyForBackup condition logic:
+//   - no conditions set (RepoHostReady missing)
+//   - RepoHostReady is false
+//   - RepoHostReady is true but ReplicaCreate is missing
+//   - RepoHostReady is true but ReplicaCreate is false
+//   - both conditions are true
+//   - existing condition gets updated when status changes
+//   - existing condition stays unchanged when status remains the same
+//   - Condition synchronization from Postgres to Percona:
+//   - syncs all conditions from postgres status
+//   - updates existing conditions on CR
+//   - Status synchronization:
+//   - syncs PGBackRest status
+//   - syncs Patroni status
+func TestUpdateConditions(t *testing.T) {
+	switchover := "switching"
+	switchoverTimeline := int64(3)
+
+	tests := []struct {
+		name             string
+		crConditions     []metav1.Condition
+		statusConditions []metav1.Condition
+		pgBackRestStatus *v1beta1.PGBackRestStatus
+		patroniStatus    v1beta1.PatroniStatus
+
+		expectedReadyForBackupStatus metav1.ConditionStatus
+		expectedReadyForBackupReason string
+		expectedSyncedConditions     []metav1.Condition
+		expectedPGBackRest           *v1beta1.PGBackRestStatus
+		expectedPatroni              *v1beta1.PatroniStatus
+	}{
+		{
+			name:                         "no conditions set - RepoHostReady missing",
+			expectedReadyForBackupStatus: metav1.ConditionFalse,
+			expectedReadyForBackupReason: postgrescluster.ConditionRepoHostReady,
+		},
+		{
+			name: "RepoHostReady is false",
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionFalse,
+					Reason: "test",
 				},
-				Status: v2.PerconaPGClusterStatus{},
-			}
-
-			postgresStatus := &v1beta1.PostgresClusterStatus{
-				Conditions: []metav1.Condition{
-					{
-						Type:               postgrescluster.ConditionRepoHostReady,
-						Status:             metav1.ConditionTrue,
-						Reason:             "Ready",
-						Message:            "Repo host is ready",
-						LastTransitionTime: metav1.Now(),
-						ObservedGeneration: 999, // This should be overwritten with CR's generation
-					},
-					{
-						Type:               postgrescluster.ConditionReplicaCreate,
-						Status:             metav1.ConditionTrue,
-						Reason:             "Ready",
-						Message:            "Replica can be created",
-						LastTransitionTime: metav1.Now(),
-						ObservedGeneration: 1, // This should be overwritten with CR's generation
-					},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
 				},
-			}
+			},
+			expectedReadyForBackupStatus: metav1.ConditionFalse,
+			expectedReadyForBackupReason: postgrescluster.ConditionRepoHostReady,
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionFalse, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+		},
+		{
+			name: "RepoHostReady is true but ReplicaCreate is missing",
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionFalse,
+			expectedReadyForBackupReason: postgrescluster.ConditionReplicaCreate,
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+		},
+		{
+			name: "RepoHostReady is true but ReplicaCreate is false",
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionFalse,
+					Reason: "test",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionFalse,
+			expectedReadyForBackupReason: postgrescluster.ConditionReplicaCreate,
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionFalse, Reason: "test"},
+			},
+		},
+		{
+			name: "both conditions are true",
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+		},
+		{
+			name: "existing ReadyForBackup condition gets updated when RepoHostReady becomes true",
+			crConditions: []metav1.Condition{
+				{
+					Type:   pNaming.ConditionClusterIsReadyForBackup,
+					Status: metav1.ConditionFalse,
+					Reason: postgrescluster.ConditionRepoHostReady,
+				},
+			},
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+		},
+		{
+			name: "existing true condition stays true when both conditions remain true",
+			crConditions: []metav1.Condition{
+				{
+					Type:   pNaming.ConditionClusterIsReadyForBackup,
+					Status: metav1.ConditionTrue,
+					Reason: "AllConditionsAreTrue",
+				},
+			},
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+		},
+		{
+			name: "syncs conditions from postgres status to percona cr",
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   "SomeOtherCondition",
+					Status: metav1.ConditionTrue,
+					Reason: "other",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: "SomeOtherCondition", Status: metav1.ConditionTrue, Reason: "other"},
+			},
+		},
+		{
+			name: "existing condition on cr gets updated by sync",
+			crConditions: []metav1.Condition{
+				{
+					Type:   "SomeOtherCondition",
+					Status: metav1.ConditionFalse,
+					Reason: "original-reason",
+				},
+			},
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   "SomeOtherCondition",
+					Status: metav1.ConditionTrue,
+					Reason: "updated-reason",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: "SomeOtherCondition", Status: metav1.ConditionTrue, Reason: "updated-reason"},
+			},
+		},
+		{
+			name: "syncs pgbackrest status from postgres to percona",
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+			},
+			pgBackRestStatus: &v1beta1.PGBackRestStatus{
+				RepoHost: &v1beta1.RepoHostStatus{Ready: true},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+			expectedPGBackRest: &v1beta1.PGBackRestStatus{
+				RepoHost: &v1beta1.RepoHostStatus{Ready: true},
+			},
+		},
+		{
+			name: "syncs patroni status from postgres to percona",
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+			},
+			patroniStatus: v1beta1.PatroniStatus{
+				SystemIdentifier:   "12345",
+				Switchover:         &switchover,
+				SwitchoverTimeline: &switchoverTimeline,
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+			expectedPatroni: &v1beta1.PatroniStatus{
+				SystemIdentifier:   "12345",
+				Switchover:         &switchover,
+				SwitchoverTimeline: &switchoverTimeline,
+			},
+		},
+	}
 
-			syncConditionsFromPostgresToPercona(cr, postgresStatus)
-
-			repoHostCond := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
-			Expect(repoHostCond).NotTo(BeNil())
-			Expect(repoHostCond.ObservedGeneration).To(Equal(int64(5)))
-
-			replicaCond := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionReplicaCreate)
-			Expect(replicaCond).NotTo(BeNil())
-			Expect(replicaCond.ObservedGeneration).To(Equal(int64(5)))
-		})
-	})
-
-	Context("When postgres conditions are empty", func() {
-		It("should not panic and result in empty conditions", func() {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			cr := &v2.PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-cluster",
@@ -513,20 +646,56 @@ var _ = Describe("syncConditionsFromPostgresToPercona", func() {
 				},
 				Status: v2.PerconaPGClusterStatus{},
 			}
-
-			postgresStatus := &v1beta1.PostgresClusterStatus{
-				Conditions: []metav1.Condition{},
+			if tt.crConditions != nil {
+				cr.Status.Conditions = tt.crConditions
 			}
 
-			// Should not panic
-			Expect(func() {
-				syncConditionsFromPostgresToPercona(cr, postgresStatus)
-			}).NotTo(Panic())
+			status := &v1beta1.PostgresClusterStatus{
+				Patroni: tt.patroniStatus,
+			}
+			if tt.statusConditions != nil {
+				status.Conditions = tt.statusConditions
+			}
+			if tt.pgBackRestStatus != nil {
+				status.PGBackRest = tt.pgBackRestStatus
+			}
 
-			Expect(cr.Status.Conditions).To(HaveLen(0))
+			updateConditions(cr, status)
+
+			// Verify ClusterIsReadyForBackup condition
+			condition := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
+			require.NotNil(t, condition, "ClusterIsReadyForBackup condition should be set")
+			assert.Equal(t, tt.expectedReadyForBackupStatus, condition.Status, "ClusterIsReadyForBackup status mismatch")
+			assert.Equal(t, tt.expectedReadyForBackupReason, condition.Reason, "ClusterIsReadyForBackup reason mismatch")
+
+			// Verify synced conditions
+			for _, expected := range tt.expectedSyncedConditions {
+				synced := meta.FindStatusCondition(cr.Status.Conditions, expected.Type)
+				if !assert.NotNil(t, synced, "condition %s should be synced", expected.Type) {
+					continue
+				}
+				assert.Equal(t, expected.Status, synced.Status, "synced condition %s status mismatch", expected.Type)
+				assert.Equal(t, expected.Reason, synced.Reason, "synced condition %s reason mismatch", expected.Type)
+				assert.Equal(t, int64(1), synced.ObservedGeneration, "synced condition %s should have ObservedGeneration=1", expected.Type)
+			}
+
+			// Verify PGBackRest status sync
+			if tt.expectedPGBackRest != nil {
+				require.NotNil(t, cr.Status.PGBackRest, "PGBackRest status should be synced")
+				require.NotNil(t, cr.Status.PGBackRest.RepoHost, "PGBackRest RepoHost should be synced")
+				assert.Equal(t, tt.expectedPGBackRest.RepoHost.Ready, cr.Status.PGBackRest.RepoHost.Ready, "PGBackRest RepoHost Ready mismatch")
+			}
+
+			// Verify Patroni status sync
+			if tt.expectedPatroni != nil {
+				require.NotNil(t, cr.Status.Patroni.Status, "Patroni status should be synced")
+				assert.Equal(t, tt.expectedPatroni.SystemIdentifier, cr.Status.Patroni.Status.SystemIdentifier, "Patroni SystemIdentifier mismatch")
+				assert.Equal(t, tt.expectedPatroni.Switchover, cr.Status.Patroni.Status.Switchover, "Patroni Switchover mismatch")
+				assert.Equal(t, tt.expectedPatroni.SwitchoverTimeline, cr.Status.Patroni.Status.SwitchoverTimeline, "Patroni SwitchoverTimeline mismatch")
+			}
 		})
-	})
-})
+	}
+}
 
 func reconcileAndAssertState(ctx context.Context, nn types.NamespacedName, cr *v2.PerconaPGCluster, expectedState v2.AppState) {
 	_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: nn})
