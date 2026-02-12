@@ -25,7 +25,7 @@ func TestNewParameters(t *testing.T) {
 		"jit": "off",
 
 		"password_encryption": "scram-sha-256",
-		"wal_level": "logical",
+		"wal_level":           "logical",
 	})
 }
 
