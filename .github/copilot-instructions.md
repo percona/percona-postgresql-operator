@@ -42,7 +42,7 @@ Kubernetes Operator for PostgreSQL (Operator SDK, controller-runtime). Go + YAML
 
 ### Logging
 
-- Use `logging.FromContext(ctx)` for loggers
+- Prefer `logging.FromContext(ctx)` for loggers
 - Use structured fields: `log.Info("message", "key", value)`
 - Add logging for important operator actions (reconcile steps, errors, retries)
 
@@ -63,7 +63,9 @@ When you identify an issue:
 
 Example:
 ```
-This could cause a panic if the map is nil. Initialize the map before use, e.g. `m := make(map[string]string)`.
+1. **Problem**: This map access can panic if the map is nil.
+2. **Why it matters**: A panic can crash the operator and disrupt reconciliation.
+3. **Fix**: Initialize the map before use, e.g. `m := make(map[string]string)` before assigning or reading.
 ```
 
 ## When to Stay Silent
