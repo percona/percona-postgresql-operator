@@ -57,7 +57,9 @@ spec:
 #    customReplicationTLSSecret:
 #      name: replication1-cert
 #  tlsOnly: false
-
+#  tls:
+#    certValidityDuration: 2160h
+#    caValidityDuration: 26280h
 #  standby:
 #    enabled: true
 #    host: "<primary-ip>"

@@ -168,6 +168,11 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 		return errors.Wrap(err, "failed to get CA certificate")
 	}
 
+	caDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CAValidityDuration != nil {
+		caDuration = cluster.Spec.TLS.CAValidityDuration.Duration
+	}
+
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
@@ -182,8 +187,8 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 				Name: naming.CAIssuer(cluster).Name,
 				Kind: v1.IssuerKind,
 			},
-			Duration:    &metav1.Duration{Duration: time.Hour * 24 * 365},
-			RenewBefore: &metav1.Duration{Duration: 730 * time.Hour},
+			Duration:    &metav1.Duration{Duration: caDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
 				Algorithm:      v1.ECDSAKeyAlgorithm,
 				Size:           256,
@@ -221,6 +226,11 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 		return errors.Wrap(err, "failed to get cluster certificate")
 	}
 
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
@@ -234,7 +244,7 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 				Name: naming.TLSIssuer(cluster).Name,
 				Kind: v1.IssuerKind,
 			},
-			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
+			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
 				Algorithm:      v1.ECDSAKeyAlgorithm,
@@ -286,6 +296,11 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 		return errors.Wrap(err, "failed to get instance certificate")
 	}
 
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
@@ -299,7 +314,7 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 				Name: naming.TLSIssuer(cluster).Name,
 				Kind: v1.IssuerKind,
 			},
-			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
+			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
 				Algorithm:      v1.ECDSAKeyAlgorithm,
@@ -350,6 +365,11 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 		return errors.Wrap(err, "failed to get pgbouncer certificate")
 	}
 
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
@@ -363,7 +383,7 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 				Name: naming.TLSIssuer(cluster).Name,
 				Kind: v1.IssuerKind,
 			},
-			Duration:    &metav1.Duration{Duration: DefaultCertDuration},
+			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
 				Algorithm:      v1.ECDSAKeyAlgorithm,

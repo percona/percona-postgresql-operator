@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/cert-manager/cert-manager/pkg/util/cmapichecker"
@@ -435,5 +436,122 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		err := ctrl2.ApplyPGBouncerCertificate(t.Context(), cluster2, []string{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "dnsNames cannot be empty")
+	})
+}
+
+func TestCustomTLSDurations(t *testing.T) {
+	customCertDuration := 2160 * time.Hour  // 90 days
+	customCADuration := 26280 * time.Hour   // 3 years
+
+	t.Run("CA certificate uses custom CA duration", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "custom-ca-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CAValidityDuration: &metav1.Duration{Duration: customCADuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresRootCASecret(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      secretName.Name,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, customCADuration, cert.Spec.Duration.Duration)
+		assert.Equal(t, DefaultRenewBefore, cert.Spec.RenewBefore.Duration)
+	})
+
+	t.Run("CA certificate uses default duration when TLS is nil", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "default-ca-dur"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresRootCASecret(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      secretName.Name,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, DefaultCertDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("cluster certificate uses custom cert duration", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "custom-cert-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: customCertDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"custom-cert-dur-primary.test-namespace.svc"}
+		err := ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresTLSSecret(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      secretName.Name,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, customCertDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("instance certificate uses custom cert duration", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "custom-inst-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: customCertDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		instanceName := "custom-inst-dur-instance-0"
+		dnsNames := []string{instanceName + ".test-namespace.svc"}
+		err := ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := instanceName + "-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, customCertDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("pgbouncer certificate uses custom cert duration", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "custom-pgb-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: customCertDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"custom-pgb-dur-pgbouncer.test-namespace.svc"}
+		err := ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := cluster.Name + "-pgbouncer-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, customCertDuration, cert.Spec.Duration.Duration)
 	})
 }
