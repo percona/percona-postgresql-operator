@@ -54345,7 +54345,7 @@ spec:
           value: "1"
         - name: PPROF_BIND_ADDRESS
           value: "0"
-        image: docker.io/perconalab/percona-postgresql-operator:main
+        image: docker.io/perconalab/percona-postgresql-operator:k8spg-911-5803
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
