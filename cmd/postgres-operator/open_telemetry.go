@@ -63,7 +63,7 @@ func initOpenTelemetry() (func(), error) {
 		client := otlptracehttp.NewClient()
 		exporter, err := otlptrace.New(context.TODO(), client)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to initialize OTLP exporter: %w")
+			return nil, errors.Wrap(err, "unable to initialize OTLP exporter")
 		}
 
 		provider := trace.NewTracerProvider(trace.WithBatcher(exporter))

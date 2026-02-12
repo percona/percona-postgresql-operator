@@ -291,7 +291,11 @@ func (r *Reconciler) Reconcile(
 		returnEarly, err := r.reconcileDirMoveJobs(ctx, cluster)
 		if err != nil || returnEarly {
 			if patchErr := patchClusterStatus(); patchErr != nil {
-				log.Error(patchErr, "Failed to patch cluster status")
+				if err == nil {
+					err = patchErr
+				} else {
+					log.Error(patchErr, "Failed to patch cluster status")
+				}
 			}
 			return runtime.ErrorWithBackoff(err)
 		}
@@ -344,7 +348,11 @@ func (r *Reconciler) Reconcile(
 		returnEarly, err := r.reconcileDataSource(ctx, cluster, instances, clusterVolumes, rootCA, backupsSpecFound)
 		if err != nil || returnEarly {
 			if patchErr := patchClusterStatus(); patchErr != nil {
-				log.Error(patchErr, "Failed to patch cluster status")
+				if err == nil {
+					err = patchErr
+				} else {
+					log.Error(patchErr, "Failed to patch cluster status")
+				}
 			}
 			return runtime.ErrorWithBackoff(err)
 		}
@@ -438,11 +446,12 @@ func (r *Reconciler) Reconcile(
 
 	log.V(1).Info("reconciled cluster")
 
-	patchErr := patchClusterStatus()
-	if err != nil {
-		log.Error(patchErr, "Failed to patch cluster status")
-	} else {
-		err = errors.Wrap(patchErr, "failed to patch cluster status")
+	if patchErr := patchClusterStatus(); patchErr != nil {
+		if err != nil {
+			log.Error(patchErr, "Failed to patch cluster status")
+		} else {
+			err = errors.Wrap(patchErr, "failed to patch cluster status")
+		}
 	}
 
 	return result, err
