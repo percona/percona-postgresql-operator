@@ -20,13 +20,12 @@ func TestNewParameters(t *testing.T) {
 		"ssl_key_file":  "/pgconf/tls/tls.key",
 
 		"unix_socket_directories": "/tmp/postgres",
-
-		"wal_level": "logical",
 	})
 	assert.DeepEqual(t, parameters.Default.AsMap(), map[string]string{
 		"jit": "off",
 
 		"password_encryption": "scram-sha-256",
+		"wal_level": "logical",
 	})
 }
 
