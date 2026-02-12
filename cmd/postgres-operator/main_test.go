@@ -118,7 +118,11 @@ func TestInitManager(t *testing.T) {
 				t.Setenv("PGO_WORKERS", v)
 
 				options, err := initManager(ctx)
-				assert.NilError(t, err)
+				if v == "3.14" {
+					assert.ErrorContains(t, err, "invalid PGO_WORKERS env var value:")
+				} else {
+					assert.NilError(t, err)
+				}
 				assert.DeepEqual(t, options.Controller.GroupKindConcurrency,
 					map[string]int{
 						"PGAdmin.postgres-operator.crunchydata.com":         1,

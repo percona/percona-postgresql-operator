@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	cruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -281,101 +280,6 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 
 	options.HealthProbeBindAddress = ":8081"
 
-	// K8SPG-915
-	getEnvBool := func(name string, defaultVal bool) (bool, error) {
-		s, ok := os.LookupEnv(name)
-		if !ok || s == "" {
-			return defaultVal, nil
-		}
-
-		var err error
-		switch strings.ToLower(strings.TrimSpace(s)) {
-		case "1", "true":
-			return true, nil
-		case "0", "false":
-			return false, nil
-		default:
-			err = fmt.Errorf("invalid boolean value for %s: expected 0/1/true/false", name)
-		}
-		return defaultVal, err
-	}
-
-	var err error
-	options.LeaderElection, err = getEnvBool("PGO_CONTROLLER_LEADER_ELECTION_ENABLED", true)
-	if err != nil {
-		return options, err
-	}
-	if options.LeaderElection {
-		options.LeaderElectionID = perconaRuntime.ElectionID
-	}
-
-	// Enable leader elections when configured with a valid Lease.coordination.k8s.io name.
-	// - https://docs.k8s.io/concepts/architecture/leases
-	// - https://releases.k8s.io/v1.30.0/pkg/apis/coordination/validation/validation.go#L26
-	if lease := os.Getenv("PGO_CONTROLLER_LEASE_NAME"); options.LeaderElection && len(lease) > 0 {
-		if errs := validation.IsDNS1123Subdomain(lease); len(errs) > 0 {
-			return options, fmt.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
-		}
-
-		options.LeaderElectionID = lease
-		options.LeaderElectionNamespace = os.Getenv("PGO_NAMESPACE")
-	}
-
-	// K8SPG-915
-	getEnvDuration := func(name string, defaultDur time.Duration) (time.Duration, error) {
-		s, ok := os.LookupEnv(name)
-		if !ok || s == "" {
-			return defaultDur, nil
-		}
-
-		v, err := strconv.Atoi(s)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get duration from %s env var: invalid value: %s", name, s)
-		}
-
-		return time.Second * time.Duration(v), nil
-	}
-	leaseDuration, err := getEnvDuration("PGO_CONTROLLER_LEASE_DURATION", 60*time.Second)
-	if err != nil {
-		return options, err
-	}
-	options.LeaseDuration = ptr.To(leaseDuration)
-	renewDeadline, err := getEnvDuration("PGO_CONTROLLER_RENEW_DEADLINE", 40*time.Second)
-	if err != nil {
-		return options, err
-	}
-	options.RenewDeadline = ptr.To(renewDeadline)
-	retryPeriod, err := getEnvDuration("PGO_CONTROLLER_RETRY_PERIOD", 10*time.Second)
-	if err != nil {
-		return options, err
-	}
-	options.RetryPeriod = ptr.To(retryPeriod)
-
-	// Check PGO_TARGET_NAMESPACE for backwards compatibility with
-	// "singlenamespace" installations
-	singlenamespace := strings.TrimSpace(os.Getenv("PGO_TARGET_NAMESPACE"))
-
-	// Check PGO_TARGET_NAMESPACES for non-cluster-wide, multi-namespace
-	// installations
-	multinamespace := strings.TrimSpace(os.Getenv("PGO_TARGET_NAMESPACES"))
-
-	// Initialize DefaultNamespaces if any target namespaces are set
-	if len(singlenamespace) > 0 || len(multinamespace) > 0 {
-		options.Cache.DefaultNamespaces = map[string]runtime.CacheConfig{}
-	}
-
-	if len(singlenamespace) > 0 {
-		options.Cache.DefaultNamespaces[singlenamespace] = runtime.CacheConfig{}
-	}
-
-	if len(multinamespace) > 0 {
-		for _, namespace := range strings.FieldsFunc(multinamespace, func(c rune) bool {
-			return c != '-' && !unicode.IsLetter(c) && !unicode.IsNumber(c)
-		}) {
-			options.Cache.DefaultNamespaces[namespace] = runtime.CacheConfig{}
-		}
-	}
-
 	options.Controller.GroupKindConcurrency = map[string]int{
 		"PostgresCluster." + v1beta1.GroupVersion.Group: 1,
 		"PGUpgrade." + v1beta1.GroupVersion.Group:       1,
@@ -386,17 +290,58 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 		"PerconaPGRestore." + v2.GroupVersion.Group:     1,
 	}
 
-	if s := os.Getenv("PGO_WORKERS"); s != "" {
-		if i, err := strconv.Atoi(s); err == nil && i > 0 {
-			for kind := range options.Controller.GroupKindConcurrency {
-				options.Controller.GroupKindConcurrency[kind] = i
+	// K8SPG-915
+	envs, err := parseEnvVars()
+	if err != nil {
+		return options, errors.Wrap(err, "parse env vars")
+	}
+
+	options.LeaseDuration = &envs.LeaseDuration
+	options.RenewDeadline = &envs.RenewDeadline
+	options.RetryPeriod = &envs.RetryPeriod
+	options.PprofBindAddress = envs.PprofBindAddress
+
+	options.LeaderElection = envs.LeaderElection
+	if options.LeaderElection {
+		options.LeaderElectionID = perconaRuntime.ElectionID
+	}
+
+	// Enable leader elections when configured with a valid Lease.coordination.k8s.io name.
+	// - https://docs.k8s.io/concepts/architecture/leases
+	// - https://releases.k8s.io/v1.30.0/pkg/apis/coordination/validation/validation.go#L26
+	if lease := envs.LeaderElectionID; options.LeaderElection && len(lease) > 0 {
+		if errs := validation.IsDNS1123Subdomain(lease); len(errs) > 0 {
+			return options, fmt.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
+		}
+
+		options.LeaderElectionID = lease
+		options.LeaderElectionNamespace = envs.LeaderElectionNamespace
+	}
+
+	if len(envs.SingleNamespace) > 0 || len(envs.MultiNamespaces) > 0 {
+		// Initialize DefaultNamespaces if any target namespaces are set
+		options.Cache.DefaultNamespaces = map[string]runtime.CacheConfig{}
+
+		if len(envs.SingleNamespace) > 0 {
+			options.Cache.DefaultNamespaces[envs.SingleNamespace] = runtime.CacheConfig{}
+		}
+
+		if len(envs.MultiNamespaces) > 0 {
+			for _, namespace := range strings.FieldsFunc(envs.MultiNamespaces, func(c rune) bool {
+				return c != '-' && !unicode.IsLetter(c) && !unicode.IsNumber(c)
+			}) {
+				options.Cache.DefaultNamespaces[namespace] = runtime.CacheConfig{}
 			}
-		} else {
-			log.Error(err, "PGO_WORKERS must be a positive number")
 		}
 	}
 
-	options.PprofBindAddress = os.Getenv("PPROF_BIND_ADDRESS")
+	if envs.Workers < 0 {
+		log.Error(nil, "PGO_WORKERS must be a positive number")
+	} else if envs.Workers > 0 {
+		for kind := range options.Controller.GroupKindConcurrency {
+			options.Controller.GroupKindConcurrency[kind] = envs.Workers
+		}
+	}
 
 	return options, nil
 }
