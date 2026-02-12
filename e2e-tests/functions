@@ -354,6 +354,18 @@ get_cr() {
 				.spec.extensions.storage = {"type": "s3", "bucket": "operator-testing", "region": "us-east-1", "endpoint": "http://minio-service:9000", "forcePathStyle": true, "disableSSL": true, "secret": {"name": "minio-secret"}}
 			    ' $TEMP_DIR/cr.yaml
 			;;
+		"huge-pages")
+			if [ "${platform}" == "aks" ]; then
+				yq eval -i '
+          .spec.instances |= (
+            .[] |= (
+              .affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms =
+                [{"matchExpressions":[{"key":"hugepages","operator":"In","values":["enabled"]}]}]
+            )
+          )
+        ' "$TEMP_DIR/cr.yaml"
+			fi
+			;;
 	esac
 	cat $TEMP_DIR/cr.yaml
 }
@@ -1256,4 +1268,359 @@ check_envs_for_component() {
   else
     echo "All environment checks passed for component '$component'"
   fi
+}
+
+detect_k8s_platform() {
+	local platform=""
+
+	if kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "gce://"; then
+		platform="gke"
+
+	elif oc get projects >/dev/null 2>&1; then
+		platform="openshift"
+
+	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "aws://"; then
+		platform="eks"
+
+	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "azure://"; then
+		platform="aks"
+
+	else
+		platform="unknown"
+	fi
+
+	echo "${platform}"
+}
+
+enable_hugepages() {
+	local platform=$1
+	local hugepage_count=${2:-1024}
+
+	echo "Detected platform: ${platform}"
+
+	case ${platform} in
+		gke)
+			enable_hugepages_gke "${hugepage_count}"
+			;;
+		openshift)
+			enable_hugepages_openshift "${hugepage_count}"
+			;;
+		eks)
+			enable_hugepages_eks "${hugepage_count}"
+			;;
+		aks)
+			enable_hugepages_aks "${hugepage_count}"
+			;;
+		*)
+			echo "Unknown platform, cannot configure hugepages"
+			return 1
+			;;
+	esac
+}
+
+enable_hugepages_gke() {
+  local hugepage_count=$1
+
+  echo "Hugepages configuration is now handled during cluster creation"
+  echo "Skipping runtime configuration for GKE"
+
+  echo "Verifying hugepages configuration..."
+  local node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+
+  if kubectl get node ${node_name} -o jsonpath='{.status.allocatable.hugepages-2Mi}' | grep -q '[0-9]'; then
+    echo "✓ Hugepages are already configured on nodes"
+    return 0
+  else
+    echo "✗ Warning: Hugepages not found in node allocatable resources"
+    return 1
+  fi
+}
+
+enable_hugepages_eks() {
+
+	echo "Configuring hugepages on EKS"
+
+	if verify_hugepages_on_nodes; then
+		echo "Hugepages already configured"
+		return 0
+	fi
+}
+
+enable_hugepages_aks() {
+	local hugepage_count="${1:-2048}"
+	local nodepool_name="${AKS_HUGEPAGES_NODEPOOL:-hp2m}"
+	local vm_size="${AKS_HUGEPAGES_VM_SIZE:-Standard_D4_v2}"
+	local node_count="${AKS_HUGEPAGES_NODE_COUNT:-1}"
+
+	echo "Checking hugepages on AKS..."
+
+	if verify_hugepages_on_nodes 2>/dev/null; then
+		echo "Hugepages already configured"
+		return 0
+	fi
+
+	local cluster_name
+	node_rg="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.azure\.com/cluster}' 2>/dev/null || true)"
+	[[ -n $node_rg ]] || return 1
+
+	aks_id="$(az aks list --subscription "${AZURE_SUBSCRIPTION:-eng-cloud-dev}" \
+		--query "[?nodeResourceGroup=='$node_rg'] | [0].id" \
+		-o tsv 2>/dev/null || true)"
+	[[ -n $aks_id ]] || return 1
+
+	cluster_name="$(echo "$aks_id" | sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
+	[[ -n $cluster_name ]] || return 1
+
+	if [[ -z ${cluster_name} ]]; then
+		echo "AKS: can't detect cluster name from node labels."
+		echo "Skipping hugepages test."
+		return 1
+	fi
+
+	echo "AKS cluster detected: ${cluster_name}"
+
+	if ! az aks nodepool show -g percona-operators --cluster-name "${cluster_name}" -n "${nodepool_name}" >/dev/null 2>&1; then
+		echo "Creating nodepool '${nodepool_name}' (${vm_size}, count=${node_count}) with label hugepages=enabled..."
+		az aks nodepool add \
+			--subscription "${AZURE_SUBSCRIPTION:-eng-cloud-dev}" \
+			-g "${AKS_RG:-percona-operators}" \
+			--cluster-name "${cluster_name}" \
+			-n "${nodepool_name}" \
+			--node-count "${node_count}" \
+			--node-vm-size "${vm_size}" \
+			--labels hugepages=enabled \
+			--mode User
+	else
+		echo "Nodepool '${nodepool_name}' already exists."
+	fi
+
+	echo "Waiting for hugepages node(s) to be Ready..."
+	kubectl wait node -l hugepages=enabled --for=condition=Ready --timeout=15m || {
+		echo "AKS: hugepages node(s) not ready in time. Skipping test."
+		return 1
+	}
+
+	echo "Applying DaemonSet to allocate hugepages on hugepages=enabled nodes (HP_2M=${hugepage_count})..."
+	cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hugepages-2mi-enable
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: hugepages-2mi-enable
+  template:
+    metadata:
+      labels:
+        app: hugepages-2mi-enable
+    spec:
+      nodeSelector:
+        hugepages: "enabled"
+      hostPID: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: enable
+          image: busybox:1.36
+          securityContext:
+            privileged: true
+          env:
+            - name: HP_2M
+              value: "${hugepage_count}"
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -eux
+              echo "Allocating \${HP_2M} hugepages (2Mi) on host..."
+              echo "\${HP_2M}" > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+              mkdir -p /host/etc/sysctl.d
+              echo "vm.nr_hugepages=\${HP_2M}" > /host/etc/sysctl.d/60-hugepages.conf
+              chroot /host /bin/sh -c "sysctl -w vm.nr_hugepages=\${HP_2M} || true; systemctl restart kubelet || true"
+              echo "Done. Sleeping..."
+              sleep infinity
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: sys
+              mountPath: /sys
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+        - name: sys
+          hostPath:
+            path: /sys
+EOF
+
+	kubectl -n kube-system rollout status ds/hugepages-2mi-enable --timeout=10m || {
+		echo "AKS: DaemonSet rollout did not complete. Skipping test."
+		return 1
+	}
+
+	echo "Re-checking hugepages on nodes..."
+	if verify_hugepages_on_nodes 2>/dev/null; then
+		echo "Hugepages configured successfully"
+		return 0
+	fi
+
+	echo "AKS: Hugepages still not visible after configuration."
+	echo "Skipping hugepages test."
+	return 1
+}
+
+enable_hugepages_openshift() {
+	local hugepage_count=$1
+
+	echo "Configuring hugepages on OpenShift"
+
+	if verify_hugepages_on_nodes; then
+		echo "Hugepages already configured"
+		return 0
+	fi
+
+	echo "Creating MachineConfig..."
+
+	cat <<EOF | kubectl apply -f -
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-hugepages-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,$(echo "vm.nr_hugepages = ${hugepage_count}" | base64 -w0)
+        mode: 0644
+        path: /etc/sysctl.d/99-hugepages.conf
+EOF
+
+    [ $? -eq 0 ] || return 1
+
+    echo "MachineConfig created"
+    echo "Waiting for worker pool to update (~10 minutes)..."
+
+    kubectl wait --for=condition=Updated mcp/worker --timeout=900s 2>/dev/null || {
+        echo "Update taking longer than expected"
+        return 1
+    }
+
+    echo "Worker pool updated"
+
+    sleep 10
+    verify_hugepages_on_nodes
+}
+
+verify_hugepages_on_nodes() {
+    echo "Verifying hugepages on nodes"
+
+    # Get first worker node, fallback to first non-master, fallback to any node
+    local node_name=$(
+        kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
+        kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
+        kubectl get nodes -o jsonpath='{.items[0].metadata.name}'
+    )
+
+    if [ -z "${node_name}" ]; then
+        echo "No nodes found"
+        return 1
+    fi
+
+    echo "Checking node: ${node_name}"
+
+    local hugepages_capacity=$(kubectl get node ${node_name} \
+        -o jsonpath='{.status.capacity.hugepages-2Mi}')
+
+    if [ -n "${hugepages_capacity}" ] && [ "${hugepages_capacity}" != "0" ]; then
+        echo "Node has hugepages capacity: ${hugepages_capacity}"
+        return 0
+    else
+        echo "No hugepages capacity found on node ${node_name}"
+        return 1
+    fi
+}
+
+verify_hugepages_in_pod() {
+    local pod_name=$1
+    local namespace=$2
+    local container=${3:-postgres}
+
+    echo "Verifying hugepages in pod ${pod_name}"
+
+    # Check /proc/meminfo
+    local hugepages_total=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
+        grep HugePages_Total /proc/meminfo | awk '{print $2}')
+
+    local hugepages_free=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
+        grep HugePages_Free /proc/meminfo | awk '{print $2}')
+
+    echo "HugePages_Total: ${hugepages_total}"
+    echo "HugePages_Free: ${hugepages_free}"
+
+    if [ "${hugepages_total}" -gt 0 ]; then
+        echo "Hugepages are available in pod"
+        return 0
+    else
+        echo "No hugepages in pod"
+        return 1
+    fi
+}
+
+verify_postgresql_hugepages_setting() {
+    local cluster_name=$1
+    local expected_value=${2:-try}
+
+    echo "Verifying PostgreSQL huge_pages setting..."
+
+    local huge_pages=$(run_psql_local \
+        "SHOW huge_pages;" \
+        "postgres:$(get_psql_user_pass ${cluster_name}-pguser-postgres)@$(get_psql_user_host ${cluster_name}-pguser-postgres)")
+
+    echo "huge_pages: ${huge_pages}"
+
+    if [[ "${huge_pages}" == *"${expected_value}"* ]]; then
+        echo "PostgreSQL huge_pages is set to '${expected_value}'"
+        return 0
+    else
+        echo "PostgreSQL huge_pages not set to '${expected_value}' (value: ${huge_pages})"
+        return 1
+    fi
+}
+
+verify_hugepages_usage() {
+    local pod_name=$1
+    local namespace=$2
+    local container=${3:-database}
+
+    echo "Checking hugepages usage..."
+
+    kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+        grep HugePages /proc/meminfo
+
+    local hugepages_total=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+        grep HugePages_Total /proc/meminfo | awk '{print $2}')
+
+    local hugepages_free=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+        grep HugePages_Free /proc/meminfo | awk '{print $2}')
+
+    local hugepages_used=$((hugepages_total - hugepages_free))
+
+    echo ""
+    echo "HugePages usage:"
+    echo "  Total: ${hugepages_total}"
+    echo "  Used:  ${hugepages_used}"
+
+    if [ "${hugepages_used}" -gt 0 ]; then
+        echo "PostgreSQL is using hugepages"
+        return 0
+    else
+        echo "Hugepages available but NOT being used by PostgreSQL"
+        return 1
+    fi
 }
