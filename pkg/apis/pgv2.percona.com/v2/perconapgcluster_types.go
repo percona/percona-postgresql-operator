@@ -5,6 +5,7 @@ import (
 
 	gover "github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -95,7 +96,7 @@ type PerconaPGClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=17
+	// +kubebuilder:validation:Maximum=18
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -103,7 +104,7 @@ type PerconaPGClusterSpec struct {
 
 	// Run this cluster as a read-only copy of an existing cluster or archive.
 	// +optional
-	Standby *crunchyv1beta1.PostgresStandbySpec `json:"standby,omitempty"`
+	Standby *StandbySpec `json:"standby,omitempty"`
 
 	// Whether or not the PostgreSQL cluster is being deployed to an OpenShift
 	// environment. If the field is unset, the operator will automatically
@@ -173,6 +174,24 @@ type PerconaPGClusterSpec struct {
 	// specified in `spec.users` across all databases associated with that user.
 	// +optional
 	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
+}
+
+type StandbySpec struct {
+	*crunchyv1beta1.PostgresStandbySpec `json:",inline"`
+
+	// +optional
+	// MaxAcceptableLag is the maximum WAL lag allowed for the standby cluster, measured in bytes of WAL data.
+	// This represents the maximum amount of WAL data that the standby can be behind the primary.
+	// If the lag exceeds this value, the standby cluster is marked as unready.
+	// If unset, lag is not checked.
+	MaxAcceptableLag *resource.Quantity `json:"maxAcceptableLag,omitempty"`
+}
+
+func (cr *PerconaPGCluster) ShouldCheckStandbyLag() bool {
+	return cr.CompareVersion("2.9.0") >= 0 &&
+		cr.Spec.Standby != nil &&
+		cr.Spec.Standby.Enabled &&
+		cr.Spec.Standby.MaxAcceptableLag != nil
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -304,7 +323,10 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
 	postgresCluster.Spec.Paused = cr.Spec.Unmanaged
 	postgresCluster.Spec.Shutdown = cr.Spec.Pause
-	postgresCluster.Spec.Standby = cr.Spec.Standby
+
+	if cr.Spec.Standby != nil {
+		postgresCluster.Spec.Standby = cr.Spec.Standby.PostgresStandbySpec
+	}
 	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy(cr.Spec.CRVersion)
 	postgresCluster.Spec.ReplicaService = cr.Spec.ExposeReplicas.ToCrunchy(cr.Spec.CRVersion)
 
@@ -470,6 +492,15 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	Standby *StandbyStatus `json:"standby,omitempty"`
+}
+
+type StandbyStatus struct {
+	LagLastComputedAt *metav1.Time `json:"lagLastComputedAt,omitempty"`
+	LagBytes          int64        `json:"lagBytes,omitempty"`
 }
 
 type Patroni struct {
@@ -1111,7 +1142,7 @@ func (cr *PerconaPGCluster) EnvFromSecrets() []string {
 		}
 	}
 
-	if len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
+	if cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil && len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
 		for _, envFrom := range cr.Spec.Proxy.PGBouncer.EnvFrom {
 			if envFrom.SecretRef == nil {
 				continue

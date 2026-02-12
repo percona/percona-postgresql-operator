@@ -105,6 +105,13 @@ func (PITRestoreDateTime) OpenAPISchemaType() []string { return []string{"string
 
 func (PITRestoreDateTime) OpenAPISchemaFormat() string { return "" }
 
+func (t *PITRestoreDateTime) ToUnstructured() any {
+	if t.IsZero() {
+		return nil
+	}
+	return t.Time.ToUnstructured()
+}
+
 func (t *PITRestoreDateTime) UnmarshalJSON(b []byte) (err error) {
 	if len(b) == 4 && string(b) == "null" {
 		mt := metav1.NewTime(time.Time{})
@@ -129,7 +136,7 @@ func (t *PITRestoreDateTime) UnmarshalJSON(b []byte) (err error) {
 	return nil
 }
 
-func (t *PITRestoreDateTime) MarshalJSON() ([]byte, error) {
+func (t PITRestoreDateTime) MarshalJSON() ([]byte, error) {
 	if t.Time == nil {
 		return []byte("null"), nil
 	}

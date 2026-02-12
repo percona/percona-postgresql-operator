@@ -70,6 +70,10 @@ const (
 	// and in-place pgBackRest restore is in progress
 	ConditionPGBackRestRestoreProgressing = "PGBackRestoreProgressing"
 
+	// ConditionStandbyLagging is the type used in a condition to indicate whether or not
+	// the standby cluster is lagging behind the main site
+	ConditionStandbyLagging = "StandbyLagging"
+
 	// EventRepoHostNotFound is used to indicate that a pgBackRest repository was not
 	// found when reconciling
 	EventRepoHostNotFound = "RepoDeploymentNotFound"

@@ -45,10 +45,10 @@ type CrunchyBridgeClusterSpec struct {
 	Plan string `json:"plan"`
 
 	// The ID of the cluster's major Postgres version.
-	// Currently Bridge offers 13-17
+	// Currently Bridge offers 13-18
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=13
-	// +kubebuilder:validation:Maximum=17
+	// +kubebuilder:validation:Maximum=18
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	PostgresVersion int `json:"majorVersion"`
 

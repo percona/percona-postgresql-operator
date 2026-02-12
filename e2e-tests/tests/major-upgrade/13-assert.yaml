@@ -1,52 +1,21 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 720
+timeout: 660
 commands:
 - script: |-
-      set -o errexit
-
-      kubectl -n ${NAMESPACE} get pod
-
-      for pod in $(kubectl -n ${NAMESPACE} get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
-              phase=$(kubectl -n ${NAMESPACE} get pod/${pod} -o jsonpath={".status.phase"})
-              if [[ "${phase}" != "Running" ]]; then
-                      echo "Waiting for ${pod} to start running"
-                      continue
-              fi
-              echo "PostgreSQL logs from ${pod}:"
-              echo "find /pgdata/pg13/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
-                      | kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
-      done
-
-      sleep 30
-collectors:
-- type: pod
-  selector: "postgres-operator.crunchydata.com/data=postgres"
-  tail: 30
+    kubectl get postgrescluster major-upgrade \
+      -n ${NAMESPACE} \
+      -o yaml \
+    | yq eval '.status.pgbackrest.repos' -
 ---
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGRestore
-metadata:
-  name: restore-after-12-to-13
-spec:
-  pgCluster: major-upgrade
-  repoName: repo2
-status:
-  state: Succeeded
----
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
 metadata:
   name: major-upgrade
 status:
-  pgbouncer:
-    ready: 3
-    size: 3
-  postgres:
-    instances:
-    - name: instance1
-      ready: 3
-      size: 3
-    ready: 3
-    size: 3
-  state: ready
+  pgbackrest:
+    repos:
+    - bound: true
+      name: repo4
+      replicaCreateBackupComplete: true
+      stanzaCreated: true

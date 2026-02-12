@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
@@ -35,6 +36,7 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 	pgadmin := new(v1beta1.PGAdmin)
 	pgadmin.Name = "test-standalone-pgadmin"
 	pgadmin.Namespace = ns.Name
+	pgadmin.Spec.Image = ptr.To("some-image")
 
 	assert.NilError(t, cc.Create(ctx, pgadmin))
 	t.Cleanup(func() { assert.Check(t, cc.Delete(ctx, pgadmin)) })
@@ -98,7 +100,6 @@ terminationGracePeriodSeconds: 30
 	})
 
 	t.Run("verify customized deployment", func(t *testing.T) {
-
 		custompgadmin := new(v1beta1.PGAdmin)
 
 		// add pod level customizations
@@ -136,9 +137,11 @@ terminationGracePeriodSeconds: 30
 			custompgadmin.Spec.PriorityClassName = initialize.String("testpriorityclass")
 		}
 
+		custompgadmin.Spec.Image = ptr.To("someimage")
 		// set an image pull secret
 		custompgadmin.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{
-			Name: "myImagePullSecret"}}
+			Name: "myImagePullSecret",
+		}}
 
 		assert.NilError(t, cc.Create(ctx, custompgadmin))
 		t.Cleanup(func() { assert.Check(t, cc.Delete(ctx, custompgadmin)) })

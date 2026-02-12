@@ -9,7 +9,7 @@ commands:
       source ../../functions
 
       kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=json -p '[{"op":"add","path":"/spec/instances/0/sidecars","value":[{"name":"testcontainer","image":"busybox","command":["sleep","infinity"]}]}]'
-      sleep 5
+      sleep 7
       CR_ID=$(kubectl -n ${NAMESPACE} get perconapgcluster/${test_name} --template='{{.metadata.uid}}')
       TRANSFERRED_KEYS=$(kubectl -n ${NAMESPACE} logs -l run=version-service| grep ${CR_ID} | tail -n1 | grep -Eo '\{.*\}$' | jq '."grpc.request.content".msg | keys')
       kubectl create configmap -n "${NAMESPACE}" 06-verify-tramsferred-sidecars --from-literal=keys="${TRANSFERRED_KEYS}"

@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // podExecutor runs command on container in pod in namespace. Non-nil streams
@@ -31,7 +32,7 @@ func newPodClient(config *rest.Config) (rest.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return apiutil.RESTClientForGVK(gvk, false, config, codecs, httpClient)
+	return apiutil.RESTClientForGVK(gvk, false, false, config, codecs, httpClient)
 }
 
 // +kubebuilder:rbac:groups="",resources="pods/exec",verbs={create}
@@ -62,6 +63,8 @@ func NewPodExecutor(config *rest.Config) (podExecutor, error) {
 
 		exec, err := remotecommand.NewSPDYExecutor(configCopy, "POST", request.URL())
 
+		log := logf.FromContext(ctx)
+		log.V(1).Info("Running command in pod", "pod", pod, "container", container, "command", command)
 		if err == nil {
 			err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 				Stdin:  stdin,

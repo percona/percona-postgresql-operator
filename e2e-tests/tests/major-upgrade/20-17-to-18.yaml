@@ -1,0 +1,24 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl apply -n ${NAMESPACE} -f - <<-EOF
+        apiVersion: pgv2.percona.com/v2
+        kind: PerconaPGUpgrade
+        metadata:
+          name: 17-to-18
+        spec:
+          postgresClusterName: major-upgrade
+          image: ${IMAGE_UPGRADE}
+          fromPostgresVersion: 17
+          toPostgresVersion: 18
+          toPostgresImage: $(get_container_image "postgres" 18)
+          toPgBouncerImage: $(get_container_image "pgbouncer" 18)
+          toPgBackRestImage: $(get_container_image "pgbackrest" 18)
+      EOF
+

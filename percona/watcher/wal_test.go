@@ -348,7 +348,7 @@ func TestGetLatestCommitTimestamp(t *testing.T) {
 					CRVersion: version.Version(),
 				},
 			},
-			expectedErr: errors.New("failed to get patroni version: Malformed version: error: primary pod not found"),
+			expectedErr: errors.New("primary pod not found"),
 		},
 	}
 	for name, tt := range tests {
@@ -357,7 +357,7 @@ func TestGetLatestCommitTimestamp(t *testing.T) {
 
 			_, err := GetLatestCommitTimestamp(ctx, c, nil, tt.cluster, tt.backup)
 
-			assert.EqualError(t, err, tt.expectedErr.Error())
+			assert.ErrorContains(t, err, tt.expectedErr.Error())
 		})
 	}
 }

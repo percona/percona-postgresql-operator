@@ -93,7 +93,7 @@ var olmClusterYAML = `
 metadata:
   name: olm
 spec:
-  postgresVersion: 13
+  postgresVersion: 17
   image: postgres
   instances:
   - name: register-now
@@ -231,7 +231,7 @@ var _ = Describe("PostgresCluster Reconciler", func() {
 metadata:
   name: carlos
 spec:
-  postgresVersion: 13
+  postgresVersion: 17
   image: postgres
   instances:
   - name: samba
@@ -438,7 +438,7 @@ spec:
 metadata:
   name: carlos
 spec:
-  postgresVersion: 13
+  postgresVersion: 17
   image: postgres
   instances:
   - name: samba
@@ -660,7 +660,7 @@ spec:
 metadata:
   name: test-cluster
 spec:
-  postgresVersion: 13
+  postgresVersion: 17
   image: postgres
   instances:
   - name: instance1
