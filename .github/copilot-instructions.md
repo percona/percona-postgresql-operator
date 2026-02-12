@@ -3,7 +3,7 @@
 ## Review Philosophy
 
 - Only comment when you have HIGH CONFIDENCE (>80%) that an issue exists
-- Be concise: one sentence per comment when possible
+- Be concise
 - Focus on actionable feedback, not observations
 - If you're uncertain, stay silent—false positives reduce trust
 
@@ -31,7 +31,7 @@ Kubernetes Operator for PostgreSQL (Operator SDK, controller-runtime). Go + YAML
 
 ### Imports and Dependencies
 
-- Use standard import aliases: `corev1`, `appsv1`, `metav1`, `apierrors`, etc. (per `.golangci.yaml` importas)
+- Use standard import aliases: `corev1`, `appsv1`, `metav1`, `apierrors`, etc. (per `.golangci.yaml`)
 - Import order: standard, default, `github.com/percona` prefix
 
 ### Controller / Reconcile Logic
