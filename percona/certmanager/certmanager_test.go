@@ -440,8 +440,8 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 }
 
 func TestCustomTLSDurations(t *testing.T) {
-	customCertDuration := 2160 * time.Hour  // 90 days
-	customCADuration := 26280 * time.Hour   // 3 years
+	customCertDuration := 2160 * time.Hour // 90 days
+	customCADuration := 26280 * time.Hour  // 3 years
 
 	t.Run("CA certificate uses custom CA duration", func(t *testing.T) {
 		cluster := testCluster()
