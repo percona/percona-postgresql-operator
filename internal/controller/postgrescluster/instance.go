@@ -1488,7 +1488,7 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 	log := logging.FromContext(ctx)
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
 
-	dnsNames := naming.InstancePodDNSNames(ctx, instance)
+	dnsNames := naming.InstancePodDNSNames(ctx, instance, cluster.Spec.ClusterServiceDNSSuffix)
 
 	err := c.ApplyInstanceCertificate(ctx, cluster, instance.Name, dnsNames)
 	if err != nil {
@@ -1554,7 +1554,7 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 		}
 	} else {
 		var leafCert *pki.LeafCertificate
-		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth)
+		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth, cluster.Spec.ClusterServiceDNSSuffix)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate instance certificate")
 		}

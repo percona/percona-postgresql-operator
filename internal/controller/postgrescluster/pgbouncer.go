@@ -230,7 +230,7 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 		if certManagerInstalled {
 			c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
 
-			dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service)
+			dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service, cluster.Spec.ClusterServiceDNSSuffix)
 			if dnsErr != nil {
 				return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
 			}

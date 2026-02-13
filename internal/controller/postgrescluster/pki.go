@@ -340,11 +340,11 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 		return nil, errors.Wrap(err, "failed to apply TLS issuer")
 	}
 
-	primaryDNSNames, err := naming.ServiceDNSNames(ctx, primaryService)
+	primaryDNSNames, err := naming.ServiceDNSNames(ctx, primaryService, cluster.Spec.ClusterServiceDNSSuffix)
 	if err != nil {
 		return nil, errors.Wrap(err, "get primary service DNS names")
 	}
-	replicaDNSNames, err := naming.ServiceDNSNames(ctx, replicaService)
+	replicaDNSNames, err := naming.ServiceDNSNames(ctx, replicaService, cluster.Spec.ClusterServiceDNSSuffix)
 	if err != nil {
 		return nil, errors.Wrap(err, "get replica service DNS names")
 	}
