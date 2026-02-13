@@ -255,12 +255,12 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
 
 	leaf := &pki.LeafCertificate{}
-	primaryServiceDNSNames, err := naming.ServiceDNSNames(ctx, primaryService)
+	primaryServiceDNSNames, err := naming.ServiceDNSNames(ctx, primaryService, cluster.Spec.ClusterServiceDNSSuffix)
 	if err != nil {
 		return nil, errors.Wrap(err, "get primary service dns names")
 	}
 
-	replicaServiceDNSNames, err := naming.ServiceDNSNames(ctx, replicaService)
+	replicaServiceDNSNames, err := naming.ServiceDNSNames(ctx, replicaService, cluster.Spec.ClusterServiceDNSSuffix)
 	if err != nil {
 		return nil, errors.Wrap(err, "get replica service dns names")
 	}
@@ -393,7 +393,7 @@ func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (boo
 // using the current root certificate
 func (*Reconciler) instanceCertificate(
 	ctx context.Context, instance *appsv1.StatefulSet,
-	existing, intent *corev1.Secret, root *pki.RootCertificateAuthority,
+	existing, intent *corev1.Secret, root *pki.RootCertificateAuthority, dnsSuffix string,
 ) (
 	*pki.LeafCertificate, error,
 ) {
@@ -404,7 +404,7 @@ func (*Reconciler) instanceCertificate(
 
 	// RFC 2818 states that the certificate DNS names must be used to verify
 	// HTTPS identity.
-	dnsNames := naming.InstancePodDNSNames(ctx, instance)
+	dnsNames := naming.InstancePodDNSNames(ctx, instance, dnsSuffix)
 	dnsFQDN := dnsNames[0]
 
 	if err == nil {

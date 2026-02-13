@@ -7116,6 +7116,8 @@ spec:
                     are enabled
                   rule: (has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos)
                     && size(self.pgbackrest.repos) > 0)
+              clusterServiceDNSSuffix:
+                type: string
               crVersion:
                 description: |-
                   Version of the operator. Update this to new version after operator

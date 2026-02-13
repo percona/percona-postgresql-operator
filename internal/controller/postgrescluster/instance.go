@@ -1624,7 +1624,7 @@ func (r *Reconciler) reconcileInternalInstanceCertificates(
 	var leafCert *pki.LeafCertificate
 
 	if err == nil {
-		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth)
+		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth, cluster.Spec.ClusterServiceDNSSuffix)
 	}
 	if err == nil {
 		err = patroni.InstanceCertificates(ctx,
