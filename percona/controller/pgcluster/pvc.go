@@ -2,10 +2,12 @@ package pgcluster
 
 import (
 	"context"
+	"maps"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -73,21 +75,38 @@ func ensureSidecarPVCs(
 		pvc := new(corev1.PersistentVolumeClaim)
 		pvc.Name = sidecarPVC.Name
 		pvc.Namespace = cr.Namespace
-		pvc.Spec = sidecarPVC.Spec
-		pvc.Labels = ls
 
-		err := cl.Get(ctx, client.ObjectKeyFromObject(pvc), &corev1.PersistentVolumeClaim{})
-		if err == nil {
-			// already exists
-			continue
+		if err := cl.Get(ctx, client.ObjectKeyFromObject(pvc), pvc); err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return errors.Wrapf(err, "get %s", client.ObjectKeyFromObject(pvc).String())
+			}
+			pvc.Spec = sidecarPVC.Spec
+			pvc.Labels = ls
+			if err := cl.Create(ctx, pvc); err != nil {
+				return errors.Wrap(err, "failed to create pvc")
+			}
+			return nil
+		}
+		if v := pvc.Labels[naming.LabelPerconaManagedBy]; v != "percona-postgresql-operator" {
+			return errors.Errorf("PersistentVolumeClaim %s already exists and not managed by percona-postgresql-operator: %s", client.ObjectKeyFromObject(pvc).String(), v)
+		}
+		if v := pvc.Labels[naming.LabelPerconaInstance]; v != cr.Name {
+			return errors.Errorf("PersistentVolumeClaim %s already exists and belongs to another cluster %s", client.ObjectKeyFromObject(pvc).String(), v)
 		}
 
-		if !k8serrors.IsNotFound(err) {
-			return errors.Wrapf(err, "get %s", client.ObjectKeyFromObject(pvc).String())
-		}
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if err := cl.Get(ctx, client.ObjectKeyFromObject(pvc), pvc); err != nil {
+				return err
+			}
+			maps.Copy(pvc.Labels, ls)
 
-		if err := cl.Create(ctx, pvc); err != nil {
-			return errors.Wrapf(err, "create PVC %s", client.ObjectKeyFromObject(pvc).String())
+			// It's only allowed to update resources.requests and volumeAttributesClassName
+			pvc.Spec.Resources.Requests = sidecarPVC.Spec.Resources.Requests
+			pvc.Spec.VolumeAttributesClassName = sidecarPVC.Spec.VolumeAttributesClassName
+
+			return cl.Update(ctx, pvc)
+		}); err != nil {
+			return errors.Wrapf(err, "update PersistentVolumeClaim %s", client.ObjectKeyFromObject(pvc).String())
 		}
 	}
 

@@ -219,6 +219,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 // +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs=create;update
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("cluster", request.Name, "namespace", request.Namespace)
