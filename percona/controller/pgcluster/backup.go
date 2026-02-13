@@ -6,12 +6,14 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
@@ -48,6 +50,14 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 	}
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
+		if repo.Volume != nil {
+			repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
+			if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
+				log.Info("pgBackRest repo host not ready, skipping backup cleanup", "repo", repo.Name)
+				continue
+			}
+		}
+
 		var info pgbackrest.InfoOutput
 
 		pbList, err := listPGBackups(ctx, r.Client, cr, repo.Name)

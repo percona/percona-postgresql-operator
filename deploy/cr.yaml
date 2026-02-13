@@ -10,6 +10,7 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.9.0
+#  clusterServiceDNSSuffix: cluster.local
 #  initContainer:
 #    image: docker.io/perconalab/percona-postgresql-operator:main
 #    resources:

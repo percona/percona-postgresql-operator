@@ -1512,7 +1512,7 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	var leafCert *pki.LeafCertificate
 
 	if err == nil {
-		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, root)
+		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, root, cluster.Spec.ClusterServiceDNSSuffix)
 	}
 	if err == nil {
 		err = patroni.InstanceCertificates(ctx,
