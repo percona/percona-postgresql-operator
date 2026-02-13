@@ -189,7 +189,7 @@ func TestReconcileCerts(t *testing.T) {
 			existing := &corev1.Secret{Data: make(map[string][]byte)}
 			intent := &corev1.Secret{Data: make(map[string][]byte)}
 
-			initialLeafCert, err := r.instanceCertificate(ctx, instance, existing, intent, initialRoot)
+			initialLeafCert, err := r.instanceCertificate(ctx, instance, existing, intent, initialRoot, "")
 			assert.NilError(t, err)
 
 			fromSecret := &pki.LeafCertificate{}
@@ -216,18 +216,18 @@ func TestReconcileCerts(t *testing.T) {
 			existing := &corev1.Secret{Data: make(map[string][]byte)}
 			intent := &corev1.Secret{Data: make(map[string][]byte)}
 
-			initialLeaf, err := r.instanceCertificate(ctx, instance, existing, intent, initialRoot)
+			initialLeaf, err := r.instanceCertificate(ctx, instance, existing, intent, initialRoot, "")
 			assert.NilError(t, err)
 
 			// reconcile the certificate
-			newLeaf, err := r.instanceCertificate(ctx, instance, existing, intent, newRootCert)
+			newLeaf, err := r.instanceCertificate(ctx, instance, existing, intent, newRootCert, "")
 			assert.NilError(t, err)
 
 			// assert old leaf cert does not match the newly reconciled one
 			assert.Assert(t, !initialLeaf.Certificate.Equal(newLeaf.Certificate))
 
 			// 'reconcile' the certificate when the secret does not change. The returned leaf certificate should not change
-			newLeaf2, err := r.instanceCertificate(ctx, instance, intent, intent, newRootCert)
+			newLeaf2, err := r.instanceCertificate(ctx, instance, intent, intent, newRootCert, "")
 			assert.NilError(t, err)
 
 			// check that the leaf cert did not change after another reconciliation
