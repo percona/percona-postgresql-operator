@@ -54,11 +54,11 @@ spec:
         - name: PGO_CONTROLLER_LEASE_NAME
           value: ""
         - name: PGO_CONTROLLER_LEASE_DURATION
-          value: "60"
+          value: 60s
         - name: PGO_CONTROLLER_RENEW_DEADLINE
-          value: "40"
+          value: 40s
         - name: PGO_CONTROLLER_RETRY_PERIOD
-          value: "10"
+          value: 10s
         image: docker.io/perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:

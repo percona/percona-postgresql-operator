@@ -119,7 +119,7 @@ func TestInitManager(t *testing.T) {
 
 				options, err := initManager(ctx)
 				if v == "3.14" {
-					assert.ErrorContains(t, err, "invalid PGO_WORKERS env var value:")
+					assert.ErrorContains(t, err, "parse env vars: envconfig.Process: assigning PGO_WORKERS to Workers: converting '3.14' to type int. details: strconv.ParseInt: parsing \"3.14\": invalid syntax")
 				} else {
 					assert.NilError(t, err)
 				}
@@ -166,9 +166,9 @@ func TestInitManager(t *testing.T) {
 	})
 
 	t.Run("Duration options", func(t *testing.T) {
-		t.Setenv("PGO_CONTROLLER_LEASE_DURATION", "1")
-		t.Setenv("PGO_CONTROLLER_RENEW_DEADLINE", "2")
-		t.Setenv("PGO_CONTROLLER_RETRY_PERIOD", "3")
+		t.Setenv("PGO_CONTROLLER_LEASE_DURATION", "1s")
+		t.Setenv("PGO_CONTROLLER_RENEW_DEADLINE", "2s")
+		t.Setenv("PGO_CONTROLLER_RETRY_PERIOD", "3s")
 		options, err := initManager(ctx)
 		assert.NilError(t, err)
 

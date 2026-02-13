@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	uzap "go.uber.org/zap"
@@ -291,17 +292,17 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	}
 
 	// K8SPG-915
-	envs, err := parseEnvVars()
-	if err != nil {
+	envs := new(envConfig)
+	if err := envconfig.Process("", envs); err != nil {
 		return options, errors.Wrap(err, "parse env vars")
 	}
 
-	options.LeaseDuration = &envs.LeaseDuration
-	options.RenewDeadline = &envs.RenewDeadline
-	options.RetryPeriod = &envs.RetryPeriod
-	options.PprofBindAddress = envs.PprofBindAddress
+	options.LeaseDuration = &envs.leaseDuration
+	options.RenewDeadline = &envs.renewDeadline
+	options.RetryPeriod = &envs.retryPeriod
+	options.PprofBindAddress = envs.pprofBindAddress
 
-	options.LeaderElection = envs.LeaderElection
+	options.LeaderElection = envs.leaderElection
 	if options.LeaderElection {
 		options.LeaderElectionID = perconaRuntime.ElectionID
 	}
@@ -309,25 +310,25 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	// Enable leader elections when configured with a valid Lease.coordination.k8s.io name.
 	// - https://docs.k8s.io/concepts/architecture/leases
 	// - https://releases.k8s.io/v1.30.0/pkg/apis/coordination/validation/validation.go#L26
-	if lease := envs.LeaderElectionID; options.LeaderElection && len(lease) > 0 {
+	if lease := envs.leaderElectionID; options.LeaderElection && len(lease) > 0 {
 		if errs := validation.IsDNS1123Subdomain(lease); len(errs) > 0 {
 			return options, fmt.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
 		}
 
 		options.LeaderElectionID = lease
-		options.LeaderElectionNamespace = envs.LeaderElectionNamespace
+		options.LeaderElectionNamespace = envs.leaderElectionNamespace
 	}
 
-	if len(envs.SingleNamespace) > 0 || len(envs.MultiNamespaces) > 0 {
+	if len(envs.singleNamespace) > 0 || len(envs.multiNamespaces) > 0 {
 		// Initialize DefaultNamespaces if any target namespaces are set
 		options.Cache.DefaultNamespaces = map[string]runtime.CacheConfig{}
 
-		if len(envs.SingleNamespace) > 0 {
-			options.Cache.DefaultNamespaces[envs.SingleNamespace] = runtime.CacheConfig{}
+		if len(envs.singleNamespace) > 0 {
+			options.Cache.DefaultNamespaces[envs.singleNamespace] = runtime.CacheConfig{}
 		}
 
-		if len(envs.MultiNamespaces) > 0 {
-			for _, namespace := range strings.FieldsFunc(envs.MultiNamespaces, func(c rune) bool {
+		if len(envs.multiNamespaces) > 0 {
+			for _, namespace := range strings.FieldsFunc(envs.multiNamespaces, func(c rune) bool {
 				return c != '-' && !unicode.IsLetter(c) && !unicode.IsNumber(c)
 			}) {
 				options.Cache.DefaultNamespaces[namespace] = runtime.CacheConfig{}
@@ -335,11 +336,11 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 		}
 	}
 
-	if envs.Workers < 0 {
+	if envs.workers < 0 {
 		log.Error(nil, "PGO_WORKERS must be a non-negative number; 0 disables the override")
-	} else if envs.Workers > 0 {
+	} else if envs.workers > 0 {
 		for kind := range options.Controller.GroupKindConcurrency {
-			options.Controller.GroupKindConcurrency[kind] = envs.Workers
+			options.Controller.GroupKindConcurrency[kind] = envs.workers
 		}
 	}
 
@@ -514,4 +515,21 @@ func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
 	}
 
 	return false
+}
+
+type envConfig struct {
+	leaderElection          bool   `default:"true" envconfig:"PGO_CONTROLLER_LEADER_ELECTION_ENABLED"`
+	leaderElectionID        string `envconfig:"PGO_CONTROLLER_LEASE_NAME"`
+	leaderElectionNamespace string `envconfig:"PGO_NAMESPACE"`
+
+	leaseDuration time.Duration `default:"60s" envconfig:"PGO_CONTROLLER_LEASE_DURATION"`
+	renewDeadline time.Duration `default:"40s" envconfig:"PGO_CONTROLLER_RENEW_DEADLINE"`
+	retryPeriod   time.Duration `default:"10s" envconfig:"PGO_CONTROLLER_RETRY_PERIOD"`
+
+	singleNamespace string `envconfig:"PGO_TARGET_NAMESPACE"`
+	multiNamespaces string `envconfig:"PGO_TARGET_NAMESPACES"`
+
+	pprofBindAddress string `envconfig:"PPROF_BIND_ADDRESS"`
+
+	workers int `envconfig:"PGO_WORKERS"`
 }
