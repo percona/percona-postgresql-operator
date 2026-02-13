@@ -157,13 +157,13 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 
 	syncPgbackrestFromPostgresToPercona(cr, status)
 
-	repoCondition := meta.FindStatusCondition(status.Conditions, postgrescluster.ConditionRepoHostReady)
+	repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
 	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
 		setClusterNotReadyCondition(metav1.ConditionFalse, postgrescluster.ConditionRepoHostReady)
 		return
 	}
 
-	backupCondition := meta.FindStatusCondition(status.Conditions, postgrescluster.ConditionReplicaCreate)
+	backupCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionReplicaCreate)
 	if backupCondition == nil || backupCondition.Status != metav1.ConditionTrue {
 		setClusterNotReadyCondition(metav1.ConditionFalse, postgrescluster.ConditionReplicaCreate)
 		return
@@ -175,21 +175,14 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 
 func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
 	for _, pcCond := range postgresStatus.Conditions {
-		existing := meta.FindStatusCondition(cr.Status.Conditions, pcCond.Type)
-		if existing != nil {
-			continue
-		}
-
-		newCond := metav1.Condition{
+		_ = meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 			Type:               pcCond.Type,
 			Status:             pcCond.Status,
 			Reason:             pcCond.Reason,
 			Message:            pcCond.Message,
 			LastTransitionTime: pcCond.LastTransitionTime,
 			ObservedGeneration: cr.Generation,
-		}
-
-		cr.Status.Conditions = append(cr.Status.Conditions, newCond)
+		})
 	}
 }
 
