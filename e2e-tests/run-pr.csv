@@ -5,6 +5,7 @@ custom-extensions
 custom-tls
 database-init-sql
 demand-backup
+dynamic-configuration
 finalizers
 init-deploy
 huge-pages
