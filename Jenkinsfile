@@ -8,6 +8,9 @@ void createCluster(String CLUSTER_SUFFIX) {
             export KUBECONFIG=/tmp/$CLUSTER_NAME-${CLUSTER_SUFFIX}
             gcloud auth activate-service-account --key-file $CLIENT_SECRET_FILE
             gcloud config set project $GCP_PROJECT
+
+            printf 'linuxConfig:\n  hugepageConfig:\n    hugepage_size2m: 1024\n' > ${WORKSPACE}/hugepages-config-${CLUSTER_SUFFIX}.yaml
+
             ret_num=0
             while [ \${ret_num} -lt 15 ]; do
                 ret_val=0
@@ -28,11 +31,15 @@ void createCluster(String CLUSTER_SUFFIX) {
                     --monitoring=NONE \
                     --logging=NONE \
                     --no-enable-managed-prometheus \
+                    --system-config-from-file=${WORKSPACE}/hugepages-config-${CLUSTER_SUFFIX}.yaml \
                     --quiet && \
                 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user jenkins@"$GCP_PROJECT".iam.gserviceaccount.com || ret_val=\$?
                 if [ \${ret_val} -eq 0 ]; then break; fi
                 ret_num=\$((ret_num + 1))
             done
+
+            rm -f ${WORKSPACE}/hugepages-config-${CLUSTER_SUFFIX}.yaml
+
             if [ \${ret_num} -eq 15 ]; then
                 gcloud container clusters list --filter $CLUSTER_NAME-${CLUSTER_SUFFIX} --zone ${region}  --format='csv[no-heading](name)' | xargs gcloud container clusters delete --zone ${region} --quiet || true
                 exit 1
