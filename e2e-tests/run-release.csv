@@ -7,6 +7,7 @@ database-init-sql
 demand-backup
 finalizers
 init-deploy
+huge-pages
 major-upgrade
 monitoring
 monitoring-pmm3
