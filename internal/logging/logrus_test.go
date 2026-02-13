@@ -51,7 +51,7 @@ func TestLogrus(t *testing.T) {
 
 	// Any error is ERROR level.
 	out.Reset()
-	logrus.Error(fmt.Errorf("%s", "dang"), "")
+	logrus.Error(errors.New("dang"), "")
 	assertLogrusContains(t, out.String(), `level=error error=dang`)
 
 	// A wrapped error includes one frame of its stack.

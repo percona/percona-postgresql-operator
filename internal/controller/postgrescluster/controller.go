@@ -6,11 +6,11 @@ package postgrescluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"time"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -290,7 +290,14 @@ func (r *Reconciler) Reconcile(
 		// return is no longer needed, and reconciliation can proceed normally.
 		returnEarly, err := r.reconcileDirMoveJobs(ctx, cluster)
 		if err != nil || returnEarly {
-			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
+			if patchErr := patchClusterStatus(); patchErr != nil {
+				if err == nil {
+					err = patchErr
+				} else {
+					log.Error(patchErr, "Failed to patch cluster status")
+				}
+			}
+			return runtime.ErrorWithBackoff(err)
 		}
 	}
 	if err == nil {
@@ -340,7 +347,14 @@ func (r *Reconciler) Reconcile(
 		// can proceed normally.
 		returnEarly, err := r.reconcileDataSource(ctx, cluster, instances, clusterVolumes, rootCA, backupsSpecFound)
 		if err != nil || returnEarly {
-			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
+			if patchErr := patchClusterStatus(); patchErr != nil {
+				if err == nil {
+					err = patchErr
+				} else {
+					log.Error(patchErr, "Failed to patch cluster status")
+				}
+			}
+			return runtime.ErrorWithBackoff(err)
 		}
 	}
 	if err == nil {
@@ -432,7 +446,15 @@ func (r *Reconciler) Reconcile(
 
 	log.V(1).Info("reconciled cluster")
 
-	return result, errors.Join(err, patchClusterStatus())
+	if patchErr := patchClusterStatus(); patchErr != nil {
+		if err != nil {
+			log.Error(patchErr, "Failed to patch cluster status")
+		} else {
+			err = errors.Wrap(patchErr, "failed to patch cluster status")
+		}
+	}
+
+	return result, err
 }
 
 // deleteControlled safely deletes object when it is controlled by cluster.

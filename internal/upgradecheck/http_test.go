@@ -7,8 +7,6 @@ package upgradecheck
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -16,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr/funcr"
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
@@ -176,7 +175,7 @@ func TestCheckForUpgradesScheduler(t *testing.T) {
 
 		// A panicking call
 		funcFoo = func() (*http.Response, error) {
-			panic(fmt.Errorf("oh no!"))
+			panic(errors.New("oh no!"))
 		}
 
 		s := CheckForUpgradesScheduler{
