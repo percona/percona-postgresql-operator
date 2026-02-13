@@ -1,14 +1,11 @@
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-timeout: 20
----
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: cluster1
 spec:
-  dynamicConfiguration:
-    postgresql:
-      parameters:
-        wal_level: "replica"
-        restore_command: "exit 1"
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          wal_level: "replica"
+          restore_command: "exit 1"
