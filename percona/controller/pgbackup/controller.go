@@ -97,7 +97,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	pgCluster := new(v2.PerconaPGCluster)
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster); err != nil {
 		if !k8serrors.IsNotFound(err) {
-			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+			return reconcile.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 		}
 		pgCluster = nil
 	}
