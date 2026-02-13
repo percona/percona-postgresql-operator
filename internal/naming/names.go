@@ -614,3 +614,19 @@ func UpgradeCheckConfigMap() metav1.ObjectMeta {
 		Name:      "pgo-upgrade-check",
 	}
 }
+
+// CAIssuer returns the ObjectMeta for the CA Issuer used by cert-manager.
+func CAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: config.PGONamespace(),
+		Name:      cluster.Name + "-ca-issuer",
+	}
+}
+
+// TLSIssuer returns the ObjectMeta for the TLS Issuer used by cert-manager.
+func TLSIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: config.PGONamespace(),
+		Name:      cluster.Name + "-tls-issuer",
+	}
+}

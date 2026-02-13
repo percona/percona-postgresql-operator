@@ -22,6 +22,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -42,8 +43,9 @@ func TestReconcileCerts(t *testing.T) {
 	namespace := setupNamespace(t, tClient).Name
 
 	r := &Reconciler{
-		Client: tClient,
-		Owner:  ControllerName,
+		Client:              tClient,
+		Owner:               ControllerName,
+		CertManagerCtrlFunc: certmanager.NewController,
 	}
 
 	// set up cluster1
