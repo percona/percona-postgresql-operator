@@ -55,6 +55,15 @@ func AdditionalConfigVolumeMount() corev1.VolumeMount {
 	}
 }
 
+// PGTDEVolumeMount returns the name and mount path of the token and certificates for KMS.
+func PGTDEVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      naming.PGTDEVolume,
+		MountPath: naming.PGTDEMountPath,
+		ReadOnly:  true,
+	}
+}
+
 // InstancePod initializes outInstancePod with the database container and the
 // volumes needed by PostgreSQL.
 func InstancePod(ctx context.Context,
@@ -84,39 +93,6 @@ func InstancePod(ctx context.Context,
 				},
 			},
 		},
-	}
-
-	pgTDEVolumeMount := corev1.VolumeMount{
-		Name:      naming.PGTDEVolume,
-		MountPath: naming.PGTDEMountPath,
-		ReadOnly:  true,
-	}
-	pgTDETokenSecret := &corev1.SecretProjection{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: inCluster.Spec.Extensions.PGTDE.Vault.TokenSecret.Name,
-		},
-	}
-	pgTDEVolume := corev1.Volume{
-		Name: pgTDEVolumeMount.Name,
-		VolumeSource: corev1.VolumeSource{
-			Projected: &corev1.ProjectedVolumeSource{
-				DefaultMode: initialize.Int32(0o600),
-				Sources: []corev1.VolumeProjection{
-					{Secret: pgTDETokenSecret},
-				},
-			},
-		},
-	}
-	if inCluster.Spec.Extensions.PGTDE.Vault.CASecret.Name != "" {
-		pgTDECASecret := &corev1.SecretProjection{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: inCluster.Spec.Extensions.PGTDE.Vault.CASecret.Name,
-			},
-		}
-		pgTDEVolume.VolumeSource.Projected.Sources = append(
-			pgTDEVolume.VolumeSource.Projected.Sources, corev1.VolumeProjection{
-				Secret: pgTDECASecret,
-			})
 	}
 
 	dataVolumeMount := DataVolumeMount()
@@ -190,7 +166,10 @@ func InstancePod(ctx context.Context,
 		dataVolumeMount,
 		downwardAPIVolumeMount,
 	}
-	if inCluster.Spec.Extensions.PGTDE.Enabled {
+
+	pgTDEVolumeMount := PGTDEVolumeMount()
+	if inCluster.Spec.Extensions.PGTDE.Enabled &&
+		inCluster.Spec.Extensions.PGTDE.Vault != nil {
 		dbContainerMounts = append(dbContainerMounts, pgTDEVolumeMount)
 	}
 
@@ -273,7 +252,51 @@ func InstancePod(ctx context.Context,
 		downwardAPIVolume,
 	}
 	if inCluster.Spec.Extensions.PGTDE.Enabled {
-		outInstancePod.Volumes = append(outInstancePod.Volumes, pgTDEVolume)
+		if vault := inCluster.Spec.Extensions.PGTDE.Vault; vault != nil {
+			pgTDETokenSecret := &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: vault.TokenSecret.Name,
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  vault.TokenSecret.Key,
+						Path: vault.TokenSecret.Key,
+					},
+				},
+			}
+
+			pgTDEVolume := corev1.Volume{
+				Name: pgTDEVolumeMount.Name,
+				VolumeSource: corev1.VolumeSource{
+					Projected: &corev1.ProjectedVolumeSource{
+						DefaultMode: initialize.Int32(0o600),
+						Sources: []corev1.VolumeProjection{
+							{Secret: pgTDETokenSecret},
+						},
+					},
+				},
+			}
+
+			if vault.CASecret.Name != "" {
+				pgTDECASecret := &corev1.SecretProjection{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: vault.CASecret.Name,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  vault.CASecret.Key,
+							Path: vault.CASecret.Key,
+						},
+					},
+				}
+				pgTDEVolume.VolumeSource.Projected.Sources = append(
+					pgTDEVolume.VolumeSource.Projected.Sources, corev1.VolumeProjection{
+						Secret: pgTDECASecret,
+					})
+			}
+
+			outInstancePod.Volumes = append(outInstancePod.Volumes, pgTDEVolume)
+		}
 	}
 
 	if HugePages2MiRequested(inCluster) {
