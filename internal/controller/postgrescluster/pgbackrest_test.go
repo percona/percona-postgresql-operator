@@ -3342,12 +3342,12 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 		})
 	}
 	t.Run("Env/EnvFrom", func(t *testing.T) {
-		t.Run(">= 2.8.0", func(t *testing.T) {
+		t.Run(">= 2.9.0", func(t *testing.T) {
 			t.Run("Manual", func(t *testing.T) {
 				cluster := &v1beta1.PostgresCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							naming.LabelVersion: "2.8.0",
+							naming.LabelVersion: "2.9.0",
 						},
 					},
 					Spec: v1beta1.PostgresClusterSpec{
@@ -3434,7 +3434,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 				cluster := &v1beta1.PostgresCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							naming.LabelVersion: "2.8.0",
+							naming.LabelVersion: "2.9.0",
 						},
 					},
 					Spec: v1beta1.PostgresClusterSpec{
@@ -3497,11 +3497,11 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 				})
 			})
 		})
-		t.Run("< 2.8.0", func(t *testing.T) {
+		t.Run("< 2.9.0", func(t *testing.T) {
 			cluster := &v1beta1.PostgresCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						naming.LabelVersion: "2.7.0",
+						naming.LabelVersion: "2.8.0",
 					},
 				},
 				Spec: v1beta1.PostgresClusterSpec{
