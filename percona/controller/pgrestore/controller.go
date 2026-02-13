@@ -230,6 +230,8 @@ func startRestore(ctx context.Context, c client.Client, pg *v2.PerconaPGCluster,
 	pg.Spec.Backups.PGBackRest.Restore.Enabled = &tvar
 	pg.Spec.Backups.PGBackRest.Restore.RepoName = pr.Spec.RepoName
 	pg.Spec.Backups.PGBackRest.Restore.Options = pr.Spec.Options
+	pg.Spec.Backups.PGBackRest.Restore.Env = pr.Spec.ContainerOptions.Env
+	pg.Spec.Backups.PGBackRest.Restore.EnvFrom = pr.Spec.ContainerOptions.EnvFrom
 
 	if err := c.Patch(ctx, pg, client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "patch PGCluster")
