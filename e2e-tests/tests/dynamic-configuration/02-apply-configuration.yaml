@@ -8,4 +8,4 @@ spec:
       postgresql:
         parameters:
           wal_level: "replica"
-          restore_command: "exit 1"
+          restore_command: "/bin/true"

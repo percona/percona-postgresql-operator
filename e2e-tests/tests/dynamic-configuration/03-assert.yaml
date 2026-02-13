@@ -4,4 +4,4 @@ metadata:
   name: 03-pg-settings
 data:
   wal_level: 'replica'
-  restore_command: 'exit 1'
+  restore_command: '/bin/true'
