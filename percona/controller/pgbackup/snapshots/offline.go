@@ -38,7 +38,7 @@ func newSnapshotConfig(pgCluster *v2.PerconaPGCluster) *v2.OfflineSnapshotConfig
 		return defaultConfig
 	}
 
-	config := pgCluster.Spec.Backups.VolumeSnapshots.OfflineConfig
+	config := pgCluster.Spec.Backups.VolumeSnapshots.OfflineConfig.DeepCopy()
 	if config.Checkpoint == nil {
 		config.Checkpoint = defaultConfig.Checkpoint
 	}
