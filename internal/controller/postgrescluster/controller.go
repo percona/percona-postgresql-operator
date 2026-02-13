@@ -43,6 +43,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -271,6 +272,9 @@ func (r *Reconciler) Reconcile(
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
 	}
+	if cluster.Spec.Extensions.PGTDE.Enabled {
+		pgtde.PostgreSQLParameters(&pgParameters)
+	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
 
@@ -386,7 +390,10 @@ func (r *Reconciler) Reconcile(
 	}
 
 	if err == nil {
-		err = r.reconcilePostgresDatabases(ctx, cluster, instances)
+		err = r.reconcilePostgresDatabases(ctx, cluster, instances, patchClusterStatus)
+	}
+	if err == nil {
+		err = r.reconcilePGTDEProviders(ctx, cluster, instances, patchClusterStatus)
 	}
 	if err == nil {
 		err = r.reconcilePostgresUsers(ctx, cluster, instances)

@@ -1305,6 +1305,14 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 			},
 		)
 	}
+
+	if cluster.Spec.Extensions.PGTDE.Enabled {
+		sts.Spec.Template.Annotations = naming.Merge(
+			sts.Spec.Template.Annotations,
+			map[string]string{naming.TDEInstalledAnnotation: "true"},
+		)
+	}
+
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
