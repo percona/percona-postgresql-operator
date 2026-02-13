@@ -344,21 +344,6 @@ var _ = Describe("PG Cluster status", Ordered, func() {
 })
 
 // Unit tests for updateConditions function
-// Test coverage:
-//   - ClusterIsReadyForBackup condition logic:
-//   - no conditions set (RepoHostReady missing)
-//   - RepoHostReady is false
-//   - RepoHostReady is true but ReplicaCreate is missing
-//   - RepoHostReady is true but ReplicaCreate is false
-//   - both conditions are true
-//   - existing condition gets updated when status changes
-//   - existing condition stays unchanged when status remains the same
-//   - Condition synchronization from Postgres to Percona:
-//   - syncs all conditions from postgres status
-//   - updates existing conditions on CR
-//   - Status synchronization:
-//   - syncs PGBackRest status
-//   - syncs Patroni status
 func TestUpdateConditions(t *testing.T) {
 	switchover := "switching"
 	switchoverTimeline := int64(3)
