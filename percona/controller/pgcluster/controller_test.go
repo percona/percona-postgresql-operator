@@ -1320,6 +1320,7 @@ var _ = Describe("Sidecars", Ordered, func() {
 	cr, err := readDefaultCR(crName, ns)
 	It("should read defautl cr.yaml", func() {
 		Expect(err).NotTo(HaveOccurred())
+		cr.Spec.CRVersion = version.Version()
 	})
 
 	It("should create PerconaPGCluster", func() {
@@ -1332,12 +1333,66 @@ var _ = Describe("Sidecars", Ordered, func() {
 					Image:   "instance-image",
 				},
 			}
+			i.SidecarVolumes = []corev1.Volume{
+				{
+					Name: "sidecar-instance-vol",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			}
+			i.SidecarPVCs = []v1beta1.SidecarPVC{
+				{
+					Name: "sidecar-instance-pvc",
+					Spec: corev1.PersistentVolumeClaimSpec{
+						VolumeName: "some-name",
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteMany,
+						},
+						Resources: corev1.VolumeResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("2G"),
+							},
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("2G"),
+							},
+						},
+					},
+				},
+			}
 		}
 		cr.Spec.Proxy.PGBouncer.Sidecars = []corev1.Container{
 			{
 				Name:    "pgbouncer-sidecar",
 				Command: []string{"pgbouncer-cmd"},
 				Image:   "pgbouncer-image",
+			},
+		}
+		cr.Spec.Proxy.PGBouncer.SidecarVolumes = []corev1.Volume{
+			{
+				Name: "sidecar-pgbouncer-vol",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+		cr.Spec.Proxy.PGBouncer.SidecarPVCs = []v1beta1.SidecarPVC{
+			{
+				Name: "sidecar-pgbouncer-pvc",
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName: "some-name",
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteMany,
+					},
+					Resources: corev1.VolumeResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("2G"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("2G"),
+						},
+					},
+				},
 			},
 		}
 		cr.Spec.Backups.PGBackRest.RepoHost.Sidecars = []corev1.Container{
@@ -1347,8 +1402,37 @@ var _ = Describe("Sidecars", Ordered, func() {
 				Image:   "repohost-image",
 			},
 		}
+		cr.Spec.Backups.PGBackRest.RepoHost.SidecarVolumes = []corev1.Volume{
+			{
+				Name: "sidecar-repohost-vol",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+		cr.Spec.Backups.PGBackRest.RepoHost.SidecarPVCs = []v1beta1.SidecarPVC{
+			{
+				Name: "sidecar-repohost-pvc",
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName: "some-name",
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteMany,
+					},
+					Resources: corev1.VolumeResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("2G"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("2G"),
+						},
+					},
+				},
+			},
+		}
+
 		status := cr.Status
 		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), cr)).Should(Succeed())
 		cr.Status = status
 		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
 	})
@@ -1384,6 +1468,32 @@ var _ = Describe("Sidecars", Ordered, func() {
 			Expect(sidecar).NotTo(BeNil())
 			Expect(sidecar.Command).To(Equal([]string{"instance-cmd"}))
 			Expect(sidecar.Image).To(Equal("instance-image"))
+
+			var sidecarVolume corev1.Volume
+			var sidecarPVCVolume corev1.Volume
+			for _, v := range sts.Spec.Template.Spec.Volumes {
+				switch v.Name {
+				case "sidecar-instance-vol":
+					sidecarVolume = v
+				case "sidecar-instance-pvc":
+					sidecarPVCVolume = v
+				}
+			}
+
+			Expect(sidecarVolume).To(Equal(corev1.Volume{
+				Name: "sidecar-instance-vol",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			}))
+			Expect(sidecarPVCVolume).To(Equal(corev1.Volume{
+				Name: "sidecar-instance-pvc",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "sidecar-instance-pvc",
+					},
+				},
+			}))
 		}
 	})
 
@@ -1400,6 +1510,32 @@ var _ = Describe("Sidecars", Ordered, func() {
 		Expect(sidecar).NotTo(BeNil())
 		Expect(sidecar.Command).To(Equal([]string{"pgbouncer-cmd"}))
 		Expect(sidecar.Image).To(Equal("pgbouncer-image"))
+
+		var sidecarVolume corev1.Volume
+		var sidecarPVCVolume corev1.Volume
+		for _, v := range deployment.Spec.Template.Spec.Volumes {
+			switch v.Name {
+			case "sidecar-pgbouncer-vol":
+				sidecarVolume = v
+			case "sidecar-pgbouncer-pvc":
+				sidecarPVCVolume = v
+			}
+		}
+
+		Expect(sidecarVolume).To(Equal(corev1.Volume{
+			Name: "sidecar-pgbouncer-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}))
+		Expect(sidecarPVCVolume).To(Equal(corev1.Volume{
+			Name: "sidecar-pgbouncer-pvc",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "sidecar-pgbouncer-pvc",
+				},
+			},
+		}))
 	})
 
 	It("PgBackrest Repo should have sidecar", func() {
@@ -1415,6 +1551,32 @@ var _ = Describe("Sidecars", Ordered, func() {
 		Expect(sidecar).NotTo(BeNil())
 		Expect(sidecar.Command).To(Equal([]string{"repohost-cmd"}))
 		Expect(sidecar.Image).To(Equal("repohost-image"))
+
+		var sidecarVolume corev1.Volume
+		var sidecarPVCVolume corev1.Volume
+		for _, v := range sts.Spec.Template.Spec.Volumes {
+			switch v.Name {
+			case "sidecar-repohost-vol":
+				sidecarVolume = v
+			case "sidecar-repohost-pvc":
+				sidecarPVCVolume = v
+			}
+		}
+
+		Expect(sidecarVolume).To(Equal(corev1.Volume{
+			Name: "sidecar-repohost-vol",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}))
+		Expect(sidecarPVCVolume).To(Equal(corev1.Volume{
+			Name: "sidecar-repohost-pvc",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "sidecar-repohost-pvc",
+				},
+			},
+		}))
 	})
 
 	It("should update PerconaPGCluster with multiple sidecars", func() {

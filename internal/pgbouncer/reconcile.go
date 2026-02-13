@@ -182,14 +182,29 @@ func Pod(
 
 	outPod.Containers = []corev1.Container{container, reloader}
 
+	outPod.Volumes = []corev1.Volume{configVolume}
+
 	// If the PGBouncerSidecars feature gate is enabled and custom pgBouncer
 	// sidecars are defined, add the defined container to the Pod.
 	if feature.Enabled(ctx, feature.PGBouncerSidecars) &&
 		inCluster.Spec.Proxy.PGBouncer.Containers != nil {
 		outPod.Containers = append(outPod.Containers, inCluster.Spec.Proxy.PGBouncer.Containers...)
-	}
 
-	outPod.Volumes = []corev1.Volume{configVolume}
+		if inCluster.CompareVersion("2.9.0") >= 0 {
+			outPod.Volumes = append(outPod.Volumes, inCluster.Spec.Proxy.PGBouncer.SidecarVolumes...)
+
+			for _, v := range inCluster.Spec.Proxy.PGBouncer.SidecarPVCs {
+				outPod.Volumes = append(outPod.Volumes, corev1.Volume{
+					Name: v.Name,
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: v.Name,
+						},
+					},
+				})
+			}
+		}
+	}
 
 	// K8SPG-833
 	if pgbouncer := inCluster.Spec.Proxy.PGBouncer; inCluster.CompareVersion("2.8.0") >= 0 && pgbouncer != nil {
