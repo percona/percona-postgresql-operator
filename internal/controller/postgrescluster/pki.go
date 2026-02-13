@@ -185,11 +185,11 @@ func (r *Reconciler) reconcileCertManagerRootCertificate(
 	}
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
 	err = c.ApplyCAIssuer(ctx, cluster)
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
+	if err != nil {
 		return nil, errors.Wrap(err, "error applying CA issuer")
 	}
 	err = c.ApplyCACertificate(ctx, cluster)
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
+	if err != nil {
 		return nil, errors.Wrap(err, "error applying CA certificate")
 	}
 
@@ -331,12 +331,10 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 ) (
 	*corev1.SecretProjection, error,
 ) {
-	log := logging.FromContext(ctx)
-
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
 
 	err := c.ApplyIssuer(ctx, cluster)
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply TLS issuer")
 	}
 
@@ -351,11 +349,9 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 	dnsNames := append(primaryDNSNames, replicaDNSNames...)
 
 	err = c.ApplyClusterCertificate(ctx, cluster, dnsNames)
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply cluster certificate")
 	}
-
-	log.V(1).Info("cert-manager cluster certificate applied", "secret", naming.PostgresTLSSecret(cluster).Name)
 
 	return clusterCertSecretProjection(&corev1.Secret{
 		ObjectMeta: naming.PostgresTLSSecret(cluster),
