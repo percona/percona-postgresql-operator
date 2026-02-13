@@ -70,6 +70,13 @@ spec:
             type: object
           spec:
             properties:
+              method:
+                default: pgbackrest
+                description: Method with which to perform the backup
+                enum:
+                - pgbackrest
+                - volumeSnapshot
+                type: string
               options:
                 description: |-
                   Command line options to include when running the pgBackRest backup command.
@@ -80,14 +87,17 @@ spec:
               pgCluster:
                 type: string
               repoName:
-                description: The name of the pgBackRest repo to run the backup command
-                  against.
+                description: |-
+                  The name of the pgBackRest repo to run the backup command against.
+                  This is required when method is 'pgbackrest'.
                 pattern: ^repo[1-4]
                 type: string
             required:
             - pgCluster
-            - repoName
             type: object
+            x-kubernetes-validations:
+            - message: repoName is required when method is 'pgbackrest'
+              rule: self.method == "volumeSnapshot" || has(self.repoName)
           status:
             properties:
               backupName:
@@ -390,6 +400,24 @@ spec:
                     type: object
                 required:
                 - name
+                type: object
+              snapshot:
+                properties:
+                  dataVolumeSnapshotRef:
+                    description: Name of the VolumeSnapshot containing data volume
+                      contents.
+                    type: string
+                  tablespaceVolumeSnapshotRefs:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Names of the VolumeSnapshots containing tablespace volume contents.
+                      Key is the name of the tablespace, value is the name of the VolumeSnapshot.
+                    type: object
+                  walVolumeSnapshotRef:
+                    description: Name of the VolumeSnapshot containing WAL volume
+                      contents.
+                    type: string
                 type: object
               state:
                 type: string

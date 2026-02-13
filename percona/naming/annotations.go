@@ -51,4 +51,16 @@ const (
 	// indicate the name of the main site.
 	// This annotation is set on standby clusters based on pgbackrest only. This is needed to calculate the replication lag.
 	AnnotationReplicationMainSite = PrefixPerconaPGV2 + "replication-main-site"
+
+	// AnnotationInstanceSuspended must be set on the instance StatefulSet to mark
+	// the instance as suspended.
+	AnnotationInstanceSuspended = PrefixPerconaPGV2 + "instance-suspended"
+
+	// AnnotationSnapshotRestore is the annotation added to the data PVCs of a cluster
+	// to indicate the name of the PerconaPGRestore that is restoring the PVC from a snapshot.
+	AnnotationSnapshotRestore = PrefixPerconaPGV2 + "snapshot-restore"
+
+	// AnnotationPVCsPreparedAt is the annotation added to the PerconaPGRestore which
+	// prepares the PVCs for a snapshot restore.
+	AnnotationPVCsPreparedAt = PrefixPerconaPGV2 + "pvcs-prepared-at"
 )

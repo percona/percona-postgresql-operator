@@ -49,6 +49,8 @@ spec:
           value: "1"
         - name: PPROF_BIND_ADDRESS
           value: "0"
+        - name: PGO_FEATURE_GATES
+          value: ""
         image: docker.io/perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:

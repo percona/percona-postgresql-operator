@@ -1,0 +1,28 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 560
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  name: backup3
+spec:
+  pgCluster: backup-snapshot
+  method: volumeSnapshot
+status:
+  state: Succeeded
+  snapshot:
+    dataVolumeSnapshotRef: backup3-pgdata
+---
+kind: VolumeSnapshot
+apiVersion: snapshot.storage.k8s.io/v1
+metadata:
+  name: backup3-pgdata
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      name: backup3
+      controller: true
+      blockOwnerDeletion: true
+status:
+  readyToUse: true
