@@ -32,7 +32,7 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGClust
 
 	// If proxy is not configured, use the pod service
 	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil {
-		return svcFQDN(naming.ClusterPodService(postgresCluster).Name, postgresCluster.Namespace), nil
+		return svcFQDN(naming.ClusterPrimaryService(postgresCluster).Name, postgresCluster.Namespace), nil
 	}
 
 	// PGBouncer is not exposed, use the service name
