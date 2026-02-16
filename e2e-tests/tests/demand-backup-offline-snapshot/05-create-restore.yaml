@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      
+      run_psql_local \
+        '\c myapp \\\ TRUNCATE TABLE myApp' \
+        "postgres:$(get_psql_user_pass backup-snapshot-pguser-postgres)@$(get_psql_user_host backup-snapshot-pguser-postgres)"
+      
+      cat <<EOF | kubectl -n ${NAMESPACE} apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: restore1
+      spec:
+        pgCluster: backup-snapshot
+        volumeSnapshotBackupName: backup1
+      EOF
+    timeout: 360
