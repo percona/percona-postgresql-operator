@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -65,13 +64,10 @@ type Reconciler struct {
 	DiscoveryClient *discovery.DiscoveryClient
 	IsOpenShift     bool
 	Owner           client.FieldOwner
-	PodExec         func(
-		ctx context.Context, namespace, pod, container string,
-		stdin io.Reader, stdout, stderr io.Writer, command ...string,
-	) error
-	Recorder            record.EventRecorder
-	Registration        registration.Registration
-	Tracer              trace.Tracer
+	PodExec         runtime.PodExecutor
+	Recorder        record.EventRecorder
+	Registration    registration.Registration
+	Tracer          trace.Tracer
 	CertManagerCtrlFunc certmanager.NewControllerFunc
 	RestConfig          *rest.Config
 }
