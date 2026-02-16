@@ -2,6 +2,7 @@ package pgcluster
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -11,16 +12,33 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
-	svcName := cr.Name + "-pgbouncer"
+	postgresCluster := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+		},
+	}
 
+	svcFQDN := func(svcName, ns string) string {
+		return fmt.Sprintf("%s.%s.svc", svcName, ns)
+	}
+
+	// If proxy is not configured, use the pod service
+	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil {
+		return svcFQDN(naming.ClusterPodService(postgresCluster).Name, postgresCluster.Namespace), nil
+	}
+
+	// PGBouncer is not exposed, use the service name
+	svcName := naming.ClusterPGBouncer(postgresCluster).Name
 	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
-		return svcName + "." + cr.Namespace + ".svc", nil
+		return svcFQDN(svcName, postgresCluster.Namespace), nil
 	}
 
 	svc := &corev1.Service{}
