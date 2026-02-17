@@ -212,7 +212,7 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
-	if cr.CompareVersion("2.9.0") < 0 || (cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil) {
+	if cr.CompareVersion("2.9.0") < 0 || cr.Spec.Proxy.IsSet() {
 		if cr.Spec.Proxy == nil {
 			cr.Spec.Proxy = &PGProxySpec{}
 		}
@@ -1040,6 +1040,10 @@ func (s *ServiceExpose) ToCrunchy(version string) *crunchyv1beta1.ServiceSpec {
 type PGProxySpec struct {
 	// Defines a PgBouncer proxy and connection pooler.
 	PGBouncer *PGBouncerSpec `json:"pgBouncer"`
+}
+
+func (p *PGProxySpec) IsSet() bool {
+	return p != nil && p.PGBouncer != nil
 }
 
 func (p *PGProxySpec) ToCrunchy(version string) *crunchyv1beta1.PostgresProxySpec {
