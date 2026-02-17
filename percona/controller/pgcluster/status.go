@@ -30,17 +30,18 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGClust
 		return fmt.Sprintf("%s.%s.svc", svcName, ns)
 	}
 
-	// If proxy is not configured, use the primary service
+	// If proxy is not configured, use the primary service as host.
 	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil {
 		return svcFQDN(naming.ClusterPrimaryService(postgresCluster).Name, postgresCluster.Namespace), nil
 	}
 
-	// PGBouncer is not exposed, use the service name
+	// Proxy is configured, but PGBouncer is not exposed, use the service name as host.
 	svcName := naming.ClusterPGBouncer(postgresCluster).Name
 	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
 		return svcFQDN(svcName, postgresCluster.Namespace), nil
 	}
 
+	// PGBouncer is exposed, find the IP/hostnames
 	svc := &corev1.Service{}
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: svcName}, svc)
 	if err != nil {
@@ -54,7 +55,6 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGClust
 			host = i.Hostname
 		}
 	}
-
 	return host, nil
 }
 
