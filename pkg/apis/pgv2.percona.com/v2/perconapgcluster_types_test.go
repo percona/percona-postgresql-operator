@@ -430,7 +430,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				return
 			}
 
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, crunchyCluster)
 
 			if tt.assertClusterFunc != nil {
