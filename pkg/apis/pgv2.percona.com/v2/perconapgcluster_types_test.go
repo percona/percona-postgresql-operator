@@ -192,7 +192,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				assert.Equal(t, expected.Spec.PostgresVersion, actual.Spec.PostgresVersion)
 				assert.Equal(t, expected.Spec.CRVersion, actual.Labels[LabelOperatorVersion])
 				assert.Len(t, actual.Spec.InstanceSets, 1)
-				assert.Len(t, len(expected.Spec.InstanceSets), len(actual.Spec.InstanceSets))
+				assert.Len(t, expected.Spec.InstanceSets, len(actual.Spec.InstanceSets))
 				assert.Equal(t, expected.Spec.InstanceSets[0].Name, actual.Spec.InstanceSets[0].Name)
 
 				assert.Equal(t, expected.Spec.Expose.Type, actual.Spec.Service.Type)
