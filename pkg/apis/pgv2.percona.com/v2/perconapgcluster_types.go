@@ -212,13 +212,17 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
-	if cr.Spec.Proxy != nil {
+	if cr.CompareVersion("2.9.0") < 0 || (cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil) {
+		if cr.Spec.Proxy == nil {
+			cr.Spec.Proxy = &PGProxySpec{}
+		}
+
 		if cr.Spec.Proxy.PGBouncer == nil {
-			cr.Spec.Proxy.PGBouncer = new(PGBouncerSpec)
+			cr.Spec.Proxy.PGBouncer = &PGBouncerSpec{}
 		}
 
 		if cr.Spec.Proxy.PGBouncer.Metadata == nil {
-			cr.Spec.Proxy.PGBouncer.Metadata = new(crunchyv1beta1.Metadata)
+			cr.Spec.Proxy.PGBouncer.Metadata = &crunchyv1beta1.Metadata{}
 		}
 		if cr.Spec.Proxy.PGBouncer.Metadata.Labels == nil {
 			cr.Spec.Proxy.PGBouncer.Metadata.Labels = make(map[string]string)

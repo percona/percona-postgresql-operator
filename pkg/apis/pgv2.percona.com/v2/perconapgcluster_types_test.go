@@ -56,14 +56,27 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 }
 
 func TestPerconaPGCluster_Proxy(t *testing.T) {
-	t.Run("Proxy is nil", func(t *testing.T) {
+	t.Run("Proxy is nil, CRVersion < 2.9.0", func(t *testing.T) {
 		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "2.8.0"
+		cr.Default()
+		assert.NotNil(t, cr.Spec.Proxy)
+		assert.NotNil(t, cr.Spec.Proxy.PGBouncer)
+		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata)
+		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata.Labels)
+		assert.Equal(t, cr.Spec.CRVersion, cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion])
+	})
+	t.Run("Proxy is nil, CRVersion >= 2.9.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "2.9.0"
 		cr.Default()
 		assert.Nil(t, cr.Spec.Proxy)
 	})
 	t.Run("Proxy is not nil", func(t *testing.T) {
 		cr := new(PerconaPGCluster)
-		cr.Spec.Proxy = new(PGProxySpec)
+		cr.Spec.Proxy = &PGProxySpec{
+			PGBouncer: &PGBouncerSpec{},
+		}
 		cr.Spec.CRVersion = "2.9.0"
 		cr.Default()
 		assert.NotNil(t, cr.Spec.Proxy)
