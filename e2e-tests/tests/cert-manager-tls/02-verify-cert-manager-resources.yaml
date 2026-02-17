@@ -8,15 +8,13 @@ commands:
 
       source ../../functions
 
-      ns="${OPERATOR_NS:-$NAMESPACE}"
-
-      ca_issuer_ready=$(kubectl -n "$ns" get issuer cert-manager-tls-ca-issuer -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      ca_issuer_ready=$(kubectl -n "$NAMESPACE" get issuer cert-manager-tls-ca-issuer -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
       if [[ "$ca_issuer_ready" != "True" ]]; then
           echo "CA Issuer is not ready: $ca_issuer_ready"
           exit 1
       fi
 
-      tls_issuer_ready=$(kubectl -n "$ns" get issuer cert-manager-tls-tls-issuer -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      tls_issuer_ready=$(kubectl -n "$NAMESPACE" get issuer cert-manager-tls-tls-issuer -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
       if [[ "$tls_issuer_ready" != "True" ]]; then
           echo "TLS Issuer is not ready: $tls_issuer_ready"
           exit 1
