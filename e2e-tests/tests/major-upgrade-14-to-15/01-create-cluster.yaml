@@ -17,4 +17,8 @@ commands:
           .spec.backups.pgbackrest.image = "perconalab/percona-postgresql-operator:main-pgbackrest14" |
           .spec.patroni.dynamicConfiguration.postgresql.parameters.shared_preload_libraries = "pg_cron" |
           .spec.extensions.custom += [{"name": "pg_cron", "version": "1.6.6"}]' \
+        | yq eval '
+          .spec.extensions.image = "'"${IMAGE}"'" |
+          .spec.extensions.imagePullPolicy = "Always" |
+          .spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}' \
         | kubectl -n "${NAMESPACE}" apply -f -
