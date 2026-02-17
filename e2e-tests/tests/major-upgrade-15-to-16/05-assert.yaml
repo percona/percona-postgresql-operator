@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 660
+commands:
+- script: |-
+    kubectl get postgrescluster major-upgrade-15-to-16 \
+      -n ${NAMESPACE} \
+      -o yaml \
+    | yq eval '.status.pgbackrest.repos' -
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: major-upgrade-15-to-16
+status:
+  pgbackrest:
+    repos:
+    - bound: true
+      name: repo2
+      replicaCreateBackupComplete: true
+      stanzaCreated: true
