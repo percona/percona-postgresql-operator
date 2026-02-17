@@ -189,10 +189,29 @@ func TestApplyIssuer(t *testing.T) {
 
 	ctrl := NewController(client, client.Scheme(), false)
 
-	t.Run("issuer is cluster-scoped and cannot have namespace-scoped owner", func(t *testing.T) {
+	t.Run("create TLS issuer in cluster namespace", func(t *testing.T) {
 		err := ctrl.ApplyIssuer(t.Context(), cluster)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to set controller reference")
+		require.NoError(t, err)
+
+		issuer := &v1.Issuer{}
+		meta := naming.TLSIssuer(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: meta.Namespace,
+			Name:      meta.Name,
+		}, issuer)
+		require.NoError(t, err)
+
+		assert.Equal(t, meta.Name, issuer.Name)
+		assert.Equal(t, cluster.Namespace, issuer.Namespace)
+		assert.NotNil(t, issuer.Spec.CA)
+		assert.Equal(t, naming.PostgresRootCASecret(cluster).Name, issuer.Spec.CA.SecretName)
+
+		require.Len(t, issuer.OwnerReferences, 1)
+		assert.Equal(t, cluster.Name, issuer.OwnerReferences[0].Name)
+
+		// return nil when issuer already exists
+		err = ctrl.ApplyIssuer(t.Context(), cluster)
+		require.NoError(t, err)
 	})
 }
 
@@ -203,10 +222,28 @@ func TestApplyCAIssuer(t *testing.T) {
 
 	ctrl := NewController(client, client.Scheme(), false)
 
-	t.Run("CA issuer is cluster-scoped and cannot have namespace-scoped owner", func(t *testing.T) {
+	t.Run("create CA issuer in cluster namespace", func(t *testing.T) {
 		err := ctrl.ApplyCAIssuer(t.Context(), cluster)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to set controller reference")
+		require.NoError(t, err)
+
+		issuer := &v1.Issuer{}
+		meta := naming.CAIssuer(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: meta.Namespace,
+			Name:      meta.Name,
+		}, issuer)
+		require.NoError(t, err)
+
+		assert.Equal(t, meta.Name, issuer.Name)
+		assert.Equal(t, cluster.Namespace, issuer.Namespace)
+		assert.NotNil(t, issuer.Spec.SelfSigned)
+
+		require.Len(t, issuer.OwnerReferences, 1)
+		assert.Equal(t, cluster.Name, issuer.OwnerReferences[0].Name)
+
+		// return nil when CA issuer already exists
+		err = ctrl.ApplyCAIssuer(t.Context(), cluster)
+		require.NoError(t, err)
 	})
 }
 
