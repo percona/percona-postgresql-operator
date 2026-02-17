@@ -1,0 +1,9 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  name: backup-after-16-to-17
+spec:
+  pgCluster: major-upgrade-16-to-17
+  repoName: repo2
+  options:
+    - --type=full
