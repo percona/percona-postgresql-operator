@@ -392,7 +392,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 				Spec: PerconaPGClusterSpec{
-					CRVersion:       "2.5.0",
+					CRVersion:       "2.9.0",
 					PostgresVersion: 15,
 					Proxy:           nil,
 					InstanceSets: PGInstanceSets{
