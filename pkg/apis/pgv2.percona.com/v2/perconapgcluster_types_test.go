@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,6 +53,25 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestPerconaPGCluster_Proxy(t *testing.T) {
+	t.Run("Proxy is nil", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Default()
+		assert.Nil(t, cr.Spec.Proxy)
+	})
+	t.Run("Proxy is not nil", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.Proxy = new(PGProxySpec)
+		cr.Spec.CRVersion = "2.9.0"
+		cr.Default()
+		assert.NotNil(t, cr.Spec.Proxy)
+		assert.NotNil(t, cr.Spec.Proxy.PGBouncer)
+		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata)
+		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata.Labels)
+		assert.Equal(t, cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion], cr.Spec.CRVersion)
+	})
 }
 
 func TestPerconaPGCluster_PostgresImage(t *testing.T) {
@@ -169,7 +188,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, expected *PerconaPGCluster) {
 				assert.Equal(t, actual.Name, expected.Name)
 				assert.Equal(t, actual.Namespace, expected.Namespace)
-				assert.DeepEqual(t, actual.Finalizers, []string{naming.Finalizer})
+				assert.Equal(t, actual.Finalizers, []string{naming.Finalizer})
 				assert.Equal(t, actual.Spec.PostgresVersion, expected.Spec.PostgresVersion)
 				assert.Equal(t, actual.Labels[LabelOperatorVersion], expected.Spec.CRVersion)
 				assert.Equal(t, len(actual.Spec.InstanceSets), 1)
@@ -177,11 +196,11 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				assert.Equal(t, actual.Spec.InstanceSets[0].Name, expected.Spec.InstanceSets[0].Name)
 
 				assert.Equal(t, actual.Spec.Service.Type, expected.Spec.Expose.Type)
-				assert.Assert(t, actual.Spec.Service.LoadBalancerClass != nil)
+				assert.NotNil(t, actual.Spec.Service.LoadBalancerClass)
 				assert.Equal(t, actual.Spec.Service.LoadBalancerClass, expected.Spec.Expose.LoadBalancerClass)
 
 				assert.Equal(t, actual.Spec.ReplicaService.Type, expected.Spec.ExposeReplicas.Type)
-				assert.Assert(t, actual.Spec.ReplicaService.LoadBalancerClass != nil)
+				assert.NotNil(t, actual.Spec.ReplicaService.LoadBalancerClass)
 				assert.Equal(t, actual.Spec.ReplicaService.LoadBalancerClass, expected.Spec.ExposeReplicas.LoadBalancerClass)
 				assert.Equal(t, *actual.Spec.Backups.TrackLatestRestorableTime, true)
 			},
@@ -347,9 +366,9 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				for i, user := range result.Spec.Users {
 					userNames[i] = string(user.Name)
 				}
-				assert.Assert(t, contains(userNames, "regular-user"))
-				assert.Assert(t, contains(userNames, "another-user"))
-				assert.Assert(t, !contains(userNames, UserMonitoring))
+				assert.True(t, contains(userNames, "regular-user"))
+				assert.True(t, contains(userNames, "another-user"))
+				assert.False(t, contains(userNames, UserMonitoring))
 			},
 		},
 	}
@@ -361,12 +380,12 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			crunchyCluster, err := tt.expectedPerconaPGCluster.ToCrunchy(ctx, tt.inputPostgresCluster, scheme)
 
 			if tt.expectedError {
-				assert.Assert(t, err != nil)
+				assert.NotNil(t, err)
 				return
 			}
 
-			assert.NilError(t, err)
-			assert.Assert(t, crunchyCluster != nil)
+			assert.Nil(t, err)
+			assert.NotNil(t, crunchyCluster)
 
 			if tt.assertClusterFunc != nil {
 				tt.assertClusterFunc(t, crunchyCluster, tt.expectedPerconaPGCluster)
