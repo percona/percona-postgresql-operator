@@ -307,7 +307,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 						break
 					}
 				}
-				assert.Equal(t, true, hasMonitoringUser)
+				assert.True(t, hasMonitoringUser)
 			},
 		},
 		"handles AutoCreateUserSchema annotation": {
@@ -375,7 +375,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
-				assert.Equal(t, 2, len(result.Spec.Users))
+				assert.Len(t, result.Spec.Users, 2)
 				userNames := make([]string, len(result.Spec.Users))
 				for i, user := range result.Spec.Users {
 					userNames[i] = string(user.Name)
@@ -426,7 +426,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			crunchyCluster, err := tt.expectedPerconaPGCluster.ToCrunchy(ctx, tt.inputPostgresCluster, scheme)
 
 			if tt.expectedError {
-				assert.NotNil(t, err)
+				require.Error(t, err)
 				return
 			}
 
