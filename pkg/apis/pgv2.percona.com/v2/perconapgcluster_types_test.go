@@ -70,7 +70,7 @@ func TestPerconaPGCluster_Proxy(t *testing.T) {
 		assert.NotNil(t, cr.Spec.Proxy.PGBouncer)
 		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata)
 		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata.Labels)
-		assert.Equal(t, cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion], cr.Spec.CRVersion)
+		assert.Equal(t, cr.Spec.CRVersion, cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion])
 	})
 }
 
@@ -127,7 +127,7 @@ func TestPerconaPGCluster_PostgresImage(t *testing.T) {
 				}()
 			}
 
-			assert.Equal(t, cluster.PostgresImage(), tt.expectedImage)
+			assert.Equal(t, tt.expectedImage, cluster.PostgresImage())
 		})
 	}
 }
@@ -186,23 +186,24 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, expected *PerconaPGCluster) {
-				assert.Equal(t, actual.Name, expected.Name)
-				assert.Equal(t, actual.Namespace, expected.Namespace)
-				assert.Equal(t, actual.Finalizers, []string{naming.Finalizer})
-				assert.Equal(t, actual.Spec.PostgresVersion, expected.Spec.PostgresVersion)
-				assert.Equal(t, actual.Labels[LabelOperatorVersion], expected.Spec.CRVersion)
-				assert.Equal(t, len(actual.Spec.InstanceSets), 1)
-				assert.Equal(t, len(actual.Spec.InstanceSets), len(expected.Spec.InstanceSets))
-				assert.Equal(t, actual.Spec.InstanceSets[0].Name, expected.Spec.InstanceSets[0].Name)
+				assert.Equal(t, expected.Name, actual.Name)
+				assert.Equal(t, expected.Namespace, actual.Namespace)
+				assert.Equal(t, []string{naming.Finalizer}, actual.Finalizers)
+				assert.Equal(t, expected.Spec.PostgresVersion, actual.Spec.PostgresVersion)
+				assert.Equal(t, expected.Spec.CRVersion, actual.Labels[LabelOperatorVersion])
+				assert.Len(t, actual.Spec.InstanceSets, 1)
+				assert.Len(t, len(expected.Spec.InstanceSets), len(actual.Spec.InstanceSets))
+				assert.Equal(t, expected.Spec.InstanceSets[0].Name, actual.Spec.InstanceSets[0].Name)
 
-				assert.Equal(t, actual.Spec.Service.Type, expected.Spec.Expose.Type)
+				assert.Equal(t, expected.Spec.Expose.Type, actual.Spec.Service.Type)
 				assert.NotNil(t, actual.Spec.Service.LoadBalancerClass)
-				assert.Equal(t, actual.Spec.Service.LoadBalancerClass, expected.Spec.Expose.LoadBalancerClass)
+				assert.Equal(t, expected.Spec.Expose.LoadBalancerClass, actual.Spec.Service.LoadBalancerClass)
 
-				assert.Equal(t, actual.Spec.ReplicaService.Type, expected.Spec.ExposeReplicas.Type)
+				assert.Equal(t, expected.Spec.ExposeReplicas.Type, actual.Spec.ReplicaService.Type)
 				assert.NotNil(t, actual.Spec.ReplicaService.LoadBalancerClass)
-				assert.Equal(t, actual.Spec.ReplicaService.LoadBalancerClass, expected.Spec.ExposeReplicas.LoadBalancerClass)
-				assert.Equal(t, *actual.Spec.Backups.TrackLatestRestorableTime, true)
+				assert.Equal(t, expected.Spec.ExposeReplicas.LoadBalancerClass, actual.Spec.ReplicaService.LoadBalancerClass)
+				assert.NotNil(t, actual.Spec.Backups.TrackLatestRestorableTime)
+				assert.True(t, *actual.Spec.Backups.TrackLatestRestorableTime)
 			},
 		},
 		"updates existing PostgresCluster": {
@@ -247,11 +248,11 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, expected *PerconaPGCluster) {
-				assert.Equal(t, actual.Spec.PostgresVersion, expected.Spec.PostgresVersion)
-				assert.Equal(t, actual.Spec.Port, expected.Spec.Port)
-				assert.Equal(t, actual.Spec.TLSOnly, expected.Spec.TLSOnly)
-				assert.Equal(t, actual.Labels["test-label"], "test-value")
-				assert.Equal(t, actual.Labels[LabelOperatorVersion], expected.Spec.CRVersion)
+				assert.Equal(t, expected.Spec.PostgresVersion, actual.Spec.PostgresVersion)
+				assert.Equal(t, expected.Spec.Port, actual.Spec.Port)
+				assert.Equal(t, expected.Spec.TLSOnly, actual.Spec.TLSOnly)
+				assert.Equal(t, "test-value", actual.Labels["test-label"])
+				assert.Equal(t, expected.Spec.CRVersion, actual.Labels[LabelOperatorVersion])
 			},
 		},
 		"handles PMM enabled scenario": {
@@ -293,7 +294,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 						break
 					}
 				}
-				assert.Equal(t, hasMonitoringUser, true)
+				assert.Equal(t, true, hasMonitoringUser)
 			},
 		},
 		"handles AutoCreateUserSchema annotation": {
@@ -325,7 +326,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
-				assert.Equal(t, actual.Annotations[naming.AutoCreateUserSchemaAnnotation], "true")
+				assert.Equal(t, "true", actual.Annotations[naming.AutoCreateUserSchemaAnnotation])
 			},
 		},
 		"filters out reserved monitoring user": {
@@ -361,7 +362,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
-				assert.Equal(t, len(result.Spec.Users), 2)
+				assert.Equal(t, 2, len(result.Spec.Users))
 				userNames := make([]string, len(result.Spec.Users))
 				for i, user := range result.Spec.Users {
 					userNames[i] = string(user.Name)
