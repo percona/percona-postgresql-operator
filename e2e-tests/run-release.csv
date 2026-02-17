@@ -9,7 +9,11 @@ demand-backup-offline-snapshot
 finalizers
 init-deploy
 huge-pages
-major-upgrade
+major-upgrade-13-to-14
+major-upgrade-14-to-15
+major-upgrade-15-to-16
+major-upgrade-16-to-17
+major-upgrade-17-to-18
 monitoring
 monitoring-pmm3
 one-pod
