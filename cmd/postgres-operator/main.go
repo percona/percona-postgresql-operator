@@ -15,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/kelseyhightower/envconfig"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	uzap "go.uber.org/zap"
@@ -125,6 +126,8 @@ func main() {
 
 	// Add Percona custom resource types to scheme
 	assertNoError(v2.AddToScheme(mgr.GetScheme()))
+
+	assertNoError(volumesnapshotv1.AddToScheme(mgr.GetScheme()))
 
 	// add all PostgreSQL Operator controllers to the runtime manager
 	err = addControllersToManager(ctx, mgr)

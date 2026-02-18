@@ -1,7 +1,12 @@
 package v2
 
 import (
+	"context"
+
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
@@ -24,6 +29,7 @@ type PerconaPGRestore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
+	// +kubebuilder:validation:XValidation:rule="((has(self.repoName) && self.repoName != \"\") || (has(self.volumeSnapshotBackupName) && self.volumeSnapshotBackupName != \"\"))",message="either repoName or volumeSnapshotBackupName must be set"
 	Spec   PerconaPGRestoreSpec   `json:"spec"`
 	Status PerconaPGRestoreStatus `json:"status,omitempty"`
 }
@@ -39,14 +45,20 @@ type PerconaPGRestoreList struct {
 type PerconaPGRestoreSpec struct {
 	// The name of the PerconaPGCluster to perform restore.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="pgCluster is an immutable field"
 	PGCluster string `json:"pgCluster"`
 
 	// The name of the pgBackRest repo within the source PostgresCluster that contains the backups
 	// that should be utilized to perform a pgBackRest restore when initializing the data source
 	// for the new PostgresCluster.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=^repo[1-4]
-	RepoName string `json:"repoName"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="repoName is an immutable field"
+	RepoName *string `json:"repoName,omitempty"`
+
+	// The name of the backup to perform in-place volume snapshot restores from.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="volumeSnapshotBackupName is an immutable field"
+	VolumeSnapshotBackupName string `json:"volumeSnapshotBackupName,omitempty"`
 
 	// Command line options to include when running the pgBackRest restore command.
 	// https://pgbackrest.org/command.html#command-restore
@@ -68,4 +80,21 @@ type PerconaPGRestoreStatus struct {
 	JobName     string         `json:"jobName,omitempty"`
 	State       PGRestoreState `json:"state,omitempty"`
 	CompletedAt *metav1.Time   `json:"completed,omitempty"`
+}
+
+func (r *PerconaPGRestore) IsCompleted() bool {
+	return r.Status.State == RestoreSucceeded || r.Status.State == RestoreFailed
+}
+
+func (pgRestore *PerconaPGRestore) UpdateStatus(ctx context.Context, cl client.Client, updateFunc func(restore *PerconaPGRestore)) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		restore := new(PerconaPGRestore)
+		if err := cl.Get(ctx, client.ObjectKeyFromObject(pgRestore), restore); err != nil {
+			return errors.Wrap(err, "get PGRestore")
+		}
+
+		updateFunc(restore)
+
+		return cl.Status().Update(ctx, restore)
+	})
 }

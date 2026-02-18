@@ -56,6 +56,8 @@ spec:
           value: 40s
         - name: PGO_CONTROLLER_RETRY_PERIOD
           value: 10s
+        - name: PGO_FEATURE_GATES
+          value: ""
         image: docker.io/perconalab/percona-postgresql-operator:main
         imagePullPolicy: Always
         livenessProbe:

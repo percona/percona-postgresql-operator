@@ -1752,6 +1752,7 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 				instanceServiceAccountName,
 				sts,
 				test.ip.numInstancePods,
+				false,
 			)
 
 			test.run(t, sts)
