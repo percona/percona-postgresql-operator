@@ -6,6 +6,7 @@ custom-tls
 database-init-sql
 demand-backup
 demand-backup-offline-snapshot
+dynamic-configuration
 finalizers
 init-deploy
 huge-pages
