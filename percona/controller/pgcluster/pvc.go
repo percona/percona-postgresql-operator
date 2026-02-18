@@ -85,7 +85,7 @@ func ensureSidecarPVCs(
 			if err := cl.Create(ctx, pvc); err != nil {
 				return errors.Wrap(err, "failed to create pvc")
 			}
-			return nil
+			continue
 		}
 		if v := pvc.Labels[naming.LabelPerconaManagedBy]; v != "percona-postgresql-operator" {
 			return errors.Errorf("PersistentVolumeClaim %s already exists and not managed by percona-postgresql-operator: %s", client.ObjectKeyFromObject(pvc).String(), v)
