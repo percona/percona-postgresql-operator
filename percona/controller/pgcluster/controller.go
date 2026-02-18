@@ -599,7 +599,7 @@ func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v
 		m[&set.EnvFrom] = set.Metadata
 	}
 
-	if len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
+	if cr.Spec.Proxy.IsSet() && len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
 		if cr.Spec.Proxy.PGBouncer.Metadata == nil {
 			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
 		}
@@ -608,7 +608,7 @@ func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v
 
 	if len(cr.Spec.Backups.PGBackRest.EnvFrom) > 0 {
 		if cr.Spec.Backups.PGBackRest.Metadata == nil {
-			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
+			cr.Spec.Backups.PGBackRest.Metadata = new(v1beta1.Metadata)
 		}
 		m[&cr.Spec.Backups.PGBackRest.EnvFrom] = cr.Spec.Backups.PGBackRest.Metadata
 	}
