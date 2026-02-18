@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -271,6 +272,12 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
 	}
+
+	if cr.Spec.Backups.IsVolumeSnapshotsEnabled() &&
+		cr.Spec.Backups.VolumeSnapshots.Mode == VolumeSnapshotModeOffline &&
+		cr.Spec.Backups.VolumeSnapshots.OfflineConfig == nil {
+		cr.Spec.Backups.VolumeSnapshots.OfflineConfig = DefaultOfflineSnapshotConfig()
+	}
 }
 
 func (cr *PerconaPGCluster) PostgresImage() string {
@@ -531,6 +538,75 @@ type Backups struct {
 
 	// Enable tracking latest restorable time
 	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
+
+	// VolumeSnapshots configuration
+	// +optional
+	VolumeSnapshots *VolumeSnapshots `json:"volumeSnapshots,omitempty"`
+}
+
+type VolumeSnapshotMode string
+
+const (
+	// VolumeSnapshotModeOffline is the mode for taking offline VolumeSnapshots.
+	// With this mode, the operator will stop a replica and take a snapshot of the PVC.
+	VolumeSnapshotModeOffline VolumeSnapshotMode = "offline"
+)
+
+type VolumeSnapshots struct {
+	// Mode of the VolumeSnapshot.
+	// +kubebuilder:validation:Enum={offline}
+	// +kubebuilder:default=offline
+	// +optional
+	Mode VolumeSnapshotMode `json:"mode,omitempty"`
+
+	// Name of the VolumeSnapshotClass to use.
+	// +kubebuilder:validation:Required
+	ClassName string `json:"className"`
+
+	// Defines the Cron schedule for a VolumeSnapshot.
+	// Follows the standard Cron schedule syntax:
+	// https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
+	// +optional
+	// +kubebuilder:validation:MinLength=6
+	Schedule *string `json:"schedule,omitempty"`
+
+	// Configuration for offline snapshot operations.
+	// Ignored if mode is not offline.
+	// +optional
+	OfflineConfig *OfflineSnapshotConfig `json:"offlineConfig,omitempty"`
+}
+
+func DefaultOfflineSnapshotConfig() *OfflineSnapshotConfig {
+	return &OfflineSnapshotConfig{
+		Checkpoint: &CheckpointConfig{
+			Enabled:        ptr.To(true),
+			TimeoutSeconds: ptr.To(int32(300)),
+		},
+	}
+}
+
+type OfflineSnapshotConfig struct {
+	// Checkpoint configuration for offline snapshot operations.
+	// +optional
+	Checkpoint *CheckpointConfig `json:"checkpoint,omitempty"`
+}
+
+type CheckpointConfig struct {
+	// If set, a checkpoint is requested.
+	// +optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Timeout for the checkpoint operation.
+	// Ignored if checkpoint is not enabled.
+	// +optional
+	// +kubebuilder:validation:Minimum=30
+	// +kubebuilder:default=300
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+}
+
+func (b Backups) IsVolumeSnapshotsEnabled() bool {
+	return b.VolumeSnapshots != nil && b.VolumeSnapshots.ClassName != ""
 }
 
 func (b Backups) IsEnabled() bool {

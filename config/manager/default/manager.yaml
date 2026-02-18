@@ -39,6 +39,8 @@ spec:
             value: "1"
           - name: PPROF_BIND_ADDRESS
             value: "0"
+          - name: PGO_FEATURE_GATES
+            value: ""
         ports:
           - containerPort: 8080
             name: metrics

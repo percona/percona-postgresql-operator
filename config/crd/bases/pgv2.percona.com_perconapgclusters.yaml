@@ -275,6 +275,13 @@ spec:
                       type: object
                     type: array
                 type: object
+              method:
+                default: pgbackrest
+                description: Method with which to perform the backup
+                enum:
+                - pgbackrest
+                - volumeSnapshot
+                type: string
               options:
                 description: |-
                   Command line options to include when running the pgBackRest backup command.
@@ -285,14 +292,17 @@ spec:
               pgCluster:
                 type: string
               repoName:
-                description: The name of the pgBackRest repo to run the backup command
-                  against.
+                description: |-
+                  The name of the pgBackRest repo to run the backup command against.
+                  This is required when method is 'pgbackrest'.
                 pattern: ^repo[1-4]
                 type: string
             required:
             - pgCluster
-            - repoName
             type: object
+            x-kubernetes-validations:
+            - message: repoName is required when method is 'pgbackrest'
+              rule: self.method == "volumeSnapshot" || has(self.repoName)
           status:
             properties:
               backupName:
@@ -595,6 +605,24 @@ spec:
                     type: object
                 required:
                 - name
+                type: object
+              snapshot:
+                properties:
+                  dataVolumeSnapshotRef:
+                    description: Name of the VolumeSnapshot containing data volume
+                      contents.
+                    type: string
+                  tablespaceVolumeSnapshotRefs:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Names of the VolumeSnapshots containing tablespace volume contents.
+                      Key is the name of the tablespace, value is the name of the VolumeSnapshot.
+                    type: object
+                  walVolumeSnapshotRef:
+                    description: Name of the VolumeSnapshot containing WAL volume
+                      contents.
+                    type: string
                 type: object
               state:
                 type: string
@@ -8137,6 +8165,51 @@ spec:
                   trackLatestRestorableTime:
                     description: Enable tracking latest restorable time
                     type: boolean
+                  volumeSnapshots:
+                    description: VolumeSnapshots configuration
+                    properties:
+                      className:
+                        description: Name of the VolumeSnapshotClass to use.
+                        type: string
+                      mode:
+                        default: offline
+                        description: Mode of the VolumeSnapshot.
+                        enum:
+                        - offline
+                        type: string
+                      offlineConfig:
+                        description: |-
+                          Configuration for offline snapshot operations.
+                          Ignored if mode is not offline.
+                        properties:
+                          checkpoint:
+                            description: Checkpoint configuration for offline snapshot
+                              operations.
+                            properties:
+                              enabled:
+                                default: true
+                                description: If set, a checkpoint is requested.
+                                type: boolean
+                              timeoutSeconds:
+                                default: 300
+                                description: |-
+                                  Timeout for the checkpoint operation.
+                                  Ignored if checkpoint is not enabled.
+                                format: int32
+                                minimum: 30
+                                type: integer
+                            type: object
+                        type: object
+                      schedule:
+                        description: |-
+                          Defines the Cron schedule for a VolumeSnapshot.
+                          Follows the standard Cron schedule syntax:
+                          https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
+                        minLength: 6
+                        type: string
+                    required:
+                    - className
+                    type: object
                 type: object
                 x-kubernetes-validations:
                 - message: At least one repository must be configured when backups
@@ -23003,6 +23076,9 @@ spec:
               pgCluster:
                 description: The name of the PerconaPGCluster to perform restore.
                 type: string
+                x-kubernetes-validations:
+                - message: pgCluster is an immutable field
+                  rule: self == oldSelf
               repoName:
                 description: |-
                   The name of the pgBackRest repo within the source PostgresCluster that contains the backups
@@ -23010,10 +23086,23 @@ spec:
                   for the new PostgresCluster.
                 pattern: ^repo[1-4]
                 type: string
+                x-kubernetes-validations:
+                - message: repoName is an immutable field
+                  rule: self == oldSelf
+              volumeSnapshotBackupName:
+                description: The name of the backup to perform in-place volume snapshot
+                  restores from.
+                type: string
+                x-kubernetes-validations:
+                - message: volumeSnapshotBackupName is an immutable field
+                  rule: self == oldSelf
             required:
             - pgCluster
-            - repoName
             type: object
+            x-kubernetes-validations:
+            - message: either repoName or volumeSnapshotBackupName must be set
+              rule: ((has(self.repoName) && self.repoName != "") || (has(self.volumeSnapshotBackupName)
+                && self.volumeSnapshotBackupName != ""))
           status:
             properties:
               completed:

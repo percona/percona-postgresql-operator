@@ -7526,6 +7526,51 @@ spec:
                   trackLatestRestorableTime:
                     description: Enable tracking latest restorable time
                     type: boolean
+                  volumeSnapshots:
+                    description: VolumeSnapshots configuration
+                    properties:
+                      className:
+                        description: Name of the VolumeSnapshotClass to use.
+                        type: string
+                      mode:
+                        default: offline
+                        description: Mode of the VolumeSnapshot.
+                        enum:
+                        - offline
+                        type: string
+                      offlineConfig:
+                        description: |-
+                          Configuration for offline snapshot operations.
+                          Ignored if mode is not offline.
+                        properties:
+                          checkpoint:
+                            description: Checkpoint configuration for offline snapshot
+                              operations.
+                            properties:
+                              enabled:
+                                default: true
+                                description: If set, a checkpoint is requested.
+                                type: boolean
+                              timeoutSeconds:
+                                default: 300
+                                description: |-
+                                  Timeout for the checkpoint operation.
+                                  Ignored if checkpoint is not enabled.
+                                format: int32
+                                minimum: 30
+                                type: integer
+                            type: object
+                        type: object
+                      schedule:
+                        description: |-
+                          Defines the Cron schedule for a VolumeSnapshot.
+                          Follows the standard Cron schedule syntax:
+                          https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
+                        minLength: 6
+                        type: string
+                    required:
+                    - className
+                    type: object
                 type: object
                 x-kubernetes-validations:
                 - message: At least one repository must be configured when backups

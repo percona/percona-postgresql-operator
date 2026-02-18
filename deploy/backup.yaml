@@ -12,5 +12,6 @@ spec:
 #    envFrom:
 #    - secretRef:
 #        name: backup-env-secret
+#  method: volumeSnapshot
 #  options:
 #  - --type=full
