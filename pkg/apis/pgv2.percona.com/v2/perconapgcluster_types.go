@@ -182,6 +182,11 @@ type PerconaPGClusterSpec struct {
 	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
+type ContainerOptions struct {
+	Env     []corev1.EnvVar        `json:"env,omitempty"`
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+}
+
 type StandbySpec struct {
 	*crunchyv1beta1.PostgresStandbySpec `json:",inline"`
 
@@ -1218,36 +1223,30 @@ func (pgc PerconaPGCluster) UserMonitoring() string {
 func (cr *PerconaPGCluster) EnvFromSecrets() []string {
 	secrets := []string{}
 
-	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
-		set := &cr.Spec.InstanceSets[i]
-		if len(set.EnvFrom) == 0 {
-			continue
-		}
-		for _, envFrom := range set.EnvFrom {
-			if envFrom.SecretRef == nil {
+	addSecrets := func(envFrom []corev1.EnvFromSource) {
+		for _, v := range envFrom {
+			if v.SecretRef == nil {
 				continue
 			}
-			secrets = append(secrets, envFrom.SecretRef.Name)
+			secrets = append(secrets, v.SecretRef.Name)
 		}
 	}
 
-	if cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil && len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
-		for _, envFrom := range cr.Spec.Proxy.PGBouncer.EnvFrom {
-			if envFrom.SecretRef == nil {
-				continue
-			}
-			secrets = append(secrets, envFrom.SecretRef.Name)
-		}
+	for _, set := range cr.Spec.InstanceSets {
+		addSecrets(set.EnvFrom)
 	}
 
-	if len(cr.Spec.Backups.PGBackRest.EnvFrom) > 0 {
-		for _, envFrom := range cr.Spec.Backups.PGBackRest.EnvFrom {
-			if envFrom.SecretRef == nil {
-				continue
-			}
-			secrets = append(secrets, envFrom.SecretRef.Name)
-		}
+	addSecrets(cr.Spec.Backups.PGBackRest.EnvFrom)
+	if cr.Spec.Backups.PGBackRest.Manual != nil {
+		addSecrets(cr.Spec.Backups.PGBackRest.Manual.EnvFrom)
 	}
+	if cr.Spec.Backups.PGBackRest.Restore != nil {
+		addSecrets(cr.Spec.Backups.PGBackRest.Restore.EnvFrom)
+	}
+	if cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil {
+		addSecrets(cr.Spec.Proxy.PGBouncer.EnvFrom)
+	}
+
 	return secrets
 }
 
