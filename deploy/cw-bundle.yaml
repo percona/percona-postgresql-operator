@@ -22657,6 +22657,13 @@ spec:
                     pattern: ^repo[1-4]
                     type: string
                 type: object
+              tls:
+                properties:
+                  caValidityDuration:
+                    type: string
+                  certValidityDuration:
+                    type: string
+                type: object
               tlsOnly:
                 type: boolean
               unmanaged:
@@ -53187,6 +53194,13 @@ spec:
                   minimum: 1
                   type: integer
                 type: array
+              tls:
+                properties:
+                  caValidityDuration:
+                    type: string
+                  certValidityDuration:
+                    type: string
+                type: object
               tlsOnly:
                 type: boolean
               userInterface:
@@ -55729,6 +55743,22 @@ rules:
   verbs:
   - create
   - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cert-manager.io
+  - certmanager.k8s.io
+  resources:
+  - certificaterequests
+  - certificates
+  - issuers
+  verbs:
+  - create
+  - delete
+  - deletecollection
   - get
   - list
   - patch

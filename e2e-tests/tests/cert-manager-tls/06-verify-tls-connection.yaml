@@ -1,0 +1,35 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      pg_certificate_data=$(run_comand_on_pod "openssl s_client -connect cert-manager-tls-primary:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -subject -issuer -dates")
+
+      echo "PostgreSQL certificate data: $pg_certificate_data"
+
+      if [[ "$pg_certificate_data" != *"subject=CN=cert-manager-tls-postgres"* ]]; then
+          echo "PostgreSQL certificate CN does not match expected value"
+          echo "Expected subject to contain: CN=cert-manager-tls-postgres"
+          exit 1
+      fi
+
+      if [[ "$pg_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "PostgreSQL certificate issuer does not match expected value"
+          echo "Expected issuer to contain: CN=cert-manager-tls-ca"
+          exit 1
+      fi
+
+      ssl_info=$(run_psql_local "SHOW ssl;" "postgres:$(get_psql_user_pass cert-manager-tls-pguser-postgres)@$(get_psql_user_host cert-manager-tls-pguser-postgres)")
+      echo "SSL status: $ssl_info"
+
+      if [[ "$ssl_info" != *"on"* ]]; then
+          echo "SSL is not enabled on PostgreSQL"
+          exit 1
+      fi
+
+      kubectl create configmap -n "${NAMESPACE}" 06-verify-tls-connection --from-literal=status="verified"
