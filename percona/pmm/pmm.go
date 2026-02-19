@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -42,6 +43,179 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 
 	pmmSpec := pgc.Spec.PMM
 
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "cert-volume",
+			MountPath: "/pgconf/tls",
+			ReadOnly:  true,
+		},
+	}
+	if pgc.CompareVersion("2.9.0") >= 0 {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      postgres.DataVolumeMount().Name,
+			MountPath: postgres.DataVolumeMount().MountPath,
+			ReadOnly:  true,
+		})
+	}
+
+	env := []corev1.EnvVar{
+		{
+			Name: "POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "PMM_USER",
+			Value: "api_key",
+		},
+		{
+			Name:  "PMM_SERVER",
+			Value: pmmSpec.ServerHost,
+		},
+		{
+			Name:  "PMM_AGENT_SERVER_ADDRESS",
+			Value: pmmSpec.ServerHost,
+		},
+		{
+			Name:  "PMM_AGENT_SERVER_USERNAME",
+			Value: "api_key",
+		},
+		{
+			Name: "PMM_AGENT_SERVER_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: pmmSpec.Secret,
+					},
+					Key: secretKey,
+				},
+			},
+		},
+		{
+			Name:  "CLIENT_PORT_LISTEN",
+			Value: "7777",
+		},
+		{
+			Name:  "CLIENT_PORT_MIN",
+			Value: "30100",
+		},
+		{
+			Name:  "CLIENT_PORT_MAX",
+			Value: "30105",
+		},
+		{
+			Name:  "PMM_AGENT_LISTEN_PORT",
+			Value: "7777",
+		},
+		{
+			Name:  "PMM_AGENT_PORTS_MIN",
+			Value: "30100",
+		},
+		{
+			Name:  "PMM_AGENT_PORTS_MAX",
+			Value: "30105",
+		},
+		{
+			Name:  "PMM_AGENT_CONFIG_FILE",
+			Value: "/usr/local/percona/pmm2/config/pmm-agent.yaml",
+		},
+		{
+			Name:  "PMM_AGENT_LOG_LEVEL",
+			Value: "info",
+		},
+		{
+			Name:  "PMM_AGENT_DEBUG",
+			Value: "false",
+		},
+		{
+			Name:  "PMM_AGENT_TRACE",
+			Value: "false",
+		},
+		{
+			Name:  "PMM_AGENT_SERVER_INSECURE_TLS",
+			Value: "1",
+		},
+		{
+			Name:  "PMM_AGENT_LISTEN_ADDRESS",
+			Value: "0.0.0.0",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP_NODE_NAME",
+			Value: "$(POD_NAMESPACE)-$(POD_NAME)",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP_METRICS_MODE",
+			Value: "push",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP",
+			Value: "1",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP_FORCE",
+			Value: "1",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP_NODE_TYPE",
+			Value: "container",
+		},
+		{
+			Name:  "PMM_AGENT_SIDECAR",
+			Value: "true",
+		},
+		{
+			Name:  "PMM_AGENT_SIDECAR_SLEEP",
+			Value: "5",
+		},
+		{
+			Name:  "DB_TYPE",
+			Value: "postgresql",
+		},
+		{
+			Name:  "DB_USER",
+			Value: v2.UserMonitoring,
+		},
+		{
+			Name: "DB_PASS",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: pgc.UserMonitoring(),
+					},
+					Key: "password",
+				},
+			},
+		},
+		{
+			Name:  "PMM_AGENT_PRERUN_SCRIPT",
+			Value: agentPrerunScript(pgc, false),
+		},
+		{
+			Name:  "PMM_AGENT_PATHS_TEMPDIR",
+			Value: "/tmp",
+		},
+	}
+
+	if pgc.CompareVersion("2.9.0") >= 0 {
+		env = append(env, corev1.EnvVar{
+			Name:  "PMM_AGENT_SETUP_MOUNT_INFO_PATH",
+			Value: "/proc/self/mounts",
+		})
+	}
+
 	return corev1.Container{
 		Name:            "pmm-client",
 		Image:           pmmSpec.Image,
@@ -74,163 +248,8 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 				},
 			},
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "cert-volume",
-				MountPath: "/pgconf/tls",
-				ReadOnly:  true,
-			},
-		},
-		Env: []corev1.EnvVar{
-			{
-				Name: "POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.name",
-					},
-				},
-			},
-			{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.namespace",
-					},
-				},
-			},
-			{
-				Name:  "PMM_USER",
-				Value: "api_key",
-			},
-			{
-				Name:  "PMM_SERVER",
-				Value: pmmSpec.ServerHost,
-			},
-			{
-				Name:  "PMM_AGENT_SERVER_ADDRESS",
-				Value: pmmSpec.ServerHost,
-			},
-			{
-				Name:  "PMM_AGENT_SERVER_USERNAME",
-				Value: "api_key",
-			},
-			{
-				Name: "PMM_AGENT_SERVER_PASSWORD",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: pmmSpec.Secret,
-						},
-						Key: secretKey,
-					},
-				},
-			},
-			{
-				Name:  "CLIENT_PORT_LISTEN",
-				Value: "7777",
-			},
-			{
-				Name:  "CLIENT_PORT_MIN",
-				Value: "30100",
-			},
-			{
-				Name:  "CLIENT_PORT_MAX",
-				Value: "30105",
-			},
-			{
-				Name:  "PMM_AGENT_LISTEN_PORT",
-				Value: "7777",
-			},
-			{
-				Name:  "PMM_AGENT_PORTS_MIN",
-				Value: "30100",
-			},
-			{
-				Name:  "PMM_AGENT_PORTS_MAX",
-				Value: "30105",
-			},
-			{
-				Name:  "PMM_AGENT_CONFIG_FILE",
-				Value: "/usr/local/percona/pmm2/config/pmm-agent.yaml",
-			},
-			{
-				Name:  "PMM_AGENT_LOG_LEVEL",
-				Value: "info",
-			},
-			{
-				Name:  "PMM_AGENT_DEBUG",
-				Value: "false",
-			},
-			{
-				Name:  "PMM_AGENT_TRACE",
-				Value: "false",
-			},
-			{
-				Name:  "PMM_AGENT_SERVER_INSECURE_TLS",
-				Value: "1",
-			},
-			{
-				Name:  "PMM_AGENT_LISTEN_ADDRESS",
-				Value: "0.0.0.0",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP_NODE_NAME",
-				Value: "$(POD_NAMESPACE)-$(POD_NAME)",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP_METRICS_MODE",
-				Value: "push",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP",
-				Value: "1",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP_FORCE",
-				Value: "1",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP_NODE_TYPE",
-				Value: "container",
-			},
-			{
-				Name:  "PMM_AGENT_SIDECAR",
-				Value: "true",
-			},
-			{
-				Name:  "PMM_AGENT_SIDECAR_SLEEP",
-				Value: "5",
-			},
-			{
-				Name:  "DB_TYPE",
-				Value: "postgresql",
-			},
-			{
-				Name:  "DB_USER",
-				Value: v2.UserMonitoring,
-			},
-			{
-				Name: "DB_PASS",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: pgc.UserMonitoring(),
-						},
-						Key: "password",
-					},
-				},
-			},
-			{
-				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: agentPrerunScript(pgc, false),
-			},
-			{
-				Name:  "PMM_AGENT_PATHS_TEMPDIR",
-				Value: "/tmp",
-			},
-		},
+		VolumeMounts: volumeMounts,
+		Env:          env,
 	}
 }
 
@@ -244,6 +263,159 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 	}
 
 	pmmSpec := pgc.Spec.PMM
+
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "cert-volume",
+			MountPath: "/pgconf/tls",
+			ReadOnly:  true,
+		},
+	}
+	if pgc.CompareVersion("2.9.0") >= 0 {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      postgres.DataVolumeMount().Name,
+			MountPath: postgres.DataVolumeMount().MountPath,
+			ReadOnly:  true,
+		})
+	}
+
+	env := []corev1.EnvVar{
+		{
+			Name: "POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "PMM_AGENT_SERVER_ADDRESS",
+			Value: pmmSpec.ServerHost,
+		},
+		{
+			Name:  "PMM_AGENT_SERVER_USERNAME",
+			Value: "service_token",
+		},
+		{
+			Name: "PMM_AGENT_SERVER_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: pmmSpec.Secret,
+					},
+					Key: secretToken,
+				},
+			},
+		},
+		{
+			Name:  "PMM_AGENT_LISTEN_PORT",
+			Value: "7777",
+		},
+		{
+			Name:  "PMM_AGENT_PORTS_MIN",
+			Value: "30100",
+		},
+		{
+			Name:  "PMM_AGENT_PORTS_MAX",
+			Value: "30105",
+		},
+		{
+			Name:  "PMM_AGENT_CONFIG_FILE",
+			Value: "/usr/local/percona/pmm/config/pmm-agent.yaml",
+		},
+		{
+			Name:  "PMM_AGENT_LOG_LEVEL",
+			Value: "info",
+		},
+		{
+			Name:  "PMM_AGENT_DEBUG",
+			Value: "false",
+		},
+		{
+			Name:  "PMM_AGENT_TRACE",
+			Value: "false",
+		},
+		{
+			Name:  "PMM_AGENT_SERVER_INSECURE_TLS",
+			Value: "1",
+		},
+		{
+			Name:  "PMM_AGENT_LISTEN_ADDRESS",
+			Value: "0.0.0.0",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP_NODE_NAME",
+			Value: "$(POD_NAMESPACE)-$(POD_NAME)",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP_METRICS_MODE",
+			Value: "push",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP",
+			Value: "1",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP_FORCE",
+			Value: "1",
+		},
+		{
+			Name:  "PMM_AGENT_SETUP_NODE_TYPE",
+			Value: "container",
+		},
+		{
+			Name:  "PMM_AGENT_SIDECAR",
+			Value: "true",
+		},
+		{
+			Name:  "PMM_AGENT_SIDECAR_SLEEP",
+			Value: "5",
+		},
+		{
+			Name:  "DB_TYPE",
+			Value: "postgresql",
+		},
+		{
+			Name:  "DB_USER",
+			Value: v2.UserMonitoring,
+		},
+		{
+			Name: "DB_PASS",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: pgc.UserMonitoring(),
+					},
+					Key: "password",
+				},
+			},
+		},
+		{
+			Name:  "PMM_AGENT_PRERUN_SCRIPT",
+			Value: agentPrerunScript(pgc, true),
+		},
+		{
+			Name:  "PMM_AGENT_PATHS_TEMPDIR",
+			Value: "/tmp/pmm",
+		},
+	}
+
+	if pgc.CompareVersion("2.9.0") >= 0 {
+		env = append(env, corev1.EnvVar{
+			Name:  "PMM_AGENT_SETUP_MOUNT_INFO_PATH",
+			Value: "/proc/self/mounts",
+		})
+	}
 
 	container := corev1.Container{
 		Name:            "pmm-client",
@@ -277,143 +449,8 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 				},
 			},
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "cert-volume",
-				MountPath: "/pgconf/tls",
-				ReadOnly:  true,
-			},
-		},
-		Env: []corev1.EnvVar{
-			{
-				Name: "POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.name",
-					},
-				},
-			},
-			{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.namespace",
-					},
-				},
-			},
-			{
-				Name:  "PMM_AGENT_SERVER_ADDRESS",
-				Value: pmmSpec.ServerHost,
-			},
-			{
-				Name:  "PMM_AGENT_SERVER_USERNAME",
-				Value: "service_token",
-			},
-			{
-				Name: "PMM_AGENT_SERVER_PASSWORD",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: pmmSpec.Secret,
-						},
-						Key: secretToken,
-					},
-				},
-			},
-			{
-				Name:  "PMM_AGENT_LISTEN_PORT",
-				Value: "7777",
-			},
-			{
-				Name:  "PMM_AGENT_PORTS_MIN",
-				Value: "30100",
-			},
-			{
-				Name:  "PMM_AGENT_PORTS_MAX",
-				Value: "30105",
-			},
-			{
-				Name:  "PMM_AGENT_CONFIG_FILE",
-				Value: "/usr/local/percona/pmm/config/pmm-agent.yaml",
-			},
-			{
-				Name:  "PMM_AGENT_LOG_LEVEL",
-				Value: "info",
-			},
-			{
-				Name:  "PMM_AGENT_DEBUG",
-				Value: "false",
-			},
-			{
-				Name:  "PMM_AGENT_TRACE",
-				Value: "false",
-			},
-			{
-				Name:  "PMM_AGENT_SERVER_INSECURE_TLS",
-				Value: "1",
-			},
-			{
-				Name:  "PMM_AGENT_LISTEN_ADDRESS",
-				Value: "0.0.0.0",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP_NODE_NAME",
-				Value: "$(POD_NAMESPACE)-$(POD_NAME)",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP_METRICS_MODE",
-				Value: "push",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP",
-				Value: "1",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP_FORCE",
-				Value: "1",
-			},
-			{
-				Name:  "PMM_AGENT_SETUP_NODE_TYPE",
-				Value: "container",
-			},
-			{
-				Name:  "PMM_AGENT_SIDECAR",
-				Value: "true",
-			},
-			{
-				Name:  "PMM_AGENT_SIDECAR_SLEEP",
-				Value: "5",
-			},
-			{
-				Name:  "DB_TYPE",
-				Value: "postgresql",
-			},
-			{
-				Name:  "DB_USER",
-				Value: v2.UserMonitoring,
-			},
-			{
-				Name: "DB_PASS",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: pgc.UserMonitoring(),
-						},
-						Key: "password",
-					},
-				},
-			},
-			{
-				Name:  "PMM_AGENT_PRERUN_SCRIPT",
-				Value: agentPrerunScript(pgc, true),
-			},
-			{
-				Name:  "PMM_AGENT_PATHS_TEMPDIR",
-				Value: "/tmp/pmm",
-			},
-		},
+		VolumeMounts: volumeMounts,
+		Env:          env,
 	}
 
 	return container

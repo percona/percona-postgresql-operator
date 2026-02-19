@@ -182,40 +182,41 @@ func TestSidecarContainerV2(t *testing.T) {
 	assert.NotNil(t, container.Lifecycle.PreStop)
 	assert.Equal(t, []string{"bash", "-c", "pmm-admin unregister --force"}, container.Lifecycle.PreStop.Exec.Command)
 
-	assert.Len(t, container.Env, 31)
+	assert.Len(t, container.Env, 32)
 
 	expectedEnvVars := map[string]string{
-		"POD_NAME":                      "", // field reference is asserted separately
-		"POD_NAMESPACE":                 "", // field reference is asserted separately
-		"PMM_USER":                      "api_key",
-		"PMM_SERVER":                    pmmSpec.ServerHost,
-		"PMM_AGENT_SERVER_ADDRESS":      pmmSpec.ServerHost,
-		"PMM_AGENT_SERVER_USERNAME":     "api_key",
-		"PMM_AGENT_SERVER_PASSWORD":     "", // secret reference is asserted separately
-		"CLIENT_PORT_LISTEN":            "7777",
-		"CLIENT_PORT_MIN":               "30100",
-		"CLIENT_PORT_MAX":               "30105",
-		"PMM_AGENT_LISTEN_PORT":         "7777",
-		"PMM_AGENT_PORTS_MIN":           "30100",
-		"PMM_AGENT_PORTS_MAX":           "30105",
-		"PMM_AGENT_CONFIG_FILE":         "/usr/local/percona/pmm2/config/pmm-agent.yaml",
-		"PMM_AGENT_LOG_LEVEL":           "info",
-		"PMM_AGENT_DEBUG":               "false",
-		"PMM_AGENT_TRACE":               "false",
-		"PMM_AGENT_SERVER_INSECURE_TLS": "1",
-		"PMM_AGENT_LISTEN_ADDRESS":      "0.0.0.0",
-		"PMM_AGENT_SETUP_NODE_NAME":     "$(POD_NAMESPACE)-$(POD_NAME)",
-		"PMM_AGENT_SETUP_METRICS_MODE":  "push",
-		"PMM_AGENT_SETUP":               "1",
-		"PMM_AGENT_SETUP_FORCE":         "1",
-		"PMM_AGENT_SETUP_NODE_TYPE":     "container",
-		"PMM_AGENT_SIDECAR":             "true",
-		"PMM_AGENT_SIDECAR_SLEEP":       "5",
-		"DB_TYPE":                       "postgresql",
-		"DB_USER":                       v2.UserMonitoring,
-		"DB_PASS":                       "", // secret reference is asserted separately
-		"PMM_AGENT_PRERUN_SCRIPT":       "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source= --cluster=test-cluster --environment=dev-postgres; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
-		"PMM_AGENT_PATHS_TEMPDIR":       "/tmp",
+		"POD_NAME":                        "", // field reference is asserted separately
+		"POD_NAMESPACE":                   "", // field reference is asserted separately
+		"PMM_USER":                        "api_key",
+		"PMM_SERVER":                      pmmSpec.ServerHost,
+		"PMM_AGENT_SERVER_ADDRESS":        pmmSpec.ServerHost,
+		"PMM_AGENT_SERVER_USERNAME":       "api_key",
+		"PMM_AGENT_SERVER_PASSWORD":       "", // secret reference is asserted separately
+		"CLIENT_PORT_LISTEN":              "7777",
+		"CLIENT_PORT_MIN":                 "30100",
+		"CLIENT_PORT_MAX":                 "30105",
+		"PMM_AGENT_LISTEN_PORT":           "7777",
+		"PMM_AGENT_PORTS_MIN":             "30100",
+		"PMM_AGENT_PORTS_MAX":             "30105",
+		"PMM_AGENT_CONFIG_FILE":           "/usr/local/percona/pmm2/config/pmm-agent.yaml",
+		"PMM_AGENT_LOG_LEVEL":             "info",
+		"PMM_AGENT_DEBUG":                 "false",
+		"PMM_AGENT_TRACE":                 "false",
+		"PMM_AGENT_SERVER_INSECURE_TLS":   "1",
+		"PMM_AGENT_LISTEN_ADDRESS":        "0.0.0.0",
+		"PMM_AGENT_SETUP_NODE_NAME":       "$(POD_NAMESPACE)-$(POD_NAME)",
+		"PMM_AGENT_SETUP_METRICS_MODE":    "push",
+		"PMM_AGENT_SETUP":                 "1",
+		"PMM_AGENT_SETUP_FORCE":           "1",
+		"PMM_AGENT_SETUP_NODE_TYPE":       "container",
+		"PMM_AGENT_SIDECAR":               "true",
+		"PMM_AGENT_SIDECAR_SLEEP":         "5",
+		"DB_TYPE":                         "postgresql",
+		"DB_USER":                         v2.UserMonitoring,
+		"DB_PASS":                         "", // secret reference is asserted separately
+		"PMM_AGENT_PRERUN_SCRIPT":         "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source= --cluster=test-cluster --environment=dev-postgres; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
+		"PMM_AGENT_PATHS_TEMPDIR":         "/tmp",
+		"PMM_AGENT_SETUP_MOUNT_INFO_PATH": "/proc/self/mounts",
 	}
 
 	for _, envVar := range container.Env {
@@ -247,7 +248,7 @@ func TestSidecarContainerV2(t *testing.T) {
 		}
 	}
 
-	assert.Len(t, container.VolumeMounts, 1)
+	assert.Len(t, container.VolumeMounts, 2)
 	assert.Equal(t, "/pgconf/tls", container.VolumeMounts[0].MountPath)
 	assert.True(t, container.VolumeMounts[0].ReadOnly)
 }
@@ -294,35 +295,36 @@ func TestSidecarContainerV3(t *testing.T) {
 	assert.NotNil(t, container.Lifecycle.PreStop)
 	assert.Equal(t, []string{"bash", "-c", "pmm-admin unregister --force"}, container.Lifecycle.PreStop.Exec.Command)
 
-	assert.Len(t, container.Env, 26)
+	assert.Len(t, container.Env, 27)
 
 	expectedEnvVars := map[string]string{
-		"POD_NAME":                      "", // field reference is asserted separately
-		"POD_NAMESPACE":                 "", // field reference is asserted separately
-		"PMM_AGENT_SERVER_ADDRESS":      pmmSpec.ServerHost,
-		"PMM_AGENT_SERVER_USERNAME":     "service_token",
-		"PMM_AGENT_SERVER_PASSWORD":     "", // secret reference is asserted separately
-		"PMM_AGENT_LISTEN_PORT":         "7777",
-		"PMM_AGENT_PORTS_MIN":           "30100",
-		"PMM_AGENT_PORTS_MAX":           "30105",
-		"PMM_AGENT_CONFIG_FILE":         "/usr/local/percona/pmm/config/pmm-agent.yaml",
-		"PMM_AGENT_LOG_LEVEL":           "info",
-		"PMM_AGENT_DEBUG":               "false",
-		"PMM_AGENT_TRACE":               "false",
-		"PMM_AGENT_SERVER_INSECURE_TLS": "1",
-		"PMM_AGENT_LISTEN_ADDRESS":      "0.0.0.0",
-		"PMM_AGENT_SETUP_NODE_NAME":     "$(POD_NAMESPACE)-$(POD_NAME)",
-		"PMM_AGENT_SETUP_METRICS_MODE":  "push",
-		"PMM_AGENT_SETUP":               "1",
-		"PMM_AGENT_SETUP_FORCE":         "1",
-		"PMM_AGENT_SETUP_NODE_TYPE":     "container",
-		"PMM_AGENT_SIDECAR":             "true",
-		"PMM_AGENT_SIDECAR_SLEEP":       "5",
-		"DB_TYPE":                       "postgresql",
-		"DB_USER":                       v2.UserMonitoring,
-		"DB_PASS":                       "", // secret reference is asserted separately
-		"PMM_AGENT_PRERUN_SCRIPT":       "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source= --cluster=test-cluster --environment=dev-postgres; pmm-admin add external --scheme=https --listen-port=8008 --tls-skip-verify --service-name=$(PMM_AGENT_SETUP_NODE_NAME)-patroni-external; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
-		"PMM_AGENT_PATHS_TEMPDIR":       "/tmp/pmm",
+		"POD_NAME":                        "", // field reference is asserted separately
+		"POD_NAMESPACE":                   "", // field reference is asserted separately
+		"PMM_AGENT_SERVER_ADDRESS":        pmmSpec.ServerHost,
+		"PMM_AGENT_SERVER_USERNAME":       "service_token",
+		"PMM_AGENT_SERVER_PASSWORD":       "", // secret reference is asserted separately
+		"PMM_AGENT_LISTEN_PORT":           "7777",
+		"PMM_AGENT_PORTS_MIN":             "30100",
+		"PMM_AGENT_PORTS_MAX":             "30105",
+		"PMM_AGENT_CONFIG_FILE":           "/usr/local/percona/pmm/config/pmm-agent.yaml",
+		"PMM_AGENT_LOG_LEVEL":             "info",
+		"PMM_AGENT_DEBUG":                 "false",
+		"PMM_AGENT_TRACE":                 "false",
+		"PMM_AGENT_SERVER_INSECURE_TLS":   "1",
+		"PMM_AGENT_LISTEN_ADDRESS":        "0.0.0.0",
+		"PMM_AGENT_SETUP_NODE_NAME":       "$(POD_NAMESPACE)-$(POD_NAME)",
+		"PMM_AGENT_SETUP_METRICS_MODE":    "push",
+		"PMM_AGENT_SETUP":                 "1",
+		"PMM_AGENT_SETUP_FORCE":           "1",
+		"PMM_AGENT_SETUP_NODE_TYPE":       "container",
+		"PMM_AGENT_SIDECAR":               "true",
+		"PMM_AGENT_SIDECAR_SLEEP":         "5",
+		"DB_TYPE":                         "postgresql",
+		"DB_USER":                         v2.UserMonitoring,
+		"DB_PASS":                         "", // secret reference is asserted separately
+		"PMM_AGENT_PRERUN_SCRIPT":         "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source= --cluster=test-cluster --environment=dev-postgres; pmm-admin add external --scheme=https --listen-port=8008 --tls-skip-verify --service-name=$(PMM_AGENT_SETUP_NODE_NAME)-patroni-external; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
+		"PMM_AGENT_PATHS_TEMPDIR":         "/tmp/pmm",
+		"PMM_AGENT_SETUP_MOUNT_INFO_PATH": "/proc/self/mounts",
 	}
 
 	for _, envVar := range container.Env {
@@ -354,7 +356,7 @@ func TestSidecarContainerV3(t *testing.T) {
 		}
 	}
 
-	assert.Len(t, container.VolumeMounts, 1)
+	assert.Len(t, container.VolumeMounts, 2)
 	assert.Equal(t, "/pgconf/tls", container.VolumeMounts[0].MountPath)
 	assert.True(t, container.VolumeMounts[0].ReadOnly)
 }
