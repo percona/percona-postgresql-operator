@@ -7,6 +7,8 @@ commands:
       set -o xtrace
 
       source ../../functions
-
-      get_cr "pgvector-extension" ${RANDOM} \
+      
+      get_cr "backup-snapshot" ${RANDOM} \
+        | yq '.spec.backups.volumeSnapshots.className="gke-snapshot-class"' \
+        | yq '.spec.backups.volumeSnapshots.mode="offline"' \
         | kubectl -n "${NAMESPACE}" apply -f -

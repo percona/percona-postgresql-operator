@@ -7,7 +7,9 @@ commands:
       set -o xtrace
 
       source ../../functions
+      init_temp_dir # do this only in the first TestStep
 
-      get_cr "pgvector-extension" ${RANDOM} \
-        | yq '.spec.extensions.builtin.pgvector=true' \
-        | kubectl -n "${NAMESPACE}" apply -f -
+      deploy_operator
+      deploy_client
+      deploy_s3_secrets
+      deploy_minio

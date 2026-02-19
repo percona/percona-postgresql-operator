@@ -73,10 +73,11 @@ type PGClusterReconciler struct {
 	Watchers             *registry.Registry
 	ExternalChan         chan event.GenericEvent
 	StopExternalWatchers chan event.DeleteEvent
+	WatchNamespace       []string
 }
 
 // SetupWithManager adds the PerconaPGCluster controller to the provided runtime manager
-func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
+func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.Manager) error {
 	if r.PodExec == nil {
 		var err error
 		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
@@ -95,6 +96,13 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		return errors.Wrap(err, "unable to watch pg-backups")
 	}
 
+	watchNamespace := ""
+	if len(r.WatchNamespace) == 1 {
+		watchNamespace = r.WatchNamespace[0]
+	}
+	standbyClusterEvents := make(chan event.GenericEvent)
+	go pollAndRequeueStandbys(ctx, standbyClusterEvents, r.Client, watchNamespace)
+
 	return builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
@@ -103,6 +111,7 @@ func (r *PGClusterReconciler) SetupWithManager(mgr manager.Manager) error {
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
+		WatchesRawSource(source.Channel(standbyClusterEvents, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }
 
@@ -312,6 +321,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
+	}
+
+	if err := r.reconcileStandbyMainSiteAnnotation(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile replication main site annotation")
 	}
 
 	if cr.Spec.Pause != nil && *cr.Spec.Pause {
@@ -586,7 +599,7 @@ func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v
 		m[&set.EnvFrom] = set.Metadata
 	}
 
-	if len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
+	if cr.Spec.Proxy.IsSet() && len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
 		if cr.Spec.Proxy.PGBouncer.Metadata == nil {
 			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
 		}
@@ -595,7 +608,7 @@ func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v
 
 	if len(cr.Spec.Backups.PGBackRest.EnvFrom) > 0 {
 		if cr.Spec.Backups.PGBackRest.Metadata == nil {
-			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
+			cr.Spec.Backups.PGBackRest.Metadata = new(v1beta1.Metadata)
 		}
 		m[&cr.Spec.Backups.PGBackRest.EnvFrom] = cr.Spec.Backups.PGBackRest.Metadata
 	}

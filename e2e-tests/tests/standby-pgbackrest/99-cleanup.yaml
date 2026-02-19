@@ -1,14 +1,21 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+timeout: 300
 delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
-    name: pgvector-extension
+    name: source-cluster
 - apiVersion: postgres-operator.crunchydata.com/v1beta1
   kind: PostgresCluster
+  name: source-cluster
+- apiVersion: pgv2.percona.com/v2
+  kind: PerconaPGCluster
   metadata:
-    name: pgvector-extension
+    name: standby-cluster
+- apiVersion: postgres-operator.crunchydata.com/v1beta1
+  kind: PostgresCluster
+  name: standby-cluster
 commands:
   - script: |-
       set -o errexit

@@ -6,12 +6,15 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
@@ -48,6 +51,14 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 	}
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
+		if repo.Volume != nil {
+			repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
+			if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
+				log.Info("pgBackRest repo host not ready, skipping backup cleanup", "repo", repo.Name)
+				continue
+			}
+		}
+
 		var info pgbackrest.InfoOutput
 
 		pbList, err := listPGBackups(ctx, r.Client, cr, repo.Name)
@@ -156,7 +167,7 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 			},
 			Spec: v2.PerconaPGBackupSpec{
 				PGCluster: cr.Name,
-				RepoName:  repoName,
+				RepoName:  ptr.To(repoName),
 			},
 		}
 		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
@@ -217,7 +228,7 @@ func listPGBackups(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluste
 	// we should not filter by label, because the user can create the resource without the label
 	list := []v2.PerconaPGBackup{}
 	for _, pgBackup := range pbList.Items {
-		if pgBackup.Spec.PGCluster != cr.Name || pgBackup.Spec.RepoName != repoName {
+		if pgBackup.Spec.PGCluster != cr.Name || ptr.Deref(pgBackup.Spec.RepoName, "") != repoName {
 			continue
 		}
 		list = append(list, pgBackup)

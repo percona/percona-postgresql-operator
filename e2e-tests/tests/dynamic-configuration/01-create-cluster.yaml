@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
+timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -8,6 +8,5 @@ commands:
 
       source ../../functions
 
-      get_cr "pgvector-extension" ${RANDOM} \
-        | yq '.spec.extensions.builtin.pgvector=false' \
+      get_cr "cluster1" ${RANDOM} \
         | kubectl -n "${NAMESPACE}" apply -f -

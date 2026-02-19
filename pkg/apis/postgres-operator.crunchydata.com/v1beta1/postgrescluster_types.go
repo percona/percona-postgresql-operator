@@ -191,6 +191,9 @@ type PostgresClusterSpec struct {
 
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+
+	// K8SPG-694
+	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
 type InitContainerSpec struct {
@@ -329,6 +332,11 @@ type PostgresClusterDataSource struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// K8SPG-873
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-873
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // Default defines several key default values for a Postgres cluster.
