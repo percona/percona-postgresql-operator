@@ -37,6 +37,14 @@ create_namespace() {
 	fi
 }
 
+check_operator_panic() {
+	local operator_pod=$(get_operator_pod)
+	if kubectl logs -n "${OPERATOR_NS:-$NAMESPACE}" "$operator_pod" -c operator | grep -q "Observed a panic"; then
+		echo "Detected panic in operator"
+		exit 1
+	fi
+}
+
 deploy_operator() {
 	local cw_prefix=""
 
