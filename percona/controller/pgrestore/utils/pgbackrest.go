@@ -66,6 +66,8 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = ptr.To(true)
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.RepoName = ptr.Deref(r.pgRestore.Spec.RepoName, "")
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Options = r.pgRestore.Spec.Options
+	r.pgCluster.Spec.Backups.PGBackRest.Restore.Env = r.pgRestore.Spec.ContainerOptions.Env
+	r.pgCluster.Spec.Backups.PGBackRest.Restore.EnvFrom = r.pgRestore.Spec.ContainerOptions.EnvFrom
 
 	if err := r.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "patch PostgresCluster status failed trying to start restore")
