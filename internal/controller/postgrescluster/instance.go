@@ -1257,6 +1257,20 @@ func (r *Reconciler) reconcileInstance(
 		}
 	}
 
+	// K8SPG-864
+	if cluster.CompareVersion("2.9.0") >= 0 {
+		for _, v := range spec.SidecarPVCs {
+			instance.Spec.Template.Spec.Volumes = append(instance.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: v.Name,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: v.Name,
+					},
+				},
+			})
+		}
+	}
+
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, instance))
 	}
