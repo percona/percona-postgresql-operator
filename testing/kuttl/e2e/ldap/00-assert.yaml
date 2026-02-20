@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+# OpenLDAP readiness probe has initialDelaySeconds: 60, so allow extra time.
+timeout: 180
+collectors:
+  - type: command
+    command: kubectl -n $NAMESPACE describe deployment openldap
+  - type: command
+    command: kubectl -n $NAMESPACE logs deployment/openldap -c openldap --tail=50
+  - type: command
+    command: kubectl -n $NAMESPACE logs deployment/openldap -c ldap-setup --tail=50

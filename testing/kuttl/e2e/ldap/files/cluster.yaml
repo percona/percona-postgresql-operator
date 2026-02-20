@@ -1,0 +1,33 @@
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: ldap
+spec:
+  postgresVersion: ${KUTTL_PG_VERSION}
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  users:
+    - name: percona
+      databases:
+        - percona
+  # Mount nothing under /etc/postgres for now; LDAPTLS_CACERT is still set
+  # by the operator and would be used if a CA cert were provided via
+  # spec.config.files. Plain LDAP (port 389) does not require a CA cert.
+  authentication:
+    rules:
+      - connection: host
+        method: ldap
+        users:
+          - percona
+        options:
+          ldapserver: openldap
+          ldapport: 389
+          ldapprefix: "uid="
+          ldapsuffix: ",ou=perconadba,dc=ldap,dc=local"

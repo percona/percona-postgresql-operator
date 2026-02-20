@@ -10,6 +10,7 @@ dynamic-configuration
 finalizers
 init-deploy
 huge-pages
+ldap
 major-upgrade
 monitoring
 monitoring-pmm3
