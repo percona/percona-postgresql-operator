@@ -41,6 +41,61 @@ spec:
           spec:
             description: PostgresClusterSpec defines the desired state of PostgresCluster
             properties:
+              authentication:
+                description: |-
+                  Defines additional authentication rules for PostgreSQL host-based
+                  authentication (pg_hba.conf). Rules added here are applied after any
+                  mandatory rules and before the default scram-sha-256 fallback.
+                properties:
+                  rules:
+                    description: |-
+                      Rules to include in pg_hba.conf. They are evaluated after mandatory
+                      operator rules and before the default scram-sha-256 fallback.
+                    items:
+                      description: |-
+                        PostgresAuthenticationRule defines a single pg_hba.conf entry. Use either
+                        the structured fields or the raw HBA line, not both.
+                      properties:
+                        connection:
+                          description: 'Connection type: local, host, hostssl, hostnossl,
+                            hostgssenc, hostnogssenc.'
+                          type: string
+                        databases:
+                          description: Databases to match. An empty list matches all
+                            databases.
+                          items:
+                            type: string
+                          type: array
+                        hba:
+                          description: |-
+                            A raw pg_hba.conf line. When non-empty, this line is used as-is and the
+                            structured fields are ignored.
+                          type: string
+                        method:
+                          description: Authentication method to use when a connection
+                            matches this rule.
+                          type: string
+                        options:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            x-kubernetes-int-or-string: true
+                          description: Options for the authentication method (e.g.
+                            ldapserver, ldapport).
+                          type: object
+                        users:
+                          description: Users to match. An empty list matches all users.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - connection
+                      - method
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                type: object
               backups:
                 description: PostgreSQL backup configuration
                 properties:
@@ -7377,6 +7432,7 @@ spec:
               config:
                 properties:
                   files:
+                    description: Files to mount under "/etc/postgres".
                     items:
                       description: |-
                         Projection that may be projected along with other supported volume types.
@@ -7808,6 +7864,55 @@ spec:
                           type: object
                       type: object
                     type: array
+                  parameters:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      Configuration parameters for the PostgreSQL server. Some values will
+                      be reloaded without validation and some cause PostgreSQL to restart.
+                      Some values cannot be changed at all.
+                      More info: https://www.postgresql.org/docs/current/runtime-config.html
+                    maxProperties: 50
+                    type: object
+                    x-kubernetes-map-type: granular
+                    x-kubernetes-validations:
+                    - message: 'cannot change PGDATA path: config_file, data_directory'
+                      rule: '!has(self.config_file) && !has(self.data_directory)'
+                    - message: cannot change external_pid_file
+                      rule: '!has(self.external_pid_file)'
+                    - message: 'cannot change authentication path: hba_file, ident_file'
+                      rule: '!has(self.hba_file) && !has(self.ident_file)'
+                    - message: 'network connectivity is always enabled: listen_addresses'
+                      rule: '!has(self.listen_addresses)'
+                    - message: change port using .spec.port instead
+                      rule: '!has(self.port)'
+                    - message: TLS is always enabled
+                      rule: '!has(self.ssl) && !self.exists(k, k.startsWith("ssl_")
+                        && !(k == ''ssl_groups'' || k == ''ssl_ecdh_curve''))'
+                    - message: domain socket paths cannot be changed
+                      rule: '!self.exists(k, k.startsWith("unix_socket_"))'
+                    - message: wal_level must be "replica" or higher
+                      rule: '!has(self.wal_level) || self.wal_level in ["logical"]'
+                    - message: wal_log_hints are always enabled
+                      rule: '!has(self.wal_log_hints)'
+                    - rule: '!has(self.archive_mode) && !has(self.archive_command)
+                        && !has(self.restore_command)'
+                    - rule: '!has(self.recovery_target) && !self.exists(k, k.startsWith("recovery_target_"))'
+                    - message: hot_standby is always enabled
+                      rule: '!has(self.hot_standby)'
+                    - rule: '!has(self.synchronous_standby_names)'
+                    - rule: '!has(self.primary_conninfo) && !has(self.primary_slot_name)'
+                    - message: delayed replication is not supported at this time
+                      rule: '!has(self.recovery_min_apply_delay)'
+                    - message: cluster_name is derived from the PostgresCluster name
+                      rule: '!has(self.cluster_name)'
+                    - message: disabling logging_collector is unsafe
+                      rule: '!has(self.logging_collector)'
+                    - message: log_file_mode cannot be changed
+                      rule: '!has(self.log_file_mode)'
                 type: object
               customReplicationTLSSecret:
                 description: |-
