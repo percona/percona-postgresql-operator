@@ -1,19 +1,14 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 600
+# The ldap-ca Secret is guaranteed to exist before this step, so the pod starts
+# without a FailedMount delay.  Allow time for readinessProbe.initialDelaySeconds
+# (120s) plus OpenLDAP startup.
+timeout: 300
 ---
-apiVersion: postgres-operator.crunchydata.com/v1beta1
-kind: PostgresCluster
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: ldap-tls
+  name: openldap-tls
 status:
-  instances:
-    - name: instance1
-      readyReplicas: 3
-      replicas: 3
-      updatedReplicas: 3
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ldap-tls-primary
+  availableReplicas: 1
+  readyReplicas: 1
