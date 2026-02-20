@@ -222,14 +222,14 @@ type PGTDEVaultSpec struct {
 	MountPath string `json:"mountPath,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!self.enabled || has(self.vault)",message="vault is required for enabling pg_tde"
+// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
 type PGTDESpec struct {
 	Enabled bool `json:"enabled,omitempty"`
 
 	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde.vault) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	PGStatMonitor    bool `json:"pgStatMonitor,omitempty"`
 	PGAudit          bool `json:"pgAudit,omitempty"`

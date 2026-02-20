@@ -450,6 +450,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
 	postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 
+	log.Info("PGTDE", "enabled", postgresCluster.Spec.Extensions.PGTDE.Enabled)
+
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 
 	postgresCluster.Spec.InitContainer = cr.Spec.InitContainer

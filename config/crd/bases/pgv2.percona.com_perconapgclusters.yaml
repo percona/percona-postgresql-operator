@@ -11722,7 +11722,8 @@ spec:
                     type: object
                     x-kubernetes-validations:
                     - message: vault is required for enabling pg_tde
-                      rule: '!self.enabled || has(self.vault)'
+                      rule: '!has(self.enabled) || (has(self.enabled) && self.enabled
+                        == false) || has(self.vault)'
                   pgvector:
                     properties:
                       enabled:
@@ -11811,8 +11812,8 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-validations:
-                - message: to disable pg_tde first set enabled=false and wait for
-                    pod restarts
+                - message: to disable pg_tde first set enabled=false without removing
+                    vault and wait for pod restarts
                   rule: '!has(oldSelf.pg_tde.vault) || !oldSelf.pg_tde.enabled ||
                     has(self.pg_tde.vault)'
               image:
