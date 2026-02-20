@@ -70,6 +70,14 @@ spec:
 
 #  autoCreateUserSchema: true
 
+#  config:
+#    files:
+#      - secret:
+#          name: my-ldap-ca-cert
+#          items:
+#            - key: ca.crt
+#              path: ldap-ca.crt
+
 #  users:
 #    - name: rhino
 #      databases:

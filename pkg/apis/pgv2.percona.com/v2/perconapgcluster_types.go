@@ -176,7 +176,26 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
 
+	// Additional configuration files to mount into PostgreSQL containers.
+	// Can be used to provide a custom CA certificate for LDAP authentication
+	// via spec.config.files (e.g. mounting a Secret with an LDAP CA cert).
+	// +optional
+	Config crunchyv1beta1.PostgresAdditionalConfig `json:"config,omitempty"`
+
 	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
+
+	// Configuration for PostgreSQL config files and server parameters.
+	// Use spec.config.files to mount files (e.g. LDAP CA certificate) under
+	// /etc/postgres, and spec.config.parameters to set postgresql.conf values.
+	// +optional
+	Config *crunchyv1beta1.PostgresConfigSpec `json:"config,omitempty"`
+
+	// Defines custom pg_hba.conf authentication rules. Rules are evaluated
+	// after mandatory operator rules and before the default scram-sha-256
+	// fallback. Use this together with spec.config.files to supply supporting
+	// files such as an LDAP CA certificate.
+	// +optional
+	Authentication *crunchyv1beta1.PostgresClusterAuthentication `json:"authentication,omitempty"`
 }
 
 type ContainerOptions struct {
@@ -416,6 +435,10 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.InitContainer = cr.Spec.InitContainer
 	postgresCluster.Spec.ClusterServiceDNSSuffix = cr.Spec.ClusterServiceDNSSuffix
+	postgresCluster.Spec.Config = cr.Spec.Config
+
+	postgresCluster.Spec.Config = cr.Spec.Config
+	postgresCluster.Spec.Authentication = cr.Spec.Authentication
 
 	return postgresCluster, nil
 }

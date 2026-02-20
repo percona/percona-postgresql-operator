@@ -253,6 +253,9 @@ func DynamicConfiguration(
 	for i := range pgHBAs.Mandatory {
 		hba = append(hba, pgHBAs.Mandatory[i].String())
 	}
+	// Include custom authentication rules from spec.authentication.rules.
+	// These are evaluated before any rules in Patroni's dynamic configuration.
+	hba = append(hba, pgHBAs.Custom...)
 	if section, ok := postgresql["pg_hba"].([]any); ok {
 		for i := range section {
 			// any pg_hba values that are not strings will be skipped

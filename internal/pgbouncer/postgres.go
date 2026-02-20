@@ -226,7 +226,7 @@ func postgresqlHBAs() []*postgres.HostBasedAuthentication {
 	// - https://www.postgresql.org/docs/current/auth-password.html
 
 	return []*postgres.HostBasedAuthentication{
-		postgres.NewHBA().User(postgresqlUser).TLS().Method("scram-sha-256"),
-		postgres.NewHBA().User(postgresqlUser).TCP().Method("reject"),
+		postgres.NewHBA().Users(postgresqlUser).TLS().Method("scram-sha-256"),
+		postgres.NewHBA().Users(postgresqlUser).TCP().Method("reject"),
 	}
 }

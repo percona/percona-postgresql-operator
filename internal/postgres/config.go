@@ -81,6 +81,9 @@ safelink() (
 
 	// configMountPath is where to mount additional config files
 	configMountPath = "/etc/postgres"
+
+	// tmpMountPath is where to mount the temporary volume.
+	tmpMountPath = "/pgtmp"
 )
 
 // ConfigDirectory returns the absolute path to $PGDATA for cluster.

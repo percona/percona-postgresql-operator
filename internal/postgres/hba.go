@@ -1,4 +1,4 @@
-// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2026 Crunchy Data Solutions, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,37 +6,48 @@ package postgres
 
 import (
 	"fmt"
+	"maps"
+	"regexp"
+	"slices"
 	"strings"
 )
 
 // NewHBAs returns HostBasedAuthentication records required by this package.
 func NewHBAs() HBAs {
 	return HBAs{
+		Custom: nil,
 		Mandatory: []*HostBasedAuthentication{
 			// The "postgres" superuser must always be able to connect locally.
-			NewHBA().Local().User("postgres").Method("peer"),
+			NewHBA().Local().Users("postgres").Method("peer"),
 
 			// The replication user must always connect over TLS using certificate
 			// authentication. Patroni also connects to the "postgres" database
 			// when calling `pg_rewind`.
 			// - https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-AUTHENTICATION
-			NewHBA().TLS().User(ReplicationUser).Method("cert").Replication(),
-			NewHBA().TLS().User(ReplicationUser).Method("cert").Database("postgres"),
-			NewHBA().TCP().User(ReplicationUser).Method("reject"),
+			NewHBA().TLS().Users(ReplicationUser).Method("cert").Replication(),
+			NewHBA().TLS().Users(ReplicationUser).Method("cert").Databases("postgres"),
+			NewHBA().TCP().Users(ReplicationUser).Method("reject"),
 		},
 
 		Default: []*HostBasedAuthentication{
-			// Allow TLS connections to any database using passwords. The "md5"
-			// authentication method automatically verifies passwords encrypted
-			// using either MD5 or SCRAM-SHA-256.
+			// Allow TLS connections to any database using passwords. Passwords are
+			// hashed and stored using SCRAM-SHA-256 by default. Since PostgreSQL 10,
+			// the "scram-sha-256" method is the preferred way to use those passwords.
 			// - https://www.postgresql.org/docs/current/auth-password.html
-			NewHBA().TLS().Method("md5"),
+			NewHBA().TLS().Method("scram-sha-256"),
 		},
 	}
 }
 
 // HBAs is a pairing of HostBasedAuthentication records.
-type HBAs struct{ Mandatory, Default []*HostBasedAuthentication }
+type HBAs struct {
+	// Custom holds additional pg_hba.conf lines to be inserted after Mandatory
+	// and before any rules from Patroni's dynamic configuration. When non-empty
+	// these lines suppress the Default rules.
+	Custom    []string
+	Mandatory []*HostBasedAuthentication
+	Default   []*HostBasedAuthentication
+}
 
 // HostBasedAuthentication represents a single record for pg_hba.conf.
 // - https://www.postgresql.org/docs/current/auth-pg-hba-conf.html
@@ -49,8 +60,49 @@ func NewHBA() *HostBasedAuthentication {
 	return new(HostBasedAuthentication).AllDatabases().AllNetworks().AllUsers()
 }
 
+// hbaRegexSpecialCharacters matches a superset of the special characters in
+// PostgreSQL [regular expressions] for:
+//
+//   - [HostBasedAuthentication.quoteDatabase]
+//   - [HostBasedAuthentication.quoteUser]
+//
+// [regular expressions]: https://www.postgresql.org/docs/current/functions-matching.html#POSIX-SYNTAX-DETAILS
+var hbaRegexSpecialCharacters = regexp.MustCompile(`[^\pL\pN_]`)
+
 func (*HostBasedAuthentication) quote(value string) string {
 	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
+}
+
+func (hba *HostBasedAuthentication) quoteDatabase(name string) string {
+	// Since PostgreSQL 16, a quoted string beginning with slash U+002F is
+	// interpreted as a regular expression. Express these names as a Postgres
+	// regex that exactly matches the entire name.
+	if len(name) > 0 && name[0] == '/' {
+		name = "/^" +
+			hbaRegexSpecialCharacters.ReplaceAllStringFunc(name,
+				func(match string) string { return "[" + match + "]" }) +
+			"$"
+	}
+
+	// Quotes indicate the value is NOT a keyword (all, sameuser, etc.)
+	// and NOT to be expanded as a filename (at sign U+0040).
+	return hba.quote(name)
+}
+
+func (hba *HostBasedAuthentication) quoteUser(name string) string {
+	// Since PostgreSQL 16, a quoted string beginning with slash U+002F is
+	// interpreted as a regular expression. Express these names as a Postgres
+	// regex that exactly matches the entire name.
+	if len(name) > 0 && name[0] == '/' {
+		name = "/^" +
+			hbaRegexSpecialCharacters.ReplaceAllStringFunc(name,
+				func(match string) string { return "[" + match + "]" }) +
+			"$"
+	}
+
+	// Quotes indicate the value is NOT a keyword (all), NOT a group (plus U+002B),
+	// and NOT to be expanded as a filename (at sign U+0040).
+	return hba.quote(name)
 }
 
 // AllDatabases makes hba match connections made to any database.
@@ -71,9 +123,12 @@ func (hba *HostBasedAuthentication) AllUsers() *HostBasedAuthentication {
 	return hba
 }
 
-// Database makes hba match connections made to a specific database.
-func (hba *HostBasedAuthentication) Database(name string) *HostBasedAuthentication {
-	hba.database = hba.quote(name)
+// Databases makes hba match connections made to specific databases.
+func (hba *HostBasedAuthentication) Databases(name string, names ...string) *HostBasedAuthentication {
+	hba.database = hba.quoteDatabase(name)
+	for _, n := range names {
+		hba.database += "," + hba.quoteDatabase(n)
+	}
 	return hba
 }
 
@@ -84,8 +139,14 @@ func (hba *HostBasedAuthentication) Local() *HostBasedAuthentication {
 }
 
 // Method specifies the authentication method to use when a connection matches hba.
+// Method names are bare identifiers in pg_hba.conf and are not quoted.
 func (hba *HostBasedAuthentication) Method(name string) *HostBasedAuthentication {
 	hba.method = name
+	return hba
+}
+
+func (hba *HostBasedAuthentication) Origin(name string) *HostBasedAuthentication {
+	hba.origin = hba.quote(name)
 	return hba
 }
 
@@ -104,8 +165,8 @@ func (hba *HostBasedAuthentication) NoSSL() *HostBasedAuthentication {
 // Options specifies any options for the authentication method.
 func (hba *HostBasedAuthentication) Options(opts map[string]string) *HostBasedAuthentication {
 	hba.options = ""
-	for k, v := range opts {
-		hba.options = fmt.Sprintf("%s %s=%s", hba.options, k, hba.quote(v))
+	for _, k := range slices.Sorted(maps.Keys(opts)) {
+		hba.options = fmt.Sprintf("%s %s=%s", hba.options, hba.quote(k), hba.quote(opts[k]))
 	}
 	return hba
 }
@@ -116,16 +177,21 @@ func (hba *HostBasedAuthentication) Replication() *HostBasedAuthentication {
 	return hba
 }
 
-// Role makes hba match connections by users that are members of a specific role.
-func (hba *HostBasedAuthentication) Role(name string) *HostBasedAuthentication {
-	hba.user = "+" + hba.quote(name)
-	return hba
-}
-
 // SameNetwork makes hba match connection attempts from IP addresses in any
 // subnet to which the server is directly connected.
 func (hba *HostBasedAuthentication) SameNetwork() *HostBasedAuthentication {
 	hba.address = "samenet"
+	return hba
+}
+
+// TLSOnly changes the HBA record to require TLS. Records that already require
+// TLS ("hostssl") or use Unix sockets ("local") are not modified. TCP records
+// ("host") and no-SSL records ("hostnossl") become "hostssl".
+func (hba *HostBasedAuthentication) TLSOnly() *HostBasedAuthentication {
+	switch hba.origin {
+	case "host", "hostnossl":
+		hba.origin = "hostssl"
+	}
 	return hba
 }
 
@@ -135,22 +201,18 @@ func (hba *HostBasedAuthentication) TLS() *HostBasedAuthentication {
 	return hba
 }
 
-func (hba *HostBasedAuthentication) TLSOnly() *HostBasedAuthentication {
-	if hba.origin == "host" || hba.origin == "hostnossl" {
-		hba.origin = "hostssl"
-	}
-	return hba
-}
-
 // TCP makes hba match connection attempts made using TCP/IP, with or without SSL.
 func (hba *HostBasedAuthentication) TCP() *HostBasedAuthentication {
 	hba.origin = "host"
 	return hba
 }
 
-// User makes hba match connections by a specific user.
-func (hba *HostBasedAuthentication) User(name string) *HostBasedAuthentication {
-	hba.user = hba.quote(name)
+// Users makes hba match connections by specific users.
+func (hba *HostBasedAuthentication) Users(name string, names ...string) *HostBasedAuthentication {
+	hba.user = hba.quoteUser(name)
+	for _, n := range names {
+		hba.user += "," + hba.quoteUser(n)
+	}
 	return hba
 }
 
@@ -163,4 +225,44 @@ func (hba *HostBasedAuthentication) String() string {
 
 	return strings.TrimSpace(fmt.Sprintf("%s %s %s %s %s %s",
 		hba.origin, hba.database, hba.user, hba.address, hba.method, hba.options))
+}
+
+// OrderedHBAs is an append-only sequence of pg_hba.conf lines.
+type OrderedHBAs struct {
+	records []string
+}
+
+// Append renders and adds pg_hba.conf lines to o. Nil pointers are ignored.
+func (o *OrderedHBAs) Append(hbas ...*HostBasedAuthentication) {
+	for _, hba := range hbas {
+		if hba != nil {
+			o.records = append(o.records, hba.String())
+		}
+	}
+}
+
+// AppendUnstructured trims and adds unvalidated pg_hba.conf lines to o.
+// Empty lines and lines that are entirely control characters are omitted.
+func (o *OrderedHBAs) AppendUnstructured(hbas ...string) {
+	for _, hba := range hbas {
+		hba = strings.TrimFunc(hba, func(r rune) bool {
+			// control characters, space, and backslash
+			return r > '~' || r < '!' || r == '\\'
+		})
+
+		// NOTE: Skipping "include" directives here is a security measure.
+		if len(hba) > 0 && !strings.HasPrefix(hba, "include") {
+			o.records = append(o.records, hba)
+		}
+	}
+}
+
+// AsStrings returns a copy of o as a slice.
+func (o *OrderedHBAs) AsStrings() []string {
+	return slices.Clone(o.records)
+}
+
+// Length returns the number of records in o.
+func (o *OrderedHBAs) Length() int {
+	return len(o.records)
 }

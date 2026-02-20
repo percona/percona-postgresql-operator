@@ -476,11 +476,13 @@ volumes:
 
 	t.Run("WithAdditionalConfigFiles", func(t *testing.T) {
 		clusterWithConfig := cluster.DeepCopy()
-		clusterWithConfig.Spec.Config.Files = []corev1.VolumeProjection{
-			{
-				Secret: &corev1.SecretProjection{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "keytab",
+		clusterWithConfig.Spec.Config = &v1beta1.PostgresConfigSpec{
+			Files: []corev1.VolumeProjection{
+				{
+					Secret: &corev1.SecretProjection{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "keytab",
+						},
 					},
 				},
 			},
@@ -1141,11 +1143,13 @@ volumes:
 
 	t.Run("WithAdditionalConfigFiles", func(t *testing.T) {
 		clusterWithConfig := cluster.DeepCopy()
-		clusterWithConfig.Spec.Config.Files = []corev1.VolumeProjection{
-			{
-				Secret: &corev1.SecretProjection{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "keytab",
+		clusterWithConfig.Spec.Config = &v1beta1.PostgresConfigSpec{
+			Files: []corev1.VolumeProjection{
+				{
+					Secret: &corev1.SecretProjection{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "keytab",
+						},
 					},
 				},
 			},
