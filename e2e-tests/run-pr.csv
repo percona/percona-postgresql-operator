@@ -10,6 +10,8 @@ dynamic-configuration
 finalizers
 init-deploy
 huge-pages
+ldap
+ldap-tls
 monitoring
 monitoring-pmm3
 one-pod

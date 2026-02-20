@@ -244,6 +244,22 @@ func (r *Reconciler) Reconcile(
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgbouncer.PostgreSQL(cluster, &pgHBAs)
 
+	// Include any structured authentication rules from spec.authentication.rules.
+	// These are evaluated after mandatory rules and before the Patroni dynamic
+	// config pg_hba section and the scram-sha-256 default.
+	if authn := cluster.Spec.Authentication; authn != nil {
+		for i := range authn.Rules {
+			rule := &authn.Rules[i]
+			if len(rule.HBA) > 0 {
+				pgHBAs.Custom = append(pgHBAs.Custom, rule.HBA)
+			} else {
+				if hba := r.generatePostgresHBA(&rule.PostgresHBARule); hba != nil {
+					pgHBAs.Custom = append(pgHBAs.Custom, hba.String())
+				}
+			}
+		}
+	}
+
 	// K8SPG-554
 	if cluster.Spec.TLSOnly {
 		for i := range pgHBAs.Mandatory {
