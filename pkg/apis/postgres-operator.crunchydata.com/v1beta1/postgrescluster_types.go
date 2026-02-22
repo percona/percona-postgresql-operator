@@ -54,6 +54,9 @@ type PostgresClusterSpec struct {
 
 	TLSOnly bool `json:"tlsOnly,omitempty"`
 
+	// +optional
+	TLS *TLSSpec `json:"tls,omitempty"`
+
 	// The secret containing the replication client certificates and keys for
 	// secure connections to the PostgreSQL server. It will need to contain the
 	// client TLS certificate, TLS key and the Certificate Authority certificate
@@ -238,6 +241,13 @@ type ExtensionsSpec struct {
 	PGRepack         bool `json:"pgRepack,omitempty"`
 
 	PGTDE PGTDESpec `json:"pg_tde,omitempty"`
+}
+
+type TLSSpec struct {
+	// +optional
+	CertValidityDuration *metav1.Duration `json:"certValidityDuration,omitempty"`
+	// +optional
+	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.

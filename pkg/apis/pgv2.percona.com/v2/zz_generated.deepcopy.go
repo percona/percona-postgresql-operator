@@ -872,6 +872,11 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 		*out = make([]v1.LocalObjectReference, len(*in))
 		copy(*out, *in)
 	}
+	if in.TLS != nil {
+		in, out := &in.TLS, &out.TLS
+		*out = new(v1beta1.TLSSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
 		*out = new(int32)
