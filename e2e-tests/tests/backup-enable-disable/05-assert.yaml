@@ -16,7 +16,6 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
   replicas: 1
   readyReplicas: 1
   updatedReplicas: 1
@@ -55,13 +54,16 @@ metadata:
       blockOwnerDeletion: true
   finalizers:
     - postgres-operator.crunchydata.com/finalizer
+spec:
+  backups:
+    pgbackrest: {}
 status:
   instances:
     - name: instance1
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 2
+  observedGeneration: 3
   proxy:
     pgBouncer:
       readyReplicas: 3
