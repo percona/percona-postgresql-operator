@@ -19,6 +19,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -104,7 +105,11 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}()
 
 	if cond := meta.FindStatusCondition(pgUpgrade.Status.Conditions, "Progressing"); cond != nil {
-		log.Info("PGUpgrade progressing", "reason", cond.Reason, "message", cond.Message, "type", cond.Type, "status", cond.Status)
+		log.Info("PGUpgrade progressing",
+			"reason", cond.Reason,
+			"message", cond.Message,
+			"type", cond.Type,
+			"status", cond.Status)
 		if cond.Status == metav1.ConditionTrue {
 			log.Info("PGUpgrade in progress", "cluster", pgCluster.Name)
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
@@ -130,12 +135,20 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if cond := meta.FindStatusCondition(pgUpgrade.Status.Conditions, "Succeeded"); cond != nil {
-		log.Info("PGUpgrade succeeded", "reason", cond.Reason, "message", cond.Message, "type", cond.Type, "status", cond.Status)
 		switch cond.Reason {
 		case "PGUpgradeFailed":
-			log.Info("PGUpgrade failed", "cluster", pgCluster.Name)
+			log.Info("PGUpgrade failed",
+				"reason", cond.Reason,
+				"message", cond.Message,
+				"type", cond.Type,
+				"status", cond.Status)
 			return reconcile.Result{}, nil
 		case "PGUpgradeSucceeded":
+			log.Info("PGUpgrade succeeded",
+				"reason", cond.Reason,
+				"message", cond.Message,
+				"type", cond.Type,
+				"status", cond.Status)
 			if err := r.finalizeUpgrade(ctx, pgCluster, perconaPGUpgrade); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "finalize upgrade")
 			}
@@ -240,6 +253,7 @@ func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pg
 	pgCluster.Spec.Image = pgUpgrade.Spec.ToPostgresImage
 	pgCluster.Spec.Proxy.PGBouncer.Image = pgUpgrade.Spec.ToPgBouncerImage
 	pgCluster.Spec.Backups.PGBackRest.Image = pgUpgrade.Spec.ToPgBackRestImage
+	pgCluster.Spec.Patroni.CreateReplicaMethods = []v1beta1.CreateReplicaMethod{"basebackup"}
 
 	log.Info("Finalizing upgrade",
 		"newPostgresVersion", pgCluster.Spec.PostgresVersion,
