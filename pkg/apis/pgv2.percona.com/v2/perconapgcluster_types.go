@@ -844,7 +844,7 @@ type BuiltInExtensionSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde.vault) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`

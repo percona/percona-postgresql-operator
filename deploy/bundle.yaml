@@ -12111,8 +12111,8 @@ spec:
                 x-kubernetes-validations:
                 - message: to disable pg_tde first set enabled=false without removing
                     vault and wait for pod restarts
-                  rule: '!has(oldSelf.pg_tde.vault) || !oldSelf.pg_tde.enabled ||
-                    has(self.pg_tde.vault)'
+                  rule: '!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled)
+                    || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)'
               image:
                 description: The image name to use for PostgreSQL containers.
                 type: string
@@ -42485,7 +42485,7 @@ spec:
                 x-kubernetes-validations:
                 - message: to disable pg_tde first set enabled=false without removing
                     vault and wait for pod restarts
-                  rule: '!has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled)
+                  rule: '!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled)
                     || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)'
               image:
                 description: |-

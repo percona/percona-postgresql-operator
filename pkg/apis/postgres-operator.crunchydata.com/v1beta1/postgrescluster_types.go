@@ -232,7 +232,7 @@ type PGTDESpec struct {
 	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	PGStatMonitor    bool `json:"pgStatMonitor,omitempty"`
 	PGAudit          bool `json:"pgAudit,omitempty"`
