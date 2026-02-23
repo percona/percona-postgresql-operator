@@ -288,6 +288,10 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.AutoCreateUserSchema = &t
 	}
 
+	if cr.CompareVersion("2.9.0") < 0 && cr.Spec.Config == nil {
+		cr.Spec.Config = &crunchyv1beta1.PostgresConfigSpec{}
+	}
+
 	if cr.Spec.Backups.IsVolumeSnapshotsEnabled() &&
 		cr.Spec.Backups.VolumeSnapshots.Mode == VolumeSnapshotModeOffline &&
 		cr.Spec.Backups.VolumeSnapshots.OfflineConfig == nil {
