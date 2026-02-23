@@ -253,9 +253,18 @@ func DynamicConfiguration(
 	for i := range pgHBAs.Mandatory {
 		hba = append(hba, pgHBAs.Mandatory[i].String())
 	}
-	// Include custom authentication rules from spec.authentication.rules.
+	// Include authentication rules from spec.authentication.rules.
 	// These are evaluated before any rules in Patroni's dynamic configuration.
-	hba = append(hba, pgHBAs.Custom...)
+	if authn := cluster.Spec.Authentication; authn != nil {
+		for i := range authn.Rules {
+			rule := &authn.Rules[i]
+			if len(rule.HBA) > 0 {
+				hba = append(hba, rule.HBA)
+			} else if r := hbaFromSpec(&rule.PostgresHBARule); r != nil {
+				hba = append(hba, r.String())
+			}
+		}
+	}
 	if section, ok := postgresql["pg_hba"].([]any); ok {
 		for i := range section {
 			// any pg_hba values that are not strings will be skipped
@@ -688,4 +697,33 @@ func probeTiming(spec *v1beta1.PatroniSpec) *corev1.Probe {
 	}
 
 	return &probe
+}
+
+// hbaFromSpec converts one PostgresHBARule into a structured HBA record.
+// The "password" method is normalized to "scram-sha-256" per PostgreSQL docs.
+func hbaFromSpec(spec *v1beta1.PostgresHBARule) *postgres.HostBasedAuthentication {
+	if spec == nil {
+		return nil
+	}
+	result := postgres.NewHBA()
+	result.Origin(spec.Connection)
+	if spec.Method == "password" {
+		result.Method("scram-sha-256")
+	} else {
+		result.Method(spec.Method)
+	}
+	if len(spec.Databases) > 0 {
+		result.Databases(spec.Databases[0], spec.Databases[1:]...)
+	}
+	if len(spec.Users) > 0 {
+		result.Users(spec.Users[0], spec.Users[1:]...)
+	}
+	if len(spec.Options) > 0 {
+		opts := make(map[string]string, len(spec.Options))
+		for k, v := range spec.Options {
+			opts[k] = v.String()
+		}
+		result.Options(opts)
+	}
+	return result
 }

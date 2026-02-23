@@ -15,7 +15,6 @@ import (
 // NewHBAs returns HostBasedAuthentication records required by this package.
 func NewHBAs() HBAs {
 	return HBAs{
-		Custom: nil,
 		Mandatory: []*HostBasedAuthentication{
 			// The "postgres" superuser must always be able to connect locally.
 			NewHBA().Local().Users("postgres").Method("peer"),
@@ -41,10 +40,6 @@ func NewHBAs() HBAs {
 
 // HBAs is a pairing of HostBasedAuthentication records.
 type HBAs struct {
-	// Custom holds additional pg_hba.conf lines to be inserted after Mandatory
-	// and before any rules from Patroni's dynamic configuration. When non-empty
-	// these lines suppress the Default rules.
-	Custom    []string
 	Mandatory []*HostBasedAuthentication
 	Default   []*HostBasedAuthentication
 }

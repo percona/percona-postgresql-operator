@@ -44,43 +44,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-// generatePostgresHBA converts one API rule into a structured HBA rule that
-// safely formats its values.
-func (*Reconciler) generatePostgresHBA(spec *v1beta1.PostgresHBARule) *postgres.HostBasedAuthentication {
-	if spec == nil {
-		return nil
-	}
-
-	result := postgres.NewHBA()
-	result.Origin(spec.Connection)
-
-	// The "password" method is not recommended. More likely, the user wants to
-	// use passwords generally. The "scram-sha-256" method is the preferred way
-	// to do that.
-	// - https://www.postgresql.org/docs/current/auth-password.html
-	if spec.Method == "password" {
-		result.Method("scram-sha-256")
-	} else {
-		result.Method(spec.Method)
-	}
-
-	if len(spec.Databases) > 0 {
-		result.Databases(spec.Databases[0], spec.Databases[1:]...)
-	}
-	if len(spec.Users) > 0 {
-		result.Users(spec.Users[0], spec.Users[1:]...)
-	}
-	if len(spec.Options) > 0 {
-		opts := make(map[string]string, len(spec.Options))
-		for k, v := range spec.Options {
-			opts[k] = v.String()
-		}
-		result.Options(opts)
-	}
-
-	return result
-}
-
 // generatePostgresUserSecret returns a Secret containing a password and
 // connection details for the first database in spec. When existing is nil or
 // lacks a password or verifier, a new password and verifier are generated.
