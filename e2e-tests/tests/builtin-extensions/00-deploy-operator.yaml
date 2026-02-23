@@ -12,4 +12,4 @@ commands:
       deploy_client
       deploy_s3_secrets
       deploy_minio
-    timeout: 60
+    timeout: 120

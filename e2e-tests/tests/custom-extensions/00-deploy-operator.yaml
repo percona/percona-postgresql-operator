@@ -13,4 +13,4 @@ commands:
       deploy_s3_secrets
       deploy_minio
       copy_custom_extensions_form_aws
-    timeout: 60
+    timeout: 120
