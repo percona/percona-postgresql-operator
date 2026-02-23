@@ -1513,7 +1513,10 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// At this point, reconciliation is allowed, so if no backups spec is found
 	// clear the status and exit
 	if !backupsSpecFound {
-		postgresCluster.Status.PGBackRest = &v1beta1.PGBackRestStatus{}
+		// K8SPG-904: we should keep the restore field
+		postgresCluster.Status.PGBackRest = &v1beta1.PGBackRestStatus{
+			Restore: postgresCluster.Status.PGBackRest.Restore,
+		}
 		return result, nil
 	}
 
