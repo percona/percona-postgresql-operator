@@ -45,6 +45,12 @@ func clusterYAML(
 	cluster *v1beta1.PostgresCluster,
 	pgHBAs postgres.HBAs, pgParameters postgres.Parameters,
 ) (string, error) {
+
+	labels := map[string]string{naming.LabelCluster: cluster.Name}
+	if cluster.CompareVersion("2.9.0") >= 0 {
+		labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(), labels)
+	}
+
 	root := map[string]any{
 		// The cluster identifier. This value cannot change during the cluster's
 		// lifetime.
@@ -64,9 +70,7 @@ func clusterYAML(
 			// In addition to "scope_label" above, Patroni will add the following to
 			// every object it creates. It will also use these as filters when doing
 			// any lookups.
-			"labels": map[string]string{
-				naming.LabelCluster: cluster.Name,
-			},
+			"labels": labels,
 		},
 
 		"postgresql": map[string]any{
