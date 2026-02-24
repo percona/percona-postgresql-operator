@@ -1,4 +1,6 @@
-FROM --platform=${BUILDPLATFORM} golang:1.25 AS go_builder
+ARG BASE_IMAGE=ubi10
+
+FROM --platform=${BUILDPLATFORM} golang:1.26 AS go_builder
 WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 
 COPY go.mod go.sum ./
@@ -45,7 +47,7 @@ RUN mkdir -p build/_output/bin \
 RUN ./bin/license_aggregator.sh ./cmd/...; \
 	cp -r ./licenses /licenses
 
-FROM registry.access.redhat.com/ubi10/ubi-minimal AS ubi10
+FROM registry.access.redhat.com/${BASE_IMAGE}/ubi-minimal AS ubi
 RUN microdnf update -y && microdnf clean all -y
 
 LABEL name="Percona Postgres Operator" \
@@ -67,6 +69,7 @@ COPY build/postgres-operator/init-entrypoint.sh /usr/local/bin
 COPY build/postgres-operator/postgres-entrypoint.sh /usr/local/bin
 COPY build/postgres-operator/postgres-liveness-check.sh /usr/local/bin
 COPY build/postgres-operator/postgres-readiness-check.sh /usr/local/bin
+COPY build/postgres-operator/restore-command-wrapper.sh /usr/local/bin
 COPY hack/tools/queries /opt/crunchy/conf
 
 RUN chgrp -R 0 /opt/crunchy/conf && chmod -R g=u opt/crunchy/conf

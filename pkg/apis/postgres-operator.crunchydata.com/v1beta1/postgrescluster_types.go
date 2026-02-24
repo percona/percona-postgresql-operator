@@ -54,6 +54,9 @@ type PostgresClusterSpec struct {
 
 	TLSOnly bool `json:"tlsOnly,omitempty"`
 
+	// +optional
+	TLS *TLSSpec `json:"tls,omitempty"`
+
 	// The secret containing the replication client certificates and keys for
 	// secure connections to the PostgreSQL server. It will need to contain the
 	// client TLS certificate, TLS key and the Certificate Authority certificate
@@ -191,6 +194,9 @@ type PostgresClusterSpec struct {
 
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+
+	// K8SPG-694
+	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
 type InitContainerSpec struct {
@@ -206,6 +212,13 @@ type ExtensionsSpec struct {
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
 	PGVector         bool `json:"pgvector,omitempty"`
 	PGRepack         bool `json:"pgRepack,omitempty"`
+}
+
+type TLSSpec struct {
+	// +optional
+	CertValidityDuration *metav1.Duration `json:"certValidityDuration,omitempty"`
+	// +optional
+	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.
@@ -329,6 +342,11 @@ type PostgresClusterDataSource struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// K8SPG-873
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-873
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // Default defines several key default values for a Postgres cluster.
@@ -793,6 +811,10 @@ func (cr *PostgresCluster) CompareVersion(ver string) int {
 func (cr *PostgresCluster) IsPatroniVer4() (bool, error) {
 	patroniVerStr, ok := cr.Annotations[pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion)]
 	if !ok {
+		// Assume Patroni v4 for CR versions greater than 2.7.0
+		if cr.CompareVersion("2.7.0") >= 0 {
+			return true, nil
+		}
 		return false, errors.New("patroni version annotation was not found")
 	}
 	patroniVer, err := gover.NewVersion(patroniVerStr)

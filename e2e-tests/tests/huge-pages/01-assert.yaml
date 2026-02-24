@@ -1,0 +1,174 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: huge-pages-repo-host
+  labels:
+    postgres-operator.crunchydata.com/cluster: huge-pages
+    postgres-operator.crunchydata.com/data: pgbackrest
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-dedicated: ''
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: huge-pages
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  serviceName: huge-pages-pods
+  template:
+    spec:
+      containers:
+        - command:
+            - pgbackrest
+            - server
+          name: pgbackrest
+        - command:
+            - bash
+            - -ceu
+            - --
+            - |-
+              monitor() {
+              exec {fd}<> <(:||:)
+              until read -r -t 5 -u "${fd}"; do
+                if
+                  [[ "${filename}" -nt "/proc/self/fd/${fd}" ]] &&
+                  pkill -HUP --exact --parent=0 pgbackrest
+                then
+                  exec {fd}>&- && exec {fd}<> <(:||:)
+                  stat --dereference --format='Loaded configuration dated %y' "${filename}"
+                elif
+                  { [[ "${directory}" -nt "/proc/self/fd/${fd}" ]] ||
+                    [[ "${authority}" -nt "/proc/self/fd/${fd}" ]]
+                  } &&
+                  pkill -HUP --exact --parent=0 pgbackrest
+                then
+                  exec {fd}>&- && exec {fd}<> <(:||:)
+                  stat --format='Loaded certificates dated %y' "${directory}"
+                fi
+              done
+              }; export directory="$1" authority="$2" filename="$3"; export -f monitor; exec -a "$0" bash -ceu monitor
+            - pgbackrest-config
+            - /etc/pgbackrest/server
+            - /etc/pgbackrest/conf.d/~postgres-operator/tls-ca.crt
+            - /etc/pgbackrest/conf.d/~postgres-operator_server.conf
+          name: pgbackrest-config
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: huge-pages
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: huge-pages
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  collisionCount: 0
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: huge-pages-pgbouncer
+  labels:
+    postgres-operator.crunchydata.com/cluster: huge-pages
+    postgres-operator.crunchydata.com/role: pgbouncer
+  annotations:
+    deployment.kubernetes.io/revision: '1'
+  ownerReferences:
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+      kind: PostgresCluster
+      name: huge-pages
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 1
+  updatedReplicas: 1
+  readyReplicas: 1
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: huge-pages
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: huge-pages
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: huge-pages
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 1
+      replicas: 1
+      updatedReplicas: 1
+  observedGeneration: 1
+  pgbackrest:
+    repoHost:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      ready: true
+    repos:
+      - bound: true
+        name: repo1
+        replicaCreateBackupComplete: true
+        stanzaCreated: true
+  proxy:
+    pgBouncer:
+      readyReplicas: 1
+      replicas: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: huge-pages
+status:
+  pgbouncer:
+    ready: 1
+    size: 1
+  postgres:
+    instances:
+      - name: instance1
+        ready: 1
+        size: 1
+    ready: 1
+    size: 1
+  state: ready

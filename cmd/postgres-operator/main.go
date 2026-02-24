@@ -14,6 +14,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/kelseyhightower/envconfig"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	uzap "go.uber.org/zap"
@@ -27,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	certmanagerscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
@@ -36,11 +39,13 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore"
 	perconaPGUpgrade "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgupgrade"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	perconaRuntime "github.com/percona/percona-postgresql-operator/v2/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
@@ -124,6 +129,12 @@ func main() {
 	// Add Percona custom resource types to scheme
 	assertNoError(v2.AddToScheme(mgr.GetScheme()))
 
+	assertNoError(volumesnapshotv1.AddToScheme(mgr.GetScheme()))
+
+	// K8SPG-552
+	// Add Scheme for cert-manager resources like Issuer and Certificate.
+	assertNoError(certmanagerscheme.AddToScheme(mgr.GetScheme()))
+
 	// add all PostgreSQL Operator controllers to the runtime manager
 	err = addControllersToManager(ctx, mgr)
 	assertNoError(err)
@@ -149,11 +160,14 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	os.Setenv("REGISTRATION_REQUIRED", "false")
 
 	r := &postgrescluster.Reconciler{
-		Client:      mgr.GetClient(),
-		Owner:       postgrescluster.ControllerName,
-		Recorder:    mgr.GetEventRecorderFor(postgrescluster.ControllerName),
-		Tracer:      otel.Tracer(postgrescluster.ControllerName),
-		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		Owner:               postgrescluster.ControllerName,
+		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName),
+		Tracer:              otel.Tracer(postgrescluster.ControllerName),
+		IsOpenShift:         isOpenshift(ctx, mgr.GetConfig()),
+		CertManagerCtrlFunc: certmanager.NewController,
+		RestConfig:          mgr.GetConfig(),
 	}
 	cm := &perconaController.CustomManager{Manager: mgr}
 	if err := r.SetupWithManager(cm); err != nil {
@@ -189,7 +203,14 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		StopExternalWatchers: stopChan,
 		Watchers:             registry.New(),
 	}
-	if err := pc.SetupWithManager(mgr); err != nil {
+
+	if namespaces, err := k8s.GetWatchNamespace(); err != nil {
+		return errors.Wrap(err, "check if watching multi namespace")
+	} else {
+		pc.WatchNamespace = strings.Split(namespaces, ",")
+	}
+
+	if err := pc.SetupWithManager(ctx, mgr); err != nil {
 		return err
 	}
 
@@ -272,48 +293,6 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 
 	options.HealthProbeBindAddress = ":8081"
 
-	// Enable leader elections when configured with a valid Lease.coordination.k8s.io name.
-	// - https://docs.k8s.io/concepts/architecture/leases
-	// - https://releases.k8s.io/v1.30.0/pkg/apis/coordination/validation/validation.go#L26
-	if lease := os.Getenv("PGO_CONTROLLER_LEASE_NAME"); len(lease) > 0 {
-		if errs := validation.IsDNS1123Subdomain(lease); len(errs) > 0 {
-			return options, fmt.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
-		}
-
-		options.LeaderElection = true
-		options.LeaderElectionID = lease
-		options.LeaderElectionNamespace = os.Getenv("PGO_NAMESPACE")
-	} else {
-		// K8SPG-761
-		options.LeaderElection = true
-		options.LeaderElectionID = perconaRuntime.ElectionID
-	}
-
-	// Check PGO_TARGET_NAMESPACE for backwards compatibility with
-	// "singlenamespace" installations
-	singlenamespace := strings.TrimSpace(os.Getenv("PGO_TARGET_NAMESPACE"))
-
-	// Check PGO_TARGET_NAMESPACES for non-cluster-wide, multi-namespace
-	// installations
-	multinamespace := strings.TrimSpace(os.Getenv("PGO_TARGET_NAMESPACES"))
-
-	// Initialize DefaultNamespaces if any target namespaces are set
-	if len(singlenamespace) > 0 || len(multinamespace) > 0 {
-		options.Cache.DefaultNamespaces = map[string]runtime.CacheConfig{}
-	}
-
-	if len(singlenamespace) > 0 {
-		options.Cache.DefaultNamespaces[singlenamespace] = runtime.CacheConfig{}
-	}
-
-	if len(multinamespace) > 0 {
-		for _, namespace := range strings.FieldsFunc(multinamespace, func(c rune) bool {
-			return c != '-' && !unicode.IsLetter(c) && !unicode.IsNumber(c)
-		}) {
-			options.Cache.DefaultNamespaces[namespace] = runtime.CacheConfig{}
-		}
-	}
-
 	options.Controller.GroupKindConcurrency = map[string]int{
 		"PostgresCluster." + v1beta1.GroupVersion.Group: 1,
 		"PGUpgrade." + v1beta1.GroupVersion.Group:       1,
@@ -324,13 +303,56 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 		"PerconaPGRestore." + v2.GroupVersion.Group:     1,
 	}
 
-	if s := os.Getenv("PGO_WORKERS"); s != "" {
-		if i, err := strconv.Atoi(s); err == nil && i > 0 {
-			for kind := range options.Controller.GroupKindConcurrency {
-				options.Controller.GroupKindConcurrency[kind] = i
+	// K8SPG-915
+	envs := new(envConfig)
+	if err := envconfig.Process("", envs); err != nil {
+		return options, errors.Wrap(err, "parse env vars")
+	}
+
+	options.LeaseDuration = &envs.LeaseDuration
+	options.RenewDeadline = &envs.RenewDeadline
+	options.RetryPeriod = &envs.RetryPeriod
+	options.PprofBindAddress = envs.PprofBindAddress
+
+	options.LeaderElection = envs.LeaderElection
+	if options.LeaderElection {
+		options.LeaderElectionID = perconaRuntime.ElectionID
+	}
+
+	// Enable leader elections when configured with a valid Lease.coordination.k8s.io name.
+	// - https://docs.k8s.io/concepts/architecture/leases
+	// - https://releases.k8s.io/v1.30.0/pkg/apis/coordination/validation/validation.go#L26
+	if lease := envs.LeaderElectionID; options.LeaderElection && len(lease) > 0 {
+		if errs := validation.IsDNS1123Subdomain(lease); len(errs) > 0 {
+			return options, fmt.Errorf("value for PGO_CONTROLLER_LEASE_NAME is invalid: %v", errs)
+		}
+
+		options.LeaderElectionID = lease
+		options.LeaderElectionNamespace = envs.LeaderElectionNamespace
+	}
+
+	if len(envs.SingleNamespace) > 0 || len(envs.MultiNamespaces) > 0 {
+		// Initialize DefaultNamespaces if any target namespaces are set
+		options.Cache.DefaultNamespaces = map[string]runtime.CacheConfig{}
+
+		if len(envs.SingleNamespace) > 0 {
+			options.Cache.DefaultNamespaces[envs.SingleNamespace] = runtime.CacheConfig{}
+		}
+
+		if len(envs.MultiNamespaces) > 0 {
+			for _, namespace := range strings.FieldsFunc(envs.MultiNamespaces, func(c rune) bool {
+				return c != '-' && !unicode.IsLetter(c) && !unicode.IsNumber(c)
+			}) {
+				options.Cache.DefaultNamespaces[namespace] = runtime.CacheConfig{}
 			}
-		} else {
-			log.Error(err, "PGO_WORKERS must be a positive number")
+		}
+	}
+
+	if envs.Workers < 0 {
+		log.Error(nil, "PGO_WORKERS must be a non-negative number; 0 disables the override")
+	} else if envs.Workers > 0 {
+		for kind := range options.Controller.GroupKindConcurrency {
+			options.Controller.GroupKindConcurrency[kind] = envs.Workers
 		}
 	}
 
@@ -505,4 +527,21 @@ func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
 	}
 
 	return false
+}
+
+type envConfig struct {
+	LeaderElection          bool   `default:"true" envconfig:"PGO_CONTROLLER_LEADER_ELECTION_ENABLED"`
+	LeaderElectionID        string `envconfig:"PGO_CONTROLLER_LEASE_NAME"`
+	LeaderElectionNamespace string `envconfig:"PGO_NAMESPACE"`
+
+	LeaseDuration time.Duration `default:"60s" envconfig:"PGO_CONTROLLER_LEASE_DURATION"`
+	RenewDeadline time.Duration `default:"40s" envconfig:"PGO_CONTROLLER_RENEW_DEADLINE"`
+	RetryPeriod   time.Duration `default:"10s" envconfig:"PGO_CONTROLLER_RETRY_PERIOD"`
+
+	SingleNamespace string `envconfig:"PGO_TARGET_NAMESPACE"`
+	MultiNamespaces string `envconfig:"PGO_TARGET_NAMESPACES"`
+
+	PprofBindAddress string `envconfig:"PPROF_BIND_ADDRESS"`
+
+	Workers int `envconfig:"PGO_WORKERS"`
 }

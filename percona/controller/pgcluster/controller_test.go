@@ -862,7 +862,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 		},
 		Spec: v2.PerconaPGBackupSpec{
 			PGCluster: crName,
-			RepoName:  "repo1",
+			RepoName:  ptr.To("repo1"),
 		},
 	}
 

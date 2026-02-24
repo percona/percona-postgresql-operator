@@ -1,0 +1,50 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      ca_issuer_ready=$(kubectl -n "$NAMESPACE" get issuer cert-manager-tls-ca-issuer -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [[ "$ca_issuer_ready" != "True" ]]; then
+          echo "CA Issuer is not ready: $ca_issuer_ready"
+          exit 1
+      fi
+
+      tls_issuer_ready=$(kubectl -n "$NAMESPACE" get issuer cert-manager-tls-tls-issuer -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [[ "$tls_issuer_ready" != "True" ]]; then
+          echo "TLS Issuer is not ready: $tls_issuer_ready"
+          exit 1
+      fi
+
+      ca_cert_ready=$(kubectl -n "$NAMESPACE" get certificate cert-manager-tls-cluster-ca-cert -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [[ "$ca_cert_ready" != "True" ]]; then
+          echo "CA Certificate is not ready: $ca_cert_ready"
+          exit 1
+      fi
+
+      cluster_cert_ready=$(kubectl -n "$NAMESPACE" get certificate cert-manager-tls-cluster-cert -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [[ "$cluster_cert_ready" != "True" ]]; then
+          echo "Cluster TLS Certificate is not ready: $cluster_cert_ready"
+          exit 1
+      fi
+
+      pgbouncer_cert_ready=$(kubectl -n "$NAMESPACE" get certificate cert-manager-tls-pgbouncer-cert -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [[ "$pgbouncer_cert_ready" != "True" ]]; then
+          echo "PgBouncer Certificate is not ready: $pgbouncer_cert_ready"
+          exit 1
+      fi
+
+      instance_sts=$(kubectl -n "$NAMESPACE" get sts -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/instance-set=instance1 -o jsonpath='{.items[*].metadata.name}')
+      for sts_name in $instance_sts; do
+          cert_name="${sts_name}-cert"
+          cert_ready=$(kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+          if [[ "$cert_ready" != "True" ]]; then
+              echo "Instance certificate $cert_name is not ready: $cert_ready"
+              exit 1
+          fi
+          echo "Instance certificate $cert_name is ready"
+      done

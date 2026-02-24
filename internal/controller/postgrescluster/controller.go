@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -21,8 +20,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +48,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -58,16 +60,16 @@ const (
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
 	Client          client.Client
+	Scheme          *k8sruntime.Scheme
 	DiscoveryClient *discovery.DiscoveryClient
 	IsOpenShift     bool
 	Owner           client.FieldOwner
-	PodExec         func(
-		ctx context.Context, namespace, pod, container string,
-		stdin io.Reader, stdout, stderr io.Writer, command ...string,
-	) error
-	Recorder     record.EventRecorder
-	Registration registration.Registration
-	Tracer       trace.Tracer
+	PodExec         runtime.PodExecutor
+	Recorder        record.EventRecorder
+	Registration    registration.Registration
+	Tracer          trace.Tracer
+	CertManagerCtrlFunc certmanager.NewControllerFunc
+	RestConfig          *rest.Config
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}

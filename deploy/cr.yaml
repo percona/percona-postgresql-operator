@@ -10,6 +10,7 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.9.0
+#  clusterServiceDNSSuffix: cluster.local
 #  initContainer:
 #    image: docker.io/perconalab/percona-postgresql-operator:main
 #    resources:
@@ -57,12 +58,15 @@ spec:
 #    customReplicationTLSSecret:
 #      name: replication1-cert
 #  tlsOnly: false
-
+#  tls:
+#    certValidityDuration: 2160h
+#    caValidityDuration: 26280h
 #  standby:
 #    enabled: true
 #    host: "<primary-ip>"
 #    port: "<primary-port>"
 #    repoName: repo1
+#    maxAcceptableLag: 1Gi
 
 #  openshift: true
 
@@ -406,6 +410,10 @@ spec:
 
   backups:
 #    trackLatestRestorableTime: true
+#    volumeSnapshots:
+#      mode: offline
+#      className: VOLUME-SNAPSHOT-CLASS
+#      schedule: "0 0 * * 6"
     pgbackrest:
 #      metadata:
 #        labels:

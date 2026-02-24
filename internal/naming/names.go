@@ -473,6 +473,14 @@ func PGBackRestCronJob(cluster *v1beta1.PostgresCluster, backuptype, repoName st
 	}
 }
 
+// VolumeSnapshotCronJob returns the ObjectMeta for a volume snapshot CronJob
+func VolumeSnapshotCronJob(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.GetNamespace(),
+		Name:      cluster.Name + "-snapshot",
+	}
+}
+
 // PGBackRestRestoreJob returns the ObjectMeta for a pgBackRest restore Job
 func PGBackRestRestoreJob(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
@@ -612,5 +620,21 @@ func UpgradeCheckConfigMap() metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: config.PGONamespace(),
 		Name:      "pgo-upgrade-check",
+	}
+}
+
+// CAIssuer returns the ObjectMeta for the CA Issuer used by cert-manager.
+func CAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-ca-issuer",
+	}
+}
+
+// TLSIssuer returns the ObjectMeta for the TLS Issuer used by cert-manager.
+func TLSIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-tls-issuer",
 	}
 }
