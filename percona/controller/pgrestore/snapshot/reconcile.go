@@ -756,7 +756,7 @@ func appendWALVolume(volumes []corev1.Volume, mounts []corev1.VolumeMount, insta
 	return volumes, mounts
 }
 
-func buildPrepareJobScript(instanceInfos []instancePrepareInfo, pgVersion int, pitrEnabled bool) string {
+func buildPrepareJobScript(instanceInfos []instancePrepareInfo, pgVersion int32, pitrEnabled bool) string {
 	scriptParts := []string{"set -e"}
 	walDirSuffix := fmt.Sprintf("pg%d_wal", pgVersion)
 	dataDirSuffix := fmt.Sprintf("pg%d", pgVersion)

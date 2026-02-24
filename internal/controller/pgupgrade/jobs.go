@@ -1,12 +1,14 @@
-// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2026 Crunchy Data Solutions, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 package pgupgrade
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,10 +21,9 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
-
-// Upgrade job
 
 // pgUpgradeJob returns the ObjectMeta for the pg_upgrade Job utilized to
 // upgrade from one major PostgreSQL version to another
@@ -35,24 +36,30 @@ func pgUpgradeJob(upgrade *v1beta1.PGUpgrade) metav1.ObjectMeta {
 
 // upgradeCommand returns an entrypoint that prepares the filesystem for
 // and performs a PostgreSQL major version upgrade using pg_upgrade.
-func upgradeCommand(oldVersion, newVersion int, fetchKeyCommand string, availableCPUs int) []string {
-	// Use multiple CPUs when three or more are available.
-	argJobs := fmt.Sprintf(` --jobs=%d`, max(1, availableCPUs-1))
+func upgradeCommand(spec *v1beta1.PGUpgradeSettings) []string {
+	argJobs := fmt.Sprintf(` --jobs=%d`, max(1, spec.Jobs))
+	argMethod := cmp.Or(map[string]string{
+		"Clone":         ` --clone`,
+		"Copy":          ` --copy`,
+		"CopyFileRange": ` --copy-file-range`,
+	}[spec.TransferMethod], ` --link`)
 
-	// if the fetch key command is set for TDE, provide the value during initialization
-	initdb := `/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}"`
-	if fetchKeyCommand != "" {
-		initdb += ` --encryption-key-command "` + fetchKeyCommand + `"`
-	}
+	oldVersion := spec.FromPostgresVersion
+	newVersion := spec.ToPostgresVersion
 
 	args := []string{fmt.Sprint(oldVersion), fmt.Sprint(newVersion)}
 	script := strings.Join([]string{
-		`declare -r data_volume='/pgdata' old_version="$1" new_version="$2"`,
-		`printf 'Performing PostgreSQL upgrade from version "%s" to "%s" ...\n\n' "$@"`,
+		// Exit immediately when a pipeline or subshell exits non-zero or when expanding an unset variable.
+		`shopt -so errexit nounset`,
 
-		// Note: Rather than import the nss_wrapper init container, as we do in
-		// the main postgres-operator, this job does the required nss_wrapper
+		`declare -r data_volume='/pgdata' old_version="$1" new_version="$2"`,
+		`printf 'Performing PostgreSQL upgrade from version "%s" to "%s" ...\n' "$@"`,
+		`section() { printf '\n\n%s\n' "$@"; }`,
+
+		// NOTE: Rather than import the nss_wrapper init container, as we do in
+		// the PostgresCluster controller, this job does the required nss_wrapper
 		// settings here.
+		`section 'Step 1 of 7: Ensuring username is postgres...'`,
 
 		// Create a copy of the system group definitions, but remove the "postgres"
 		// group or any group with the current GID. Replace them with our own that
@@ -71,63 +78,101 @@ func upgradeCommand(oldVersion, newVersion int, fetchKeyCommand string, availabl
 		// Enable nss_wrapper so the current UID and GID resolve to "postgres".
 		// - https://cwrap.org/nss_wrapper.html
 		`export LD_PRELOAD='libnss_wrapper.so' NSS_WRAPPER_GROUP NSS_WRAPPER_PASSWD`,
+		`id; [[ "$(id -nu)" == 'postgres' && "$(id -ng)" == 'postgres' ]]`,
+
+		`section 'Step 2 of 7: Finding data and tools...'`,
+		`old_data="${data_volume}/pg${old_version}" && [[ -d "${old_data}" ]]`,
+		`new_data="${data_volume}/pg${new_version}"`,
+
+		// Search for Postgres executables matching the old and new versions.
+		// Use `command -v` to look through all of PATH, then trim the executable name from the absolute path.
+		`old_bin=$(` + postgres.ShellPath(oldVersion) + ` && command -v postgres)`,
+		`old_bin="${old_bin%/postgres}"`,
+		`new_bin=$(` + postgres.ShellPath(newVersion) + ` && command -v pg_upgrade)`,
+		`new_bin="${new_bin%/pg_upgrade}"`,
+
+		// The executables found might not be the versions we need, so do a cursory check before writing to disk.
+		// pg_upgrade checks every executable thoroughly since PostgreSQL v14.
+		//
+		// https://git.postgresql.org/gitweb/?p=postgresql.git;hb=refs/tags/REL_10_0;f=src/bin/pg_upgrade/exec.c#l355
+		// https://git.postgresql.org/gitweb/?p=postgresql.git;hb=refs/tags/REL_14_0;f=src/bin/pg_upgrade/exec.c#l358
+		// https://git.postgresql.org/gitweb/?p=postgresql.git;hb=refs/tags/REL_18_0;f=src/bin/pg_upgrade/exec.c#l370
+		`(set -x && [[ "$("${old_bin}/postgres" --version)" =~ ") ${old_version}"($|[^0-9]) ]])`,
+		`(set -x && [[ "$("${new_bin}/initdb" --version)"   =~ ") ${new_version}"($|[^0-9]) ]])`,
+
+		// pg_upgrade writes its files in "${new_data}/pg_upgrade_output.d" since PostgreSQL v15.
+		// Change to a writable working directory to be compatible with PostgreSQL v14 and earlier.
+		//
+		// https://www.postgresql.org/docs/release/15#id-1.11.6.20.5.11.3
+		`cd "${data_volume}"`,
 
 		// Below is the pg_upgrade script used to upgrade a PostgresCluster from
 		// one major version to another. Additional information concerning the
 		// steps used and command flag specifics can be found in the documentation:
 		// - https://www.postgresql.org/docs/current/pgupgrade.html
 
-		// To begin, we first move to the mounted /pgdata directory and create a
-		// new version directory which is then initialized with the initdb command.
-		`cd /pgdata || exit`,
-		`echo -e "Step 1: Making new pgdata directory...\n"`,
-		`mkdir /pgdata/pg"${new_version}"`,
-		`echo -e "Step 2: Initializing new pgdata directory...\n"`,
-		initdb,
+		// Examine the old data directory.
+		`control=$(LC_ALL=C PGDATA="${old_data}" "${old_bin}/pg_controldata")`,
+		`read -r checksums <<< "${control##*page checksum version:}"`,
 
-		// Before running the upgrade check, which ensures the clusters are compatible,
-		// proper permissions have to be set on the old pgdata directory and the
-		// preload library settings must be copied over.
-		`echo -e "\nStep 3: Setting the expected permissions on the old pgdata directory...\n"`,
-		`chmod 700 /pgdata/pg"${old_version}"`,
-		`echo -e "Step 4: Copying shared_preload_libraries setting to new postgresql.conf file...\n"`,
-		`echo "shared_preload_libraries = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \`,
-		`/pgdata/pg"""${old_version}""" -C shared_preload_libraries)'" >> /pgdata/pg"${new_version}"/postgresql.conf`,
+		// Data checksums on the old and new data directories must match.
+		// Configuring these checksums depends on the version of initdb:
+		//
+		// - PostgreSQL v17 and earlier: disabled by default, enable with "--data-checksums"
+		// - PostgreSQL v18: enabled by default, enable with "--data-checksums", disable with "--no-data-checksums"
+		//
+		// https://www.postgresql.org/docs/release/18#RELEASE-18-MIGRATION
+		//
+		// Data page checksum version zero means checksums are disabled.
+		// Produce an initdb argument that enables or disables data checksums.
+		//
+		// https://git.postgresql.org/gitweb/?p=postgresql.git;hb=refs/tags/REL_11_0;f=src/bin/pg_verify_checksums/pg_verify_checksums.c#l303
+		// https://git.postgresql.org/gitweb/?p=postgresql.git;hb=refs/tags/REL_12_0;f=src/bin/pg_checksums/pg_checksums.c#l523
+		// https://git.postgresql.org/gitweb/?p=postgresql.git;hb=refs/tags/REL_18_0;f=src/bin/pg_checksums/pg_checksums.c#l571
+		`checksums=$(if [[ "${checksums}" -gt 0 ]]; then echo '--data-checksums'; elif [[ "${new_version}" -ge 18 ]]; then echo '--no-data-checksums'; fi)`,
 
-		// Before the actual upgrade is run, we will run the upgrade --check to
-		// verify everything before actually changing any data.
-		`echo -e "Step 5: Running pg_upgrade check...\n"`,
-		`time /usr/pgsql-"${new_version}"/bin/pg_upgrade --old-bindir /usr/pgsql-"${old_version}"/bin \`,
-		`--new-bindir /usr/pgsql-"${new_version}"/bin --old-datadir /pgdata/pg"${old_version}"\`,
-		` --new-datadir /pgdata/pg"${new_version}" --link --check` + argJobs,
+		`section 'Step 3 of 7: Initializing new data directory...'`,
+		`PGDATA="${new_data}" "${new_bin}/initdb" --allow-group-access ${checksums}`,
 
-		// Assuming the check completes successfully, the pg_upgrade command will
-		// be run that actually prepares the upgraded pgdata directory.
-		`echo -e "\nStep 6: Running pg_upgrade...\n"`,
-		`time /usr/pgsql-"${new_version}"/bin/pg_upgrade --old-bindir /usr/pgsql-"${old_version}"/bin \`,
-		`--new-bindir /usr/pgsql-"${new_version}"/bin --old-datadir /pgdata/pg"${old_version}" \`,
-		`--new-datadir /pgdata/pg"${new_version}" --link` + argJobs,
+		// Read the configured value then quote it; every single-quote U+0027 is replaced by two.
+		//
+		// https://www.postgresql.org/docs/current/config-setting.html
+		// https://www.gnu.org/software/bash/manual/bash.html#ANSI_002dC-Quoting
+		`section 'Step 4 of 7: Copying shared_preload_libraries parameter...'`,
+		`value=$(LC_ALL=C PGDATA="${old_data}" "${old_bin}/postgres" -C shared_preload_libraries)`,
+		`echo >> "${new_data}/postgresql.conf" "shared_preload_libraries = '${value//$'\''/$'\'\''}'"`,
 
-		// Since we have cleared the Patroni cluster step by removing the EndPoints, we copy patroni.dynamic.json
-		// from the old data dir to help retain PostgreSQL parameters you had set before.
-		// - https://patroni.readthedocs.io/en/latest/existing_data.html#major-upgrade-of-postgresql-version
-		`echo -e "\nStep 7: Copying patroni.dynamic.json...\n"`,
-		`cp /pgdata/pg"${old_version}"/patroni.dynamic.json /pgdata/pg"${new_version}"`,
+		// NOTE: The default for --new-bindir is the directory of pg_upgrade since PostgreSQL v13.
+		//
+		// https://www.postgresql.org/docs/release/13#id-1.11.6.28.5.11
+		`section 'Step 5 of 7: Checking for potential issues...'`,
+		`"${new_bin}/pg_upgrade" --check` + argMethod + argJobs + ` \`,
+		`--old-bindir="${old_bin}" --old-datadir="${old_data}" \`,
+		`--new-bindir="${new_bin}" --new-datadir="${new_data}"`,
 
-		`echo -e "\npg_upgrade Job Complete!"`,
+		`section 'Step 6 of 7: Performing upgrade...'`,
+		`(set -x && time "${new_bin}/pg_upgrade"` + argMethod + argJobs + ` \`,
+		`--old-bindir="${old_bin}" --old-datadir="${old_data}" \`,
+		`--new-bindir="${new_bin}" --new-datadir="${new_data}")`,
+
+		// https://patroni.readthedocs.io/en/latest/existing_data.html#major-upgrade-of-postgresql-version
+		`section 'Step 7 of 7: Copying Patroni settings...'`,
+		`(set -x && cp "${old_data}/patroni.dynamic.json" "${new_data}")`,
+
+		`section 'Success!'`,
 	}, "\n")
 
-	return append([]string{"bash", "-ceu", "--", script, "upgrade"}, args...)
+	return append([]string{"bash", "-c", "--", script, "upgrade"}, args...)
 }
 
 // largestWholeCPU returns the maximum CPU request or limit as a non-negative
 // integer of CPUs. When resources lacks any CPU, the result is zero.
-func largestWholeCPU(resources corev1.ResourceRequirements) int {
+func largestWholeCPU(resources corev1.ResourceRequirements) int64 {
 	// Read CPU quantities as millicores then divide to get the "floor."
 	// NOTE: [resource.Quantity.Value] looks easier, but it rounds up.
 	return max(
-		int(resources.Limits.Cpu().ScaledValue(resource.Milli)/1000),
-		int(resources.Requests.Cpu().ScaledValue(resource.Milli)/1000),
+		resources.Limits.Cpu().ScaledValue(resource.Milli)/1000,
+		resources.Requests.Cpu().ScaledValue(resource.Milli)/1000,
 		0)
 }
 
@@ -135,8 +180,7 @@ func largestWholeCPU(resources corev1.ResourceRequirements) int {
 // directory of the startup instance.
 func (r *PGUpgradeReconciler) generateUpgradeJob(
 	ctx context.Context, upgrade *v1beta1.PGUpgrade,
-	startup *appsv1.StatefulSet, fetchKeyCommand string,
-) *batchv1.Job {
+	startup *appsv1.StatefulSet) *batchv1.Job {
 	job := &batchv1.Job{}
 	job.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
 
@@ -180,10 +224,13 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 	job.Spec.BackoffLimit = initialize.Int32(0)
 	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 
-	// When enabled, calculate the number of CPUs for pg_upgrade.
-	wholeCPUs := 0
-	if feature.Enabled(ctx, feature.PGUpgradeCPUConcurrency) {
-		wholeCPUs = largestWholeCPU(upgrade.Spec.Resources)
+	settings := upgrade.Spec.PGUpgradeSettings.DeepCopy()
+
+	// When jobs is undefined, use one less than the number of CPUs.
+	//nolint:gosec // The CPU count is clamped to MaxInt32.
+	if settings.Jobs == 0 && feature.Enabled(ctx, feature.PGUpgradeCPUConcurrency) {
+		wholeCPUs := int32(min(math.MaxInt32, largestWholeCPU(upgrade.Spec.Resources)))
+		settings.Jobs = wholeCPUs - 1
 	}
 
 	// Replace all containers with one that does the upgrade.
@@ -215,7 +262,7 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 		// refers back to the container by name, so use that same name here.
 		Name:            database.Name,
 		SecurityContext: database.SecurityContext,
-		VolumeMounts:    volumeMounts, // K8SPG-254
+		VolumeMounts:    database.VolumeMounts,
 
 		// K8SPG-893
 		Env: []corev1.EnvVar{
@@ -232,11 +279,7 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 		},
 
 		// Use our upgrade command and the specified image and resources.
-		Command: upgradeCommand(
-			upgrade.Spec.FromPostgresVersion,
-			upgrade.Spec.ToPostgresVersion,
-			fetchKeyCommand,
-			wholeCPUs),
+		Command:         upgradeCommand(settings),
 		Image:           pgUpgradeContainerImage(upgrade),
 		ImagePullPolicy: upgrade.Spec.ImagePullPolicy,
 		Resources:       upgrade.Spec.Resources,
@@ -258,38 +301,37 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 // We currently target the `pgdata/pg{old_version}` and `pgdata/pg{old_version}_wal`
 // directories for removal.
 func removeDataCommand(upgrade *v1beta1.PGUpgrade) []string {
-	oldVersion := fmt.Sprint(upgrade.Spec.FromPostgresVersion)
+	oldVersion := upgrade.Spec.FromPostgresVersion
 
 	// Before removing the directories (both data and wal), we check that
 	// the directory is not in use by running `pg_controldata` and making sure
 	// the server state is "shut down in recovery"
-	// TODO(benjaminjb): pg_controldata seems pretty stable, but might want to
-	// experiment with a few more versions.
-	args := []string{oldVersion}
+	args := []string{fmt.Sprint(oldVersion)}
 	script := strings.Join([]string{
-		`declare -r old_version="$1"`,
-		`printf 'Removing PostgreSQL data dir for pg%s...\n\n' "$@"`,
-		`echo -e "Checking the directory exists and isn't being used...\n"`,
-		`cd /pgdata || exit`,
-		// The string `shut down in recovery` is the dbstate that postgres sets from
-		// at least version 10 to 14 when a replica has been shut down.
-		// - https://git.postgresql.org/gitweb/?p=postgresql.git;a=blob;f=src/bin/pg_controldata/pg_controldata.c;h=f911f98d946d83f1191abf35239d9b4455c5f52a;hb=HEAD#l59
-		// Note: `pg_controldata` is actually used by `pg_upgrade` before upgrading
-		// to make sure that the server in question is shut down as a primary;
-		// that aligns with our use here, where we're making sure that the server in question
-		// was shut down as a replica.
-		// - https://git.postgresql.org/gitweb/?p=postgresql.git;a=blob;f=src/bin/pg_upgrade/controldata.c;h=41b8f69b8cbe4f40e6098ad84c2e8e987e24edaf;hb=HEAD#l122
-		`if [ "$(/usr/pgsql-"${old_version}"/bin/pg_controldata /pgdata/pg"${old_version}" | grep -c "shut down in recovery")" -ne 1 ]; then echo -e "Directory in use, cannot remove..."; exit 1; fi`,
-		`echo -e "Removing old pgdata directory...\n"`,
-		// When deleting the wal directory, use `realpath` to resolve the symlink from
-		// the pgdata directory. This is necessary because the wal directory can be
-		// mounted at different places depending on if an external wal PVC is used,
-		// i.e. `/pgdata/pg14_wal` vs `/pgwal/pg14_wal`
-		`rm -rf /pgdata/pg"${old_version}" "$(realpath /pgdata/pg${old_version}/pg_wal)"`,
-		`echo -e "Remove Data Job Complete!"`,
+		// Exit immediately when a pipeline or subshell exits non-zero or when expanding an unset variable.
+		`shopt -so errexit nounset`,
+
+		`declare -r data_volume='/pgdata' old_version="$1"`,
+		`printf 'Removing PostgreSQL %s data...\n\n' "$@"`,
+		`delete() (set -x && rm -rf -- "$@")`,
+
+		`old_data="${data_volume}/pg${old_version}"`,
+		`control=$(` + postgres.ShellPath(oldVersion) + ` && LC_ALL=C pg_controldata "${old_data}")`,
+		`read -r state <<< "${control##*cluster state:}"`,
+
+		// We expect exactly one state for a replica that has been stopped.
+		//
+		// https://git.postgresql.org/gitweb/?p=postgresql.git;hb=refs/tags/REL_10_0;f=src/bin/pg_controldata/pg_controldata.c#l55
+		// https://git.postgresql.org/gitweb/?p=postgresql.git;hb=refs/tags/REL_17_0;f=src/bin/pg_controldata/pg_controldata.c#l58
+		`[[ "${state}" == 'shut down in recovery' ]] || { printf >&2 'Unexpected state! %q\n' "${state}"; exit 1; }`,
+
+		// "rm" does not follow symbolic links.
+		// Delete the old data directory after subdirectories that contain versioned data.
+		`delete "${old_data}/pg_wal/"`,
+		`delete "${old_data}" && echo 'Success!'`,
 	}, "\n")
 
-	return append([]string{"bash", "-ceu", "--", script, "remove"}, args...)
+	return append([]string{"bash", "-c", "--", script, "remove"}, args...)
 }
 
 // generateRemoveDataJob returns a Job that can remove the data
@@ -381,7 +423,7 @@ func pgUpgradeContainerImage(upgrade *v1beta1.PGUpgrade) string {
 // spec is defined. If it is undefined, an error is returned.
 func verifyUpgradeImageValue(upgrade *v1beta1.PGUpgrade) error {
 	if pgUpgradeContainerImage(upgrade) == "" {
-		return fmt.Errorf("Missing crunchy-upgrade image")
+		return fmt.Errorf("missing crunchy-upgrade image")
 	}
 	return nil
 }

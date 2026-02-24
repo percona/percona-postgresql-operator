@@ -459,8 +459,8 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 		cluster.Spec.DataSource.Volumes.PGDataVolume.PVCName,
 		cluster.Spec.DataSource.Volumes.PGDataVolume.Directory,
 		cluster.Spec.DataSource.Volumes.PGDataVolume.Directory,
-		strconv.Itoa(cluster.Spec.PostgresVersion),
-		strconv.Itoa(cluster.Spec.PostgresVersion))
+		strconv.Itoa(int(cluster.Spec.PostgresVersion)),
+		strconv.Itoa(int(cluster.Spec.PostgresVersion)))
 
 	container := corev1.Container{
 		Command:         []string{"bash", "-ceu", script},

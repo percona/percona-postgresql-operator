@@ -39,29 +39,6 @@ type PGUpgradeSpec struct {
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
-	// TODO(benjaminjb): define webhook validation to make sure
-	// `fromPostgresVersion` is below `toPostgresVersion`
-	// or leverage other validation rules, such as the Common Expression Language
-	// rules currently in alpha as of Kubernetes 1.23
-	// - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation-rules
-
-	// The major version of PostgreSQL before the upgrade.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=18
-	FromPostgresVersion int `json:"fromPostgresVersion"`
-
-	// TODO(benjaminjb): define webhook validation to make sure
-	// `fromPostgresVersion` is below `toPostgresVersion`
-	// or leverage other validation rules, such as the Common Expression Language
-	// rules currently in alpha as of Kubernetes 1.23
-
-	// The major version of PostgreSQL to be upgraded to.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=13
-	// +kubebuilder:validation:Maximum=18
-	ToPostgresVersion int `json:"toPostgresVersion"`
-
 	// The image name to use for PostgreSQL containers after upgrade.
 	// When omitted, the value comes from an operator environment variable.
 	// +optional
@@ -97,6 +74,50 @@ type PGUpgradeSpec struct {
 	// The list of volume mounts to mount to upgrade pod.
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	PGUpgradeSettings `json:",inline"`
+}
+
+// Arguments and settings for the pg_upgrade tool.
+// See: https://www.postgresql.org/docs/current/pgupgrade.html
+// ---
+// +kubebuilder:validation:XValidation:rule=`self.fromPostgresVersion < self.toPostgresVersion`
+// +kubebuilder:validation:XValidation:rule=`!has(self.transferMethod) || (self.toPostgresVersion < 12 ? self.transferMethod in ["Copy","Link"] : true)`,message="Only Copy or Link before PostgreSQL 12"
+// +kubebuilder:validation:XValidation:rule=`!has(self.transferMethod) || (self.toPostgresVersion < 17 ? self.transferMethod in ["Clone","Copy","Link"] : true)`,message="Only Clone, Copy, or Link before PostgreSQL 17"
+type PGUpgradeSettings struct {
+
+	// The major version of PostgreSQL before the upgrade.
+	// ---
+	// +kubebuilder:validation:Minimum=12
+	// +kubebuilder:validation:Maximum=18
+	// +required
+	FromPostgresVersion int32 `json:"fromPostgresVersion"`
+
+	// The number of simultaneous processes pg_upgrade should use.
+	// More info: https://www.postgresql.org/docs/current/pgupgrade.html
+	// ---
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Jobs int32 `json:"jobs,omitempty"`
+
+	// The major version of PostgreSQL to be upgraded to.
+	// ---
+	// +kubebuilder:validation:Minimum=13
+	// +kubebuilder:validation:Maximum=18
+	// +required
+	ToPostgresVersion int32 `json:"toPostgresVersion"`
+
+	// The method pg_upgrade should use to transfer files to the new cluster.
+	// More info: https://www.postgresql.org/docs/current/pgupgrade.html
+	// ---
+	// Different versions of the tool have different methods.
+	// - Copy and Link forever:  https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/bin/pg_upgrade/pg_upgrade.h;hb=REL_10_0#l232
+	// - Clone since 12:         https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/bin/pg_upgrade/pg_upgrade.h;hb=REL_12_0#l232
+	// - CopyFileRange since 17: https://git.postgresql.org/gitweb/?p=postgresql.git;f=src/bin/pg_upgrade/pg_upgrade.h;hb=REL_17_0#l251
+	//
+	// +kubebuilder:validation:Enum={Clone,Copy,CopyFileRange,Link}
+	// +optional
+	TransferMethod string `json:"transferMethod,omitempty"`
 }
 
 // PGUpgradeStatus defines the observed state of PGUpgrade

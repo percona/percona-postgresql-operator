@@ -96,10 +96,10 @@ type PerconaPGClusterSpec struct {
 
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=12
+	// +kubebuilder:validation:Minimum=13
 	// +kubebuilder:validation:Maximum=18
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	PostgresVersion int `json:"postgresVersion"`
+	PostgresVersion int32 `json:"postgresVersion"`
 
 	Secrets SecretsSpec `json:"secrets,omitempty"`
 
@@ -456,7 +456,7 @@ type PostgresStatus struct {
 	InstanceSets []PostgresInstanceSetStatus `json:"instances"`
 
 	// +optional
-	Version int `json:"version"`
+	Version int32 `json:"version"`
 
 	// +optional
 	ImageID string `json:"imageID"`

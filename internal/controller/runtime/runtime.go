@@ -1,22 +1,18 @@
-// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2026 Crunchy Data Solutions, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 package runtime
 
 import (
-	"context"
-
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -63,13 +59,7 @@ func NewManager(config *rest.Config, options manager.Options) (manager.Manager, 
 	}
 
 	if err == nil {
-		// Create a copy of the config to avoid modifying the original
-		configCopy := rest.CopyConfig(config)
-
-		// Ensure throttling is disabled by setting a fake rate limiter
-		configCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
-
-		m, err = manager.New(configCopy, options)
+		m, err = manager.New(config, options)
 	}
 
 	return m, err
@@ -77,6 +67,3 @@ func NewManager(config *rest.Config, options manager.Options) (manager.Manager, 
 
 // SetLogger assigns the default Logger used by [sigs.k8s.io/controller-runtime].
 func SetLogger(logger logging.Logger) { log.SetLogger(logger) }
-
-// SignalHandler returns a Context that is canceled on SIGINT or SIGTERM.
-func SignalHandler() context.Context { return signals.SetupSignalHandler() }

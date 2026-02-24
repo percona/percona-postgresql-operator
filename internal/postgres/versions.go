@@ -7,7 +7,7 @@ package postgres
 import "time"
 
 // https://www.postgresql.org/support/versioning
-var finalReleaseDates = map[int]time.Time{
+var finalReleaseDates = map[int32]time.Time{
 	10: time.Date(2022, time.November+1, 10, 0, 0, 0, 0, time.UTC),
 	11: time.Date(2023, time.November+1, +9, 0, 0, 0, 0, time.UTC),
 	12: time.Date(2024, time.November+1, 14, 0, 0, 0, 0, time.UTC),
@@ -20,7 +20,7 @@ var finalReleaseDates = map[int]time.Time{
 
 // ReleaseIsFinal returns whether or not t is definitively past the final
 // scheduled release of a Postgres version.
-func ReleaseIsFinal(majorVersion int, t time.Time) bool {
+func ReleaseIsFinal(majorVersion int32, t time.Time) bool {
 	known, ok := finalReleaseDates[majorVersion]
 	return ok && t.After(known)
 }

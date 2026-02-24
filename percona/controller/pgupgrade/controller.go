@@ -19,7 +19,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -184,7 +183,7 @@ func (r *PGUpgradeReconciler) createPGUpgrade(ctx context.Context, cluster *pgv2
 		return r.Client.Create(ctx, pgUpgrade)
 	}
 
-	for _, pgVersion := range []int{perconaPGUpgrade.Spec.FromPostgresVersion, perconaPGUpgrade.Spec.ToPostgresVersion} {
+	for _, pgVersion := range []int32{perconaPGUpgrade.Spec.FromPostgresVersion, perconaPGUpgrade.Spec.ToPostgresVersion} {
 		extensionKeys := make([]string, 0)
 
 		for _, extension := range cluster.Spec.Extensions.Custom {
@@ -253,7 +252,6 @@ func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pg
 	pgCluster.Spec.Image = pgUpgrade.Spec.ToPostgresImage
 	pgCluster.Spec.Proxy.PGBouncer.Image = pgUpgrade.Spec.ToPgBouncerImage
 	pgCluster.Spec.Backups.PGBackRest.Image = pgUpgrade.Spec.ToPgBackRestImage
-	pgCluster.Spec.Patroni.CreateReplicaMethods = []v1beta1.CreateReplicaMethod{"basebackup"}
 
 	log.Info("Finalizing upgrade",
 		"newPostgresVersion", pgCluster.Spec.PostgresVersion,

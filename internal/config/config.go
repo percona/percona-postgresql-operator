@@ -101,7 +101,7 @@ func PGExporterContainerImage(cluster *v1beta1.PostgresCluster) string {
 
 // PostgresContainerImageString returns the container image to use for PostgreSQL (from string params).
 // This func copies logic from original PostgresContainerImage as is, leaving PostgresContainerImage as a wrapper for upstream compatibility
-func PostgresContainerImageString(image string, postgresVersion int, postGISVersion string) string {
+func PostgresContainerImageString(image string, postgresVersion int32, postGISVersion string) string {
 	key := "RELATED_IMAGE_POSTGRES_" + fmt.Sprint(postgresVersion)
 
 	if postGISVersion != "" {

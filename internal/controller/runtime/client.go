@@ -1,4 +1,4 @@
-// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2026 Crunchy Data Solutions, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -81,3 +82,16 @@ func (fn ClientUpdate) Update(ctx context.Context, obj client.Object, opts ...cl
 func (fn ClientApply) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
 	return fn(ctx, obj, opts...)
 }
+
+// WarningHandler implements [rest.WarningHandler] and [rest.WarningHandlerWithContext] as a single function.
+type WarningHandler func(ctx context.Context, code int, agent string, text string)
+
+func (fn WarningHandler) HandleWarningHeader(code int, agent string, text string) {
+	fn(context.Background(), code, agent, text)
+}
+func (fn WarningHandler) HandleWarningHeaderWithContext(ctx context.Context, code int, agent string, text string) {
+	fn(ctx, code, agent, text)
+}
+
+var _ rest.WarningHandler = WarningHandler(nil)
+var _ rest.WarningHandlerWithContext = WarningHandler(nil)

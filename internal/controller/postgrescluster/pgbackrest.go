@@ -1116,6 +1116,8 @@ func (r *Reconciler) prepareForRestore(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, observed *observedInstances,
 	currentEndpoints []corev1.Endpoints, restoreJob *batchv1.Job, restoreID string,
 ) error {
+	log := logging.FromContext(ctx)
+
 	setPreparingClusterCondition := func(resource string) {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			ObservedGeneration: cluster.GetGeneration(),
@@ -1148,6 +1150,10 @@ func (r *Reconciler) prepareForRestore(ctx context.Context,
 		}
 	}
 
+	if primary != nil {
+		log.Info("Primary found", "primary", primary.Name)
+	}
+
 	// Set the proper startup instance for the restore.  This specifically enables a delta
 	// restore by attempting to find an existing instance whose PVC (if it exists, e.g. as
 	// in the case of an in-place restore where all PVCs are kept in place) can be utilized
@@ -1171,6 +1177,7 @@ func (r *Reconciler) prepareForRestore(ctx context.Context,
 		} else {
 			return errors.New("unable to determine startup instance for restore")
 		}
+		log.Info("Selected startup instance for the restore", "instance", cluster.Status.StartupInstance, "instanceSet", cluster.Status.InstanceSets)
 	}
 
 	// remove any existing restore Jobs
@@ -1186,6 +1193,7 @@ func (r *Reconciler) prepareForRestore(ctx context.Context,
 	if clusterRunning {
 		setPreparingClusterCondition("removing runners")
 		for _, runner := range runners {
+			log.Info("Deleting instance", "instance", runner.Name)
 			err := r.Client.Delete(ctx, runner,
 				client.PropagationPolicy(metav1.DeletePropagationForeground))
 			if client.IgnoreNotFound(err) != nil {
@@ -1217,6 +1225,7 @@ func (r *Reconciler) prepareForRestore(ctx context.Context,
 	setPreparingClusterCondition("removing DCS")
 	// delete any Endpoints
 	for i := range currentEndpoints {
+		log.Info("Deleting endpoint", "endpoint", &currentEndpoints[i].Name)
 		if err := r.Client.Delete(ctx, &currentEndpoints[i]); client.IgnoreNotFound(err) != nil {
 			return errors.WithStack(err)
 		}

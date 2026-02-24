@@ -99,7 +99,7 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 		populatePGInstanceConfigurationMap(
 			serviceName, serviceNamespace, repoHostName, pgdataDir,
 			config.FetchKeyCommand(&postgresCluster.Spec),
-			strconv.Itoa(postgresCluster.Spec.PostgresVersion),
+			strconv.Itoa(int(postgresCluster.Spec.PostgresVersion)),
 			pgPort, postgresCluster.Spec.Backups.PGBackRest.Repos,
 			postgresCluster.Spec.Backups.PGBackRest.Global,
 			postgresCluster.Spec.ClusterServiceDNSSuffix).String()
@@ -119,7 +119,7 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 			populateRepoHostConfigurationMap(
 				serviceName, serviceNamespace,
 				pgdataDir, config.FetchKeyCommand(&postgresCluster.Spec),
-				strconv.Itoa(postgresCluster.Spec.PostgresVersion),
+				strconv.Itoa(int(postgresCluster.Spec.PostgresVersion)),
 				pgPort, instanceNames,
 				postgresCluster.Spec.Backups.PGBackRest.Repos,
 				postgresCluster.Spec.Backups.PGBackRest.Global,

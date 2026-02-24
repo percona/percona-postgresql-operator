@@ -45,7 +45,7 @@ func (r *PGClusterReconciler) getVersionMeta(cr *v2.PerconaPGCluster, operatorDe
 		CRUID:           string(cr.GetUID()),
 		KubeVersion:     r.KubeVersion,
 		Platform:        r.Platform,
-		PGVersion:       strconv.Itoa(cr.Spec.PostgresVersion),
+		PGVersion:       strconv.Itoa(int(cr.Spec.PostgresVersion)),
 		BackupVersion:   "",
 		PMMVersion:      "",
 		PMMEnabled:      cr.PMMEnabled(),

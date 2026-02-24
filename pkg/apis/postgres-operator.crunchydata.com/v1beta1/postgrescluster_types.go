@@ -131,7 +131,7 @@ type PostgresClusterSpec struct {
 	// +kubebuilder:validation:Minimum=12
 	// +kubebuilder:validation:Maximum=18
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
-	PostgresVersion int `json:"postgresVersion"`
+	PostgresVersion int32 `json:"postgresVersion"`
 
 	// The PostGIS extension version installed in the PostgreSQL image.
 	// When image is not set, indicates a PostGIS enabled image will be used.
@@ -405,7 +405,7 @@ type PostgresClusterStatus struct {
 	// Stores the current PostgreSQL major version following a successful
 	// major PostgreSQL upgrade.
 	// +optional
-	PostgresVersion int `json:"postgresVersion"`
+	PostgresVersion int32 `json:"postgresVersion"`
 
 	// Current state of the PostgreSQL proxy.
 	// +optional

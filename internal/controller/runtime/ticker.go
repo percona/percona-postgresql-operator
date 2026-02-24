@@ -1,4 +1,4 @@
-// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2026 Crunchy Data Solutions, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -18,7 +19,7 @@ import (
 type ticker struct {
 	time.Duration
 	event.GenericEvent
-	Handler   handler.EventHandler
+	Handler   handler.TypedEventHandler[client.Object, reconcile.Request]
 	Immediate bool
 }
 

@@ -10,13 +10,13 @@ import (
 	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
-func GetExtensionKey(pgMajor int, name, version string) string {
+func GetExtensionKey(pgMajor int32, name, version string) string {
 	return fmt.Sprintf("%s-pg%d-%s", name, pgMajor, version)
 }
 
 // RelocatorContainer returns a container that will relocate extensions from the base image (i.e. pg_stat_monitor, pg_audit)
 // to the data directory so we don't lose them when user adds a custom extension.
-func RelocatorContainer(cr *pgv2.PerconaPGCluster, image string, imagePullPolicy corev1.PullPolicy, postgresVersion int) corev1.Container {
+func RelocatorContainer(cr *pgv2.PerconaPGCluster, image string, imagePullPolicy corev1.PullPolicy, postgresVersion int32) corev1.Container {
 	mounts := []corev1.VolumeMount{
 		{
 			Name:      "postgres-data",
@@ -42,14 +42,14 @@ func RelocatorContainer(cr *pgv2.PerconaPGCluster, image string, imagePullPolicy
 		Env: []corev1.EnvVar{
 			{
 				Name:  "PG_VERSION",
-				Value: strconv.Itoa(postgresVersion),
+				Value: strconv.Itoa(int(postgresVersion)),
 			},
 		},
 		VolumeMounts: mounts,
 	}
 }
 
-func InstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int, spec *pgv2.ExtensionsSpec, extensions string, openshift *bool) corev1.Container {
+func InstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int32, spec *pgv2.ExtensionsSpec, extensions string, openshift *bool) corev1.Container {
 	mounts := []corev1.VolumeMount{
 		{
 			Name:      "postgres-data",
@@ -86,11 +86,11 @@ func InstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int, spec *pg
 			},
 			{
 				Name:  "PG_VERSION",
-				Value: strconv.Itoa(postgresVersion),
+				Value: strconv.Itoa(int(postgresVersion)),
 			},
 			{
 				Name:  "PGDATA_EXTENSIONS",
-				Value: "/pgdata/extension/" + strconv.Itoa(postgresVersion),
+				Value: "/pgdata/extension/" + strconv.Itoa(int(postgresVersion)),
 			},
 		},
 		EnvFrom: []corev1.EnvFromSource{
@@ -133,7 +133,7 @@ func InstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int, spec *pg
 	return container
 }
 
-func VolumeMounts(postgresVersion int) []corev1.VolumeMount {
+func VolumeMounts(postgresVersion int32) []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
 			Name:      "postgres-data",

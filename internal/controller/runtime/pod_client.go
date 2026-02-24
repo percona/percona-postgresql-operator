@@ -1,4 +1,4 @@
-// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2026 Crunchy Data Solutions, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,9 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // podExecutor runs command on container in pod in namespace. Non-nil streams
@@ -26,8 +24,8 @@ type PodExecutor func(
 ) error
 
 func newPodClient(config *rest.Config) (rest.Interface, error) {
-	codecs := serializer.NewCodecFactory(scheme.Scheme)
-	gvk, _ := apiutil.GVKForObject(&corev1.Pod{}, scheme.Scheme)
+	codecs := serializer.NewCodecFactory(Scheme)
+	gvk, _ := apiutil.GVKForObject(&corev1.Pod{}, Scheme)
 	httpClient, err := rest.HTTPClientFor(config)
 	if err != nil {
 		return nil, err
@@ -38,13 +36,7 @@ func newPodClient(config *rest.Config) (rest.Interface, error) {
 // +kubebuilder:rbac:groups="",resources="pods/exec",verbs={create}
 
 func NewPodExecutor(config *rest.Config) (PodExecutor, error) {
-	// Create a copy of the config to avoid modifying the original
-	configCopy := rest.CopyConfig(config)
-
-	// Ensure throttling is disabled by setting a fake rate limiter
-	configCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
-
-	client, err := newPodClient(configCopy)
+	client, err := newPodClient(config)
 
 	return func(
 		ctx context.Context, namespace, pod, container string,
@@ -61,10 +53,8 @@ func NewPodExecutor(config *rest.Config) (PodExecutor, error) {
 				Stderr:    stderr != nil,
 			}, scheme.ParameterCodec)
 
-		exec, err := remotecommand.NewSPDYExecutor(configCopy, "POST", request.URL())
+		exec, err := remotecommand.NewSPDYExecutor(config, "POST", request.URL())
 
-		log := logf.FromContext(ctx)
-		log.V(1).Info("Running command in pod", "pod", pod, "container", container, "command", command)
 		if err == nil {
 			err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 				Stdin:  stdin,

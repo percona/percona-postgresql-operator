@@ -1,4 +1,4 @@
-// Copyright 2021 - 2024 Crunchy Data Solutions, Inc.
+// Copyright 2021 - 2026 Crunchy Data Solutions, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -19,17 +19,18 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func TestLargestWholeCPU(t *testing.T) {
-	assert.Equal(t, 0,
+	assert.Equal(t, int64(0),
 		largestWholeCPU(corev1.ResourceRequirements{}),
 		"expected the zero value to be zero")
 
 	for _, tt := range []struct {
 		Name, ResourcesYAML string
-		Result              int
+		Result              int64
 	}{
 		{
 			Name: "Negatives", ResourcesYAML: `{requests: {cpu: -3}, limits: {cpu: -5}}`,
@@ -54,7 +55,7 @@ func TestLargestWholeCPU(t *testing.T) {
 	} {
 		t.Run(tt.Name, func(t *testing.T) {
 			var resources corev1.ResourceRequirements
-			assert.NilError(t, yaml.Unmarshal([]byte(tt.ResourcesYAML), &resources))
+			require.UnmarshalInto(t, &resources, tt.ResourcesYAML)
 			assert.Equal(t, tt.Result, largestWholeCPU(resources))
 		})
 	}
@@ -72,26 +73,52 @@ func TestUpgradeCommand(t *testing.T) {
 		})
 	}
 
-	t.Run("CPUs", func(t *testing.T) {
+	t.Run("Jobs", func(t *testing.T) {
 		for _, tt := range []struct {
-			CPUs int
-			Jobs string
+			Spec int32
+			Args string
 		}{
-			{CPUs: 0, Jobs: "--jobs=1"},
-			{CPUs: 1, Jobs: "--jobs=1"},
-			{CPUs: 2, Jobs: "--jobs=1"},
-			{CPUs: 3, Jobs: "--jobs=2"},
-			{CPUs: 10, Jobs: "--jobs=9"},
+			{Spec: -1, Args: "--jobs=1"},
+			{Spec: 0, Args: "--jobs=1"},
+			{Spec: 1, Args: "--jobs=1"},
+			{Spec: 2, Args: "--jobs=2"},
+			{Spec: 10, Args: "--jobs=10"},
 		} {
-			command := upgradeCommand(10, 11, "", tt.CPUs)
+			spec := &v1beta1.PGUpgradeSettings{Jobs: tt.Spec}
+			command := upgradeCommand(spec)
 			assert.Assert(t, len(command) > 3)
-			assert.DeepEqual(t, []string{"bash", "-ceu", "--"}, command[:3])
+			assert.DeepEqual(t, []string{"bash", "-c", "--"}, command[:3])
 
 			script := command[3]
-			assert.Assert(t, cmp.Contains(script, tt.Jobs))
+			assert.Assert(t, cmp.Contains(script, tt.Args))
 
 			expectScript(t, script)
 		}
+	})
+
+	t.Run("Method", func(t *testing.T) {
+		for _, tt := range []struct {
+			Spec string
+			Args string
+		}{
+			{Spec: "", Args: "--link"},
+			{Spec: "mystery!", Args: "--link"},
+			{Spec: "Link", Args: "--link"},
+			{Spec: "Clone", Args: "--clone"},
+			{Spec: "Copy", Args: "--copy"},
+			{Spec: "CopyFileRange", Args: "--copy-file-range"},
+		} {
+			spec := &v1beta1.PGUpgradeSettings{TransferMethod: tt.Spec}
+			command := upgradeCommand(spec)
+			assert.Assert(t, len(command) > 3)
+			assert.DeepEqual(t, []string{"bash", "-c", "--"}, command[:3])
+
+			script := command[3]
+			assert.Assert(t, cmp.Contains(script, tt.Args))
+
+			expectScript(t, script)
+		}
+
 	})
 }
 
@@ -110,19 +137,9 @@ func TestGenerateUpgradeJob(t *testing.T) {
 	upgrade.Spec.Resources.Requests = corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("3.14"),
 	}
-	upgrade.Spec.InitContainers = []corev1.Container{
-		{
-			Name: "upgrade-init-container",
-		},
-	}
 
 	startup := &appsv1.StatefulSet{}
 	startup.Spec.Template.Spec = corev1.PodSpec{
-		InitContainers: []corev1.Container{
-			{
-				Name: ContainerDatabase + "-init",
-			},
-		},
 		Containers: []corev1.Container{{
 			Name: ContainerDatabase,
 
@@ -141,7 +158,7 @@ func TestGenerateUpgradeJob(t *testing.T) {
 		},
 	}
 
-	job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "")
+	job := reconciler.generateUpgradeJob(ctx, upgrade, startup)
 	assert.Assert(t, cmp.MarshalMatches(job, `
 apiVersion: batch/v1
 kind: Job
@@ -177,11 +194,14 @@ spec:
       containers:
       - command:
         - bash
-        - -ceu
+        - -c
         - --
         - |-
+          shopt -so errexit nounset
           declare -r data_volume='/pgdata' old_version="$1" new_version="$2"
-          printf 'Performing PostgreSQL upgrade from version "%s" to "%s" ...\n\n' "$@"
+          printf 'Performing PostgreSQL upgrade from version "%s" to "%s" ...\n' "$@"
+          section() { printf '\n\n%s\n' "$@"; }
+          section 'Step 1 of 7: Ensuring username is postgres...'
           gid=$(id -G); NSS_WRAPPER_GROUP=$(mktemp)
           (sed "/^postgres:x:/ d; /^[^:]*:x:${gid%% *}:/ d" /etc/group
           echo "postgres:x:${gid%% *}:") > "${NSS_WRAPPER_GROUP}"
@@ -189,35 +209,39 @@ spec:
           (sed "/^postgres:x:/ d; /^[^:]*:x:${uid}:/ d" /etc/passwd
           echo "postgres:x:${uid}:${gid%% *}::${data_volume}:") > "${NSS_WRAPPER_PASSWD}"
           export LD_PRELOAD='libnss_wrapper.so' NSS_WRAPPER_GROUP NSS_WRAPPER_PASSWD
-          cd /pgdata || exit
-          echo -e "Step 1: Making new pgdata directory...\n"
-          mkdir /pgdata/pg"${new_version}"
-          echo -e "Step 2: Initializing new pgdata directory...\n"
-          /usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}"
-          echo -e "\nStep 3: Setting the expected permissions on the old pgdata directory...\n"
-          chmod 700 /pgdata/pg"${old_version}"
-          echo -e "Step 4: Copying shared_preload_libraries setting to new postgresql.conf file...\n"
-          echo "shared_preload_libraries = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \
-          /pgdata/pg"""${old_version}""" -C shared_preload_libraries)'" >> /pgdata/pg"${new_version}"/postgresql.conf
-          echo -e "Step 5: Running pg_upgrade check...\n"
-          time /usr/pgsql-"${new_version}"/bin/pg_upgrade --old-bindir /usr/pgsql-"${old_version}"/bin \
-          --new-bindir /usr/pgsql-"${new_version}"/bin --old-datadir /pgdata/pg"${old_version}"\
-           --new-datadir /pgdata/pg"${new_version}" --link --check --jobs=1
-          echo -e "\nStep 6: Running pg_upgrade...\n"
-          time /usr/pgsql-"${new_version}"/bin/pg_upgrade --old-bindir /usr/pgsql-"${old_version}"/bin \
-          --new-bindir /usr/pgsql-"${new_version}"/bin --old-datadir /pgdata/pg"${old_version}" \
-          --new-datadir /pgdata/pg"${new_version}" --link --jobs=1
-          echo -e "\nStep 7: Copying patroni.dynamic.json...\n"
-          cp /pgdata/pg"${old_version}"/patroni.dynamic.json /pgdata/pg"${new_version}"
-          echo -e "\npg_upgrade Job Complete!"
+          id; [[ "$(id -nu)" == 'postgres' && "$(id -ng)" == 'postgres' ]]
+          section 'Step 2 of 7: Finding data and tools...'
+          old_data="${data_volume}/pg${old_version}" && [[ -d "${old_data}" ]]
+          new_data="${data_volume}/pg${new_version}"
+          old_bin=$(PATH="/usr/lib/postgresql/19/bin:/usr/libexec/postgresql19:/usr/pgsql-19/bin${PATH+:${PATH}}" && command -v postgres)
+          old_bin="${old_bin%/postgres}"
+          new_bin=$(PATH="/usr/lib/postgresql/25/bin:/usr/libexec/postgresql25:/usr/pgsql-25/bin${PATH+:${PATH}}" && command -v pg_upgrade)
+          new_bin="${new_bin%/pg_upgrade}"
+          (set -x && [[ "$("${old_bin}/postgres" --version)" =~ ") ${old_version}"($|[^0-9]) ]])
+          (set -x && [[ "$("${new_bin}/initdb" --version)"   =~ ") ${new_version}"($|[^0-9]) ]])
+          cd "${data_volume}"
+          control=$(LC_ALL=C PGDATA="${old_data}" "${old_bin}/pg_controldata")
+          read -r checksums <<< "${control##*page checksum version:}"
+          checksums=$(if [[ "${checksums}" -gt 0 ]]; then echo '--data-checksums'; elif [[ "${new_version}" -ge 18 ]]; then echo '--no-data-checksums'; fi)
+          section 'Step 3 of 7: Initializing new data directory...'
+          PGDATA="${new_data}" "${new_bin}/initdb" --allow-group-access ${checksums}
+          section 'Step 4 of 7: Copying shared_preload_libraries parameter...'
+          value=$(LC_ALL=C PGDATA="${old_data}" "${old_bin}/postgres" -C shared_preload_libraries)
+          echo >> "${new_data}/postgresql.conf" "shared_preload_libraries = '${value//$'\''/$'\'\''}'"
+          section 'Step 5 of 7: Checking for potential issues...'
+          "${new_bin}/pg_upgrade" --check --link --jobs=1 \
+          --old-bindir="${old_bin}" --old-datadir="${old_data}" \
+          --new-bindir="${new_bin}" --new-datadir="${new_data}"
+          section 'Step 6 of 7: Performing upgrade...'
+          (set -x && time "${new_bin}/pg_upgrade" --link --jobs=1 \
+          --old-bindir="${old_bin}" --old-datadir="${old_data}" \
+          --new-bindir="${new_bin}" --new-datadir="${new_data}")
+          section 'Step 7 of 7: Copying Patroni settings...'
+          (set -x && cp "${old_data}/patroni.dynamic.json" "${new_data}")
+          section 'Success!'
         - upgrade
         - "19"
         - "25"
-        env:
-        - name: LC_ALL
-          value: en_US.utf-8
-        - name: LANG
-          value: en_US.utf-8
         image: img4
         name: database
         resources:
@@ -228,11 +252,6 @@ spec:
         volumeMounts:
         - mountPath: /mnt/some/such
           name: vm1
-      initContainers:
-      - name: database-init
-        resources: {}
-      - name: upgrade-init-container
-        resources: {}
       restartPolicy: Never
       volumes:
       - hostPath:
@@ -248,13 +267,9 @@ status: {}
 		}))
 		ctx := feature.NewContext(context.Background(), gate)
 
-		job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "")
+		job := reconciler.generateUpgradeJob(ctx, upgrade, startup)
 		assert.Assert(t, cmp.MarshalContains(job, `--jobs=2`))
 	})
-
-	tdeJob := reconciler.generateUpgradeJob(ctx, upgrade, startup, "echo testKey")
-	assert.Assert(t, cmp.MarshalContains(tdeJob,
-		`/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}" --encryption-key-command "echo testKey"`))
 }
 
 func TestGenerateRemoveDataJob(t *testing.T) {
@@ -328,17 +343,19 @@ spec:
       containers:
       - command:
         - bash
-        - -ceu
+        - -c
         - --
         - |-
-          declare -r old_version="$1"
-          printf 'Removing PostgreSQL data dir for pg%s...\n\n' "$@"
-          echo -e "Checking the directory exists and isn't being used...\n"
-          cd /pgdata || exit
-          if [ "$(/usr/pgsql-"${old_version}"/bin/pg_controldata /pgdata/pg"${old_version}" | grep -c "shut down in recovery")" -ne 1 ]; then echo -e "Directory in use, cannot remove..."; exit 1; fi
-          echo -e "Removing old pgdata directory...\n"
-          rm -rf /pgdata/pg"${old_version}" "$(realpath /pgdata/pg${old_version}/pg_wal)"
-          echo -e "Remove Data Job Complete!"
+          shopt -so errexit nounset
+          declare -r data_volume='/pgdata' old_version="$1"
+          printf 'Removing PostgreSQL %s data...\n\n' "$@"
+          delete() (set -x && rm -rf -- "$@")
+          old_data="${data_volume}/pg${old_version}"
+          control=$(PATH="/usr/lib/postgresql/19/bin:/usr/libexec/postgresql19:/usr/pgsql-19/bin${PATH+:${PATH}}" && LC_ALL=C pg_controldata "${old_data}")
+          read -r state <<< "${control##*cluster state:}"
+          [[ "${state}" == 'shut down in recovery' ]] || { printf >&2 'Unexpected state! %q\n' "${state}"; exit 1; }
+          delete "${old_data}/pg_wal/"
+          delete "${old_data}" && echo 'Success!'
         - remove
         - "19"
         image: img4
@@ -373,8 +390,7 @@ func TestPGUpgradeContainerImage(t *testing.T) {
 	t.Setenv("RELATED_IMAGE_PGUPGRADE", "env-var-pgbackrest")
 	assert.Equal(t, pgUpgradeContainerImage(upgrade), "env-var-pgbackrest")
 
-	assert.NilError(t, yaml.Unmarshal(
-		[]byte(`{ image: spec-image }`), &upgrade.Spec))
+	require.UnmarshalInto(t, &upgrade.Spec, `{ image: spec-image }`)
 	assert.Equal(t, pgUpgradeContainerImage(upgrade), "spec-image")
 }
 

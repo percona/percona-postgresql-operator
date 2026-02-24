@@ -244,12 +244,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		return err
 	}
 
-	upgradeReconciler := &pgupgrade.PGUpgradeReconciler{
-		Client: mgr.GetClient(),
-		Owner:  "pgupgrade-controller",
-	}
-
-	if err := upgradeReconciler.SetupWithManager(mgr); err != nil {
+	if err := pgupgrade.ManagedReconciler(mgr); err != nil {
 		return errors.Wrap(err, "unable to create PGUpgrade controller")
 	}
 
