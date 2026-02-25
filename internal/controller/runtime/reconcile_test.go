@@ -5,10 +5,10 @@
 package runtime
 
 import (
-	"errors"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )

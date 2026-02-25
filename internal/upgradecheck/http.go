@@ -6,12 +6,12 @@ package upgradecheck
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,7 +67,8 @@ func init() {
 
 func checkForUpgrades(ctx context.Context, url, versionString string, backoff wait.Backoff,
 	crclient crclient.Client, cfg *rest.Config,
-	isOpenShift bool, registrationToken string) (message string, header string, err error) {
+	isOpenShift bool, registrationToken string,
+) (message string, header string, err error) {
 	var headerPayloadStruct *clientUpgradeData
 
 	// Prep request
@@ -115,7 +116,7 @@ func checkForUpgrades(ctx context.Context, url, versionString string, backoff wa
 
 	// We received responses, but none of them were 200 OK.
 	if err == nil && status != http.StatusOK {
-		err = fmt.Errorf("received StatusCode %d", status)
+		err = errors.Errorf("received StatusCode %d", status)
 	}
 
 	// TODO: Parse response and log info for user on potential upgrades
@@ -139,7 +140,8 @@ type CheckForUpgradesScheduler struct {
 // we will want the upgrade mechanism to instantiate its own registration runner
 // or otherwise get the most recent token.
 func ManagedScheduler(m manager.Manager, openshift bool,
-	url, version string, registrationToken *jwt.Token) error {
+	url, version string, registrationToken *jwt.Token,
+) error {
 	if url == "" {
 		url = upgradeCheckURL
 	}

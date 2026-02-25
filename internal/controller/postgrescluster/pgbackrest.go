@@ -514,7 +514,7 @@ func unstructuredToRepoResources(kind string, repoResources *RepoResources,
 			repoResources.rolebindings = append(repoResources.rolebindings, &rb.Items[i])
 		}
 	default:
-		return fmt.Errorf("unexpected kind %q", kind)
+		return errors.Errorf("unexpected kind %q", kind)
 	}
 
 	return nil
@@ -1748,8 +1748,8 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 			forCluster: []*Instance{instance},
 		}, rootCA, backupsSpecFound)
 		if err != nil || result != (reconcile.Result{}) {
-			return fmt.Errorf("unable to reconcile pgBackRest as needed to initialize "+
-				"PostgreSQL data for the cluster: %w", err)
+			return errors.Wrap(err, "unable to reconcile pgBackRest as needed to initialize "+
+				"PostgreSQL data for the cluster")
 		}
 	} else {
 		if err := r.Client.Get(ctx,

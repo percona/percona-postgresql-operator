@@ -5,11 +5,10 @@
 package password
 
 import (
-
-	// #nosec G501
 	"crypto/md5"
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 // ErrMD5PasswordInvalid is returned when the password attributes are invalid

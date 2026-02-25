@@ -41,8 +41,8 @@ type Executor func(
 // from running (with a config mismatch indicating that the pgBackRest configuration as stored in
 // the cluster's pgBackRest ConfigMap has not yet propagated to the Pod).
 func (exec Executor) StanzaCreateOrUpgrade(ctx context.Context, configHash string,
-	postgresCluster *v1beta1.PostgresCluster) (bool, error) {
-
+	postgresCluster *v1beta1.PostgresCluster,
+) (bool, error) {
 	var stdout, stderr bytes.Buffer
 
 	var reposWithVolumes []v1beta1.PGBackRestRepo
@@ -102,7 +102,7 @@ fi
 		}
 
 		// if none of the above errors, return the err
-		return false, errors.WithStack(fmt.Errorf("%w: %v", err, errReturn))
+		return false, errors.Wrap(err, errReturn)
 	}
 
 	return false, nil
