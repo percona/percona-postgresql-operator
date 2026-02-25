@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
@@ -576,7 +577,7 @@ func instanceYAML(
 		//            We should use "no_leader" instead
 		patroniVer4, err := cluster.IsPatroniVer4()
 		if err != nil {
-			return "", fmt.Errorf("failed to check if patroni v4 is used: %w", err)
+			return "", errors.Wrap(err, "failed to check if patroni v4 is used")
 		}
 		if !patroniVer4 {
 			postgresql[pgBackRestCreateReplicaMethod] = map[string]any{
