@@ -21721,6 +21721,13 @@ spec:
                     pattern: ^repo[1-4]
                     type: string
                 type: object
+              tls:
+                properties:
+                  caValidityDuration:
+                    type: string
+                  certValidityDuration:
+                    type: string
+                type: object
               tlsOnly:
                 type: boolean
               unmanaged:
