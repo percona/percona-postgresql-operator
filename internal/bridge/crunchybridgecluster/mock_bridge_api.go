@@ -6,14 +6,13 @@ package crunchybridgecluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/bridge"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 

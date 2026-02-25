@@ -5,7 +5,7 @@
 package password
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 )
 
 // PasswordType helps to specify the type of password method (e.g. md5)
