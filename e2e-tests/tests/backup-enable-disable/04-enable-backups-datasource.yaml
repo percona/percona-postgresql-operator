@@ -13,7 +13,7 @@ commands:
       fi
 
       
-      if [[ $(kubectl get job -n "${NAMESPACE}" --no-headers -l postgres-operator.crunchydata.com/pgbackrest-backup=replica-create,postgres-operator.crunchydata.com/cluster=some-name-datasource | wc -l) > 0 ]]; then
+      if [[ $(kubectl get job -n "${NAMESPACE}" --no-headers -l postgres-operator.crunchydata.com/pgbackrest-backup=replica-create,postgres-operator.crunchydata.com/cluster=some-name-datasource | wc -l) -gt 0 ]]; then
         echo "expected pgBackRest backup job to not exist"
         exit 1
       fi

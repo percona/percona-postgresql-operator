@@ -12,7 +12,7 @@ commands:
         exit 1
       fi
 
-      if [[ $(kubectl get job --no-headers -l postgres-operator.crunchydata.com/pgbackrest-backup=replica-create | wc -l) > 0 ]]; then
+      if [[ $(kubectl get job --no-headers -l postgres-operator.crunchydata.com/pgbackrest-backup=replica-create | wc -l) -gt 0 ]]; then
         echo "backups are not disabled properly"
         exit 1
       fi
