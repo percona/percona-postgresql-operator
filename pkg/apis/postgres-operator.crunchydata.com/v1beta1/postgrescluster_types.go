@@ -54,6 +54,9 @@ type PostgresClusterSpec struct {
 
 	TLSOnly bool `json:"tlsOnly,omitempty"`
 
+	// +optional
+	TLS *TLSSpec `json:"tls,omitempty"`
+
 	// The secret containing the replication client certificates and keys for
 	// secure connections to the PostgreSQL server. It will need to contain the
 	// client TLS certificate, TLS key and the Certificate Authority certificate
@@ -211,6 +214,13 @@ type ExtensionsSpec struct {
 	PGRepack         bool `json:"pgRepack,omitempty"`
 }
 
+type TLSSpec struct {
+	// +optional
+	CertValidityDuration *metav1.Duration `json:"certValidityDuration,omitempty"`
+	// +optional
+	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
+}
+
 // DataSource defines data sources for a new PostgresCluster.
 type DataSource struct {
 	// Defines a pgBackRest cloud-based data source that can be used to pre-populate the
@@ -332,6 +342,11 @@ type PostgresClusterDataSource struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// K8SPG-873
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-873
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // Default defines several key default values for a Postgres cluster.

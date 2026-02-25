@@ -46,6 +46,16 @@ spec:
           value: "1"
         - name: PPROF_BIND_ADDRESS
           value: "0"
+        - name: PGO_CONTROLLER_LEADER_ELECTION_ENABLED
+          value: "true"
+        - name: PGO_CONTROLLER_LEASE_NAME
+          value: ""
+        - name: PGO_CONTROLLER_LEASE_DURATION
+          value: 60s
+        - name: PGO_CONTROLLER_RENEW_DEADLINE
+          value: 40s
+        - name: PGO_CONTROLLER_RETRY_PERIOD
+          value: 10s
         - name: PGO_FEATURE_GATES
           value: ""
         image: docker.io/perconalab/percona-postgresql-operator:main

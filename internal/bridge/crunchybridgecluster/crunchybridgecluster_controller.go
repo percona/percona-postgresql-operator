@@ -663,7 +663,6 @@ func (r *CrunchyBridgeClusterReconciler) handleUpdate(ctx context.Context,
 func (r *CrunchyBridgeClusterReconciler) GetSecretKeys(
 	ctx context.Context, crunchyBridgeCluster *v1beta1.CrunchyBridgeCluster,
 ) (string, string, error) {
-
 	existing := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
 		Namespace: crunchyBridgeCluster.GetNamespace(),
 		Name:      crunchyBridgeCluster.Spec.Secret,
@@ -676,7 +675,7 @@ func (r *CrunchyBridgeClusterReconciler) GetSecretKeys(
 		if existing.Data["key"] != nil && existing.Data["team"] != nil {
 			return string(existing.Data["key"]), string(existing.Data["team"]), nil
 		}
-		err = fmt.Errorf("error handling secret; expected to find a key and a team: found key %t, found team %t",
+		err = errors.Errorf("error handling secret; expected to find a key and a team: found key %t, found team %t",
 			existing.Data["key"] != nil,
 			existing.Data["team"] != nil)
 	}
