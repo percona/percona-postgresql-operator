@@ -443,7 +443,6 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	instances *observedInstances,
 	patchStatus func() error,
 ) error {
-	var podExecutor postgres.Executor
 	const container = naming.ContainerDatabase
 
 	if !cluster.Spec.Extensions.PGTDE.Enabled || cluster.Spec.Extensions.PGTDE.Vault == nil {
@@ -463,10 +462,10 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		return nil
 	}
 
-	log := logging.FromContext(ctx).WithName("PGTDE")
+	log := logging.FromContext(ctx).WithName("PGTDE").WithValues("pod", pod.Name)
 
-	ctx = logging.NewContext(ctx, logging.FromContext(ctx).WithValues("pod", pod.Name))
-	podExecutor = func(
+	ctx = logging.NewContext(ctx, log)
+	podExecutor := func(
 		ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 	) error {
 		return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
@@ -477,8 +476,10 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	// Compute revision from the desired Vault configuration only,
 	// independent of whether Add or Change will be used.
 	revision, err := safeHash32(func(hasher io.Writer) error {
-		_, err := fmt.Fprint(hasher, vault.Host, vault.MountPath,
-			vault.TokenSecret.Key, vault.CASecret.Key)
+		_, err := fmt.Fprint(hasher,
+			vault.Host, vault.MountPath,
+			vault.TokenSecret.Name, vault.TokenSecret.Key,
+			vault.CASecret.Name, vault.CASecret.Key)
 		return err
 	})
 
@@ -488,7 +489,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 
 	if err == nil {
 		log := log.WithValues("revision", revision)
-		log.Info("configuring pg_tde", "pod", pod.Name)
+		log.Info("configuring pg_tde")
 		ctx := logging.NewContext(ctx, log)
 		if cluster.Status.PGTDERevision == "" {
 			err = pgtde.AddVaultProvider(ctx, podExecutor, vault)

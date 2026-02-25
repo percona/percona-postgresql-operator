@@ -39,7 +39,7 @@ func TestEnableInPostgreSQL(t *testing.T) {
 		return expected
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	assert.Equal(t, expected, EnableInPostgreSQL(ctx, exec))
 }
 
