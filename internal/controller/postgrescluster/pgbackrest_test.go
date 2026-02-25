@@ -6,7 +6,6 @@ package postgrescluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -836,7 +836,7 @@ func TestReconcileStanzaCreate(t *testing.T) {
 	}
 
 	configHashMismatch, err = r.reconcileStanzaCreate(ctx, postgresCluster, instances, "abcde12345")
-	assert.Error(t, err, "fake stanza create failed:  ")
+	assert.Error(t, err, " : fake stanza create failed")
 	assert.Assert(t, !configHashMismatch)
 
 	assert.NilError(t, wait.PollUntilContextTimeout(ctx, time.Second/2, Scale(time.Second*2), false,

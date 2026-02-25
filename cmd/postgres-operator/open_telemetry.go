@@ -6,11 +6,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -37,7 +37,7 @@ func initOpenTelemetry() (func(), error) {
 		if filename != "" {
 			file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 			if err != nil {
-				return nil, fmt.Errorf("unable to open exporter file: %w", err)
+				return nil, errors.Wrap(err, "unable to open exporter file")
 			}
 			closer = file
 			options = append(options, stdouttrace.WithWriter(file))
@@ -45,7 +45,7 @@ func initOpenTelemetry() (func(), error) {
 
 		exporter, err := stdouttrace.New(options...)
 		if err != nil {
-			return nil, fmt.Errorf("unable to initialize stdout exporter: %w", err)
+			return nil, errors.Wrap(err, "unable to initialize stdout exporter")
 		}
 
 		provider := trace.NewTracerProvider(trace.WithBatcher(exporter))
@@ -63,7 +63,7 @@ func initOpenTelemetry() (func(), error) {
 		client := otlptracehttp.NewClient()
 		exporter, err := otlptrace.New(context.TODO(), client)
 		if err != nil {
-			return nil, fmt.Errorf("unable to initialize OTLP exporter: %w", err)
+			return nil, errors.Wrap(err, "unable to initialize OTLP exporter")
 		}
 
 		provider := trace.NewTracerProvider(trace.WithBatcher(exporter))

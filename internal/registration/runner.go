@@ -7,13 +7,13 @@ package registration
 import (
 	"context"
 	"crypto/rsa"
-	"errors"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"

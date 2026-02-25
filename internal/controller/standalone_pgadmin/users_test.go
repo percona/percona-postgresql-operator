@@ -7,12 +7,12 @@ package standalone_pgadmin
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,10 +72,8 @@ func TestReconcilePGAdminUsers(t *testing.T) {
 
 		pod.DeletionTimestamp = new(metav1.Time)
 		*pod.DeletionTimestamp = metav1.Now()
-		pod.Status.ContainerStatuses =
-			[]corev1.ContainerStatus{{Name: naming.ContainerPGAdmin}}
-		pod.Status.ContainerStatuses[0].State.Running =
-			new(corev1.ContainerStateRunning)
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: naming.ContainerPGAdmin}}
+		pod.Status.ContainerStatuses[0].State.Running = new(corev1.ContainerStateRunning)
 
 		r := new(PGAdminReconciler)
 		r.Client = fake.NewClientBuilder().WithObjects(pod).Build()
@@ -90,10 +88,8 @@ func TestReconcilePGAdminUsers(t *testing.T) {
 		pod := pod.DeepCopy()
 
 		pod.DeletionTimestamp = nil
-		pod.Status.ContainerStatuses =
-			[]corev1.ContainerStatus{{Name: naming.ContainerPGAdmin}}
-		pod.Status.ContainerStatuses[0].State.Running =
-			new(corev1.ContainerStateRunning)
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: naming.ContainerPGAdmin}}
+		pod.Status.ContainerStatuses[0].State.Running = new(corev1.ContainerStateRunning)
 		pod.Status.ContainerStatuses[0].ImageID = "fakeSHA"
 
 		r := new(PGAdminReconciler)
@@ -129,10 +125,8 @@ func TestReconcilePGAdminUsers(t *testing.T) {
 		pod := pod.DeepCopy()
 
 		pod.DeletionTimestamp = nil
-		pod.Status.ContainerStatuses =
-			[]corev1.ContainerStatus{{Name: naming.ContainerPGAdmin}}
-		pod.Status.ContainerStatuses[0].State.Running =
-			new(corev1.ContainerStateRunning)
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: naming.ContainerPGAdmin}}
+		pod.Status.ContainerStatuses[0].State.Running = new(corev1.ContainerStateRunning)
 		pod.Status.ContainerStatuses[0].ImageID = "newFakeSHA"
 
 		r := new(PGAdminReconciler)
