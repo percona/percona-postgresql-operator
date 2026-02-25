@@ -2,8 +2,10 @@ package v2
 
 import (
 	"context"
+	"os"
 
 	gover "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +49,6 @@ type PerconaPGCluster struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
-// +kubebuilder:validation:XValidation:rule="!has(self.dataSource) || (has(self.backups.pgbackrest.image) && self.backups.pgbackrest.image != \"\")",message="spec.backups.pgbackrest.image is required when spec.dataSource is set"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
@@ -284,6 +285,13 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.Backups.VolumeSnapshots.OfflineConfig == nil {
 		cr.Spec.Backups.VolumeSnapshots.OfflineConfig = DefaultOfflineSnapshotConfig()
 	}
+}
+
+func (cr *PerconaPGCluster) Validate() error {
+	if cr.Spec.DataSource != nil && cr.Spec.Backups.PGBackRest.Image == "" && os.Getenv("RELATED_IMAGE_PGBACKREST") == "" {
+		return errors.New("spec.backups.pgbackrest.image or RELATED_IMAGE_PGBACKREST is required when spec.dataSource is set")
+	}
+	return nil
 }
 
 func (cr *PerconaPGCluster) PostgresImage() string {

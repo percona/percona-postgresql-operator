@@ -239,6 +239,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "set CR version")
 	}
 	cr.Default()
+	if err := cr.Validate(); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "validate PerconaPGCluster")
+	}
 
 	if cr.Spec.OpenShift == nil {
 		cr.Spec.OpenShift = &r.IsOpenShift
