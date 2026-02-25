@@ -515,7 +515,7 @@ func unstructuredToRepoResources(kind string, repoResources *RepoResources,
 			repoResources.rolebindings = append(repoResources.rolebindings, &rb.Items[i])
 		}
 	default:
-		return fmt.Errorf("unexpected kind %q", kind)
+		return errors.Errorf("unexpected kind %q", kind)
 	}
 
 	return nil
@@ -739,6 +739,20 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 		// defined, add the defined container to the Pod.
 		if feature.Enabled(ctx, feature.PGBackrestRepoHostSidecars) && repoHost.Sidecars != nil {
 			repo.Spec.Template.Spec.Containers = append(repo.Spec.Template.Spec.Containers, repoHost.Sidecars...)
+			if postgresCluster.CompareVersion("2.9.0") >= 0 {
+				repo.Spec.Template.Spec.Volumes = append(repo.Spec.Template.Spec.Volumes, repoHost.SidecarVolumes...)
+
+				for _, v := range repoHost.SidecarPVCs {
+					repo.Spec.Template.Spec.Volumes = append(repo.Spec.Template.Spec.Volumes, corev1.Volume{
+						Name: v.Name,
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: v.Name,
+							},
+						},
+					})
+				}
+			}
 		}
 	}
 	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
@@ -1752,8 +1766,8 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 			forCluster: []*Instance{instance},
 		}, rootCA, backupsSpecFound)
 		if err != nil || result != (reconcile.Result{}) {
-			return fmt.Errorf("unable to reconcile pgBackRest as needed to initialize "+
-				"PostgreSQL data for the cluster: %w", err)
+			return errors.Wrap(err, "unable to reconcile pgBackRest as needed to initialize "+
+				"PostgreSQL data for the cluster")
 		}
 	} else {
 		if err := r.Client.Get(ctx,

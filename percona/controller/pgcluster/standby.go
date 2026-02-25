@@ -177,12 +177,12 @@ func (r *PGClusterReconciler) getLagFromMainSite(ctx context.Context, standby *v
 	// Find the main site for the standby cluster.
 	mainSiteNN, ok := standby.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
 	if !ok || mainSiteNN == "" {
-		return 0, fmt.Errorf("annotation '%s' is missing or empty", pNaming.AnnotationReplicationMainSite)
+		return 0, errors.Errorf("annotation '%s' is missing or empty", pNaming.AnnotationReplicationMainSite)
 	}
 
 	mainSiteParts := strings.Split(mainSiteNN, "/")
 	if len(mainSiteParts) != 2 {
-		return 0, fmt.Errorf("invalid format for annotation '%s': expected 'namespace/name', got '%s'", pNaming.AnnotationReplicationMainSite, mainSiteNN)
+		return 0, errors.Errorf("invalid format for annotation '%s': expected 'namespace/name', got '%s'", pNaming.AnnotationReplicationMainSite, mainSiteNN)
 	}
 
 	mainSite := &v2.PerconaPGCluster{}
@@ -209,7 +209,8 @@ func (r *PGClusterReconciler) getLagFromMainSite(ctx context.Context, standby *v
 func (r *PGClusterReconciler) getWALLagBytes(
 	ctx context.Context,
 	currentWALLSN string,
-	standby *v2.PerconaPGCluster) (int64, error) {
+	standby *v2.PerconaPGCluster,
+) (int64, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, standby)
 	if err != nil {
 		return 0, errors.Wrap(err, "get primary pod")
@@ -349,7 +350,8 @@ func pollAndRequeueStandbys(
 	ctx context.Context,
 	events chan event.GenericEvent,
 	cl client.Client,
-	namespace string) {
+	namespace string,
+) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	log := logging.FromContext(ctx).WithName("PollStandbys")

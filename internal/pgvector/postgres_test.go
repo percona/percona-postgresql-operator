@@ -2,11 +2,11 @@ package pgvector
 
 import (
 	"context"
-	"errors"
 	"io"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 )
 

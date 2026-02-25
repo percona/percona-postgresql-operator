@@ -9,7 +9,8 @@ import (
 	"crypto/x509"
 	"encoding"
 	"encoding/pem"
-	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -46,7 +47,7 @@ func (c *Certificate) UnmarshalText(data []byte) error {
 	block, _ := pem.Decode(data)
 
 	if block == nil || block.Type != pemLabelCertificate {
-		return fmt.Errorf("not a PEM-encoded certificate")
+		return errors.New("not a PEM-encoded certificate")
 	}
 
 	parsed, err := x509.ParseCertificate(block.Bytes)
@@ -84,7 +85,7 @@ func (k *PrivateKey) UnmarshalText(data []byte) error {
 	block, _ := pem.Decode(data)
 
 	if block == nil || block.Type != pemLabelECDSAKey {
-		return fmt.Errorf("not a PEM-encoded private key")
+		return errors.New("not a PEM-encoded private key")
 	}
 
 	key, err := x509.ParseECPrivateKey(block.Bytes)

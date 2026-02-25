@@ -5,9 +5,9 @@
 package patroni
 
 import (
-	"errors"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 

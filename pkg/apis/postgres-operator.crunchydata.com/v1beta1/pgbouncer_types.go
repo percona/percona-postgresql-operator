@@ -67,6 +67,11 @@ type PGBouncerPodSpec struct {
 	// +optional
 	Containers []corev1.Container `json:"containers,omitempty"`
 
+	// K8SPG-864
+	SidecarVolumes []corev1.Volume `json:"sidecarVolumes,omitempty"`
+	// K8SPG-864
+	SidecarPVCs []SidecarPVC `json:"sidecarPVCs,omitempty"`
+
 	// A secret projection containing a certificate and key with which to encrypt
 	// connections to PgBouncer. The "tls.crt", "tls.key", and "ca.crt" paths must
 	// be PEM-encoded certificates and keys. Changing this value causes PgBouncer
