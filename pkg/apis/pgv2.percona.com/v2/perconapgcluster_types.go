@@ -891,6 +891,9 @@ type PGInstanceSetSpec struct {
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
 
+	SidecarVolumes []corev1.Volume             `json:"sidecarVolumes,omitempty"`
+	SidecarPVCs    []crunchyv1beta1.SidecarPVC `json:"sidecarPVCs,omitempty"`
+
 	// Configuration for instance default sidecar containers.
 	// +optional
 	Containers *crunchyv1beta1.InstanceSidecars `json:"containers,omitempty"`
@@ -974,6 +977,8 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Affinity:                  p.Affinity,
 		Containers:                p.Sidecars,
 		Sidecars:                  p.Containers,
+		SidecarVolumes:            p.SidecarVolumes,
+		SidecarPVCs:               p.SidecarPVCs,
 		InitContainers:            p.InitContainers,
 		PriorityClassName:         p.PriorityClassName,
 		Replicas:                  p.Replicas,
@@ -1087,6 +1092,9 @@ type PGBouncerSpec struct {
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
 
+	SidecarVolumes []corev1.Volume             `json:"sidecarVolumes,omitempty"`
+	SidecarPVCs    []crunchyv1beta1.SidecarPVC `json:"sidecarPVCs,omitempty"`
+
 	// Configuration for pgBouncer default sidecar containers.
 	// +optional
 	Containers *crunchyv1beta1.PGBouncerSidecars `json:"containers,omitempty"`
@@ -1174,6 +1182,8 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		Affinity:                  p.Affinity,
 		Config:                    p.Config,
 		Containers:                p.Sidecars,
+		SidecarVolumes:            p.SidecarVolumes,
+		SidecarPVCs:               p.SidecarPVCs,
 		Sidecars:                  p.Containers,
 		CustomTLSSecret:           p.CustomTLSSecret,
 		ExposeSuperusers:          p.ExposeSuperusers,
