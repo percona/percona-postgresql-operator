@@ -341,7 +341,7 @@ func (r *Reconciler) generatePGBouncerService(
 				// and event could potentially be removed in favor of that validation
 				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "MisconfiguredClusterIP",
 					"NodePort cannot be set with type ClusterIP on Service %q", service.Name)
-				return nil, true, fmt.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
+				return nil, true, errors.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
 			}
 			servicePort.NodePort = *spec.NodePort
 		}
@@ -452,10 +452,8 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	// Use scheduling constraints from the cluster spec.
 	deploy.Spec.Template.Spec.Affinity = cluster.Spec.Proxy.PGBouncer.Affinity
 	deploy.Spec.Template.Spec.Tolerations = cluster.Spec.Proxy.PGBouncer.Tolerations
-	deploy.Spec.Template.Spec.PriorityClassName =
-		initialize.FromPointer(cluster.Spec.Proxy.PGBouncer.PriorityClassName)
-	deploy.Spec.Template.Spec.TopologySpreadConstraints =
-		cluster.Spec.Proxy.PGBouncer.TopologySpreadConstraints
+	deploy.Spec.Template.Spec.PriorityClassName = initialize.FromPointer(cluster.Spec.Proxy.PGBouncer.PriorityClassName)
+	deploy.Spec.Template.Spec.TopologySpreadConstraints = cluster.Spec.Proxy.PGBouncer.TopologySpreadConstraints
 
 	// if default pod scheduling is not explicitly disabled, add the default
 	// pod topology spread constraints

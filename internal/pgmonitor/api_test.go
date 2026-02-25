@@ -17,12 +17,12 @@ package pgmonitor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 )
 
