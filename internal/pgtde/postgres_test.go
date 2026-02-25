@@ -40,7 +40,7 @@ func TestEnableInPostgreSQL(t *testing.T) {
 	}
 
 	ctx := t.Context()
-	assert.Equal(t, expected, EnableInPostgreSQL(ctx, exec))
+	assert.Equal(t, expected, enableInPostgreSQL(ctx, exec))
 }
 
 func TestDisableInPostgreSQL(t *testing.T) {
@@ -66,7 +66,7 @@ func TestDisableInPostgreSQL(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	assert.Equal(t, expected, DisableInPostgreSQL(ctx, exec))
+	assert.Equal(t, expected, disableInPostgreSQL(ctx, exec))
 }
 
 func TestPostgreSQLParameters(t *testing.T) {
@@ -130,7 +130,7 @@ func TestAddVaultProvider(t *testing.T) {
 				Key:  "ca-key",
 			},
 		}
-		assert.Equal(t, expected, AddVaultProvider(ctx, exec, vault))
+		assert.Equal(t, expected, addVaultProvider(ctx, exec, vault))
 	})
 
 	t.Run("already exists", func(t *testing.T) {
@@ -150,7 +150,7 @@ func TestAddVaultProvider(t *testing.T) {
 				Key:  "token-key",
 			},
 		}
-		assert.Assert(t, errors.Is(AddVaultProvider(ctx, exec, vault), ErrAlreadyExists))
+		assert.Assert(t, errors.Is(addVaultProvider(ctx, exec, vault), errAlreadyExists))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -164,7 +164,7 @@ func TestAddVaultProvider(t *testing.T) {
 			return nil
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -173,7 +173,7 @@ func TestAddVaultProvider(t *testing.T) {
 				Key:  "token-key",
 			},
 		}
-		assert.NilError(t, AddVaultProvider(ctx, exec, vault))
+		assert.NilError(t, addVaultProvider(ctx, exec, vault))
 	})
 }
 
@@ -201,8 +201,8 @@ func TestCreateGlobalKey(t *testing.T) {
 			return expected
 		}
 
-		ctx := context.Background()
-		assert.Equal(t, expected, CreateGlobalKey(ctx, exec, clusterID))
+		ctx := t.Context()
+		assert.Equal(t, expected, createGlobalKey(ctx, exec, clusterID))
 	})
 
 	t.Run("already exists", func(t *testing.T) {
@@ -214,8 +214,8 @@ func TestCreateGlobalKey(t *testing.T) {
 			return nil
 		}
 
-		ctx := context.Background()
-		assert.Assert(t, errors.Is(CreateGlobalKey(ctx, exec, clusterID), ErrAlreadyExists))
+		ctx := t.Context()
+		assert.Assert(t, errors.Is(createGlobalKey(ctx, exec, clusterID), errAlreadyExists))
 	})
 }
 
@@ -244,7 +244,7 @@ func TestSetDefaultKey(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		assert.Equal(t, expected, SetDefaultKey(ctx, exec, clusterID))
+		assert.Equal(t, expected, setDefaultKey(ctx, exec, clusterID))
 	})
 }
 
@@ -286,7 +286,7 @@ func TestChangeVaultProvider(t *testing.T) {
 				Key:  "ca-key",
 			},
 		}
-		assert.Equal(t, expected, ChangeVaultProvider(ctx, exec, vault))
+		assert.Equal(t, expected, changeVaultProvider(ctx, exec, vault))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -309,6 +309,6 @@ func TestChangeVaultProvider(t *testing.T) {
 				Key:  "token-key",
 			},
 		}
-		assert.NilError(t, ChangeVaultProvider(ctx, exec, vault))
+		assert.NilError(t, changeVaultProvider(ctx, exec, vault))
 	})
 }
