@@ -22250,6 +22250,13 @@ spec:
                   minimum: 1
                   type: integer
                 type: array
+              tls:
+                properties:
+                  caValidityDuration:
+                    type: string
+                  certValidityDuration:
+                    type: string
+                type: object
               tlsOnly:
                 type: boolean
               userInterface:
