@@ -30,7 +30,7 @@ metadata:
   name: restore-after-17-to-18
 spec:
   pgCluster: major-upgrade-17-to-18
-  repoName: repo2
+  repoName: repo1
 status:
   state: Succeeded
 ---
