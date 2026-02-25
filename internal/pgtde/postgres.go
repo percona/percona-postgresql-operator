@@ -15,7 +15,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -57,7 +56,7 @@ func disableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	return err
 }
 
-func ReconcileExtension(ctx context.Context, exec postgres.Executor, record record.EventRecorder, cluster *v1beta1.PostgresCluster) error {
+func ReconcileExtension(ctx context.Context, exec postgres.Executor, record record.EventRecorder, cluster *crunchyv1beta1.PostgresCluster) error {
 	if !cluster.Spec.Extensions.PGTDE.Enabled {
 		err := disableInPostgreSQL(ctx, exec)
 		if err != nil {
@@ -66,7 +65,7 @@ func ReconcileExtension(ctx context.Context, exec postgres.Executor, record reco
 		}
 
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:               v1beta1.PGTDEEnabled,
+			Type:               crunchyv1beta1.PGTDEEnabled,
 			Status:             metav1.ConditionFalse,
 			Reason:             "Disabled",
 			Message:            "pg_tde is disabled in PerconaPGCluster",
@@ -83,7 +82,7 @@ func ReconcileExtension(ctx context.Context, exec postgres.Executor, record reco
 	}
 
 	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:               v1beta1.PGTDEEnabled,
+		Type:               crunchyv1beta1.PGTDEEnabled,
 		Status:             metav1.ConditionTrue,
 		Reason:             "Enabled",
 		Message:            "pg_tde is enabled in PerconaPGCluster",
@@ -235,7 +234,7 @@ func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *cru
 	return err
 }
 
-func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster *v1beta1.PostgresCluster) error {
+func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster) error {
 	vault := cluster.Spec.Extensions.PGTDE.Vault
 
 	if cluster.Status.PGTDERevision == "" {
