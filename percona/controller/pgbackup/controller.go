@@ -2,7 +2,6 @@ package pgbackup
 
 import (
 	"context"
-	"fmt"
 	"path"
 	"slices"
 	"time"

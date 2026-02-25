@@ -6,18 +6,21 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
-var ErrAlreadyExists = errors.New("already exists")
-
-// EnableInPostgreSQL installs pg_tde extension in every database.
-func EnableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
+// enableInPostgreSQL installs pg_tde extension in every database.
+func enableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	log := logging.FromContext(ctx)
 
 	stdout, stderr, err := exec.ExecInAllDatabases(ctx,
@@ -36,7 +39,7 @@ func EnableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	return err
 }
 
-func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
+func disableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	log := logging.FromContext(ctx)
 
 	stdout, stderr, err := exec.ExecInAllDatabases(ctx,
@@ -54,11 +57,49 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	return err
 }
 
+func ReconcileExtension(ctx context.Context, exec postgres.Executor, record record.EventRecorder, cluster *v1beta1.PostgresCluster) error {
+	if !cluster.Spec.Extensions.PGTDE.Enabled {
+		err := disableInPostgreSQL(ctx, exec)
+		if err != nil {
+			record.Event(cluster, corev1.EventTypeWarning, "pgTdeEnabled", "Unable to disable pg_tde")
+			return err
+		}
+
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:               v1beta1.PGTDEEnabled,
+			Status:             metav1.ConditionFalse,
+			Reason:             "Disabled",
+			Message:            "pg_tde is disabled in PerconaPGCluster",
+			ObservedGeneration: cluster.GetGeneration(),
+		})
+
+		return nil
+	}
+
+	err := enableInPostgreSQL(ctx, exec)
+	if err != nil {
+		record.Event(cluster, corev1.EventTypeWarning, "pgTdeDisabled", "Unable to install pg_tde")
+		return err
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:               v1beta1.PGTDEEnabled,
+		Status:             metav1.ConditionTrue,
+		Reason:             "Enabled",
+		Message:            "pg_tde is enabled in PerconaPGCluster",
+		ObservedGeneration: cluster.GetGeneration(),
+	})
+
+	return nil
+}
+
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_tde")
 }
 
-func AddVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec) error {
+var errAlreadyExists = errors.New("already exists")
+
+func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec) error {
 	log := logging.FromContext(ctx)
 
 	caSecretPath := ""
@@ -92,13 +133,13 @@ func AddVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunch
 	}
 
 	if strings.Contains(stderr, "already exists") {
-		return ErrAlreadyExists
+		return errAlreadyExists
 	}
 
 	return err
 }
 
-func CreateGlobalKey(ctx context.Context, exec postgres.Executor, clusterID types.UID) error {
+func createGlobalKey(ctx context.Context, exec postgres.Executor, clusterID types.UID) error {
 	log := logging.FromContext(ctx)
 
 	globalKey := fmt.Sprintf("%s-%s", naming.PGTDEGlobalKey, clusterID)
@@ -124,13 +165,13 @@ func CreateGlobalKey(ctx context.Context, exec postgres.Executor, clusterID type
 	}
 
 	if strings.Contains(stderr, "already exists") {
-		return ErrAlreadyExists
+		return errAlreadyExists
 	}
 
 	return err
 }
 
-func SetDefaultKey(ctx context.Context, exec postgres.Executor, clusterID types.UID) error {
+func setDefaultKey(ctx context.Context, exec postgres.Executor, clusterID types.UID) error {
 	log := logging.FromContext(ctx)
 
 	globalKey := fmt.Sprintf("%s-%s", naming.PGTDEGlobalKey, clusterID)
@@ -158,7 +199,7 @@ func SetDefaultKey(ctx context.Context, exec postgres.Executor, clusterID types.
 	return err
 }
 
-func ChangeVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec) error {
+func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec) error {
 	log := logging.FromContext(ctx)
 
 	caSecretPath := ""
@@ -192,4 +233,24 @@ func ChangeVaultProvider(ctx context.Context, exec postgres.Executor, vault *cru
 	}
 
 	return err
+}
+
+func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster *v1beta1.PostgresCluster) error {
+	vault := cluster.Spec.Extensions.PGTDE.Vault
+
+	if cluster.Status.PGTDERevision == "" {
+		err := addVaultProvider(ctx, exec, vault)
+
+		if err == nil || errors.Is(err, errAlreadyExists) {
+			err = createGlobalKey(ctx, exec, cluster.UID)
+		}
+
+		if err == nil || errors.Is(err, errAlreadyExists) {
+			err = setDefaultKey(ctx, exec, cluster.UID)
+		}
+
+		return err
+	}
+
+	return changeVaultProvider(ctx, exec, vault)
 }

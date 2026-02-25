@@ -20,7 +20,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -342,17 +341,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		}
 
 		// K8SPG-911
-		if cluster.Spec.Extensions.PGTDE.Enabled {
-			if pgTdeOK = pgtde.EnableInPostgreSQL(ctx, exec) == nil; !pgTdeOK {
-				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgTdeDisabled",
-					"Unable to install pg_tde")
-			}
-		} else {
-			if pgTdeOK = pgtde.DisableInPostgreSQL(ctx, exec) == nil; !pgTdeOK {
-				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgTdeEnabled",
-					"Unable to disable pg_tde")
-			}
-		}
+		pgTdeOK = pgtde.ReconcileExtension(ctx, exec, r.Recorder, cluster) == nil
 
 		// Enabling PostGIS extensions is a one-way operation
 		// e.g., you can take a PostgresCluster and turn it into a PostGISCluster,
@@ -396,27 +385,6 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	if err == nil {
 		log := logging.FromContext(ctx).WithValues("revision", revision)
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
-	}
-
-	if pgTdeOK {
-		status := metav1.ConditionFalse
-		reason := "Disabled"
-		message := "pg_tde is disabled in PerconaPGCluster"
-		if cluster.Spec.Extensions.PGTDE.Enabled {
-			status = metav1.ConditionTrue
-			reason = "Enabled"
-			message = "pg_tde is enabled in PerconaPGCluster"
-		}
-
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:    v1beta1.PGTDEEnabled,
-			Status:  status,
-			Reason:  reason,
-			Message: message,
-
-			ObservedGeneration: cluster.GetGeneration(),
-		})
-
 	}
 
 	// K8SPG-472
@@ -488,21 +456,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	}
 
 	if err == nil {
-		log := log.WithValues("revision", revision)
-		log.Info("configuring pg_tde")
-		ctx := logging.NewContext(ctx, log)
-		if cluster.Status.PGTDERevision == "" {
-			err = pgtde.AddVaultProvider(ctx, podExecutor, vault)
-			if err == nil || errors.Is(err, pgtde.ErrAlreadyExists) {
-				err = pgtde.CreateGlobalKey(ctx, podExecutor, cluster.UID)
-			}
-			if err == nil || errors.Is(err, pgtde.ErrAlreadyExists) {
-				err = pgtde.SetDefaultKey(ctx, podExecutor, cluster.UID)
-			}
-		} else {
-			err = pgtde.ChangeVaultProvider(ctx, podExecutor, vault)
-		}
-		err = errors.WithStack(err)
+		err = errors.WithStack(pgtde.ReconcileVaultProvider(ctx, podExecutor, cluster))
 	}
 
 	if err == nil {
