@@ -158,7 +158,7 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/perconalab/percona-postgresql-operator:main-ppg17-postgres
+  image: docker.io/perconalab/percona-distribution-postgresql-with-postgis:17
   imagePullPolicy: Always
   postgresVersion: 17
 #  port: 5432

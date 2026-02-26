@@ -7,6 +7,6 @@ spec:
   image: docker.io/perconalab/percona-postgresql-operator:main-upgrade
   fromPostgresVersion: 16
   toPostgresVersion: 17
-  toPostgresImage: docker.io/perconalab/percona-postgresql-operator:main-ppg17-postgres
+  toPostgresImage: docker.io/perconalab/percona-distribution-postgresql-with-postgis:17
   toPgBouncerImage: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer17
   toPgBackRestImage: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest17
