@@ -396,10 +396,27 @@ run_psql() {
 		bash -c "printf '$command\n' | PGPASSWORD="\'$password\'" psql -v ON_ERROR_STOP=1 -t -q $uri"
 }
 
+run_psql_command() {
+	local command=${1}
+	local uri=${2}
+	local driver=${3:-postgres}
+	
+	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
+		psql -v ON_ERROR_STOP=1 -t -q "${driver}://${uri}" -c "${command}"
+}
+
 get_psql_user_pass() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.password | base64decode}}'
+}
+
+get_psql_uri() {
+	local cluster=$1
+	local user=$2
+	local secret_name="${cluster}-pguser-${user}"
+
+	echo "${user}:$(get_psql_user_pass ${secret_name})@$(get_psql_user_host ${secret_name})"
 }
 
 get_pgbouncer_host() {
@@ -1624,4 +1641,187 @@ verify_hugepages_usage() {
         echo "Hugepages available but NOT being used by PostgreSQL"
         return 1
     fi
+}
+
+function vault_tls() {
+	local name=${1:-vault-service}
+	local tmp_dir=$2
+
+	local service=$name
+	local namespace=$name
+	local secret_name=$name
+	local csr_name=vault-csr-${RANDOM}
+	local csr_api_ver="v1"
+	local csr_signer
+	local platform=$(detect_k8s_platform)
+
+	echo "Detected platform: ${platform}"
+
+	case ${platform} in
+		eks)
+			csr_signer="  signerName: beta.eks.amazonaws.com/app-serving"
+			;;
+		*)
+			csr_signer="  signerName: kubernetes.io/kubelet-serving"
+			;;
+	esac
+
+	openssl genrsa -out ${tmp_dir}/vault.key 2048
+	cat <<EOF >${tmp_dir}/csr.conf
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = ${service}
+DNS.2 = ${service}.${namespace}
+DNS.3 = ${service}.${namespace}.svc
+DNS.4 = ${service}.${namespace}.svc.cluster.local
+IP.1 = 127.0.0.1
+EOF
+
+	openssl req -new -key ${tmp_dir}/vault.key -subj "/CN=system:node:${service}.${namespace}.svc;/O=system:nodes" -out ${tmp_dir}/server.csr -config ${tmp_dir}/csr.conf
+
+	cat <<EOF >${tmp_dir}/csr.yaml
+apiVersion: certificates.k8s.io/${csr_api_ver}
+kind: CertificateSigningRequest
+metadata:
+  name: ${csr_name}
+spec:
+  groups:
+  - system:authenticated
+  request: $(cat ${tmp_dir}/server.csr | base64 | tr -d '\n')
+${csr_signer}
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+EOF
+
+	kubectl create -f ${tmp_dir}/csr.yaml
+	sleep 10
+	kubectl certificate approve ${csr_name}
+	kubectl get csr ${csr_name} -o jsonpath='{.status.certificate}' >${tmp_dir}/serverCert
+	openssl base64 -in ${tmp_dir}/serverCert -d -A -out ${tmp_dir}/vault.crt
+	kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d >${tmp_dir}/vault.ca
+	if [[ -n ${OPENSHIFT} ]]; then
+		if [[ "x$(kubectl get namespaces | awk '{print $1}' | grep openshift-kube-controller-manager-operator)" != "x" ]]; then
+			#Detecting openshift 4+
+			kubectl -n openshift-kube-controller-manager-operator get secret csr-signer -o jsonpath='{.data.tls\.crt}' \
+				| base64 -d >${tmp_dir}/vault.ca
+		else
+			local ca_secret_name=$(kubectl -n default get secrets \
+				| grep default \
+				| grep service-account-token \
+				| head -n 1 \
+				| awk {'print $1'})
+			kubectl -n default get secret ${ca_secret_name} -o jsonpath='{.data.ca\.crt}' \
+				| base64 -d >${tmp_dir}/vault.ca
+		fi
+	fi
+	kubectl create secret generic ${secret_name} \
+		--namespace ${namespace} \
+		--from-file=vault.key=${tmp_dir}/vault.key \
+		--from-file=vault.crt=${tmp_dir}/vault.crt \
+		--from-file=vault.ca=${tmp_dir}/vault.ca
+}
+
+function start_vault() {
+	local name=${1:-vault-service}
+	local protocol=${2:-http}
+	local platform=kubernetes
+	local tmp_dir=$(mktemp -d)
+
+	if [[ -n ${OPENSHIFT} ]]; then
+		platform=openshift
+		oc patch clusterrole system:auth-delegator --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
+		local extra_args="--set server.image.repository=docker.io/hashicorp/vault --set injector.image.repository=docker.io/hashicorp/vault-k8s"
+	fi
+
+	create_namespace "$name" "skip_clean"
+	helm repo add hashicorp https://helm.releases.hashicorp.com
+	helm uninstall "$name" || :
+
+	echo "install Vault $name"
+
+	if [ $protocol == "https" ]; then
+		vault_tls "${name}" ${tmp_dir}
+		helm install $name hashicorp/vault \
+			--disable-openapi-validation \
+			--version $VAULT_VER \
+			--namespace "$name" \
+			--set global.tlsDisable=false \
+			--set global.platform="${platform}" \
+			--set server.dataStorage.enabled=false \
+			--set server.standalone.enabled=true \
+			--set server.ha.raft.enabled=false \
+			--set server.extraVolumes[0].type=secret \
+			--set server.extraVolumes[0].name=$name \
+			--set server.extraEnvironmentVars.VAULT_CACERT=/vault/userconfig/$name/vault.ca \
+			$extra_args \
+			--set server.standalone.config=" \
+listener \"tcp\" {
+    address = \"[::]:8200\"
+    cluster_address = \"[::]:8201\"
+    tls_cert_file = \"/vault/userconfig/$name/vault.crt\"
+    tls_key_file  = \"/vault/userconfig/$name/vault.key\"
+    tls_client_ca_file = \"/vault/userconfig/$name/vault.ca\"
+}
+
+storage \"file\" {
+    path = \"/vault/data\"
+}"
+
+	else
+		helm install $name hashicorp/vault \
+			--disable-openapi-validation \
+			--version $VAULT_VER \
+			--namespace "$name" \
+			--set server.dataStorage.enabled=false \
+			--set server.standalone.enabled=true \
+			--set server.ha.raft.enabled=false \
+			$extra_args \
+			--set global.platform="${platform}"
+	fi
+
+	if [[ -n ${OPENSHIFT} ]]; then
+		oc patch clusterrole $name-agent-injector-clusterrole --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
+		oc adm policy add-scc-to-user privileged $name-agent-injector
+	fi
+
+	set +o xtrace
+	local retry=0
+	echo -n pod/$name-0
+	until kubectl -n ${name} get pod/$name-0 -o 'jsonpath={.status.containerStatuses[0].state}' 2>/dev/null | grep 'running'; do
+		echo -n .
+		sleep 1
+		let retry+=1
+		if [ "$retry" -ge 480 ]; then
+			kubectl -n ${name} describe pod/$name-0
+			kubectl -n ${name} logs $name-0
+			echo max retry count "$retry" reached. something went wrong with vault
+			exit 1
+		fi
+	done
+
+	kubectl -n ${name} exec -it $name-0 -- vault operator init -tls-skip-verify -key-shares=1 -key-threshold=1 -format=json >"$tmp_dir/$name"
+	local unsealKey=$(jq -r ".unseal_keys_b64[]" <"$tmp_dir/$name")
+	local token=$(jq -r ".root_token" <"$tmp_dir/$name")
+	sleep 10
+
+	kubectl -n ${name} exec -it $name-0 -- vault operator unseal -tls-skip-verify "$unsealKey"
+	kubectl -n ${name} exec -it $name-0 -- \
+		sh -c "export VAULT_TOKEN=$token && export VAULT_LOG_LEVEL=trace \
+                && vault secrets enable --version=2 -path=tde kv \
+                && vault audit enable file file_path=/vault/vault-audit.log"
+	sleep 10
+
+	kubectl -n "${NAMESPACE}" create secret generic vault-secret \
+		--from-literal=token=${token} \
+		--from-file=ca.crt=${tmp_dir}/vault.ca
 }

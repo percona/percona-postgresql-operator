@@ -36,6 +36,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgrepack"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgvector"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgis"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -191,7 +192,10 @@ func (r *Reconciler) generatePostgresUserSecret(
 
 // reconcilePostgresDatabases creates databases inside of PostgreSQL.
 func (r *Reconciler) reconcilePostgresDatabases(
-	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	instances *observedInstances,
+	patchStatus func() error,
 ) error {
 	const container = naming.ContainerDatabase
 	var podExecutor postgres.Executor
@@ -248,8 +252,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
-	// K8SPG-375, K8SPG-577, K8SPG-699
-	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, postgisInstallOK bool
+	// K8SPG-375, K8SPG-577, K8SPG-699, K8SPG-911
+	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, pgTdeOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
 		_, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -336,6 +340,9 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
+		// K8SPG-911
+		pgTdeOK = pgtde.ReconcileExtension(ctx, exec, r.Recorder, cluster) == nil
+
 		// Enabling PostGIS extensions is a one-way operation
 		// e.g., you can take a PostgresCluster and turn it into a PostGISCluster,
 		// but you cannot reverse the process, as that would potentially remove an extension
@@ -375,14 +382,88 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	// Apply the necessary SQL and record its hash in cluster.Status. Include
 	// the hash in any log messages.
-
 	if err == nil {
 		log := logging.FromContext(ctx).WithValues("revision", revision)
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
 	}
+
 	// K8SPG-472
-	if err == nil && pgStatMonitorOK && pgAuditOK && pgvectorOK && postgisInstallOK && pgRepackOK {
+	if err == nil &&
+		pgStatMonitorOK &&
+		pgAuditOK &&
+		pgvectorOK &&
+		postgisInstallOK &&
+		pgRepackOK &&
+		pgTdeOK {
 		cluster.Status.DatabaseRevision = revision
+		if err := patchStatus(); err != nil {
+			return errors.Wrap(err, "patch status")
+		}
+	}
+
+	return err
+}
+
+// reconcilePGTDEProviders configures pg_tde providers
+func (r *Reconciler) reconcilePGTDEProviders(
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	instances *observedInstances,
+	patchStatus func() error,
+) error {
+	const container = naming.ContainerDatabase
+
+	if !cluster.Spec.Extensions.PGTDE.Enabled || cluster.Spec.Extensions.PGTDE.Vault == nil {
+		cluster.Status.PGTDERevision = ""
+		return nil
+	}
+
+	// Find the PostgreSQL instance that can execute SQL that writes system
+	// catalogs. When there is none, return early.
+	pod, _ := instances.writablePod(container)
+	if pod == nil {
+		return nil
+	}
+
+	// We need to configure pg_tde after volumes are mounted and extension is created
+	if _, ok := pod.Annotations[naming.TDEInstalledAnnotation]; !ok {
+		return nil
+	}
+
+	log := logging.FromContext(ctx).WithName("PGTDE").WithValues("pod", pod.Name)
+
+	ctx = logging.NewContext(ctx, log)
+	podExecutor := func(
+		ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error {
+		return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
+	}
+
+	vault := cluster.Spec.Extensions.PGTDE.Vault
+
+	// Compute revision from the desired Vault configuration only,
+	// independent of whether Add or Change will be used.
+	revision, err := safeHash32(func(hasher io.Writer) error {
+		_, err := fmt.Fprint(hasher,
+			vault.Host, vault.MountPath,
+			vault.TokenSecret.Name, vault.TokenSecret.Key,
+			vault.CASecret.Name, vault.CASecret.Key)
+		return err
+	})
+
+	if err == nil && revision == cluster.Status.PGTDERevision {
+		return nil
+	}
+
+	if err == nil {
+		err = errors.WithStack(pgtde.ReconcileVaultProvider(ctx, podExecutor, cluster))
+	}
+
+	if err == nil {
+		cluster.Status.PGTDERevision = revision
+		if err := patchStatus(); err != nil {
+			return errors.Wrap(err, "patch status")
+		}
 	}
 
 	return err
