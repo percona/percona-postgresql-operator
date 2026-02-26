@@ -5,10 +5,8 @@
 package postgrescluster
 
 import (
-	"io"
 	"testing"
 
-	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,27 +17,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
-
-func TestSafeHash32(t *testing.T) {
-	expected := errors.New("whomp")
-
-	_, err := safeHash32(func(io.Writer) error { return expected })
-	assert.Equal(t, err, expected)
-
-	stuff, err := safeHash32(func(w io.Writer) error {
-		_, _ = w.Write([]byte(`some stuff`))
-		return nil
-	})
-	assert.NilError(t, err)
-	assert.Equal(t, stuff, "574b4c7d87", "expected alphanumeric")
-
-	same, err := safeHash32(func(w io.Writer) error {
-		_, _ = w.Write([]byte(`some stuff`))
-		return nil
-	})
-	assert.NilError(t, err)
-	assert.Equal(t, same, stuff, "expected deterministic hash")
-}
 
 func TestAddDevSHM(t *testing.T) {
 

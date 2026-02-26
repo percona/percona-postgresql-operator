@@ -173,7 +173,7 @@ func MakePGBackrestLogDir(template *corev1.PodTemplateSpec,
 //   - Renames the data directory as needed to bootstrap the cluster using the restored database.
 //     This ensures compatibility with the "existing" bootstrap method that is included in the
 //     Patroni config when bootstrapping a cluster using an existing data directory.
-func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev1.PersistentVolumeClaim, args ...string) []string {
+func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev1.PersistentVolumeClaim, tdeEnabled bool, args ...string) []string {
 	ps := postgres.NewParameterSet()
 	ps.Add("data_directory", pgdata)
 	ps.Add("huge_pages", hugePagesSetting)
@@ -186,6 +186,10 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 	// Enable "hot_standby" so we can connect to Postgres and observe its
 	// progress during recovery.
 	ps.Add("hot_standby", "on")
+
+	if tdeEnabled {
+		ps.Add("shared_preload_libraries", "pg_tde")
+	}
 
 	if fetchKeyCommand != "" {
 		ps.Add("encryption_key_command", fetchKeyCommand)

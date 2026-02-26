@@ -19,6 +19,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -35,6 +36,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
@@ -288,6 +290,31 @@ func (observed *observedInstances) writablePod(container string) (*corev1.Pod, *
 	}
 
 	return nil, nil
+}
+
+// runningPods returns the Pod of every non-terminating instance whose named
+// container is running, and whether that accounts for every instance in the
+// cluster. Callers that must reach the whole cluster, rather than any one
+// member of it, should wait while complete is false.
+func (observed *observedInstances) runningPods(container string) (pods []*corev1.Pod, complete bool) {
+	if observed == nil {
+		return nil, false
+	}
+
+	complete = true
+	for _, instance := range observed.forCluster {
+		if terminating, known := instance.IsTerminating(); terminating || !known {
+			complete = false
+			continue
+		}
+		if running, known := instance.IsRunning(container); !running || !known || len(instance.Pods) == 0 {
+			complete = false
+			continue
+		}
+		pods = append(pods, instance.Pods[0])
+	}
+
+	return pods, complete
 }
 
 // +kubebuilder:rbac:groups="",resources="pods",verbs={list}
@@ -1201,6 +1228,25 @@ func (r *Reconciler) reconcileInstance(
 			postgresDataVolume, postgresWALVolume, tablespaceVolumes,
 			&instance.Spec.Template.Spec)
 
+		// K8SPG-911: reconcilePGTDEProviders has not repointed the key provider
+		// at the credentials in the spec yet, so keep mounting the ones it does
+		// name. Rolling now would leave pg_tde reading a token the provider was
+		// never told about. Once phase 1 lands, the phase moves on and the
+		// volume updates, which is what restarts the Pods for phase 2.
+		if cluster.Spec.Extensions.PGTDE.Vault != nil {
+			change, changeErr := pgtde.VaultChangeFor(cluster)
+			if changeErr != nil {
+				// Without the revisions there is no way to tell a pending
+				// change from a settled one. Hold the volume: a Pod that keeps
+				// its credentials can be rolled later, one that loses them
+				// cannot get them back.
+				log.Error(changeErr, "keeping the pg_tde vault volume")
+			}
+			if changeErr != nil || change.Phase == pgtde.StageCredentials {
+				pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
+			}
+		}
+
 		if backupsSpecFound {
 			addPGBackRestToInstancePodSpec(
 				ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)
@@ -1322,6 +1368,18 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 			},
 		)
 	}
+
+	pgTDECondition := meta.FindStatusCondition(cluster.Status.Conditions,
+		v1beta1.PGTDEEnabled)
+	pgTDEEnabled := pgTDECondition != nil && pgTDECondition.Status == metav1.ConditionTrue
+	// we should restart pods only after extension is dropped
+	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
+		sts.Spec.Template.Annotations = naming.Merge(
+			sts.Spec.Template.Annotations,
+			map[string]string{naming.TDEInstalledAnnotation: "true"},
+		)
+	}
+
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
