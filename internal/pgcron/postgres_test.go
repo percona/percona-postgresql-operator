@@ -69,6 +69,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+		"cron.database_name":       "postgres",
 		"shared_preload_libraries": "pg_cron",
 	})
 
@@ -77,6 +78,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+		"cron.database_name":       "postgres",
 		"shared_preload_libraries": "some,existing,pg_cron",
 	})
 }
