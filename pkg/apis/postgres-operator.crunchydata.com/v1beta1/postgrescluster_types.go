@@ -206,12 +206,41 @@ type InitContainerSpec struct {
 	ContainerSecurityContext *corev1.SecurityContext      `json:"containerSecurityContext,omitempty"`
 }
 
+type PGTDESecretObjectReference struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+}
+
+type PGTDEVaultSpec struct {
+	// Host of Vault server.
+	Host string `json:"host"`
+	// Name of the secret that contains the access token with read and write access to the mount path.
+	TokenSecret PGTDESecretObjectReference `json:"tokenSecret"`
+	// Name of the secret that contains the CA certificate for SSL verification.
+	CASecret PGTDESecretObjectReference `json:"caSecret,omitempty"`
+	// The mount point on the Vault server where the key provider should store the keys.
+	// +kubebuilder:default=secret/data
+	MountPath string `json:"mountPath,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
+type PGTDESpec struct {
+	Enabled bool `json:"enabled,omitempty"`
+
+	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	PGStatMonitor    bool `json:"pgStatMonitor,omitempty"`
 	PGAudit          bool `json:"pgAudit,omitempty"`
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
 	PGVector         bool `json:"pgvector,omitempty"`
 	PGRepack         bool `json:"pgRepack,omitempty"`
+
+	PGTDE PGTDESpec `json:"pg_tde,omitempty"`
 }
 
 type TLSSpec struct {
@@ -393,6 +422,9 @@ type PostgresClusterStatus struct {
 	// Identifies the databases that have been installed into PostgreSQL.
 	DatabaseRevision string `json:"databaseRevision,omitempty"`
 
+	// Identifies the pg_tde configuration that have been installed into PostgreSQL.
+	PGTDERevision string `json:"pgTDERevision,omitempty"`
+
 	// Current state of PostgreSQL instances.
 	// +listType=map
 	// +listMapKey=name
@@ -466,6 +498,7 @@ const (
 	PostgresClusterProgressing = "Progressing"
 	ProxyAvailable             = "ProxyAvailable"
 	Registered                 = "Registered"
+	PGTDEEnabled               = "PGTDEEnabled"
 )
 
 type PostgresInstanceSetSpec struct {
