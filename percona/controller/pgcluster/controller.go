@@ -219,6 +219,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 // +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs=create;update
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("cluster", request.Name, "namespace", request.Namespace)
@@ -321,6 +322,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
+	}
+
+	if err := r.reconcilePVCs(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile pvcs")
 	}
 
 	if err := r.reconcileStandbyMainSiteAnnotation(ctx, cr); err != nil {
@@ -599,7 +604,7 @@ func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v
 		m[&set.EnvFrom] = set.Metadata
 	}
 
-	if len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
+	if cr.Spec.Proxy.IsSet() && len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
 		if cr.Spec.Proxy.PGBouncer.Metadata == nil {
 			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
 		}
@@ -608,7 +613,7 @@ func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v
 
 	if len(cr.Spec.Backups.PGBackRest.EnvFrom) > 0 {
 		if cr.Spec.Backups.PGBackRest.Metadata == nil {
-			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
+			cr.Spec.Backups.PGBackRest.Metadata = new(v1beta1.Metadata)
 		}
 		m[&cr.Spec.Backups.PGBackRest.EnvFrom] = cr.Spec.Backups.PGBackRest.Metadata
 	}

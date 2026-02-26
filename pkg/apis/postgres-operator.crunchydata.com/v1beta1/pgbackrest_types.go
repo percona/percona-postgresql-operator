@@ -218,6 +218,11 @@ type PGBackRestManualBackup struct {
 	// before initiating the backup process.
 	// +optional
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
+
+	// K8SPG-873
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-873
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // PGBackRestRepoHost represents a pgBackRest dedicated repository host
@@ -267,6 +272,11 @@ type PGBackRestRepoHost struct {
 	// PostgreSQL to restart.
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
+
+	// K8SPG-864
+	SidecarVolumes []corev1.Volume `json:"sidecarVolumes,omitempty"`
+	// K8SPG-864
+	SidecarPVCs []SidecarPVC `json:"sidecarPVCs,omitempty"`
 }
 
 // PGBackRestRestore defines an in-place restore for the PostgresCluster.

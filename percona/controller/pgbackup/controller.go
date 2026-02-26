@@ -2,7 +2,6 @@ package pgbackup
 
 import (
 	"context"
-	"fmt"
 	"path"
 	"slices"
 	"time"
@@ -124,7 +123,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = "repoName is required when method is 'pgbackrest'"
 		}); updErr != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 		}
 		return reconcile.Result{}, errors.New("'repoName' is required when method is 'pgbackrest'")
 	}
@@ -666,6 +665,9 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 
 		pg.Spec.Backups.PGBackRest.Manual.RepoName = ptr.Deref(pb.Spec.RepoName, "")
 		pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options
+
+		pg.Spec.Backups.PGBackRest.Manual.Env = pb.Spec.ContainerOptions.Env
+		pg.Spec.Backups.PGBackRest.Manual.EnvFrom = pb.Spec.ContainerOptions.EnvFrom
 
 		return c.Update(ctx, pg)
 	}); err != nil {

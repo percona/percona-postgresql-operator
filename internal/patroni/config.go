@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
@@ -45,6 +46,12 @@ func clusterYAML(
 	cluster *v1beta1.PostgresCluster,
 	pgHBAs postgres.HBAs, pgParameters postgres.Parameters,
 ) (string, error) {
+
+	labels := map[string]string{naming.LabelCluster: cluster.Name}
+	if cluster.CompareVersion("2.9.0") >= 0 {
+		labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(), labels)
+	}
+
 	root := map[string]any{
 		// The cluster identifier. This value cannot change during the cluster's
 		// lifetime.
@@ -64,9 +71,7 @@ func clusterYAML(
 			// In addition to "scope_label" above, Patroni will add the following to
 			// every object it creates. It will also use these as filters when doing
 			// any lookups.
-			"labels": map[string]string{
-				naming.LabelCluster: cluster.Name,
-			},
+			"labels": labels,
 		},
 
 		"postgresql": map[string]any{
@@ -572,7 +577,7 @@ func instanceYAML(
 		//            We should use "no_leader" instead
 		patroniVer4, err := cluster.IsPatroniVer4()
 		if err != nil {
-			return "", fmt.Errorf("failed to check if patroni v4 is used: %w", err)
+			return "", errors.Wrap(err, "failed to check if patroni v4 is used")
 		}
 		if !patroniVer4 {
 			postgresql[pgBackRestCreateReplicaMethod] = map[string]any{

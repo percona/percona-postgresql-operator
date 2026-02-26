@@ -196,10 +196,14 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,delete,patch}
 
 // reconcilePGBouncerSecret writes the Secret for a PgBouncer Pod.
+// When cert-manager is installed and no custom TLS secret is provided,
+// it creates a Certificate CR for PgBouncer frontend TLS.
 func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
 ) (*corev1.Secret, error) {
+	log := logging.FromContext(ctx)
+
 	existing := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	err := errors.WithStack(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
@@ -216,6 +220,29 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	}
 
 	err = client.IgnoreNotFound(err)
+
+	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
+		certManagerInstalled, certErr := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		if certErr != nil {
+			return nil, errors.Wrap(certErr, "failed to check if cert-manager is installed")
+		}
+
+		if certManagerInstalled {
+			c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+			dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service, cluster.Spec.ClusterServiceDNSSuffix)
+			if dnsErr != nil {
+				return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
+			}
+
+			certErr = c.ApplyPGBouncerCertificate(ctx, cluster, dnsNames)
+			if certErr != nil {
+				return nil, errors.Wrap(certErr, "failed to apply pgbouncer certificate")
+			}
+
+			log.V(1).Info("cert-manager pgbouncer certificate applied")
+		}
+	}
 
 	intent := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
@@ -314,7 +341,7 @@ func (r *Reconciler) generatePGBouncerService(
 				// and event could potentially be removed in favor of that validation
 				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "MisconfiguredClusterIP",
 					"NodePort cannot be set with type ClusterIP on Service %q", service.Name)
-				return nil, true, fmt.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
+				return nil, true, errors.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
 			}
 			servicePort.NodePort = *spec.NodePort
 		}
@@ -425,10 +452,8 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	// Use scheduling constraints from the cluster spec.
 	deploy.Spec.Template.Spec.Affinity = cluster.Spec.Proxy.PGBouncer.Affinity
 	deploy.Spec.Template.Spec.Tolerations = cluster.Spec.Proxy.PGBouncer.Tolerations
-	deploy.Spec.Template.Spec.PriorityClassName =
-		initialize.FromPointer(cluster.Spec.Proxy.PGBouncer.PriorityClassName)
-	deploy.Spec.Template.Spec.TopologySpreadConstraints =
-		cluster.Spec.Proxy.PGBouncer.TopologySpreadConstraints
+	deploy.Spec.Template.Spec.PriorityClassName = initialize.FromPointer(cluster.Spec.Proxy.PGBouncer.PriorityClassName)
+	deploy.Spec.Template.Spec.TopologySpreadConstraints = cluster.Spec.Proxy.PGBouncer.TopologySpreadConstraints
 
 	// if default pod scheduling is not explicitly disabled, add the default
 	// pod topology spread constraints

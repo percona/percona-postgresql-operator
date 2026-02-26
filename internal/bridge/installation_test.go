@@ -7,12 +7,12 @@ package bridge
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	cmpopt "gotest.tools/v3/assert/opt"
 	corev1 "k8s.io/api/core/v1"

@@ -6,10 +6,10 @@ package postgrescluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -20,8 +20,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +48,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -57,6 +60,7 @@ const (
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
 	Client          client.Client
+	Scheme          *k8sruntime.Scheme
 	DiscoveryClient *discovery.DiscoveryClient
 	IsOpenShift     bool
 	Owner           client.FieldOwner
@@ -64,6 +68,8 @@ type Reconciler struct {
 	Recorder        record.EventRecorder
 	Registration    registration.Registration
 	Tracer          trace.Tracer
+	CertManagerCtrlFunc certmanager.NewControllerFunc
+	RestConfig          *rest.Config
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
@@ -286,7 +292,14 @@ func (r *Reconciler) Reconcile(
 		// return is no longer needed, and reconciliation can proceed normally.
 		returnEarly, err := r.reconcileDirMoveJobs(ctx, cluster)
 		if err != nil || returnEarly {
-			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
+			if patchErr := patchClusterStatus(); patchErr != nil {
+				if err == nil {
+					err = patchErr
+				} else {
+					log.Error(patchErr, "Failed to patch cluster status")
+				}
+			}
+			return runtime.ErrorWithBackoff(err)
 		}
 	}
 	if err == nil {
@@ -336,7 +349,14 @@ func (r *Reconciler) Reconcile(
 		// can proceed normally.
 		returnEarly, err := r.reconcileDataSource(ctx, cluster, instances, clusterVolumes, rootCA, backupsSpecFound)
 		if err != nil || returnEarly {
-			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
+			if patchErr := patchClusterStatus(); patchErr != nil {
+				if err == nil {
+					err = patchErr
+				} else {
+					log.Error(patchErr, "Failed to patch cluster status")
+				}
+			}
+			return runtime.ErrorWithBackoff(err)
 		}
 	}
 	if err == nil {
@@ -428,7 +448,15 @@ func (r *Reconciler) Reconcile(
 
 	log.V(1).Info("reconciled cluster")
 
-	return result, errors.Join(err, patchClusterStatus())
+	if patchErr := patchClusterStatus(); patchErr != nil {
+		if err != nil {
+			log.Error(patchErr, "Failed to patch cluster status")
+		} else {
+			err = errors.Wrap(patchErr, "failed to patch cluster status")
+		}
+	}
+
+	return result, err
 }
 
 // deleteControlled safely deletes object when it is controlled by cluster.

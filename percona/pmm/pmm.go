@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -20,7 +21,7 @@ const (
 // if the PMM2 or the PMM3 container should be configured.
 func Container(secret *corev1.Secret, pgc *v2.PerconaPGCluster) (corev1.Container, error) {
 	if secret == nil {
-		return corev1.Container{}, fmt.Errorf("secret is nil")
+		return corev1.Container{}, errors.New("secret is nil")
 	}
 	if v, exists := secret.Data[secretToken]; exists && len(v) != 0 {
 		return sidecarContainerV3(pgc), nil
@@ -29,7 +30,7 @@ func Container(secret *corev1.Secret, pgc *v2.PerconaPGCluster) (corev1.Containe
 		return sidecarContainerV2(pgc), nil
 	}
 
-	return corev1.Container{}, fmt.Errorf("can't enable PMM: neither %s for PMM3 nor %s for PMM2 exist in the provided secret or they are empty", secretToken, secretKey)
+	return corev1.Container{}, errors.Errorf("can't enable PMM: neither %s for PMM3 nor %s for PMM2 exist in the provided secret or they are empty", secretToken, secretKey)
 }
 
 // sidecarContainerV2 refers to the construction of the PMM2 container.
