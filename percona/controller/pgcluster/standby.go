@@ -72,6 +72,24 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 
 	lagBytes, err := r.getStandbyLag(ctx, cr)
 	if err != nil {
+		if errors.Is(err, ErrPrimaryPodNotFound) && cr.Status.State != v2.AppStateReady {
+			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+				Type:    postgrescluster.ConditionStandbyLagging,
+				Status:  metav1.ConditionUnknown,
+				Reason:  "PrimaryNotFound",
+				Message: "Cannot find primary for replication lag calculation",
+			})
+			return nil
+		}
+		if errors.Is(err, ErrInvalidLagQueryOutput) {
+			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+				Type:    postgrescluster.ConditionStandbyLagging,
+				Status:  metav1.ConditionUnknown,
+				Reason:  "InvalidLagQueryOutput",
+				Message: "Invalid output from lag query. The WAL receiver is probably not active",
+			})
+			return nil
+		}
 		return errors.Wrap(err, "calculate replication lag bytes")
 	}
 
@@ -146,10 +164,15 @@ func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.Per
 	return r.getLagFromMainSite(ctx, standby)
 }
 
+var (
+	ErrPrimaryPodNotFound    = errors.New("primary pod not found")
+	ErrInvalidLagQueryOutput = errors.New("invalid lag query output")
+)
+
 func (r *PGClusterReconciler) getLagFromStreamingHost(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, standby)
 	if err != nil {
-		return 0, errors.Wrap(err, "get primary pod")
+		return 0, errors.Wrapf(ErrPrimaryPodNotFound, "get primary pod: %s", err.Error())
 	}
 
 	podExecutor := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
@@ -166,6 +189,9 @@ func (r *PGClusterReconciler) getLagFromStreamingHost(ctx context.Context, stand
 	}
 
 	lagStr := strings.TrimSpace(stdout)
+	if lagStr == "" {
+		return 0, errors.Wrapf(ErrInvalidLagQueryOutput, "failed to get lag from streaming host: invalid value: %q", lagStr)
+	}
 	lagBytes, err := strconv.ParseInt(lagStr, 10, 64)
 	if err != nil {
 		return 0, errors.Wrapf(err, "parse lag bytes: %s", lagStr)
@@ -213,7 +239,7 @@ func (r *PGClusterReconciler) getWALLagBytes(
 ) (int64, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, standby)
 	if err != nil {
-		return 0, errors.Wrap(err, "get primary pod")
+		return 0, errors.Wrap(ErrPrimaryPodNotFound, "get primary pod")
 	}
 
 	podExecutor := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
@@ -239,7 +265,7 @@ func (r *PGClusterReconciler) getWALLagBytes(
 func (r *PGClusterReconciler) getCurrentWALLSN(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, cr)
 	if err != nil {
-		return "", errors.Wrap(err, "get primary pod")
+		return "", errors.Wrapf(ErrPrimaryPodNotFound, "get primary pod: %s", err.Error())
 	}
 
 	podExecutor := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
@@ -374,7 +400,7 @@ func pollAndRequeueStandbys(
 				if !cluster.ShouldCheckStandbyLag() || status.Standby == nil || shouldSkipLagCheck(&cluster) {
 					continue
 				}
-				log.Info("Requeuing standby cluster for lag check", "cluster", cluster.Name)
+				log.V(1).Info("Requeuing standby cluster for lag check", "cluster", cluster.Name)
 				events <- event.GenericEvent{Object: cluster.DeepCopy()}
 			}
 		case <-ctx.Done():

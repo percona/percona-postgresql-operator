@@ -45,8 +45,8 @@ func TestReconcileStandbyLag(t *testing.T) {
 
 	mockPodExec := func(wantLagBytes int64) func(context.Context, string, string, string, io.Reader, io.Writer, io.Writer, ...string) error {
 		return func(ctx context.Context, namespace, pod, container string,
-			stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
-
+			stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
 			if stdin == nil {
 				return nil
 			}
@@ -68,11 +68,9 @@ func TestReconcileStandbyLag(t *testing.T) {
 
 	newReconciler := func(
 		sourceCluster *v2.PerconaPGCluster,
-		standbyCluster *v2.PerconaPGCluster,
-		sourcePrimary *corev1.Pod,
-		standbyPrimary *corev1.Pod,
+		obj ...client.Object,
 	) *PGClusterReconciler {
-		cl, err := buildFakeClient(t.Context(), sourceCluster, standbyCluster, sourcePrimary, standbyPrimary)
+		cl, err := buildFakeClient(t.Context(), sourceCluster, obj...)
 		require.NoError(t, err)
 
 		return &PGClusterReconciler{
@@ -139,6 +137,53 @@ func TestReconcileStandbyLag(t *testing.T) {
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
 		assert.Equal(t, "MainSiteNotFound", cond.Reason)
+	})
+
+	t.Run("primary not found", func(t *testing.T) {
+		cluster := standbyCluster.DeepCopy()
+		cluster.Status.State = v2.AppStateInit
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type: postgrescluster.ConditionStandbyLagging,
+		})
+
+		r := newReconciler(
+			sourceCluster,
+			cluster,
+		)
+		r.PodExec = mockPodExec(0)
+
+		err = r.reconcileStandbyLag(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		assert.NotNil(t, cond)
+		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
+		assert.Equal(t, "PrimaryNotFound", cond.Reason)
+	})
+
+	t.Run("invalid lag query output", func(t *testing.T) {
+		cluster := standbyCluster.DeepCopy()
+		cluster.Spec.Standby.Host = "streaming-primary-host"
+
+		r := newReconciler(
+			sourceCluster,
+			cluster,
+			primaryPodForCluster(sourceCluster),
+			primaryPodForCluster(cluster),
+		)
+		r.PodExec = func(ctx context.Context, namespace, pod, container string,
+			stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			return nil
+		}
+
+		err = r.reconcileStandbyLag(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		assert.NotNil(t, cond)
+		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
+		assert.Equal(t, "InvalidLagQueryOutput", cond.Reason)
 	})
 
 	t.Run("lag not detected", func(t *testing.T) {
