@@ -12,9 +12,8 @@ func EnableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	log := logging.FromContext(ctx)
 
 	stdout, stderr, err := exec.ExecInAllDatabases(ctx,
-		// Quiet the NOTICE from IF EXISTS, and install the pgAudit event triggers.
+		// Quiet the NOTICE from IF EXISTS, and create pgvector extension.
 		// - https://www.postgresql.org/docs/current/runtime-config-client.html
-		// - https://github.com/pgaudit/pgaudit#settings
 		`SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS vector; ALTER EXTENSION vector UPDATE;`,
 		map[string]string{
 			"ON_ERROR_STOP": "on", // Abort when any one command fails.
@@ -30,9 +29,8 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	log := logging.FromContext(ctx)
 
 	stdout, stderr, err := exec.ExecInAllDatabases(ctx,
-		// Quiet the NOTICE from IF EXISTS, and install the pgAudit event triggers.
+		// Quiet the NOTICE from IF EXISTS, and drop pgvector extension.
 		// - https://www.postgresql.org/docs/current/runtime-config-client.html
-		// - https://github.com/pgaudit/pgaudit#settings
 		`SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS vector;`,
 		map[string]string{
 			"ON_ERROR_STOP": "on", // Abort when any one command fails.
@@ -44,5 +42,5 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	return err
 }
 
-// PostgreSQLParameters sets the parameters required by pgAudit.
+// PostgreSQLParameters sets the parameters required by pgvector.
 func PostgreSQLParameters(outParameters *postgres.Parameters) {}

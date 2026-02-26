@@ -11,9 +11,13 @@ spec:
           pgaudit.log_level: 'warning'
           logging_collector: 'off'
   extensions:
-    builtin:
-      pg_stat_monitor: false # you can't enable both pg_stat_statements and pg_stat_monitor
-      pg_stat_statements: true
-      pg_audit: true
-      pgvector: true
-      pg_repack: true
+    pg_stat_monitor:
+      enabled: false # you can't enable both pg_stat_statements and pg_stat_monitor
+    pg_stat_statements:
+      enabled: true
+    pg_audit:
+      enabled: true
+    pgvector:
+      enabled: true
+    pg_repack:
+      enabled: true

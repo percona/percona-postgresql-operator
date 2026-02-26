@@ -125,6 +125,7 @@ watchdog:
 		cluster := new(v1beta1.PostgresCluster)
 		err := cluster.Default(context.Background(), nil)
 		assert.NilError(t, err)
+
 		cluster.Namespace = "some-namespace"
 		cluster.Name = "cluster-name"
 		cluster.Labels = map[string]string{
@@ -150,6 +151,7 @@ watchdog:
 		cluster := new(v1beta1.PostgresCluster)
 		err := cluster.Default(context.Background(), nil)
 		assert.NilError(t, err)
+
 		cluster.Namespace = "some-namespace"
 		cluster.Name = "cluster-name"
 		cluster.Labels = map[string]string{
@@ -173,8 +175,7 @@ watchdog:
 		cluster := new(v1beta1.PostgresCluster)
 		err := cluster.Default(context.Background(), nil)
 		assert.NilError(t, err)
-		cluster.Namespace = "some-namespace"
-		cluster.Name = "cluster-name"
+
 		cluster.Labels = map[string]string{
 			v1beta1.LabelVersion: "2.8.0",
 		}
@@ -191,8 +192,55 @@ watchdog:
 
 		pgSection, ok := parsed["postgresql"].(map[string]any)
 		assert.Assert(t, ok, "expected postgresql section")
+
 		_, exists := pgSection["remove_data_directory_on_diverged_timelines"]
 		assert.Assert(t, !exists, "expected remove_data_directory_on_diverged_timelines to be absent for version < 2.9.0")
+	})
+
+	t.Run("PGTDE enabled adds bin_name", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Spec.PostgresVersion = 17
+		cluster.Spec.Extensions.PGTDE.Enabled = true
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+
+		binName, ok := pgSection["bin_name"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql.bin_name section")
+
+		assert.Equal(t, binName["pg_basebackup"], "pg_tde_basebackup")
+		assert.Equal(t, binName["pg_rewind"], "pg_tde_rewind")
+	})
+
+	t.Run("PGTDE disabled no bin_name", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+
+		_, hasBinName := pgSection["bin_name"]
+		assert.Assert(t, !hasBinName, "expected no bin_name when PGTDE is disabled")
 	})
 
 	t.Run(">PG10", func(t *testing.T) {
