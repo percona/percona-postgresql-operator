@@ -13138,6 +13138,8 @@ spec:
                 description: The specification of extensions.
                 properties:
                   builtin:
+                    description: 'Deprecated: Use extensions.<extension> instead.
+                      This field will be removed after 2.11.0.'
                     properties:
                       pg_audit:
                         type: boolean
@@ -13167,6 +13169,78 @@ spec:
                     description: PullPolicy describes a policy for if/when to pull
                       a container image
                     type: string
+                  pg_audit:
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
+                  pg_repack:
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
+                  pg_stat_monitor:
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
+                  pg_stat_statements:
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
+                  pg_tde:
+                    properties:
+                      enabled:
+                        type: boolean
+                      vault:
+                        properties:
+                          caSecret:
+                            description: Name of the secret that contains the CA certificate
+                              for SSL verification.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          host:
+                            description: Host of Vault server.
+                            type: string
+                          mountPath:
+                            default: secret/data
+                            description: The mount point on the Vault server where
+                              the key provider should store the keys.
+                            type: string
+                          tokenSecret:
+                            description: Name of the secret that contains the access
+                              token with read and write access to the mount path.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        required:
+                        - host
+                        - tokenSecret
+                        type: object
+                    type: object
+                    x-kubernetes-validations:
+                    - message: vault is required for enabling pg_tde
+                      rule: '!has(self.enabled) || (has(self.enabled) && self.enabled
+                        == false) || has(self.vault)'
+                  pgvector:
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
                   storage:
                     properties:
                       bucket:
@@ -13249,6 +13323,11 @@ spec:
                         type: string
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: to disable pg_tde first set enabled=false without removing
+                    vault and wait for pod restarts
+                  rule: '!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled)
+                    || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)'
               image:
                 description: The image name to use for PostgreSQL containers.
                 type: string
