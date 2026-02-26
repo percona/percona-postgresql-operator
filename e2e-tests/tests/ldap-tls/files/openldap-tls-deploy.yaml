@@ -1,0 +1,104 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openldap-tls
+  labels:
+    app.kubernetes.io/name: openldap-tls
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openldap-tls
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openldap-tls
+    spec:
+      initContainers:
+        - name: copy-certs
+          image: busybox
+          command: ["sh", "-c", "cp /certs-ro/* /certs/"]
+          volumeMounts:
+            - name: ldap-server-secret
+              mountPath: /certs-ro
+              readOnly: true
+            - name: ldap-certs
+              mountPath: /certs
+      containers:
+        - name: openldap
+          image: public.ecr.aws/bitnami/openldap:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: LDAP_ROOT
+              value: "dc=ldap,dc=local"
+            - name: LDAP_ADMIN_USERNAME
+              value: "admin"
+            - name: LDAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: adminpassword
+                  name: openldap-tls-admin
+            - name: LDAP_USERS
+              value: "percona"
+            - name: LDAP_PASSWORDS
+              value: "mysecretpassword"
+            - name: LDAP_USER_OU
+              value: "perconadba"
+            - name: LDAP_ENABLE_TLS
+              value: "yes"
+            - name: LDAP_TLS_CERT_FILE
+              value: "/certs/tls.crt"
+            - name: LDAP_TLS_KEY_FILE
+              value: "/certs/tls.key"
+            - name: LDAP_TLS_CA_FILE
+              value: "/certs/ca.crt"
+            - name: LDAP_TLS_VERIFY_CLIENTS
+              value: "never"
+          ports:
+            - name: tcp-ldap
+              containerPort: 1389
+            - name: tls-ldap
+              containerPort: 1636
+          volumeMounts:
+            - name: ldap-certs
+              mountPath: /certs
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: 1636
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 16
+          livenessProbe:
+            tcpSocket:
+              port: 1636
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: ldap-server-secret
+          secret:
+            secretName: ldap-server
+        - name: ldap-certs
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openldap-tls
+  labels:
+    app.kubernetes.io/name: openldap-tls
+spec:
+  type: ClusterIP
+  ports:
+    - name: tls-ldap
+      port: 636
+      targetPort: tls-ldap
+    - name: tcp-ldap
+      port: 389
+      targetPort: tcp-ldap
+  selector:
+    app.kubernetes.io/name: openldap-tls

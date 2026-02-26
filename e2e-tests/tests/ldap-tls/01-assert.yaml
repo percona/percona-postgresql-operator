@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+# Wait for cert-manager to issue the CA and server certificates.  The server
+# cert (ldap-server) is signed by the CA, so both secrets are guaranteed to
+# exist once this assertion passes.
+timeout: 120
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ldap-ca
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ldap-server

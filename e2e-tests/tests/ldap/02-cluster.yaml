@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq eval '
+            .spec.users += [{"name":"percona","databases":["percona"]}] |
+            .spec.authentication.rules = [{"connection":"host","method":"ldap","users":["percona"],"options":{"ldapserver":"openldap","ldapport":389,"ldapprefix":"cn=","ldapsuffix":",ou=perconadba,dc=ldap,dc=local"}}]
+          ' - \
+        | kubectl -n "${NAMESPACE}" apply -f -

@@ -1,0 +1,63 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |
+      set -e
+
+      PRIMARY=$(
+        kubectl get pod --namespace "${NAMESPACE}" \
+          --output name --selector \
+          'postgres-operator.crunchydata.com/cluster=ldap-tls,postgres-operator.crunchydata.com/role=primary' \
+          | head -1
+      )
+
+      HBA=$(kubectl exec --namespace "${NAMESPACE}" "${PRIMARY}" -c database \
+        -- psql -tAc "SELECT pg_read_file('pg_hba.conf');" 2>&1)
+
+      contains() { bash -ceu '[[ "$1" == *"$2"* ]]' - "$@"; }
+      contains "${HBA}" "ldapscheme" || {
+        echo >&2 'pg_hba.conf does not contain an ldapscheme option (expected ldapscheme=ldaps)'
+        exit 1
+      }
+
+      ## verify ldap directories
+      for i in $(seq 12); do
+        if kubectl exec --namespace "${NAMESPACE}" deployment/openldap-tls \
+          -- ldapsearch -x -H ldap://localhost:1389 \
+             -D "cn=admin,dc=ldap,dc=local" -w adminpassword \
+             -b "ou=perconadba,dc=ldap,dc=local" "(uid=percona)" 2>&1 \
+          | grep -q "uid: percona"; then
+          echo "LDAP entry for percona found"
+          break
+        fi
+        echo "Attempt ${i}: LDAP entry not yet available, waiting..."
+        sleep 10
+      done
+
+      # verify LDAPS auth — PostgreSQL connects to OpenLDAP over ldaps://
+      # (TLS between Postgres and the LDAP server, validated via LDAPTLS_CACERT).
+      # PGSSLMODE=disable controls only the psql→Postgres connection, not the
+      # Postgres→LDAP connection.
+      result=""
+      for i in $(seq 6); do
+        result=$(kubectl exec --namespace "${NAMESPACE}" "${PRIMARY}" -c database \
+          -- bash -c 'PGPASSWORD=mysecretpassword PGSSLMODE=disable \
+            psql -h 127.0.0.1 -U percona -d percona -tAc "SELECT current_user;" 2>&1') && break
+        echo "Attempt ${i} failed: ${result}"
+        sleep 10
+      done
+
+      [[ "${result}" == "percona" ]] || {
+        echo >&2 "Expected current_user='percona', got: ${result}"
+        exit 1
+      }
+
+      # verify wrong password is rejected
+      if bad_result=$(kubectl exec --namespace "${NAMESPACE}" "${PRIMARY}" -c database \
+        -- bash -c 'PGPASSWORD=wrongpassword PGSSLMODE=disable \
+          psql -h 127.0.0.1 -U percona -d percona -tAc "SELECT current_user;" 2>&1'); then
+        echo >&2 "Expected authentication failure with wrong password, but login succeeded: ${bad_result}"
+        exit 1
+      fi
+      echo "Wrong password correctly rejected"

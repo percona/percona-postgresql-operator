@@ -531,6 +531,7 @@ func TestAddConfigToRestorePod(t *testing.T) {
 		custom.Name = "custom-configmap-files"
 
 		cluster := cluster.DeepCopy()
+		cluster.Spec.Config = &v1beta1.PostgresConfigSpec{}
 		cluster.Spec.Config.Files = []corev1.VolumeProjection{
 			{ConfigMap: &custom},
 		}

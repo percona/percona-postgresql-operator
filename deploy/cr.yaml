@@ -72,6 +72,29 @@ spec:
 
 #  autoCreateUserSchema: true
 
+#  config:
+#    files:
+#      - secret:
+#          name: my-ldap-ca-cert
+#          items:
+#            - key: ca.crt
+#              path: ldap-ca.crt
+
+#  authentication:
+#    rules:
+#      - connection: host
+#        method: ldap
+#        databases: []
+#        users: []
+#        options:
+#          ldapserver: ldap.example.com
+#          ldapport: "636"
+#          ldaptls: "1"
+#          ldapbasedn: dc=example,dc=com
+#          ldapbinddn: cn=admin,dc=example,dc=com
+#          ldapbindpasswd: secret
+#          ldapsearchattribute: uid
+
 #  users:
 #    - name: rhino
 #      databases:
