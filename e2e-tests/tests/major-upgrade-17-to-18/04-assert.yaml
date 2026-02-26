@@ -3,6 +3,9 @@ kind: TestAssert
 timeout: 360
 commands:
 - script: |-
+    kubectl -n ${NAMESPACE} get cm \
+      -l app.kubernetes.io/instance=major-upgrade-17-to-18 \
+      -l app.kubernetes.io/component=pg -o yaml
     kubectl -n ${NAMESPACE} get pg,pod,job
     sleep 5
 ---

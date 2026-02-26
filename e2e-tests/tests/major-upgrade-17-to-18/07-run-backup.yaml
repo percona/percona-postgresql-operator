@@ -1,7 +1,9 @@
 apiVersion: pgv2.percona.com/v2
-kind: PerconaPGRestore
+kind: PerconaPGBackup
 metadata:
-  name: restore-after-17-to-18
+  name: backup-after-17-to-18
 spec:
   pgCluster: major-upgrade-17-to-18
   repoName: repo1
+  options:
+    - --type=full

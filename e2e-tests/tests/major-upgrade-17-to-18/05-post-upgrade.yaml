@@ -11,3 +11,5 @@ commands:
       kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-in-stages --missing-stats-only
       kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-only
       kubectl -n ${NAMESPACE} exec ${primary} -- /pgdata/delete_old_cluster.sh
+      #kubectl -n ${NAMESPACE} exec ${primary} -- psql -c "CHECKPOINT"
+      #kubectl -n ${NAMESPACE} exec ${primary} -- psql -c "SELECT pg_switch_wal()"
