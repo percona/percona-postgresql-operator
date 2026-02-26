@@ -626,3 +626,84 @@ func TestReleaseLeaseIfNeeded(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to release lease")
 	})
 }
+
+func TestStartBackup(t *testing.T) {
+	ctx := t.Context()
+	ns := "test-ns"
+	clusterName := "my-cluster"
+
+	s := scheme.Scheme
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, v2.AddToScheme(s))
+
+	newCluster := func() *v2.PerconaPGCluster {
+		return &v2.PerconaPGCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: ns},
+			Spec: v2.PerconaPGClusterSpec{
+				CRVersion:       "2.9.0",
+				PostgresVersion: 17,
+			},
+		}
+	}
+
+	newBackup := func() *v2.PerconaPGBackup {
+		repo := "repo1"
+		return &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns},
+			Spec: v2.PerconaPGBackupSpec{
+				PGCluster: clusterName,
+				RepoName:  &repo,
+			},
+		}
+	}
+
+	t.Run("marks the cluster for backup", func(t *testing.T) {
+		cluster, backup := newCluster(), newBackup()
+		cl := fake.NewClientBuilder().WithScheme(s).WithObjects(cluster, backup).Build()
+
+		require.NoError(t, startBackup(ctx, cl, backup))
+
+		updated := &v2.PerconaPGCluster{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updated))
+
+		assert.Equal(t, backup.Name, updated.Annotations[naming.PGBackRestBackup])
+		assert.Equal(t, backup.Name, updated.Annotations[pNaming.AnnotationBackupInProgress])
+		require.NotNil(t, updated.Spec.Backups.PGBackRest.Manual)
+		assert.Equal(t, "repo1", updated.Spec.Backups.PGBackRest.Manual.RepoName)
+	})
+
+	t.Run("does not persist defaults", func(t *testing.T) {
+		cluster, backup := newCluster(), newBackup()
+		cl := fake.NewClientBuilder().WithScheme(s).WithObjects(cluster, backup).Build()
+
+		defaulted := cluster.DeepCopy()
+		defaulted.Default()
+		require.NotNil(t, defaulted.Spec.Extensions.BuiltIn.PGStatMonitor) // nolint:staticcheck
+		require.NotNil(t, defaulted.Spec.Extensions.PGStatMonitor.Enabled)
+		require.NotNil(t, defaulted.Spec.AutoCreateUserSchema)
+
+		require.NoError(t, startBackup(ctx, cl, backup))
+
+		updated := &v2.PerconaPGCluster{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updated))
+
+		assert.Nil(t, updated.Spec.Extensions.BuiltIn.PGStatMonitor, // nolint:staticcheck
+			"a backup must not write the deprecated builtin extension fields")
+		assert.Nil(t, updated.Spec.Extensions.PGStatMonitor.Enabled,
+			"a backup must not decide which extensions the user enabled")
+		assert.Nil(t, updated.Spec.AutoCreateUserSchema,
+			"a backup must not fill in unrelated spec defaults")
+	})
+
+	t.Run("refuses when another backup is running", func(t *testing.T) {
+		cluster, backup := newCluster(), newBackup()
+		cluster.Annotations = map[string]string{
+			pNaming.AnnotationBackupInProgress: "other-backup",
+		}
+		cl := fake.NewClientBuilder().WithScheme(s).WithObjects(cluster, backup).Build()
+
+		err := startBackup(ctx, cl, backup)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "other-backup")
+	})
+}

@@ -674,6 +674,7 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 		if a := pg.Annotations[pNaming.AnnotationBackupInProgress]; a != "" && a != pb.Name {
 			return errors.Errorf("backup %s already in progress", a)
 		}
+
 		if pg.Annotations == nil {
 			pg.Annotations = make(map[string]string)
 		}

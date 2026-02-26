@@ -1,0 +1,7 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
+metadata:
+  name: restore1
+spec:
+  pgCluster: pg-tde
+  repoName: repo1
