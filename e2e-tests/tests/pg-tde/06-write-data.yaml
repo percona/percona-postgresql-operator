@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myTable (id) VALUES (100501)' \
+        "$(get_psql_uri pg-tde postgres)"
+      
+      sleep 5
