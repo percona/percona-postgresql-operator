@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq 'del(.spec.extensions.pg_tde)' \
+        | kubectl -n "${NAMESPACE}" apply -f -

@@ -4,9 +4,13 @@ metadata:
   name: builtin-extensions
 spec:
   extensions:
-    builtin:
-      pg_stat_monitor: false
-      pg_stat_statements: false
-      pg_audit: false
-      pgvector: false
-      pg_repack: false
+    pg_stat_monitor:
+      enabled: false
+    pg_stat_statements:
+      enabled: false
+    pg_audit:
+      enabled: false
+    pgvector:
+      enabled: false
+    pg_repack:
+      enabled: false
