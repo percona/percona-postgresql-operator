@@ -2,8 +2,10 @@ package v2
 
 import (
 	"context"
+	"os"
 
 	gover "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -320,6 +322,13 @@ func (cr *PerconaPGCluster) SetExtensionDefaults() {
 		cr.Spec.Backups.VolumeSnapshots.OfflineConfig == nil {
 		cr.Spec.Backups.VolumeSnapshots.OfflineConfig = DefaultOfflineSnapshotConfig()
 	}
+}
+
+func (cr *PerconaPGCluster) Validate() error {
+	if cr.Spec.DataSource != nil && cr.Spec.Backups.PGBackRest.Image == "" && os.Getenv("RELATED_IMAGE_PGBACKREST") == "" {
+		return errors.New("spec.backups.pgbackrest.image or RELATED_IMAGE_PGBACKREST is required when spec.dataSource is set")
+	}
+	return nil
 }
 
 func (cr *PerconaPGCluster) PostgresImage() string {
@@ -669,7 +678,12 @@ func (b Backups) IsEnabled() bool {
 
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	if b.Enabled != nil && !*b.Enabled {
-		return crunchyv1beta1.Backups{}
+		return crunchyv1beta1.Backups{
+			Enabled: ptr.To(false),
+			PGBackRest: crunchyv1beta1.PGBackRestArchive{
+				Image: b.PGBackRest.Image,
+			},
+		}
 	}
 
 	var sc *crunchyv1beta1.PGBackRestSidecars
@@ -682,6 +696,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	}
 
 	backups := crunchyv1beta1.Backups{
+		Enabled: b.Enabled,
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
 			Metadata:      b.PGBackRest.Metadata,
 			Configuration: b.PGBackRest.Configuration,

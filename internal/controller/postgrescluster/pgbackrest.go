@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -1551,7 +1552,10 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// At this point, reconciliation is allowed, so if no backups spec is found
 	// clear the status and exit
 	if !backupsSpecFound {
-		postgresCluster.Status.PGBackRest = &v1beta1.PGBackRestStatus{}
+		// K8SPG-904: we should keep the restore field
+		postgresCluster.Status.PGBackRest = &v1beta1.PGBackRestStatus{
+			Restore: postgresCluster.Status.PGBackRest.Restore,
+		}
 		return result, nil
 	}
 
@@ -3298,7 +3302,7 @@ func (r *Reconciler) ObserveBackupUniverse(ctx context.Context,
 	err error,
 ) {
 	// Does the cluster have a blank Backups section
-	backupsSpecFound = !reflect.DeepEqual(postgresCluster.Spec.Backups, v1beta1.Backups{PGBackRest: v1beta1.PGBackRestArchive{}})
+	backupsSpecFound = !reflect.DeepEqual(postgresCluster.Spec.Backups, v1beta1.Backups{PGBackRest: v1beta1.PGBackRestArchive{}}) && ptr.Deref[bool](postgresCluster.Spec.Backups.Enabled, true)
 
 	// Does the repo-host StatefulSet exist?
 	name := fmt.Sprintf("%s-%s", postgresCluster.GetName(), "repo-host")
