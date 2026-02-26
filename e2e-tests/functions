@@ -1653,12 +1653,18 @@ function vault_tls() {
 	local csr_name=vault-csr-${RANDOM}
 	local csr_api_ver="v1"
 	local csr_signer
+	local platform=$(detect_k8s_platform)
 
-	if [ "$EKS" = 1 ]; then
-		csr_signer="  signerName: beta.eks.amazonaws.com/app-serving"
-	else
-		csr_signer="  signerName: kubernetes.io/kubelet-serving"
-	fi
+	echo "Detected platform: ${platform}"
+
+	case ${platform} in
+		eks)
+			csr_signer="  signerName: beta.eks.amazonaws.com/app-serving"
+			;;
+		*)
+			csr_signer="  signerName: kubernetes.io/kubelet-serving"
+			;;
+	esac
 
 	openssl genrsa -out ${tmp_dir}/vault.key 2048
 	cat <<EOF >${tmp_dir}/csr.conf
@@ -1749,9 +1755,11 @@ function start_vault() {
 			--disable-openapi-validation \
 			--version $VAULT_VER \
 			--namespace "$name" \
-			--set dataStorage.enabled=false \
 			--set global.tlsDisable=false \
 			--set global.platform="${platform}" \
+			--set server.dataStorage.enabled=false \
+			--set server.standalone.enabled=true \
+			--set server.ha.raft.enabled=false \
 			--set server.extraVolumes[0].type=secret \
 			--set server.extraVolumes[0].name=$name \
 			--set server.extraEnvironmentVars.VAULT_CACERT=/vault/userconfig/$name/vault.ca \
@@ -1774,7 +1782,9 @@ storage \"file\" {
 			--disable-openapi-validation \
 			--version $VAULT_VER \
 			--namespace "$name" \
-			--set dataStorage.enabled=false \
+			--set server.dataStorage.enabled=false \
+			--set server.standalone.enabled=true \
+			--set server.ha.raft.enabled=false \
 			$extra_args \
 			--set global.platform="${platform}"
 	fi
