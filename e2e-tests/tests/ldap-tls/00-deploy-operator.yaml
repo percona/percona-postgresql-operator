@@ -12,3 +12,7 @@ commands:
           deploy_operator
           deploy_client
           deploy_cert_manager
+
+          if [[ $OPENSHIFT ]]; then
+              oc adm policy add-scc-to-user anyuid -z default || :
+          fi
