@@ -256,7 +256,7 @@ deploy_s3_secrets() {
 			yq eval '.stringData["credentials.json"]' ${TESTS_CONFIG_DIR}/cloud-secret-minio-gw.yml >${TEMP_DIR}/gcs-key.json
 			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini" --from-file=gcs-key.json=${TEMP_DIR}/gcs-key.json
 			;;
-		"custom-extensions" | "major-upgrade" | "builtin-extensions")
+		"custom-extensions"  | "builtin-extensions" | major-upgrade*)
 			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
 			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
 			;;
@@ -341,7 +341,7 @@ get_cr() {
 				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
 				' $TEMP_DIR/cr.yaml
 			;;
-		"major-upgrade")
+		major-upgrade*)
 			yq eval -i '
 				.spec.extensions.image = "'$IMAGE'" |
 				.spec.extensions.imagePullPolicy = "Always" |
