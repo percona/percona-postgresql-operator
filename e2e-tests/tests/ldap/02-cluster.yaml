@@ -11,6 +11,6 @@ commands:
       get_cr \
         | yq eval '
             .spec.users += [{"name":"percona","databases":["percona"]}] |
-            .spec.authentication.rules = [{"connection":"host","method":"ldap","users":["percona"],"options":{"ldapserver":"openldap","ldapport":389,"ldapprefix":"uid=","ldapsuffix":",ou=perconadba,dc=ldap,dc=local"}}]
+            .spec.authentication.rules = [{"connection":"host","method":"ldap","users":["percona"],"options":{"ldapserver":"openldap","ldapport":389,"ldapprefix":"cn=","ldapsuffix":",ou=perconadba,dc=ldap,dc=local"}}]
           ' - \
         | kubectl -n "${NAMESPACE}" apply -f -

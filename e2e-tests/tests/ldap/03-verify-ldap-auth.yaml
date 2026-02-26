@@ -23,10 +23,10 @@ commands:
 
       ## verify ldap directories
       for i in $(seq 12); do
-        if kubectl exec --namespace "${NAMESPACE}" deployment/openldap -c ldap-setup \
-          -- ldapsearch -x -H ldap://localhost:389 \
+        if kubectl exec --namespace "${NAMESPACE}" deployment/openldap \
+          -- ldapsearch -x -H ldap://localhost:1389 \
              -D "cn=admin,dc=ldap,dc=local" -w adminpassword \
-             -b "uid=percona,ou=perconadba,dc=ldap,dc=local" 2>&1 \
+             -b "ou=perconadba,dc=ldap,dc=local" "(uid=percona)" 2>&1 \
           | grep -q "uid: percona"; then
           echo "LDAP entry for percona found"
           break

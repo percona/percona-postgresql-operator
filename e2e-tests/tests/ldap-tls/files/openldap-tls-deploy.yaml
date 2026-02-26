@@ -15,116 +15,75 @@ spec:
       labels:
         app.kubernetes.io/name: openldap-tls
     spec:
+      initContainers:
+        - name: copy-certs
+          image: busybox
+          command: ["sh", "-c", "cp /certs-ro/* /certs/"]
+          volumeMounts:
+            - name: ldap-server-secret
+              mountPath: /certs-ro
+              readOnly: true
+            - name: ldap-certs
+              mountPath: /certs
       containers:
         - name: openldap
-          image: osixia/openldap:latest
-          imagePullPolicy: Always
-          args: ["--copy-service"]
+          image: public.ecr.aws/bitnami/openldap:latest
+          imagePullPolicy: IfNotPresent
           env:
-            - name: LDAP_DOMAIN
-              value: "ldap.local"
-            - name: LDAP_ORGANISATION
-              value: "ldap.local"
+            - name: LDAP_ROOT
+              value: "dc=ldap,dc=local"
+            - name: LDAP_ADMIN_USERNAME
+              value: "admin"
             - name: LDAP_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   key: adminpassword
                   name: openldap-tls-admin
-            - name: LDAP_CONFIG_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: adminpassword
-                  name: openldap-tls-admin
-            - name: LDAP_READONLY_USER
-              value: "true"
-            - name: LDAP_READONLY_USER_USERNAME
-              value: "readonly"
-            - name: LDAP_READONLY_USER_PASSWORD
-              value: "readonlypass"
-            - name: CONTAINER_LOG_LEVEL
-              value: "info"
-            - name: LDAP_TLS
-              value: "true"
-            - name: LDAP_TLS_CRT_FILENAME
-              value: "tls.crt"
-            - name: LDAP_TLS_KEY_FILENAME
-              value: "tls.key"
-            - name: LDAP_TLS_CA_CRT_FILENAME
-              value: "ca.crt"
-            # Do not require a client certificate from connecting peers.
-            - name: LDAP_TLS_VERIFY_CLIENT
+            - name: LDAP_USERS
+              value: "percona"
+            - name: LDAP_PASSWORDS
+              value: "mysecretpassword"
+            - name: LDAP_USER_OU
+              value: "perconadba"
+            - name: LDAP_ENABLE_TLS
+              value: "yes"
+            - name: LDAP_TLS_CERT_FILE
+              value: "/certs/tls.crt"
+            - name: LDAP_TLS_KEY_FILE
+              value: "/certs/tls.key"
+            - name: LDAP_TLS_CA_FILE
+              value: "/certs/ca.crt"
+            - name: LDAP_TLS_VERIFY_CLIENTS
               value: "never"
-            # Keep plain LDAP on 389 available so the ldap-setup sidecar can
-            # run ldapadd without needing TLS.
-            - name: LDAP_TLS_ENFORCE
-              value: "false"
           ports:
             - name: tcp-ldap
-              containerPort: 389
+              containerPort: 1389
             - name: tls-ldap
-              containerPort: 636
+              containerPort: 1636
           volumeMounts:
-            - name: ldap-ca
-              mountPath: /container/service/slapd/assets/certs
+            - name: ldap-certs
+              mountPath: /certs
+              readOnly: true
           readinessProbe:
             tcpSocket:
-              port: 636
-            initialDelaySeconds: 120
-            periodSeconds: 10
+              port: 1636
+            initialDelaySeconds: 20
+            periodSeconds: 5
             timeoutSeconds: 5
-            failureThreshold: 10
+            failureThreshold: 16
           livenessProbe:
             tcpSocket:
-              port: 636
-            initialDelaySeconds: 60
+              port: 1636
+            initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
-        - name: ldap-setup
-          image: osixia/openldap:latest
-          imagePullPolicy: Always
-          command: ["/bin/bash"]
-          args:
-            - -c
-            - |
-              echo "Waiting for LDAP server to be ready..."
-              sleep 60
-
-              echo "Adding LDAP structure..."
-              ldapadd -x -H ldap://localhost:389 -D "cn=admin,dc=ldap,dc=local" -w adminpassword <<EOF
-              dn: ou=perconadba,dc=ldap,dc=local
-              objectClass: organizationalUnit
-              ou: perconadba
-
-              dn: uid=percona,ou=perconadba,dc=ldap,dc=local
-              objectClass: inetOrgPerson
-              uid: percona
-              cn: percona
-              sn: percona
-              userPassword: mysecretpassword
-
-              dn: cn=admin,ou=perconadba,dc=ldap,dc=local
-              objectClass: groupOfUniqueNames
-              cn: admin
-              uniqueMember: uid=percona,ou=perconadba,dc=ldap,dc=local
-              EOF
-
-              echo "LDAP structure added successfully"
-              sleep infinity
-          env:
-            - name: LDAP_DOMAIN
-              value: "ldap.local"
-            - name: LDAP_ORGANISATION
-              value: "ldap.local"
-            - name: LDAP_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: adminpassword
-                  name: openldap-tls-admin
       volumes:
-        - name: ldap-ca
+        - name: ldap-server-secret
           secret:
-            secretName: ldap-ca
+            secretName: ldap-server
+        - name: ldap-certs
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

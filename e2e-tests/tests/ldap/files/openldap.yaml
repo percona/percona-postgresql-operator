@@ -25,90 +25,41 @@ spec:
     spec:
       containers:
         - name: openldap
-          image: osixia/openldap:latest
-          imagePullPolicy: Always
-          args: ["--copy-service"]
+          image: public.ecr.aws/bitnami/openldap:latest
+          imagePullPolicy: IfNotPresent
           env:
-            - name: LDAP_DOMAIN
-              value: "ldap.local"
-            - name: LDAP_ORGANISATION
-              value: "ldap.local"
+            - name: LDAP_ROOT
+              value: "dc=ldap,dc=local"
+            - name: LDAP_ADMIN_USERNAME
+              value: "admin"
             - name: LDAP_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   key: adminpassword
                   name: openldap
-            - name: LDAP_CONFIG_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: adminpassword
-                  name: openldap
-            - name: LDAP_READONLY_USER
-              value: "true"
-            - name: LDAP_READONLY_USER_USERNAME
-              value: "readonly"
-            - name: LDAP_READONLY_USER_PASSWORD
-              value: "readonlypass"
-            - name: CONTAINER_LOG_LEVEL
-              value: "info"
+            - name: LDAP_USERS
+              value: "percona"
+            - name: LDAP_PASSWORDS
+              value: "mysecretpassword"
+            - name: LDAP_USER_OU
+              value: "perconadba"
           ports:
             - name: tcp-ldap
-              containerPort: 389
+              containerPort: 1389
           readinessProbe:
             tcpSocket:
-              port: 389
-            initialDelaySeconds: 60
-            periodSeconds: 10
+              port: 1389
+            initialDelaySeconds: 10
+            periodSeconds: 5
             timeoutSeconds: 5
-            failureThreshold: 5
+            failureThreshold: 12
           livenessProbe:
             tcpSocket:
-              port: 389
-            initialDelaySeconds: 60
+              port: 1389
+            initialDelaySeconds: 15
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
-        - name: ldap-setup
-          image: osixia/openldap:latest
-          imagePullPolicy: Always
-          command: ["/bin/bash"]
-          args:
-            - -c
-            - |
-              echo "Waiting for LDAP server to be ready..."
-              sleep 60
-
-              echo "Adding LDAP structure..."
-              ldapadd -x -H ldap://localhost:389 -D "cn=admin,dc=ldap,dc=local" -w adminpassword <<EOF
-              dn: ou=perconadba,dc=ldap,dc=local
-              objectClass: organizationalUnit
-              ou: perconadba
-
-              dn: uid=percona,ou=perconadba,dc=ldap,dc=local
-              objectClass: inetOrgPerson
-              uid: percona
-              cn: percona
-              sn: percona
-              userPassword: mysecretpassword
-
-              dn: cn=admin,ou=perconadba,dc=ldap,dc=local
-              objectClass: groupOfUniqueNames
-              cn: admin
-              uniqueMember: uid=percona,ou=perconadba,dc=ldap,dc=local
-              EOF
-
-              echo "LDAP structure added successfully"
-              sleep infinity
-          env:
-            - name: LDAP_DOMAIN
-              value: "ldap.local"
-            - name: LDAP_ORGANISATION
-              value: "ldap.local"
-            - name: LDAP_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: adminpassword
-                  name: openldap
 ---
 apiVersion: v1
 kind: Service

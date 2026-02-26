@@ -14,19 +14,45 @@ metadata:
 spec:
   selfSigned: {}
 ---
-# A self-signed CA certificate.  cert-manager stores it in the Secret
-# "ldap-ca" with keys tls.crt (server cert), tls.key (server key), and
-# ca.crt (CA cert).  commonName must match the Kubernetes Service name so
-# that PostgreSQL can verify the LDAP server's certificate hostname.
+# Self-signed CA certificate.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: ldap-ca
 spec:
   isCA: true
-  commonName: openldap-tls
+  commonName: ldap-ca
   secretName: ldap-ca
   issuerRef:
     name: ldap-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+# CA-backed Issuer that signs the server certificate.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ldap-ca-issuer
+spec:
+  ca:
+    secretName: ldap-ca
+---
+# Server certificate with proper serverAuth usage and SAN matching the Service
+# name, so that PostgreSQL can verify the LDAP server's TLS certificate.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ldap-server
+spec:
+  secretName: ldap-server
+  commonName: openldap-tls
+  dnsNames:
+    - openldap-tls
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  issuerRef:
+    name: ldap-ca-issuer
     kind: Issuer
     group: cert-manager.io
