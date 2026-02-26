@@ -6,15 +6,17 @@ commands:
       set -o xtrace
 
       source ../../functions
+
 # TODO: turn on after changes in PMM:  PMM-14832
+
 #      series_fetched=$(curl --insecure -G "https://admin:admin@$(get_service_ip monitoring-service)/prometheus/api/v1/query_range" \
 #           --data-urlencode "query=node_filesystem_free_bytes{mountpoint=\"/pgdata\"}" \
 #           --data-urlencode "start=$(($(date +%s) - 300))" \
 #           --data-urlencode "end=$(date +%s)" \
 #           --data-urlencode "step=5s" | jq -r '.stats.seriesFetched')
-#
+
 #      if [[ $series_fetched == 0 ]]; then
 #        echo "seriesFetched is 0"
 #        exit 1
-#      fi
+#     fi
     timeout: 360
