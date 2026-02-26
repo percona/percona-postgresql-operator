@@ -447,11 +447,21 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy(cr.Spec.CRVersion)
 
 	postgresCluster.Spec.Extensions.PGTDE = cr.Spec.Extensions.PGTDE
-	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.PGStatMonitor.Enabled
-	postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.BuiltIn.PGStatStatements
-	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
-	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
-	postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
+	if cr.Spec.Extensions.PGStatMonitor.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.PGStatMonitor.Enabled
+	}
+	if cr.Spec.Extensions.PGStatStatements.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.PGStatStatements.Enabled
+	}
+	if cr.Spec.Extensions.PGAudit.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.PGAudit.Enabled
+	}
+	if cr.Spec.Extensions.PGVector.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.PGVector.Enabled
+	}
+	if cr.Spec.Extensions.PGRepack.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.PGRepack.Enabled
+	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 	postgresCluster.Spec.TLS = cr.Spec.TLS
