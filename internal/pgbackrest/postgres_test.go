@@ -78,7 +78,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -105,7 +105,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -138,7 +138,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -161,7 +161,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -182,7 +182,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
