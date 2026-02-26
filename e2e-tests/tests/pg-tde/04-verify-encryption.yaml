@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+
+      source ../../functions
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_psql_uri pg-tde postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 05-verify-extension --from-literal=pg_tde_extension="$result"
+
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_psql_uri pg-tde postgres)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 05-verify-encryption --from-literal=pg_tde_is_encrypted="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri pg-tde postgres)/myapp"
