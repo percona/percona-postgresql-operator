@@ -110,6 +110,6 @@ func updateCommandRestorableTime(archive *string) {
 	extractCommitTime := `grep -oP "COMMIT \K[^;]+" | ` + fixTimezone + ``
 	validateCommitTime := `grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"`
 
-	*archive += ` && timestamp=$(pg_waldump "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
+	*archive += ` && timestamp=$(pg_waldump -r Transaction "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
 	*archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
 }
