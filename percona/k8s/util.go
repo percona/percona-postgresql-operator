@@ -11,8 +11,10 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/percona/naming"
@@ -181,4 +183,28 @@ func ObjectHash(obj runtime.Object) (string, error) {
 
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
+}
+
+// GroupVersionKindExists checks to see whether a given Kind for a given
+// GroupVersion exists in the Kubernetes API Server.
+func GroupVersionKindExists(dc *discovery.DiscoveryClient, groupVersion, kind string) (bool, error) {
+	if dc == nil {
+		return false, errors.New("discovery client is nil")
+	}
+
+	resourceList, err := dc.ServerResourcesForGroupVersion(groupVersion)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, resource := range resourceList.APIResources {
+		if resource.Kind == kind {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

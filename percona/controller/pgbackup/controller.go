@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -26,11 +27,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup/snapshots"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
@@ -47,14 +50,15 @@ var ErrBackupJobNotFound = errors.New("backup Job not found")
 
 // Reconciler holds resources for the PerconaPGBackup reconciler
 type PGBackupReconciler struct {
-	Client  client.Client
-	PodExec runtime.PodExecutor
+	Client          client.Client
+	DiscoveryClient *discovery.DiscoveryClient
+	PodExec         runtime.PodExecutor
 
 	ExternalChan chan event.GenericEvent
 }
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
-func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
+func (r *PGBackupReconciler) SetupWithManager(ctx context.Context, mgr manager.Manager) error {
 	if r.PodExec == nil {
 		var err error
 		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
@@ -62,11 +66,31 @@ func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
 			return err
 		}
 	}
-	return (builder.ControllerManagedBy(mgr).
+
+	if r.DiscoveryClient == nil {
+		var err error
+		r.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
+		if err != nil {
+			return errors.Wrap(err, "failed to create discovery client")
+		}
+	}
+
+	b := builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGBackup{}).
-		WatchesRawSource(source.Channel(r.ExternalChan, &handler.EnqueueRequestForObject{})).
-		Owns(&volumesnapshotv1.VolumeSnapshot{}).
-		Complete(r))
+		WatchesRawSource(source.Channel(r.ExternalChan, &handler.EnqueueRequestForObject{}))
+
+	// Watch VolumeSnapshots if the feature is enabled and the API is available.
+	if feature.Enabled(ctx, feature.BackupSnapshots) {
+		gvk := volumesnapshotv1.SchemeGroupVersion.WithKind(pNaming.KindVolumeSnapshot)
+		gv := gvk.GroupVersion().String()
+		if ok, err := k8s.GroupVersionKindExists(r.DiscoveryClient, gv, gvk.Kind); err != nil {
+			return errors.Wrap(err, "check VolumeSnapshot API availability")
+		} else if ok {
+			b = b.Owns(&volumesnapshotv1.VolumeSnapshot{})
+		}
+	}
+
+	return b.Complete(r)
 }
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete;patch
