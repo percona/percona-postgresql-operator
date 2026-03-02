@@ -8,6 +8,6 @@ commands:
       source ../../functions
 
       primary=$(get_pod_by_role major-upgrade-14-to-15 primary name)
-      kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-in-stages --missing-stats-only
+      kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-in-stages
       kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-only
       kubectl -n ${NAMESPACE} exec ${primary} -- /pgdata/delete_old_cluster.sh
