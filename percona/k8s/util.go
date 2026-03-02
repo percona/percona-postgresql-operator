@@ -191,13 +191,19 @@ func GroupVersionKindExists(dc *discovery.DiscoveryClient, groupVersion, kind st
 	if dc == nil {
 		return false, errors.New("discovery client is nil")
 	}
+	if groupVersion == "" {
+		return false, errors.New("groupVersion must not be empty")
+	}
+	if kind == "" {
+		return false, errors.New("kind must not be empty")
+	}
 
 	resourceList, err := dc.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return false, nil
 		}
-		return false, err
+		return false, errors.Wrap(err, "get server resources for group version")
 	}
 
 	for _, resource := range resourceList.APIResources {
