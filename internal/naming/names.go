@@ -135,6 +135,21 @@ const (
 )
 
 const (
+	// PGTDEVolume is the name of the pg_tde secret volume and volume mount in a
+	// PostgreSQL instance Pod
+	PGTDEVolume = "pg-tde"
+
+	// PGTDEMountPath is the path for mounting the pg_tde secret
+	PGTDEMountPath = "/pgconf/tde"
+
+	// PGTDEVaultProvider is the name of the Vault provider
+	PGTDEVaultProvider = "vault-provider"
+
+	// PGTDEGlobalKey is the name of the global key
+	PGTDEGlobalKey = "global-master-key"
+)
+
+const (
 	// PGBackRestRepoContainerName is the name assigned to the container used to run pgBackRest
 	PGBackRestRepoContainerName = "pgbackrest"
 
@@ -620,5 +635,21 @@ func UpgradeCheckConfigMap() metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: config.PGONamespace(),
 		Name:      "pgo-upgrade-check",
+	}
+}
+
+// CAIssuer returns the ObjectMeta for the CA Issuer used by cert-manager.
+func CAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-ca-issuer",
+	}
+}
+
+// TLSIssuer returns the ObjectMeta for the TLS Issuer used by cert-manager.
+func TLSIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-tls-issuer",
 	}
 }

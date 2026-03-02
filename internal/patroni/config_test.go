@@ -18,10 +18,12 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -84,6 +86,38 @@ scope: cluster-name-ha
 watchdog:
   mode: "off"
 	`)+"\n")
+	})
+
+	t.Run("metadata labels propagated to labels", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			naming.LabelVersion: version.Version(),
+		}
+		cluster.Spec.Metadata = &v1beta1.Metadata{
+			Labels: map[string]string{
+				"example.com/env":   "production",
+				"example.com/owner": "team-a",
+			},
+		}
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		k8sSection, ok := parsed["kubernetes"].(map[string]any)
+		assert.Assert(t, ok, "expected kubernetes section")
+		labels, ok := k8sSection["labels"].(map[string]any)
+		assert.Assert(t, ok, "expected kubernetes.labels section")
+
+		assert.Equal(t, labels["example.com/env"], "production")
+		assert.Equal(t, labels["example.com/owner"], "team-a")
+		assert.Equal(t, labels["postgres-operator.crunchydata.com/cluster"], "cluster-name")
 	})
 
 	t.Run(">PG10", func(t *testing.T) {

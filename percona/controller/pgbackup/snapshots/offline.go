@@ -99,7 +99,7 @@ func (e *offlineExec) checkpoint(ctx context.Context, instanceName string) error
 	}
 
 	if stderr != "" {
-		return fmt.Errorf("checkpoint failed: %s", stderr)
+		return errors.Errorf("checkpoint failed: %s", stderr)
 	}
 
 	log.Info("checkpoint executed", "stdout", stdout, "stderr", stderr)

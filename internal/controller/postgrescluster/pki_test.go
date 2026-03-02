@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +23,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -42,8 +44,9 @@ func TestReconcileCerts(t *testing.T) {
 	namespace := setupNamespace(t, tClient).Name
 
 	r := &Reconciler{
-		Client: tClient,
-		Owner:  ControllerName,
+		Client:              tClient,
+		Owner:               ControllerName,
+		CertManagerCtrlFunc: certmanager.NewController,
 	}
 
 	// set up cluster1
@@ -393,7 +396,7 @@ func getCertFromSecret(
 	// get the cert from the secret
 	secretCRT, ok := secret.Data[dataKey]
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve %s", dataKey)
+		return nil, errors.Errorf("could not retrieve %s", dataKey)
 	}
 
 	// parse the cert from binary encoded data

@@ -5,12 +5,12 @@
 package util
 
 import (
-	"errors"
 	"strings"
 	"testing"
 	"testing/iotest"
 	"unicode"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 	"k8s.io/apimachinery/pkg/util/sets"

@@ -78,6 +78,9 @@ type PerconaPGBackupSpec struct {
 	// https://pgbackrest.org/command.html#command-backup
 	// +optional
 	Options []string `json:"options,omitempty"`
+
+	// +optional
+	ContainerOptions ContainerOptions `json:"containerOptions"`
 }
 
 const IndexFieldPGCluster = "spec.pgCluster"

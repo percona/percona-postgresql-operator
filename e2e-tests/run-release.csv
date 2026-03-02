@@ -1,11 +1,13 @@
 backup-enable-disable
 builtin-extensions
+cert-manager-tls
 custom-envs
 custom-extensions
 custom-tls
 database-init-sql
 demand-backup
 demand-backup-offline-snapshot
+dynamic-configuration
 finalizers
 init-deploy
 huge-pages
@@ -14,6 +16,7 @@ monitoring
 monitoring-pmm3
 one-pod
 operator-self-healing
+pg-tde
 pitr
 scaling
 scheduled-backup
