@@ -3,6 +3,9 @@ kind: TestAssert
 timeout: 360
 commands:
 - script: |-
+    kubectl -n ${NAMESPACE} get cm \
+      -l app.kubernetes.io/instance=major-upgrade-15-to-16 \
+      -l app.kubernetes.io/component=pg -o yaml
     kubectl -n ${NAMESPACE} get pg,pod,job
     sleep 5
 ---
@@ -24,6 +27,22 @@ status:
     ready: 3
     size: 3
   state: ready
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGUpgrade
+metadata:
+  name: 15-to-16
+status:
+  conditions:
+  - type: Progressing
+    reason: PGUpgradeCompleted
+    status: "False"
+    observedGeneration: 1
+  - type: Succeeded
+    reason: PGUpgradeSucceeded
+    status: "True"
+    observedGeneration: 1
+  observedGeneration: 1
 ---
 kind: Job
 apiVersion: batch/v1

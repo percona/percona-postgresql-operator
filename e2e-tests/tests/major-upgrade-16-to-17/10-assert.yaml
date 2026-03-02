@@ -23,6 +23,9 @@ collectors:
   - type: pod
     selector: "postgres-operator.crunchydata.com/data=postgres"
     tail: 30
+  - type: pod
+    selector: "postgres-operator.crunchydata.com/pgbackrest-restore=''"
+    tail: 30
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
@@ -30,7 +33,7 @@ metadata:
   name: restore-after-16-to-17
 spec:
   pgCluster: major-upgrade-16-to-17
-  repoName: repo2
+  repoName: repo1
 status:
   state: Succeeded
 ---
