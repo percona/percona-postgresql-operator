@@ -6,7 +6,6 @@ package postgrescluster
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
@@ -287,7 +286,7 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 				// and event could potentially be removed in favor of that validation
 				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "MisconfiguredClusterIP",
 					"NodePort cannot be set with type ClusterIP on Service %q", service.Name)
-				return nil, fmt.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
+				return nil, errors.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
 			}
 			servicePort.NodePort = *spec.NodePort
 		}

@@ -9,12 +9,12 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"hash"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/pkg/errors"
 	"github.com/xdg-go/stringprep"
 	"golang.org/x/crypto/pbkdf2"
 )

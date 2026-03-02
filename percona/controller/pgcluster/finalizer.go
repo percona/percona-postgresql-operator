@@ -213,16 +213,21 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 }
 
 func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	finalizers := map[string]controller.FinalizerFunc[*v2.PerconaPGCluster]{
-		pNaming.FinalizerDeletePVC:     r.deletePVCAndSecrets,
-		pNaming.FinalizerDeleteSSL:     r.deleteTLSSecrets,
-		pNaming.FinalizerStopWatchers:  r.stopExternalWatchers,
-		pNaming.FinalizerDeleteBackups: r.deleteBackups,
+	type finalizerEntry struct {
+		name string
+		fn   controller.FinalizerFunc[*v2.PerconaPGCluster]
 	}
 
-	for finalizer, f := range finalizers {
-		if _, err := controller.RunFinalizer(ctx, r.Client, cr, finalizer, f); err != nil {
-			return errors.Wrapf(err, "run finalizer %s", finalizer)
+	finalizers := []finalizerEntry{
+		{pNaming.FinalizerDeletePVC, r.deletePVCAndSecrets},
+		{pNaming.FinalizerDeleteSSL, r.deleteTLSSecrets},
+		{pNaming.FinalizerStopWatchers, r.stopExternalWatchers},
+		{pNaming.FinalizerDeleteBackups, r.deleteBackups},
+	}
+
+	for _, entry := range finalizers {
+		if _, err := controller.RunFinalizer(ctx, r.Client, cr, entry.name, entry.fn); err != nil {
+			return errors.Wrapf(err, "run finalizer %s", entry.name)
 		}
 	}
 

@@ -2,7 +2,6 @@ package pgbackup
 
 import (
 	"context"
-	"fmt"
 	"path"
 	"slices"
 	"time"
@@ -124,7 +123,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = "repoName is required when method is 'pgbackrest'"
 		}); updErr != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 		}
 		return reconcile.Result{}, errors.New("'repoName' is required when method is 'pgbackrest'")
 	}
@@ -654,6 +653,9 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 		if a := pg.Annotations[pNaming.AnnotationBackupInProgress]; a != "" && a != pb.Name {
 			return errors.Errorf("backup %s already in progress", a)
 		}
+
+		pg.Default()
+
 		if pg.Annotations == nil {
 			pg.Annotations = make(map[string]string)
 		}

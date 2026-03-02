@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -395,7 +396,7 @@ func getCertFromSecret(
 	// get the cert from the secret
 	secretCRT, ok := secret.Data[dataKey]
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve %s", dataKey)
+		return nil, errors.Errorf("could not retrieve %s", dataKey)
 	}
 
 	// parse the cert from binary encoded data

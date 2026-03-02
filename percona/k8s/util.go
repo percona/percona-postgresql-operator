@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 
@@ -34,7 +33,7 @@ func GetWatchNamespace() (string, error) {
 
 	ns, found = os.LookupEnv(WatchNamespaceEnvVar)
 	if !found {
-		return "", fmt.Errorf("%s must be set", WatchNamespaceEnvVar)
+		return "", errors.Errorf("%s must be set", WatchNamespaceEnvVar)
 	}
 
 	return ns, nil

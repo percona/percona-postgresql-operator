@@ -6,7 +6,6 @@ package postgrescluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"github.com/go-logr/logr/funcr"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

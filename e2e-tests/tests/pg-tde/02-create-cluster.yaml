@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq '.spec.extensions.pg_tde.enabled = true' \
+        | yq '.spec.extensions.pg_tde.vault.host = "https://vault-service.vault-service.svc:8200"' \
+        | yq '.spec.extensions.pg_tde.vault.mountPath = "tde"' \
+        | yq '.spec.extensions.pg_tde.vault.tokenSecret.name = "vault-secret"' \
+        | yq '.spec.extensions.pg_tde.vault.tokenSecret.key = "token"' \
+        | yq '.spec.extensions.pg_tde.vault.caSecret.name = "vault-secret"' \
+        | yq '.spec.extensions.pg_tde.vault.caSecret.key = "ca.crt"' \
+        | kubectl -n "${NAMESPACE}" apply -f -

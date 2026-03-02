@@ -18,6 +18,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1257,6 +1258,20 @@ func (r *Reconciler) reconcileInstance(
 		}
 	}
 
+	// K8SPG-864
+	if cluster.CompareVersion("2.9.0") >= 0 {
+		for _, v := range spec.SidecarPVCs {
+			instance.Spec.Template.Spec.Volumes = append(instance.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: v.Name,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: v.Name,
+					},
+				},
+			})
+		}
+	}
+
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, instance))
 	}
@@ -1308,6 +1323,18 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 			},
 		)
 	}
+
+	pgTDECondition := meta.FindStatusCondition(cluster.Status.Conditions,
+		v1beta1.PGTDEEnabled)
+	pgTDEEnabled := pgTDECondition != nil && pgTDECondition.Status == metav1.ConditionTrue
+	// we should restart pods only after extension is dropped
+	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
+		sts.Spec.Template.Annotations = naming.Merge(
+			sts.Spec.Template.Annotations,
+			map[string]string{naming.TDEInstalledAnnotation: "true"},
+		)
+	}
+
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),

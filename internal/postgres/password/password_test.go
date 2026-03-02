@@ -5,8 +5,9 @@
 package password
 
 import (
-	"errors"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func TestNewPostgresPassword(t *testing.T) {

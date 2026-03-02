@@ -180,6 +180,24 @@ metadata:
     kind: PostgresCluster
     name: init-deploy
 ---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/patroni: init-deploy-ha
+    test-label: test
+  name: init-deploy-ha
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: init-deploy
+    postgres-operator.crunchydata.com/patroni: init-deploy-ha
+    test-label: test
+  name: init-deploy-ha-config
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

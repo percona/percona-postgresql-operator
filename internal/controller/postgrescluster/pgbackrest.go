@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -514,7 +515,7 @@ func unstructuredToRepoResources(kind string, repoResources *RepoResources,
 			repoResources.rolebindings = append(repoResources.rolebindings, &rb.Items[i])
 		}
 	default:
-		return fmt.Errorf("unexpected kind %q", kind)
+		return errors.Errorf("unexpected kind %q", kind)
 	}
 
 	return nil
@@ -738,6 +739,20 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 		// defined, add the defined container to the Pod.
 		if feature.Enabled(ctx, feature.PGBackrestRepoHostSidecars) && repoHost.Sidecars != nil {
 			repo.Spec.Template.Spec.Containers = append(repo.Spec.Template.Spec.Containers, repoHost.Sidecars...)
+			if postgresCluster.CompareVersion("2.9.0") >= 0 {
+				repo.Spec.Template.Spec.Volumes = append(repo.Spec.Template.Spec.Volumes, repoHost.SidecarVolumes...)
+
+				for _, v := range repoHost.SidecarPVCs {
+					repo.Spec.Template.Spec.Volumes = append(repo.Spec.Template.Spec.Volumes, corev1.Volume{
+						Name: v.Name,
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: v.Name,
+							},
+						},
+					})
+				}
+			}
 		}
 	}
 	sizeLimit := getTMPSizeLimit(repo.Labels[naming.LabelVersion], resources)
@@ -1537,7 +1552,10 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	// At this point, reconciliation is allowed, so if no backups spec is found
 	// clear the status and exit
 	if !backupsSpecFound {
-		postgresCluster.Status.PGBackRest = &v1beta1.PGBackRestStatus{}
+		// K8SPG-904: we should keep the restore field
+		postgresCluster.Status.PGBackRest = &v1beta1.PGBackRestStatus{
+			Restore: postgresCluster.Status.PGBackRest.Restore,
+		}
 		return result, nil
 	}
 
@@ -1748,8 +1766,8 @@ func (r *Reconciler) reconcilePostgresClusterDataSource(ctx context.Context,
 			forCluster: []*Instance{instance},
 		}, rootCA, backupsSpecFound)
 		if err != nil || result != (reconcile.Result{}) {
-			return fmt.Errorf("unable to reconcile pgBackRest as needed to initialize "+
-				"PostgreSQL data for the cluster: %w", err)
+			return errors.Wrap(err, "unable to reconcile pgBackRest as needed to initialize "+
+				"PostgreSQL data for the cluster")
 		}
 	} else {
 		if err := r.Client.Get(ctx,
@@ -3284,7 +3302,7 @@ func (r *Reconciler) ObserveBackupUniverse(ctx context.Context,
 	err error,
 ) {
 	// Does the cluster have a blank Backups section
-	backupsSpecFound = !reflect.DeepEqual(postgresCluster.Spec.Backups, v1beta1.Backups{PGBackRest: v1beta1.PGBackRestArchive{}})
+	backupsSpecFound = !reflect.DeepEqual(postgresCluster.Spec.Backups, v1beta1.Backups{PGBackRest: v1beta1.PGBackRestArchive{}}) && ptr.Deref[bool](postgresCluster.Spec.Backups.Enabled, true)
 
 	// Does the repo-host StatefulSet exist?
 	name := fmt.Sprintf("%s-%s", postgresCluster.GetName(), "repo-host")

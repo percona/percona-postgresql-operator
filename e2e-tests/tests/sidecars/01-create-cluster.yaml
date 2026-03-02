@@ -11,7 +11,14 @@ commands:
       get_cr \
         | yq eval '.spec.instances[0].sidecars = [{"name": "sidecar1", "image": "busybox", "command": ["sleep", "30d"]}]' - \
         | yq eval '.spec.instances[0].sidecars += [{"name": "sidecar2", "image": "busybox", "command": ["sleep", "30d"]}]' - \
+        | yq eval '.spec.instances[0].sidecarVolumes = [{"name": "sidecar-secret", "secret": {"secretName": "mysecret"}}]' - \
+        | yq eval '.spec.instances[0].sidecarPVCs = [{"name": "sidecar-instance-claim", "spec": {"resources": {"requests": {"storage": "1Gi"}}, "volumeMode": "Filesystem", "accessModes": ["ReadWriteOnce"]}}]' - \
       	| yq eval '.spec.proxy.pgBouncer.sidecars = [{"name": "sidecar1", "image": "busybox", "command": ["sleep", "30d"]}]' - \
+        | yq eval '.spec.proxy.pgBouncer.sidecarVolumes = [{"name": "sidecar-secret", "secret": {"secretName": "mysecret"}}]' - \
+        | yq eval '.spec.proxy.pgBouncer.sidecarPVCs = [{"name": "sidecar-pgbouncer-claim", "spec": {"resources": {"requests": {"storage": "1Gi"}}, "volumeMode": "Filesystem", "accessModes": ["ReadWriteOnce"]}}]' - \
+      	| yq eval '.spec.backups.pgbackrest.repoHost.sidecars = [{"name": "sidecar1", "image": "busybox", "command": ["sleep", "30d"]}]' - \
+        | yq eval '.spec.backups.pgbackrest.repoHost.sidecarVolumes = [{"name": "sidecar-secret", "secret": {"secretName": "mysecret"}}]' - \
+        | yq eval '.spec.backups.pgbackrest.repoHost.sidecarPVCs = [{"name": "sidecar-repohost-claim", "spec": {"resources": {"requests": {"storage": "1Gi"}}, "volumeMode": "Filesystem", "accessModes": ["ReadWriteOnce"]}}]' - \
       	| kubectl -n "${NAMESPACE}" apply -f -
     timeout: 30
 

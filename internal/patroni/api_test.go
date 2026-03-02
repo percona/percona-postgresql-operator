@@ -6,13 +6,13 @@ package patroni
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os/exec"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 )
 
