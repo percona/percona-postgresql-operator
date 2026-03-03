@@ -193,6 +193,7 @@ const (
 	PGBackupTypeFull         PGBackupType = "full"
 	PGBackupTypeDifferential PGBackupType = "differential"
 	PGBackupTypeIncremental  PGBackupType = "incremental"
+	PGBackupTypeSnapshot     PGBackupType = "snapshot"
 )
 
 const (
