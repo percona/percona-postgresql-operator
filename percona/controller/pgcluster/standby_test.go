@@ -158,7 +158,8 @@ func TestReconcileStandbyLag(t *testing.T) {
 		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
-		assert.Equal(t, "PrimaryNotFound", cond.Reason)
+		assert.Equal(t, "ErrorGettingLag", cond.Reason)
+		assert.Equal(t, "Cannot find primary for replication lag calculation", cond.Message)
 	})
 
 	t.Run("invalid lag query output", func(t *testing.T) {
@@ -183,7 +184,8 @@ func TestReconcileStandbyLag(t *testing.T) {
 		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
-		assert.Equal(t, "InvalidLagQueryOutput", cond.Reason)
+		assert.Equal(t, "ErrorGettingLag", cond.Reason)
+		assert.Equal(t, "Invalid output from lag query. The WAL receiver is probably not active", cond.Message)
 	})
 
 	t.Run("lag not detected", func(t *testing.T) {

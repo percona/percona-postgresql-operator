@@ -72,22 +72,22 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 
 	lagBytes, err := r.getStandbyLag(ctx, cr)
 	if err != nil {
+		cond := metav1.Condition{
+			Type:    postgrescluster.ConditionStandbyLagging,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "ErrorGettingLag",
+			Message: err.Error(),
+		}
+		defer func() {
+			meta.SetStatusCondition(&cr.Status.Conditions, cond)
+		}()
+
 		if errors.Is(err, ErrPrimaryPodNotFound) && cr.Status.State != v2.AppStateReady {
-			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-				Type:    postgrescluster.ConditionStandbyLagging,
-				Status:  metav1.ConditionUnknown,
-				Reason:  "PrimaryNotFound",
-				Message: "Cannot find primary for replication lag calculation",
-			})
+			cond.Message = "Cannot find primary for replication lag calculation"
 			return nil
 		}
 		if errors.Is(err, ErrInvalidLagQueryOutput) {
-			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-				Type:    postgrescluster.ConditionStandbyLagging,
-				Status:  metav1.ConditionUnknown,
-				Reason:  "InvalidLagQueryOutput",
-				Message: "Invalid output from lag query. The WAL receiver is probably not active",
-			})
+			cond.Message = "Invalid output from lag query. The WAL receiver is probably not active"
 			return nil
 		}
 		return errors.Wrap(err, "calculate replication lag bytes")
