@@ -17,7 +17,6 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -60,15 +59,15 @@ const (
 
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
-	Client          client.Client
-	Scheme          *k8sruntime.Scheme
-	DiscoveryClient *discovery.DiscoveryClient
-	IsOpenShift     bool
-	Owner           client.FieldOwner
-	PodExec         runtime.PodExecutor
-	Recorder        record.EventRecorder
-	Registration    registration.Registration
-	Tracer          trace.Tracer
+	Client              client.Client
+	Scheme              *k8sruntime.Scheme
+	DiscoveryClient     *discovery.DiscoveryClient
+	IsOpenShift         bool
+	Owner               client.FieldOwner
+	PodExec             runtime.PodExecutor
+	Recorder            record.EventRecorder
+	Registration        registration.Registration
+	Tracer              trace.Tracer
 	CertManagerCtrlFunc certmanager.NewControllerFunc
 	RestConfig          *rest.Config
 }
@@ -587,29 +586,4 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Watches(&appsv1.StatefulSet{},
 			r.controllerRefHandlerFuncs()). // watch all StatefulSets
 		Complete(r)
-}
-
-// GroupVersionKindExists checks to see whether a given Kind for a given
-// GroupVersion exists in the Kubernetes API Server.
-func (r *Reconciler) GroupVersionKindExists(groupVersion, kind string) (*bool, error) {
-	if r.DiscoveryClient == nil {
-		return initialize.Bool(false), nil
-	}
-
-	resourceList, err := r.DiscoveryClient.ServerResourcesForGroupVersion(groupVersion)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return initialize.Bool(false), nil
-		}
-
-		return nil, err
-	}
-
-	for _, resource := range resourceList.APIResources {
-		if resource.Kind == kind {
-			return initialize.Bool(true), nil
-		}
-	}
-
-	return initialize.Bool(false), nil
 }

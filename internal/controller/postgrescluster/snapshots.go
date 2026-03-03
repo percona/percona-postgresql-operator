@@ -24,6 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -56,11 +57,11 @@ func (r *Reconciler) reconcileVolumeSnapshots(ctx context.Context,
 	// Check if the Kube cluster has VolumeSnapshots installed. If VolumeSnapshots
 	// are not installed, we need to return early. If user is attempting to use
 	// VolumeSnapshots, return an error, otherwise return nil.
-	volumeSnapshotKindExists, err := r.GroupVersionKindExists("snapshot.storage.k8s.io/v1", "VolumeSnapshot")
+	volumeSnapshotKindExists, err := k8s.GroupVersionKindExists(r.DiscoveryClient, "snapshot.storage.k8s.io/v1", "VolumeSnapshot")
 	if err != nil {
 		return err
 	}
-	if !*volumeSnapshotKindExists {
+	if !volumeSnapshotKindExists {
 		if postgrescluster.Spec.Backups.Snapshots != nil {
 			return errors.New("VolumeSnapshots are not installed/enabled in this Kubernetes cluster; cannot create snapshot.")
 		} else {
