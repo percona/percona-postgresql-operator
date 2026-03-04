@@ -89,7 +89,7 @@ spec:
               uid: percona
               cn: percona
               sn: percona
-              userPassword: mysecretpassword
+              userPassword: password
 
               dn: cn=admin,ou=perconadba,dc=ldap,dc=local
               objectClass: groupOfUniqueNames

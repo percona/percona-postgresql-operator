@@ -1,6 +1,9 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 180
+# The ldap-ca Secret is guaranteed to exist before this step, so the pod starts
+# without a FailedMount delay.  Allow time for readinessProbe.initialDelaySeconds
+# (120s) plus OpenLDAP startup.
+timeout: 300
 ---
 apiVersion: apps/v1
 kind: Deployment
