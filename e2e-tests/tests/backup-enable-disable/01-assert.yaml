@@ -57,7 +57,7 @@ metadata:
     - postgres-operator.crunchydata.com/finalizer
 spec:
   backups:
-    pgbackrest: {}
+    enabled: false
 status:
   instances:
     - name: instance1

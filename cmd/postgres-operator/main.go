@@ -217,7 +217,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Client:       mgr.GetClient(),
 		ExternalChan: externalEvents,
 	}
-	if err := pb.SetupWithManager(mgr); err != nil {
+	if err := pb.SetupWithManager(ctx, mgr); err != nil {
 		return err
 	}
 
