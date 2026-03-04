@@ -82,7 +82,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 			meta.SetStatusCondition(&cr.Status.Conditions, cond)
 		}()
 
-		if errors.Is(err, ErrPrimaryPodNotFound) && cr.Status.State != v2.AppStateReady {
+		if errors.Is(err, ErrPrimaryPodNotFound) {
 			cond.Message = "Cannot find primary for replication lag calculation"
 			return nil
 		}
@@ -239,7 +239,7 @@ func (r *PGClusterReconciler) getWALLagBytes(
 ) (int64, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, standby)
 	if err != nil {
-		return 0, errors.Wrap(ErrPrimaryPodNotFound, "get primary pod")
+		return 0, errors.Wrapf(ErrPrimaryPodNotFound, "get primary pod: %s", err.Error())
 	}
 
 	podExecutor := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
