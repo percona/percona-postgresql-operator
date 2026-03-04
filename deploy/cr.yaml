@@ -272,6 +272,11 @@ spec:
 #      image: busybox:latest
 #      command: ["sleep", "30d"]
 #      securityContext: {}
+#      volumeMounts:
+#        - name: sidecar-secret
+#          mountPath: /tmp/secret/path
+#        - name: sidecar-config
+#          mountPath: /tmp/config/path
 #    - name: testcontainer2
 #      image: mycontainer1:latest
 #    sidecarVolumes:
@@ -444,6 +449,11 @@ spec:
 #        image: busybox:latest
 #        command: ["sleep", "30d"]
 #        securityContext: {}
+#        volumeMounts:
+#          - name: sidecar-secret
+#            mountPath: /tmp/secret/path
+#          - name: sidecar-config
+#            mountPath: /tmp/config/path
 #      sidecarVolumes:
 #      - name: sidecar-secret
 #        secret:
@@ -591,6 +601,11 @@ spec:
 #          image: busybox:latest
 #          command: ["sleep", "30d"]
 #          securityContext: {}
+#          volumeMounts:
+#            - name: sidecar-secret
+#              mountPath: /tmp/secret/path
+#            - name: sidecar-config
+#              mountPath: /tmp/config/path
 #        - name: testcontainer2
 #          image: mycontainer1:latest
 #        sidecarVolumes:
