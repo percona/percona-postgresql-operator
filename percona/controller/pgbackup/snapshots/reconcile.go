@@ -151,6 +151,7 @@ func (r *snapshotReconciler) reconcileNew(ctx context.Context) (reconcile.Result
 
 	if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupStarting
+		bcp.Status.BackupType = v2.PGBackupTypeSnapshot
 	}); updErr != nil {
 		return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 	}
