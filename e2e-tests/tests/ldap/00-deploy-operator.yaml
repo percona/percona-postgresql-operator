@@ -8,6 +8,11 @@ commands:
           
           source ../../functions
           init_temp_dir # do this only in the first TestStep
-          
+
+          if [[ $OPENSHIFT ]]; then
+              echo "Skipping LDAP test on OpenShift"
+              exit 1
+          fi
+
           deploy_operator
           deploy_client
