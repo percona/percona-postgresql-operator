@@ -69,6 +69,47 @@ func TestShouldFailSnapshot(t *testing.T) {
 	}
 }
 
+func TestReconcileNew(t *testing.T) {
+	ctx := context.Background()
+	ns := "test-ns"
+	backupName := "my-backup"
+	clusterName := "my-cluster"
+
+	s := scheme.Scheme
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, v2.AddToScheme(s))
+	require.NoError(t, volumesnapshotv1.AddToScheme(s))
+
+	noopExec := &mockSnapshotExecutor{}
+	t.Run("transitions to BackupStarting when cluster is ready", func(t *testing.T) {
+		cluster := &v2.PerconaPGCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: ns},
+			Status: v2.PerconaPGClusterStatus{
+				State: v2.AppStateReady,
+			},
+		}
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup.DeepCopy(), cluster).
+			WithStatusSubresource(backup).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		result, err := r.reconcileNew(ctx)
+		require.NoError(t, err)
+		assert.Zero(t, result.RequeueAfter, "should not requeue")
+
+		updated := &v2.PerconaPGBackup{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+		assert.Equal(t, v2.BackupStarting, updated.Status.State)
+		assert.Equal(t, v2.PGBackupTypeSnapshot, updated.Status.BackupType)
+	})
+}
+
 func TestReconcileDataSnapshot(t *testing.T) {
 	ctx := context.Background()
 	ns := "test-ns"
