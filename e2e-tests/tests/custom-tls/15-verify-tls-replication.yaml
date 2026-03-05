@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      repl_ssl_count=$(run_psql_local \
+        "SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_replication r ON s.pid = r.pid WHERE s.ssl = true;" \
+        "postgres:$(get_psql_user_pass custom-tls-pguser-postgres)@custom-tls-primary")
+      repl_ssl_count=$(echo "$repl_ssl_count" | tr -d '[:space:]')
+
+      if [[ "$repl_ssl_count" -lt 1 ]]; then
+          echo "No SSL replication connections found after rotation, got: $repl_ssl_count"
+          exit 1
+      fi
