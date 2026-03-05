@@ -477,8 +477,8 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 }
 
 func TestUpdateCertificateDuration(t *testing.T) {
-	initialDuration := 2160 * time.Hour  // 90 days
-	updatedDuration := 4320 * time.Hour  // 180 days
+	initialDuration := 2160 * time.Hour    // 90 days
+	updatedDuration := 4320 * time.Hour    // 180 days
 	updatedCADuration := 52560 * time.Hour // 6 years
 
 	t.Run("CA certificate duration updated when spec changes", func(t *testing.T) {
