@@ -16,6 +16,8 @@ major-upgrade-14-to-15
 major-upgrade-15-to-16
 major-upgrade-16-to-17
 major-upgrade-17-to-18
+ldap
+ldap-tls
 monitoring
 monitoring-pmm3
 one-pod

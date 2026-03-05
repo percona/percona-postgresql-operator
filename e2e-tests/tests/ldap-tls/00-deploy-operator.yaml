@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+    - script: |-
+          set -o errexit
+          set -o xtrace
+
+          source ../../functions
+          init_temp_dir # do this only in the first TestStep
+
+          if [[ $OPENSHIFT ]]; then
+              echo "Skipping LDAP-TLS test on OpenShift"
+              exit 1
+          fi
+
+          deploy_operator
+          deploy_client
+          deploy_cert_manager

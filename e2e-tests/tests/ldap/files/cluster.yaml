@@ -1,0 +1,23 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: ldap
+spec:
+  # postgresVersion, images, backups, etc. are injected by get_cr() from deploy/cr.yaml
+  users:
+    - name: percona
+      databases:
+        - percona
+  # LDAP simple-bind: constructs DN as uid={username},ou=perconadba,dc=ldap,dc=local
+  # and binds with the user's password against the openldap Service (port 389).
+  authentication:
+    rules:
+      - connection: host
+        method: ldap
+        users:
+          - percona
+        options:
+          ldapserver: openldap
+          ldapport: 389
+          ldapprefix: "uid="
+          ldapsuffix: ",ou=perconadba,dc=ldap,dc=local"
