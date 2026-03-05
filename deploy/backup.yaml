@@ -4,7 +4,7 @@ metadata:
   name: backup1
 spec:
   pgCluster: cluster1
-#  repoName: repo1
+  repoName: repo1
 #  containerOptions:
 #    env:
 #    - name: MY_ENV
@@ -12,24 +12,6 @@ spec:
 #    envFrom:
 #    - secretRef:
 #        name: backup-env-secret
-  method: volumeSnapshot
-#  options:
-#  - --type=full
----
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGBackup
-metadata:
-  name: backup2
-spec:
-  pgCluster: cluster1
-#  repoName: repo1
-#  containerOptions:
-#    env:
-#    - name: MY_ENV
-#      value: "1000"
-#    envFrom:
-#    - secretRef:
-#        name: backup-env-secret
-  method: volumeSnapshot
+#  method: volumeSnapshot
 #  options:
 #  - --type=full
