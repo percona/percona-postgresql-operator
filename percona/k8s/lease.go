@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	coordv1 "k8s.io/api/coordination/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,8 +21,8 @@ type IsHolderStaleFunc func(ctx context.Context, currentHolder string) (bool, er
 
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list
 
-func GetLease(ctx context.Context, client client.Client, leaseName, namespace string) (*coordv1.Lease, error) {
-	lease := &coordv1.Lease{}
+func GetLease(ctx context.Context, client client.Client, leaseName, namespace string) (*coordinationv1.Lease, error) {
+	lease := &coordinationv1.Lease{}
 	if err := client.Get(ctx, types.NamespacedName{Name: leaseName, Namespace: namespace}, lease); err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func GetLease(ctx context.Context, client client.Client, leaseName, namespace st
 // the callback is invoked to determine whether the current holder is stale.
 // A stale holder is evicted atomically and the lease is granted to the new holder.
 func AcquireLease(ctx context.Context, cl client.Client, leaseName, holder, namespace string, checkStale IsHolderStaleFunc) error {
-	lease := &coordv1.Lease{
+	lease := &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      leaseName,
 			Namespace: namespace,

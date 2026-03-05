@@ -637,7 +637,7 @@ func TestReconcileRunning(t *testing.T) {
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
 		_, err := r.reconcileRunning(ctx)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, errVolumeSnapshotFailed)
+		require.ErrorIs(t, err, errVolumeSnapshotFailed)
 
 		updated := &v2.PerconaPGBackup{}
 		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
