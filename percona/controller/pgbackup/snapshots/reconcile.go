@@ -546,27 +546,19 @@ func (r *snapshotReconciler) tryAcquireLease(ctx context.Context) (bool, error) 
 	leaseName := r.backupLeaseName()
 	leaseHolder := r.backupLeaseHolder()
 
-	lease, err := k8s.GetLease(ctx, r.cl, leaseName, r.cluster.GetNamespace())
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return false, errors.Wrap(err, "failed to get lease")
-	}
-
-	// Check if the lease is held by another non-complete backup.
-	if lease != nil && lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity != leaseHolder {
-		backupName := *lease.Spec.HolderIdentity
+	checkStale := func(ctx context.Context, currentHolder string) (bool, error) {
 		backup := &v2.PerconaPGBackup{}
-		if err := r.cl.Get(ctx, client.ObjectKey{Name: backupName, Namespace: r.cluster.GetNamespace()}, backup); err != nil {
-			if !k8serrors.IsNotFound(err) {
-				return false, errors.Wrap(err, "failed to get backup")
+		if err := r.cl.Get(ctx, client.ObjectKey{Name: currentHolder, Namespace: r.cluster.GetNamespace()}, backup); err != nil {
+			if k8serrors.IsNotFound(err) {
+				return true, nil
 			}
-			// Backup was deleted; treat as complete and allow lease acquisition.
-		} else if !backup.IsComplete() {
-			return false, nil
+			return false, errors.Wrap(err, "failed to get backup")
 		}
+		return backup.IsComplete(), nil
 	}
 
-	if err := k8s.AcquireLease(ctx, r.cl, leaseName, leaseHolder, r.cluster.GetNamespace()); err != nil {
-		if errors.Is(err, k8s.ErrLeaseAlreadyHeld) {
+	if err := k8s.AcquireLease(ctx, r.cl, leaseName, leaseHolder, r.cluster.GetNamespace(), checkStale); err != nil {
+		if errors.Is(err, k8s.ErrLeaseAlreadyHeld) || k8serrors.IsAlreadyExists(err) || k8serrors.IsConflict(err) {
 			return false, nil
 		}
 		return false, errors.Wrap(err, "failed to acquire lease")
