@@ -17,6 +17,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -443,6 +444,205 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.True(t, ok, "all tablespace snapshots ready")
+	})
+}
+
+func TestReconcileRunning(t *testing.T) {
+	ctx := context.Background()
+	ns := "test-ns"
+	backupName := "my-backup"
+	clusterName := "my-cluster"
+	snapshotClassName := "test-snapshotclass"
+	targetInstance := "instance-0"
+
+	s := scheme.Scheme
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, v2.AddToScheme(s))
+	require.NoError(t, volumesnapshotv1.AddToScheme(s))
+
+	cluster := &v2.PerconaPGCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: ns},
+		Spec: v2.PerconaPGClusterSpec{
+			Backups: v2.Backups{
+				VolumeSnapshots: &v2.VolumeSnapshots{
+					Mode:      v2.VolumeSnapshotModeOffline,
+					ClassName: snapshotClassName,
+				},
+			},
+		},
+	}
+
+	dataPVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "data-pvc",
+			Namespace: ns,
+			Labels: map[string]string{
+				naming.LabelInstance: targetInstance,
+				naming.LabelRole:     naming.RolePostgresData,
+			},
+		},
+	}
+
+	walPVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "wal-pvc",
+			Namespace: ns,
+			Labels: map[string]string{
+				naming.LabelInstance: targetInstance,
+				naming.LabelRole:     naming.RolePostgresWAL,
+			},
+		},
+	}
+
+	noopExec := &mockSnapshotExecutor{}
+	t.Run("creates snapshots and requeues when not ready", func(t *testing.T) {
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        backupName,
+				Namespace:   ns,
+				UID:         "backup-uid",
+				Annotations: map[string]string{annotationBackupTarget: targetInstance},
+			},
+			Spec: v2.PerconaPGBackupSpec{PGCluster: clusterName},
+			Status: v2.PerconaPGBackupStatus{
+				State:    v2.BackupRunning,
+				Snapshot: &v2.SnapshotStatus{},
+			},
+		}
+
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup.DeepCopy(), cluster, dataPVC, walPVC).
+			WithStatusSubresource(backup).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		result, err := r.reconcileRunning(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, time.Second*5, result.RequeueAfter, "should requeue while snapshots are pending")
+
+		dataVSName := backupName + "-" + naming.RolePostgresData
+		dataVS := &volumesnapshotv1.VolumeSnapshot{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKey{Namespace: ns, Name: dataVSName}, dataVS))
+		assert.Equal(t, "data-pvc", ptr.Deref(dataVS.Spec.Source.PersistentVolumeClaimName, ""))
+
+		walVSName := backupName + "-" + naming.RolePostgresWAL
+		walVS := &volumesnapshotv1.VolumeSnapshot{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKey{Namespace: ns, Name: walVSName}, walVS))
+		assert.Equal(t, "wal-pvc", ptr.Deref(walVS.Spec.Source.PersistentVolumeClaimName, ""))
+	})
+
+	t.Run("succeeds when all snapshots are ready", func(t *testing.T) {
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        backupName,
+				Namespace:   ns,
+				UID:         "backup-uid",
+				Annotations: map[string]string{annotationBackupTarget: targetInstance},
+				Finalizers:  []string{pNaming.FinalizerSnapshotInProgress},
+			},
+			Spec: v2.PerconaPGBackupSpec{PGCluster: clusterName},
+			Status: v2.PerconaPGBackupStatus{
+				State:    v2.BackupRunning,
+				Snapshot: &v2.SnapshotStatus{},
+			},
+		}
+
+		dataVS := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backupName + "-" + naming.RolePostgresData,
+				Namespace: ns,
+			},
+			Spec: volumesnapshotv1.VolumeSnapshotSpec{
+				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				Source: volumesnapshotv1.VolumeSnapshotSource{
+					PersistentVolumeClaimName: ptr.To("data-pvc"),
+				},
+			},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+		}
+		walVS := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backupName + "-" + naming.RolePostgresWAL,
+				Namespace: ns,
+			},
+			Spec: volumesnapshotv1.VolumeSnapshotSpec{
+				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				Source: volumesnapshotv1.VolumeSnapshotSource{
+					PersistentVolumeClaimName: ptr.To("wal-pvc"),
+				},
+			},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+		}
+
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup.DeepCopy(), cluster, dataPVC, walPVC, dataVS, walVS).
+			WithStatusSubresource(backup, dataVS, walVS).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		result, err := r.reconcileRunning(ctx)
+		require.NoError(t, err)
+		assert.Zero(t, result.RequeueAfter, "should not requeue on success")
+
+		updated := &v2.PerconaPGBackup{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+		assert.Equal(t, v2.BackupSucceeded, updated.Status.State)
+		assert.NotNil(t, updated.Status.CompletedAt)
+		assert.NotContains(t, updated.Finalizers, pNaming.FinalizerSnapshotInProgress,
+			"finalizer should be removed after completion")
+	})
+
+	t.Run("fails backup when volume snapshot error exceeds deadline", func(t *testing.T) {
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        backupName,
+				Namespace:   ns,
+				UID:         "backup-uid",
+				Annotations: map[string]string{annotationBackupTarget: targetInstance},
+			},
+			Spec: v2.PerconaPGBackupSpec{PGCluster: clusterName},
+			Status: v2.PerconaPGBackupStatus{
+				State:    v2.BackupRunning,
+				Snapshot: &v2.SnapshotStatus{},
+			},
+		}
+
+		failedDataVS := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backupName + "-" + naming.RolePostgresData,
+				Namespace: ns,
+			},
+			Spec: volumesnapshotv1.VolumeSnapshotSpec{
+				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				Source: volumesnapshotv1.VolumeSnapshotSource{
+					PersistentVolumeClaimName: ptr.To("data-pvc"),
+				},
+			},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{
+				Error: &volumesnapshotv1.VolumeSnapshotError{
+					Time:    ptr.To(metav1.NewTime(time.Now().Add(-10 * time.Minute))),
+					Message: ptr.To("disk full"),
+				},
+			},
+		}
+
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup.DeepCopy(), cluster, dataPVC, walPVC, failedDataVS).
+			WithStatusSubresource(backup, failedDataVS).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		_, err := r.reconcileRunning(ctx)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, errVolumeSnapshotFailed)
+
+		updated := &v2.PerconaPGBackup{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+		assert.Equal(t, v2.BackupFailed, updated.Status.State)
+		assert.Contains(t, updated.Status.Error, "one or more snapshots failed")
 	})
 }
 
