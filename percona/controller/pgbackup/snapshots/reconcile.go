@@ -2,8 +2,8 @@ package snapshots
 
 import (
 	"context"
-	stderrors "errors"
 	"fmt"
+	"strings"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -197,37 +197,43 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 
 	// Gather all VolumeSnapshot errors across all snapshots.
 	// They will all be reported together when failing the backup.
-	var snapshotErrors error
+	var snapshotErrors []error
 
 	dataOk, err := r.reconcileDataSnapshot(ctx, dataPVC)
 	if errors.Is(err, errVolumeSnapshotFailed) {
-		snapshotErrors = stderrors.Join(snapshotErrors, errors.Unwrap(err))
+		snapshotErrors = append(snapshotErrors, errors.Unwrap(err))
 	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile data snapshot")
 	}
 
 	walOk, err := r.reconcileWALSnapshot(ctx, walPVC)
 	if errors.Is(err, errVolumeSnapshotFailed) {
-		snapshotErrors = stderrors.Join(snapshotErrors, errors.Unwrap(err))
+		snapshotErrors = append(snapshotErrors, errors.Unwrap(err))
 	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile WAL snapshot")
 	}
 
 	tablespaceOk, err := r.reconcileTablespaceSnapshot(ctx, tablespacePVCs)
 	if errors.Is(err, errVolumeSnapshotFailed) {
-		snapshotErrors = stderrors.Join(snapshotErrors, errors.Unwrap(err))
+		snapshotErrors = append(snapshotErrors, errors.Unwrap(err))
 	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile tablespace snapshot")
 	}
 
-	if snapshotErrors != nil {
+	if len(snapshotErrors) > 0 {
+		msgs := make([]string, len(snapshotErrors))
+		for i, err := range snapshotErrors {
+			msgs[i] = err.Error()
+		}
+		err := errors.New(strings.Join(msgs, ", "))
+
 		if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupFailed
-			bcp.Status.Error = fmt.Sprintf("one or more snapshots failed: %s", snapshotErrors)
+			bcp.Status.Error = err.Error()
 		}); updErr != nil {
 			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 		}
-		return reconcile.Result{}, snapshotErrors
+		return reconcile.Result{}, err
 	}
 
 	if !dataOk || !walOk || !tablespaceOk {
