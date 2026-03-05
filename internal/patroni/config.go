@@ -175,6 +175,10 @@ func clusterYAML(
 		}
 	}
 
+	if cluster.CompareVersion("2.9.0") >= 0 {
+		root["postgresql"].(map[string]any)["remove_data_directory_on_diverged_timelines"] = true
+	}
+
 	b, err := yaml.Marshal(root)
 	return string(append([]byte(yamlGeneratedWarning), b...)), err
 }
