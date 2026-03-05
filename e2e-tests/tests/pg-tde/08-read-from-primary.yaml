@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # data=$(run_psql_local \
+      #   '\c myapp \\\ SELECT * from myTable;' \
+      #   "$(get_psql_uri pg-tde postgres)")
+
+      t=1
+      for i in $(kubectl get pods -n "${NAMESPACE}" |grep pg-tde-instance1| awk '{print $1}'); 
+        do echo $i
+        data=$(kubectl exec $i -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+        kubectl create configmap -n "${NAMESPACE}" 07-read-from-primary-${t} --from-literal=data="${data}"
+        t=$((t+1))
+      done
+      
