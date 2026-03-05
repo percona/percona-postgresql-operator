@@ -60,8 +60,8 @@ spec:
         - name: PGO_CONTROLLER_RETRY_PERIOD
           value: 10s
         - name: PGO_FEATURE_GATES
-          value: ""
-        image: docker.io/perconalab/percona-postgresql-operator:main
+          value: "BackupSnapshots=true"
+        image: asia-south1-docker.pkg.dev/cloud-dev-112233/mayankshah/pg-operator:K8SPG-771
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

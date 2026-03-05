@@ -10,6 +10,7 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
@@ -22,6 +23,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
@@ -150,6 +152,15 @@ func (r *snapshotReconciler) reconcile(ctx context.Context) (reconcile.Result, e
 func (r *snapshotReconciler) reconcileNew(ctx context.Context) (reconcile.Result, error) {
 	if r.cluster.Status.State != v2.AppStateReady {
 		r.log.Info("Waiting for cluster to be ready before creating snapshot")
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
+	acquired, err := r.tryAcquireLease(ctx)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to acquire lease")
+	}
+	if !acquired {
+		r.log.Info("Backup lock is held by another backup")
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -504,6 +515,11 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 		return errors.Wrap(err, "finalize failed")
 	}
 
+	// release lease
+	if err := k8s.ReleaseLease(ctx, r.cl, r.backupLeaseName(), r.backupLeaseHolder(), r.cluster.GetNamespace()); err != nil {
+		return errors.Wrap(err, "failed to release lease")
+	}
+
 	// remove finalizer
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		bcp := r.backup.DeepCopy()
@@ -517,4 +533,44 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 		return errors.Wrap(err, "failed to remove finalizer")
 	}
 	return nil
+}
+
+func (r *snapshotReconciler) backupLeaseName() string {
+	return "pg-" + r.cluster.GetName() + "-backup-lock"
+}
+
+func (r *snapshotReconciler) backupLeaseHolder() string {
+	return r.backup.GetName()
+}
+
+func (r *snapshotReconciler) tryAcquireLease(ctx context.Context) (bool, error) {
+	leaseName := r.backupLeaseName()
+	leaseHolder := r.backupLeaseHolder()
+
+	lease, err := k8s.GetLease(ctx, r.cl, leaseName, r.cluster.GetNamespace())
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return false, errors.Wrap(err, "failed to get lease")
+	}
+
+	// Check if the lease is held by another non-complete backup.
+	if lease != nil && lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity != leaseHolder {
+		backupName := *lease.Spec.HolderIdentity
+		backup := &v2.PerconaPGBackup{}
+		if err := r.cl.Get(ctx, client.ObjectKey{Name: backupName, Namespace: r.cluster.GetNamespace()}, backup); err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return false, errors.Wrap(err, "failed to get backup")
+			}
+			// Backup was deleted; treat as complete and allow lease acquisition.
+		} else if !backup.IsComplete() {
+			return false, nil
+		}
+	}
+
+	if err := k8s.AcquireLease(ctx, r.cl, leaseName, leaseHolder, r.cluster.GetNamespace()); err != nil {
+		if errors.Is(err, k8s.ErrLeaseAlreadyHeld) {
+			return false, nil
+		}
+		return false, errors.Wrap(err, "failed to acquire lease")
+	}
+	return true, nil
 }

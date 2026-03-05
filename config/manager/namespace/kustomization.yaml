@@ -9,5 +9,5 @@ patchesStrategicMerge:
 
 images:
 - name: postgres-operator
-  newName: docker.io/perconalab/percona-postgresql-operator
-  newTag: main
+  newName: asia-south1-docker.pkg.dev/cloud-dev-112233/mayankshah/pg-operator
+  newTag: K8SPG-771
