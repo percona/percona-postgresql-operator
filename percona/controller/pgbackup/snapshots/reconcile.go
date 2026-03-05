@@ -2,10 +2,9 @@ package snapshots
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"time"
-
-	stderrors "errors"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
