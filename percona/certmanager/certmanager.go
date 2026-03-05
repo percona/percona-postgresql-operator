@@ -159,18 +159,22 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
 	certName := naming.PostgresRootCASecret(cluster).Name
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get CA certificate")
-	}
-
 	caDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CAValidityDuration != nil {
 		caDuration = cluster.Spec.TLS.CAValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == caDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: caDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update ca certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get CA certificate")
 	}
 
 	cert := &v1.Certificate{
@@ -217,18 +221,22 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 
 	certName := naming.PostgresTLSSecret(cluster).Name
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get cluster certificate")
-	}
-
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
 		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update cluster certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get cluster certificate")
 	}
 
 	cert := &v1.Certificate{
@@ -287,18 +295,22 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 	certName := instanceName + "-cert"
 	secretName := instanceName + "-certs"
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get instance certificate")
-	}
-
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
 		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update instance certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get instance certificate")
 	}
 
 	cert := &v1.Certificate{
@@ -356,18 +368,22 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 	secretMeta := naming.ClusterPGBouncer(cluster)
 	certName := cluster.Name + "-pgbouncer-cert"
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get pgbouncer certificate")
-	}
-
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
 		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update pgbouncer certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get pgbouncer certificate")
 	}
 
 	cert := &v1.Certificate{
