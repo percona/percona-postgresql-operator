@@ -476,6 +476,120 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 	})
 }
 
+func TestUpdateCertificateDuration(t *testing.T) {
+	initialDuration := 2160 * time.Hour  // 90 days
+	updatedDuration := 4320 * time.Hour  // 180 days
+	updatedCADuration := 52560 * time.Hour // 6 years
+
+	t.Run("CA certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-ca-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CAValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CAValidityDuration = &metav1.Duration{Duration: updatedCADuration}
+		err = ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresRootCASecret(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      secretName.Name,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedCADuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("cluster certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-cluster-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"update-cluster-dur-primary.test-namespace.svc"}
+		err := ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresTLSSecret(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      secretName.Name,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("instance certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-inst-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		instanceName := "update-inst-dur-instance-0"
+		dnsNames := []string{instanceName + ".test-namespace.svc"}
+		err := ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := instanceName + "-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("pgbouncer certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-pgb-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"update-pgb-dur-pgbouncer.test-namespace.svc"}
+		err := ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := cluster.Name + "-pgbouncer-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
+	})
+}
+
 func TestCustomTLSDurations(t *testing.T) {
 	customCertDuration := 2160 * time.Hour // 90 days
 	customCADuration := 26280 * time.Hour  // 3 years
