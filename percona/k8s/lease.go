@@ -16,6 +16,7 @@ import (
 var ErrLeaseAlreadyHeld = errors.New("lease held by another holder")
 
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list
+
 func GetLease(ctx context.Context, client client.Client, leaseName, namespace string) (*coordv1.Lease, error) {
 	lease := &coordv1.Lease{}
 	if err := client.Get(ctx, types.NamespacedName{Name: leaseName, Namespace: namespace}, lease); err != nil {
@@ -25,6 +26,7 @@ func GetLease(ctx context.Context, client client.Client, leaseName, namespace st
 }
 
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=create;update
+
 func AcquireLease(ctx context.Context, client client.Client, leaseName, holder, namespace string) error {
 	lease := &coordv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
@@ -45,6 +47,7 @@ func AcquireLease(ctx context.Context, client client.Client, leaseName, holder, 
 }
 
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;delete
+
 func ReleaseLease(ctx context.Context, client client.Client, leaseName, holder, namespace string) error {
 	lease, err := GetLease(ctx, client, leaseName, namespace)
 	if k8serrors.IsNotFound(err) {
