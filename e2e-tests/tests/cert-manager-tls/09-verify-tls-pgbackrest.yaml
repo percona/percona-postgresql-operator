@@ -1,0 +1,36 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      instance=$(kubectl -n "$NAMESPACE" get pod \
+        -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      kubectl -n "$NAMESPACE" exec "$instance" -c pgbackrest -- \
+        test -f /etc/pgbackrest/server/server-tls.crt
+      kubectl -n "$NAMESPACE" exec "$instance" -c pgbackrest -- \
+        test -f /etc/pgbackrest/server/server-tls.key
+      kubectl -n "$NAMESPACE" exec "$instance" -c pgbackrest -- \
+        test -f /etc/pgbackrest/conf.d/~postgres-operator/tls-ca.crt
+
+      pgbr_certificate_data=$(run_comand_on_pod "openssl s_client -connect ${instance}.cert-manager-tls-pods:8432 <<< '' 2>/dev/null | openssl x509 -noout -subject -issuer")
+
+      if [[ -z "$pgbr_certificate_data" ]]; then
+          echo "Failed to retrieve pgBackRest TLS certificate"
+          exit 1
+      fi
+
+      if [[ "$pgbr_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "Unexpected pgBackRest certificate issuer. Expected CN=cert-manager-tls-ca"
+          echo "Got: $pgbr_certificate_data"
+          exit 1
+      fi
+
+      # Verify pgBackRest works over TLS, not just cert file existence
+      kubectl -n "$NAMESPACE" exec "$instance" -c pgbackrest -- pgbackrest info
