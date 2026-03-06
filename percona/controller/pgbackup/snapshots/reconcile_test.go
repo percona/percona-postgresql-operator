@@ -8,6 +8,7 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -725,6 +726,203 @@ func TestGenerateSnapshotIntent(t *testing.T) {
 			assert.Equal(t, "PerconaPGBackup", vs.OwnerReferences[0].Kind)
 		})
 	}
+}
+
+func TestTryAcquireLease(t *testing.T) {
+	ctx := context.Background()
+	ns := "test-ns"
+	clusterName := "my-cluster"
+
+	s := scheme.Scheme
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, v2.AddToScheme(s))
+	require.NoError(t, volumesnapshotv1.AddToScheme(s))
+	require.NoError(t, coordinationv1.AddToScheme(s))
+
+	cluster := &v2.PerconaPGCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: ns},
+	}
+	noopExec := &mockSnapshotExecutor{}
+
+	t.Run("acquires lease when no lease exists", func(t *testing.T) {
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		acquired, err := r.tryAcquireLease(ctx)
+		require.NoError(t, err)
+		assert.True(t, acquired)
+
+		lease := &coordinationv1.Lease{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKey{
+			Name:      "pg-" + clusterName + "-backup-lock",
+			Namespace: ns,
+		}, lease))
+		require.NotNil(t, lease.Spec.HolderIdentity)
+		assert.Equal(t, "backup-1", *lease.Spec.HolderIdentity)
+	})
+
+	t.Run("returns false when lease is held by another active backup", func(t *testing.T) {
+		otherBackup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "other-backup", Namespace: ns, UID: "uid-other"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+			Status: v2.PerconaPGBackupStatus{
+				State: v2.BackupRunning,
+			},
+		}
+		existingLease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pg-" + clusterName + "-backup-lock",
+				Namespace: ns,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: ptr.To("other-backup"),
+			},
+		}
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup, otherBackup, existingLease).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		acquired, err := r.tryAcquireLease(ctx)
+		require.NoError(t, err)
+		assert.False(t, acquired)
+	})
+
+	t.Run("acquires stale lease when holder backup is not found", func(t *testing.T) {
+		existingLease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pg-" + clusterName + "-backup-lock",
+				Namespace: ns,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: ptr.To("deleted-backup"),
+			},
+		}
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup, existingLease).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		acquired, err := r.tryAcquireLease(ctx)
+		require.NoError(t, err)
+		assert.True(t, acquired)
+
+		lease := &coordinationv1.Lease{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKey{
+			Name:      "pg-" + clusterName + "-backup-lock",
+			Namespace: ns,
+		}, lease))
+		require.NotNil(t, lease.Spec.HolderIdentity)
+		assert.Equal(t, "backup-1", *lease.Spec.HolderIdentity)
+	})
+
+	t.Run("acquires stale lease when holder backup has succeeded", func(t *testing.T) {
+		completedBackup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "completed-backup", Namespace: ns, UID: "uid-completed"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+			Status: v2.PerconaPGBackupStatus{
+				State: v2.BackupSucceeded,
+			},
+		}
+		existingLease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pg-" + clusterName + "-backup-lock",
+				Namespace: ns,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: ptr.To("completed-backup"),
+			},
+		}
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup, completedBackup, existingLease).
+			WithStatusSubresource(completedBackup).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		acquired, err := r.tryAcquireLease(ctx)
+		require.NoError(t, err)
+		assert.True(t, acquired)
+	})
+
+	t.Run("acquires stale lease when holder backup has failed", func(t *testing.T) {
+		failedBackup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "failed-backup", Namespace: ns, UID: "uid-failed"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+			Status: v2.PerconaPGBackupStatus{
+				State: v2.BackupFailed,
+			},
+		}
+		existingLease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pg-" + clusterName + "-backup-lock",
+				Namespace: ns,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: ptr.To("failed-backup"),
+			},
+		}
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup, failedBackup, existingLease).
+			WithStatusSubresource(failedBackup).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		acquired, err := r.tryAcquireLease(ctx)
+		require.NoError(t, err)
+		assert.True(t, acquired)
+	})
+
+	t.Run("returns true when lease is already held by self", func(t *testing.T) {
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		existingLease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pg-" + clusterName + "-backup-lock",
+				Namespace: ns,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: ptr.To("backup-1"),
+			},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup, existingLease).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		acquired, err := r.tryAcquireLease(ctx)
+		require.NoError(t, err)
+		assert.True(t, acquired)
+	})
 }
 
 // mockSnapshotExecutor is a no-op snapshotExecutor for tests.
