@@ -116,6 +116,7 @@ rules:
   - leases
   verbs:
   - create
+  - delete
   - get
   - update
   - watch
