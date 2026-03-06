@@ -3,6 +3,7 @@ package snapshots
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	merr "github.com/hashicorp/go-multierror"
@@ -540,16 +541,26 @@ func (r *snapshotReconciler) backupLeaseName() string {
 }
 
 func (r *snapshotReconciler) backupLeaseHolder() string {
-	return r.backup.GetName()
+	return fmt.Sprintf("%s|%s", r.backup.GetName(), r.backup.GetUID())
+}
+
+func (r *snapshotReconciler) backupNameFromHolder(holder string) string {
+	parts := strings.Split(holder, "|")
+	return parts[0]
 }
 
 func (r *snapshotReconciler) tryAcquireLease(ctx context.Context) (bool, error) {
 	leaseName := r.backupLeaseName()
-	leaseHolder := r.backupLeaseHolder()
+	leaseHolderID := r.backupLeaseHolder()
 
 	checkStale := func(ctx context.Context, currentHolder string) (bool, error) {
 		backup := &v2.PerconaPGBackup{}
-		if err := r.cl.Get(ctx, client.ObjectKey{Name: currentHolder, Namespace: r.cluster.GetNamespace()}, backup); err != nil {
+		backupName := r.backupNameFromHolder(currentHolder)
+		if backupName == "" {
+			return false, errors.New("invalid holder identity")
+		}
+
+		if err := r.cl.Get(ctx, client.ObjectKey{Name: backupName, Namespace: r.cluster.GetNamespace()}, backup); err != nil {
 			if k8serrors.IsNotFound(err) {
 				return true, nil
 			}
@@ -559,7 +570,7 @@ func (r *snapshotReconciler) tryAcquireLease(ctx context.Context) (bool, error) 
 		return (backup.Status.State == v2.BackupFailed || backup.Status.State == v2.BackupSucceeded) && len(backup.GetFinalizers()) == 0, nil
 	}
 
-	if err := k8s.AcquireLease(ctx, r.cl, leaseName, leaseHolder, r.cluster.GetNamespace(), checkStale); err != nil {
+	if err := k8s.AcquireLease(ctx, r.cl, leaseName, leaseHolderID, r.cluster.GetNamespace(), checkStale); err != nil {
 		if errors.Is(err, k8s.ErrLeaseAlreadyHeld) || k8serrors.IsAlreadyExists(err) || k8serrors.IsConflict(err) {
 			return false, nil
 		}
