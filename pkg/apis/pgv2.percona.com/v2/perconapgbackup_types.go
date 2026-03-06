@@ -232,7 +232,3 @@ func (pgBackup *PerconaPGBackup) UpdateStatus(ctx context.Context, cl client.Cli
 		return cl.Status().Update(ctx, bcp)
 	})
 }
-
-func (pgBackup *PerconaPGBackup) IsComplete() bool {
-	return pgBackup.Status.State == BackupSucceeded || pgBackup.Status.State == BackupFailed
-}
