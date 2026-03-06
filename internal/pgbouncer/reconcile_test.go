@@ -68,7 +68,7 @@ func TestSecret(t *testing.T) {
 	t.Run("Disabled", func(t *testing.T) {
 		// Nothing happens when PgBouncer is disabled.
 		constant := intent.DeepCopy()
-		assert.NilError(t, Secret(ctx, cluster, root, existing, service, intent))
+		assert.NilError(t, Secret(ctx, cluster, root, existing, service, intent, nil))
 		assert.DeepEqual(t, constant, intent)
 	})
 
@@ -78,7 +78,7 @@ func TestSecret(t *testing.T) {
 	assert.NilError(t, err)
 
 	constant := existing.DeepCopy()
-	assert.NilError(t, Secret(ctx, cluster, root, existing, service, intent))
+	assert.NilError(t, Secret(ctx, cluster, root, existing, service, intent, nil))
 	assert.DeepEqual(t, constant, existing)
 
 	// A password should be generated.
@@ -91,7 +91,7 @@ func TestSecret(t *testing.T) {
 	// Assuming the intent is written, no change when called again.
 	existing.Data = intent.Data
 	before := intent.DeepCopy()
-	assert.NilError(t, Secret(ctx, cluster, root, existing, service, intent))
+	assert.NilError(t, Secret(ctx, cluster, root, existing, service, intent, nil))
 	assert.DeepEqual(t, before, intent)
 }
 

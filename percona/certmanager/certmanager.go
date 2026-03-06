@@ -31,6 +31,8 @@ type Controller interface {
 	ApplyClusterCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 	ApplyInstanceCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, instanceName string, dnsNames []string) error
 	ApplyPGBouncerCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
+	ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
+	ApplyPGBackRestRepoCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 }
 
 const (
@@ -427,6 +429,143 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 
 	if err := c.cl.Create(ctx, cert); err != nil {
 		return errors.Wrap(err, "failed to create pgbouncer certificate")
+	}
+
+	return nil
+}
+
+// ApplyPGBackRestClientCertificate creates a cert-manager Certificate resource
+// for the pgBackRest client used by all PostgreSQL instances to connect to the
+// repository host.
+func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	secretMeta := naming.PGBackRestClientCertSecret(cluster)
+	certName := cluster.Name + "-pgbackrest-client-cert"
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get pgbackrest client certificate")
+	}
+
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	// The common name must match what pgBackRest expects in its tls-server-auth option.
+	// All instances in the cluster share a single client certificate identified by cluster UID.
+	commonName := "pgbackrest@" + string(cluster.GetUID())
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: cluster.Namespace,
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: secretMeta.Name,
+			CommonName: commonName,
+			DNSNames:   []string{commonName},
+			IssuerRef: cmmeta.IssuerReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: certDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
+			},
+			Usages: []v1.KeyUsage{
+				v1.UsageClientAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster: cluster.Name,
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	if err := c.cl.Create(ctx, cert); err != nil {
+		return errors.Wrap(err, "failed to create pgbackrest client certificate")
+	}
+
+	return nil
+}
+
+// ApplyPGBackRestRepoCertificate creates a cert-manager Certificate resource
+// for the pgBackRest repository host server.
+func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error {
+	if len(dnsNames) == 0 {
+		return errors.New("dnsNames cannot be empty")
+	}
+
+	secretMeta := naming.PGBackRestRepoCertSecret(cluster)
+	certName := cluster.Name + "-pgbackrest-repo-cert"
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get pgbackrest repo certificate")
+	}
+
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: cluster.Namespace,
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: secretMeta.Name,
+			CommonName: dnsNames[0],
+			DNSNames:   dnsNames,
+			IssuerRef: cmmeta.IssuerReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: certDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
+			},
+			Usages: []v1.KeyUsage{
+				v1.UsageServerAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster: cluster.Name,
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	if err := c.cl.Create(ctx, cert); err != nil {
+		return errors.Wrap(err, "failed to create pgbackrest repo certificate")
 	}
 
 	return nil

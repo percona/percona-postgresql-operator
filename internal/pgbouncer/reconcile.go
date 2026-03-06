@@ -43,6 +43,10 @@ func Secret(ctx context.Context,
 	inSecret *corev1.Secret,
 	inService *corev1.Service,
 	outSecret *corev1.Secret,
+	// frontendCertManagerSecret is the cert-manager-managed TLS secret for the
+	// PgBouncer frontend. When non-nil, its tls.crt/tls.key are used instead
+	// of generating a certificate with the internal PKI.
+	frontendCertManagerSecret *corev1.Secret,
 ) error {
 	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
 		// PgBouncer is disabled; there is nothing to do.
@@ -72,32 +76,42 @@ func Secret(ctx context.Context,
 	}
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-		leaf := &pki.LeafCertificate{}
-		dnsNames, err := naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
-		if err != nil {
-			return errors.Wrap(err, "get service dns names")
-		}
-		dnsFQDN := dnsNames[0]
+		if frontendCertManagerSecret != nil {
+			if err == nil {
+				outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
+			}
+			if err == nil {
+				outSecret.Data[certFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
+				outSecret.Data[certFrontendPrivateKeySecretKey] = frontendCertManagerSecret.Data[corev1.TLSPrivateKeyKey]
+			}
+		} else {
+			leaf := &pki.LeafCertificate{}
+			dnsNames, err := naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
+			if err != nil {
+				return errors.Wrap(err, "get service dns names")
+			}
+			dnsFQDN := dnsNames[0]
 
-		if err == nil {
-			// Unmarshal and validate the stored leaf. These first errors can
-			// be ignored because they result in an invalid leaf which is then
-			// correctly regenerated.
-			_ = leaf.Certificate.UnmarshalText(inSecret.Data[certFrontendSecretKey])
-			_ = leaf.PrivateKey.UnmarshalText(inSecret.Data[certFrontendPrivateKeySecretKey])
+			if err == nil {
+				// Unmarshal and validate the stored leaf. These first errors can
+				// be ignored because they result in an invalid leaf which is then
+				// correctly regenerated.
+				_ = leaf.Certificate.UnmarshalText(inSecret.Data[certFrontendSecretKey])
+				_ = leaf.PrivateKey.UnmarshalText(inSecret.Data[certFrontendPrivateKeySecretKey])
 
-			leaf, err = inRoot.RegenerateLeafWhenNecessary(leaf, dnsFQDN, dnsNames)
-			err = errors.WithStack(err)
-		}
+				leaf, err = inRoot.RegenerateLeafWhenNecessary(leaf, dnsFQDN, dnsNames)
+				err = errors.WithStack(err)
+			}
 
-		if err == nil {
-			outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
-		}
-		if err == nil {
-			outSecret.Data[certFrontendPrivateKeySecretKey], err = leaf.PrivateKey.MarshalText()
-		}
-		if err == nil {
-			outSecret.Data[certFrontendSecretKey], err = leaf.Certificate.MarshalText()
+			if err == nil {
+				outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
+			}
+			if err == nil {
+				outSecret.Data[certFrontendPrivateKeySecretKey], err = leaf.PrivateKey.MarshalText()
+			}
+			if err == nil {
+				outSecret.Data[certFrontendSecretKey], err = leaf.Certificate.MarshalText()
+			}
 		}
 	}
 
