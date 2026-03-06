@@ -19,7 +19,7 @@ var ErrLeaseAlreadyHeld = errors.New("lease held by another holder")
 // and can be evicted. Called with the current holder's identity.
 type IsHolderStaleFunc func(ctx context.Context, currentHolder string) (bool, error)
 
-// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get
 
 func GetLease(ctx context.Context, client client.Client, leaseName, namespace string) (*coordinationv1.Lease, error) {
 	lease := &coordinationv1.Lease{}
@@ -83,7 +83,7 @@ func ReleaseLease(ctx context.Context, cl client.Client, leaseName, holder, name
 	}
 
 	if holderID := lease.Spec.HolderIdentity; holderID != nil && *holderID != holder {
-		return errors.New("lease held by another holder")
+		return ErrLeaseAlreadyHeld
 	}
 
 	if err := cl.Delete(ctx, lease, &client.DeleteOptions{
