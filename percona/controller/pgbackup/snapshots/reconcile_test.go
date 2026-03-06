@@ -800,6 +800,43 @@ func TestTryAcquireLease(t *testing.T) {
 		assert.False(t, acquired)
 	})
 
+	t.Run("returns false when backup has finalizers", func(t *testing.T) {
+		otherBackup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "other-backup",
+				Namespace:  ns,
+				UID:        "uid-other",
+				Finalizers: []string{pNaming.FinalizerSnapshotInProgress},
+			},
+			Spec: v2.PerconaPGBackupSpec{PGCluster: clusterName},
+			Status: v2.PerconaPGBackupStatus{
+				State: v2.BackupFailed,
+			},
+		}
+		existingLease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pg-" + clusterName + "-backup-lock",
+				Namespace: ns,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: ptr.To("other-backup"),
+			},
+		}
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup, otherBackup, existingLease).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		acquired, err := r.tryAcquireLease(ctx)
+		require.NoError(t, err)
+		assert.False(t, acquired)
+	})
+
 	t.Run("acquires stale lease when holder backup is not found", func(t *testing.T) {
 		existingLease := &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{

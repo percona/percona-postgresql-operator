@@ -555,7 +555,8 @@ func (r *snapshotReconciler) tryAcquireLease(ctx context.Context) (bool, error) 
 			}
 			return false, errors.Wrap(err, "failed to get backup")
 		}
-		return backup.IsComplete(), nil
+
+		return backup.IsComplete() && len(backup.GetFinalizers()) == 0, nil
 	}
 
 	if err := k8s.AcquireLease(ctx, r.cl, leaseName, leaseHolder, r.cluster.GetNamespace(), checkStale); err != nil {
