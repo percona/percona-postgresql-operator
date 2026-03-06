@@ -44,7 +44,6 @@ metadata: {}
 spec:
   backups:
     pgbackrest: {}
-  config: {}
   extensions:
     pg_tde: {}
   instances: null
@@ -78,7 +77,6 @@ metadata: {}
 spec:
   backups:
     pgbackrest: {}
-  config: {}
   extensions:
     pg_tde: {}
   instances:

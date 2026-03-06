@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: ldap
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ldap-primary
+
