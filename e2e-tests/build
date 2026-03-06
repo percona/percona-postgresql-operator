@@ -50,6 +50,7 @@ build_operator() {
 		--build-arg GIT_BRANCH="${GIT_BRANCH}" \
 		--build-arg BUILD_TIME="${BUILD_TIME}" \
 		--build-arg GO_LDFLAGS="${GO_LDFLAGS}" \
+		--build-arg BASE_IMAGE="${BASE_IMAGE:-ubi10}" \
 		--progress plain \
 		$imgresult \
 		$squash \

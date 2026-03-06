@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+
+      source ../../functions
+
+      # pg_tde requires all encrypted objects to be dropped first
+      run_psql_command \
+        "DROP TABLE mytable;" \
+        "$(get_psql_uri pg-tde postgres)/myapp"
+
+      get_cr \
+        | yq '.spec.extensions.pg_tde.enabled = false' \
+        | yq '.spec.extensions.pg_tde.vault.host = "https://vault-service.vault-service.svc:8200"' \
+        | yq '.spec.extensions.pg_tde.vault.mountPath = "tde"' \
+        | yq '.spec.extensions.pg_tde.vault.tokenSecret.name = "vault-secret"' \
+        | yq '.spec.extensions.pg_tde.vault.tokenSecret.key = "token"' \
+        | yq '.spec.extensions.pg_tde.vault.caSecret.name = "vault-secret"' \
+        | yq '.spec.extensions.pg_tde.vault.caSecret.key = "ca.crt"' \
+        | kubectl -n "${NAMESPACE}" apply -f -

@@ -283,6 +283,9 @@ func (r *PGClusterReconciler) handleCustomPatroniVersionAnnotation(ctx context.C
 
 func (r *PGClusterReconciler) patchPatroniVersionAnnotation(ctx context.Context, cr *v2.PerconaPGCluster, patroniVersion string) error {
 	orig := cr.DeepCopy()
+	if cr.Annotations == nil {
+		cr.Annotations = make(map[string]string)
+	}
 	cr.Annotations[pNaming.AnnotationPatroniVersion] = patroniVersion
 	if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "failed to patch the pg cluster")

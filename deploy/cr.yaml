@@ -10,6 +10,7 @@ metadata:
 #  - percona.com/delete-backups
 spec:
   crVersion: 2.9.0
+#  clusterServiceDNSSuffix: cluster.local
 #  initContainer:
 #    image: docker.io/perconalab/percona-postgresql-operator:main
 #    resources:
@@ -57,16 +58,43 @@ spec:
 #    customReplicationTLSSecret:
 #      name: replication1-cert
 #  tlsOnly: false
-
+#  tls:
+#    certValidityDuration: 2160h
+#    caValidityDuration: 26280h
 #  standby:
 #    enabled: true
 #    host: "<primary-ip>"
 #    port: "<primary-port>"
 #    repoName: repo1
+#    maxAcceptableLag: 1Gi
 
 #  openshift: true
 
 #  autoCreateUserSchema: true
+
+#  config:
+#    files:
+#      - secret:
+#          name: my-ldap-ca-cert
+#          items:
+#            - key: ca.crt
+#              path: ldap-ca.crt
+
+#  authentication:
+#    rules:
+#      - connection: host
+#        method: ldap
+#        databases: []
+#        users: []
+#        options:
+#          ldapserver: ldap.example.com
+#          ldapport: "636"
+#          ldaptls: "1"
+#          ldapbasedn: dc=example,dc=com
+#          ldapbinddn: cn=admin,dc=example,dc=com
+#          ldapbindpasswd: secret
+#          ldapsearchattribute: uid
+#      - hba: "host all all 10.0.0.0/8 md5"
 
 #  users:
 #    - name: rhino
@@ -244,8 +272,33 @@ spec:
 #      image: busybox:latest
 #      command: ["sleep", "30d"]
 #      securityContext: {}
+#      volumeMounts:
+#        - name: sidecar-secret
+#          mountPath: /tmp/secret/path
+#        - name: sidecar-config
+#          mountPath: /tmp/config/path
 #    - name: testcontainer2
 #      image: mycontainer1:latest
+#    sidecarVolumes:
+#    - name: sidecar-secret
+#      secret:
+#        secretName: mysecret
+#    - name: sidecar-config
+#      configMap:
+#        name: myconfigmap
+#    - name: backup-nfs
+#      nfs:
+#        server: "nfs-service.storage.svc.cluster.local"
+#        path: "/pg-some-name"
+#    sidecarPVCs:
+#    - name: sidecar-volume-claim
+#      spec:
+#        resources:
+#          requests:
+#            storage: 1Gi
+#        volumeMode: Filesystem
+#        accessModes:
+#          - ReadWriteOnce
 #
 #    topologySpreadConstraints:
 #      - maxSkew: 1
@@ -396,6 +449,31 @@ spec:
 #        image: busybox:latest
 #        command: ["sleep", "30d"]
 #        securityContext: {}
+#        volumeMounts:
+#          - name: sidecar-secret
+#            mountPath: /tmp/secret/path
+#          - name: sidecar-config
+#            mountPath: /tmp/config/path
+#      sidecarVolumes:
+#      - name: sidecar-secret
+#        secret:
+#          secretName: mysecret
+#      - name: sidecar-config
+#        configMap:
+#          name: myconfigmap
+#      - name: backup-nfs
+#        nfs:
+#          server: "nfs-service.storage.svc.cluster.local"
+#          path: "/pg-some-name"
+#      sidecarPVCs:
+#      - name: sidecar-volume-claim
+#        spec:
+#          resources:
+#            requests:
+#              storage: 1Gi
+#          volumeMode: Filesystem
+#          accessModes:
+#            - ReadWriteOnce
 #
 #      customTLSSecret:
 #        name: keycloakdb-pgbouncer.tls
@@ -406,6 +484,10 @@ spec:
 
   backups:
 #    trackLatestRestorableTime: true
+#    volumeSnapshots:
+#      mode: offline
+#      className: VOLUME-SNAPSHOT-CLASS
+#      schedule: "0 0 * * 6"
     pgbackrest:
 #      metadata:
 #        labels:
@@ -519,8 +601,33 @@ spec:
 #          image: busybox:latest
 #          command: ["sleep", "30d"]
 #          securityContext: {}
+#          volumeMounts:
+#            - name: sidecar-secret
+#              mountPath: /tmp/secret/path
+#            - name: sidecar-config
+#              mountPath: /tmp/config/path
 #        - name: testcontainer2
 #          image: mycontainer1:latest
+#        sidecarVolumes:
+#        - name: sidecar-secret
+#          secret:
+#            secretName: mysecret
+#        - name: sidecar-config
+#          configMap:
+#            name: myconfigmap
+#        - name: backup-nfs
+#          nfs:
+#            server: "nfs-service.storage.svc.cluster.local"
+#            path: "/pg-some-name"
+#        sidecarPVCs:
+#        - name: sidecar-volume-claim
+#          spec:
+#            resources:
+#              requests:
+#                storage: 1Gi
+#            volumeMode: Filesystem
+#            accessModes:
+#              - ReadWriteOnce
 #        resources:
 #          limits:
 #            cpu: 200m
@@ -658,12 +765,27 @@ spec:
 #      disableSSL: false
 #      secret:
 #        name: cluster1-extensions-secret
-#    builtin:
-#      pg_stat_monitor: true
-#      pg_stat_statements: false
-#      pg_audit: true
-#      pgvector: false
-#      pg_repack: false
+#    pg_stat_monitor:
+#      enabled: true
+#    pg_stat_statements:
+#      enabled: false
+#    pg_audit:
+#      enabled: true
+#    pgvector:
+#      enabled: false
+#    pg_repack:
+#      enabled: false
+#    pg_tde:
+#      enabled: false
+#      vault:
+#        host: https://vault-service:8200
+#        mountPath: tde
+#        tokenSecret:
+#          name: pg-tde-vault-secret
+#          key: token
+#        caSecret:
+#          name: pg-tde-vault-secret
+#          key: ca.crt
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1

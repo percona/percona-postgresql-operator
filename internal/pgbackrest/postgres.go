@@ -78,7 +78,8 @@ func PostgreSQL(
 	// Fetch WAL files from any configured repository during recovery.
 	// - https://pgbackrest.org/command.html#command-archive-get
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
-	restore := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"`
+	restore := "/opt/crunchy/bin/restore-command-wrapper.sh "
+	restore += `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"`
 	if inCluster.Spec.Patroni != nil && inCluster.Spec.Patroni.DynamicConfiguration != nil {
 		postgresql, ok := inCluster.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
 		if ok {
@@ -109,6 +110,6 @@ func updateCommandRestorableTime(archive *string) {
 	extractCommitTime := `grep -oP "COMMIT \K[^;]+" | ` + fixTimezone + ``
 	validateCommitTime := `grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"`
 
-	*archive += ` && timestamp=$(pg_waldump "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
+	*archive += ` && timestamp=$(pg_waldump -r Transaction "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
 	*archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
 }

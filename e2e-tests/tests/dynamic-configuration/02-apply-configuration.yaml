@@ -1,0 +1,11 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: cluster1
+spec:
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          wal_level: "replica"
+          restore_command: "/bin/true"

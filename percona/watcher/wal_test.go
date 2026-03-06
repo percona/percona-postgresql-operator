@@ -2,17 +2,18 @@ package watcher
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/percona/testutils"
+	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
@@ -331,7 +332,7 @@ func TestGetLatestCommitTimestamp(t *testing.T) {
 				},
 				Spec: pgv2.PerconaPGBackupSpec{
 					PGCluster: "test-cluster",
-					RepoName:  "repo1",
+					RepoName:  ptr.To("repo1"),
 				},
 			},
 			cluster: &pgv2.PerconaPGCluster{

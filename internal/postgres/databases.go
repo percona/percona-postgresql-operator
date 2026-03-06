@@ -64,7 +64,7 @@ SELECT pg_catalog.format('CREATE DATABASE %I',
 		map[string]string{
 			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
 			"QUIET":         "on", // Do not print successful statements to stdout.
-		})
+		}, nil)
 
 	log.V(1).Info("created PostgreSQL databases", "stdout", stdout, "stderr", stderr)
 

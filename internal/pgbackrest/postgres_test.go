@@ -30,7 +30,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 			"archive_mode":    "on",
 			"archive_command": `pgbackrest --stanza=db archive-push "%p"`,
-			"restore_command": `pgbackrest --stanza=db archive-get %f "%p"`,
+			"restore_command": `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p"`,
 		})
 
 		assert.DeepEqual(t, parameters.Default.AsMap(), map[string]string{
@@ -66,7 +66,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 			"archive_mode":    "on",
 			"archive_command": `pgbackrest --stanza=db archive-push "%p"`,
-			"restore_command": `pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
+			"restore_command": `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
 		})
 
 		cluster.Spec.Standby = nil
@@ -78,7 +78,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -86,7 +86,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 				`grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"); `,
 				"if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi",
 			}, ""),
-			"restore_command":        `pgbackrest --stanza=db archive-get %f "%p"`,
+			"restore_command":        `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p"`,
 			"track_commit_timestamp": "true",
 		})
 	})
@@ -105,7 +105,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -113,7 +113,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 				`grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"); `,
 				"if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi",
 			}, ""),
-			"restore_command":        `pgbackrest --stanza=db archive-get %f "%p"`,
+			"restore_command":        `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p"`,
 			"track_commit_timestamp": "true",
 		})
 
@@ -138,7 +138,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -161,7 +161,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -169,7 +169,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 				`grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"); `,
 				"if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi",
 			}, ""),
-			"restore_command":        `pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
+			"restore_command":        `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
 			"track_commit_timestamp": "true",
 		})
 
@@ -182,7 +182,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 			"archive_mode": "on",
 			"archive_command": strings.Join([]string{
 				`pgbackrest --stanza=db archive-push "%p" `,
-				`&& timestamp=$(pg_waldump "%p" | `,
+				`&& timestamp=$(pg_waldump -r Transaction "%p" | `,
 				`grep -oP "COMMIT \K[^;]+" | `,
 				`sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | `,
 				`sed "s/UTC/Z/" | `,
@@ -190,7 +190,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 				`grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"); `,
 				"if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi",
 			}, ""),
-			"restore_command":        `pgbackrest --stanza=db archive-get %f "%p"`,
+			"restore_command":        `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p"`,
 			"track_commit_timestamp": "true",
 		})
 	})

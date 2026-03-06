@@ -6,12 +6,12 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"io"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
@@ -233,5 +233,4 @@ func TestWriteUsersSchemasInPostgreSQL(t *testing.T) {
 		// 	* the user with 0 databases
 		assert.Equal(t, calls, 2)
 	})
-
 }

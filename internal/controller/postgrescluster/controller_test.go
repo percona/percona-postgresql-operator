@@ -32,6 +32,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -141,6 +142,7 @@ var _ = Describe("PostgresCluster Reconciler", func() {
 		test.Reconciler.Recorder = test.Recorder
 		test.Reconciler.Registration = nil
 		test.Reconciler.Tracer = otel.Tracer("asdf")
+		test.Reconciler.CertManagerCtrlFunc = certmanager.NewController
 	})
 
 	AfterEach(func() {

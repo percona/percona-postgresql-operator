@@ -54,6 +54,9 @@ type PostgresClusterSpec struct {
 
 	TLSOnly bool `json:"tlsOnly,omitempty"`
 
+	// +optional
+	TLS *TLSSpec `json:"tls,omitempty"`
+
 	// The secret containing the replication client certificates and keys for
 	// secure connections to the PostgreSQL server. It will need to contain the
 	// client TLS certificate, TLS key and the Certificate Authority certificate
@@ -185,12 +188,22 @@ type PostgresClusterSpec struct {
 	// +optional
 	Users []PostgresUserSpec `json:"users,omitempty"`
 
-	Config PostgresAdditionalConfig `json:"config,omitempty"`
+	// +optional
+	Config *PostgresConfigSpec `json:"config,omitempty"`
+
+	// Defines additional authentication rules for PostgreSQL host-based
+	// authentication (pg_hba.conf). Rules added here are applied after any
+	// mandatory rules and before the default scram-sha-256 fallback.
+	// +optional
+	Authentication *PostgresClusterAuthentication `json:"authentication,omitempty"`
 
 	Extensions ExtensionsSpec `json:"extensions,omitempty"`
 
 	// +optional
 	InitContainer *InitContainerSpec `json:"initContainer,omitempty"` // K8SPG-613
+
+	// K8SPG-694
+	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
 type InitContainerSpec struct {
@@ -200,12 +213,48 @@ type InitContainerSpec struct {
 	ContainerSecurityContext *corev1.SecurityContext      `json:"containerSecurityContext,omitempty"`
 }
 
+type PGTDESecretObjectReference struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+}
+
+type PGTDEVaultSpec struct {
+	// Host of Vault server.
+	Host string `json:"host"`
+	// Name of the secret that contains the access token with read and write access to the mount path.
+	TokenSecret PGTDESecretObjectReference `json:"tokenSecret"`
+	// Name of the secret that contains the CA certificate for SSL verification.
+	CASecret PGTDESecretObjectReference `json:"caSecret,omitempty"`
+	// The mount point on the Vault server where the key provider should store the keys.
+	// +kubebuilder:default=secret/data
+	MountPath string `json:"mountPath,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
+type PGTDESpec struct {
+	Enabled bool `json:"enabled,omitempty"`
+
+	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	PGStatMonitor    bool `json:"pgStatMonitor,omitempty"`
 	PGAudit          bool `json:"pgAudit,omitempty"`
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
 	PGVector         bool `json:"pgvector,omitempty"`
 	PGRepack         bool `json:"pgRepack,omitempty"`
+
+	PGTDE PGTDESpec `json:"pg_tde,omitempty"`
+}
+
+type TLSSpec struct {
+	// +optional
+	CertValidityDuration *metav1.Duration `json:"certValidityDuration,omitempty"`
+	// +optional
+	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.
@@ -329,6 +378,11 @@ type PostgresClusterDataSource struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// K8SPG-873
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// K8SPG-873
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // Default defines several key default values for a Postgres cluster.
@@ -358,6 +412,8 @@ func (s *PostgresClusterSpec) Default() {
 
 // Backups defines a PostgreSQL archive configuration
 type Backups struct {
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// pgBackRest archive configuration
 	// +optional
 	PGBackRest PGBackRestArchive `json:"pgbackrest"`
@@ -374,6 +430,9 @@ type Backups struct {
 type PostgresClusterStatus struct {
 	// Identifies the databases that have been installed into PostgreSQL.
 	DatabaseRevision string `json:"databaseRevision,omitempty"`
+
+	// Identifies the pg_tde configuration that have been installed into PostgreSQL.
+	PGTDERevision string `json:"pgTDERevision,omitempty"`
 
 	// Current state of PostgreSQL instances.
 	// +listType=map
@@ -448,6 +507,7 @@ const (
 	PostgresClusterProgressing = "Progressing"
 	ProxyAvailable             = "ProxyAvailable"
 	Registered                 = "Registered"
+	PGTDEEnabled               = "PGTDEEnabled"
 )
 
 type PostgresInstanceSetSpec struct {
@@ -487,6 +547,11 @@ type PostgresInstanceSetSpec struct {
 	// PostgreSQL to restart.
 	// +optional
 	Containers []corev1.Container `json:"containers,omitempty"`
+
+	// K8SPG-864
+	SidecarVolumes []corev1.Volume `json:"sidecarVolumes,omitempty"`
+	// K8SPG-864
+	SidecarPVCs []SidecarPVC `json:"sidecarPVCs,omitempty"`
 
 	// Additional init containers for PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
@@ -698,8 +763,107 @@ type PostgresUserInterfaceStatus struct {
 	PGAdmin PGAdminPodStatus `json:"pgAdmin,omitempty"`
 }
 
-type PostgresAdditionalConfig struct {
+type PostgresConfigSpec struct {
+	// Files to mount under "/etc/postgres".
+	// ---
+	// +optional
 	Files []corev1.VolumeProjection `json:"files,omitempty"`
+
+	// Configuration parameters for the PostgreSQL server. Some values will
+	// be reloaded without validation and some cause PostgreSQL to restart.
+	// Some values cannot be changed at all.
+	// More info: https://www.postgresql.org/docs/current/runtime-config.html
+	// ---
+	//
+	// Postgres 17 has something like 350+ built-in parameters, but typically
+	// an administrator will change only a handful of these.
+	// +kubebuilder:validation:MaxProperties=50
+	//
+	// # File Locations
+	// - https://www.postgresql.org/docs/current/runtime-config-file-locations.html
+	//
+	// +kubebuilder:validation:XValidation:rule=`!has(self.config_file) && !has(self.data_directory)`,message=`cannot change PGDATA path: config_file, data_directory`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.external_pid_file)`,message=`cannot change external_pid_file`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.hba_file) && !has(self.ident_file)`,message=`cannot change authentication path: hba_file, ident_file`
+	//
+	// # Connections
+	// - https://www.postgresql.org/docs/current/runtime-config-connection.html
+	//
+	// +kubebuilder:validation:XValidation:rule=`!has(self.listen_addresses)`,message=`network connectivity is always enabled: listen_addresses`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.port)`,message=`change port using .spec.port instead`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.ssl) && !self.exists(k, k.startsWith("ssl_") && !(k == 'ssl_groups' || k == 'ssl_ecdh_curve'))`,message=`TLS is always enabled`
+	// +kubebuilder:validation:XValidation:rule=`!self.exists(k, k.startsWith("unix_socket_"))`,message=`domain socket paths cannot be changed`
+	//
+	// # Write Ahead Log
+	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
+	//
+	// +kubebuilder:validation:XValidation:rule=`!has(self.wal_level) || self.wal_level in ["logical"]`,message=`wal_level must be "replica" or higher`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.wal_log_hints)`,message=`wal_log_hints are always enabled`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.archive_mode) && !has(self.archive_command) && !has(self.restore_command)`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.recovery_target) && !self.exists(k, k.startsWith("recovery_target_"))`
+	//
+	// # Replication
+	// - https://www.postgresql.org/docs/current/runtime-config-replication.html
+	//
+	// +kubebuilder:validation:XValidation:rule=`!has(self.hot_standby)`,message=`hot_standby is always enabled`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.synchronous_standby_names)`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.primary_conninfo) && !has(self.primary_slot_name)`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.recovery_min_apply_delay)`,message=`delayed replication is not supported at this time`
+	//
+	// # Logging
+	// - https://www.postgresql.org/docs/current/runtime-config-logging.html
+	//
+	// +kubebuilder:validation:XValidation:rule=`!has(self.cluster_name)`,message=`cluster_name is derived from the PostgresCluster name`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.logging_collector)`,message=`disabling logging_collector is unsafe`
+	// +kubebuilder:validation:XValidation:rule=`!has(self.log_file_mode)`,message=`log_file_mode cannot be changed`
+	//
+	// +mapType=granular
+	// +optional
+	Parameters map[string]intstr.IntOrString `json:"parameters,omitempty"`
+}
+
+// PostgresHBARule defines a structured pg_hba.conf record.
+// - https://www.postgresql.org/docs/current/auth-pg-hba-conf.html
+type PostgresHBARule struct {
+	// Connection type: local, host, hostssl, hostnossl, hostgssenc, hostnogssenc.
+	// +kubebuilder:validation:Required
+	Connection string `json:"connection"`
+
+	// Authentication method to use when a connection matches this rule.
+	// +kubebuilder:validation:Required
+	Method string `json:"method"`
+
+	// Databases to match. An empty list matches all databases.
+	// +optional
+	Databases []string `json:"databases,omitempty"`
+
+	// Users to match. An empty list matches all users.
+	// +optional
+	Users []string `json:"users,omitempty"`
+
+	// Options for the authentication method (e.g. ldapserver, ldapport).
+	// +optional
+	Options map[string]intstr.IntOrString `json:"options,omitempty"`
+}
+
+// PostgresAuthenticationRule defines a single pg_hba.conf entry. Use either
+// the structured fields or the raw HBA line, not both.
+type PostgresAuthenticationRule struct {
+	PostgresHBARule `json:",inline"`
+
+	// A raw pg_hba.conf line. When non-empty, this line is used as-is and the
+	// structured fields are ignored.
+	// +optional
+	HBA string `json:"hba,omitempty"`
+}
+
+// PostgresClusterAuthentication defines custom pg_hba.conf rules for a cluster.
+type PostgresClusterAuthentication struct {
+	// Rules to include in pg_hba.conf. They are evaluated after mandatory
+	// operator rules and before the default scram-sha-256 fallback.
+	// +listType=atomic
+	// +optional
+	Rules []PostgresAuthenticationRule `json:"rules,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -806,4 +970,11 @@ func (cr *PostgresCluster) IsPatroniVer4() (bool, error) {
 
 func (cr *PostgresCluster) BackupSpecFound() bool {
 	return !reflect.DeepEqual(cr.Spec.Backups, Backups{PGBackRest: PGBackRestArchive{}})
+}
+
+// K8SPG-864
+type SidecarPVC struct {
+	Name string `json:"name"`
+
+	Spec corev1.PersistentVolumeClaimSpec `json:"spec"`
 }

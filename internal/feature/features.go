@@ -97,6 +97,12 @@ const (
 
 	// Support EndpointSlices
 	EndpointSlices = "EndpointSlices"
+
+	// K8SPG-771
+	// This feature gate enables the use of snapshot based backups.
+	// NOTE: This feature is different from VolumeSnapshots which is implemented by
+	// CrunchyData to perform snapshots of already existing backups.
+	BackupSnapshots = "BackupSnapshots"
 )
 
 // NewGate returns a MutableGate with the Features defined in this package.
@@ -115,6 +121,7 @@ func NewGate() MutableGate {
 		TablespaceVolumes:          {Default: false, PreRelease: featuregate.Alpha},
 		VolumeSnapshots:            {Default: false, PreRelease: featuregate.Alpha},
 		EndpointSlices:             {Default: false, PreRelease: featuregate.Alpha},
+		BackupSnapshots:            {Default: false, PreRelease: featuregate.Alpha},
 	}); err != nil {
 		panic(err)
 	}

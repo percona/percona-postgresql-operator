@@ -5,10 +5,10 @@
 package postgrescluster
 
 import (
-	"errors"
 	"io"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"

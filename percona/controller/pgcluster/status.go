@@ -2,6 +2,8 @@ package pgcluster
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -10,18 +12,36 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
-	svcName := cr.Name + "-pgbouncer"
-
-	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
-		return svcName + "." + cr.Namespace + ".svc", nil
+	postgresCluster := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+		},
 	}
 
+	svcFQDN := func(svcName, ns string) string {
+		return fmt.Sprintf("%s.%s.svc", svcName, ns)
+	}
+
+	// If proxy is not configured, use the primary service as host.
+	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil {
+		return svcFQDN(naming.ClusterPrimaryService(postgresCluster).Name, postgresCluster.Namespace), nil
+	}
+
+	// Proxy is configured, but PGBouncer is not exposed, use the service name as host.
+	svcName := naming.ClusterPGBouncer(postgresCluster).Name
+	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
+		return svcFQDN(svcName, postgresCluster.Namespace), nil
+	}
+
+	// PGBouncer is exposed, find the IP/hostnames
 	svc := &corev1.Service{}
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: svcName}, svc)
 	if err != nil {
@@ -35,7 +55,6 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGClust
 			host = i.Hostname
 		}
 	}
-
 	return host, nil
 }
 
@@ -121,6 +140,10 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 
+		if err := r.reconcileStandbyLag(ctx, cluster); err != nil {
+			return errors.Wrap(err, "reconcile replication lag status")
+		}
+
 		cluster.Status.ObservedGeneration = cluster.Generation
 
 		updateConditions(cluster, status)
@@ -152,13 +175,13 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 
 	syncPgbackrestFromPostgresToPercona(cr, status)
 
-	repoCondition := meta.FindStatusCondition(status.Conditions, postgrescluster.ConditionRepoHostReady)
+	repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
 	if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
 		setClusterNotReadyCondition(metav1.ConditionFalse, postgrescluster.ConditionRepoHostReady)
 		return
 	}
 
-	backupCondition := meta.FindStatusCondition(status.Conditions, postgrescluster.ConditionReplicaCreate)
+	backupCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionReplicaCreate)
 	if backupCondition == nil || backupCondition.Status != metav1.ConditionTrue {
 		setClusterNotReadyCondition(metav1.ConditionFalse, postgrescluster.ConditionReplicaCreate)
 		return
@@ -170,21 +193,14 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 
 func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
 	for _, pcCond := range postgresStatus.Conditions {
-		existing := meta.FindStatusCondition(cr.Status.Conditions, pcCond.Type)
-		if existing != nil {
-			continue
-		}
-
-		newCond := metav1.Condition{
+		_ = meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 			Type:               pcCond.Type,
 			Status:             pcCond.Status,
 			Reason:             pcCond.Reason,
 			Message:            pcCond.Message,
 			LastTransitionTime: pcCond.LastTransitionTime,
 			ObservedGeneration: cr.Generation,
-		}
-
-		cr.Status.Conditions = append(cr.Status.Conditions, newCond)
+		})
 	}
 }
 

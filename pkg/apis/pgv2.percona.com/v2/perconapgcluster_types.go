@@ -2,12 +2,16 @@ package v2
 
 import (
 	"context"
+	"os"
 
 	gover "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -78,6 +82,9 @@ type PerconaPGClusterSpec struct {
 
 	TLSOnly bool `json:"tlsOnly,omitempty"`
 
+	// +optional
+	TLS *crunchyv1beta1.TLSSpec `json:"tls,omitempty"`
+
 	// The port on which PostgreSQL should listen.
 	// +optional
 	// +kubebuilder:default=5432
@@ -103,7 +110,7 @@ type PerconaPGClusterSpec struct {
 
 	// Run this cluster as a read-only copy of an existing cluster or archive.
 	// +optional
-	Standby *crunchyv1beta1.PostgresStandbySpec `json:"standby,omitempty"`
+	Standby *StandbySpec `json:"standby,omitempty"`
 
 	// Whether or not the PostgreSQL cluster is being deployed to an OpenShift
 	// environment. If the field is unset, the operator will automatically
@@ -173,6 +180,44 @@ type PerconaPGClusterSpec struct {
 	// specified in `spec.users` across all databases associated with that user.
 	// +optional
 	AutoCreateUserSchema *bool `json:"autoCreateUserSchema,omitempty"`
+
+	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
+
+	// Configuration for PostgreSQL config files and server parameters.
+	// Use spec.config.files to mount files (e.g. LDAP CA certificate) under
+	// /etc/postgres, and spec.config.parameters to set postgresql.conf values.
+	// +optional
+	Config *crunchyv1beta1.PostgresConfigSpec `json:"config,omitempty"`
+
+	// Defines custom pg_hba.conf authentication rules. Rules are evaluated
+	// after mandatory operator rules and before the default scram-sha-256
+	// fallback. Use this together with spec.config.files to supply supporting
+	// files such as an LDAP CA certificate.
+	// +optional
+	Authentication *crunchyv1beta1.PostgresClusterAuthentication `json:"authentication,omitempty"`
+}
+
+type ContainerOptions struct {
+	Env     []corev1.EnvVar        `json:"env,omitempty"`
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+}
+
+type StandbySpec struct {
+	*crunchyv1beta1.PostgresStandbySpec `json:",inline"`
+
+	// +optional
+	// MaxAcceptableLag is the maximum WAL lag allowed for the standby cluster, measured in bytes of WAL data.
+	// This represents the maximum amount of WAL data that the standby can be behind the primary.
+	// If the lag exceeds this value, the standby cluster is marked as unready.
+	// If unset, lag is not checked.
+	MaxAcceptableLag *resource.Quantity `json:"maxAcceptableLag,omitempty"`
+}
+
+func (cr *PerconaPGCluster) ShouldCheckStandbyLag() bool {
+	return cr.CompareVersion("2.9.0") >= 0 &&
+		cr.Spec.Standby != nil &&
+		cr.Spec.Standby.Enabled &&
+		cr.Spec.Standby.MaxAcceptableLag != nil
 }
 
 func (cr *PerconaPGCluster) Default() {
@@ -190,24 +235,25 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.InstanceSets[i].Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
-	if cr.Spec.Proxy == nil {
-		cr.Spec.Proxy = new(PGProxySpec)
-	}
+	if cr.CompareVersion("2.9.0") < 0 || cr.Spec.Proxy.IsSet() {
+		if cr.Spec.Proxy == nil {
+			cr.Spec.Proxy = &PGProxySpec{}
+		}
 
-	if cr.Spec.Proxy.PGBouncer == nil {
-		cr.Spec.Proxy.PGBouncer = new(PGBouncerSpec)
-	}
+		if cr.Spec.Proxy.PGBouncer == nil {
+			cr.Spec.Proxy.PGBouncer = &PGBouncerSpec{}
+		}
 
-	if cr.Spec.Proxy.PGBouncer.Metadata == nil {
-		cr.Spec.Proxy.PGBouncer.Metadata = new(crunchyv1beta1.Metadata)
+		if cr.Spec.Proxy.PGBouncer.Metadata == nil {
+			cr.Spec.Proxy.PGBouncer.Metadata = &crunchyv1beta1.Metadata{}
+		}
+		if cr.Spec.Proxy.PGBouncer.Metadata.Labels == nil {
+			cr.Spec.Proxy.PGBouncer.Metadata.Labels = make(map[string]string)
+		}
+		cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
-	if cr.Spec.Proxy.PGBouncer.Metadata.Labels == nil {
-		cr.Spec.Proxy.PGBouncer.Metadata.Labels = make(map[string]string)
-	}
-	cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 
 	t := true
-	f := false
 
 	if cr.Spec.Backups.IsEnabled() {
 		if cr.Spec.Backups.TrackLatestRestorableTime == nil {
@@ -226,25 +272,80 @@ func (cr *PerconaPGCluster) Default() {
 		}
 	}
 
-	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
-	}
-	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatStatements = &f
-	}
-	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
-		cr.Spec.Extensions.BuiltIn.PGAudit = &t
-	}
-	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
-		cr.Spec.Extensions.BuiltIn.PGVector = &f
-	}
-	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
-		cr.Spec.Extensions.BuiltIn.PGRepack = &f
-	}
+	cr.SetExtensionDefaults()
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
 	}
+}
+
+func (cr *PerconaPGCluster) SetExtensionDefaults() {
+	// for backward compatibility, delete after 2.11.0
+	if cr.Spec.Extensions.BuiltIn.PGStatMonitor != nil {
+		cr.Spec.Extensions.PGStatMonitor.Enabled = cr.Spec.Extensions.BuiltIn.PGStatMonitor
+	}
+	if cr.Spec.Extensions.BuiltIn.PGStatStatements != nil {
+		cr.Spec.Extensions.PGStatStatements.Enabled = cr.Spec.Extensions.BuiltIn.PGStatStatements
+	}
+	if cr.Spec.Extensions.BuiltIn.PGAudit != nil {
+		cr.Spec.Extensions.PGAudit.Enabled = cr.Spec.Extensions.BuiltIn.PGAudit
+	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
+		cr.Spec.Extensions.PGRepack.Enabled = cr.Spec.Extensions.BuiltIn.PGRepack
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector != nil {
+		cr.Spec.Extensions.PGVector.Enabled = cr.Spec.Extensions.BuiltIn.PGVector
+	}
+
+	if cr.Spec.Extensions.PGStatMonitor.Enabled == nil {
+		cr.Spec.Extensions.PGStatMonitor.Enabled = ptr.To(true)
+	}
+	if cr.Spec.Extensions.PGStatStatements.Enabled == nil {
+		cr.Spec.Extensions.PGStatStatements.Enabled = ptr.To(false)
+	}
+	if cr.Spec.Extensions.PGAudit.Enabled == nil {
+		cr.Spec.Extensions.PGAudit.Enabled = ptr.To(true)
+	}
+	if cr.Spec.Extensions.PGVector.Enabled == nil {
+		cr.Spec.Extensions.PGVector.Enabled = ptr.To(false)
+	}
+	if cr.Spec.Extensions.PGRepack.Enabled == nil {
+		cr.Spec.Extensions.PGRepack.Enabled = ptr.To(false)
+	}
+
+	// for backward compatibility, delete after 2.11.0
+	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatMonitor = cr.Spec.Extensions.PGStatMonitor.Enabled
+	}
+	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatStatements = cr.Spec.Extensions.PGStatStatements.Enabled
+	}
+	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
+		cr.Spec.Extensions.BuiltIn.PGAudit = cr.Spec.Extensions.PGAudit.Enabled
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
+		cr.Spec.Extensions.BuiltIn.PGVector = cr.Spec.Extensions.PGVector.Enabled
+	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
+		cr.Spec.Extensions.BuiltIn.PGRepack = cr.Spec.Extensions.PGRepack.Enabled
+	}
+
+	if cr.CompareVersion("2.9.0") < 0 && cr.Spec.Config == nil {
+		cr.Spec.Config = &crunchyv1beta1.PostgresConfigSpec{}
+	}
+
+	if cr.Spec.Backups.IsVolumeSnapshotsEnabled() &&
+		cr.Spec.Backups.VolumeSnapshots.Mode == VolumeSnapshotModeOffline &&
+		cr.Spec.Backups.VolumeSnapshots.OfflineConfig == nil {
+		cr.Spec.Backups.VolumeSnapshots.OfflineConfig = DefaultOfflineSnapshotConfig()
+	}
+}
+
+func (cr *PerconaPGCluster) Validate() error {
+	if cr.Spec.DataSource != nil && cr.Spec.Backups.PGBackRest.Image == "" && os.Getenv("RELATED_IMAGE_PGBACKREST") == "" {
+		return errors.New("spec.backups.pgbackrest.image or RELATED_IMAGE_PGBACKREST is required when spec.dataSource is set")
+	}
+	return nil
 }
 
 func (cr *PerconaPGCluster) PostgresImage() string {
@@ -304,7 +405,10 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.OpenShift = cr.Spec.OpenShift
 	postgresCluster.Spec.Paused = cr.Spec.Unmanaged
 	postgresCluster.Spec.Shutdown = cr.Spec.Pause
-	postgresCluster.Spec.Standby = cr.Spec.Standby
+
+	if cr.Spec.Standby != nil {
+		postgresCluster.Spec.Standby = cr.Spec.Standby.PostgresStandbySpec
+	}
 	postgresCluster.Spec.Service = cr.Spec.Expose.ToCrunchy(cr.Spec.CRVersion)
 	postgresCluster.Spec.ReplicaService = cr.Spec.ExposeReplicas.ToCrunchy(cr.Spec.CRVersion)
 
@@ -368,15 +472,30 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy(cr.Spec.CRVersion)
 
-	postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
-	postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.BuiltIn.PGStatStatements
-	postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
-	postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
-	postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
+	postgresCluster.Spec.Extensions.PGTDE = cr.Spec.Extensions.PGTDE
+	if cr.Spec.Extensions.PGStatMonitor.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.PGStatMonitor.Enabled
+	}
+	if cr.Spec.Extensions.PGStatStatements.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.PGStatStatements.Enabled
+	}
+	if cr.Spec.Extensions.PGAudit.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.PGAudit.Enabled
+	}
+	if cr.Spec.Extensions.PGVector.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.PGVector.Enabled
+	}
+	if cr.Spec.Extensions.PGRepack.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.PGRepack.Enabled
+	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
+	postgresCluster.Spec.TLS = cr.Spec.TLS
 
 	postgresCluster.Spec.InitContainer = cr.Spec.InitContainer
+	postgresCluster.Spec.ClusterServiceDNSSuffix = cr.Spec.ClusterServiceDNSSuffix
+	postgresCluster.Spec.Config = cr.Spec.Config
+	postgresCluster.Spec.Authentication = cr.Spec.Authentication
 
 	return postgresCluster, nil
 }
@@ -470,6 +589,15 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	Standby *StandbyStatus `json:"standby,omitempty"`
+}
+
+type StandbyStatus struct {
+	LagLastComputedAt *metav1.Time `json:"lagLastComputedAt,omitempty"`
+	LagBytes          int64        `json:"lagBytes,omitempty"`
 }
 
 type Patroni struct {
@@ -492,6 +620,75 @@ type Backups struct {
 
 	// Enable tracking latest restorable time
 	TrackLatestRestorableTime *bool `json:"trackLatestRestorableTime,omitempty"`
+
+	// VolumeSnapshots configuration
+	// +optional
+	VolumeSnapshots *VolumeSnapshots `json:"volumeSnapshots,omitempty"`
+}
+
+type VolumeSnapshotMode string
+
+const (
+	// VolumeSnapshotModeOffline is the mode for taking offline VolumeSnapshots.
+	// With this mode, the operator will stop a replica and take a snapshot of the PVC.
+	VolumeSnapshotModeOffline VolumeSnapshotMode = "offline"
+)
+
+type VolumeSnapshots struct {
+	// Mode of the VolumeSnapshot.
+	// +kubebuilder:validation:Enum={offline}
+	// +kubebuilder:default=offline
+	// +optional
+	Mode VolumeSnapshotMode `json:"mode,omitempty"`
+
+	// Name of the VolumeSnapshotClass to use.
+	// +kubebuilder:validation:Required
+	ClassName string `json:"className"`
+
+	// Defines the Cron schedule for a VolumeSnapshot.
+	// Follows the standard Cron schedule syntax:
+	// https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
+	// +optional
+	// +kubebuilder:validation:MinLength=6
+	Schedule *string `json:"schedule,omitempty"`
+
+	// Configuration for offline snapshot operations.
+	// Ignored if mode is not offline.
+	// +optional
+	OfflineConfig *OfflineSnapshotConfig `json:"offlineConfig,omitempty"`
+}
+
+func DefaultOfflineSnapshotConfig() *OfflineSnapshotConfig {
+	return &OfflineSnapshotConfig{
+		Checkpoint: &CheckpointConfig{
+			Enabled:        ptr.To(true),
+			TimeoutSeconds: ptr.To(int32(300)),
+		},
+	}
+}
+
+type OfflineSnapshotConfig struct {
+	// Checkpoint configuration for offline snapshot operations.
+	// +optional
+	Checkpoint *CheckpointConfig `json:"checkpoint,omitempty"`
+}
+
+type CheckpointConfig struct {
+	// If set, a checkpoint is requested.
+	// +optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Timeout for the checkpoint operation.
+	// Ignored if checkpoint is not enabled.
+	// +optional
+	// +kubebuilder:validation:Minimum=30
+	// +kubebuilder:default=300
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+}
+
+func (b Backups) IsVolumeSnapshotsEnabled() bool {
+	return b.VolumeSnapshots != nil && b.VolumeSnapshots.ClassName != ""
 }
 
 func (b Backups) IsEnabled() bool {
@@ -500,7 +697,12 @@ func (b Backups) IsEnabled() bool {
 
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	if b.Enabled != nil && !*b.Enabled {
-		return crunchyv1beta1.Backups{}
+		return crunchyv1beta1.Backups{
+			Enabled: ptr.To(false),
+			PGBackRest: crunchyv1beta1.PGBackRestArchive{
+				Image: b.PGBackRest.Image,
+			},
+		}
 	}
 
 	var sc *crunchyv1beta1.PGBackRestSidecars
@@ -513,6 +715,7 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	}
 
 	backups := crunchyv1beta1.Backups{
+		Enabled: b.Enabled,
 		PGBackRest: crunchyv1beta1.PGBackRestArchive{
 			Metadata:      b.PGBackRest.Metadata,
 			Configuration: b.PGBackRest.Configuration,
@@ -679,12 +882,27 @@ type BuiltInExtensionsSpec struct {
 	PGRepack         *bool `json:"pg_repack,omitempty"`
 }
 
+type BuiltInExtensionSpec struct {
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
 	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
-	BuiltIn         BuiltInExtensionsSpec       `json:"builtin,omitempty"`
-	Custom          []CustomExtensionSpec       `json:"custom,omitempty"`
+
+	// Deprecated: Use extensions.<extension> instead. This field will be removed after 2.11.0.
+	BuiltIn BuiltInExtensionsSpec `json:"builtin,omitempty"`
+
+	PGStatMonitor    BuiltInExtensionSpec     `json:"pg_stat_monitor,omitempty"`
+	PGStatStatements BuiltInExtensionSpec     `json:"pg_stat_statements,omitempty"`
+	PGAudit          BuiltInExtensionSpec     `json:"pg_audit,omitempty"`
+	PGVector         BuiltInExtensionSpec     `json:"pgvector,omitempty"`
+	PGRepack         BuiltInExtensionSpec     `json:"pg_repack,omitempty"`
+	PGTDE            crunchyv1beta1.PGTDESpec `json:"pg_tde,omitempty"`
+
+	Custom []CustomExtensionSpec `json:"custom,omitempty"`
 }
 
 type SecretsSpec struct {
@@ -770,6 +988,9 @@ type PGInstanceSetSpec struct {
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
 
+	SidecarVolumes []corev1.Volume             `json:"sidecarVolumes,omitempty"`
+	SidecarPVCs    []crunchyv1beta1.SidecarPVC `json:"sidecarPVCs,omitempty"`
+
 	// Configuration for instance default sidecar containers.
 	// +optional
 	Containers *crunchyv1beta1.InstanceSidecars `json:"containers,omitempty"`
@@ -853,6 +1074,8 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Affinity:                  p.Affinity,
 		Containers:                p.Sidecars,
 		Sidecars:                  p.Containers,
+		SidecarVolumes:            p.SidecarVolumes,
+		SidecarPVCs:               p.SidecarPVCs,
 		InitContainers:            p.InitContainers,
 		PriorityClassName:         p.PriorityClassName,
 		Replicas:                  p.Replicas,
@@ -930,6 +1153,10 @@ type PGProxySpec struct {
 	PGBouncer *PGBouncerSpec `json:"pgBouncer"`
 }
 
+func (p *PGProxySpec) IsSet() bool {
+	return p != nil && p.PGBouncer != nil
+}
+
 func (p *PGProxySpec) ToCrunchy(version string) *crunchyv1beta1.PostgresProxySpec {
 	if p == nil {
 		return nil
@@ -961,6 +1188,9 @@ type PGBouncerSpec struct {
 	// PgBouncer to restart.
 	// +optional
 	Sidecars []corev1.Container `json:"sidecars,omitempty"`
+
+	SidecarVolumes []corev1.Volume             `json:"sidecarVolumes,omitempty"`
+	SidecarPVCs    []crunchyv1beta1.SidecarPVC `json:"sidecarPVCs,omitempty"`
 
 	// Configuration for pgBouncer default sidecar containers.
 	// +optional
@@ -1049,6 +1279,8 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		Affinity:                  p.Affinity,
 		Config:                    p.Config,
 		Containers:                p.Sidecars,
+		SidecarVolumes:            p.SidecarVolumes,
+		SidecarPVCs:               p.SidecarPVCs,
 		Sidecars:                  p.Containers,
 		CustomTLSSecret:           p.CustomTLSSecret,
 		ExposeSuperusers:          p.ExposeSuperusers,
@@ -1098,36 +1330,30 @@ func (pgc PerconaPGCluster) UserMonitoring() string {
 func (cr *PerconaPGCluster) EnvFromSecrets() []string {
 	secrets := []string{}
 
-	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
-		set := &cr.Spec.InstanceSets[i]
-		if len(set.EnvFrom) == 0 {
-			continue
-		}
-		for _, envFrom := range set.EnvFrom {
-			if envFrom.SecretRef == nil {
+	addSecrets := func(envFrom []corev1.EnvFromSource) {
+		for _, v := range envFrom {
+			if v.SecretRef == nil {
 				continue
 			}
-			secrets = append(secrets, envFrom.SecretRef.Name)
+			secrets = append(secrets, v.SecretRef.Name)
 		}
 	}
 
-	if cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil && len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
-		for _, envFrom := range cr.Spec.Proxy.PGBouncer.EnvFrom {
-			if envFrom.SecretRef == nil {
-				continue
-			}
-			secrets = append(secrets, envFrom.SecretRef.Name)
-		}
+	for _, set := range cr.Spec.InstanceSets {
+		addSecrets(set.EnvFrom)
 	}
 
-	if len(cr.Spec.Backups.PGBackRest.EnvFrom) > 0 {
-		for _, envFrom := range cr.Spec.Backups.PGBackRest.EnvFrom {
-			if envFrom.SecretRef == nil {
-				continue
-			}
-			secrets = append(secrets, envFrom.SecretRef.Name)
-		}
+	addSecrets(cr.Spec.Backups.PGBackRest.EnvFrom)
+	if cr.Spec.Backups.PGBackRest.Manual != nil {
+		addSecrets(cr.Spec.Backups.PGBackRest.Manual.EnvFrom)
 	}
+	if cr.Spec.Backups.PGBackRest.Restore != nil {
+		addSecrets(cr.Spec.Backups.PGBackRest.Restore.EnvFrom)
+	}
+	if cr.Spec.Proxy != nil && cr.Spec.Proxy.PGBouncer != nil {
+		addSecrets(cr.Spec.Proxy.PGBouncer.EnvFrom)
+	}
+
 	return secrets
 }
 
