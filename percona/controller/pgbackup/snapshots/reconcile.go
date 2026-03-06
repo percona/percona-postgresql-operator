@@ -201,21 +201,21 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 
 	dataOk, err := r.reconcileDataSnapshot(ctx, dataPVC)
 	if errors.Is(err, errVolumeSnapshotFailed) {
-		snapshotErrors = merr.Append(snapshotErrors, errors.Unwrap(err))
+		snapshotErrors = merr.Append(snapshotErrors, err)
 	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile data snapshot")
 	}
 
 	walOk, err := r.reconcileWALSnapshot(ctx, walPVC)
 	if errors.Is(err, errVolumeSnapshotFailed) {
-		snapshotErrors = merr.Append(snapshotErrors, errors.Unwrap(err))
+		snapshotErrors = merr.Append(snapshotErrors, err)
 	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile WAL snapshot")
 	}
 
 	tablespaceOk, err := r.reconcileTablespaceSnapshot(ctx, tablespacePVCs)
 	if errors.Is(err, errVolumeSnapshotFailed) {
-		snapshotErrors = merr.Append(snapshotErrors, errors.Unwrap(err))
+		snapshotErrors = merr.Append(snapshotErrors, err)
 	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile tablespace snapshot")
 	}
