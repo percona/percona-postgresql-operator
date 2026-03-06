@@ -224,6 +224,7 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 		if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = fmt.Sprintf("one or more snapshots failed: %s", snapshotErrors)
+			bcp.Status.CompletedAt = ptr.To(metav1.Now())
 		}); updErr != nil {
 			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 		}
@@ -282,7 +283,7 @@ func (r *snapshotReconciler) reconcileSnapshot(ctx context.Context, volumeSnapsh
 			return false, nil
 		}
 
-		err := errors.Wrap(errVolumeSnapshotFailed, message)
+		err := errors.Wrap(errVolumeSnapshotFailed, fmt.Sprintf("VolumeSnapshot %s failed: %s", volumeSnapshot.GetName(), message))
 
 		log.Error(err, "Volume snapshot failed")
 		return false, err
