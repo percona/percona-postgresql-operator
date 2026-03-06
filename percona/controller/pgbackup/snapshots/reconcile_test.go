@@ -72,7 +72,7 @@ func TestShouldFailSnapshot(t *testing.T) {
 }
 
 func TestReconcileNew(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ns := "test-ns"
 	backupName := "my-backup"
 	clusterName := "my-cluster"
@@ -113,7 +113,7 @@ func TestReconcileNew(t *testing.T) {
 }
 
 func TestReconcileDataSnapshot(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ns := "test-ns"
 	backupName := "my-backup"
 	clusterName := "my-cluster"
@@ -200,7 +200,7 @@ func TestReconcileDataSnapshot(t *testing.T) {
 }
 
 func TestReconcileWALSnapshot(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ns := "test-ns"
 	backupName := "my-backup"
 	clusterName := "my-cluster"
@@ -312,7 +312,7 @@ func TestReconcileWALSnapshot(t *testing.T) {
 }
 
 func TestReconcileTablespaceSnapshot(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ns := "test-ns"
 	backupName := "my-backup"
 	clusterName := "my-cluster"
@@ -449,7 +449,7 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 }
 
 func TestReconcileRunning(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ns := "test-ns"
 	backupName := "my-backup"
 	clusterName := "my-cluster"
@@ -729,7 +729,7 @@ func TestGenerateSnapshotIntent(t *testing.T) {
 }
 
 func TestTryAcquireLease(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ns := "test-ns"
 	clusterName := "my-cluster"
 
