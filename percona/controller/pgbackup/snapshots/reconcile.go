@@ -13,6 +13,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -544,9 +545,12 @@ func (r *snapshotReconciler) backupLeaseHolder() string {
 	return fmt.Sprintf("%s|%s", r.backup.GetName(), r.backup.GetUID())
 }
 
-func (r *snapshotReconciler) backupNameFromHolder(holder string) string {
+func (r *snapshotReconciler) parseBackupLeaseHolder(holder string) (string, types.UID) {
 	parts := strings.Split(holder, "|")
-	return parts[0]
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], types.UID(parts[1])
 }
 
 func (r *snapshotReconciler) tryAcquireLease(ctx context.Context) (bool, error) {
@@ -554,20 +558,26 @@ func (r *snapshotReconciler) tryAcquireLease(ctx context.Context) (bool, error) 
 	leaseHolderID := r.backupLeaseHolder()
 
 	checkStale := func(ctx context.Context, currentHolder string) (bool, error) {
+		backupName, backupUID := r.parseBackupLeaseHolder(currentHolder)
+		if backupName == "" || backupUID == "" {
+			r.log.Info("Backup lease holder is malformed, acquiring lease anyway")
+			return true, nil
+		}
+
 		backup := &v2.PerconaPGBackup{}
-		backupName := r.backupNameFromHolder(currentHolder)
-		if backupName == "" {
-			return false, errors.New("invalid holder identity")
-		}
-
-		if err := r.cl.Get(ctx, client.ObjectKey{Name: backupName, Namespace: r.cluster.GetNamespace()}, backup); err != nil {
-			if k8serrors.IsNotFound(err) {
-				return true, nil
-			}
+		if err := r.cl.Get(ctx, client.ObjectKey{Name: backupName, Namespace: r.cluster.GetNamespace()}, backup); k8serrors.IsNotFound(err) {
+			return true, nil
+		} else if err != nil {
 			return false, errors.Wrap(err, "failed to get backup")
+		} else if backup.GetUID() != backupUID {
+			// We found a backup with the same name, but different UID.
+			// So this isn't the same backup that was holding the lease.
+			return true, nil
 		}
 
-		return (backup.Status.State == v2.BackupFailed || backup.Status.State == v2.BackupSucceeded) && len(backup.GetFinalizers()) == 0, nil
+		// We found the backup that holds the lease. Check if it has completed fully before we acquire the lease.
+		return (backup.Status.State == v2.BackupFailed || backup.Status.State == v2.BackupSucceeded) &&
+			!controllerutil.ContainsFinalizer(backup, pNaming.FinalizerSnapshotInProgress), nil
 	}
 
 	if err := k8s.AcquireLease(ctx, r.cl, leaseName, leaseHolderID, r.cluster.GetNamespace(), checkStale); err != nil {

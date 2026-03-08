@@ -765,7 +765,7 @@ func TestTryAcquireLease(t *testing.T) {
 			Namespace: ns,
 		}, lease))
 		require.NotNil(t, lease.Spec.HolderIdentity)
-		assert.Equal(t, "backup-1", *lease.Spec.HolderIdentity)
+		assert.Equal(t, "backup-1|uid-1", *lease.Spec.HolderIdentity)
 	})
 
 	t.Run("returns false when lease is held by another active backup", func(t *testing.T) {
@@ -782,7 +782,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("other-backup"),
+				HolderIdentity: ptr.To("other-backup|uid-other"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -819,7 +819,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("other-backup"),
+				HolderIdentity: ptr.To("other-backup|uid-other"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -844,7 +844,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("deleted-backup"),
+				HolderIdentity: ptr.To("deleted-backup|uid-deleted"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -867,7 +867,7 @@ func TestTryAcquireLease(t *testing.T) {
 			Namespace: ns,
 		}, lease))
 		require.NotNil(t, lease.Spec.HolderIdentity)
-		assert.Equal(t, "backup-1", *lease.Spec.HolderIdentity)
+		assert.Equal(t, "backup-1|uid-1", *lease.Spec.HolderIdentity)
 	})
 
 	t.Run("acquires stale lease when holder backup has succeeded", func(t *testing.T) {
@@ -884,7 +884,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("completed-backup"),
+				HolderIdentity: ptr.To("completed-backup|uid-completed"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -917,7 +917,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("failed-backup"),
+				HolderIdentity: ptr.To("failed-backup|uid-failed"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -928,6 +928,37 @@ func TestTryAcquireLease(t *testing.T) {
 			WithScheme(s).
 			WithObjects(backup, failedBackup, existingLease).
 			WithStatusSubresource(failedBackup).
+			Build()
+
+		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
+		acquired, err := r.tryAcquireLease(ctx)
+		require.NoError(t, err)
+		assert.True(t, acquired)
+	})
+
+	t.Run("acquires stale lease when holder backup is found but has a different UID", func(t *testing.T) {
+		existingBackup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-abc"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+			Status:     v2.PerconaPGBackupStatus{},
+		}
+		existingLease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pg-" + clusterName + "-backup-lock",
+				Namespace: ns,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: ptr.To("backup-1|uid-xyz"),
+			},
+		}
+		backup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-2", Namespace: ns, UID: "uid-1"},
+			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
+		}
+		cl := fake.NewClientBuilder().
+			WithScheme(s).
+			WithObjects(backup, existingBackup, existingLease).
+			WithStatusSubresource(backup).
 			Build()
 
 		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
@@ -947,7 +978,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("backup-1"),
+				HolderIdentity: ptr.To("backup-1|uid-1"),
 			},
 		}
 		cl := fake.NewClientBuilder().
