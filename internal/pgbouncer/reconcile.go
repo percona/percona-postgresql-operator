@@ -34,6 +34,12 @@ func ConfigMap(
 
 	outConfigMap.Data[emptyConfigMapKey] = ""
 	outConfigMap.Data[iniFileConfigMapKey] = clusterINI(inCluster)
+
+	if hasLDAPRules(inCluster) {
+		outConfigMap.Data[hbaFileConfigMapKey] = pgbouncerHBAFileContents(inCluster)
+	} else {
+		delete(outConfigMap.Data, hbaFileConfigMapKey)
+	}
 }
 
 // Secret populates the PgBouncer Secret.

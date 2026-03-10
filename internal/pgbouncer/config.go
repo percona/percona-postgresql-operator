@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -21,16 +22,19 @@ const (
 	authFileAbsolutePath  = configDirectory + "/" + authFileProjectionPath
 	emptyFileAbsolutePath = configDirectory + "/" + emptyFileProjectionPath
 	iniFileAbsolutePath   = configDirectory + "/" + iniFileProjectionPath
+	hbaFileAbsolutePath   = configDirectory + "/" + hbaFileProjectionPath
 
 	authFileProjectionPath  = "~postgres-operator/users.txt"
 	emptyFileProjectionPath = "pgbouncer.ini"
 	iniFileProjectionPath   = "~postgres-operator.ini"
+	hbaFileProjectionPath   = "~postgres-operator/pgbouncer_hba.conf"
 
 	authFileSecretKey   = "pgbouncer-users.txt" // #nosec G101 this is a name, not a credential
 	passwordSecretKey   = "pgbouncer-password"  // #nosec G101 this is a name, not a credential
 	verifierSecretKey   = "pgbouncer-verifier"  // #nosec G101 this is a name, not a credential
 	emptyConfigMapKey   = "pgbouncer-empty"
 	iniFileConfigMapKey = "pgbouncer.ini"
+	hbaFileConfigMapKey = "pgbouncer-hba.conf"
 )
 
 const (
@@ -74,6 +78,60 @@ func authFileContents(password string) []byte {
 	return []byte(user1)
 }
 
+func hasLDAPRules(cluster *v1beta1.PostgresCluster) bool {
+	if cluster.Spec.Authentication == nil {
+		return false
+	}
+	for i := range cluster.Spec.Authentication.Rules {
+		if cluster.Spec.Authentication.Rules[i].Method == "ldap" {
+			return true
+		}
+	}
+	return false
+}
+
+// pgbouncerHBAFileContents generates a PgBouncer HBA file that mirrors any LDAP
+// authentication rules from the cluster spec.
+func pgbouncerHBAFileContents(cluster *v1beta1.PostgresCluster) string {
+	var lines []string
+
+	if cluster.Spec.Authentication != nil {
+		for i := range cluster.Spec.Authentication.Rules {
+			rule := &cluster.Spec.Authentication.Rules[i]
+			if rule.HBA != "" {
+				if rule.Method == "ldap" {
+					lines = append(lines, rule.HBA)
+				}
+				continue
+			}
+			if rule.Method != "ldap" {
+				continue
+			}
+			hba := postgres.NewHBA()
+			hba.Origin(rule.Connection)
+			hba.Method(rule.Method)
+			if len(rule.Databases) > 0 {
+				hba.Databases(rule.Databases[0], rule.Databases[1:]...)
+			}
+			if len(rule.Users) > 0 {
+				hba.Users(rule.Users[0], rule.Users[1:]...)
+			}
+			if len(rule.Options) > 0 {
+				opts := make(map[string]string, len(rule.Options))
+				for k, v := range rule.Options {
+					opts[k] = v.String()
+				}
+				hba.Options(opts)
+			}
+			lines = append(lines, hba.String())
+		}
+	}
+
+	lines = append(lines, "host all all all scram-sha-256")
+
+	return strings.Join(lines, "\n") + "\n"
+}
+
 func clusterINI(cluster *v1beta1.PostgresCluster) string {
 	var (
 		pgBouncerPort = *cluster.Spec.Proxy.PGBouncer.Port
@@ -99,13 +157,6 @@ func clusterINI(cluster *v1beta1.PostgresCluster) string {
 		"auth_query": "SELECT username, password from pgbouncer.get_auth($1)",
 		"auth_user":  postgresqlUser,
 
-		// TODO(cbandy): Use an HBA file to control authentication of PgBouncer
-		// accounts; e.g. "admin_users" below.
-		// - https://www.pgbouncer.org/config.html#hba-file-format
-		//"auth_hba_file": "",
-		//"auth_type":     "hba",
-		//"admin_users": "pgbouncer",
-
 		// Require TLS encryption on client connections.
 		"client_tls_sslmode":   "require",
 		"client_tls_cert_file": certFrontendAbsolutePath,
@@ -122,6 +173,13 @@ func clusterINI(cluster *v1beta1.PostgresCluster) string {
 
 		// Disable Unix sockets to keep the filesystem read-only.
 		"unix_socket_dir": "",
+	}
+
+	// When LDAP authentication rules are present, configure PgBouncer to use an
+	// HBA file so it can validate clients against LDAP before allowing pool access.
+	if hasLDAPRules(cluster) {
+		global["auth_type"] = "hba"
+		global["auth_hba_file"] = hbaFileAbsolutePath
 	}
 
 	// Override the above with any specified settings.
@@ -222,6 +280,21 @@ func podConfigFiles(
 			},
 		},
 	}...)
+
+	// Mount the PgBouncer HBA file when it has been generated (i.e. LDAP rules exist).
+	if _, ok := configmap.Data[hbaFileConfigMapKey]; ok {
+		projections = append(projections, corev1.VolumeProjection{
+			ConfigMap: &corev1.ConfigMapProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: configmap.Name,
+				},
+				Items: []corev1.KeyToPath{{
+					Key:  hbaFileConfigMapKey,
+					Path: hbaFileProjectionPath,
+				}},
+			},
+		})
+	}
 
 	return projections
 }
