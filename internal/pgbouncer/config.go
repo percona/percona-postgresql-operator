@@ -92,6 +92,10 @@ func hasLDAPRules(cluster *v1beta1.PostgresCluster) bool {
 
 // pgbouncerHBAFileContents generates a PgBouncer HBA file that mirrors any LDAP
 // authentication rules from the cluster spec.
+// PgBouncer supports the "ldap" method in its HBA file using the same format as
+// pg_hba.conf (see https://github.com/pgbouncer/pgbouncer/pull/731). PgBouncer
+// authenticates the client against the LDAP server directly, then uses the
+// received cleartext credential for the server-side PostgreSQL connection.
 func pgbouncerHBAFileContents(cluster *v1beta1.PostgresCluster) string {
 	var lines []string
 
@@ -108,7 +112,19 @@ func pgbouncerHBAFileContents(cluster *v1beta1.PostgresCluster) string {
 				continue
 			}
 			hba := postgres.NewHBA()
-			hba.Origin(rule.Connection)
+			// Use typed methods so the connection type is written as an
+			// unquoted keyword (host, hostssl, …) rather than a quoted string.
+			// HBA parsers require unquoted connection-type tokens.
+			switch rule.Connection {
+			case "hostssl":
+				hba.TLS()
+			case "hostnossl":
+				hba.NoSSL()
+			case "local":
+				hba.Local()
+			default:
+				hba.TCP()
+			}
 			hba.Method(rule.Method)
 			if len(rule.Databases) > 0 {
 				hba.Databases(rule.Databases[0], rule.Databases[1:]...)

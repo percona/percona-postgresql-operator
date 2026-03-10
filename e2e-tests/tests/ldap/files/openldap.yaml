@@ -76,7 +76,13 @@ spec:
             - -c
             - |
               echo "Waiting for LDAP server to be ready..."
-              sleep 60
+              for i in $(seq 30); do
+                ldapsearch -x -H ldap://localhost:389 \
+                  -D "cn=admin,dc=ldap,dc=local" -w adminpassword \
+                  -b "dc=ldap,dc=local" 2>&1 | grep -q "numEntries" && break
+                echo "Attempt ${i}: LDAP server not ready yet, waiting..."
+                sleep 10
+              done
 
               echo "Adding LDAP structure..."
               ldapadd -x -H ldap://localhost:389 -D "cn=admin,dc=ldap,dc=local" -w adminpassword <<EOF
