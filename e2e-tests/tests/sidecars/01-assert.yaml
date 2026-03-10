@@ -204,7 +204,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: standard-rwo
   volumeMode: Filesystem
 status:
   accessModes:
@@ -233,7 +232,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: standard-rwo
   volumeMode: Filesystem
 status:
   accessModes:
@@ -263,7 +261,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: standard-rwo
   volumeMode: Filesystem
 status:
   accessModes:
