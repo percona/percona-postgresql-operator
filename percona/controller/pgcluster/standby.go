@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,6 +91,15 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 			cond.Message = "Invalid output from lag query. The WAL receiver is probably not active"
 			return nil
 		}
+
+		// If the standby was previously lagging, we should mark the pod as ready again since now
+		// we do not know the actual state of lag.
+		if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) {
+			if err := r.setPodReplicationLagSignal(ctx, cr, true); err != nil {
+				return errors.Wrap(err, "set pod replication readiness signal")
+			}
+		}
+
 		return errors.Wrap(err, "calculate replication lag bytes")
 	}
 
@@ -158,10 +168,22 @@ func (r *PGClusterReconciler) setPodReplicationLagSignal(
 }
 
 func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
+	var errs error
 	if standby.Spec.Standby.Host != "" {
-		return r.getLagFromStreamingHost(ctx, standby)
+		lag, err := r.getLagFromStreamingHost(ctx, standby)
+		if err == nil {
+			return lag, nil
+		}
+		errs = multierror.Append(errs, fmt.Errorf("get lag from streaming host: %w", err))
+		logging.FromContext(ctx).V(1).Info("Failed to get lag from streaming host, falling back to main site", "error", err)
+		// Fallthrough so we can try getting lag from main site
 	}
-	return r.getLagFromMainSite(ctx, standby)
+
+	lag, err := r.getLagFromMainSite(ctx, standby)
+	if err != nil {
+		return 0, multierror.Append(errs, fmt.Errorf("get lag from main site: %w", err))
+	}
+	return lag, nil
 }
 
 var (
