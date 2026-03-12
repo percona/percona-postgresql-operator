@@ -278,6 +278,10 @@ func TestPgbouncerHBAFileContents(t *testing.T) {
 		assert.Assert(t, strings.Contains(result, "mydb"))
 		assert.Assert(t, strings.Contains(result, "myuser"))
 		assert.Assert(t, strings.Contains(result, "ldap"))
+		assert.Assert(t, strings.Contains(result, "ldapport"))
+		assert.Assert(t, strings.Contains(result, "389"))
+		assert.Assert(t, strings.Contains(result, "ldapserver"))
+		assert.Assert(t, strings.Contains(result, "ldap.example.com"))
 	})
 
 	t.Run("StructuredLDAPAllConnectionTypes", func(t *testing.T) {
