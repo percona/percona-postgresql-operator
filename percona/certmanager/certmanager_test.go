@@ -446,6 +446,7 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		assert.Equal(t, cluster.Namespace, cert.Namespace)
 		assert.Equal(t, cluster.Name+"-pgbouncer-frontend-tls", cert.Spec.SecretName)
 		assert.Equal(t, cluster.Name+"-pgbouncer", cert.Spec.CommonName)
+		assert.LessOrEqual(t, len(cert.Spec.CommonName), 64)
 		assert.Equal(t, dnsNames, cert.Spec.DNSNames)
 		assert.Equal(t, naming.TLSIssuer(cluster).Name, cert.Spec.IssuerRef.Name)
 		assert.Equal(t, v1.IssuerKind, cert.Spec.IssuerRef.Kind)
@@ -464,6 +465,26 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("commonName does not exceed 64 bytes", func(t *testing.T) {
+		cluster3 := testCluster()
+		cluster3.Name = "a-very-long-cluster-name-that-exceeds-fifty-four-characters-xx"
+		client3 := setupFakeClient(t, cluster3)
+		ctrl3 := NewController(client3, client3.Scheme(), false)
+
+		dnsNames := []string{cluster3.Name + "-pgbouncer.test-namespace.svc"}
+		err := ctrl3.ApplyPGBouncerCertificate(t.Context(), cluster3, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client3.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster3.Namespace,
+			Name:      cluster3.Name + "-pgbouncer-cert",
+		}, cert)
+		require.NoError(t, err)
+
+		assert.LessOrEqual(t, len(cert.Spec.CommonName), 64)
+	})
+
 	t.Run("fail with empty dnsNames", func(t *testing.T) {
 		cluster2 := testCluster()
 		cluster2.Name = "pgbouncer-cert-test-2"
@@ -471,6 +492,85 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		ctrl2 := NewController(client2, client2.Scheme(), false)
 
 		err := ctrl2.ApplyPGBouncerCertificate(t.Context(), cluster2, []string{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dnsNames cannot be empty")
+	})
+}
+
+func TestApplyPGBackRestRepoCertificate(t *testing.T) {
+	t.Run("create pgbackrest repo certificate successfully", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-repo-cert-test"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{
+			"pgbackrest-repo-cert-test-repo-host-0.pgbackrest-repo-cert-test-pgbackrest.test-namespace.svc.cluster.local",
+			"pgbackrest-repo-cert-test-repo-host-0.pgbackrest-repo-cert-test-pgbackrest.test-namespace.svc",
+			"pgbackrest-repo-cert-test-repo-host-0.pgbackrest-repo-cert-test-pgbackrest.test-namespace",
+			"pgbackrest-repo-cert-test-repo-host-0.pgbackrest-repo-cert-test-pgbackrest",
+		}
+
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := cluster.Name + "-pgbackrest-repo-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+
+		assert.Equal(t, certName, cert.Name)
+		assert.Equal(t, cluster.Namespace, cert.Namespace)
+		assert.Equal(t, cluster.Name+"-pgbackrest-repo-tls", cert.Spec.SecretName)
+		assert.Equal(t, cluster.Name+"-pgbackrest-repo", cert.Spec.CommonName)
+		assert.LessOrEqual(t, len(cert.Spec.CommonName), 64)
+		assert.Equal(t, dnsNames, cert.Spec.DNSNames)
+		assert.Equal(t, naming.TLSIssuer(cluster).Name, cert.Spec.IssuerRef.Name)
+		assert.Equal(t, v1.IssuerKind, cert.Spec.IssuerRef.Kind)
+		assert.NotNil(t, cert.Spec.Duration)
+		assert.Equal(t, DefaultCertDuration, cert.Spec.Duration.Duration)
+
+		require.Len(t, cert.OwnerReferences, 1)
+		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
+
+		// return nil when certificate already exists
+		err = ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+	})
+
+	t.Run("commonName does not exceed 64 bytes for long cluster names", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "long-cluster-name-that-makes-fqdn-too-long"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{
+			cluster.Name + "-repo-host-0." + cluster.Name + "-pgbackrest.test-namespace.svc.cluster.local",
+		}
+
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-pgbackrest-repo-cert",
+		}, cert)
+		require.NoError(t, err)
+
+		assert.LessOrEqual(t, len(cert.Spec.CommonName), 64)
+	})
+
+	t.Run("fail with empty dnsNames", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-repo-cert-test-2"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, []string{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "dnsNames cannot be empty")
 	})
