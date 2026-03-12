@@ -50,6 +50,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -591,7 +592,11 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 	// PostgresCluster and cert-manager-issued Secrets (which are owned by
 	// Certificate, not PostgresCluster) so that deletions or renewals trigger
 	// an immediate reconcile rather than waiting for the next resync.
-	if _, err := r.DiscoveryClient.ServerResourcesForGroupVersion("cert-manager.io/v1"); err == nil {
+	certManagerExists, err := k8s.GroupVersionKindExists(r.DiscoveryClient, "cert-manager.io/v1", "Certificate")
+	if err != nil {
+		return err
+	}
+	if certManagerExists {
 		certManagerSecretPredicate := builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
 			_, ok := obj.GetAnnotations()["cert-manager.io/certificate-name"]
 			return ok
