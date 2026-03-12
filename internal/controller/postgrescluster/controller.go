@@ -597,6 +597,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 			return ok
 		}))
 		bldr.Owns(&cmv1.Certificate{}).
+			Owns(&cmv1.Issuer{}).
 			Watches(&corev1.Secret{}, r.watchCertManagerSecrets(), certManagerSecretPredicate)
 	}
 

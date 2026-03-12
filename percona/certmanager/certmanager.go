@@ -200,6 +200,11 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 				Size:           256,
 				RotationPolicy: v1.RotationPolicyNever,
 			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster: cluster.Name,
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
 		},
 	}
 
