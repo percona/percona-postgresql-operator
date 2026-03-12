@@ -267,7 +267,7 @@ func TestPgbouncerHBAFileContents(t *testing.T) {
 					Users:      []string{"myuser"},
 					Options: map[string]intstr.IntOrString{
 						"ldapserver": intstr.FromString("ldap.example.com"),
-						"ldapport":   intstr.FromInt(389),
+						"ldapport":   intstr.FromInt32(389),
 					},
 				}},
 			},
