@@ -6,7 +6,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: source-cluster
+    postgres-operator.crunchydata.com/cluster: standby-cluster
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
@@ -14,7 +14,7 @@ metadata:
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
-    name: source-cluster
+    name: standby-cluster
 status:
   availableReplicas: 1
   currentReplicas: 1
@@ -25,14 +25,14 @@ status:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: source-cluster-pgbouncer
+  name: standby-cluster-pgbouncer
   labels:
-    postgres-operator.crunchydata.com/cluster: source-cluster
+    postgres-operator.crunchydata.com/cluster: standby-cluster
     postgres-operator.crunchydata.com/role: pgbouncer
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
-      name: source-cluster
+      name: standby-cluster
       controller: true
       blockOwnerDeletion: true
 status:
@@ -45,7 +45,7 @@ kind: Job
 apiVersion: batch/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: source-cluster
+    postgres-operator.crunchydata.com/cluster: standby-cluster
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
@@ -60,11 +60,11 @@ status:
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: source-cluster
+  name: standby-cluster
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: source-cluster
+      name: standby-cluster
       controller: true
       blockOwnerDeletion: true
   finalizers:
@@ -75,7 +75,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 1
+  observedGeneration: 2
   pgbackrest:
     repos:
       - name: repo1
@@ -88,7 +88,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: source-cluster
+  name: standby-cluster
 status:
   pgbouncer:
     ready: 3

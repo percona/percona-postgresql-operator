@@ -316,7 +316,7 @@ get_cr() {
 	fi
 
 	case $test_name in
-		"demand-backup" | "start-from-backup" | "standby-pgbackrest")
+		"demand-backup" | "start-from-backup" | "standby-pgbackrest" | "standby-both")
 			yq eval -i '
 				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
 				.spec.backups.pgbackrest.manual.repoName = "repo1" |
@@ -428,6 +428,16 @@ get_psql_uri() {
 	local secret_name="${cluster}-pguser-${user}"
 
 	echo "${user}:$(get_psql_user_pass ${secret_name})@$(get_psql_user_host ${secret_name})"
+}
+
+get_standby_psql_uri() {
+	local standby_cluster=$1
+	local user=$2
+	local source_cluster=$3
+	local standby_secret_name="${standby_cluster}-pguser-${user}"
+	local source_secret_name="${source_cluster}-pguser-${user}"
+
+	echo "${user}:$(get_psql_user_pass ${source_secret_name})@$(get_psql_user_host ${standby_secret_name})"
 }
 
 get_pgbouncer_host() {

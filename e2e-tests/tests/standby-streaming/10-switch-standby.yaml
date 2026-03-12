@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+
+      source ../../functions
+
+      # pause source cluster and then standby to be primary
+
+      kubectl patch pg -n "${NAMESPACE}" source-cluster --type=merge -p '{"spec": {"pause": true}}'
+
+      # wait till source cluster is paused
+
+      until [[ $(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.state}') == "paused" ]]; do
+        sleep 5
+      done 
+
+      kubectl patch pg -n "${NAMESPACE}" standby-cluster --type=merge -p '{"spec":{"standby":{"enabled":false}}}'

@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myTable (id) VALUES (100501)' \
+        "$(get_psql_uri standby-cluster postgres)"
+
+      run_psql_local \
+        'CREATE DATABASE myapp2; \c myapp2 \\\ CREATE TABLE myTable2 (id int PRIMARY KEY) USING tde_heap;' \
+        "$(get_psql_uri standby-cluster postgres)"
+
+      run_psql_local \
+        '\c myapp2 \\\ INSERT INTO myTable2 (id) VALUES (200500)' \
+        "$(get_psql_uri standby-cluster postgres)"
+

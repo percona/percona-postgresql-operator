@@ -1,0 +1,27 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster_name="standby-cluster"
+
+      t=1
+      for i in $(kubectl get pods -n "${NAMESPACE}" |grep ${cluster_name}-instance| awk '{print $1}'); 
+        do echo $i
+        data=$(kubectl exec $i -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+        kubectl create configmap -n "${NAMESPACE}" 12-read-from-each-pod-${t} --from-literal=data="${data}"
+        t=$((t+1))
+      done
+
+      t=1
+      for i in $(kubectl get pods -n "${NAMESPACE}" |grep ${cluster_name}-instance| awk '{print $1}'); 
+        do echo $i
+        data=$(kubectl exec $i -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp2 -c "SELECT * from myTable2;"')
+        kubectl create configmap -n "${NAMESPACE}" 12-read-from-each-pod-${t}-2 --from-literal=data="${data}"
+        t=$((t+1))
+      done

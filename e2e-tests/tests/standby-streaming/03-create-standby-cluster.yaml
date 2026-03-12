@@ -13,6 +13,15 @@ commands:
         | yq eval '.spec.instances[0].sidecars = [{"name": "netshoot", "image": "docker.io/nicolaka/netshoot:latest", "command": ["sleep", "infinity"], "securityContext": {"capabilities": {"add": ["NET_ADMIN", "NET_RAW"]}, "privileged": false}, "resources": {"limits": {"cpu": "100m", "memory": "128Mi"}}}]' - \
         | yq eval ".spec.backups.pgbackrest.global.repo1-path = \"${repo_path}\"" - \
         | yq eval '.spec.standby.enabled = true' - \
-        | yq eval '.spec.standby.repoName = "repo1"' - \
+        | yq eval ".spec.standby.host = \"source-cluster-ha.${NAMESPACE}.svc.cluster.local\"" - \
         | yq eval '.spec.standby.maxAcceptableLag = "1Ki"' - \
+        | yq eval '.spec.secrets.customTLSSecret.name = "source-cluster-cluster-cert"' - \
+        | yq eval '.spec.secrets.customReplicationTLSSecret.name = "source-cluster-replication-cert"' - \
+        | yq '.spec.extensions.pg_tde.enabled = true' \
+        | yq '.spec.extensions.pg_tde.vault.host = "https://vault-service.vault-service.svc:8200"' \
+        | yq '.spec.extensions.pg_tde.vault.mountPath = "tde"' \
+        | yq '.spec.extensions.pg_tde.vault.tokenSecret.name = "vault-secret"' \
+        | yq '.spec.extensions.pg_tde.vault.tokenSecret.key = "token"' \
+        | yq '.spec.extensions.pg_tde.vault.caSecret.name = "vault-secret"' \
+        | yq '.spec.extensions.pg_tde.vault.caSecret.key = "ca.crt"' \
         | kubectl -n "${NAMESPACE}" apply -f -

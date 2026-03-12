@@ -1,0 +1,55 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 12-read-from-each-pod-1
+data:
+  data: |2-
+     100500
+     100501
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 12-read-from-each-pod-2
+data:
+  data: |2-
+     100500
+     100501
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 12-read-from-each-pod-3
+data:
+  data: |2-
+     100500
+     100501
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 12-read-from-each-pod-1-2
+data:
+  data: |2-
+     200500
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 12-read-from-each-pod-2-2
+data:
+  data: |2-
+     200500
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 12-read-from-each-pod-3-2
+data:
+  data: |2-
+     200500

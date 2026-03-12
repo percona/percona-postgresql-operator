@@ -1,15 +1,12 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 480
-command:
-  - script: |-
-      kubectl wait --for=jsonpath='{.metadata.annotations["pgv2.percona.com/replication-main-site"]}'="${NAMESPACE}"/source-cluster --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: standby-cluster
+    postgres-operator.crunchydata.com/cluster: source-cluster
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
@@ -17,7 +14,7 @@ metadata:
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
-    name: standby-cluster
+    name: source-cluster
 status:
   availableReplicas: 1
   currentReplicas: 1
@@ -28,14 +25,14 @@ status:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: standby-cluster-pgbouncer
+  name: source-cluster-pgbouncer
   labels:
-    postgres-operator.crunchydata.com/cluster: standby-cluster
+    postgres-operator.crunchydata.com/cluster: source-cluster
     postgres-operator.crunchydata.com/role: pgbouncer
   ownerReferences:
     - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
-      name: standby-cluster
+      name: source-cluster
       controller: true
       blockOwnerDeletion: true
 status:
@@ -44,14 +41,30 @@ status:
   updatedReplicas: 3
   readyReplicas: 3
 ---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: source-cluster
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: standby-cluster
+  name: source-cluster
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: standby-cluster
+      name: source-cluster
       controller: true
       blockOwnerDeletion: true
   finalizers:
@@ -66,6 +79,7 @@ status:
   pgbackrest:
     repos:
       - name: repo1
+        stanzaCreated: true
   proxy:
     pgBouncer:
       readyReplicas: 3
@@ -74,7 +88,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: standby-cluster
+  name: source-cluster
 status:
   pgbouncer:
     ready: 3
