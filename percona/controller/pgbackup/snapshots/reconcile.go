@@ -3,13 +3,17 @@ package snapshots
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	merr "github.com/hashicorp/go-multierror"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,6 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
@@ -29,6 +34,8 @@ const (
 
 	defaultSnapshotErrorDeadline = 5 * time.Minute
 )
+
+var errVolumeSnapshotFailed = errors.New("volume snapshot failed")
 
 type snapshotExecutor interface {
 	// Prepare the cluster for performing a snapshot.
@@ -149,6 +156,15 @@ func (r *snapshotReconciler) reconcileNew(ctx context.Context) (reconcile.Result
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
+	acquired, err := r.tryAcquireLease(ctx)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to acquire lease")
+	}
+	if !acquired {
+		r.log.Info("Backup lock is held by another backup")
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
 	if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupStarting
 		bcp.Status.BackupType = v2.PGBackupTypeSnapshot
@@ -181,19 +197,40 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 		return reconcile.Result{}, errors.Wrap(err, "failed to get target PVCs")
 	}
 
+	// Gather VolumeSnapshot errors from all and report it at once in the status
+	// while failing the backup.
+	var snapshotErrors error
+
 	dataOk, err := r.reconcileDataSnapshot(ctx, dataPVC)
-	if err != nil {
+	if errors.Is(err, errVolumeSnapshotFailed) {
+		snapshotErrors = merr.Append(snapshotErrors, err)
+	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile data snapshot")
 	}
 
 	walOk, err := r.reconcileWALSnapshot(ctx, walPVC)
-	if err != nil {
+	if errors.Is(err, errVolumeSnapshotFailed) {
+		snapshotErrors = merr.Append(snapshotErrors, err)
+	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile WAL snapshot")
 	}
 
 	tablespaceOk, err := r.reconcileTablespaceSnapshot(ctx, tablespacePVCs)
-	if err != nil {
+	if errors.Is(err, errVolumeSnapshotFailed) {
+		snapshotErrors = merr.Append(snapshotErrors, err)
+	} else if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile tablespace snapshot")
+	}
+
+	if snapshotErrors != nil {
+		if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
+			bcp.Status.State = v2.BackupFailed
+			bcp.Status.Error = fmt.Sprintf("one or more snapshots failed: %s", snapshotErrors)
+			bcp.Status.CompletedAt = ptr.To(metav1.Now())
+		}); updErr != nil {
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
+		}
+		return reconcile.Result{}, errors.Wrap(errVolumeSnapshotFailed, snapshotErrors.Error())
 	}
 
 	if !dataOk || !walOk || !tablespaceOk {
@@ -248,7 +285,7 @@ func (r *snapshotReconciler) reconcileSnapshot(ctx context.Context, volumeSnapsh
 			return false, nil
 		}
 
-		err := errors.New(message)
+		err := errors.Wrap(errVolumeSnapshotFailed, fmt.Sprintf("VolumeSnapshot %s failed: %s", volumeSnapshot.GetName(), message))
 
 		log.Error(err, "Volume snapshot failed")
 		return false, err
@@ -480,6 +517,11 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 		return errors.Wrap(err, "finalize failed")
 	}
 
+	// release lease
+	if err := k8s.ReleaseLease(ctx, r.cl, r.backupLeaseName(), r.backupLeaseHolder(), r.cluster.GetNamespace()); err != nil {
+		return errors.Wrap(err, "failed to release lease")
+	}
+
 	// remove finalizer
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		bcp := r.backup.DeepCopy()
@@ -493,4 +535,56 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 		return errors.Wrap(err, "failed to remove finalizer")
 	}
 	return nil
+}
+
+func (r *snapshotReconciler) backupLeaseName() string {
+	return "pg-" + r.cluster.GetName() + "-backup-lock"
+}
+
+func (r *snapshotReconciler) backupLeaseHolder() string {
+	return fmt.Sprintf("%s|%s", r.backup.GetName(), r.backup.GetUID())
+}
+
+func (r *snapshotReconciler) parseBackupLeaseHolder(holder string) (string, types.UID) {
+	parts := strings.Split(holder, "|")
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], types.UID(parts[1])
+}
+
+func (r *snapshotReconciler) tryAcquireLease(ctx context.Context) (bool, error) {
+	leaseName := r.backupLeaseName()
+	leaseHolderID := r.backupLeaseHolder()
+
+	checkStale := func(ctx context.Context, currentHolder string) (bool, error) {
+		backupName, backupUID := r.parseBackupLeaseHolder(currentHolder)
+		if backupName == "" || backupUID == "" {
+			r.log.Info("Backup lease holder is malformed, acquiring lease anyway")
+			return true, nil
+		}
+
+		backup := &v2.PerconaPGBackup{}
+		if err := r.cl.Get(ctx, client.ObjectKey{Name: backupName, Namespace: r.cluster.GetNamespace()}, backup); k8serrors.IsNotFound(err) {
+			return true, nil
+		} else if err != nil {
+			return false, errors.Wrap(err, "failed to get backup")
+		} else if backup.GetUID() != backupUID {
+			// We found a backup with the same name, but different UID.
+			// So this isn't the same backup that was holding the lease.
+			return true, nil
+		}
+
+		// We found the backup that holds the lease. Check if it has completed fully before we acquire the lease.
+		return (backup.Status.State == v2.BackupFailed || backup.Status.State == v2.BackupSucceeded) &&
+			!controllerutil.ContainsFinalizer(backup, pNaming.FinalizerSnapshotInProgress), nil
+	}
+
+	if err := k8s.AcquireLease(ctx, r.cl, leaseName, leaseHolderID, r.cluster.GetNamespace(), checkStale); err != nil {
+		if errors.Is(err, k8s.ErrLeaseAlreadyHeld) || k8serrors.IsAlreadyExists(err) || k8serrors.IsConflict(err) {
+			return false, nil
+		}
+		return false, errors.Wrap(err, "failed to acquire lease")
+	}
+	return true, nil
 }

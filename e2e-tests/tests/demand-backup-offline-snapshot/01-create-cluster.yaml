@@ -8,7 +8,12 @@ commands:
 
       source ../../functions
       
+      snapshot_class='gke-snapshot-class'
+      platform=$(detect_k8s_platform)
+      if [[ "$platform" == "digitalocean" ]]; then
+        snapshot_class='do-block-storage'
+      fi
       get_cr "backup-snapshot" ${RANDOM} \
-        | yq '.spec.backups.volumeSnapshots.className="gke-snapshot-class"' \
+        | yq ".spec.backups.volumeSnapshots.className=\"$snapshot_class\"" \
         | yq '.spec.backups.volumeSnapshots.mode="offline"' \
         | kubectl -n "${NAMESPACE}" apply -f -
