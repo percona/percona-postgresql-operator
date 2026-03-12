@@ -169,14 +169,14 @@ func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.Per
 		if err == nil {
 			return lag, nil
 		}
-		errs = multierror.Append(errs, fmt.Errorf("get lag from streaming host: %w", err))
+		errs = multierror.Append(errs, errors.Errorf("get lag from streaming host: %w", err))
 		logging.FromContext(ctx).V(1).Info("Failed to get lag from streaming host, falling back to main site", "error", err)
 		// Fallthrough so we can try getting lag from main site
 	}
 
 	lag, err := r.getLagFromMainSite(ctx, standby)
 	if err != nil {
-		return 0, multierror.Append(errs, fmt.Errorf("get lag from main site: %w", err))
+		return 0, multierror.Append(errs, errors.Errorf("get lag from main site: %w", err))
 	}
 	return lag, nil
 }
