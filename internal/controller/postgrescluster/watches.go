@@ -20,27 +20,19 @@ import (
 // watchCertManagerSecrets returns a handler.EventHandler for cert-manager-issued
 // Secrets. These Secrets are owned by Certificate resources (not PostgresCluster),
 // so they are not covered by Owns(&corev1.Secret{}).
-func (*Reconciler) watchCertManagerSecrets() handler.Funcs {
-	enqueue := func(obj client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (*Reconciler) watchCertManagerSecrets() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		cluster := obj.GetLabels()[naming.LabelCluster]
-		if len(cluster) != 0 {
-			q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
-				Namespace: obj.GetNamespace(),
-				Name:      cluster,
-			}})
+		if len(cluster) > 0 {
+			return []reconcile.Request{
+				{NamespacedName: client.ObjectKey{
+					Namespace: obj.GetNamespace(),
+					Name:      cluster,
+				}},
+			}
 		}
-	}
-	return handler.Funcs{
-		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			enqueue(e.Object, q)
-		},
-		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			enqueue(e.ObjectNew, q)
-		},
-		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			enqueue(e.Object, q)
-		},
-	}
+		return nil
+	})
 }
 
 // watchPods returns a handler.EventHandler for Pods.
