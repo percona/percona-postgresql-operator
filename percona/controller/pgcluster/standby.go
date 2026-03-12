@@ -79,17 +79,12 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 			Reason:  "ErrorGettingLag",
 			Message: err.Error(),
 		}
-		defer func() {
-			meta.SetStatusCondition(&cr.Status.Conditions, cond)
-		}()
 
 		if errors.Is(err, ErrPrimaryPodNotFound) {
 			cond.Message = "Cannot find primary for replication lag calculation"
-			return nil
 		}
 		if errors.Is(err, ErrInvalidLagQueryOutput) {
 			cond.Message = "Invalid output from lag query. The WAL receiver is probably not active"
-			return nil
 		}
 
 		// If the standby was previously lagging, we should mark the pod as ready again since now
@@ -99,8 +94,8 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 				return errors.Wrap(err, "set pod replication readiness signal")
 			}
 		}
-
-		return errors.Wrap(err, "calculate replication lag bytes")
+		meta.SetStatusCondition(&cr.Status.Conditions, cond)
+		return nil
 	}
 
 	maxLag := cr.Spec.Standby.MaxAcceptableLag.AsDec().UnscaledBig().Int64()
