@@ -598,8 +598,9 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 	}
 	if certManagerExists {
 		certManagerSecretPredicate := builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-			_, ok := obj.GetAnnotations()["cert-manager.io/certificate-name"]
-			return ok
+			_, hasCluster := obj.GetLabels()[naming.LabelCluster]
+			_, hasCertAnnotation := obj.GetAnnotations()["cert-manager.io/certificate-name"]
+			return hasCluster && hasCertAnnotation
 		}))
 		bldr.Owns(&cmv1.Certificate{}).
 			Owns(&cmv1.Issuer{}).

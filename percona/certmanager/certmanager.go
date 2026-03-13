@@ -183,7 +183,9 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
-			Labels:    cluster.Labels,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster: cluster.Name,
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: certName,
@@ -250,6 +252,10 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster:            cluster.Name,
+				naming.LabelClusterCertificate: "postgres-tls",
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: certName,
@@ -324,6 +330,10 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster:  cluster.Name,
+				naming.LabelInstance: instanceName,
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretName,
@@ -402,6 +412,10 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster: cluster.Name,
+				naming.LabelRole:    naming.RolePGBouncer,
+			}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretMeta.Name + "-frontend-tls",
@@ -473,6 +487,9 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster: cluster.Name,
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretMeta.Name,
@@ -541,6 +558,9 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster: cluster.Name,
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretMeta.Name,

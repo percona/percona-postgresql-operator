@@ -280,6 +280,9 @@ func TestApplyCACertificate(t *testing.T) {
 		assert.Equal(t, 256, cert.Spec.PrivateKey.Size)
 		assert.Equal(t, v1.RotationPolicyNever, cert.Spec.PrivateKey.RotationPolicy)
 
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
@@ -338,6 +341,10 @@ func TestApplyClusterCertificate(t *testing.T) {
 		assert.NotEmpty(t, cert.Spec.SecretTemplate.Labels)
 		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
 		assert.Equal(t, "postgres-tls", cert.Spec.SecretTemplate.Labels[naming.LabelClusterCertificate])
+
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.Equal(t, "postgres-tls", cert.Labels[naming.LabelClusterCertificate])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
 
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
@@ -398,6 +405,10 @@ func TestApplyInstanceCertificate(t *testing.T) {
 		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
 		assert.Equal(t, instanceName, cert.Spec.SecretTemplate.Labels[naming.LabelInstance])
 
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.Equal(t, instanceName, cert.Labels[naming.LabelInstance])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
@@ -456,6 +467,10 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		assert.NotNil(t, cert.Spec.SecretTemplate)
 		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
 		assert.Equal(t, naming.RolePGBouncer, cert.Spec.SecretTemplate.Labels[naming.LabelRole])
+
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.Equal(t, naming.RolePGBouncer, cert.Labels[naming.LabelRole])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
 
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
@@ -533,6 +548,9 @@ func TestApplyPGBackRestRepoCertificate(t *testing.T) {
 		assert.NotNil(t, cert.Spec.Duration)
 		assert.Equal(t, DefaultCertDuration, cert.Spec.Duration.Duration)
 
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
@@ -573,6 +591,52 @@ func TestApplyPGBackRestRepoCertificate(t *testing.T) {
 		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, []string{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "dnsNames cannot be empty")
+	})
+}
+
+func TestApplyPGBackRestClientCertificate(t *testing.T) {
+	t.Run("create pgbackrest client certificate successfully", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-client-cert-test"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := cluster.Name + "-pgbackrest-client-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+
+		assert.Equal(t, certName, cert.Name)
+		assert.Equal(t, cluster.Namespace, cert.Namespace)
+		assert.Equal(t, naming.PGBackRestClientCertSecret(cluster).Name, cert.Spec.SecretName)
+		assert.Equal(t, "pgbackrest@"+string(cluster.GetUID()), cert.Spec.CommonName)
+		assert.Equal(t, naming.TLSIssuer(cluster).Name, cert.Spec.IssuerRef.Name)
+		assert.Equal(t, v1.IssuerKind, cert.Spec.IssuerRef.Kind)
+		assert.NotNil(t, cert.Spec.Duration)
+		assert.Equal(t, DefaultCertDuration, cert.Spec.Duration.Duration)
+
+		assert.Contains(t, cert.Spec.Usages, v1.UsageClientAuth)
+		assert.Contains(t, cert.Spec.Usages, v1.UsageDigitalSignature)
+		assert.Contains(t, cert.Spec.Usages, v1.UsageKeyEncipherment)
+
+		assert.NotNil(t, cert.Spec.SecretTemplate)
+		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
+
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
+		require.Len(t, cert.OwnerReferences, 1)
+		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
+
+		// return nil when certificate already exists
+		err = ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster)
+		require.NoError(t, err)
 	})
 }
 
