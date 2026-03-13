@@ -285,6 +285,12 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 		`  END" && sleep 1) ||:`,
 		`done`,
 
+		`touch ${PGDATA}/sleep-forever`,
+		`until [[ ! -f ${PGDATA}/sleep-forever ]]; do`,
+		`  echo "waiting ${PGDATA}/sleep-forever to be removed"`,
+		`  sleep 1`,
+		`done`,
+
 		// Replay is done. Stop Postgres gracefully and move the data directory
 		// into position for our Patroni bootstrap method.
 		`pg_ctl stop --silent --wait`,
