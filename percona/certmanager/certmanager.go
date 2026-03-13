@@ -31,6 +31,8 @@ type Controller interface {
 	ApplyClusterCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 	ApplyInstanceCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, instanceName string, dnsNames []string) error
 	ApplyPGBouncerCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
+	ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
+	ApplyPGBackRestRepoCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 }
 
 const (
@@ -159,25 +161,31 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
 	certName := naming.PostgresRootCASecret(cluster).Name
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get CA certificate")
-	}
-
 	caDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CAValidityDuration != nil {
 		caDuration = cluster.Spec.TLS.CAValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == caDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: caDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update ca certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get CA certificate")
 	}
 
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
-			Labels:    cluster.Labels,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster: cluster.Name,
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: certName,
@@ -193,6 +201,11 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 				Algorithm:      v1.ECDSAKeyAlgorithm,
 				Size:           256,
 				RotationPolicy: v1.RotationPolicyNever,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster: cluster.Name,
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 			},
 		},
 	}
@@ -217,24 +230,32 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 
 	certName := naming.PostgresTLSSecret(cluster).Name
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get cluster certificate")
-	}
-
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
 		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update cluster certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get cluster certificate")
 	}
 
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster:            cluster.Name,
+				naming.LabelClusterCertificate: "postgres-tls",
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: certName,
@@ -287,24 +308,32 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 	certName := instanceName + "-cert"
 	secretName := instanceName + "-certs"
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get instance certificate")
-	}
-
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
 		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update instance certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get instance certificate")
 	}
 
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster:  cluster.Name,
+				naming.LabelInstance: instanceName,
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretName,
@@ -356,28 +385,41 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 	secretMeta := naming.ClusterPGBouncer(cluster)
 	certName := cluster.Name + "-pgbouncer-cert"
 
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
 	existing := &v1.Certificate{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
-		return nil
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update pgbouncer certificate")
 	}
 	if !k8serrors.IsNotFound(err) {
 		return errors.Wrap(err, "failed to get pgbouncer certificate")
 	}
 
-	certDuration := DefaultCertDuration
-	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
-		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	clusterName := cluster.Name
+	if len(clusterName) > 54 {
+		clusterName = clusterName[:54]
 	}
 
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
 			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster: cluster.Name,
+				naming.LabelRole:    naming.RolePGBouncer,
+			}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretMeta.Name + "-frontend-tls",
-			CommonName: cluster.Name + "-pgbouncer",
+			CommonName: clusterName + "-pgbouncer",
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.IssuerReference{
 				Name: naming.TLSIssuer(cluster).Name,
@@ -411,6 +453,149 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 
 	if err := c.cl.Create(ctx, cert); err != nil {
 		return errors.Wrap(err, "failed to create pgbouncer certificate")
+	}
+
+	return nil
+}
+
+// ApplyPGBackRestClientCertificate creates a cert-manager Certificate resource
+// for the pgBackRest client used by all PostgreSQL instances to connect to the
+// repository host.
+func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	secretMeta := naming.PGBackRestClientCertSecret(cluster)
+	certName := cluster.Name + "-pgbackrest-client-cert"
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get pgbackrest client certificate")
+	}
+
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	// The common name must match what pgBackRest expects in its tls-server-auth option.
+	// All instances in the cluster share a single client certificate identified by cluster UID.
+	commonName := "pgbackrest@" + string(cluster.GetUID())
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster: cluster.Name,
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: secretMeta.Name,
+			CommonName: commonName,
+			DNSNames:   []string{commonName},
+			IssuerRef: cmmeta.IssuerReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: certDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
+			},
+			Usages: []v1.KeyUsage{
+				v1.UsageClientAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster: cluster.Name,
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	if err := c.cl.Create(ctx, cert); err != nil {
+		return errors.Wrap(err, "failed to create pgbackrest client certificate")
+	}
+
+	return nil
+}
+
+// ApplyPGBackRestRepoCertificate creates a cert-manager Certificate resource
+// for the pgBackRest repository host server.
+func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error {
+	if len(dnsNames) == 0 {
+		return errors.New("dnsNames cannot be empty")
+	}
+
+	secretMeta := naming.PGBackRestRepoCertSecret(cluster)
+	certName := cluster.Name + "-pgbackrest-repo-cert"
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get pgbackrest repo certificate")
+	}
+
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster: cluster.Name,
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: secretMeta.Name,
+			CommonName: cluster.Name + "-pgbackrest-repo",
+			DNSNames:   dnsNames,
+			IssuerRef: cmmeta.IssuerReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: certDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
+			},
+			Usages: []v1.KeyUsage{
+				v1.UsageServerAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster: cluster.Name,
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	if err := c.cl.Create(ctx, cert); err != nil {
+		return errors.Wrap(err, "failed to create pgbackrest repo certificate")
 	}
 
 	return nil

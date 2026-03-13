@@ -280,6 +280,9 @@ func TestApplyCACertificate(t *testing.T) {
 		assert.Equal(t, 256, cert.Spec.PrivateKey.Size)
 		assert.Equal(t, v1.RotationPolicyNever, cert.Spec.PrivateKey.RotationPolicy)
 
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
@@ -338,6 +341,10 @@ func TestApplyClusterCertificate(t *testing.T) {
 		assert.NotEmpty(t, cert.Spec.SecretTemplate.Labels)
 		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
 		assert.Equal(t, "postgres-tls", cert.Spec.SecretTemplate.Labels[naming.LabelClusterCertificate])
+
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.Equal(t, "postgres-tls", cert.Labels[naming.LabelClusterCertificate])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
 
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
@@ -398,6 +405,10 @@ func TestApplyInstanceCertificate(t *testing.T) {
 		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
 		assert.Equal(t, instanceName, cert.Spec.SecretTemplate.Labels[naming.LabelInstance])
 
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.Equal(t, instanceName, cert.Labels[naming.LabelInstance])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
@@ -446,6 +457,7 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		assert.Equal(t, cluster.Namespace, cert.Namespace)
 		assert.Equal(t, cluster.Name+"-pgbouncer-frontend-tls", cert.Spec.SecretName)
 		assert.Equal(t, cluster.Name+"-pgbouncer", cert.Spec.CommonName)
+		assert.LessOrEqual(t, len(cert.Spec.CommonName), 64)
 		assert.Equal(t, dnsNames, cert.Spec.DNSNames)
 		assert.Equal(t, naming.TLSIssuer(cluster).Name, cert.Spec.IssuerRef.Name)
 		assert.Equal(t, v1.IssuerKind, cert.Spec.IssuerRef.Kind)
@@ -456,12 +468,36 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
 		assert.Equal(t, naming.RolePGBouncer, cert.Spec.SecretTemplate.Labels[naming.LabelRole])
 
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.Equal(t, naming.RolePGBouncer, cert.Labels[naming.LabelRole])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
 		require.Len(t, cert.OwnerReferences, 1)
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
 		// return nil when pgbouncer certificate already exists
 		err = ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames)
 		require.NoError(t, err)
+	})
+
+	t.Run("commonName does not exceed 64 bytes", func(t *testing.T) {
+		cluster3 := testCluster()
+		cluster3.Name = "a-very-long-cluster-name-that-exceeds-fifty-four-characters-xx"
+		client3 := setupFakeClient(t, cluster3)
+		ctrl3 := NewController(client3, client3.Scheme(), false)
+
+		dnsNames := []string{cluster3.Name + "-pgbouncer.test-namespace.svc"}
+		err := ctrl3.ApplyPGBouncerCertificate(t.Context(), cluster3, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client3.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster3.Namespace,
+			Name:      cluster3.Name + "-pgbouncer-cert",
+		}, cert)
+		require.NoError(t, err)
+
+		assert.LessOrEqual(t, len(cert.Spec.CommonName), 64)
 	})
 
 	t.Run("fail with empty dnsNames", func(t *testing.T) {
@@ -473,6 +509,248 @@ func TestApplyPGBouncerCertificate(t *testing.T) {
 		err := ctrl2.ApplyPGBouncerCertificate(t.Context(), cluster2, []string{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "dnsNames cannot be empty")
+	})
+}
+
+func TestApplyPGBackRestRepoCertificate(t *testing.T) {
+	t.Run("create pgbackrest repo certificate successfully", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-repo-cert-test"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{
+			"pgbackrest-repo-cert-test-repo-host-0.pgbackrest-repo-cert-test-pgbackrest.test-namespace.svc.cluster.local",
+			"pgbackrest-repo-cert-test-repo-host-0.pgbackrest-repo-cert-test-pgbackrest.test-namespace.svc",
+			"pgbackrest-repo-cert-test-repo-host-0.pgbackrest-repo-cert-test-pgbackrest.test-namespace",
+			"pgbackrest-repo-cert-test-repo-host-0.pgbackrest-repo-cert-test-pgbackrest",
+		}
+
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := cluster.Name + "-pgbackrest-repo-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+
+		assert.Equal(t, certName, cert.Name)
+		assert.Equal(t, cluster.Namespace, cert.Namespace)
+		assert.Equal(t, cluster.Name+"-pgbackrest-repo-tls", cert.Spec.SecretName)
+		assert.Equal(t, cluster.Name+"-pgbackrest-repo", cert.Spec.CommonName)
+		assert.LessOrEqual(t, len(cert.Spec.CommonName), 64)
+		assert.Equal(t, dnsNames, cert.Spec.DNSNames)
+		assert.Equal(t, naming.TLSIssuer(cluster).Name, cert.Spec.IssuerRef.Name)
+		assert.Equal(t, v1.IssuerKind, cert.Spec.IssuerRef.Kind)
+		assert.NotNil(t, cert.Spec.Duration)
+		assert.Equal(t, DefaultCertDuration, cert.Spec.Duration.Duration)
+
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
+		require.Len(t, cert.OwnerReferences, 1)
+		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
+
+		// return nil when certificate already exists
+		err = ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+	})
+
+	t.Run("commonName does not exceed 64 bytes for long cluster names", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "long-cluster-name-that-makes-fqdn-too-long"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{
+			cluster.Name + "-repo-host-0." + cluster.Name + "-pgbackrest.test-namespace.svc.cluster.local",
+		}
+
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-pgbackrest-repo-cert",
+		}, cert)
+		require.NoError(t, err)
+
+		assert.LessOrEqual(t, len(cert.Spec.CommonName), 64)
+	})
+
+	t.Run("fail with empty dnsNames", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-repo-cert-test-2"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, []string{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dnsNames cannot be empty")
+	})
+}
+
+func TestApplyPGBackRestClientCertificate(t *testing.T) {
+	t.Run("create pgbackrest client certificate successfully", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-client-cert-test"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := cluster.Name + "-pgbackrest-client-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+
+		assert.Equal(t, certName, cert.Name)
+		assert.Equal(t, cluster.Namespace, cert.Namespace)
+		assert.Equal(t, naming.PGBackRestClientCertSecret(cluster).Name, cert.Spec.SecretName)
+		assert.Equal(t, "pgbackrest@"+string(cluster.GetUID()), cert.Spec.CommonName)
+		assert.Equal(t, naming.TLSIssuer(cluster).Name, cert.Spec.IssuerRef.Name)
+		assert.Equal(t, v1.IssuerKind, cert.Spec.IssuerRef.Kind)
+		assert.NotNil(t, cert.Spec.Duration)
+		assert.Equal(t, DefaultCertDuration, cert.Spec.Duration.Duration)
+
+		assert.Contains(t, cert.Spec.Usages, v1.UsageClientAuth)
+		assert.Contains(t, cert.Spec.Usages, v1.UsageDigitalSignature)
+		assert.Contains(t, cert.Spec.Usages, v1.UsageKeyEncipherment)
+
+		assert.NotNil(t, cert.Spec.SecretTemplate)
+		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
+
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
+		require.Len(t, cert.OwnerReferences, 1)
+		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
+
+		// return nil when certificate already exists
+		err = ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+	})
+}
+
+func TestUpdateCertificateDuration(t *testing.T) {
+	initialDuration := 2160 * time.Hour    // 90 days
+	updatedDuration := 4320 * time.Hour    // 180 days
+	updatedCADuration := 52560 * time.Hour // 6 years
+
+	t.Run("CA certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-ca-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CAValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CAValidityDuration = &metav1.Duration{Duration: updatedCADuration}
+		err = ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresRootCASecret(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      secretName.Name,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedCADuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("cluster certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-cluster-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"update-cluster-dur-primary.test-namespace.svc"}
+		err := ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresTLSSecret(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      secretName.Name,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("instance certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-inst-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		instanceName := "update-inst-dur-instance-0"
+		dnsNames := []string{instanceName + ".test-namespace.svc"}
+		err := ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := instanceName + "-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("pgbouncer certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-pgb-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"update-pgb-dur-pgbouncer.test-namespace.svc"}
+		err := ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := cluster.Name + "-pgbouncer-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
 	})
 }
 
