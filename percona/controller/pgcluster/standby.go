@@ -170,6 +170,7 @@ func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.Per
 		if err == nil {
 			return lag, nil
 		}
+		log.Error(err, "Failed to get lag from streaming host")
 
 		// Fallthrough to pgbackrest repo only if configured
 		if standby.Spec.Standby.RepoName == "" {
@@ -177,7 +178,6 @@ func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.Per
 		}
 
 		errs = multierror.Append(errs, errors.Wrap(err, "get lag from streaming host"))
-		log.Error(err, "Failed to get lag from streaming host")
 		log.Info("Falling back to using pgbackrest repo for lag calculation")
 	}
 
