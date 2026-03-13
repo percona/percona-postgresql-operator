@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/cert-manager/cert-manager v1.19.4
 	github.com/go-logr/logr v1.4.3
-	github.com/go-openapi/errors v0.22.6
+	github.com/go-openapi/errors v0.22.7
 	github.com/go-openapi/runtime v0.29.2
 	github.com/go-openapi/strfmt v0.25.0
 	github.com/go-openapi/swag v0.25.5
