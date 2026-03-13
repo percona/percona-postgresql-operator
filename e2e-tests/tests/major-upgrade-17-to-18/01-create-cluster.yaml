@@ -1,0 +1,24 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      postgres_image=$(get_container_image "postgres" 17)
+      pgbouncer_image=$(get_container_image "pgbouncer" 17)
+      pgbackrest_image=$(get_container_image "pgbackrest" 17)
+
+      get_cr \
+        | yq eval "
+          .spec.postgresVersion = 17 |
+          .spec.image = \"${postgres_image}\" |
+          .spec.instances[0].dataVolumeClaimSpec.resources.requests.storage = \"3Gi\" |
+          .spec.proxy.pgBouncer.image = \"${pgbouncer_image}\" |
+          .spec.backups.pgbackrest.image = \"${pgbackrest_image}\" |
+          .spec.patroni.dynamicConfiguration.postgresql.parameters.shared_preload_libraries = \"pg_cron\" |
+          .spec.extensions.custom += [{\"name\": \"pg_cron\", \"version\": \"1.6.6\"}]" \
+        | kubectl -n "${NAMESPACE}" apply -f -
