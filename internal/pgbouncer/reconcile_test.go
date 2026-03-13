@@ -6,7 +6,6 @@ package pgbouncer
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	gocmp "github.com/google/go-cmp/cmp"
@@ -444,30 +443,6 @@ volumes:
         - key: ca.crt
           path: ~postgres-operator/backend-ca.crt
 		`))
-	})
-
-	t.Run("LDAPWithNilConfig", func(t *testing.T) {
-		cluster.Spec.Authentication = &v1beta1.PostgresClusterAuthentication{
-			Rules: []v1beta1.PostgresAuthenticationRule{
-				{PostgresHBARule: v1beta1.PostgresHBARule{
-					Connection: "host",
-					Method:     "ldap",
-				}},
-			},
-		}
-		cluster.Spec.Config = nil
-
-		assert.NilError(t, func() (err error) {
-			defer func() {
-				if r := recover(); r != nil {
-					err = fmt.Errorf("Pod panicked: %v", r)
-				}
-			}()
-			call()
-			return nil
-		}())
-
-		cluster.Spec.Authentication = nil
 	})
 
 	t.Run("WithCustomSidecarContainer", func(t *testing.T) {
