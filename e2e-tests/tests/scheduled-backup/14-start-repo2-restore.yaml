@@ -11,10 +11,10 @@ commands:
       apiVersion: pgv2.percona.com/v2
       kind: PerconaPGRestore
       metadata:
-        name: azure-restore
+        name: repo2-restore
       spec:
         pgCluster: scheduled-backup
-        repoName: repo3
+        repoName: repo2
         options:
         - --type=time
         - --target="$(kubectl -n ${NAMESPACE} get configmap pitr-target --template={{.data.pitr}})"
