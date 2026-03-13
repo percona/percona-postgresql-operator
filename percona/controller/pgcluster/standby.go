@@ -84,7 +84,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 			cond.Message = "Cannot find primary for replication lag calculation"
 		}
 		if errors.Is(err, ErrInvalidLagQueryOutput) {
-			cond.Message = "Invalid output from lag query. The WAL receiver is probably not active"
+			cond.Message = "Invalid output from lag query. The WAL receiver may not be active"
 		}
 
 		// If the standby was previously lagging, we should mark the pod as ready again since now
@@ -164,6 +164,7 @@ func (r *PGClusterReconciler) setPodReplicationLagSignal(
 
 func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
 	var errs error
+	log := logging.FromContext(ctx)
 	if standby.Spec.Standby.Host != "" {
 		lag, err := r.getLagFromStreamingHost(ctx, standby)
 		if err == nil {
@@ -176,11 +177,13 @@ func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.Per
 		}
 
 		errs = multierror.Append(errs, errors.Wrap(err, "get lag from streaming host"))
-		logging.FromContext(ctx).V(1).Info("Failed to get lag from streaming host, falling back to using pgbackrest repo", "error", err)
+		log.Error(err, "Failed to get lag from streaming host")
+		log.Info("Falling back to using pgbackrest repo for lag calculation")
 	}
 
 	lag, err := r.getLagFromMainSite(ctx, standby)
 	if err != nil {
+		log.Error(err, "Failed to get lag from main site")
 		return 0, multierror.Append(errs, errors.Wrap(err, "get lag from main site"))
 	}
 	return lag, nil
