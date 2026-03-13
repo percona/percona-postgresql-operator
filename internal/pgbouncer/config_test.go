@@ -15,6 +15,7 @@ import (
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
@@ -199,6 +200,140 @@ func TestPodConfigFiles(t *testing.T) {
       path: ~postgres-operator/users.txt
     name: some-shh
 		`))
+	})
+}
+
+func TestPgbouncerHBAFileContents(t *testing.T) {
+	t.Parallel()
+
+	cluster := new(v1beta1.PostgresCluster)
+
+	t.Run("NoAuthentication", func(t *testing.T) {
+		cluster.Spec.Authentication = nil
+		result := pgbouncerHBAFileContents(cluster)
+		assert.Equal(t, result, "host all all all scram-sha-256\n")
+	})
+
+	t.Run("EmptyRules", func(t *testing.T) {
+		cluster.Spec.Authentication = &v1beta1.PostgresClusterAuthentication{}
+		result := pgbouncerHBAFileContents(cluster)
+		assert.Equal(t, result, "host all all all scram-sha-256\n")
+	})
+
+	t.Run("NonLDAPRuleSkipped", func(t *testing.T) {
+		cluster.Spec.Authentication = &v1beta1.PostgresClusterAuthentication{
+			Rules: []v1beta1.PostgresAuthenticationRule{
+				{PostgresHBARule: v1beta1.PostgresHBARule{
+					Connection: "host",
+					Method:     "scram-sha-256",
+				}},
+			},
+		}
+		result := pgbouncerHBAFileContents(cluster)
+		assert.Equal(t, result, "host all all all scram-sha-256\n")
+	})
+
+	t.Run("RawHBANonLDAPSkipped", func(t *testing.T) {
+		cluster.Spec.Authentication = &v1beta1.PostgresClusterAuthentication{
+			Rules: []v1beta1.PostgresAuthenticationRule{
+				{HBA: "host all all all md5"},
+			},
+		}
+		result := pgbouncerHBAFileContents(cluster)
+		assert.Equal(t, result, "host all all all scram-sha-256\n")
+	})
+
+	t.Run("RawHBALDAPIncluded", func(t *testing.T) {
+		cluster.Spec.Authentication = &v1beta1.PostgresClusterAuthentication{
+			Rules: []v1beta1.PostgresAuthenticationRule{
+				{
+					HBA:             "host all all all ldap ldapserver=ldap.example.com",
+					PostgresHBARule: v1beta1.PostgresHBARule{Method: "ldap"},
+				},
+			},
+		}
+		result := pgbouncerHBAFileContents(cluster)
+		assert.Equal(t, result,
+			"host all all all ldap ldapserver=ldap.example.com\nhost all all all scram-sha-256\n")
+	})
+
+	t.Run("StructuredLDAPRule", func(t *testing.T) {
+		cluster.Spec.Authentication = &v1beta1.PostgresClusterAuthentication{
+			Rules: []v1beta1.PostgresAuthenticationRule{
+				{PostgresHBARule: v1beta1.PostgresHBARule{
+					Connection: "hostssl",
+					Method:     "ldap",
+					Databases:  []string{"mydb"},
+					Users:      []string{"myuser"},
+					Options: map[string]intstr.IntOrString{
+						"ldapserver": intstr.FromString("ldap.example.com"),
+						"ldapport":   intstr.FromInt32(389),
+					},
+				}},
+			},
+		}
+		result := pgbouncerHBAFileContents(cluster)
+		assert.Assert(t, strings.HasSuffix(result, "\nhost all all all scram-sha-256\n"))
+		assert.Assert(t, strings.HasPrefix(result, "hostssl"))
+		assert.Assert(t, strings.Contains(result, "mydb"))
+		assert.Assert(t, strings.Contains(result, "myuser"))
+		assert.Assert(t, strings.Contains(result, "ldap"))
+		assert.Assert(t, strings.Contains(result, "ldapport"))
+		assert.Assert(t, strings.Contains(result, "389"))
+		assert.Assert(t, strings.Contains(result, "ldapserver"))
+		assert.Assert(t, strings.Contains(result, "ldap.example.com"))
+	})
+
+	t.Run("StructuredLDAPAllConnectionTypes", func(t *testing.T) {
+		for _, tc := range []struct {
+			connection string
+			wantPrefix string
+		}{
+			{"hostssl", "hostssl"},
+			{"hostnossl", "hostnossl"},
+			{"local", "local"},
+			{"host", "host"},
+			{"", "host"}, // default falls through to TCP
+		} {
+			cluster.Spec.Authentication = &v1beta1.PostgresClusterAuthentication{
+				Rules: []v1beta1.PostgresAuthenticationRule{
+					{PostgresHBARule: v1beta1.PostgresHBARule{
+						Connection: tc.connection,
+						Method:     "ldap",
+					}},
+				},
+			}
+			result := pgbouncerHBAFileContents(cluster)
+			assert.Assert(t, strings.HasPrefix(result, tc.wantPrefix))
+		}
+	})
+
+	t.Run("MultipleRules", func(t *testing.T) {
+		cluster.Spec.Authentication = &v1beta1.PostgresClusterAuthentication{
+			Rules: []v1beta1.PostgresAuthenticationRule{
+				{
+					HBA:             "hostssl mydb myuser 0.0.0.0/0 ldap ldapserver=a.example.com",
+					PostgresHBARule: v1beta1.PostgresHBARule{Method: "ldap"},
+				},
+				{PostgresHBARule: v1beta1.PostgresHBARule{
+					Connection: "host",
+					Method:     "scram-sha-256",
+				}},
+				{PostgresHBARule: v1beta1.PostgresHBARule{
+					Connection: "host",
+					Method:     "ldap",
+					Options: map[string]intstr.IntOrString{
+						"ldapserver": intstr.FromString("b.example.com"),
+					},
+				}},
+			},
+		}
+		result := pgbouncerHBAFileContents(cluster)
+		lines := strings.Split(strings.TrimSuffix(result, "\n"), "\n")
+		assert.Equal(t, len(lines), 3)
+		assert.Equal(t, lines[0], "hostssl mydb myuser 0.0.0.0/0 ldap ldapserver=a.example.com")
+		assert.Assert(t, strings.Contains(lines[1], "b.example.com"))
+		assert.Equal(t, lines[2], "host all all all scram-sha-256")
 	})
 }
 
