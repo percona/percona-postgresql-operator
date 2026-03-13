@@ -341,7 +341,7 @@ func TestRestoreCommand(t *testing.T) {
 		"--stanza=" + DefaultStanzaName, "--pg1-path=" + pgdata,
 		"--repo=1",
 	}
-	command := RestoreCommand(pgdata, "try", "", nil, strings.Join(opts, " "))
+	command := RestoreCommand(pgdata, "try", "", nil, false, strings.Join(opts, " "))
 
 	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
 	assert.Assert(t, len(command) > 3)
@@ -358,7 +358,7 @@ func TestRestoreCommand(t *testing.T) {
 func TestRestoreCommandPrettyYAML(t *testing.T) {
 	assert.Assert(t,
 		cmp.MarshalContains(
-			RestoreCommand("/dir", "try", "", nil, "--options"),
+			RestoreCommand("/dir", "try", "", nil, false, "--options"),
 			"\n- |",
 		),
 		"expected literal block scalar")
@@ -367,7 +367,7 @@ func TestRestoreCommandPrettyYAML(t *testing.T) {
 func TestRestoreCommandTDE(t *testing.T) {
 	assert.Assert(t,
 		cmp.MarshalContains(
-			RestoreCommand("/dir", "try", "echo testValue", nil, "--options"),
+			RestoreCommand("/dir", "try", "echo testValue", nil, false, "--options"),
 			"encryption_key_command = 'echo testValue'",
 		),
 		"expected encryption_key_command setting")

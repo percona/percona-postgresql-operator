@@ -18,6 +18,17 @@ import (
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
+const (
+	// TempTokenPath is where the new vault token is written inside the pod
+	// during a vault provider change (before the volume is updated).
+	// Stored under /pgdata so it survives pod restarts (persistent volume).
+	TempTokenPath = "/pgdata/tde-new-token"
+	// TempCAPath is where the new CA certificate is written inside the pod
+	// during a vault provider change (before the volume is updated).
+	// Stored under /pgdata so it survives pod restarts (persistent volume).
+	TempCAPath = "/pgdata/tde-new-ca.crt"
+)
+
 // enableInPostgreSQL installs pg_tde extension in every database.
 func enableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	log := logging.FromContext(ctx)
@@ -94,17 +105,33 @@ func ReconcileExtension(ctx context.Context, exec postgres.Executor, record reco
 
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_tde")
+	outParameters.Mandatory.Add("pg_tde.wal_encrypt", "off")
+}
+
+// VaultCredentialPaths returns the standard volume mount paths for the vault
+// token and CA certificate based on the vault spec's secret key names.
+func VaultCredentialPaths(vault *crunchyv1beta1.PGTDEVaultSpec) (tokenPath, caPath string) {
+	tokenPath = naming.PGTDEMountPath + "/" + vault.TokenSecret.Key
+	if vault.CASecret.Key != "" {
+		caPath = naming.PGTDEMountPath + "/" + vault.CASecret.Key
+	}
+	return tokenPath, caPath
+}
+
+// TempVaultCredentialPaths returns the temporary file paths used during a vault
+// provider change, before the pod volume is updated with new credentials.
+func TempVaultCredentialPaths(vault *crunchyv1beta1.PGTDEVaultSpec) (tokenPath, caPath string) {
+	tokenPath = TempTokenPath
+	if vault.CASecret.Name != "" && vault.CASecret.Key != "" {
+		caPath = TempCAPath
+	}
+	return tokenPath, caPath
 }
 
 var errAlreadyExists = errors.New("already exists")
 
-func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec) error {
+func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec, tokenPath, caPath string) error {
 	log := logging.FromContext(ctx)
-
-	caSecretPath := ""
-	if vault.CASecret.Key != "" {
-		caSecretPath = naming.PGTDEMountPath + "/" + vault.CASecret.Key
-	}
 
 	stdout, stderr, err := exec.Exec(ctx,
 		strings.NewReader(strings.Join([]string{
@@ -121,8 +148,8 @@ func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunch
 			"provider_name":    naming.PGTDEVaultProvider,
 			"vault_host":       vault.Host,
 			"vault_mount_path": vault.MountPath,
-			"token_path":       naming.PGTDEMountPath + "/" + vault.TokenSecret.Key,
-			"ca_path":          caSecretPath,
+			"token_path":       tokenPath,
+			"ca_path":          caPath,
 		}, nil)
 
 	if err != nil {
@@ -198,13 +225,8 @@ func setDefaultKey(ctx context.Context, exec postgres.Executor, clusterID types.
 	return err
 }
 
-func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec) error {
+func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec, tokenPath, caPath string) error {
 	log := logging.FromContext(ctx)
-
-	caSecretPath := ""
-	if vault.CASecret.Key != "" {
-		caSecretPath = naming.PGTDEMountPath + "/" + vault.CASecret.Key
-	}
 
 	stdout, stderr, err := exec.Exec(ctx,
 		strings.NewReader(strings.Join([]string{
@@ -221,8 +243,8 @@ func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *cru
 			"provider_name":    naming.PGTDEVaultProvider,
 			"vault_host":       vault.Host,
 			"vault_mount_path": vault.MountPath,
-			"token_path":       naming.PGTDEMountPath + "/" + vault.TokenSecret.Key,
-			"ca_path":          caSecretPath,
+			"token_path":       tokenPath,
+			"ca_path":          caPath,
 		}, nil)
 
 	if err != nil {
@@ -234,11 +256,15 @@ func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *cru
 	return err
 }
 
-func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster) error {
+// ReconcileVaultProvider configures or updates the pg_tde vault key provider.
+// tokenPath and caPath are the file paths inside the pod where the vault
+// credentials can be read. For initial setup these are the standard volume
+// mount paths; for provider changes they may be temporary file paths.
+func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster, tokenPath, caPath string) error {
 	vault := cluster.Spec.Extensions.PGTDE.Vault
 
 	if cluster.Status.PGTDERevision == "" {
-		err := addVaultProvider(ctx, exec, vault)
+		err := addVaultProvider(ctx, exec, vault, tokenPath, caPath)
 
 		if err == nil || errors.Is(err, errAlreadyExists) {
 			err = createGlobalKey(ctx, exec, cluster.UID)
@@ -251,5 +277,5 @@ func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster
 		return err
 	}
 
-	return changeVaultProvider(ctx, exec, vault)
+	return changeVaultProvider(ctx, exec, vault, tokenPath, caPath)
 }

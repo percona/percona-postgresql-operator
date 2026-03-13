@@ -102,6 +102,13 @@ status:
     status: "True"
     type: PGTDEEnabled
 ---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: pg-tde
+status:
+  pgTDERevision: 9f64d9447
+---
 kind: Job
 apiVersion: batch/v1
 metadata:

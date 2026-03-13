@@ -83,6 +83,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 		"shared_preload_libraries": "pg_tde",
+		"pg_tde.wal_encrypt":       "off",
 	})
 
 	// Appended when not empty.
@@ -92,6 +93,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 		"shared_preload_libraries": "some,existing,pg_tde",
+		"pg_tde.wal_encrypt":       "off",
 	})
 }
 
@@ -133,7 +135,8 @@ func TestAddVaultProvider(t *testing.T) {
 				Key:  "ca-key",
 			},
 		}
-		assert.Equal(t, expected, addVaultProvider(ctx, exec, vault))
+		tokenPath, caPath := VaultCredentialPaths(vault)
+		assert.Equal(t, expected, addVaultProvider(ctx, exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("already exists", func(t *testing.T) {
@@ -153,7 +156,8 @@ func TestAddVaultProvider(t *testing.T) {
 				Key:  "token-key",
 			},
 		}
-		assert.Assert(t, errors.Is(addVaultProvider(ctx, exec, vault), errAlreadyExists))
+		tokenPath, caPath := VaultCredentialPaths(vault)
+		assert.Assert(t, errors.Is(addVaultProvider(ctx, exec, vault, tokenPath, caPath), errAlreadyExists))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -176,7 +180,8 @@ func TestAddVaultProvider(t *testing.T) {
 				Key:  "token-key",
 			},
 		}
-		assert.NilError(t, addVaultProvider(ctx, exec, vault))
+		tokenPath, caPath := VaultCredentialPaths(vault)
+		assert.NilError(t, addVaultProvider(ctx, exec, vault, tokenPath, caPath))
 	})
 }
 
@@ -289,7 +294,8 @@ func TestChangeVaultProvider(t *testing.T) {
 				Key:  "ca-key",
 			},
 		}
-		assert.Equal(t, expected, changeVaultProvider(ctx, exec, vault))
+		tokenPath, caPath := VaultCredentialPaths(vault)
+		assert.Equal(t, expected, changeVaultProvider(ctx, exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -312,7 +318,8 @@ func TestChangeVaultProvider(t *testing.T) {
 				Key:  "token-key",
 			},
 		}
-		assert.NilError(t, changeVaultProvider(ctx, exec, vault))
+		tokenPath, caPath := VaultCredentialPaths(vault)
+		assert.NilError(t, changeVaultProvider(ctx, exec, vault, tokenPath, caPath))
 	})
 }
 
@@ -425,6 +432,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 			Key:  "token-key",
 		},
 	}
+	tokenPath, caPath := VaultCredentialPaths(vault)
 
 	t.Run("first time all succeed", func(t *testing.T) {
 		callCount := 0
@@ -440,7 +448,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 		cluster.Spec.Extensions.PGTDE.Vault = vault
 		cluster.UID = "test-uid"
 
-		err := ReconcileVaultProvider(ctx, exec, cluster)
+		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.NilError(t, err)
 		assert.Equal(t, callCount, 3)
 	})
@@ -458,7 +466,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 		cluster.Spec.Extensions.PGTDE.Vault = vault
 		cluster.UID = "test-uid"
 
-		err := ReconcileVaultProvider(ctx, exec, cluster)
+		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.Equal(t, expected, err)
 	})
 
@@ -480,7 +488,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 		cluster.Spec.Extensions.PGTDE.Vault = vault
 		cluster.UID = "test-uid"
 
-		err := ReconcileVaultProvider(ctx, exec, cluster)
+		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.NilError(t, err)
 		assert.Equal(t, callCount, 3)
 	})
@@ -503,7 +511,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 		cluster.Spec.Extensions.PGTDE.Vault = vault
 		cluster.UID = "test-uid"
 
-		err := ReconcileVaultProvider(ctx, exec, cluster)
+		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.Equal(t, expected, err)
 		assert.Equal(t, callCount, 2)
 	})
@@ -526,7 +534,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 		cluster.Spec.Extensions.PGTDE.Vault = vault
 		cluster.UID = "test-uid"
 
-		err := ReconcileVaultProvider(ctx, exec, cluster)
+		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.NilError(t, err)
 		assert.Equal(t, callCount, 3)
 	})
@@ -549,7 +557,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 		cluster.Spec.Extensions.PGTDE.Vault = vault
 		cluster.UID = "test-uid"
 
-		err := ReconcileVaultProvider(ctx, exec, cluster)
+		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.Equal(t, expected, err)
 		assert.Equal(t, callCount, 3)
 	})
@@ -571,7 +579,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 		cluster.Status.PGTDERevision = "some-revision"
 		cluster.UID = "test-uid"
 
-		err := ReconcileVaultProvider(ctx, exec, cluster)
+		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.NilError(t, err)
 		assert.Equal(t, callCount, 1)
 	})
@@ -590,7 +598,7 @@ func TestReconcileVaultProvider(t *testing.T) {
 		cluster.Status.PGTDERevision = "some-revision"
 		cluster.UID = "test-uid"
 
-		err := ReconcileVaultProvider(ctx, exec, cluster)
+		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.Equal(t, expected, err)
 	})
 }

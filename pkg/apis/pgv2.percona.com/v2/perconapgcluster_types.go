@@ -48,6 +48,7 @@ type PerconaPGCluster struct {
 	Status PerconaPGClusterStatus `json:"status,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.extensions) || !has(self.extensions.pg_tde) || !has(self.extensions.pg_tde.enabled) || !self.extensions.pg_tde.enabled || self.postgresVersion >= 17",message="pg_tde is only supported for PG17 and above"
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
 type PerconaPGClusterSpec struct {
 	// +optional
