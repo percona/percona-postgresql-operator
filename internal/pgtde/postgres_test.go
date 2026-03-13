@@ -83,6 +83,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 		"shared_preload_libraries": "pg_tde",
+		"pg_tde.wal_encrypt":       "off",
 	})
 
 	// Appended when not empty.
@@ -92,6 +93,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 		"shared_preload_libraries": "some,existing,pg_tde",
+		"pg_tde.wal_encrypt":       "off",
 	})
 }
 

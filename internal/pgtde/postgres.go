@@ -94,6 +94,7 @@ func ReconcileExtension(ctx context.Context, exec postgres.Executor, record reco
 
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_tde")
+	outParameters.Mandatory.Add("pg_tde.wal_encrypt", "off")
 }
 
 var errAlreadyExists = errors.New("already exists")
