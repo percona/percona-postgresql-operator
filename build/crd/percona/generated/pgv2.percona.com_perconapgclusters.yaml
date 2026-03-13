@@ -28857,6 +28857,9 @@ spec:
             - postgresVersion
             type: object
             x-kubernetes-validations:
+            - message: pg_tde is only supported for PG17 and above
+              rule: '!has(self.extensions) || !has(self.extensions.pg_tde) || !has(self.extensions.pg_tde.enabled)
+                || !self.extensions.pg_tde.enabled || self.postgresVersion >= 17'
             - message: PostgresVersion must be >= 15 if grantPublicSchemaAccess exists
                 and is true
               rule: '!has(self.users) || self.postgresVersion >= 15 || self.users.all(u,
