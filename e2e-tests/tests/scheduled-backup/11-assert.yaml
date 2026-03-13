@@ -33,7 +33,7 @@ status:
         stanzaCreated: true
     restore:
       finished: true
-      id: s3-restore
+      id: repo1-restore
       succeeded: 1
   proxy:
     pgBouncer:
@@ -43,6 +43,6 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: s3-restore
+  name: repo1-restore
 status:
   state: Succeeded
