@@ -1,0 +1,30 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: some-name
+spec:
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: scheduled-backup-pgbackrest-secrets
+      manual:
+        repoName: repo1
+        options:
+          - --type=full
+      global:
+        repo1-path: /backrestrepo/postgres-operator/<repo-path>/repo1
+        repo2-path: /backrestrepo/postgres-operator/<repo-path>/repo2
+        repo3-path: /backrestrepo/postgres-operator/<repo-path>/repo3
+      repos:
+        - name: repo1
+          s3:
+            bucket: <bucket>
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+        - name: repo2
+          gcs:
+            bucket: <bucket>
+        - name: repo3
+          azure:
+            container: <bucket>

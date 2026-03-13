@@ -6,7 +6,7 @@ kind: Job
 apiVersion: batch/v1
 metadata:
   annotations:
-    postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full-s3
+    postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full-repo1
   labels:
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
@@ -20,7 +20,7 @@ spec:
   template:
     metadata:
       annotations:
-        postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full-s3
+        postgres-operator.crunchydata.com/pgbackrest-backup: demand-backup-full-repo1
     spec:
       containers:
       - command:
@@ -89,7 +89,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
-  name: demand-backup-full-s3
+  name: demand-backup-full-repo1
 spec:
   pgCluster: demand-backup
   repoName: repo1

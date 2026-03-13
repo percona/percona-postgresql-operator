@@ -1,0 +1,15 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: major-upgrade
+spec:
+  instances:
+    - affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: hugepages
+                    operator: In
+                    values:
+                      - enabled
