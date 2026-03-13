@@ -49,6 +49,8 @@ check_operator_panic() {
 }
 
 deploy_operator() {
+	deploy_coredns
+
 	local cw_prefix=""
 
 	destroy_operator
@@ -411,7 +413,7 @@ run_psql_command() {
 	local command=${1}
 	local uri=${2}
 	local driver=${3:-postgres}
-	
+
 	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
 		psql -v ON_ERROR_STOP=1 -t -q "${driver}://${uri}" -c "${command}"
 }
@@ -1209,94 +1211,127 @@ wait_for_generation() {
 
 # Reads all environment variables from a pod (single kubectl exec call)
 get_envs_from_pod() {
-  local namespace=$1
-  local pod=$2
-  local container=$3
+	local namespace=$1
+	local pod=$2
+	local container=$3
 
-  if [ -n "$container" ]; then
-    kubectl exec -n "$namespace" "$pod" -c "$container" -- printenv 2>/dev/null || true
-  else
-    kubectl exec -n "$namespace" "$pod" -- printenv 2>/dev/null || true
-  fi
+	if [ -n "$container" ]; then
+		kubectl exec -n "$namespace" "$pod" -c "$container" -- printenv 2>/dev/null || true
+	else
+		kubectl exec -n "$namespace" "$pod" -- printenv 2>/dev/null || true
+	fi
 }
 
 # Verifies a single variable in given env content
 check_env_in_pod() {
-  local check_type=$1
-  local pod=$2
-  local var_name=$3
-  local expected_value=$4
-  local env_content=$5
+	local check_type=$1
+	local pod=$2
+	local var_name=$3
+	local expected_value=$4
+	local env_content=$5
 
-  local actual_value
-  actual_value=$(echo "$env_content" | grep -E "^${var_name}=" | cut -d'=' -f2- || true)
+	local actual_value
+	actual_value=$(echo "$env_content" | grep -E "^${var_name}=" | cut -d'=' -f2- || true)
 
-  if [[ "$check_type" == "add" ]]; then
-    if [ "$actual_value" != "$expected_value" ]; then
-      echo "ERROR: $var_name in $pod — expected '$expected_value', got '${actual_value:-<missing>}'"
-      return 1
-    else
-      echo "OK: $var_name=$actual_value in $pod"
-    fi
-  elif [[ "$check_type" == "delete" ]]; then
-    if [ -n "$actual_value" ]; then
-      echo "ERROR: $var_name exists in $pod (should not exist)"
-      return 1
-    else
-      echo "OK: $var_name deleted in $pod"
-    fi
-  else
-    echo "ERROR: unknown check type '$check_type'"
-    return 1
-  fi
+	if [[ $check_type == "add" ]]; then
+		if [ "$actual_value" != "$expected_value" ]; then
+			echo "ERROR: $var_name in $pod — expected '$expected_value', got '${actual_value:-<missing>}'"
+			return 1
+		else
+			echo "OK: $var_name=$actual_value in $pod"
+		fi
+	elif [[ $check_type == "delete" ]]; then
+		if [ -n "$actual_value" ]; then
+			echo "ERROR: $var_name exists in $pod (should not exist)"
+			return 1
+		else
+			echo "OK: $var_name deleted in $pod"
+		fi
+	else
+		echo "ERROR: unknown check type '$check_type'"
+		return 1
+	fi
 }
 
 # Checks multiple env vars in one or more components
 check_envs_for_component() {
-  local check_type=$1      # add | delete
-  local component=$2       # instance | pgbouncer | repohost
-  local vars=("${@:3}")    # everything after the 2nd argument
+	local check_type=$1   # add | delete
+	local component=$2    # instance | pgbouncer | repohost
+	local vars=("${@:3}") # everything after the 2nd argument
 
-  case "$component" in
-    instance)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER=""
-      ;;
-    pgbouncer)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER="pgbouncer"
-      ;;
-    repohost)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER="pgbackrest"
-      ;;
-    *)
-      echo "ERROR: unknown component '$component'"
-      return 1
-      ;;
-  esac
+	case "$component" in
+		instance)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER=""
+			;;
+		pgbouncer)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER="pgbouncer"
+			;;
+		repohost)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER="pgbackrest"
+			;;
+		*)
+			echo "ERROR: unknown component '$component'"
+			return 1
+			;;
+	esac
 
-  echo "Fetching environment variables for $component pod $POD..."
-  local env_content
-  env_content=$(get_envs_from_pod "${NAMESPACE}" "$POD" "$CONTAINER")
+	echo "Fetching environment variables for $component pod $POD..."
+	local env_content
+	env_content=$(get_envs_from_pod "${NAMESPACE}" "$POD" "$CONTAINER")
 
-  local errors=0
-  for var_entry in "${vars[@]}"; do
-    if [[ "$check_type" == "add" ]]; then
-      local var_name="${var_entry%%=*}"
-      local var_expected="${var_entry#*=}"
-      check_env_in_pod add "$POD" "$var_name" "$var_expected" "$env_content" || errors=$((errors+1))
-    else
-      check_env_in_pod delete "$POD" "$var_entry" "" "$env_content" || errors=$((errors+1))
-    fi
-  done
+	local errors=0
+	for var_entry in "${vars[@]}"; do
+		if [[ $check_type == "add" ]]; then
+			local var_name="${var_entry%%=*}"
+			local var_expected="${var_entry#*=}"
+			check_env_in_pod add "$POD" "$var_name" "$var_expected" "$env_content" || errors=$((errors + 1))
+		else
+			check_env_in_pod delete "$POD" "$var_entry" "" "$env_content" || errors=$((errors + 1))
+		fi
+	done
 
-  if (( errors > 0 )); then
-    echo "$errors environment check(s) failed for component '$component'"
-    return 1
-  else
-    echo "All environment checks passed for component '$component'"
-  fi
+	if ((errors > 0)); then
+		echo "$errors environment check(s) failed for component '$component'"
+		return 1
+	else
+		echo "All environment checks passed for component '$component'"
+	fi
+}
+
+deploy_coredns() {
+	# Only the "upgrade-consistency" test needs CoreDNS to be installed.
+	# For all other tests, if CoreDNS was installed by this script earlier, uninstall it.
+	local coredns_found=false
+	if kubectl -n kube-system get deploy coredns >/dev/null 2>&1; then
+		coredns_found=true
+	fi
+
+	if [[ $test_name != "upgrade-consistency" ]]; then
+		! $coredns_found && return
+
+		helm uninstall coredns -n kube-system >/dev/null 2>&1 || true
+		kubectl scale deployment --replicas=2 kube-dns --namespace=kube-system
+		kubectl scale deployment --replicas=1 kube-dns-autoscaler --namespace=kube-system
+		return
+	fi
+
+	$coredns_found && return
+
+	helm repo add coredns https://coredns.github.io/helm
+	helm install coredns coredns/coredns \
+		-n kube-system \
+		--set k8sAppLabelOverride=kube-dns
+	kubectl scale deployment --replicas=0 kube-dns-autoscaler kube-dns --namespace=kube-system
+	=======
+	if ((errors > 0)); then
+		echo "$errors environment check(s) failed for component '$component'"
+		return 1
+	else
+		echo "All environment checks passed for component '$component'"
+	fi
 }
 
 detect_k8s_platform() {
@@ -1354,21 +1389,21 @@ enable_hugepages() {
 }
 
 enable_hugepages_gke() {
-  local hugepage_count=$1
+	local hugepage_count=$1
 
-  echo "Hugepages configuration is now handled during cluster creation"
-  echo "Skipping runtime configuration for GKE"
+	echo "Hugepages configuration is now handled during cluster creation"
+	echo "Skipping runtime configuration for GKE"
 
-  echo "Verifying hugepages configuration..."
-  local node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+	echo "Verifying hugepages configuration..."
+	local node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
 
-  if kubectl get node ${node_name} -o jsonpath='{.status.allocatable.hugepages-2Mi}' | grep -q '[0-9]'; then
-    echo "✓ Hugepages are already configured on nodes"
-    return 0
-  else
-    echo "✗ Warning: Hugepages not found in node allocatable resources"
-    return 1
-  fi
+	if kubectl get node ${node_name} -o jsonpath='{.status.allocatable.hugepages-2Mi}' | grep -q '[0-9]'; then
+		echo "✓ Hugepages are already configured on nodes"
+		return 0
+	else
+		echo "✗ Warning: Hugepages not found in node allocatable resources"
+		return 1
+	fi
 }
 
 enable_hugepages_eks() {
@@ -1591,128 +1626,128 @@ spec:
         path: /etc/sysctl.d/99-hugepages.conf
 EOF
 
-    [ $? -eq 0 ] || return 1
+	[ $? -eq 0 ] || return 1
 
-    echo "MachineConfig created"
-    echo "Waiting for worker pool to update (~10 minutes)..."
+	echo "MachineConfig created"
+	echo "Waiting for worker pool to update (~10 minutes)..."
 
-    kubectl wait --for=condition=Updated mcp/worker --timeout=900s 2>/dev/null || {
-        echo "Update taking longer than expected"
-        return 1
-    }
+	kubectl wait --for=condition=Updated mcp/worker --timeout=900s 2>/dev/null || {
+		echo "Update taking longer than expected"
+		return 1
+	}
 
-    echo "Worker pool updated"
+	echo "Worker pool updated"
 
-    sleep 10
-    verify_hugepages_on_nodes
+	sleep 10
+	verify_hugepages_on_nodes
 }
 
 verify_hugepages_on_nodes() {
-    echo "Verifying hugepages on nodes"
+	echo "Verifying hugepages on nodes"
 
-    # Get first worker node, fallback to first non-master, fallback to any node
-    local node_name=$(
-        kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
-        kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
-        kubectl get nodes -o jsonpath='{.items[0].metadata.name}'
-    )
+	# Get first worker node, fallback to first non-master, fallback to any node
+	local node_name=$(
+		kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
+			|| kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
+			|| kubectl get nodes -o jsonpath='{.items[0].metadata.name}'
+	)
 
-    if [ -z "${node_name}" ]; then
-        echo "No nodes found"
-        return 1
-    fi
+	if [ -z "${node_name}" ]; then
+		echo "No nodes found"
+		return 1
+	fi
 
-    echo "Checking node: ${node_name}"
+	echo "Checking node: ${node_name}"
 
-    local hugepages_capacity=$(kubectl get node ${node_name} \
-        -o jsonpath='{.status.capacity.hugepages-2Mi}')
+	local hugepages_capacity=$(kubectl get node ${node_name} \
+		-o jsonpath='{.status.capacity.hugepages-2Mi}')
 
-    if [ -n "${hugepages_capacity}" ] && [ "${hugepages_capacity}" != "0" ]; then
-        echo "Node has hugepages capacity: ${hugepages_capacity}"
-        return 0
-    else
-        echo "No hugepages capacity found on node ${node_name}"
-        return 1
-    fi
+	if [ -n "${hugepages_capacity}" ] && [ "${hugepages_capacity}" != "0" ]; then
+		echo "Node has hugepages capacity: ${hugepages_capacity}"
+		return 0
+	else
+		echo "No hugepages capacity found on node ${node_name}"
+		return 1
+	fi
 }
 
 verify_hugepages_in_pod() {
-    local pod_name=$1
-    local namespace=$2
-    local container=${3:-postgres}
+	local pod_name=$1
+	local namespace=$2
+	local container=${3:-postgres}
 
-    echo "Verifying hugepages in pod ${pod_name}"
+	echo "Verifying hugepages in pod ${pod_name}"
 
-    # Check /proc/meminfo
-    local hugepages_total=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
-        grep HugePages_Total /proc/meminfo | awk '{print $2}')
+	# Check /proc/meminfo
+	local hugepages_total=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
+		grep HugePages_Total /proc/meminfo | awk '{print $2}')
 
-    local hugepages_free=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
-        grep HugePages_Free /proc/meminfo | awk '{print $2}')
+	local hugepages_free=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
+		grep HugePages_Free /proc/meminfo | awk '{print $2}')
 
-    echo "HugePages_Total: ${hugepages_total}"
-    echo "HugePages_Free: ${hugepages_free}"
+	echo "HugePages_Total: ${hugepages_total}"
+	echo "HugePages_Free: ${hugepages_free}"
 
-    if [ "${hugepages_total}" -gt 0 ]; then
-        echo "Hugepages are available in pod"
-        return 0
-    else
-        echo "No hugepages in pod"
-        return 1
-    fi
+	if [ "${hugepages_total}" -gt 0 ]; then
+		echo "Hugepages are available in pod"
+		return 0
+	else
+		echo "No hugepages in pod"
+		return 1
+	fi
 }
 
 verify_postgresql_hugepages_setting() {
-    local cluster_name=$1
-    local expected_value=${2:-try}
+	local cluster_name=$1
+	local expected_value=${2:-try}
 
-    echo "Verifying PostgreSQL huge_pages setting..."
+	echo "Verifying PostgreSQL huge_pages setting..."
 
-    local huge_pages=$(run_psql_local \
-        "SHOW huge_pages;" \
-        "postgres:$(get_psql_user_pass ${cluster_name}-pguser-postgres)@$(get_psql_user_host ${cluster_name}-pguser-postgres)")
+	local huge_pages=$(run_psql_local \
+		"SHOW huge_pages;" \
+		"postgres:$(get_psql_user_pass ${cluster_name}-pguser-postgres)@$(get_psql_user_host ${cluster_name}-pguser-postgres)")
 
-    echo "huge_pages: ${huge_pages}"
+	echo "huge_pages: ${huge_pages}"
 
-    if [[ "${huge_pages}" == *"${expected_value}"* ]]; then
-        echo "PostgreSQL huge_pages is set to '${expected_value}'"
-        return 0
-    else
-        echo "PostgreSQL huge_pages not set to '${expected_value}' (value: ${huge_pages})"
-        return 1
-    fi
+	if [[ ${huge_pages} == *"${expected_value}"* ]]; then
+		echo "PostgreSQL huge_pages is set to '${expected_value}'"
+		return 0
+	else
+		echo "PostgreSQL huge_pages not set to '${expected_value}' (value: ${huge_pages})"
+		return 1
+	fi
 }
 
 verify_hugepages_usage() {
-    local pod_name=$1
-    local namespace=$2
-    local container=${3:-database}
+	local pod_name=$1
+	local namespace=$2
+	local container=${3:-database}
 
-    echo "Checking hugepages usage..."
+	echo "Checking hugepages usage..."
 
-    kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
-        grep HugePages /proc/meminfo
+	kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+		grep HugePages /proc/meminfo
 
-    local hugepages_total=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
-        grep HugePages_Total /proc/meminfo | awk '{print $2}')
+	local hugepages_total=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+		grep HugePages_Total /proc/meminfo | awk '{print $2}')
 
-    local hugepages_free=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
-        grep HugePages_Free /proc/meminfo | awk '{print $2}')
+	local hugepages_free=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+		grep HugePages_Free /proc/meminfo | awk '{print $2}')
 
-    local hugepages_used=$((hugepages_total - hugepages_free))
+	local hugepages_used=$((hugepages_total - hugepages_free))
 
-    echo ""
-    echo "HugePages usage:"
-    echo "  Total: ${hugepages_total}"
-    echo "  Used:  ${hugepages_used}"
+	echo ""
+	echo "HugePages usage:"
+	echo "  Total: ${hugepages_total}"
+	echo "  Used:  ${hugepages_used}"
 
-    if [ "${hugepages_used}" -gt 0 ]; then
-        echo "PostgreSQL is using hugepages"
-        return 0
-    else
-        echo "Hugepages available but NOT being used by PostgreSQL"
-        return 1
-    fi
+	if [ "${hugepages_used}" -gt 0 ]; then
+		echo "PostgreSQL is using hugepages"
+		return 0
+	else
+		echo "Hugepages available but NOT being used by PostgreSQL"
+		return 1
+	fi
 }
 
 function vault_tls() {

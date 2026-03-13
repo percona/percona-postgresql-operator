@@ -1,0 +1,11 @@
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  generateName: upgrade-consistency-primary-
+  labels:
+    endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: upgrade-consistency-primary
