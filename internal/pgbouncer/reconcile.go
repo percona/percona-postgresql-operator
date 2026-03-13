@@ -34,6 +34,12 @@ func ConfigMap(
 
 	outConfigMap.Data[emptyConfigMapKey] = ""
 	outConfigMap.Data[iniFileConfigMapKey] = clusterINI(inCluster)
+
+	if hasLDAPRules(inCluster) {
+		outConfigMap.Data[hbaFileConfigMapKey] = pgbouncerHBAFileContents(inCluster)
+	} else {
+		delete(outConfigMap.Data, hbaFileConfigMapKey)
+	}
 }
 
 // Secret populates the PgBouncer Secret.
@@ -144,6 +150,16 @@ func Pod(
 		),
 	}
 
+	// When LDAP rules are present, mount the cluster's config files (which
+	// may include the LDAP TLS CA cert at ldap/ca.crt) into PgBouncer's
+	// config volume so that the OpenLDAP client library can verify the LDAP
+	// server's TLS certificate — mirroring the LDAPTLS_CACERT convention
+	// used for the PostgreSQL containers.
+	if hasLDAPRules(inCluster) && inCluster.Spec.Config != nil && len(inCluster.Spec.Config.Files) > 0 {
+		configVolume.Projected.Sources = append(configVolume.Projected.Sources,
+			inCluster.Spec.Config.Files...)
+	}
+
 	container := corev1.Container{
 		Name: naming.ContainerPGBouncer,
 
@@ -160,6 +176,15 @@ func Pod(
 		}},
 
 		VolumeMounts: []corev1.VolumeMount{configVolumeMount},
+	}
+
+	// Set LDAPTLS_CACERT so PgBouncer's OpenLDAP client can find the CA cert
+	// at the same path convention used by the PostgreSQL containers.
+	if hasLDAPRules(inCluster) {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "LDAPTLS_CACERT",
+			Value: configDirectory + "/ldap/ca.crt",
+		})
 	}
 
 	// TODO container.LivenessProbe?
