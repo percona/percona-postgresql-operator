@@ -141,7 +141,7 @@ func Pod(
 	// config volume so that the OpenLDAP client library can verify the LDAP
 	// server's TLS certificate — mirroring the LDAPTLS_CACERT convention
 	// used for the PostgreSQL containers.
-	if hasLDAPRules(inCluster) && len(inCluster.Spec.Config.Files) > 0 {
+	if hasLDAPRules(inCluster) && inCluster.Spec.Config != nil && len(inCluster.Spec.Config.Files) > 0 {
 		configVolume.Projected.Sources = append(configVolume.Projected.Sources,
 			inCluster.Spec.Config.Files...)
 	}
