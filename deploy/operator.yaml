@@ -61,7 +61,7 @@ spec:
           value: 10s
         - name: PGO_FEATURE_GATES
           value: ""
-        image: docker.io/perconalab/percona-postgresql-operator:restore-debug-25225
+        image: docker.io/perconalab/percona-postgresql-operator:restore-debug-20948
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
