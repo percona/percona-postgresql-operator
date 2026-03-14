@@ -1337,7 +1337,7 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
 	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, config.FetchKeyCommand(&cluster.Spec),
-		pgtablespaceVolumes, strings.Join(opts, " "))
+		pgtablespaceVolumes, cluster.Spec.Extensions.PGTDE.Enabled, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
 	dataVolumeMount := postgres.DataVolumeMount()
@@ -1379,6 +1379,55 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		}
 		volumes = append(volumes, tablespaceVolume)
 		volumeMounts = append(volumeMounts, tablespaceVolumeMount)
+	}
+
+	if vault := cluster.Spec.Extensions.PGTDE.Vault; vault != nil {
+		pgTDEVolumeMount := postgres.PGTDEVolumeMount()
+		volumeMounts = append(volumeMounts, pgTDEVolumeMount)
+
+		pgTDETokenSecret := &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: vault.TokenSecret.Name,
+			},
+			Items: []corev1.KeyToPath{
+				{
+					Key:  vault.TokenSecret.Key,
+					Path: vault.TokenSecret.Key,
+				},
+			},
+		}
+
+		pgTDEVolume := corev1.Volume{
+			Name: pgTDEVolumeMount.Name,
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					DefaultMode: initialize.Int32(0o600),
+					Sources: []corev1.VolumeProjection{
+						{Secret: pgTDETokenSecret},
+					},
+				},
+			},
+		}
+
+		if vault.CASecret.Name != "" {
+			pgTDECASecret := &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: vault.CASecret.Name,
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  vault.CASecret.Key,
+						Path: vault.CASecret.Key,
+					},
+				},
+			}
+			pgTDEVolume.Projected.Sources = append(
+				pgTDEVolume.Projected.Sources, corev1.VolumeProjection{
+					Secret: pgTDECASecret,
+				})
+		}
+
+		volumes = append(volumes, pgTDEVolume)
 	}
 
 	restoreJob := &batchv1.Job{}
