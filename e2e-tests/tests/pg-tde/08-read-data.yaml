@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role pg-tde primary name)
+      echo "Primary pod: ${primary}"
+      data=$(kubectl exec ${primary} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+      kubectl create configmap -n "${NAMESPACE}" 08-read-from-primary --from-literal=data="${data}"
+
+      t=1
+      for i in $(kubectl get pods -n "${NAMESPACE}" -l postgres-operator.crunchydata.com/cluster=pg-tde,postgres-operator.crunchydata.com/role=replica -o jsonpath='{.items[*].metadata.name}'); do
+        echo "Replica pod: ${i}"
+        data=$(kubectl exec ${i} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+        kubectl create configmap -n "${NAMESPACE}" 08-read-from-replica-${t} --from-literal=data="${data}"
+        t=$((t+1))
+      done
