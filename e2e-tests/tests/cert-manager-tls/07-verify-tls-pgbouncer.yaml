@@ -1,0 +1,31 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      pgb_certificate_data=$(run_comand_on_pod "openssl s_client -connect cert-manager-tls-pgbouncer:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -subject -issuer")
+
+      echo "PgBouncer certificate data: $pgb_certificate_data"
+
+      if [[ -z "$pgb_certificate_data" ]]; then
+          echo "Failed to retrieve PgBouncer TLS certificate"
+          exit 1
+      fi
+
+      if [[ "$pgb_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "Unexpected PgBouncer certificate issuer. Expected CN=cert-manager-tls-ca"
+          echo "Got: $pgb_certificate_data"
+          exit 1
+      fi
+
+      pgb_ssl=$(run_psql_local "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid();" "cert-manager-tls:$(get_psql_user_pass cert-manager-tls-pguser-cert-manager-tls)@cert-manager-tls-pgbouncer/postgres")
+
+      if [[ "$pgb_ssl" != *"t"* ]]; then
+          echo "PgBouncer-to-PostgreSQL connection is not using SSL"
+          exit 1
+      fi

@@ -1321,6 +1321,9 @@ detect_k8s_platform() {
 	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "aws://"; then
 		platform="eks"
 
+	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "digitalocean://"; then
+		platform="digitalocean"
+
 	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "azure://"; then
 		platform="aks"
 
@@ -1349,6 +1352,9 @@ enable_hugepages() {
 			;;
 		aks)
 			enable_hugepages_aks "${hugepage_count}"
+			;;
+		digitalocean)
+			enable_hugepages_doks "${hugepage_count}"
 			;;
 		*)
 			echo "Unknown platform, cannot configure hugepages"
@@ -1382,6 +1388,61 @@ enable_hugepages_eks() {
 	if verify_hugepages_on_nodes; then
 		echo "Hugepages already configured"
 		return 0
+	fi
+}
+
+enable_hugepages_doks() {
+	local hugepage_count=$1
+  
+  if verify_hugepages_on_nodes; then
+		echo "Hugepages already configured"
+		return 0
+	fi
+
+	cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hugepages
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: hugepages
+  template:
+    metadata:
+      labels:
+        app: hugepages
+    spec:
+      hostPID: true
+      containers:
+      - name: hugepages
+        image: busybox
+        securityContext:
+          privileged: true
+        command:
+        - sh
+        - -c
+        - |
+          echo "Setting hugepages..."
+          echo 1024 > /proc/sys/vm/nr_hugepages
+          cat /proc/sys/vm/nr_hugepages
+          echo "Restarting Kubelet..."
+          nsenter -t 1 -m -u -i -n -p systemctl restart kubelet
+          echo "Done, sleeping..."
+          sleep infinity
+EOF
+
+	kubectl -n kube-system rollout status daemonset/hugepages --timeout=15m || {
+		echo "DOKS: DaemonSet rollout did not complete. Skipping test."
+		return 1
+	}
+
+	if verify_hugepages_on_nodes; then
+		echo "Hugepages successfully configured"
+	else
+		echo "Failed to configure hugepages"
+		return 1
 	fi
 }
 

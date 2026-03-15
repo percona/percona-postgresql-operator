@@ -15,6 +15,7 @@ import (
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
@@ -588,6 +589,162 @@ func TestDynamicConfiguration(t *testing.T) {
 					"pg_hba": []string{
 						"local all all peer",
 						"custom",
+					},
+					"use_pg_rewind": true,
+					"use_slots":     false,
+				},
+			},
+		},
+		{
+			name: "authentication: raw HBA rule in pg_hba",
+			cluster: &v1beta1.PostgresCluster{
+				Spec: v1beta1.PostgresClusterSpec{
+					Authentication: &v1beta1.PostgresClusterAuthentication{
+						Rules: []v1beta1.PostgresAuthenticationRule{
+							{HBA: "host all all all ldap ldapserver=ldap.example.com"},
+						},
+					},
+				},
+			},
+			expected: map[string]any{
+				"loop_wait": int32(10),
+				"ttl":       int32(30),
+				"postgresql": map[string]any{
+					"parameters": map[string]any{},
+					"pg_hba": []string{
+						"host all all all ldap ldapserver=ldap.example.com",
+					},
+					"use_pg_rewind": true,
+					"use_slots":     false,
+				},
+			},
+		},
+		{
+			name: "authentication: structured rule in pg_hba",
+			cluster: &v1beta1.PostgresCluster{
+				Spec: v1beta1.PostgresClusterSpec{
+					Authentication: &v1beta1.PostgresClusterAuthentication{
+						Rules: []v1beta1.PostgresAuthenticationRule{
+							{
+								PostgresHBARule: v1beta1.PostgresHBARule{
+									Connection: "hostssl",
+									Method:     "ldap",
+									Options: map[string]intstr.IntOrString{
+										"ldapserver": intstr.FromString("ldap.example.com"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]any{
+				"loop_wait": int32(10),
+				"ttl":       int32(30),
+				"postgresql": map[string]any{
+					"parameters": map[string]any{},
+					"pg_hba": []string{
+						`"hostssl" all all all ldap  "ldapserver"="ldap.example.com"`,
+					},
+					"use_pg_rewind": true,
+					"use_slots":     false,
+				},
+			},
+		},
+		{
+			name: "authentication: password method normalizes to scram-sha-256",
+			cluster: &v1beta1.PostgresCluster{
+				Spec: v1beta1.PostgresClusterSpec{
+					Authentication: &v1beta1.PostgresClusterAuthentication{
+						Rules: []v1beta1.PostgresAuthenticationRule{
+							{
+								PostgresHBARule: v1beta1.PostgresHBARule{
+									Connection: "host",
+									Method:     "password",
+									Databases:  []string{"mydb"},
+									Users:      []string{"myuser"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]any{
+				"loop_wait": int32(10),
+				"ttl":       int32(30),
+				"postgresql": map[string]any{
+					"parameters": map[string]any{},
+					"pg_hba": []string{
+						`"host" "mydb" "myuser" all scram-sha-256`,
+					},
+					"use_pg_rewind": true,
+					"use_slots":     false,
+				},
+			},
+		},
+		{
+			name: "authentication: rules appear after mandatory, before patroni input",
+			cluster: &v1beta1.PostgresCluster{
+				Spec: v1beta1.PostgresClusterSpec{
+					Authentication: &v1beta1.PostgresClusterAuthentication{
+						Rules: []v1beta1.PostgresAuthenticationRule{
+							{HBA: "host all all all ldap ldapserver=ldap.example.com"},
+						},
+					},
+				},
+			},
+			input: map[string]any{
+				"postgresql": map[string]any{
+					"pg_hba": []any{"custom"},
+				},
+			},
+			hbas: postgres.HBAs{
+				Mandatory: []*postgres.HostBasedAuthentication{
+					postgres.NewHBA().Local().Method("peer"),
+				},
+			},
+			expected: map[string]any{
+				"loop_wait": int32(10),
+				"ttl":       int32(30),
+				"postgresql": map[string]any{
+					"parameters": map[string]any{},
+					"pg_hba": []string{
+						"local all all peer",
+						"host all all all ldap ldapserver=ldap.example.com",
+						"custom",
+					},
+					"use_pg_rewind": true,
+					"use_slots":     false,
+				},
+			},
+		},
+		{
+			name: "authentication: rules prevent fallback default",
+			cluster: &v1beta1.PostgresCluster{
+				Spec: v1beta1.PostgresClusterSpec{
+					Authentication: &v1beta1.PostgresClusterAuthentication{
+						Rules: []v1beta1.PostgresAuthenticationRule{
+							{HBA: "host all all all ldap ldapserver=ldap.example.com"},
+						},
+					},
+				},
+			},
+			hbas: postgres.HBAs{
+				Mandatory: []*postgres.HostBasedAuthentication{
+					postgres.NewHBA().Local().Method("peer"),
+				},
+				Default: []*postgres.HostBasedAuthentication{
+					postgres.NewHBA().TLS().Method("scram-sha-256"),
+				},
+			},
+			expected: map[string]any{
+				"loop_wait": int32(10),
+				"ttl":       int32(30),
+				"postgresql": map[string]any{
+					"parameters": map[string]any{},
+					"pg_hba": []string{
+						"local all all peer",
+						"host all all all ldap ldapserver=ldap.example.com",
 					},
 					"use_pg_rewind": true,
 					"use_slots":     false,
