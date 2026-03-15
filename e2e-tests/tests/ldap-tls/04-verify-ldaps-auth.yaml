@@ -61,3 +61,28 @@ commands:
         exit 1
       fi
       echo "Wrong password correctly rejected"
+
+      # verify LDAP auth through PgBouncer
+      # PgBouncer requires TLS from the client (client_tls_sslmode=require)
+      pgb_result=""
+      for i in $(seq 6); do
+        pgb_result=$(kubectl exec --namespace "${NAMESPACE}" "${PRIMARY}" -c database \
+          -- bash -c 'PGPASSWORD=mysecretpassword PGSSLMODE=require \
+            psql -h ldap-tls-pgbouncer -p 5432 -U percona -d percona -tAc "SELECT current_user;" 2>&1') && break
+        echo "PgBouncer attempt ${i} failed: ${pgb_result}"
+        sleep 10
+      done
+
+      [[ "${pgb_result}" == "percona" ]] || {
+        echo >&2 "Expected current_user='percona' via PgBouncer, got: ${pgb_result}"
+        exit 1
+      }
+
+      # verify wrong password is rejected through PgBouncer
+      if pgb_bad=$(kubectl exec --namespace "${NAMESPACE}" "${PRIMARY}" -c database \
+        -- bash -c 'PGPASSWORD=wrongpassword PGSSLMODE=require \
+          psql -h ldap-tls-pgbouncer -p 5432 -U percona -d percona -tAc "SELECT current_user;" 2>&1'); then
+        echo >&2 "Expected authentication failure with wrong password via PgBouncer, but login succeeded: ${pgb_bad}"
+        exit 1
+      fi
+      echo "Wrong password via PgBouncer correctly rejected"
