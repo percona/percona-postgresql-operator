@@ -15,7 +15,16 @@ commands:
       elif [[ "$platform" == "digitalocean" ]]; then
         snapshot_class='do-block-storage'
       fi
-      get_cr "backup-snapshot" ${RANDOM} \
-        | yq ".spec.backups.volumeSnapshots.className=\"$snapshot_class\"" \
-        | yq '.spec.backups.volumeSnapshots.mode="offline"' \
-        | kubectl -n "${NAMESPACE}" apply -f -
+
+      if [[ "$platform" == "eks" ]]; then
+        get_cr "backup-snapshot" ${RANDOM} \
+          | yq '.spec.instances[0].dataVolumeClaimSpec.storageClassName="ebs-csi-gp3"' \
+          | yq ".spec.backups.volumeSnapshots.className=\"$snapshot_class\"" \
+          | yq '.spec.backups.volumeSnapshots.mode="offline"' \
+          | kubectl -n "${NAMESPACE}" apply -f -
+      else
+        get_cr "backup-snapshot" ${RANDOM} \
+          | yq ".spec.backups.volumeSnapshots.className=\"$snapshot_class\"" \
+          | yq '.spec.backups.volumeSnapshots.mode="offline"' \
+          | kubectl -n "${NAMESPACE}" apply -f -
+      fi
