@@ -185,7 +185,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
 		assert.Equal(t, "ErrorGettingLag", cond.Reason)
-		assert.Equal(t, "Invalid output from lag query. The WAL receiver is probably not active", cond.Message)
+		assert.Equal(t, "Invalid output from lag query. The WAL receiver may not be active", cond.Message)
 	})
 
 	t.Run("lag not detected", func(t *testing.T) {
