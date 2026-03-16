@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
@@ -118,6 +119,7 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		ready += is.ReadyReplicas
 	}
 
+	log := logging.FromContext(ctx)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cluster := &v2.PerconaPGCluster{}
 		if err := r.Client.Get(ctx, types.NamespacedName{
@@ -141,7 +143,7 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 
 		if err := r.reconcileStandbyLag(ctx, cluster); err != nil {
-			return errors.Wrap(err, "reconcile replication lag status")
+			log.Error(err, "reconcile replication lag status")
 		}
 
 		cluster.Status.ObservedGeneration = cluster.Generation

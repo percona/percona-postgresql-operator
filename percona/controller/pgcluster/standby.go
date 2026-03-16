@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,19 +79,23 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 			Reason:  "ErrorGettingLag",
 			Message: err.Error(),
 		}
-		defer func() {
-			meta.SetStatusCondition(&cr.Status.Conditions, cond)
-		}()
 
 		if errors.Is(err, ErrPrimaryPodNotFound) {
 			cond.Message = "Cannot find primary for replication lag calculation"
-			return nil
 		}
 		if errors.Is(err, ErrInvalidLagQueryOutput) {
-			cond.Message = "Invalid output from lag query. The WAL receiver is probably not active"
-			return nil
+			cond.Message = "Invalid output from lag query. The WAL receiver may not be active"
 		}
-		return errors.Wrap(err, "calculate replication lag bytes")
+
+		// If the standby was previously lagging, we should mark the pod as ready again since now
+		// we do not know the actual state of lag.
+		if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) {
+			if err := r.setPodReplicationLagSignal(ctx, cr, true); err != nil {
+				return errors.Wrap(err, "set pod replication readiness signal")
+			}
+		}
+		meta.SetStatusCondition(&cr.Status.Conditions, cond)
+		return nil
 	}
 
 	maxLag := cr.Spec.Standby.MaxAcceptableLag.AsDec().UnscaledBig().Int64()
@@ -158,10 +163,30 @@ func (r *PGClusterReconciler) setPodReplicationLagSignal(
 }
 
 func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
+	var errs error
+	log := logging.FromContext(ctx)
 	if standby.Spec.Standby.Host != "" {
-		return r.getLagFromStreamingHost(ctx, standby)
+		lag, err := r.getLagFromStreamingHost(ctx, standby)
+		if err == nil {
+			return lag, nil
+		}
+		log.Error(err, "Failed to get lag from streaming host")
+
+		// Fallthrough to pgbackrest repo only if configured
+		if standby.Spec.Standby.RepoName == "" {
+			return 0, err
+		}
+
+		errs = multierror.Append(errs, errors.Wrap(err, "get lag from streaming host"))
+		log.Info("Falling back to using pgbackrest repo for lag calculation")
 	}
-	return r.getLagFromMainSite(ctx, standby)
+
+	lag, err := r.getLagFromMainSite(ctx, standby)
+	if err != nil {
+		log.Error(err, "Failed to get lag from main site")
+		return 0, multierror.Append(errs, errors.Wrap(err, "get lag from main site"))
+	}
+	return lag, nil
 }
 
 var (
