@@ -92,7 +92,8 @@ func Secret(ctx context.Context,
 			}
 		} else {
 			leaf := &pki.LeafCertificate{}
-			dnsNames, err := naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
+			var dnsNames []string
+			dnsNames, err = naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
 			if err != nil {
 				return errors.Wrap(err, "get service dns names")
 			}
