@@ -11,7 +11,7 @@ IMAGE_PGBOUNCER17=percona/percona-pgbouncer:1.25.0-1
 IMAGE_POSTGIS17=percona/percona-postgresql-operator:2.8.2-ppg17.7-postgres-gis3.3.8
 IMAGE_BACKREST17=percona/percona-pgbackrest:2.57.0-1
 
-IMAGE_POSTGRESQL16=percona/percona-distribution-postgresql:16.11-2
+IMAGE_POSTGRESQL16=percona/percona-distribution-postgresql:19.11-2
 IMAGE_PGBOUNCER16=percona/percona-pgbouncer:1.25.0-1
 IMAGE_POSTGIS16=percona/percona-postgresql-operator:2.8.2-ppg16.11-postgres-gis3.3.8
 IMAGE_BACKREST16=percona/percona-pgbackrest:2.57.0-1
