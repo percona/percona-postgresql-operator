@@ -31,7 +31,7 @@ status:
         stanzaCreated: true
     restore:
       finished: true
-      id: demand-backup-restore
+      id: demand-backup-restore-repo1
       succeeded: 1
   proxy:
     pgBouncer:
@@ -52,7 +52,7 @@ status:
         stanzaCreated: true
     restore:
       finished: true
-      id: demand-backup-restore
+      id: demand-backup-restore-repo1
       succeeded: 1
   pgbouncer:
     ready: 3
@@ -69,7 +69,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: demand-backup-restore
+  name: demand-backup-restore-repo1
 spec:
   pgCluster: demand-backup
   repoName: repo1
