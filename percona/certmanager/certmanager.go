@@ -465,18 +465,22 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 	secretMeta := naming.PGBackRestClientCertSecret(cluster)
 	certName := cluster.Name + "-pgbackrest-client-cert"
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get pgbackrest client certificate")
-	}
-
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
 		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update pgbackrest client certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get pgbackrest client certificate")
 	}
 
 	// The common name must match what pgBackRest expects in its tls-server-auth option.
@@ -540,18 +544,22 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 	secretMeta := naming.PGBackRestRepoCertSecret(cluster)
 	certName := cluster.Name + "-pgbackrest-repo-cert"
 
-	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get pgbackrest repo certificate")
-	}
-
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
 		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+			return nil
+		}
+		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update pgbackrest repo certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get pgbackrest repo certificate")
 	}
 
 	cert := &v1.Certificate{
