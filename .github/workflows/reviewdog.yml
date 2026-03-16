@@ -103,6 +103,7 @@ jobs:
         run: |
           make generate VERSION=main
           git diff --exit-code
+
   e2e-release-versions-images:
     name: e2e-tests release_versions image availability
     runs-on: ubuntu-latest
@@ -131,6 +132,7 @@ jobs:
           fi
           failed=""
           for img in $images; do
+            echo "Checking image $img"
             if ! docker manifest inspect "$img"; then
               echo "::error::Image not found or inaccessible: $img"
               failed="${failed} ${img}"
