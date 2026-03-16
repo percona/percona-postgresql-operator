@@ -450,6 +450,159 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
+func TestValidateDynamicConfiguration(t *testing.T) {
+	tests := map[string]struct {
+		cr      *PerconaPGCluster
+		wantErr string
+	}{
+		"nil patroni": {
+			cr: &PerconaPGCluster{},
+		},
+		"nil dynamic configuration": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{},
+				},
+			},
+		},
+		"no postgresql key": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"ttl": 30,
+						},
+					},
+				},
+			},
+		},
+		"postgresql is not a map": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": "invalid",
+						},
+					},
+				},
+			},
+		},
+		"no parameters key": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"use_slots": true,
+							},
+						},
+					},
+				},
+			},
+		},
+		"parameters is not a map": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": "invalid",
+							},
+						},
+					},
+				},
+			},
+		},
+		"wal_level is not set": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"max_connections": "100",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"wal_level is replica": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"wal_level": "replica",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"wal_level is logical": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"wal_level": "logical",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"wal_level is minimal": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"wal_level": "minimal",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: "wal_level cannot be set to 'minimal'",
+		},
+		"wal_level is not a string": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"wal_level": 123,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := tt.cr.ValidateDynamicConfiguration()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestShouldCheckStandbyLag(t *testing.T) {
 	testCases := []struct {
 		descr    string

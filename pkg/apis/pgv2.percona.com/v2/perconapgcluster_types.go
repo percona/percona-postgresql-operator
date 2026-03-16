@@ -345,6 +345,32 @@ func (cr *PerconaPGCluster) Validate() error {
 	if cr.Spec.DataSource != nil && cr.Spec.Backups.PGBackRest.Image == "" && os.Getenv("RELATED_IMAGE_PGBACKREST") == "" {
 		return errors.New("spec.backups.pgbackrest.image or RELATED_IMAGE_PGBACKREST is required when spec.dataSource is set")
 	}
+	if err := cr.ValidateDynamicConfiguration(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cr *PerconaPGCluster) ValidateDynamicConfiguration() error {
+	if cr.Spec.Patroni == nil || cr.Spec.Patroni.DynamicConfiguration == nil {
+		return nil
+	}
+
+	postgresql, ok := cr.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	params, ok := postgresql["parameters"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	walLevel, ok := params["wal_level"].(string)
+	if ok && walLevel == "minimal" {
+		return errors.New("wal_level cannot be set to 'minimal'")
+	}
+
 	return nil
 }
 
