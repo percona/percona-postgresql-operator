@@ -277,7 +277,7 @@ deploy_s3_secrets() {
 
 		case $test_name in
 			"demand-backup")
-				repo_auth+=$(get_repo_auth repo2 s3 $key $secret)
+				repo_auth+=$(get_repo_auth repo3 s3 $key $secret)
 			;;
 			"scheduled-backup")
 				repo_auth+=$(get_repo_auth repo2 s3 $key $secret)
