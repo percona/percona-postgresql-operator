@@ -1557,7 +1557,7 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 			naming.LabelInstance:    instance.Name,
 		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
-	instanceCerts.Type = corev1.SecretTypeOpaque
+	instanceCerts.Type = corev1.SecretTypeTLS
 	instanceCerts.Data = make(map[string][]byte)
 
 	if existing.Data != nil {
@@ -1568,45 +1568,27 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 			instanceCerts.Data["dns.key"] = tlsKey
 		}
 	}
+	
+	if len(instanceCerts.Data["dns.crt"]) == 0 || len(instanceCerts.Data["dns.key"]) == 0 {
+		return &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}, nil
+	}
 
-	if len(instanceCerts.Data["dns.crt"]) > 0 && len(instanceCerts.Data["dns.key"]) > 0 {
-		leafCert := &pki.LeafCertificate{}
-		_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
-		_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
+	leafCert := &pki.LeafCertificate{}
+	_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
+	_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
 
-		err = patroni.InstanceCertificates(ctx,
-			rootCertificateAuth.Certificate, leafCert.Certificate,
-			leafCert.PrivateKey, instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add patroni certificates")
-		}
+	err = patroni.InstanceCertificates(ctx,
+		rootCertificateAuth.Certificate, leafCert.Certificate,
+		leafCert.PrivateKey, instanceCerts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to add patroni certificates")
+	}
 
-		err = pgbackrest.InstanceCertificates(ctx, cluster,
-			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
-			instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
-		}
-	} else {
-		var leafCert *pki.LeafCertificate
-		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth, cluster.Spec.ClusterServiceDNSSuffix)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate instance certificate")
-		}
-
-		err = patroni.InstanceCertificates(ctx,
-			rootCertificateAuth.Certificate, leafCert.Certificate,
-			leafCert.PrivateKey, instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add patroni certificates")
-		}
-
-		err = pgbackrest.InstanceCertificates(ctx, cluster,
-			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
-			instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
-		}
+	err = pgbackrest.InstanceCertificates(ctx, cluster,
+		rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
+		instanceCerts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
 	}
 
 	err = errors.WithStack(r.apply(ctx, instanceCerts))
