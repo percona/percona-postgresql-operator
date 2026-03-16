@@ -12,10 +12,23 @@ commands:
       PGO_FEATURE_GATES="BackupSnapshots=true" deploy_operator
       deploy_client
       deploy_s3_secrets
----
-apiVersion: snapshot.storage.k8s.io/v1
-kind: VolumeSnapshotClass
-metadata:
-  name: gke-snapshot-class
-driver: pd.csi.storage.gke.io
-deletionPolicy: Delete
+      snapshot_class='gke-snapshot-class'
+      snapshot_driver='pd.csi.storage.gke.io'
+      platform=$(detect_k8s_platform)
+
+      if [[ "$platform" == "eks" ]]; then
+        snapshot_class='eks-snapshot-class'
+        snapshot_driver='ebs.csi.aws.com'
+      elif [[ "$platform" == "digitalocean" ]]; then
+        snapshot_class='do-block-storage'
+        snapshot_driver='dobs.csi.digitalocean.com'
+      fi
+
+      cat <<EOF | kubectl apply -f -
+      apiVersion: snapshot.storage.k8s.io/v1
+      kind: VolumeSnapshotClass
+      metadata:
+        name: ${snapshot_class}
+      driver: ${snapshot_driver}
+      deletionPolicy: Delete
+      EOF

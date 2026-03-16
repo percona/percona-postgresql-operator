@@ -10,7 +10,9 @@ commands:
       
       snapshot_class='gke-snapshot-class'
       platform=$(detect_k8s_platform)
-      if [[ "$platform" == "digitalocean" ]]; then
+      if [[ "$platform" == "eks" ]]; then
+        snapshot_class='eks-snapshot-class'
+      elif [[ "$platform" == "digitalocean" ]]; then
         snapshot_class='do-block-storage'
       fi
       get_cr "backup-snapshot" ${RANDOM} \
