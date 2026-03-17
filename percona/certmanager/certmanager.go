@@ -562,6 +562,11 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 		return errors.Wrap(err, "failed to get pgbackrest repo certificate")
 	}
 
+	clusterName := cluster.Name
+	if len(clusterName) > 54 {
+		clusterName = clusterName[:54]
+	}
+
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
@@ -572,7 +577,7 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretMeta.Name,
-			CommonName: cluster.Name + "-pgbackrest-repo",
+			CommonName: clusterName + "-pgbackrest-repo",
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.IssuerReference{
 				Name: naming.TLSIssuer(cluster).Name,
