@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"os"
+	"slices"
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -367,8 +368,8 @@ func (cr *PerconaPGCluster) ValidateDynamicConfiguration() error {
 	}
 
 	walLevel, ok := params["wal_level"].(string)
-	if ok && walLevel == "minimal" {
-		return errors.New("wal_level cannot be set to 'minimal'")
+	if ok && slices.Index([]string{"logical", "replica"}, walLevel) < 0 {
+		return errors.New("wal_level must be 'logical' or 'replica'")
 	}
 
 	return nil

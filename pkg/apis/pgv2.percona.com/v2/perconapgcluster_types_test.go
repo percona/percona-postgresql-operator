@@ -572,7 +572,7 @@ func TestValidateDynamicConfiguration(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "wal_level cannot be set to 'minimal'",
+			wantErr: "wal_level must be 'logical' or 'replica'",
 		},
 		"wal_level is not a string": {
 			cr: &PerconaPGCluster{
