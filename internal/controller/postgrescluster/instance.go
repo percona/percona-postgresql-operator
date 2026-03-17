@@ -1499,14 +1499,15 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	rootCertificateAuth *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
-	// Check if cert-manager is installed
-	certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
-	}
+	if cluster.Spec.CustomTLSSecret == nil {
+		certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
+		}
 
-	if certManagerInstalled {
-		return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+		if certManagerInstalled {
+			return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+		}
 	}
 
 	// Fall back to internal certificate generation

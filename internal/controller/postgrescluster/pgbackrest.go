@@ -2227,9 +2227,13 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	// }
 
 	if err == nil && repoHost != nil {
-		certManagerInstalled, certErr := r.isCertManagerInstalled(ctx, cluster.Namespace)
-		if certErr != nil {
-			return errors.Wrap(certErr, "failed to check if cert-manager is installed")
+		certManagerInstalled := false
+		if cluster.Spec.CustomTLSSecret == nil {
+			var certErr error
+			certManagerInstalled, certErr = r.isCertManagerInstalled(ctx, cluster.Namespace)
+			if certErr != nil {
+				return errors.Wrap(certErr, "failed to check if cert-manager is installed")
+			}
 		}
 
 		if certManagerInstalled {
