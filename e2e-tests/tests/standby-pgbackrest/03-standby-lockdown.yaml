@@ -15,4 +15,8 @@ commands:
         exit 1
       fi
       
-      kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c 'iptables -A OUTPUT -p tcp -m string --string "s3.amazonaws.com" --algo bm -j DROP'
+      endpoint=$(kubectl get pg standby-cluster -n "${NAMESPACE}" \
+        -o jsonpath='{.spec.backups.pgbackrest.repos[?(@.name=="repo1")].s3.endpoint}')
+
+      kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c \
+        "iptables -A OUTPUT -p tcp -m string --string \"$endpoint\" --algo bm -j DROP"
