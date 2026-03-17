@@ -572,7 +572,7 @@ func TestValidateDynamicConfiguration(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "wal_level must be 'logical' or 'replica'",
+			wantErr: "invalid value for spec.patroni.dynamicConfiguration.postgresql.parameters.wal_level: \"minimal\"; must be 'logical' or 'replica'",
 		},
 		"wal_level is not a string": {
 			cr: &PerconaPGCluster{
