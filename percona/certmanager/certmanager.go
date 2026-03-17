@@ -466,8 +466,8 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 	certName := cluster.Name + "-pgbackrest-client-cert"
 
 	certDuration := DefaultCertDuration
-	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
-		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.PGBackRestCertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.PGBackRestCertValidityDuration.Duration
 	}
 
 	existing := &v1.Certificate{}
@@ -545,8 +545,8 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 	certName := cluster.Name + "-pgbackrest-repo-cert"
 
 	certDuration := DefaultCertDuration
-	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
-		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.PGBackRestCertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.PGBackRestCertValidityDuration.Duration
 	}
 
 	existing := &v1.Certificate{}

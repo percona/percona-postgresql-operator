@@ -255,6 +255,8 @@ type TLSSpec struct {
 	CertValidityDuration *metav1.Duration `json:"certValidityDuration,omitempty"`
 	// +optional
 	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
+	// +optional
+	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.

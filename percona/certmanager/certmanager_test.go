@@ -592,6 +592,52 @@ func TestApplyPGBackRestRepoCertificate(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "dnsNames cannot be empty")
 	})
+
+	t.Run("uses pgBackRestCertValidityDuration when set", func(t *testing.T) {
+		pgbrDuration := 4320 * time.Hour // 180 days
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-repo-cert-pgbr-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			PGBackRestCertValidityDuration: &metav1.Duration{Duration: pgbrDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{cluster.Name + "-repo-host-0." + cluster.Name + "-pgbackrest.test-namespace.svc"}
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-pgbackrest-repo-cert",
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, pgbrDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("certValidityDuration does not affect pgbackrest repo certificate", func(t *testing.T) {
+		certDuration := 2160 * time.Hour // 90 days
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-repo-cert-no-fallback"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: certDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{cluster.Name + "-repo-host-0." + cluster.Name + "-pgbackrest.test-namespace.svc"}
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-pgbackrest-repo-cert",
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, DefaultCertDuration, cert.Spec.Duration.Duration)
+	})
 }
 
 func TestApplyPGBackRestClientCertificate(t *testing.T) {
@@ -637,6 +683,28 @@ func TestApplyPGBackRestClientCertificate(t *testing.T) {
 		// return nil when certificate already exists
 		err = ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster)
 		require.NoError(t, err)
+	})
+
+	t.Run("uses pgBackRestCertValidityDuration when set", func(t *testing.T) {
+		pgbrDuration := 4320 * time.Hour // 180 days
+		cluster := testCluster()
+		cluster.Name = "pgbackrest-client-cert-pgbr-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			PGBackRestCertValidityDuration: &metav1.Duration{Duration: pgbrDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-pgbackrest-client-cert",
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, pgbrDuration, cert.Spec.Duration.Duration)
 	})
 }
 
@@ -748,6 +816,57 @@ func TestUpdateCertificateDuration(t *testing.T) {
 		err = client.Get(t.Context(), sigs.ObjectKey{
 			Namespace: cluster.Namespace,
 			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("pgbackrest client certificate duration updated when pgBackRestCertValidityDuration changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-pgbr-client-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			PGBackRestCertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.PGBackRestCertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-pgbackrest-client-cert",
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("pgbackrest repo certificate duration updated when pgBackRestCertValidityDuration changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-pgbr-repo-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			PGBackRestCertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{cluster.Name + "-repo-host-0." + cluster.Name + "-pgbackrest.test-namespace.svc"}
+		err := ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.PGBackRestCertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-pgbackrest-repo-cert",
 		}, cert)
 		require.NoError(t, err)
 		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
