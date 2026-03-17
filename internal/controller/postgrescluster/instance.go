@@ -1568,7 +1568,6 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 			instanceCerts.Data["dns.key"] = tlsKey
 		}
 	}
-	
 	if len(instanceCerts.Data["dns.crt"]) == 0 || len(instanceCerts.Data["dns.key"]) == 0 {
 		return &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}, nil
 	}
