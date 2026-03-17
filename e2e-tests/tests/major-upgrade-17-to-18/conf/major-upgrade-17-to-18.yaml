@@ -1,7 +1,7 @@
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: major-upgrade
+  name: major-upgrade-17-to-18
 spec:
   extensions:
     image: <image>
