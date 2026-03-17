@@ -1,0 +1,22 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: standby-cluster
+spec:
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: standby-pgbackrest-pgbackrest-secrets
+      manual:
+        repoName: repo1
+        options:
+          - --type=full
+      global:
+        repo1-path: /backrestrepo/postgres-operator/<repo-path>/repo1
+      repos:
+        - name: repo1
+          s3:
+            bucket: <bucket>
+            endpoint: s3.amazonaws.com
+            region: us-east-1

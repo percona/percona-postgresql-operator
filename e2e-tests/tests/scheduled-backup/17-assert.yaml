@@ -33,7 +33,7 @@ status:
         stanzaCreated: true
     restore:
       finished: true
-      id: azure-restore
+      id: repo3-restore
       succeeded: 1
   proxy:
     pgBouncer:
@@ -43,6 +43,6 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: azure-restore
+  name: repo3-restore
 status:
   state: Succeeded

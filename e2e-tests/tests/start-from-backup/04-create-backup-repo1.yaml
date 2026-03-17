@@ -1,7 +1,7 @@
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
-  name: start-from-backup-source-full-s3
+  name: start-from-backup-source-full-repo1
 spec:
   pgCluster: start-from-backup-source
   repoName: repo1

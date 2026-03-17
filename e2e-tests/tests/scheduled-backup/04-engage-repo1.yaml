@@ -9,8 +9,9 @@ commands:
           .spec.backups.pgbackrest.repos as $repos |
           [
             {
-              op: "remove",
-              path: "/spec/backups/pgbackrest/repos/\($repos | map(.name=="repo3") | index(true))/schedules"
+              op: "add",
+              path: "/spec/backups/pgbackrest/repos/\($repos | map(.name=="repo1") | index(true))/schedules",
+              value: { full: "*/5 * * * *" }
             }
           ]
         '
