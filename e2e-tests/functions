@@ -247,32 +247,71 @@ deploy_minio() {
 		/usr/bin/aws --endpoint-url http://minio-service:9000 s3 mb s3://operator-testing"
 }
 
-deploy_s3_secrets() {
-	set +o xtrace
-	printf "[global]\nrepo1-s3-key=%s\nrepo1-s3-key-secret=%s\n" \
-		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_ACCESS_KEY_ID' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
-		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
-		>"${TEMP_DIR}/pgbackrest-secret.ini"
+get_repo_auth() {
+	local repo=$1
+	local type=$2
+	local key=$3
+	local secret=$4
 
-	if [[ $test_name == "demand-backup" || $test_name == "scheduled-backup" ]]; then
-		printf "repo3-azure-account=%s\nrepo3-azure-key=%s\n" \
-			"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_NAME' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
-			"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
-			>>"${TEMP_DIR}/pgbackrest-secret.ini"
+	auth="${repo}-${type}-key=${key}\n${repo}-${type}-key-secret=${secret}"
+	if [[ "$type" == "azure" ]]; then
+		auth="${repo}-${type}-account=${key}\n${repo}-${type}-key=${secret}"
+	elif [[ "$type" == "gcs" ]]; then
+		auth="${repo}-${type}-key=${key}"
 	fi
 
-	case ${test_name} in
-		"scheduled-backup")
-			printf 'repo2-gcs-key=/etc/pgbackrest/conf.d/gcs-key.json\n' >>"${TEMP_DIR}/pgbackrest-secret.ini"
-			yq eval '.stringData["credentials.json"]' ${TESTS_CONFIG_DIR}/cloud-secret-minio-gw.yml >${TEMP_DIR}/gcs-key.json
-			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini" --from-file=gcs-key.json=${TEMP_DIR}/gcs-key.json
+	echo "\n$auth"
+}
+
+deploy_s3_secrets() {
+	set +o xtrace
+
+	local platform=${1:-$(detect_k8s_platform)}
+	local repo_auth=""
+	local secret_args=()
+
+	if [[ $platform == "digitalocean" ]]; then
+		key=$(yq eval 'select(.metadata.name=="*spaces*").data.ACCESS_KEY_ID' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		secret=$(yq eval 'select(.metadata.name=="*spaces*").data.SECRET_ACCESS_KEY' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		repo_auth+=$(get_repo_auth repo1 s3 $key $secret)
+
+		case $test_name in
+			"demand-backup")
+				repo_auth+=$(get_repo_auth repo2 s3 $key $secret)
 			;;
-		"custom-extensions"  | "builtin-extensions" | major-upgrade*)
-			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
-			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+			"scheduled-backup")
+				repo_auth+=$(get_repo_auth repo2 s3 $key $secret)
+				repo_auth+=$(get_repo_auth repo3 s3 $key $secret)
 			;;
-		*)
-			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini"
+		esac
+	else
+		key=$(yq eval 'select(.metadata.name=="*s3*").data.AWS_ACCESS_KEY_ID' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		secret=$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		azure_key=$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_NAME' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		azure_secret=$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_KEY' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		repo_auth+=$(get_repo_auth repo1 s3 $key $secret)
+
+		case $test_name in
+			"demand-backup")
+				repo_auth+=$(get_repo_auth repo3 azure $azure_key $azure_secret)
+			;;
+			"scheduled-backup")
+				repo_auth+=$(get_repo_auth repo2 gcs "/etc/pgbackrest/conf.d/gcs-key.json")
+				repo_auth+=$(get_repo_auth repo3 azure $azure_key $azure_secret)
+				yq eval '.stringData["credentials.json"]' "$TESTS_CONFIG_DIR/cloud-secret-minio-gw.yml" > "$TEMP_DIR/gcs-key.json"
+				secret_args+=(--from-file=gcs-key.json="$TEMP_DIR/gcs-key.json")
+			;;
+		esac
+	fi
+
+	printf "[global]%b" "$repo_auth" > "$TEMP_DIR/pgbackrest-secret.ini"
+	secret_args+=(--from-file=cloud.conf="$TEMP_DIR/pgbackrest-secret.ini")
+	kubectl -n "$NAMESPACE" create secret generic "${test_name}-pgbackrest-secrets" "${secret_args[@]}"
+
+	case $test_name in
+		"custom-extensions" | "builtin-extensions" | major-upgrade* )
+			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/cloud-secret.yml"
+			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/minio-secret.yml"
 			;;
 	esac
 
@@ -289,13 +328,29 @@ get_client_pod() {
 
 get_cr() {
 	local cr_name=$1
-	if [ -z ${cr_name} ]; then
-		cr_name=${test_name}
-	fi
 	local repo_path=$2
 	local source_path=$3
+	if [ -z "$cr_name" ]; then
+		cr_name=${test_name}
+	fi
 
-	yq eval '
+	local platform="$(detect_k8s_platform)"
+	local cr_file="$TEST_CONFIG_DIR/${cr_name}.yaml"
+	local spaces_cr_file="$TEST_CONFIG_DIR/${cr_name}-spaces.yaml"
+	local aks_cr_file="$TEST_CONFIG_DIR/${cr_name}-aks.yaml"
+	if [[ $platform == "digitalocean" && -f "$spaces_cr_file" ]]; then
+		cr_file=$spaces_cr_file
+	elif [[ $platform == "aks" && -f "$aks_cr_file" ]]; then	
+		cr_file=$aks_cr_file
+	fi
+
+	local crs=("$DEPLOY_DIR/cr.yaml")
+	if [[ -f "$cr_file" ]]; then
+		crs+=($cr_file)
+	fi
+
+	yq eval-all '
+		select(fileIndex == 0) * (select(fileIndex == 1) // {}) |
 		.metadata.name = "'${cr_name}'" |
 		.metadata.labels = {"e2e":"'${cr_name}'"} |
 		.spec.postgresVersion = '$PG_VER' |
@@ -309,77 +364,18 @@ get_cr() {
 		.spec.pmm.secret = "'${cr_name}'-pmm-secret" |
 		.spec.pmm.customClusterName = "'${cr_name}'-pmm-custom-name" |
 		.spec.pmm.postgresParams = "--environment=dev-postgres"
-		' $DEPLOY_DIR/cr.yaml >$TEMP_DIR/cr.yaml
+	' "${crs[@]}" > "$TEMP_DIR/cr.yaml"
+
+	sed -i "s|<repo-path>|$repo_path|g" "$TEMP_DIR/cr.yaml"
+	sed -i "s|<source-path>|$source_path|g" "$TEMP_DIR/cr.yaml"
+	sed -i "s|<bucket>|$BUCKET|g" "$TEMP_DIR/cr.yaml"
+	sed -i "s|<image>|$IMAGE|g" "$TEMP_DIR/cr.yaml"
 
 	if [[ $OPENSHIFT ]]; then
-		yq eval -i '.spec.openshift = true' $TEMP_DIR/cr.yaml
+		yq eval -i '.spec.openshift = true' "$TEMP_DIR/cr.yaml"
 	fi
 
-	case $test_name in
-		"demand-backup" | "start-from-backup" | "standby-pgbackrest")
-			yq eval -i '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
-				.spec.backups.pgbackrest.manual.repoName = "repo1" |
-				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
-				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
-				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
-				' $TEMP_DIR/cr.yaml
-			if [[ $test_name == "demand-backup" ]]; then
-				yq eval -i '
-				.spec.backups.pgbackrest.global.repo3-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo3" |
-				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
-				' $TEMP_DIR/cr.yaml
-			fi
-			if [[ $test_name == "start-from-backup" && ! $cr_name =~ "source" ]]; then
-				yq eval -i '
-					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
-					.spec.dataSource.pgbackrest.stanza = "db" |
-					.spec.dataSource.pgbackrest.global.repo1-path = "'${source_path}'" |
-					.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
-					' $TEMP_DIR/cr.yaml
-			fi
-			;;
-		"scheduled-backup")
-			yq eval -i '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
-				.spec.backups.pgbackrest.manual.repoName = "repo1" |
-				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
-				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
-				.spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo2" |
-				.spec.backups.pgbackrest.global.repo3-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo3" |
-				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
-				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}] |
-				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
-				' $TEMP_DIR/cr.yaml
-			;;
-		major-upgrade*)
-			yq eval -i '
-				.spec.extensions.image = "'$IMAGE'" |
-				.spec.extensions.imagePullPolicy = "Always" |
-				.spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
-			    ' $TEMP_DIR/cr.yaml
-			;;
-		"custom-extensions")
-			yq eval -i '
-				.spec.extensions.image = "'$IMAGE'" |
-				.spec.extensions.imagePullPolicy = "Always" |
-				.spec.extensions.storage = {"type": "s3", "bucket": "operator-testing", "region": "us-east-1", "endpoint": "http://minio-service:9000", "forcePathStyle": true, "disableSSL": true, "secret": {"name": "minio-secret"}}
-			    ' $TEMP_DIR/cr.yaml
-			;;
-		"huge-pages")
-			if [ "${platform}" == "aks" ]; then
-				yq eval -i '
-          .spec.instances |= (
-            .[] |= (
-              .affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms =
-                [{"matchExpressions":[{"key":"hugepages","operator":"In","values":["enabled"]}]}]
-            )
-          )
-        ' "$TEMP_DIR/cr.yaml"
-			fi
-			;;
-	esac
-	cat $TEMP_DIR/cr.yaml
+	cat "$TEMP_DIR/cr.yaml"
 }
 
 run_comand_on_pod() {
