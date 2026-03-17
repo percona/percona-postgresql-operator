@@ -369,7 +369,7 @@ func (cr *PerconaPGCluster) ValidateDynamicConfiguration() error {
 
 	walLevel, ok := params["wal_level"].(string)
 	if ok && slices.Index([]string{"logical", "replica"}, walLevel) < 0 {
-		return errors.New("wal_level must be 'logical' or 'replica'")
+		return errors.Errorf("invalid value for spec.patroni.dynamicConfiguration.postgresql.parameters.wal_level: %q; must be 'logical' or 'replica'", walLevel)
 	}
 
 	return nil
