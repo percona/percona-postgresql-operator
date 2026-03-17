@@ -105,7 +105,7 @@ deploy_operator_gh() {
 
 	curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/${cw_prefix}operator.yaml" >"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml"
 
-	local docker_hub_org=$(echo "$IMAGE" | sed -E 's|(.*/)?([^/]+)/[^/]+(:.*)?|\2|')
+	local docker_hub_org=$(echo "$IMAGE" | $sed -E 's|(.*/)?([^/]+)/[^/]+(:.*)?|\2|')
 	yq eval '.spec.template.spec.containers[0].image = "'${REGISTRY_NAME_FULL}''$docker_hub_org'/percona-postgresql-operator:'${git_tag#v}'"' \
 		"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml" \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
@@ -366,10 +366,10 @@ get_cr() {
 		.spec.pmm.postgresParams = "--environment=dev-postgres"
 	' "${crs[@]}" > "$TEMP_DIR/cr.yaml"
 
-	sed -i "s|<repo-path>|$repo_path|g" "$TEMP_DIR/cr.yaml"
-	sed -i "s|<source-path>|$source_path|g" "$TEMP_DIR/cr.yaml"
-	sed -i "s|<bucket>|$BUCKET|g" "$TEMP_DIR/cr.yaml"
-	sed -i "s|<image>|$IMAGE|g" "$TEMP_DIR/cr.yaml"
+	$sed -i "s|<repo-path>|$repo_path|g" "$TEMP_DIR/cr.yaml"
+	$sed -i "s|<source-path>|$source_path|g" "$TEMP_DIR/cr.yaml"
+	$sed -i "s|<bucket>|$BUCKET|g" "$TEMP_DIR/cr.yaml"
+	$sed -i "s|<image>|$IMAGE|g" "$TEMP_DIR/cr.yaml"
 
 	if [[ $OPENSHIFT ]]; then
 		yq eval -i '.spec.openshift = true' "$TEMP_DIR/cr.yaml"
@@ -663,7 +663,7 @@ generate_pmm3_server_token() {
 		-w "\n%{http_code}")
 
 	create_status_code=$(echo "$create_response" | tail -n1)
-	create_json_response=$(echo "$create_response" | sed '$ d')
+	create_json_response=$(echo "$create_response" | $sed '$ d')
 
 	if [[ $create_status_code -ne 201 ]]; then
 		echo "Error: Failed to create PMM service account. HTTP Status: $create_status_code" >&2
@@ -687,7 +687,7 @@ generate_pmm3_server_token() {
 		-w "\n%{http_code}")
 
 	token_status_code=$(echo "$token_response" | tail -n1)
-	token_json_response=$(echo "$token_response" | sed '$ d')
+	token_json_response=$(echo "$token_response" | $sed '$ d')
 
 	if [[ $token_status_code -ne 200 ]]; then
 		echo "Error: Failed to create token. HTTP Status: $token_status_code" >&2
@@ -807,7 +807,7 @@ deploy_chaos_mesh() {
 }
 
 destroy_chaos_mesh() {
-	local chaos_mesh_ns=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}' | sed 's/NAMESPACE//')
+	local chaos_mesh_ns=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}' | $sed 's/NAMESPACE//')
 
 	if [ -n "${chaos_mesh_ns}" ]; then
 		helm uninstall --wait --timeout 60s chaos-mesh --namespace ${chaos_mesh_ns} || :
@@ -1454,7 +1454,7 @@ enable_hugepages_aks() {
 		-o tsv 2>/dev/null || true)"
 	[[ -n $aks_id ]] || return 1
 
-	cluster_name="$(echo "$aks_id" | sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
+	cluster_name="$(echo "$aks_id" | $sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
 	[[ -n $cluster_name ]] || return 1
 
 	if [[ -z ${cluster_name} ]]; then
