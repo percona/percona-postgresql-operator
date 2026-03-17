@@ -24,6 +24,8 @@ import (
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
+var allowedWALLevels = []string{"logical", "replica"}
+
 func init() {
 	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
 }
@@ -368,7 +370,7 @@ func (cr *PerconaPGCluster) ValidateDynamicConfiguration() error {
 	}
 
 	walLevel, ok := params["wal_level"].(string)
-	if ok && slices.Index([]string{"logical", "replica"}, walLevel) < 0 {
+	if ok && !slices.Contains(allowedWALLevels, walLevel) {
 		return errors.Errorf("invalid value for spec.patroni.dynamicConfiguration.postgresql.parameters.wal_level: %q; must be 'logical' or 'replica'", walLevel)
 	}
 
