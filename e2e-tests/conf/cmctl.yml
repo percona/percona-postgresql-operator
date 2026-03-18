@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cmctl
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cmctl
+rules:
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates", "certificates/status", "certificaterequests"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cmctl
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cmctl
+subjects:
+  - kind: ServiceAccount
+    name: cmctl
+    namespace: ${NAMESPACE}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cmctl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: cmctl
+  template:
+    metadata:
+      labels:
+        name: cmctl
+    spec:
+      serviceAccountName: cmctl
+      containers:
+        - name: cmctl
+          image: curlimages/curl
+          imagePullPolicy: Always
+          command:
+          - /bin/sh
+          - -c
+          - |
+            curl -fsSL -o /tmp/cmctl https://github.com/cert-manager/cmctl/releases/download/v2.4.1/cmctl_linux_amd64 \
+            && chmod +x /tmp/cmctl \
+            && sleep 100500
+      restartPolicy: Always
