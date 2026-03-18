@@ -1558,7 +1558,6 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 			naming.LabelInstance:    instance.Name,
 		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
-	instanceCerts.Type = corev1.SecretTypeTLS
 	instanceCerts.Data = make(map[string][]byte)
 
 	if existing.Data != nil {
