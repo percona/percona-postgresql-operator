@@ -44,8 +44,8 @@ metadata: {}
 spec:
   backups:
     pgbackrest: {}
-  extensions:
-    pg_tde: {}
+  config: {}
+  extensions: {}
   instances: null
   patroni:
     leaderLeaseDurationSeconds: 30
@@ -77,8 +77,8 @@ metadata: {}
 spec:
   backups:
     pgbackrest: {}
-  extensions:
-    pg_tde: {}
+  config: {}
+  extensions: {}
   instances:
   - dataVolumeClaimSpec:
       resources: {}
