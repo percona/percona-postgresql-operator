@@ -403,11 +403,6 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 		return errors.Wrap(err, "failed to get pgbouncer certificate")
 	}
 
-	clusterName := cluster.Name
-	if len(clusterName) > 54 {
-		clusterName = clusterName[:54]
-	}
-
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
@@ -419,7 +414,7 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretMeta.Name + "-frontend-tls",
-			CommonName: clusterName + "-pgbouncer",
+			CommonName: truncateForCommonName(cluster.Name, "-pgbouncer"),
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.IssuerReference{
 				Name: naming.TLSIssuer(cluster).Name,
@@ -562,11 +557,6 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 		return errors.Wrap(err, "failed to get pgbackrest repo certificate")
 	}
 
-	clusterName := cluster.Name
-	if len(clusterName) > 54 {
-		clusterName = clusterName[:54]
-	}
-
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
@@ -577,7 +567,7 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 		},
 		Spec: v1.CertificateSpec{
 			SecretName: secretMeta.Name,
-			CommonName: clusterName + "-pgbackrest-repo",
+			CommonName: truncateForCommonName(cluster.Name, "-pgbackrest-repo"),
 			DNSNames:   dnsNames,
 			IssuerRef: cmmeta.IssuerReference{
 				Name: naming.TLSIssuer(cluster).Name,
@@ -624,4 +614,14 @@ func translateCheckError(err error) error {
 	}
 
 	return cmapichecker.TranslateToSimpleError(err)
+}
+
+const maxCommonNameLength = 64
+
+func truncateForCommonName(clusterName, suffix string) string {
+	maxLen := maxCommonNameLength - len(suffix)
+	if len(clusterName) > maxLen {
+		clusterName = clusterName[:maxLen]
+	}
+	return clusterName + suffix
 }
