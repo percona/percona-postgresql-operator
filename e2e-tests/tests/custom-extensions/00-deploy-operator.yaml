@@ -1,5 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -13,4 +14,3 @@ commands:
       deploy_s3_secrets
       deploy_minio
       copy_custom_extensions_form_aws
-    timeout: 120
