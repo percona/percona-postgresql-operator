@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"os"
+	"slices"
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -22,6 +23,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
+
+var allowedWALLevels = []string{"logical", "replica"}
 
 func init() {
 	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
@@ -254,6 +257,7 @@ func (cr *PerconaPGCluster) Default() {
 	}
 
 	t := true
+	f := false
 
 	if cr.Spec.Backups.IsEnabled() {
 		if cr.Spec.Backups.TrackLatestRestorableTime == nil {
@@ -272,62 +276,24 @@ func (cr *PerconaPGCluster) Default() {
 		}
 	}
 
-	cr.SetExtensionDefaults()
+	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
+	}
+	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatStatements = &f
+	}
+	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
+		cr.Spec.Extensions.BuiltIn.PGAudit = &t
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
+		cr.Spec.Extensions.BuiltIn.PGVector = &f
+	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
+		cr.Spec.Extensions.BuiltIn.PGRepack = &f
+	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = &t
-	}
-}
-
-func (cr *PerconaPGCluster) SetExtensionDefaults() {
-	// for backward compatibility, delete after 2.11.0
-	if cr.Spec.Extensions.BuiltIn.PGStatMonitor != nil {
-		cr.Spec.Extensions.PGStatMonitor.Enabled = cr.Spec.Extensions.BuiltIn.PGStatMonitor
-	}
-	if cr.Spec.Extensions.BuiltIn.PGStatStatements != nil {
-		cr.Spec.Extensions.PGStatStatements.Enabled = cr.Spec.Extensions.BuiltIn.PGStatStatements
-	}
-	if cr.Spec.Extensions.BuiltIn.PGAudit != nil {
-		cr.Spec.Extensions.PGAudit.Enabled = cr.Spec.Extensions.BuiltIn.PGAudit
-	}
-	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
-		cr.Spec.Extensions.PGRepack.Enabled = cr.Spec.Extensions.BuiltIn.PGRepack
-	}
-	if cr.Spec.Extensions.BuiltIn.PGVector != nil {
-		cr.Spec.Extensions.PGVector.Enabled = cr.Spec.Extensions.BuiltIn.PGVector
-	}
-
-	if cr.Spec.Extensions.PGStatMonitor.Enabled == nil {
-		cr.Spec.Extensions.PGStatMonitor.Enabled = ptr.To(true)
-	}
-	if cr.Spec.Extensions.PGStatStatements.Enabled == nil {
-		cr.Spec.Extensions.PGStatStatements.Enabled = ptr.To(false)
-	}
-	if cr.Spec.Extensions.PGAudit.Enabled == nil {
-		cr.Spec.Extensions.PGAudit.Enabled = ptr.To(true)
-	}
-	if cr.Spec.Extensions.PGVector.Enabled == nil {
-		cr.Spec.Extensions.PGVector.Enabled = ptr.To(false)
-	}
-	if cr.Spec.Extensions.PGRepack.Enabled == nil {
-		cr.Spec.Extensions.PGRepack.Enabled = ptr.To(false)
-	}
-
-	// for backward compatibility, delete after 2.11.0
-	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatMonitor = cr.Spec.Extensions.PGStatMonitor.Enabled
-	}
-	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatStatements = cr.Spec.Extensions.PGStatStatements.Enabled
-	}
-	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
-		cr.Spec.Extensions.BuiltIn.PGAudit = cr.Spec.Extensions.PGAudit.Enabled
-	}
-	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
-		cr.Spec.Extensions.BuiltIn.PGVector = cr.Spec.Extensions.PGVector.Enabled
-	}
-	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
-		cr.Spec.Extensions.BuiltIn.PGRepack = cr.Spec.Extensions.PGRepack.Enabled
 	}
 
 	if cr.CompareVersion("2.9.0") < 0 && cr.Spec.Config == nil {
@@ -345,6 +311,32 @@ func (cr *PerconaPGCluster) Validate() error {
 	if cr.Spec.DataSource != nil && cr.Spec.Backups.PGBackRest.Image == "" && os.Getenv("RELATED_IMAGE_PGBACKREST") == "" {
 		return errors.New("spec.backups.pgbackrest.image or RELATED_IMAGE_PGBACKREST is required when spec.dataSource is set")
 	}
+	if err := cr.ValidateDynamicConfiguration(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cr *PerconaPGCluster) ValidateDynamicConfiguration() error {
+	if cr.Spec.Patroni == nil || cr.Spec.Patroni.DynamicConfiguration == nil {
+		return nil
+	}
+
+	postgresql, ok := cr.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	params, ok := postgresql["parameters"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	walLevel, ok := params["wal_level"].(string)
+	if ok && !slices.Contains(allowedWALLevels, walLevel) {
+		return errors.Errorf("invalid value for spec.patroni.dynamicConfiguration.postgresql.parameters.wal_level: %q; must be 'logical' or 'replica'", walLevel)
+	}
+
 	return nil
 }
 
@@ -472,21 +464,20 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy(cr.Spec.CRVersion)
 
-	postgresCluster.Spec.Extensions.PGTDE = cr.Spec.Extensions.PGTDE
-	if cr.Spec.Extensions.PGStatMonitor.Enabled != nil {
-		postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.PGStatMonitor.Enabled
+	if cr.Spec.Extensions.BuiltIn.PGStatMonitor != nil {
+		postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
 	}
-	if cr.Spec.Extensions.PGStatStatements.Enabled != nil {
-		postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.PGStatStatements.Enabled
+	if cr.Spec.Extensions.BuiltIn.PGStatStatements != nil {
+		postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.BuiltIn.PGStatStatements
 	}
-	if cr.Spec.Extensions.PGAudit.Enabled != nil {
-		postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.PGAudit.Enabled
+	if cr.Spec.Extensions.BuiltIn.PGAudit != nil {
+		postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
 	}
-	if cr.Spec.Extensions.PGVector.Enabled != nil {
-		postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.PGVector.Enabled
+	if cr.Spec.Extensions.BuiltIn.PGVector != nil {
+		postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
 	}
-	if cr.Spec.Extensions.PGRepack.Enabled != nil {
-		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.PGRepack.Enabled
+	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
+		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
@@ -882,27 +873,12 @@ type BuiltInExtensionsSpec struct {
 	PGRepack         *bool `json:"pg_repack,omitempty"`
 }
 
-type BuiltInExtensionSpec struct {
-	Enabled *bool `json:"enabled,omitempty"`
-}
-
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
 	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
-
-	// Deprecated: Use extensions.<extension> instead. This field will be removed after 2.11.0.
-	BuiltIn BuiltInExtensionsSpec `json:"builtin,omitempty"`
-
-	PGStatMonitor    BuiltInExtensionSpec     `json:"pg_stat_monitor,omitempty"`
-	PGStatStatements BuiltInExtensionSpec     `json:"pg_stat_statements,omitempty"`
-	PGAudit          BuiltInExtensionSpec     `json:"pg_audit,omitempty"`
-	PGVector         BuiltInExtensionSpec     `json:"pgvector,omitempty"`
-	PGRepack         BuiltInExtensionSpec     `json:"pg_repack,omitempty"`
-	PGTDE            crunchyv1beta1.PGTDESpec `json:"pg_tde,omitempty"`
-
-	Custom []CustomExtensionSpec `json:"custom,omitempty"`
+	BuiltIn         BuiltInExtensionsSpec       `json:"builtin,omitempty"`
+	Custom          []CustomExtensionSpec       `json:"custom,omitempty"`
 }
 
 type SecretsSpec struct {
