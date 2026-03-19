@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"os"
+	"slices"
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -22,6 +23,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
+
+var allowedWALLevels = []string{"logical", "replica"}
 
 func init() {
 	SchemeBuilder.Register(&PerconaPGCluster{}, &PerconaPGClusterList{})
@@ -345,6 +348,32 @@ func (cr *PerconaPGCluster) Validate() error {
 	if cr.Spec.DataSource != nil && cr.Spec.Backups.PGBackRest.Image == "" && os.Getenv("RELATED_IMAGE_PGBACKREST") == "" {
 		return errors.New("spec.backups.pgbackrest.image or RELATED_IMAGE_PGBACKREST is required when spec.dataSource is set")
 	}
+	if err := cr.ValidateDynamicConfiguration(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cr *PerconaPGCluster) ValidateDynamicConfiguration() error {
+	if cr.Spec.Patroni == nil || cr.Spec.Patroni.DynamicConfiguration == nil {
+		return nil
+	}
+
+	postgresql, ok := cr.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	params, ok := postgresql["parameters"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	walLevel, ok := params["wal_level"].(string)
+	if ok && !slices.Contains(allowedWALLevels, walLevel) {
+		return errors.Errorf("invalid value for spec.patroni.dynamicConfiguration.postgresql.parameters.wal_level: %q; must be 'logical' or 'replica'", walLevel)
+	}
+
 	return nil
 }
 
