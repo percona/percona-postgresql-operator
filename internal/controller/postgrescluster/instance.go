@@ -18,7 +18,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1323,18 +1322,6 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 			},
 		)
 	}
-
-	pgTDECondition := meta.FindStatusCondition(cluster.Status.Conditions,
-		v1beta1.PGTDEEnabled)
-	pgTDEEnabled := pgTDECondition != nil && pgTDECondition.Status == metav1.ConditionTrue
-	// we should restart pods only after extension is dropped
-	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
-		sts.Spec.Template.Annotations = naming.Merge(
-			sts.Spec.Template.Annotations,
-			map[string]string{naming.TDEInstalledAnnotation: "true"},
-		)
-	}
-
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
@@ -1499,14 +1486,15 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	rootCertificateAuth *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
-	// Check if cert-manager is installed
-	certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
-	}
+	if cluster.Spec.CustomTLSSecret == nil {
+		certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
+		}
 
-	if certManagerInstalled {
-		return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+		if certManagerInstalled {
+			return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+		}
 	}
 
 	// Fall back to internal certificate generation
@@ -1557,7 +1545,6 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 			naming.LabelInstance:    instance.Name,
 		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
-	instanceCerts.Type = corev1.SecretTypeOpaque
 	instanceCerts.Data = make(map[string][]byte)
 
 	if existing.Data != nil {
@@ -1568,45 +1555,26 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 			instanceCerts.Data["dns.key"] = tlsKey
 		}
 	}
+	if len(instanceCerts.Data["dns.crt"]) == 0 || len(instanceCerts.Data["dns.key"]) == 0 {
+		return &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}, nil
+	}
 
-	if len(instanceCerts.Data["dns.crt"]) > 0 && len(instanceCerts.Data["dns.key"]) > 0 {
-		leafCert := &pki.LeafCertificate{}
-		_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
-		_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
+	leafCert := &pki.LeafCertificate{}
+	_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
+	_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
 
-		err = patroni.InstanceCertificates(ctx,
-			rootCertificateAuth.Certificate, leafCert.Certificate,
-			leafCert.PrivateKey, instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add patroni certificates")
-		}
+	err = patroni.InstanceCertificates(ctx,
+		rootCertificateAuth.Certificate, leafCert.Certificate,
+		leafCert.PrivateKey, instanceCerts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to add patroni certificates")
+	}
 
-		err = pgbackrest.InstanceCertificates(ctx, cluster,
-			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
-			instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
-		}
-	} else {
-		var leafCert *pki.LeafCertificate
-		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth, cluster.Spec.ClusterServiceDNSSuffix)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate instance certificate")
-		}
-
-		err = patroni.InstanceCertificates(ctx,
-			rootCertificateAuth.Certificate, leafCert.Certificate,
-			leafCert.PrivateKey, instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add patroni certificates")
-		}
-
-		err = pgbackrest.InstanceCertificates(ctx, cluster,
-			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
-			instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
-		}
+	err = pgbackrest.InstanceCertificates(ctx, cluster,
+		rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
+		instanceCerts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
 	}
 
 	err = errors.WithStack(r.apply(ctx, instanceCerts))

@@ -135,21 +135,6 @@ const (
 )
 
 const (
-	// PGTDEVolume is the name of the pg_tde secret volume and volume mount in a
-	// PostgreSQL instance Pod
-	PGTDEVolume = "pg-tde"
-
-	// PGTDEMountPath is the path for mounting the pg_tde secret
-	PGTDEMountPath = "/pgconf/tde"
-
-	// PGTDEVaultProvider is the name of the Vault provider
-	PGTDEVaultProvider = "vault-provider"
-
-	// PGTDEGlobalKey is the name of the global key
-	PGTDEGlobalKey = "global-master-key"
-)
-
-const (
 	// PGBackRestRepoContainerName is the name assigned to the container used to run pgBackRest
 	PGBackRestRepoContainerName = "pgbackrest"
 
@@ -546,6 +531,24 @@ func PGBackRestSSHSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 func PGBackRestSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      cluster.GetName() + "-pgbackrest",
+		Namespace: cluster.GetNamespace(),
+	}
+}
+
+// PGBackRestClientCertSecret returns the ObjectMeta for the cert-manager-managed
+// Secret containing the pgBackRest client TLS certificate.
+func PGBackRestClientCertSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      cluster.GetName() + "-pgbackrest-client-tls",
+		Namespace: cluster.GetNamespace(),
+	}
+}
+
+// PGBackRestRepoCertSecret returns the ObjectMeta for the cert-manager-managed
+// Secret containing the pgBackRest repository host TLS certificate.
+func PGBackRestRepoCertSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      cluster.GetName() + "-pgbackrest-repo-tls",
 		Namespace: cluster.GetNamespace(),
 	}
 }

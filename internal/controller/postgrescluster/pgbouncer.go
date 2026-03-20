@@ -221,6 +221,7 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	err = client.IgnoreNotFound(err)
 
+	var frontendCertManagerSecret *corev1.Secret
 	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		certManagerInstalled, certErr := r.isCertManagerInstalled(ctx, cluster.Namespace)
 		if certErr != nil {
@@ -241,6 +242,20 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 			}
 
 			log.V(1).Info("cert-manager pgbouncer certificate applied")
+
+			// Fetch the cert-manager-managed frontend TLS secret to populate
+			// the main pgbouncer secret with cert-manager-issued certs.
+			s := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				Name:      naming.ClusterPGBouncer(cluster).Name + "-frontend-tls",
+				Namespace: cluster.Namespace,
+			}}
+			fetchErr := r.Client.Get(ctx, client.ObjectKeyFromObject(s), s)
+			if fetchErr != nil && client.IgnoreNotFound(fetchErr) != nil {
+				return nil, errors.Wrap(fetchErr, "failed to get pgbouncer frontend TLS secret")
+			}
+			if fetchErr == nil {
+				frontendCertManagerSecret = s
+			}
 		}
 	}
 
@@ -266,7 +281,7 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 
 	if err == nil {
-		err = pgbouncer.Secret(ctx, cluster, root, existing, service, intent)
+		err = pgbouncer.Secret(ctx, cluster, root, existing, service, intent, frontendCertManagerSecret)
 	}
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, intent))
