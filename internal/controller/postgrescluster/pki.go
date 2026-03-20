@@ -92,6 +92,9 @@ func (r *Reconciler) reconcileRootCertificate(
 	// If the secret is managed by cert-manager, parse it using cert-manager key names
 	// (tls.crt/tls.key) and return without overwriting the secret with internal PKI.
 	if err == nil && existing.Annotations["cert-manager.io/certificate-name"] != "" {
+		if _, certManagerErr := r.reconcileCertManagerRootCertificate(ctx, cluster); certManagerErr != nil {
+			return nil, certManagerErr
+		}
 		root := &pki.RootCertificateAuthority{}
 		_ = root.Certificate.UnmarshalText(existing.Data["tls.crt"])
 		_ = root.PrivateKey.UnmarshalText(existing.Data["tls.key"])
