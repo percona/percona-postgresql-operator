@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -16,3 +15,4 @@ commands:
         echo "master pod was not killed! something went wrong."
         exit 1
       fi
+    timeout: 30

@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -14,3 +13,4 @@ commands:
           echo "Postgres not configured with the new certificate"
           exit 1
       fi
+    timeout: 30

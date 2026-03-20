@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -15,3 +14,4 @@ commands:
             .spec.config.files = [{"secret":{"name":"ldap-ca","items":[{"key":"ca.crt","path":"ldap/ca.crt"}]}}]
           ' - \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 10

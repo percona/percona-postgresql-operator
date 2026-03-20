@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -16,3 +15,4 @@ commands:
         | yq '.spec.instances[0].resources.limits.memory = "4Gi"' \
         | yq '.spec.patroni.dynamicConfiguration.postgresql.parameters.shared_buffers = "1GB"' \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 20

@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 100
 commands:
   - script: |-
       set -o errexit
@@ -43,3 +42,4 @@ commands:
           .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
           .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' "${TEMP_DIR}/cr_lower.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"
+    timeout: 100

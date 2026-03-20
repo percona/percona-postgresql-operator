@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
 commands:
   - script: |-
       set -o errexit
@@ -10,3 +9,4 @@ commands:
 
       kubectl delete pg-backup -n "${NAMESPACE}" demand-backup-full-repo1
       kubectl delete pg-backup -n "${NAMESPACE}" demand-backup-full-repo3-2
+    timeout: 60

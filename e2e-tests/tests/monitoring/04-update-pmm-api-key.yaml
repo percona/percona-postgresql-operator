@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 25
 commands:
   - script: |-
       set -o errexit
@@ -14,3 +13,4 @@ commands:
         || true
 
       sleep 25
+    timeout: 25

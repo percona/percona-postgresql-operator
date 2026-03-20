@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 90
 commands:
   - script: |-
       set -o errexit
@@ -10,4 +9,5 @@ commands:
 
       network_loss "${NAMESPACE}" "$(get_pod_by_role self-healing primary name)"
       sleep 40 # wait for new master to get elected
+    timeout: 90
     timeout: 90

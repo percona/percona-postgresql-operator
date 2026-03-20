@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -33,3 +32,4 @@ commands:
       fi
 
       kubectl create configmap -n "${NAMESPACE}" 06-verify-tls-connection --from-literal=status="verified"
+    timeout: 30

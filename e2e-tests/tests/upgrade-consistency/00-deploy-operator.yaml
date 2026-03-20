@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -10,3 +9,4 @@ commands:
       init_temp_dir # do this only in the first TestStep
 
       deploy_operator
+    timeout: 10

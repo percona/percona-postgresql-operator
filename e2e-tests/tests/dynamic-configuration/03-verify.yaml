@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -19,3 +18,4 @@ commands:
       kubectl create configmap -n "${NAMESPACE}" 03-pg-settings \
         --from-literal=wal_level="${wal_level}" \
         --from-literal=restore_command="${restore_command}"
+    timeout: 30

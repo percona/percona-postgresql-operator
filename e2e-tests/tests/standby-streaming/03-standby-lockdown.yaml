@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -20,3 +19,4 @@ commands:
       source_cluster_ip=$(kubectl get svc -n "${NAMESPACE}" source-cluster-ha -o jsonpath='{.spec.clusterIP}')
       kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c "iptables -A OUTPUT -p tcp -d ${source_cluster_ip} --dport 5432 -m limit --limit 1/s --limit-burst 1 -j ACCEPT"
       kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c "iptables -A OUTPUT -p tcp -d ${source_cluster_ip} --dport 5432 -j DROP"
+    timeout: 20

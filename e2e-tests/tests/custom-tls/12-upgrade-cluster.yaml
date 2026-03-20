@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -18,3 +17,4 @@ commands:
         | yq '.spec.secrets.customTLSSecret.name="new-custom-cert-tls-ssl"' \
         | yq '.spec.secrets.customReplicationTLSSecret.name="new-custom-cert-tls-ssl-replica"' \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 10

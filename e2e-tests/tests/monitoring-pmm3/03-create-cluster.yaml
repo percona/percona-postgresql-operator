@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -12,3 +11,4 @@ commands:
         | yq eval '.spec.pmm.enabled=true' - \
         | yq eval ".spec.pmm.image=\"${IMAGE_PMM3_CLIENT}\"" - \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 10

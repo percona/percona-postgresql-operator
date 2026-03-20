@@ -1,7 +1,6 @@
 # To simulate broken replication, we will block the standby primary from accessing the S3 bucket.
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -20,3 +19,4 @@ commands:
 
       kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c \
         "iptables -A OUTPUT -p tcp -m string --string \"$endpoint\" --algo bm -j DROP"
+    timeout: 20

@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -19,4 +18,4 @@ commands:
       wait_cluster_consistency custom-envs
         
       check_envs_for_component delete pgbouncer FIRST_ENV SECOND_ENV
-
+    timeout: 10

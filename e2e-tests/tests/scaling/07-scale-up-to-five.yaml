@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -13,3 +12,4 @@ commands:
             .spec.proxy.pgBouncer.replicas=5 |
             .spec.instances[].replicas=5' - \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 10

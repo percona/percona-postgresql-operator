@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -9,3 +8,4 @@ commands:
       source ../../functions
 
       get_cr "pitr" ${RANDOM}| kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 10

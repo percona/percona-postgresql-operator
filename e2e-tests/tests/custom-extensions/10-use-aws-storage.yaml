@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -18,3 +17,4 @@ commands:
           {"op": "replace", "path": "/spec/extensions/storage/bucket", "value": "pg-extensions"},
           {"op": "replace", "path": "/spec/extensions/storage/endpoint", "value": "s3.eu-central-1.amazonaws.com"}
          ]'
+    timeout: 10

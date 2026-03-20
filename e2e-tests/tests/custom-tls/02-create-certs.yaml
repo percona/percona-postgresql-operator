@@ -8,7 +8,6 @@ spec:
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -63,4 +62,4 @@ commands:
           - "digital signature"
           - "key encipherment"
       EOF
-
+    timeout: 10
