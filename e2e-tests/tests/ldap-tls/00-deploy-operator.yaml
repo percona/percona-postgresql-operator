@@ -16,3 +16,4 @@ commands:
           deploy_operator
           deploy_client
           deploy_cert_manager
+      timeout: 10

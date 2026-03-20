@@ -26,3 +26,4 @@ commands:
           verify_hugepages_usage "${PRIMARY}" "${NAMESPACE}" "database"
           
           echo "Hugepages verification passed"
+      timeout: 120
