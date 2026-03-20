@@ -1,0 +1,103 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      pgb_cert_before=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbouncer-frontend-tls -o jsonpath='{.data.tls\.crt}')
+      pgbr_repo_cert_before=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbackrest-repo-tls -o jsonpath='{.data.tls\.crt}')
+      pgbr_client_cert_before=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbackrest-client-tls -o jsonpath='{.data.tls\.crt}')
+
+      kubectl -n "$NAMESPACE" delete certificate \
+        cert-manager-tls-pgbouncer-cert \
+        cert-manager-tls-pgbackrest-repo-cert \
+        cert-manager-tls-pgbackrest-client-cert
+
+      kubectl -n "$NAMESPACE" delete secret \
+        cert-manager-tls-pgbouncer-frontend-tls \
+        cert-manager-tls-pgbackrest-repo-tls \
+        cert-manager-tls-pgbackrest-client-tls
+
+      verify_cert_recreated() {
+          local cert_name="$1"
+          cert_ready=$(kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+          [[ "$cert_ready" == "True" ]]
+      }
+
+      retry 30 10 verify_cert_recreated cert-manager-tls-pgbouncer-cert
+      echo "pgBouncer Certificate recreated and ready"
+
+      retry 30 10 verify_cert_recreated cert-manager-tls-pgbackrest-repo-cert
+      echo "pgBackRest repo Certificate recreated and ready"
+
+      retry 30 10 verify_cert_recreated cert-manager-tls-pgbackrest-client-cert
+      echo "pgBackRest client Certificate recreated and ready"
+
+      verify_secret_data() {
+          local secret_name="$1"
+          shift
+          for key in "$@"; do
+              escaped_key="${key//./\\.}"
+              val=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath="{.data.${escaped_key}}" 2>/dev/null)
+              if [[ -z "$val" ]]; then
+                  echo "Secret $secret_name is missing key: $key"
+                  return 1
+              fi
+          done
+      }
+
+      retry 12 5 verify_secret_data cert-manager-tls-pgbouncer-frontend-tls tls.crt tls.key ca.crt
+      retry 12 5 verify_secret_data cert-manager-tls-pgbackrest-repo-tls tls.crt tls.key
+      retry 12 5 verify_secret_data cert-manager-tls-pgbackrest-client-tls tls.crt tls.key
+
+      pgb_cert_after=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbouncer-frontend-tls -o jsonpath='{.data.tls\.crt}')
+      if [[ "$pgb_cert_before" == "$pgb_cert_after" ]]; then
+          echo "pgBouncer certificate was not reissued after deletion"
+          exit 1
+      fi
+
+      pgbr_repo_cert_after=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbackrest-repo-tls -o jsonpath='{.data.tls\.crt}')
+      if [[ "$pgbr_repo_cert_before" == "$pgbr_repo_cert_after" ]]; then
+          echo "pgBackRest repo certificate was not reissued after deletion"
+          exit 1
+      fi
+
+      pgbr_client_cert_after=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbackrest-client-tls -o jsonpath='{.data.tls\.crt}')
+      if [[ "$pgbr_client_cert_before" == "$pgbr_client_cert_after" ]]; then
+          echo "pgBackRest client certificate was not reissued after deletion"
+          exit 1
+      fi
+
+      instance_sts=$(kubectl -n "$NAMESPACE" get sts \
+        -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/instance-set=instance1 \
+        -o jsonpath='{.items[*].metadata.name}')
+
+      for sts_name in $instance_sts; do
+          secret_name="${sts_name}-certs"
+          kubectl -n "$NAMESPACE" delete secret "$secret_name"
+          echo "Deleted instance secret $secret_name"
+      done
+
+      verify_instance_secret_recovered() {
+          local secret_name="$1"
+          for key in tls.crt tls.key dns.crt dns.key patroni.ca-roots patroni.crt-combined pgbackrest-server.crt pgbackrest-server.key; do
+              escaped_key="${key//./\\.}"
+              val=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath="{.data.${escaped_key}}" 2>/dev/null)
+              if [[ -z "$val" ]]; then
+                  echo "Recovered instance secret $secret_name is missing key: $key"
+                  return 1
+              fi
+          done
+      }
+
+      for sts_name in $instance_sts; do
+          secret_name="${sts_name}-certs"
+          retry 30 10 verify_instance_secret_recovered "$secret_name"
+          echo "Instance secret $secret_name recovered with all required keys"
+      done
+
+      wait_cluster_consistency cert-manager-tls
