@@ -18,6 +18,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -34,6 +35,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
@@ -1201,6 +1203,26 @@ func (r *Reconciler) reconcileInstance(
 			postgresDataVolume, postgresWALVolume, tablespaceVolumes,
 			&instance.Spec.Template.Spec)
 
+		// K8SPG-911: When a vault provider change is pending (phase 1 not yet
+		// done), keep the old TDE volume so pods don't restart before the
+		// temp-file-based provider change SQL runs. After phase 1, the
+		// revision matches tempRevision, so we release the hold and let
+		// the volume update trigger a pod restart for phase 2.
+		if observed != nil && observed.Runner != nil &&
+			cluster.Spec.Extensions.PGTDE.Vault != nil &&
+			cluster.Status.PGTDERevision != "" {
+			vault := cluster.Spec.Extensions.PGTDE.Vault
+			tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
+			standardRev, _ := pgTDEVaultRevision(vault, tokenPath, caPath)
+			tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
+			tempRev, _ := pgTDEVaultRevision(vault, tempTokenPath, tempCAPath)
+
+			if cluster.Status.PGTDERevision != standardRev &&
+				cluster.Status.PGTDERevision != tempRev {
+				preserveOldTDEVolume(&instance.Spec.Template.Spec, observed.Runner)
+			}
+		}
+
 		if backupsSpecFound {
 			addPGBackRestToInstancePodSpec(
 				ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)
@@ -1322,6 +1344,18 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 			},
 		)
 	}
+
+	pgTDECondition := meta.FindStatusCondition(cluster.Status.Conditions,
+		v1beta1.PGTDEEnabled)
+	pgTDEEnabled := pgTDECondition != nil && pgTDECondition.Status == metav1.ConditionTrue
+	// we should restart pods only after extension is dropped
+	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
+		sts.Spec.Template.Annotations = naming.Merge(
+			sts.Spec.Template.Annotations,
+			map[string]string{naming.TDEInstalledAnnotation: "true"},
+		)
+	}
+
 	sts.Spec.Template.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		spec.Metadata.GetLabelsOrNil(),
@@ -1424,6 +1458,43 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// of propagation to existing pods when the CRD is updated:
 	// https://github.com/kubernetes/kubernetes/issues/88456
 	sts.Spec.Template.Spec.ImagePullSecrets = cluster.Spec.ImagePullSecrets
+}
+
+// pgTDEVaultRevision computes a hash of the vault configuration and credential
+// paths for comparing with cluster.Status.PGTDERevision.
+func pgTDEVaultRevision(vault *v1beta1.PGTDEVaultSpec, tokenPath, caPath string) (string, error) {
+	return safeHash32(func(hasher io.Writer) error {
+		_, err := fmt.Fprint(hasher,
+			vault.Host, vault.MountPath,
+			vault.TokenSecret.Name, vault.TokenSecret.Key,
+			vault.CASecret.Name, vault.CASecret.Key,
+			tokenPath, caPath)
+		return err
+	})
+}
+
+// preserveOldTDEVolume replaces the pg-tde volume in the new pod spec with
+// the one from the currently running StatefulSet. This prevents pods from
+// restarting with new vault credentials before the vault provider change
+// SQL has been executed.
+func preserveOldTDEVolume(podSpec *corev1.PodSpec, runner *appsv1.StatefulSet) {
+	var oldVolume *corev1.Volume
+	for i := range runner.Spec.Template.Spec.Volumes {
+		if runner.Spec.Template.Spec.Volumes[i].Name == naming.PGTDEVolume {
+			oldVolume = &runner.Spec.Template.Spec.Volumes[i]
+			break
+		}
+	}
+	if oldVolume == nil {
+		return
+	}
+
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Name == naming.PGTDEVolume {
+			podSpec.Volumes[i] = *oldVolume
+			return
+		}
+	}
 }
 
 // addPGBackRestToInstancePodSpec adds pgBackRest configurations and sidecars

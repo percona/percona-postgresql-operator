@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
@@ -36,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgrepack"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgvector"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgis"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -191,7 +193,10 @@ func (r *Reconciler) generatePostgresUserSecret(
 
 // reconcilePostgresDatabases creates databases inside of PostgreSQL.
 func (r *Reconciler) reconcilePostgresDatabases(
-	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	instances *observedInstances,
+	patchStatus func() error,
 ) error {
 	const container = naming.ContainerDatabase
 	var podExecutor postgres.Executor
@@ -248,8 +253,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
-	// K8SPG-375, K8SPG-577, K8SPG-699
-	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, postgisInstallOK bool
+	// K8SPG-375, K8SPG-577, K8SPG-699, K8SPG-911
+	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, pgTdeOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
 		_, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -336,6 +341,9 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
+		// K8SPG-911
+		pgTdeOK = pgtde.ReconcileExtension(ctx, exec, r.Recorder, cluster) == nil
+
 		// Enabling PostGIS extensions is a one-way operation
 		// e.g., you can take a PostgresCluster and turn it into a PostGISCluster,
 		// but you cannot reverse the process, as that would potentially remove an extension
@@ -375,17 +383,200 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	// Apply the necessary SQL and record its hash in cluster.Status. Include
 	// the hash in any log messages.
-
 	if err == nil {
 		log := logging.FromContext(ctx).WithValues("revision", revision)
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
 	}
+
 	// K8SPG-472
-	if err == nil && pgStatMonitorOK && pgAuditOK && pgvectorOK && postgisInstallOK && pgRepackOK {
+	if err == nil &&
+		pgStatMonitorOK &&
+		pgAuditOK &&
+		pgvectorOK &&
+		postgisInstallOK &&
+		pgRepackOK &&
+		pgTdeOK {
 		cluster.Status.DatabaseRevision = revision
+		if err := patchStatus(); err != nil {
+			return errors.Wrap(err, "patch status")
+		}
 	}
 
 	return err
+}
+
+// reconcilePGTDEProviders configures pg_tde providers using a two-phase
+// approach for vault credential changes:
+//
+//   - Phase 1: The pod still mounts the OLD vault secret. Fetch the new
+//     credentials from the Kubernetes Secret into temp files and run
+//     pg_tde_change_global_key_provider_vault_v2 with those temp paths.
+//     Store a "temp" revision (hash includes temp paths). This releases
+//     the volume hold so the StatefulSet updates and pods restart.
+//
+//   - Phase 2: After restart, the pod mounts the NEW vault secret at
+//     standard paths. Run pg_tde_change_global_key_provider_vault_v2
+//     again with the standard mount paths so pg_tde no longer references
+//     temp files. Store the "standard" revision.
+func (r *Reconciler) reconcilePGTDEProviders(
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	instances *observedInstances,
+	patchStatus func() error,
+) error {
+	const container = naming.ContainerDatabase
+
+	if !cluster.Spec.Extensions.PGTDE.Enabled || cluster.Spec.Extensions.PGTDE.Vault == nil {
+		cluster.Status.PGTDERevision = ""
+		return nil
+	}
+
+	log := logging.FromContext(ctx).WithName("PGTDE")
+
+	// Wait for all instances to match their pod templates before configuring
+	// the vault provider. This prevents running SQL on pods that are mid-rollout.
+	for _, inst := range instances.forCluster {
+		if matches, known := inst.PodMatchesPodTemplate(); !matches || !known {
+			log.V(1).Info("Waiting for instance to be updated", "instance", inst.Name)
+			return nil
+		}
+	}
+
+	// Find the PostgreSQL instance that can execute SQL that writes system
+	// catalogs. When there is none, return early.
+	pod, _ := instances.writablePod(container)
+	if pod == nil {
+		return nil
+	}
+
+	// We need to configure pg_tde after volumes are mounted and extension is created
+	if _, ok := pod.Annotations[naming.TDEInstalledAnnotation]; !ok {
+		return nil
+	}
+
+	log = log.WithValues("pod", pod.Name)
+	ctx = logging.NewContext(ctx, log)
+	pgExecutor := func(
+		ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error {
+		return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
+	}
+
+	vault := cluster.Spec.Extensions.PGTDE.Vault
+	tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
+
+	standardRevision, err := pgTDEVaultRevision(vault, tokenPath, caPath)
+	if err == nil && standardRevision == cluster.Status.PGTDERevision {
+		return nil
+	}
+
+	tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
+	tempRevision, _ := pgTDEVaultRevision(vault, tempTokenPath, tempCAPath)
+
+	var revision string
+	if err == nil {
+		switch {
+		case cluster.Status.PGTDERevision == tempRevision:
+			// Phase 2: pod restarted with new volume mounted at standard paths.
+			// Change provider from temp paths to persistent mount paths, then
+			// clean up the temp files from /pgdata.
+			log.Info("finalizing vault provider change with standard mount paths")
+			err = errors.WithStack(
+				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tokenPath, caPath))
+			if err == nil {
+				cleanupTempFile(ctx, pod, container, r.PodExec, tempTokenPath)
+				if tempCAPath != "" {
+					cleanupTempFile(ctx, pod, container, r.PodExec, tempCAPath)
+				}
+			}
+			revision = standardRevision
+
+		case cluster.Status.PGTDERevision != "":
+			// Phase 1: vault config changed, pod still has old credentials.
+			// Fetch new credentials to temp files on /pgdata (persistent volume)
+			// and change the provider to use those paths. The temp files survive
+			// the pod restart so pg_tde can read them until phase 2 runs.
+			log.Info("changing vault provider using temporary credentials")
+			if err = fetchSecretToTempFile(ctx, r.Client, r.PodExec, cluster.Namespace,
+				vault.TokenSecret, pod, container, tempTokenPath); err != nil {
+				return errors.Wrap(err, "token secret")
+			}
+
+			if vault.CASecret.Name != "" && vault.CASecret.Key != "" {
+				if err = fetchSecretToTempFile(ctx, r.Client, r.PodExec, cluster.Namespace,
+					vault.CASecret, pod, container, tempCAPath); err != nil {
+					return errors.Wrap(err, "CA secret")
+				}
+			}
+
+			err = errors.WithStack(
+				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tempTokenPath, tempCAPath))
+			revision = tempRevision
+
+		default:
+			// Initial setup: PGTDERevision is empty, use standard paths.
+			err = errors.WithStack(
+				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tokenPath, caPath))
+			revision = standardRevision
+		}
+	}
+
+	if err == nil {
+		cluster.Status.PGTDERevision = revision
+		if err := patchStatus(); err != nil {
+			return errors.Wrap(err, "patch status")
+		}
+	}
+
+	return err
+}
+
+// fetchSecretToTempFile reads a key from a Kubernetes Secret and writes it
+// to a temporary file inside a pod container.
+func fetchSecretToTempFile(
+	ctx context.Context,
+	k8sClient client.Reader,
+	podExec runtime.PodExecutor,
+	namespace string,
+	secretRef v1beta1.PGTDESecretObjectReference,
+	pod *corev1.Pod,
+	container string,
+	destPath string,
+) error {
+	secret := &corev1.Secret{}
+	if err := k8sClient.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      secretRef.Name,
+	}, secret); err != nil {
+		return errors.Wrapf(err, "get secret %q", secretRef.Name)
+	}
+	data, ok := secret.Data[secretRef.Key]
+	if !ok {
+		return errors.Errorf("key %q not found in secret %q", secretRef.Key, secretRef.Name)
+	}
+
+	var stdout, stderr bytes.Buffer
+	err := podExec(ctx, pod.Namespace, pod.Name, container,
+		bytes.NewReader(data), &stdout, &stderr,
+		"bash", "-c", fmt.Sprintf("cat > %s && chmod 600 %s", destPath, destPath))
+	if err != nil {
+		return errors.Wrapf(err, "write %s: %s", destPath, stderr.String())
+	}
+	return nil
+}
+
+// cleanupTempFile removes a temporary file from a pod container (best-effort).
+func cleanupTempFile(
+	ctx context.Context,
+	pod *corev1.Pod,
+	container string,
+	podExec runtime.PodExecutor,
+	path string,
+) {
+	var stdout, stderr bytes.Buffer
+	_ = podExec(ctx, pod.Namespace, pod.Name, container,
+		nil, &stdout, &stderr,
+		"bash", "-c", fmt.Sprintf("rm -f %s", path))
 }
 
 // reconcilePostgresUsers writes the objects necessary to manage users and their

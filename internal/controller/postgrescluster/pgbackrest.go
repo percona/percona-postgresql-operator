@@ -1337,7 +1337,7 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
 	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, config.FetchKeyCommand(&cluster.Spec),
-		pgtablespaceVolumes, strings.Join(opts, " "))
+		pgtablespaceVolumes, cluster.Spec.Extensions.PGTDE.Enabled, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
 	dataVolumeMount := postgres.DataVolumeMount()
@@ -1379,6 +1379,11 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		}
 		volumes = append(volumes, tablespaceVolume)
 		volumeMounts = append(volumeMounts, tablespaceVolumeMount)
+	}
+
+	if vault := cluster.Spec.Extensions.PGTDE.Vault; vault != nil {
+		volumeMounts = append(volumeMounts, postgres.PGTDEVolumeMount())
+		volumes = append(volumes, postgres.PGTDEVolume(vault))
 	}
 
 	restoreJob := &batchv1.Job{}
