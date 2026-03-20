@@ -121,6 +121,80 @@ watchdog:
 		assert.Equal(t, labels["postgres-operator.crunchydata.com/cluster"], "cluster-name")
 	})
 
+	t.Run("remove_data_directory_on_diverged_timelines set when version >= 2.9.0", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			v1beta1.LabelVersion: "2.9.0",
+		}
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			RemoveDataDirectoryOnDivergedTimelines: true,
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		assert.Equal(t, pgSection["remove_data_directory_on_diverged_timelines"], true)
+	})
+
+	t.Run("remove_data_directory_on_diverged_timelines false when version >= 2.9.0", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			v1beta1.LabelVersion: "2.9.0",
+		}
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		assert.Equal(t, pgSection["remove_data_directory_on_diverged_timelines"], false)
+	})
+
+	t.Run("remove_data_directory_on_diverged_timelines absent when version < 2.9.0", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			v1beta1.LabelVersion: "2.8.0",
+		}
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			RemoveDataDirectoryOnDivergedTimelines: true,
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		_, exists := pgSection["remove_data_directory_on_diverged_timelines"]
+		assert.Assert(t, !exists, "expected remove_data_directory_on_diverged_timelines to be absent for version < 2.9.0")
+	})
+
 	t.Run(">PG10", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		err := cluster.Default(context.Background(), nil)

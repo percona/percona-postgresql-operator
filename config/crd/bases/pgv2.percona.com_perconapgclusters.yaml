@@ -22703,6 +22703,11 @@ spec:
                     format: int32
                     minimum: 1024
                     type: integer
+                  removeDataDirectoryOnDivergedTimelines:
+                    description: RemoveDataDirectoryOnDivergedTimelines allows controlling
+                      remove_data_directory_on_diverged_timelines in Patroni cluster
+                      config.
+                    type: boolean
                   switchover:
                     description: Switchover gives options to perform ad hoc switchovers
                       in a PostgresCluster.

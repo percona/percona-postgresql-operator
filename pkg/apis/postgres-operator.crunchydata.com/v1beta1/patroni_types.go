@@ -50,6 +50,10 @@ type PatroniSpec struct {
 	// TODO(cbandy): Allow other DCS: etcd, raft, etc?
 	// N.B. changing this will cause downtime.
 	// - https://patroni.readthedocs.io/en/latest/kubernetes.html
+
+	// RemoveDataDirectoryOnDivergedTimelines allows controlling remove_data_directory_on_diverged_timelines in Patroni cluster config.
+	// +optional
+	RemoveDataDirectoryOnDivergedTimelines bool `json:"removeDataDirectoryOnDivergedTimelines,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={basebackup,pgbackrest}
