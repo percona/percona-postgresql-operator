@@ -79,7 +79,7 @@ func PostgreSQL(
 	// - https://pgbackrest.org/command.html#command-archive-get
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
 	restore := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"`
-	if inCluster.CompareVersion("2.8.2") >= 0 {
+	if inCluster.CompareVersion("2.9.0") >= 0 {
 		restore = "/opt/crunchy/bin/restore-command-wrapper.sh " + restore
 	}
 	if inCluster.Spec.Patroni != nil && inCluster.Spec.Patroni.DynamicConfiguration != nil {
