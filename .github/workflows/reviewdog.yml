@@ -104,7 +104,7 @@ jobs:
           make generate VERSION=main
           git diff --exit-code
 
-  e2e-release-versions-images:
+  e2e-release-versions-imagess:
     name: e2e-tests release_versions image availability
     runs-on: ubuntu-latest
     steps:
