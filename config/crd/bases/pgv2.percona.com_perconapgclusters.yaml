@@ -29336,6 +29336,8 @@ spec:
                     type: string
                   certValidityDuration:
                     type: string
+                  pgBackRestCertValidityDuration:
+                    type: string
                 type: object
               tlsOnly:
                 type: boolean
