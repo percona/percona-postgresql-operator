@@ -2225,7 +2225,23 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	// if err == nil {
 	// 	err = r.setControllerReference(cluster, intent)
 	// }
-	if err == nil {
+
+	if err == nil && repoHost != nil {
+		certManagerInstalled := false
+		if cluster.Spec.CustomTLSSecret == nil {
+			var certErr error
+			certManagerInstalled, certErr = r.isCertManagerInstalled(ctx, cluster.Namespace)
+			if certErr != nil {
+				return errors.Wrap(certErr, "failed to check if cert-manager is installed")
+			}
+		}
+
+		if certManagerInstalled {
+			err = r.reconcileCertManagerPGBackRestSecret(ctx, cluster, repoHost, rootCA, existing, intent)
+		} else {
+			err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
+		}
+	} else if err == nil {
 		err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
 	}
 
@@ -2239,7 +2255,73 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	if err == nil && len(intent.Data) != 0 {
 		err = errors.WithStack(r.apply(ctx, intent))
 	}
+
 	return err
+}
+
+// reconcileCertManagerPGBackRestSecret populates the pgBackRest secret using
+// cert-manager-issued certificates instead of the internal PKI.
+func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	repoHost *appsv1.StatefulSet,
+	rootCA *pki.RootCertificateAuthority,
+	existing, intent *corev1.Secret,
+) error {
+	log := logging.FromContext(ctx)
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+	// Apply the pgBackRest client Certificate CR (shared by all instances).
+	if err := c.ApplyPGBackRestClientCertificate(ctx, cluster); err != nil {
+		return errors.Wrap(err, "failed to apply pgbackrest client certificate")
+	}
+
+	// Apply the pgBackRest repo host Certificate CR.
+	repoDNSNames, err := naming.RepoHostPodDNSNames(ctx, repoHost, cluster.Spec.ClusterServiceDNSSuffix)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve repo host pod DNS names")
+	}
+	if err := c.ApplyPGBackRestRepoCertificate(ctx, cluster, repoDNSNames); err != nil {
+		return errors.Wrap(err, "failed to apply pgbackrest repo certificate")
+	}
+
+	log.V(1).Info("cert-manager pgbackrest certificates applied")
+
+	// Fetch the cert-manager-issued client TLS secret.
+	clientSecret := &corev1.Secret{ObjectMeta: naming.PGBackRestClientCertSecret(cluster)}
+	clientErr := r.Client.Get(ctx, client.ObjectKeyFromObject(clientSecret), clientSecret)
+	if clientErr != nil && client.IgnoreNotFound(clientErr) != nil {
+		return errors.Wrap(clientErr, "failed to get pgbackrest client TLS secret")
+	}
+
+	// Fetch the cert-manager-issued repo host TLS secret.
+	repoSecret := &corev1.Secret{ObjectMeta: naming.PGBackRestRepoCertSecret(cluster)}
+	repoErr := r.Client.Get(ctx, client.ObjectKeyFromObject(repoSecret), repoSecret)
+	if repoErr != nil && client.IgnoreNotFound(repoErr) != nil {
+		return errors.Wrap(repoErr, "failed to get pgbackrest repo TLS secret")
+	}
+
+	// If cert-manager hasn't issued the secrets yet, fall back to internal PKI
+	// so pgBackRest remains functional during the transition.
+	if clientErr != nil || repoErr != nil {
+		log.V(1).Info("cert-manager pgbackrest secrets not yet available, using internal PKI")
+		return pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
+	}
+
+	// Populate the pgBackRest secret from cert-manager-issued certs.
+	initialize.Map(&intent.Data)
+
+	caCert, err := rootCA.Certificate.MarshalText()
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal root CA certificate")
+	}
+	intent.Data[pgbackrest.CertAuthoritySecretKey] = caCert
+	intent.Data[pgbackrest.CertClientSecretKey] = clientSecret.Data[corev1.TLSCertKey]
+	intent.Data[pgbackrest.CertClientPrivateKeySecretKey] = clientSecret.Data[corev1.TLSPrivateKeyKey]
+	intent.Data[pgbackrest.CertRepoSecretKey] = repoSecret.Data[corev1.TLSCertKey]
+	intent.Data[pgbackrest.CertRepoPrivateKeySecretKey] = repoSecret.Data[corev1.TLSPrivateKeyKey]
+
+	return nil
 }
 
 // +kubebuilder:rbac:groups="",resources="serviceaccounts",verbs={create,patch}

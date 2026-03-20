@@ -5,20 +5,53 @@
 package postgrescluster
 
 import (
-	"context"
 	"testing"
 
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllertest"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+func TestWatchCertManagerSecrets(t *testing.T) {
+	ctx := t.Context()
+	reconciler := &Reconciler{}
+	h := reconciler.watchCertManagerSecrets()
+
+	t.Run("secret without cluster label enqueues nothing", func(t *testing.T) {
+		queue := &controllertest.Queue{TypedInterface: workqueue.NewTyped[reconcile.Request]()}
+		h.Generic(ctx, event.GenericEvent{Object: &corev1.Secret{}}, queue)
+		assert.Equal(t, queue.Len(), 0)
+	})
+
+	t.Run("secret with cluster label enqueues reconcile for that cluster", func(t *testing.T) {
+		queue := &controllertest.Queue{TypedInterface: workqueue.NewTyped[reconcile.Request]()}
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-ns",
+				Labels: map[string]string{
+					"postgres-operator.crunchydata.com/cluster": "my-cluster",
+				},
+			},
+		}
+		h.Generic(ctx, event.GenericEvent{Object: secret}, queue)
+		assert.Equal(t, queue.Len(), 1)
+
+		item, _ := queue.Get()
+		assert.Equal(t, item, reconcile.Request{NamespacedName: client.ObjectKey{
+			Namespace: "test-ns",
+			Name:      "my-cluster",
+		}})
+		queue.Done(item)
+	})
+}
+
 func TestWatchPodsUpdate(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	queue := &controllertest.Queue{TypedInterface: workqueue.NewTyped[reconcile.Request]()}
 	reconciler := &Reconciler{}
 

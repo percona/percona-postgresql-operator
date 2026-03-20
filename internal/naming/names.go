@@ -535,6 +535,24 @@ func PGBackRestSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	}
 }
 
+// PGBackRestClientCertSecret returns the ObjectMeta for the cert-manager-managed
+// Secret containing the pgBackRest client TLS certificate.
+func PGBackRestClientCertSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      cluster.GetName() + "-pgbackrest-client-tls",
+		Namespace: cluster.GetNamespace(),
+	}
+}
+
+// PGBackRestRepoCertSecret returns the ObjectMeta for the cert-manager-managed
+// Secret containing the pgBackRest repository host TLS certificate.
+func PGBackRestRepoCertSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      cluster.GetName() + "-pgbackrest-repo-tls",
+		Namespace: cluster.GetNamespace(),
+	}
+}
+
 // DeprecatedPostgresUserSecret returns the ObjectMeta necessary to lookup the
 // old Secret containing the default Postgres user and connection information.
 // Use PostgresUserSecret instead.

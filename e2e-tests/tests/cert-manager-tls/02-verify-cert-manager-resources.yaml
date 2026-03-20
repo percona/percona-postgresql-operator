@@ -38,6 +38,18 @@ commands:
           exit 1
       fi
 
+      pgbackrest_client_cert_ready=$(kubectl -n "$NAMESPACE" get certificate cert-manager-tls-pgbackrest-client-cert -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [[ "$pgbackrest_client_cert_ready" != "True" ]]; then
+          echo "pgBackRest client Certificate is not ready: $pgbackrest_client_cert_ready"
+          exit 1
+      fi
+
+      pgbackrest_repo_cert_ready=$(kubectl -n "$NAMESPACE" get certificate cert-manager-tls-pgbackrest-repo-cert -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [[ "$pgbackrest_repo_cert_ready" != "True" ]]; then
+          echo "pgBackRest repo Certificate is not ready: $pgbackrest_repo_cert_ready"
+          exit 1
+      fi
+
       instance_sts=$(kubectl -n "$NAMESPACE" get sts -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/instance-set=instance1 -o jsonpath='{.items[*].metadata.name}')
       for sts_name in $instance_sts; do
           cert_name="${sts_name}-cert"
