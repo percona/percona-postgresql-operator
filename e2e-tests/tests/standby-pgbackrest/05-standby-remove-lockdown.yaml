@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -15,3 +14,4 @@ commands:
       fi
       
       kubectl exec -n "${NAMESPACE}" "${standby_primary}" -c netshoot -- sh -c 'iptables -F OUTPUT'
+    timeout: 20

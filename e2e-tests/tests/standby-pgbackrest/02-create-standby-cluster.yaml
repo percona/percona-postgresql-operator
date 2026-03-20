@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -16,3 +15,4 @@ commands:
         | yq eval '.spec.standby.repoName = "repo1"' - \
         | yq eval '.spec.standby.maxAcceptableLag = "1Ki"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 20

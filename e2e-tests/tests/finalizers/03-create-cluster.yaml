@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -11,3 +10,4 @@ commands:
       get_cr "finalizers-2" \
         | yq eval '.metadata.finalizers += ["percona.com/delete-pvc", "percona.com/delete-ssl"]' \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 10

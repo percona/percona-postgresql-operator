@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -9,3 +8,4 @@ commands:
       source ../../functions
       destination=$(kubectl get perconapgbackup -n "${NAMESPACE}" start-from-backup-source-full-repo1 -o jsonpath='{.status.destination}' | sed "s|^s3://$BUCKET||g")
       get_cr "start-from-backup" ${RANDOM} ${destination} | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 10

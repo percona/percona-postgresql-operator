@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -12,3 +11,4 @@ commands:
 
       kubectl create configmap -n "${NAMESPACE}" 06-read-from-primary --from-literal=data="${data}"
       kubectl get configmap -n "${NAMESPACE}" 06-read-from-primary -o yaml
+    timeout: 30

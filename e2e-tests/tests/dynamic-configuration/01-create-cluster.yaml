@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -10,3 +9,4 @@ commands:
 
       get_cr "cluster1" ${RANDOM} \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 20

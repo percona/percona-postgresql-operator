@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -18,3 +17,4 @@ commands:
         | yq eval '.spec.secrets.customTLSSecret.name = "source-cluster-cluster-cert"' - \
         | yq eval '.spec.secrets.customReplicationTLSSecret.name = "source-cluster-replication-cert"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 20

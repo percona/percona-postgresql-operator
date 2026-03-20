@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -12,7 +11,7 @@ commands:
         .spec.instances[].replicas = 1 |
         .spec.instances[].env = ((.spec.instances[].env // []) + [{"name": "FIRST_ENV", "value": "1000"}, {"name": "SECOND_ENV", "value": "2000"}] | unique_by(.name))
         ' - | kubectl -n "${NAMESPACE}" apply -f -
-
+    timeout: 10
   
         sleep 10  
         wait_cluster_consistency custom-envs

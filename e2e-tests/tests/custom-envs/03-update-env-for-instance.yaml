@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -17,3 +16,4 @@ commands:
       wait_cluster_consistency custom-envs
         
       check_envs_for_component add instance FIRST_ENV=2000 SECOND_ENV=2000
+    timeout: 10

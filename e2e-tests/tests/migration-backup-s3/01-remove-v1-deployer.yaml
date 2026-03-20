@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -20,3 +19,4 @@ commands:
       sed -r 's/^(    namespace:).*pgo.*$/\1 \"'$NAMESPACE'\"/g' |
       sed -r 's/^(    pgo_operator_namespace:).*pgo.*$/\1 \"'$OPNS'\"/g' |
       kubectl -n $NAMESPACE delete -f -
+    timeout: 10

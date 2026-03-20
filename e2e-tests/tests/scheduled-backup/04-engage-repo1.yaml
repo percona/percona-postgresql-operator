@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |
       patch=$(
@@ -21,3 +20,4 @@ commands:
         -n "$NAMESPACE" \
         --type=json \
         -p "$patch"
+    timeout: 30

@@ -1,7 +1,6 @@
 
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -13,6 +12,7 @@ commands:
       kubectl -n ${NAMESPACE} create configmap versions \
           --from-file "${TESTS_CONFIG_DIR}/operator.9.9.9.pg-operator.dep.json" \
           --from-file "${TESTS_CONFIG_DIR}/operator.9.9.9.pg-operator.json"
+    timeout: 10
 ---
 apiVersion: apps/v1
 kind: Deployment

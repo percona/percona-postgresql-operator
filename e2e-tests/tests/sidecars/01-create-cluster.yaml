@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -21,5 +20,4 @@ commands:
         | yq eval '.spec.backups.pgbackrest.repoHost.sidecarPVCs = [{"name": "sidecar-repohost-claim", "spec": {"resources": {"requests": {"storage": "1Gi"}}, "volumeMode": "Filesystem", "accessModes": ["ReadWriteOnce"]}}]' - \
       	| kubectl -n "${NAMESPACE}" apply -f -
     timeout: 30
-
-
+    timeout: 20

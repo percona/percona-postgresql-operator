@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -28,4 +27,4 @@ commands:
 
       # Verify pgBackRest works over TLS, not just cert file existence
       kubectl -n "$NAMESPACE" exec "$instance" -c pgbackrest -- pgbackrest info
-
+    timeout: 30

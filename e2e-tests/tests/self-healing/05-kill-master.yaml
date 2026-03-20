@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -10,3 +9,4 @@ commands:
 
       kill_pods "${NAMESPACE}" "pod" "$init_pod"
       sleep 10 # wait a bit for pod to be killed
+    timeout: 30

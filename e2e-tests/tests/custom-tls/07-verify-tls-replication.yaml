@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -17,3 +16,4 @@ commands:
           echo "No SSL replication connections found, got: $repl_ssl_count"
           exit 1
       fi
+    timeout: 30
