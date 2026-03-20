@@ -37,6 +37,15 @@ const (
 	certRepoSecretKey           = "pgbackrest-repo-host.crt" // #nosec G101 this is a name, not a credential
 )
 
+// Exported key names for use by the cert-manager integration.
+const (
+	CertAuthoritySecretKey        = certAuthoritySecretKey
+	CertClientSecretKey           = certClientSecretKey
+	CertClientPrivateKeySecretKey = certClientPrivateKeySecretKey
+	CertRepoSecretKey             = certRepoSecretKey
+	CertRepoPrivateKeySecretKey   = certRepoPrivateKeySecretKey
+)
+
 // certFile concatenates the results of multiple PEM-encoding marshalers.
 func certFile(texts ...encoding.TextMarshaler) ([]byte, error) {
 	var out []byte

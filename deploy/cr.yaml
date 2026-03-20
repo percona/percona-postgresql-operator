@@ -61,6 +61,7 @@ spec:
 #  tls:
 #    certValidityDuration: 2160h
 #    caValidityDuration: 26280h
+#    pgBackRestCertValidityDuration: 2160h
 #  standby:
 #    enabled: true
 #    host: "<primary-ip>"
