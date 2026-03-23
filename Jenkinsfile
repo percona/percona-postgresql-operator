@@ -375,7 +375,10 @@ void checkE2EIgnoreFiles() {
     echo "Excluded files: $excludedFiles"
     echo "Changed files: $changedFiles"
 
-    def excludedFilesRegex = excludedFiles.collect{it.replace("**", ".*")}
+    // Use placeholder so the * in ".*" (from **) is not replaced by [^/]*
+    def excludedFilesRegex = excludedFiles.collect{
+        it.replace("**", ".__STARSTAR__").replace("*", "[^/]*").replace(".__STARSTAR__", ".*")
+    }
     needToRunTests = !changedFiles.every{changed -> excludedFilesRegex.any{regex -> changed ==~ regex}}
 
     if (needToRunTests) {
