@@ -75,21 +75,19 @@ func GetReadyInstancePod(ctx context.Context, c client.Client, clusterName, name
 		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
-		if !isDatabaseContainerReady(&pod) {
+		ready := false
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady {
+				ready = condition.Status == corev1.ConditionTrue
+				break
+			}
+		}
+		if !ready {
 			continue
 		}
 		return &pod, nil
 	}
 	return nil, errors.New("no running instance found")
-}
-
-func isDatabaseContainerReady(pod *corev1.Pod) bool {
-	for _, cs := range pod.Status.ContainerStatuses {
-		if cs.Name == naming.ContainerDatabase {
-			return cs.Ready
-		}
-	}
-	return false
 }
 
 type FinalizerFunc[T client.Object] func(context.Context, T) error
