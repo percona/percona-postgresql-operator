@@ -256,12 +256,9 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion] = cr.Spec.CRVersion
 	}
 
-	t := true
-	f := false
-
 	if cr.Spec.Backups.IsEnabled() {
 		if cr.Spec.Backups.TrackLatestRestorableTime == nil {
-			cr.Spec.Backups.TrackLatestRestorableTime = &t
+			cr.Spec.Backups.TrackLatestRestorableTime = ptr.To(true)
 		}
 		if cr.Spec.Backups.PGBackRest.Metadata == nil {
 			cr.Spec.Backups.PGBackRest.Metadata = new(crunchyv1beta1.Metadata)
@@ -277,23 +274,37 @@ func (cr *PerconaPGCluster) Default() {
 	}
 
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatMonitor = &t
+		cr.Spec.Extensions.BuiltIn.PGStatMonitor = ptr.To(true)
+		if cr.CompareVersion("2.9.0") >= 0 {
+			var qs PMMQuerySource
+			if cr.Spec.PMM != nil {
+				qs = cr.Spec.PMM.QuerySource
+			}
+			cr.Spec.Extensions.BuiltIn.PGStatMonitor = ptr.To(qs == PgStatMonitor)
+		}
 	}
 	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatStatements = &f
+		cr.Spec.Extensions.BuiltIn.PGStatStatements = ptr.To(false)
+		if cr.CompareVersion("2.9.0") >= 0 {
+			var qs PMMQuerySource
+			if cr.Spec.PMM != nil {
+				qs = cr.Spec.PMM.QuerySource
+			}
+			cr.Spec.Extensions.BuiltIn.PGStatStatements = ptr.To(qs == PgStatStatements)
+		}
 	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
-		cr.Spec.Extensions.BuiltIn.PGAudit = &t
+		cr.Spec.Extensions.BuiltIn.PGAudit = ptr.To(true)
 	}
 	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
-		cr.Spec.Extensions.BuiltIn.PGVector = &f
+		cr.Spec.Extensions.BuiltIn.PGVector = ptr.To(false)
 	}
 	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
-		cr.Spec.Extensions.BuiltIn.PGRepack = &f
+		cr.Spec.Extensions.BuiltIn.PGRepack = ptr.To(false)
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
-		cr.Spec.AutoCreateUserSchema = &t
+		cr.Spec.AutoCreateUserSchema = ptr.To(true)
 	}
 
 	if cr.CompareVersion("2.9.0") < 0 && cr.Spec.Config == nil {
@@ -310,6 +321,10 @@ func (cr *PerconaPGCluster) Default() {
 func (cr *PerconaPGCluster) Validate() error {
 	if cr.Spec.DataSource != nil && cr.Spec.Backups.PGBackRest.Image == "" && os.Getenv("RELATED_IMAGE_PGBACKREST") == "" {
 		return errors.New("spec.backups.pgbackrest.image or RELATED_IMAGE_PGBACKREST is required when spec.dataSource is set")
+	}
+	if ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatMonitor, false) &&
+		ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatStatements, false) {
+		return errors.New("pg_stat_monitor and pg_stat_statements cannot both be enabled")
 	}
 	if err := cr.ValidateDynamicConfiguration(); err != nil {
 		return err
@@ -455,8 +470,6 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 				},
 			})
 		}
-
-		postgresCluster.Spec.Extensions.PGStatStatements = cr.Spec.PMM.QuerySource == PgStatStatements
 	}
 
 	postgresCluster.Spec.Users = users
@@ -800,6 +813,7 @@ type PMMQuerySource string
 
 const (
 	PgStatStatements PMMQuerySource = "pgstatstatements"
+	PgStatMonitor    PMMQuerySource = "pgstatmonitor"
 )
 
 type PMMSpec struct {
