@@ -309,7 +309,7 @@ deploy_s3_secrets() {
 	kubectl -n "$NAMESPACE" create secret generic "${test_name}-pgbackrest-secrets" "${secret_args[@]}"
 
 	case $test_name in
-		"custom-extensions" | "major-upgrade" | "builtin-extensions")
+		"custom-extensions" | "builtin-extensions" | major-upgrade* )
 			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/cloud-secret.yml"
 			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/minio-secret.yml"
 			;;
@@ -525,6 +525,13 @@ get_version_images() {
 	fi
 
 	grep -i ${component} $release_versions_file | cut -d'=' -f2
+}
+
+get_release_image() {
+	local key="$1"
+	local release_versions_file="${ROOT_REPO}/e2e-tests/release_versions"
+
+	grep -E "^${key}=" "$release_versions_file" | cut -d'=' -f2
 }
 
 wait_for_delete() {
@@ -1138,6 +1145,18 @@ destroy_cert_manager() {
 get_container_image() {
 	local component=$1
 	local pgVersion=$2
+
+	if [[ ${IMAGE} == percona/* ]] || [[ -n ${FORCE_RELEASE_RUN} ]]; then
+		local key
+		case $component in
+			pgbouncer)  key="IMAGE_PGBOUNCER${pgVersion}" ;;
+			pgbackrest) key="IMAGE_BACKREST${pgVersion}" ;;
+			*)          key="IMAGE_POSTGRESQL${pgVersion}" ;;
+		esac
+		get_release_image "$key"
+		return
+	fi
+
 	local operatorVersion=${VERSION}
 
 	# if operator version is not a proper version (i.e. 2.5.0) use main
