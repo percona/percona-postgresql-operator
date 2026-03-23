@@ -322,6 +322,11 @@ deploy_client() {
 	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/client.yaml"
 }
 
+deploy_cmctl() {
+	envsubst < "${TESTS_CONFIG_DIR}/cmctl.yml" | kubectl -n "${NAMESPACE}" apply -f -
+	kubectl -n "${NAMESPACE}" wait deployment cmctl --for=condition=available --timeout=60s
+}
+
 get_client_pod() {
 	kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}'
 }
@@ -1318,6 +1323,26 @@ detect_k8s_platform() {
 	fi
 
 	echo "${platform}"
+}
+
+ensure_eks_gp3_storage_class() {
+	local platform=${1:-$(detect_k8s_platform)}
+
+	if [[ "$platform" != "eks" ]]; then
+		return 0
+	fi
+
+	cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-csi-gp3
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+EOF
 }
 
 enable_hugepages() {

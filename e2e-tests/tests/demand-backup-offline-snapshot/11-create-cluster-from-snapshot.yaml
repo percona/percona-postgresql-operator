@@ -9,18 +9,19 @@ commands:
       source ../../functions
 
       platform=$(detect_k8s_platform)
-
-      if [[ "$platform" == "eks" ]]; then
-        get_cr "cluster-from-snapshot" ${RANDOM} \
-          | yq '.spec.instances[0].dataVolumeClaimSpec.storageClassName="ebs-csi-gp3"' \
-          | yq '.spec.instances[0].dataVolumeClaimSpec.dataSource.apiGroup="snapshot.storage.k8s.io"' \
-          | yq '.spec.instances[0].dataVolumeClaimSpec.dataSource.kind="VolumeSnapshot"' \
-          | yq '.spec.instances[0].dataVolumeClaimSpec.dataSource.name="backup3-pgdata"' \
-          | kubectl -n "${NAMESPACE}" apply -f -
-      else
-        get_cr "cluster-from-snapshot" ${RANDOM} \
-          | yq '.spec.instances[0].dataVolumeClaimSpec.dataSource.apiGroup="snapshot.storage.k8s.io"' \
-          | yq '.spec.instances[0].dataVolumeClaimSpec.dataSource.kind="VolumeSnapshot"' \
-          | yq '.spec.instances[0].dataVolumeClaimSpec.dataSource.name="backup3-pgdata"' \
-          | kubectl -n "${NAMESPACE}" apply -f -
-      fi
+      export platform
+      get_cr "cluster-from-snapshot" ${RANDOM} \
+        | yq e '
+          .spec.instances[0].dataVolumeClaimSpec.dataSource = {
+            "apiGroup": "snapshot.storage.k8s.io",
+            "kind": "VolumeSnapshot",
+            "name": "backup3-pgdata"
+          }
+          |
+          (
+            select(strenv(platform) == "eks")
+            | .spec.instances[0].dataVolumeClaimSpec.storageClassName = "ebs-csi-gp3"
+          )
+          // .
+        ' \
+        | kubectl -n "${NAMESPACE}" apply -f -

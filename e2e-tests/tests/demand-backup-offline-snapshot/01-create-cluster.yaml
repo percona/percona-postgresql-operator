@@ -10,21 +10,32 @@ commands:
       
       snapshot_class='gke-snapshot-class'
       platform=$(detect_k8s_platform)
-      if [[ "$platform" == "eks" ]]; then
-        snapshot_class='eks-snapshot-class'
-      elif [[ "$platform" == "digitalocean" ]]; then
-        snapshot_class='do-block-storage'
-      fi
+      case "$platform" in
+        eks)
+          snapshot_class='eks-snapshot-class'
+          ;;
+        openshift)
+          snapshot_class='openshift-snapshot-class'
+          ;;
+        aks)
+          snapshot_class='aks-snapshot-class'
+          ;;
+        digitalocean)
+          snapshot_class='do-block-storage'
+          ;;
+      esac
 
-      if [[ "$platform" == "eks" ]]; then
-        get_cr "backup-snapshot" ${RANDOM} \
-          | yq '.spec.instances[0].dataVolumeClaimSpec.storageClassName="ebs-csi-gp3"' \
-          | yq ".spec.backups.volumeSnapshots.className=\"$snapshot_class\"" \
-          | yq '.spec.backups.volumeSnapshots.mode="offline"' \
-          | kubectl -n "${NAMESPACE}" apply -f -
-      else
-        get_cr "backup-snapshot" ${RANDOM} \
-          | yq ".spec.backups.volumeSnapshots.className=\"$snapshot_class\"" \
-          | yq '.spec.backups.volumeSnapshots.mode="offline"' \
-          | kubectl -n "${NAMESPACE}" apply -f -
-      fi
+      export platform snapshot_class
+      get_cr "backup-snapshot" ${RANDOM} \
+        | yq e '
+          .spec.backups.volumeSnapshots.className = strenv(snapshot_class)
+          |
+          .spec.backups.volumeSnapshots.mode = "offline"
+          |
+          (
+            select(strenv(platform) == "eks")
+            | .spec.instances[0].dataVolumeClaimSpec.storageClassName = "ebs-csi-gp3"
+          )
+          // .
+        ' \
+        | kubectl -n "${NAMESPACE}" apply -f -
