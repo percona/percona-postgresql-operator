@@ -51,12 +51,10 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 	}
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
-		if repo.Volume != nil {
-			repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
-			if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
-				log.Info("pgBackRest repo host not ready, skipping backup cleanup", "repo", repo.Name)
-				continue
-			}
+		repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
+		if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
+			log.Info("pgBackRest repo host not ready, skipping backup cleanup", "repo", repo.Name)
+			continue
 		}
 
 		var info pgbackrest.InfoOutput
@@ -77,6 +75,10 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 		if err != nil {
 			if errors.Is(err, pgbackrest.ErrNoValidBackups) {
 				log.Info("There are no info about backups in the pgbackrest", "repo", repo.Name)
+				continue
+			}
+			if errors.Is(err, pgbackrest.ErrStanzaNotCreated) {
+				log.Info("pgBackRest stanza not yet created, skipping backup cleanup", "repo", repo.Name)
 				continue
 			}
 			return errors.Wrap(err, "get pgBackRest info")
