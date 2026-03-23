@@ -51,10 +51,12 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 	}
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
-		repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
-		if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
-			log.Info("pgBackRest repo host not ready, skipping backup cleanup", "repo", repo.Name)
-			continue
+		if repo.Volume != nil {
+			repoCondition := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionRepoHostReady)
+			if repoCondition == nil || repoCondition.Status != metav1.ConditionTrue {
+				log.Info("pgBackRest repo host not ready, skipping backup cleanup", "repo", repo.Name)
+				continue
+			}
 		}
 
 		var info pgbackrest.InfoOutput
