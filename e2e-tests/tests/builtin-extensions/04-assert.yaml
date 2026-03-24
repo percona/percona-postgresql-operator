@@ -9,7 +9,6 @@ metadata:
 data:
   data: |2-
      pg_repack
-     pg_stat_monitor
      pg_stat_statements
      pgaudit
      plpgsql
