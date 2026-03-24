@@ -95,9 +95,14 @@ func Reconcile(
 		WithName("SnapshotReconciler").
 		WithValues("backup", pgBackup.Name, "cluster", pgCluster.Name)
 
-	// Do nothing if the feature is not enabled.
+	// Fail the backup if the feature gate is not enabled so the lease is released.
 	if !feature.Enabled(ctx, feature.BackupSnapshots) {
-		log.Info(fmt.Sprintf("Feature gate '%s' is not enabled, skipping snapshot reconciliation", feature.BackupSnapshots))
+		if updErr := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
+			bcp.Status.State = v2.BackupFailed
+			bcp.Status.Error = fmt.Sprintf("Feature gate '%s' is not enabled", feature.BackupSnapshots)
+		}); updErr != nil {
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
+		}
 		return reconcile.Result{}, nil
 	}
 
