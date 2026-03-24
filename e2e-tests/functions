@@ -1327,10 +1327,10 @@ detect_k8s_platform() {
 	echo "${platform}"
 }
 
-ensure_eks_gp3_storage_class() {
+ensure_ebs_gp3_storage_class() {
 	local platform=${1:-$(detect_k8s_platform)}
 
-	if [[ "$platform" != "eks" ]]; then
+	if [[ "$platform" != "eks" && "$platform" != "openshift" ]]; then
 		return 0
 	fi
 

@@ -13,7 +13,7 @@ commands:
       deploy_client
       deploy_s3_secrets
       platform=$(detect_k8s_platform)
-      ensure_eks_gp3_storage_class "$platform"
+      ensure_ebs_gp3_storage_class "$platform"
       snapshot_class_file='conf/volume-snapshot-class-gke.yaml'
 
       case "$platform" in

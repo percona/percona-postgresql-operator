@@ -33,7 +33,7 @@ commands:
           .spec.backups.volumeSnapshots.mode = "offline"
           |
           (
-            select(strenv(platform) == "eks")
+            select(strenv(platform) == "eks" or strenv(platform) == "openshift")
             | .spec.instances[0].dataVolumeClaimSpec.storageClassName = "ebs-csi-gp3"
           )
           // .
