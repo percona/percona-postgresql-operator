@@ -2,8 +2,10 @@ package pgbackup
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"slices"
+	"strings"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -125,6 +127,12 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		pgCluster = nil
 	}
 
+	if ok, err := r.handleLease(ctx, pgBackup); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to process lease")
+	} else if !ok {
+		return reconcile.Result{RequeueAfter: time.Second * 10}, nil
+	}
+
 	if *pgBackup.Spec.Method == v2.BackupMethodVolumeSnapshot {
 		return snapshots.Reconcile(ctx, r.Client, r.PodExec, pgBackup, pgCluster)
 	}
@@ -136,7 +144,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if pgBackup.Status.State != v2.BackupFailed && pgBackup.Status.State != v2.BackupSucceeded {
+	if !pgBackup.Status.State.IsTerminal() {
 		if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 		}
@@ -186,15 +194,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		if err != nil {
 			if !errors.Is(err, ErrBackupJobNotFound) {
 				return reconcile.Result{}, errors.Wrap(err, "find backup job")
-			}
-
-			runningBackup, err := getBackupInProgress(ctx, r.Client, pgBackup.Spec.PGCluster, pgBackup.Namespace)
-			if err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "get backup in progress")
-			}
-			if runningBackup != "" && runningBackup != pgBackup.Name {
-				log.Info("Can't start backup. Previous backup is still in progress", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
-				return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 			}
 			if err := startBackup(ctx, r.Client, pgBackup); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "failed to start backup")
@@ -782,4 +781,121 @@ func failIfClusterIsNotReady(ctx context.Context, cl client.Client, pgCluster *v
 		return errors.Wrap(err, "update PGBackup status")
 	}
 	return nil
+}
+
+func backupLeaseName(clusterName string) string {
+	return "pg-" + clusterName + "-backup-lock"
+}
+
+func backupLeaseHolder(backup *v2.PerconaPGBackup) string {
+	return fmt.Sprintf("%s|%s", backup.GetName(), backup.GetUID())
+}
+
+func parseBackupLeaseHolder(holder string) (string, types.UID) {
+	parts := strings.Split(holder, "|")
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], types.UID(parts[1])
+}
+
+func (r *PGBackupReconciler) tryAcquireLease(ctx context.Context, backup *v2.PerconaPGBackup) (bool, error) {
+	log := logging.FromContext(ctx).WithName("tryAcquireLease")
+	leaseName := backupLeaseName(backup.Spec.PGCluster)
+	leaseHolderID := backupLeaseHolder(backup)
+
+	checkStale := func(ctx context.Context, currentHolder string) (bool, error) {
+		backupName, backupUID := parseBackupLeaseHolder(currentHolder)
+		if backupName == "" || backupUID == "" {
+			log.Info("Backup lease holder is malformed, acquiring lease anyway")
+			return true, nil
+		}
+
+		holderBackup := &v2.PerconaPGBackup{}
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: backupName, Namespace: backup.GetNamespace()}, holderBackup); k8serrors.IsNotFound(err) {
+			return true, nil
+		} else if err != nil {
+			return false, errors.Wrap(err, "failed to get backup")
+		} else if holderBackup.GetUID() != backupUID {
+			// We found a backup with the same name, but different UID.
+			// So this isn't the same backup that was holding the lease.
+			return true, nil
+		}
+
+		// We found the backup that holds the lease. Check if it has completed fully before we acquire the lease.
+		return holderBackup.Status.State.IsTerminal() &&
+			!controllerutil.ContainsFinalizer(holderBackup, pNaming.FinalizerSnapshotInProgress), nil
+	}
+
+	acquired := true
+	if err := k8s.AcquireLease(ctx, r.Client, leaseName, leaseHolderID, backup.GetNamespace(), checkStale); err != nil {
+		if errors.Is(err, k8s.ErrLeaseAlreadyHeld) || k8serrors.IsAlreadyExists(err) || k8serrors.IsConflict(err) {
+			acquired = false
+		} else {
+			return false, errors.Wrap(err, "failed to acquire lease")
+		}
+	}
+
+	cond := metav1.Condition{
+		Type:               v2.ConditionBackupLeaseAcquired,
+		Status:             metav1.ConditionTrue,
+		Reason:             "LeaseAcquired",
+		ObservedGeneration: backup.GetGeneration(),
+	}
+	if !acquired {
+		cond.Status = metav1.ConditionFalse
+		cond.Reason = "LeaseAlreadyHeld"
+	}
+
+	if !meta.IsStatusConditionPresentAndEqual(backup.Status.Conditions, v2.ConditionBackupLeaseAcquired, cond.Status) {
+		if updErr := backup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
+			meta.SetStatusCondition(&bcp.Status.Conditions, cond)
+		}); updErr != nil {
+			return false, errors.Wrap(updErr, "failed to update backup status")
+		}
+		if cond.Status == metav1.ConditionTrue {
+			log.Info("Backup lease acquired")
+		}
+	}
+
+	return acquired, nil
+}
+
+func (r *PGBackupReconciler) releaseLeaseIfNeeded(ctx context.Context, backup *v2.PerconaPGBackup) error {
+	log := logging.FromContext(ctx).WithName("releaseLeaseIfNeeded")
+	if !meta.IsStatusConditionPresentAndEqual(backup.Status.Conditions, v2.ConditionBackupLeaseAcquired, metav1.ConditionTrue) {
+		return nil
+	}
+	if err := k8s.ReleaseLease(ctx, r.Client, backupLeaseName(backup.Spec.PGCluster), backupLeaseHolder(backup), backup.GetNamespace()); err != nil {
+		return errors.Wrap(err, "failed to release lease")
+	}
+	if updErr := backup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
+		meta.RemoveStatusCondition(&bcp.Status.Conditions, v2.ConditionBackupLeaseAcquired)
+	}); updErr != nil {
+		return errors.Wrap(updErr, "failed to update backup status")
+	}
+	log.Info("Backup lease released")
+	return nil
+}
+
+// handleLease attempts to acquire or release the lease based on
+// the backup state.
+// Returns true if the caller can continue with the reconciliation.
+func (r *PGBackupReconciler) handleLease(
+	ctx context.Context,
+	backup *v2.PerconaPGBackup,
+) (bool, error) {
+	if (backup.Status.State.IsTerminal() || !backup.DeletionTimestamp.IsZero()) &&
+		!controllerutil.ContainsFinalizer(backup, pNaming.FinalizerSnapshotInProgress) {
+		if err := r.releaseLeaseIfNeeded(ctx, backup); err != nil {
+			return false, errors.Wrap(err, "failed to release lease")
+		}
+		return true, nil
+	}
+
+	acquired, err := r.tryAcquireLease(ctx, backup)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to acquire lease")
+	}
+	return acquired, nil
 }
