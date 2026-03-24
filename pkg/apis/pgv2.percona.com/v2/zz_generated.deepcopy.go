@@ -10,8 +10,8 @@ package v2
 
 import (
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -117,14 +117,14 @@ func (in *ContainerOptions) DeepCopyInto(out *ContainerOptions) {
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]v1.EnvVar, len(*in))
+		*out = make([]corev1.EnvVar, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.EnvFrom != nil {
 		in, out := &in.EnvFrom, &out.EnvFrom
-		*out = make([]v1.EnvFromSource, len(*in))
+		*out = make([]corev1.EnvFromSource, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -161,7 +161,7 @@ func (in *CustomExtensionsStorageSpec) DeepCopyInto(out *CustomExtensionsStorage
 	*out = *in
 	if in.Secret != nil {
 		in, out := &in.Secret, &out.Secret
-		*out = new(v1.SecretProjection)
+		*out = new(corev1.SecretProjection)
 		(*in).DeepCopyInto(*out)
 	}
 }
@@ -228,7 +228,7 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 	}
 	if in.Configuration != nil {
 		in, out := &in.Configuration, &out.Configuration
-		*out = make([]v1.VolumeProjection, len(*in))
+		*out = make([]corev1.VolumeProjection, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -284,14 +284,14 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]v1.EnvVar, len(*in))
+		*out = make([]corev1.EnvVar, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.EnvFrom != nil {
 		in, out := &in.EnvFrom, &out.EnvFrom
-		*out = make([]v1.EnvFromSource, len(*in))
+		*out = make([]corev1.EnvFromSource, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -318,20 +318,20 @@ func (in *PGBouncerSpec) DeepCopyInto(out *PGBouncerSpec) {
 	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
-		*out = new(v1.Affinity)
+		*out = new(corev1.Affinity)
 		(*in).DeepCopyInto(*out)
 	}
 	in.Config.DeepCopyInto(&out.Config)
 	if in.Sidecars != nil {
 		in, out := &in.Sidecars, &out.Sidecars
-		*out = make([]v1.Container, len(*in))
+		*out = make([]corev1.Container, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.SidecarVolumes != nil {
 		in, out := &in.SidecarVolumes, &out.SidecarVolumes
-		*out = make([]v1.Volume, len(*in))
+		*out = make([]corev1.Volume, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -350,7 +350,7 @@ func (in *PGBouncerSpec) DeepCopyInto(out *PGBouncerSpec) {
 	}
 	if in.CustomTLSSecret != nil {
 		in, out := &in.CustomTLSSecret, &out.CustomTLSSecret
-		*out = new(v1.SecretProjection)
+		*out = new(corev1.SecretProjection)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Port != nil {
@@ -381,33 +381,33 @@ func (in *PGBouncerSpec) DeepCopyInto(out *PGBouncerSpec) {
 	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]v1.Toleration, len(*in))
+		*out = make([]corev1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.TopologySpreadConstraints != nil {
 		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
-		*out = make([]v1.TopologySpreadConstraint, len(*in))
+		*out = make([]corev1.TopologySpreadConstraint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.PodSecurityContext)
+		*out = new(corev1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]v1.EnvVar, len(*in))
+		*out = make([]corev1.EnvVar, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.EnvFrom != nil {
 		in, out := &in.EnvFrom, &out.EnvFrom
-		*out = make([]v1.EnvFromSource, len(*in))
+		*out = make([]corev1.EnvFromSource, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -449,19 +449,19 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
-		*out = new(v1.Affinity)
+		*out = new(corev1.Affinity)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Sidecars != nil {
 		in, out := &in.Sidecars, &out.Sidecars
-		*out = make([]v1.Container, len(*in))
+		*out = make([]corev1.Container, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.SidecarVolumes != nil {
 		in, out := &in.SidecarVolumes, &out.SidecarVolumes
-		*out = make([]v1.Volume, len(*in))
+		*out = make([]corev1.Volume, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -480,7 +480,7 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	}
 	if in.InitContainers != nil {
 		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]v1.Container, len(*in))
+		*out = make([]corev1.Container, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -503,21 +503,21 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]v1.Toleration, len(*in))
+		*out = make([]corev1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.TopologySpreadConstraints != nil {
 		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
-		*out = make([]v1.TopologySpreadConstraint, len(*in))
+		*out = make([]corev1.TopologySpreadConstraint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.WALVolumeClaimSpec != nil {
 		in, out := &in.WALVolumeClaimSpec, &out.WALVolumeClaimSpec
-		*out = new(v1.PersistentVolumeClaimSpec)
+		*out = new(corev1.PersistentVolumeClaimSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	in.DataVolumeClaimSpec.DeepCopyInto(&out.DataVolumeClaimSpec)
@@ -530,14 +530,14 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	}
 	if in.VolumeMounts != nil {
 		in, out := &in.VolumeMounts, &out.VolumeMounts
-		*out = make([]v1.VolumeMount, len(*in))
+		*out = make([]corev1.VolumeMount, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.PodSecurityContext)
+		*out = new(corev1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.InitContainer != nil {
@@ -547,14 +547,14 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]v1.EnvVar, len(*in))
+		*out = make([]corev1.EnvVar, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.EnvFrom != nil {
 		in, out := &in.EnvFrom, &out.EnvFrom
-		*out = make([]v1.EnvFromSource, len(*in))
+		*out = make([]corev1.EnvFromSource, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -637,7 +637,7 @@ func (in *PMMSpec) DeepCopyInto(out *PMMSpec) {
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.ContainerSecurityContext != nil {
 		in, out := &in.ContainerSecurityContext, &out.ContainerSecurityContext
-		*out = new(v1.SecurityContext)
+		*out = new(corev1.SecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.RuntimeClassName != nil {
@@ -785,6 +785,13 @@ func (in *PerconaPGBackupStatus) DeepCopyInto(out *PerconaPGBackupStatus) {
 		*out = new(SnapshotStatus)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]v1.Condition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 }
 
 // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PerconaPGBackupStatus.
@@ -871,7 +878,7 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 	}
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
-		*out = make([]v1.LocalObjectReference, len(*in))
+		*out = make([]corev1.LocalObjectReference, len(*in))
 		copy(*out, *in)
 	}
 	if in.TLS != nil {
@@ -1001,7 +1008,7 @@ func (in *PerconaPGClusterStatus) DeepCopyInto(out *PerconaPGClusterStatus) {
 	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make([]metav1.Condition, len(*in))
+		*out = make([]v1.Condition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -1201,13 +1208,13 @@ func (in *PerconaPGUpgradeSpec) DeepCopyInto(out *PerconaPGUpgradeSpec) {
 	}
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
-		*out = make([]v1.LocalObjectReference, len(*in))
+		*out = make([]corev1.LocalObjectReference, len(*in))
 		copy(*out, *in)
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
-		*out = new(v1.Affinity)
+		*out = new(corev1.Affinity)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.PriorityClassName != nil {
@@ -1217,21 +1224,21 @@ func (in *PerconaPGUpgradeSpec) DeepCopyInto(out *PerconaPGUpgradeSpec) {
 	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]v1.Toleration, len(*in))
+		*out = make([]corev1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.InitContainers != nil {
 		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]v1.Container, len(*in))
+		*out = make([]corev1.Container, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.VolumeMounts != nil {
 		in, out := &in.VolumeMounts, &out.VolumeMounts
-		*out = make([]v1.VolumeMount, len(*in))
+		*out = make([]corev1.VolumeMount, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -1304,17 +1311,17 @@ func (in *SecretsSpec) DeepCopyInto(out *SecretsSpec) {
 	*out = *in
 	if in.CustomTLSSecret != nil {
 		in, out := &in.CustomTLSSecret, &out.CustomTLSSecret
-		*out = new(v1.SecretProjection)
+		*out = new(corev1.SecretProjection)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.CustomReplicationClientTLSSecret != nil {
 		in, out := &in.CustomReplicationClientTLSSecret, &out.CustomReplicationClientTLSSecret
-		*out = new(v1.SecretProjection)
+		*out = new(corev1.SecretProjection)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.CustomRootCATLSSecret != nil {
 		in, out := &in.CustomRootCATLSSecret, &out.CustomRootCATLSSecret
-		*out = new(v1.SecretProjection)
+		*out = new(corev1.SecretProjection)
 		(*in).DeepCopyInto(*out)
 	}
 }
