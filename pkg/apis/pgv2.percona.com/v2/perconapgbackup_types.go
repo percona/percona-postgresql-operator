@@ -104,6 +104,14 @@ const (
 	BackupSucceeded PGBackupState = "Succeeded"
 )
 
+func (s PGBackupState) IsTerminal() bool {
+	return s == BackupFailed || s == BackupSucceeded
+}
+
+const (
+	ConditionBackupLeaseAcquired = "BackupLeaseAcquired"
+)
+
 type PerconaPGBackupStatus struct {
 	JobName              string                         `json:"jobName,omitempty"`
 	State                PGBackupState                  `json:"state,omitempty"`
@@ -118,6 +126,7 @@ type PerconaPGBackupStatus struct {
 	CRVersion            string                         `json:"crVersion,omitempty"`
 	LatestRestorableTime PITRestoreDateTime             `json:"latestRestorableTime,omitempty"`
 	Snapshot             *SnapshotStatus                `json:"snapshot,omitempty"`
+	Conditions           []metav1.Condition             `json:"conditions,omitempty"`
 }
 
 type SnapshotStatus struct {
