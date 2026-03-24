@@ -436,7 +436,7 @@ func agentPrerunScript(pgc *v2.PerconaPGCluster, isPMM3 bool) string {
 		"--skip-connection-check",
 		"--metrics-mode=push",
 		"--service-name=$(PMM_AGENT_SETUP_NODE_NAME)",
-		fmt.Sprintf("--query-source=%s", querySource(pgc.Spec.PMM.QuerySource)),
+		fmt.Sprintf("--query-source=%s", querySource(pgc, pgc.Spec.PMM.QuerySource)),
 	}
 
 	if pgc.CompareVersion("2.7.0") >= 0 {
@@ -462,8 +462,8 @@ func agentPrerunScript(pgc *v2.PerconaPGCluster, isPMM3 bool) string {
 // querySource maps the CR query source value to the PMM-expected value.
 // PMM accepts "pgstatements", "pgstatmonitor", "none".
 // The CR uses "pgstatstatements" for backward compatibility.
-func querySource(source v2.PMMQuerySource) string {
-	if source == v2.PgStatStatements {
+func querySource(pgc *v2.PerconaPGCluster, source v2.PMMQuerySource) string {
+	if pgc.CompareVersion("2.9.0") >= 0 && source == v2.PgStatStatements {
 		return "pgstatements"
 	}
 	return string(source)
