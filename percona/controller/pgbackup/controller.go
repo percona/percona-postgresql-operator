@@ -885,7 +885,8 @@ func (r *PGBackupReconciler) handleLease(
 	ctx context.Context,
 	backup *v2.PerconaPGBackup,
 ) (bool, error) {
-	if backup.Status.State.IsTerminal() || !backup.DeletionTimestamp.IsZero() {
+	if (backup.Status.State.IsTerminal() || !backup.DeletionTimestamp.IsZero()) &&
+		!controllerutil.ContainsFinalizer(backup, pNaming.FinalizerSnapshotInProgress) {
 		if err := r.releaseLeaseIfNeeded(ctx, backup); err != nil {
 			return false, errors.Wrap(err, "failed to release lease")
 		}
