@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role major-upgrade-13-to-14 primary name)
+      kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-in-stages
+      kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-only
+      kubectl -n ${NAMESPACE} exec ${primary} -- /pgdata/delete_old_cluster.sh
