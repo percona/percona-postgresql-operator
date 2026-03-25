@@ -1,0 +1,111 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 600
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      serial_from_secret() {
+          local secret_name="$1"
+          local key="$2"
+          local escaped_key="${key//./\\.}"
+          kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath="{.data.${escaped_key}}" | base64 -d | openssl x509 -noout -serial | tr -d '[:space:]'
+      }
+
+      instance=$(kubectl -n "$NAMESPACE" get pod \
+        -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+      primary_sts=$(echo "$instance" | sed 's/-[0-9]*$//')
+
+      pg_serial_before=$(serial_from_secret cert-manager-tls-cluster-cert tls.crt)
+      pgb_serial_before=$(serial_from_secret cert-manager-tls-pgbouncer-frontend-tls tls.crt)
+      pgbr_serial_before=$(serial_from_secret "${primary_sts}-certs" pgbackrest-server.crt)
+
+      cmctl_pod=$(kubectl -n "$NAMESPACE" get pods --selector=name=cmctl -o 'jsonpath={.items[].metadata.name}')
+
+      renew_and_wait() {
+          local cert_name="$1"
+
+          local revision
+          revision=$(kubectl -n "$NAMESPACE" get certificate "$cert_name" -o 'jsonpath={.status.revision}')
+
+          kubectl -n "$NAMESPACE" exec "$cmctl_pod" -- /tmp/cmctl renew "$cert_name" -n "$NAMESPACE"
+
+          for i in {1..30}; do
+              local new_revision
+              new_revision=$(kubectl -n "$NAMESPACE" get certificate "$cert_name" -o 'jsonpath={.status.revision}')
+              if [[ "$((revision + 1))" == "$new_revision" ]]; then
+                  echo "Certificate $cert_name renewed: revision $revision -> $new_revision"
+                  return 0
+              fi
+              sleep 2
+          done
+          echo "Certificate $cert_name did not renew in time"
+          return 1
+      }
+
+      renew_and_wait cert-manager-tls-cluster-cert
+      renew_and_wait cert-manager-tls-pgbouncer-cert
+
+      instance_sts=$(kubectl -n "$NAMESPACE" get sts \
+        -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/instance-set=instance1 \
+        -o jsonpath='{.items[*].metadata.name}')
+      for sts_name in $instance_sts; do
+          renew_and_wait "${sts_name}-cert"
+      done
+
+      wait_cluster_consistency cert-manager-tls
+
+      pg_serial_after=$(serial_from_secret cert-manager-tls-cluster-cert tls.crt)
+      if [[ "$pg_serial_before" == "$pg_serial_after" ]]; then
+          echo "PostgreSQL certificate secret did not change after rotation"
+          exit 1
+      fi
+
+      pgb_serial_after=$(serial_from_secret cert-manager-tls-pgbouncer-frontend-tls tls.crt)
+      if [[ "$pgb_serial_before" == "$pgb_serial_after" ]]; then
+          echo "PgBouncer certificate secret did not change after rotation"
+          exit 1
+      fi
+
+      pgbr_serial_after=$(serial_from_secret "${primary_sts}-certs" pgbackrest-server.crt)
+      if [[ "$pgbr_serial_before" == "$pgbr_serial_after" ]]; then
+          echo "pgBackRest certificate secret did not change after rotation"
+          exit 1
+      fi
+
+      pg_certificate_data=$(run_comand_on_pod "openssl s_client -connect cert-manager-tls-primary:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -issuer")
+      if [[ "$pg_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "Unexpected PostgreSQL certificate issuer after rotation"
+          echo "Got: $pg_certificate_data"
+          exit 1
+      fi
+
+      ssl_info=$(run_psql_local "SHOW ssl;" "postgres:$(get_psql_user_pass cert-manager-tls-pguser-postgres)@$(get_psql_user_host cert-manager-tls-pguser-postgres)")
+      if [[ "$ssl_info" != *"on"* ]]; then
+          echo "SSL is not enabled on PostgreSQL after rotation"
+          exit 1
+      fi
+
+      pgb_certificate_data=$(run_comand_on_pod "openssl s_client -connect cert-manager-tls-pgbouncer:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -issuer")
+      if [[ "$pgb_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "Unexpected PgBouncer certificate issuer after rotation"
+          echo "Got: $pgb_certificate_data"
+          exit 1
+      fi
+
+      instance=$(kubectl -n "$NAMESPACE" get pod \
+        -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      pgbr_certificate_data=$(run_comand_on_pod "openssl s_client -connect ${instance}.cert-manager-tls-pods:8432 <<< '' 2>/dev/null | openssl x509 -noout -issuer")
+      if [[ "$pgbr_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "Unexpected pgBackRest certificate issuer after rotation"
+          echo "Got: $pgbr_certificate_data"
+          exit 1
+      fi
+
+      kubectl -n "$NAMESPACE" exec "$instance" -c pgbackrest -- pgbackrest info

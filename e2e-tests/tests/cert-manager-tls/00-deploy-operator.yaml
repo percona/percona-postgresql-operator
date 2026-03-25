@@ -12,3 +12,4 @@ commands:
       deploy_cert_manager
       deploy_operator
       deploy_client
+      deploy_cmctl
