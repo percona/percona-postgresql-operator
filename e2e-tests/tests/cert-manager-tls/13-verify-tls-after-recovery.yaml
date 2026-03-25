@@ -1,0 +1,42 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      pg_certificate_data=$(run_comand_on_pod "openssl s_client -connect cert-manager-tls-primary:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -issuer")
+      if [[ "$pg_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "Unexpected PostgreSQL certificate issuer after recovery"
+          echo "Got: $pg_certificate_data"
+          exit 1
+      fi
+
+      ssl_info=$(run_psql_local "SHOW ssl;" "postgres:$(get_psql_user_pass cert-manager-tls-pguser-postgres)@$(get_psql_user_host cert-manager-tls-pguser-postgres)")
+      if [[ "$ssl_info" != *"on"* ]]; then
+          echo "SSL is not enabled on PostgreSQL after recovery"
+          exit 1
+      fi
+
+      pgb_certificate_data=$(run_comand_on_pod "openssl s_client -connect cert-manager-tls-pgbouncer:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -issuer")
+      if [[ "$pgb_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "Unexpected PgBouncer certificate issuer after recovery"
+          echo "Got: $pgb_certificate_data"
+          exit 1
+      fi
+
+      instance=$(kubectl -n "$NAMESPACE" get pod \
+        -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      pgbr_certificate_data=$(run_comand_on_pod "openssl s_client -connect ${instance}.cert-manager-tls-pods:8432 <<< '' 2>/dev/null | openssl x509 -noout -issuer")
+      if [[ "$pgbr_certificate_data" != *"issuer=CN=cert-manager-tls-ca"* ]]; then
+          echo "Unexpected pgBackRest certificate issuer after recovery"
+          echo "Got: $pgbr_certificate_data"
+          exit 1
+      fi
+
+      kubectl -n "$NAMESPACE" exec "$instance" -c pgbackrest -- pgbackrest info
