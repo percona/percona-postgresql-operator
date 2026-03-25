@@ -34,6 +34,12 @@ func ConfigMap(
 
 	outConfigMap.Data[emptyConfigMapKey] = ""
 	outConfigMap.Data[iniFileConfigMapKey] = clusterINI(inCluster)
+
+	if hasLDAPRules(inCluster) {
+		outConfigMap.Data[hbaFileConfigMapKey] = pgbouncerHBAFileContents(inCluster)
+	} else {
+		delete(outConfigMap.Data, hbaFileConfigMapKey)
+	}
 }
 
 // Secret populates the PgBouncer Secret.
@@ -43,6 +49,10 @@ func Secret(ctx context.Context,
 	inSecret *corev1.Secret,
 	inService *corev1.Service,
 	outSecret *corev1.Secret,
+	// frontendCertManagerSecret is the cert-manager-managed TLS secret for the
+	// PgBouncer frontend. When non-nil, its tls.crt/tls.key are used instead
+	// of generating a certificate with the internal PKI.
+	frontendCertManagerSecret *corev1.Secret,
 ) error {
 	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
 		// PgBouncer is disabled; there is nothing to do.
@@ -72,32 +82,43 @@ func Secret(ctx context.Context,
 	}
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-		leaf := &pki.LeafCertificate{}
-		dnsNames, err := naming.ServiceDNSNames(ctx, inService)
-		if err != nil {
-			return errors.Wrap(err, "get service dns names")
-		}
-		dnsFQDN := dnsNames[0]
+		if frontendCertManagerSecret != nil {
+			if err == nil {
+				outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
+			}
+			if err == nil {
+				outSecret.Data[certFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
+				outSecret.Data[certFrontendPrivateKeySecretKey] = frontendCertManagerSecret.Data[corev1.TLSPrivateKeyKey]
+			}
+		} else {
+			leaf := &pki.LeafCertificate{}
+			var dnsNames []string
+			dnsNames, err = naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
+			if err != nil {
+				return errors.Wrap(err, "get service dns names")
+			}
+			dnsFQDN := dnsNames[0]
 
-		if err == nil {
-			// Unmarshal and validate the stored leaf. These first errors can
-			// be ignored because they result in an invalid leaf which is then
-			// correctly regenerated.
-			_ = leaf.Certificate.UnmarshalText(inSecret.Data[certFrontendSecretKey])
-			_ = leaf.PrivateKey.UnmarshalText(inSecret.Data[certFrontendPrivateKeySecretKey])
+			if err == nil {
+				// Unmarshal and validate the stored leaf. These first errors can
+				// be ignored because they result in an invalid leaf which is then
+				// correctly regenerated.
+				_ = leaf.Certificate.UnmarshalText(inSecret.Data[certFrontendSecretKey])
+				_ = leaf.PrivateKey.UnmarshalText(inSecret.Data[certFrontendPrivateKeySecretKey])
 
-			leaf, err = inRoot.RegenerateLeafWhenNecessary(leaf, dnsFQDN, dnsNames)
-			err = errors.WithStack(err)
-		}
+				leaf, err = inRoot.RegenerateLeafWhenNecessary(leaf, dnsFQDN, dnsNames)
+				err = errors.WithStack(err)
+			}
 
-		if err == nil {
-			outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
-		}
-		if err == nil {
-			outSecret.Data[certFrontendPrivateKeySecretKey], err = leaf.PrivateKey.MarshalText()
-		}
-		if err == nil {
-			outSecret.Data[certFrontendSecretKey], err = leaf.Certificate.MarshalText()
+			if err == nil {
+				outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
+			}
+			if err == nil {
+				outSecret.Data[certFrontendPrivateKeySecretKey], err = leaf.PrivateKey.MarshalText()
+			}
+			if err == nil {
+				outSecret.Data[certFrontendSecretKey], err = leaf.Certificate.MarshalText()
+			}
 		}
 	}
 
@@ -130,6 +151,16 @@ func Pod(
 		),
 	}
 
+	// When LDAP rules are present, mount the cluster's config files (which
+	// may include the LDAP TLS CA cert at ldap/ca.crt) into PgBouncer's
+	// config volume so that the OpenLDAP client library can verify the LDAP
+	// server's TLS certificate — mirroring the LDAPTLS_CACERT convention
+	// used for the PostgreSQL containers.
+	if hasLDAPRules(inCluster) && inCluster.Spec.Config != nil && len(inCluster.Spec.Config.Files) > 0 {
+		configVolume.Projected.Sources = append(configVolume.Projected.Sources,
+			inCluster.Spec.Config.Files...)
+	}
+
 	container := corev1.Container{
 		Name: naming.ContainerPGBouncer,
 
@@ -146,6 +177,15 @@ func Pod(
 		}},
 
 		VolumeMounts: []corev1.VolumeMount{configVolumeMount},
+	}
+
+	// Set LDAPTLS_CACERT so PgBouncer's OpenLDAP client can find the CA cert
+	// at the same path convention used by the PostgreSQL containers.
+	if hasLDAPRules(inCluster) {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "LDAPTLS_CACERT",
+			Value: configDirectory + "/ldap/ca.crt",
+		})
 	}
 
 	// TODO container.LivenessProbe?
@@ -182,14 +222,29 @@ func Pod(
 
 	outPod.Containers = []corev1.Container{container, reloader}
 
+	outPod.Volumes = []corev1.Volume{configVolume}
+
 	// If the PGBouncerSidecars feature gate is enabled and custom pgBouncer
 	// sidecars are defined, add the defined container to the Pod.
 	if feature.Enabled(ctx, feature.PGBouncerSidecars) &&
 		inCluster.Spec.Proxy.PGBouncer.Containers != nil {
 		outPod.Containers = append(outPod.Containers, inCluster.Spec.Proxy.PGBouncer.Containers...)
-	}
 
-	outPod.Volumes = []corev1.Volume{configVolume}
+		if inCluster.CompareVersion("2.9.0") >= 0 {
+			outPod.Volumes = append(outPod.Volumes, inCluster.Spec.Proxy.PGBouncer.SidecarVolumes...)
+
+			for _, v := range inCluster.Spec.Proxy.PGBouncer.SidecarPVCs {
+				outPod.Volumes = append(outPod.Volumes, corev1.Volume{
+					Name: v.Name,
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: v.Name,
+						},
+					},
+				})
+			}
+		}
+	}
 
 	// K8SPG-833
 	if pgbouncer := inCluster.Spec.Proxy.PGBouncer; inCluster.CompareVersion("2.8.0") >= 0 && pgbouncer != nil {

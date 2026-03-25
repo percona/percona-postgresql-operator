@@ -13,6 +13,7 @@ linters:
     - errchkjson
     - errorlint
     - exhaustive
+    - forbidigo
     - gocheckcompilerdirectives
     - gochecksumtype
     - gomodguard
@@ -39,6 +40,10 @@ linters:
   disable:
     - contextcheck
   settings:
+    forbidigo:
+      forbid:
+        - pattern: ^fmt\.Errorf$
+          msg: "Do not use fmt.Errorf; use github.com/pkg/errors (errors.Errorf / errors.Wrap / errors.Wrapf) instead."
     depguard:
       rules:
         everything:
@@ -56,12 +61,8 @@ linters:
               desc: The "testing" packages should be used only in tests.
             - pkg: github.com/percona/percona-postgresql-operator/v2/internal/testing/*
               desc: The "internal/testing" packages should be used only in tests.
-        tests:
-          files:
-            - $test
-          deny:
-            - pkg: github.com/pkg/errors
-              desc: Use the "errors" package unless you are interacting with stack traces.
+            - pkg: errors
+              desc: Use "github.com/pkg/errors" instead (errors.Wrap/Wrapf/Errorf) for stack traces.
     errchkjson:
       check-error-free-encoding: true
     exhaustive:

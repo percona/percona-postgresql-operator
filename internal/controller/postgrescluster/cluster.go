@@ -6,7 +6,6 @@ package postgrescluster
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/pkg/errors"
@@ -236,7 +235,7 @@ func (r *Reconciler) generateClusterReplicaService(
 				// and event could potentially be removed in favor of that validation
 				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "MisconfiguredClusterIP",
 					"NodePort cannot be set with type ClusterIP on Service %q", service.Name)
-				return nil, fmt.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
+				return nil, errors.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
 			}
 			servicePort.NodePort = *spec.NodePort
 		}
@@ -287,7 +286,6 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	rootCA *pki.RootCertificateAuthority,
 	backupsSpecFound bool,
 ) (bool, error) {
-
 	// a hash func to hash the pgBackRest restore options
 	hashFunc := func(jobConfigs []string) (string, error) {
 		return safeHash32(func(w io.Writer) (err error) {
@@ -380,8 +378,7 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	}
 	var configChanged bool
 	if restoreJob != nil {
-		configChanged =
-			(configHash != restoreJob.GetAnnotations()[naming.PGBackRestConfigHash])
+		configChanged = (configHash != restoreJob.GetAnnotations()[naming.PGBackRestConfigHash])
 	}
 
 	// Proceed with preparing the cluster for restore (e.g. tearing down runners, the DCS,

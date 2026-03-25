@@ -5,10 +5,10 @@
 package pgbackrest
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"

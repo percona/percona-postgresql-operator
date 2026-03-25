@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
@@ -45,6 +46,12 @@ func clusterYAML(
 	cluster *v1beta1.PostgresCluster,
 	pgHBAs postgres.HBAs, pgParameters postgres.Parameters,
 ) (string, error) {
+
+	labels := map[string]string{naming.LabelCluster: cluster.Name}
+	if cluster.CompareVersion("2.9.0") >= 0 {
+		labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(), labels)
+	}
+
 	root := map[string]any{
 		// The cluster identifier. This value cannot change during the cluster's
 		// lifetime.
@@ -64,9 +71,7 @@ func clusterYAML(
 			// In addition to "scope_label" above, Patroni will add the following to
 			// every object it creates. It will also use these as filters when doing
 			// any lookups.
-			"labels": map[string]string{
-				naming.LabelCluster: cluster.Name,
-			},
+			"labels": labels,
 		},
 
 		"postgresql": map[string]any{
@@ -170,6 +175,10 @@ func clusterYAML(
 		}
 	}
 
+	if cluster.CompareVersion("2.9.0") >= 0 && cluster.Spec.Patroni != nil {
+		root["postgresql"].(map[string]any)["remove_data_directory_on_diverged_timelines"] = cluster.Spec.Patroni.RemoveDataDirectoryOnDivergedTimelines
+	}
+
 	b, err := yaml.Marshal(root)
 	return string(append([]byte(yamlGeneratedWarning), b...)), err
 }
@@ -252,6 +261,18 @@ func DynamicConfiguration(
 	hba := make([]string, 0, len(pgHBAs.Mandatory))
 	for i := range pgHBAs.Mandatory {
 		hba = append(hba, pgHBAs.Mandatory[i].String())
+	}
+	// Include authentication rules from spec.authentication.rules.
+	// These are evaluated before any rules in Patroni's dynamic configuration.
+	if authn := cluster.Spec.Authentication; authn != nil {
+		for i := range authn.Rules {
+			rule := &authn.Rules[i]
+			if len(rule.HBA) > 0 {
+				hba = append(hba, rule.HBA)
+			} else if r := hbaFromSpec(&rule.PostgresHBARule); r != nil {
+				hba = append(hba, r.String())
+			}
+		}
 	}
 	if section, ok := postgresql["pg_hba"].([]any); ok {
 		for i := range section {
@@ -572,7 +593,7 @@ func instanceYAML(
 		//            We should use "no_leader" instead
 		patroniVer4, err := cluster.IsPatroniVer4()
 		if err != nil {
-			return "", fmt.Errorf("failed to check if patroni v4 is used: %w", err)
+			return "", errors.Wrap(err, "failed to check if patroni v4 is used")
 		}
 		if !patroniVer4 {
 			postgresql[pgBackRestCreateReplicaMethod] = map[string]any{
@@ -685,4 +706,33 @@ func probeTiming(spec *v1beta1.PatroniSpec) *corev1.Probe {
 	}
 
 	return &probe
+}
+
+// hbaFromSpec converts one PostgresHBARule into a structured HBA record.
+// The "password" method is normalized to "scram-sha-256" per PostgreSQL docs.
+func hbaFromSpec(spec *v1beta1.PostgresHBARule) *postgres.HostBasedAuthentication {
+	if spec == nil {
+		return nil
+	}
+	result := postgres.NewHBA()
+	result.Origin(spec.Connection)
+	if spec.Method == "password" {
+		result.Method("scram-sha-256")
+	} else {
+		result.Method(spec.Method)
+	}
+	if len(spec.Databases) > 0 {
+		result.Databases(spec.Databases[0], spec.Databases[1:]...)
+	}
+	if len(spec.Users) > 0 {
+		result.Users(spec.Users[0], spec.Users[1:]...)
+	}
+	if len(spec.Options) > 0 {
+		opts := make(map[string]string, len(spec.Options))
+		for k, v := range spec.Options {
+			opts[k] = v.String()
+		}
+		result.Options(opts)
+	}
+	return result
 }

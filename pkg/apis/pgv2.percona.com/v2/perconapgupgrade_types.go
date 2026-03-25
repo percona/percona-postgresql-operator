@@ -59,13 +59,13 @@ type PerconaPGUpgradeSpec struct {
 	// The major version of PostgreSQL before the upgrade.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=16
+	// +kubebuilder:validation:Maximum=17
 	FromPostgresVersion int `json:"fromPostgresVersion"`
 
 	// The major version of PostgreSQL to be upgraded to.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=13
-	// +kubebuilder:validation:Maximum=17
+	// +kubebuilder:validation:Maximum=18
 	ToPostgresVersion int `json:"toPostgresVersion"`
 
 	// The image to use for PostgreSQL containers after upgrade.

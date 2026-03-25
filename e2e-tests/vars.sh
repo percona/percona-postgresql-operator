@@ -6,6 +6,8 @@ export DEPLOY_DIR="${DEPLOY_DIR:-${ROOT_REPO}/deploy}"
 export TESTS_DIR="${TESTS_DIR:-${ROOT_REPO}/e2e-tests}"
 export TESTS_CONFIG_DIR="${TESTS_CONFIG_DIR:-${TESTS_DIR}/conf}"
 # shellcheck disable=SC2154
+export TEST_CONFIG_DIR="${TESTS_DIR}/tests/${test_name}/conf"
+# shellcheck disable=SC2154
 export TEMP_DIR="/tmp/kuttl/pg/${test_name}"
 
 # shellcheck disable=SC2155
@@ -27,10 +29,11 @@ if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
 	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -E 's/.*:(.*ppg)?([0-9]+).*/\2/')
 	export PG_VER="${pg_version_value}"
 else
-	export PG_VER="${PG_VER:-17}"
+	export PG_VER="${PG_VER:-18}"
 fi
+
 export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
-export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"perconalab/percona-distribution-postgresql:$PG_VER"}
+export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
 export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
 export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade"}
 export BUCKET=${BUCKET:-"pg-operator-testing"}

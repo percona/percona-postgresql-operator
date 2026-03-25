@@ -6,11 +6,11 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"io"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"

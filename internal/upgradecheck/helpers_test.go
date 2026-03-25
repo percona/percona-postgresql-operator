@@ -7,12 +7,12 @@ package upgradecheck
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/go-logr/logr/funcr"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -34,7 +34,7 @@ type fakeClientWithError struct {
 func (f *fakeClientWithError) Get(ctx context.Context, key types.NamespacedName, obj crclient.Object, opts ...crclient.GetOption) error {
 	switch f.errorType {
 	case "get error":
-		return fmt.Errorf("get error")
+		return errors.New("get error")
 	default:
 		return f.Client.Get(ctx, key, obj, opts...)
 	}
@@ -45,10 +45,11 @@ func (f *fakeClientWithError) Get(ctx context.Context, key types.NamespacedName,
 // - https://github.com/kubernetes/client-go/issues/970
 // Once that gets fixed, we can test without envtest
 func (f *fakeClientWithError) Patch(ctx context.Context, obj crclient.Object,
-	patch crclient.Patch, opts ...crclient.PatchOption) error {
+	patch crclient.Patch, opts ...crclient.PatchOption,
+) error {
 	switch {
 	case f.errorType == "patch error":
-		return fmt.Errorf("patch error")
+		return errors.New("patch error")
 	default:
 		return f.Client.Patch(ctx, obj, patch, opts...)
 	}
@@ -56,10 +57,11 @@ func (f *fakeClientWithError) Patch(ctx context.Context, obj crclient.Object,
 
 // List returns the client.get OR an Error (`list error`) if the fakeClientWithError is set to error that way
 func (f *fakeClientWithError) List(ctx context.Context, objList crclient.ObjectList,
-	opts ...crclient.ListOption) error {
+	opts ...crclient.ListOption,
+) error {
 	switch f.errorType {
 	case "list error":
-		return fmt.Errorf("list error")
+		return errors.New("list error")
 	default:
 		return f.Client.List(ctx, objList, opts...)
 	}
@@ -125,7 +127,8 @@ func setupVersionServer(t *testing.T, works bool) (version.Info, *httptest.Serve
 		GitCommit: "v1.22.2",
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,
-		req *http.Request) {
+		req *http.Request,
+	) {
 		if works {
 			output, _ := json.Marshal(expect)
 			w.Header().Set("Content-Type", "application/json")

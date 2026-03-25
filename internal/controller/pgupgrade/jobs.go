@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -189,8 +190,22 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 	// Replace all containers with one that does the upgrade.
 	job.Spec.Template.Spec.EphemeralContainers = nil
 
-	// K8SPG-254: Major upgrade support
-	job.Spec.Template.Spec.InitContainers = upgrade.Spec.InitContainers
+	// K8SPG-894: Ensure database init container is included for required scripts
+	var initContainers []corev1.Container
+
+	dbInitContainerName := ContainerDatabase + "-init"
+	for _, container := range startup.Spec.Template.Spec.InitContainers {
+		if container.Name == dbInitContainerName {
+			initContainers = append(initContainers, container)
+			break
+		}
+	}
+
+	if len(upgrade.Spec.InitContainers) > 0 {
+		initContainers = append(initContainers, upgrade.Spec.InitContainers...)
+	}
+
+	job.Spec.Template.Spec.InitContainers = initContainers
 
 	volumeMounts := database.VolumeMounts
 	volumeMounts = append(volumeMounts, upgrade.Spec.VolumeMounts...)
@@ -202,6 +217,20 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 		Name:            database.Name,
 		SecurityContext: database.SecurityContext,
 		VolumeMounts:    volumeMounts, // K8SPG-254
+
+		// K8SPG-893
+		Env: []corev1.EnvVar{
+			// Critical for major upgrades to avoid lc_collate mismatches.
+			// - https://www.postgresql.org/docs/current/locale.html
+			{
+				Name:  "LC_ALL",
+				Value: "en_US.utf-8",
+			},
+			{
+				Name:  "LANG",
+				Value: "en_US.utf-8",
+			},
+		},
 
 		// Use our upgrade command and the specified image and resources.
 		Command: upgradeCommand(
@@ -353,7 +382,7 @@ func pgUpgradeContainerImage(upgrade *v1beta1.PGUpgrade) string {
 // spec is defined. If it is undefined, an error is returned.
 func verifyUpgradeImageValue(upgrade *v1beta1.PGUpgrade) error {
 	if pgUpgradeContainerImage(upgrade) == "" {
-		return fmt.Errorf("Missing crunchy-upgrade image")
+		return errors.New("Missing crunchy-upgrade image")
 	}
 	return nil
 }

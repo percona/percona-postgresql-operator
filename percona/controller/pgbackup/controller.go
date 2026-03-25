@@ -2,10 +2,13 @@ package pgbackup
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"slices"
+	"strings"
 	"time"
 
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,7 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -23,10 +28,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup/snapshots"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
@@ -43,17 +52,47 @@ var ErrBackupJobNotFound = errors.New("backup Job not found")
 
 // Reconciler holds resources for the PerconaPGBackup reconciler
 type PGBackupReconciler struct {
-	Client client.Client
+	Client          client.Client
+	DiscoveryClient *discovery.DiscoveryClient
+	PodExec         runtime.PodExecutor
 
 	ExternalChan chan event.GenericEvent
 }
 
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
-func (r *PGBackupReconciler) SetupWithManager(mgr manager.Manager) error {
-	return (builder.ControllerManagedBy(mgr).
+func (r *PGBackupReconciler) SetupWithManager(ctx context.Context, mgr manager.Manager) error {
+	if r.PodExec == nil {
+		var err error
+		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
+		if err != nil {
+			return err
+		}
+	}
+
+	if r.DiscoveryClient == nil {
+		var err error
+		r.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
+		if err != nil {
+			return errors.Wrap(err, "failed to create discovery client")
+		}
+	}
+
+	b := builder.ControllerManagedBy(mgr).
 		For(&v2.PerconaPGBackup{}).
-		WatchesRawSource(source.Channel(r.ExternalChan, &handler.EnqueueRequestForObject{})).
-		Complete(r))
+		WatchesRawSource(source.Channel(r.ExternalChan, &handler.EnqueueRequestForObject{}))
+
+	// Watch VolumeSnapshots if the feature is enabled and the API is available.
+	if feature.Enabled(ctx, feature.BackupSnapshots) {
+		gvk := volumesnapshotv1.SchemeGroupVersion.WithKind(pNaming.KindVolumeSnapshot)
+		gv := gvk.GroupVersion().String()
+		if ok, err := k8s.GroupVersionKindExists(r.DiscoveryClient, gv, gvk.Kind); err != nil {
+			return errors.Wrap(err, "check VolumeSnapshot API availability")
+		} else if ok {
+			b = b.Owns(&volumesnapshotv1.VolumeSnapshot{})
+		}
+	}
+
+	return b.Complete(r)
 }
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete;patch
@@ -80,6 +119,24 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 	pgBackup.Default()
 
+	pgCluster := new(v2.PerconaPGCluster)
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return reconcile.Result{}, errors.Wrap(err, "get PerconaPGCluster")
+		}
+		pgCluster = nil
+	}
+
+	if ok, err := r.handleLease(ctx, pgBackup); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to process lease")
+	} else if !ok {
+		return reconcile.Result{RequeueAfter: time.Second * 10}, nil
+	}
+
+	if *pgBackup.Spec.Method == v2.BackupMethodVolumeSnapshot {
+		return snapshots.Reconcile(ctx, r.Client, r.PodExec, pgBackup, pgCluster)
+	}
+
 	if !pgBackup.DeletionTimestamp.IsZero() || pgBackup.Status.State == v2.BackupFailed {
 		if _, err := runFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to run finalizers")
@@ -87,18 +144,20 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if pgBackup.Status.State != v2.BackupFailed && pgBackup.Status.State != v2.BackupSucceeded {
+	if !pgBackup.Status.State.IsTerminal() {
 		if err := ensureFinalizers(ctx, r.Client, pgBackup); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 		}
 	}
 
-	pgCluster := new(v2.PerconaPGCluster)
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: request.Namespace}, pgCluster); err != nil {
-		if !k8serrors.IsNotFound(err) {
-			return reconcile.Result{}, errors.Wrap(err, "get PostgresCluster")
+	if ptr.Deref(pgBackup.Spec.RepoName, "") == "" {
+		if updErr := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
+			bcp.Status.State = v2.BackupFailed
+			bcp.Status.Error = "repoName is required when method is 'pgbackrest'"
+		}); updErr != nil {
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 		}
-		pgCluster = nil
+		return reconcile.Result{}, errors.New("'repoName' is required when method is 'pgbackrest'")
 	}
 
 	switch pgBackup.Status.State {
@@ -136,15 +195,6 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			if !errors.Is(err, ErrBackupJobNotFound) {
 				return reconcile.Result{}, errors.Wrap(err, "find backup job")
 			}
-
-			runningBackup, err := getBackupInProgress(ctx, r.Client, pgBackup.Spec.PGCluster, pgBackup.Namespace)
-			if err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "get backup in progress")
-			}
-			if runningBackup != "" && runningBackup != pgBackup.Name {
-				log.Info("Can't start backup. Previous backup is still in progress", "pg-backup", pgBackup.Name, "cluster", pgCluster.Name)
-				return reconcile.Result{RequeueAfter: time.Second * 5}, nil
-			}
 			if err := startBackup(ctx, r.Client, pgBackup); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "failed to start backup")
 			}
@@ -152,10 +202,10 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 
 		repo := getRepo(pgCluster, pgBackup)
 		if repo == nil {
-			return reconcile.Result{}, errors.Errorf("%s repo not defined", pgBackup.Spec.RepoName)
+			return reconcile.Result{}, errors.Errorf("'%s' repo not defined", ptr.Deref(pgBackup.Spec.RepoName, ""))
 		}
 
-		if err := updateStatus(ctx, r.Client, pgBackup, func(bcp *v2.PerconaPGBackup) {
+		if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.Destination = getDestination(pgCluster, pgBackup)
 			bcp.Status.Image = pgCluster.Spec.Backups.PGBackRest.Image
 			bcp.Status.Repo = repo
@@ -219,7 +269,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup")
 		}
 
-		if err := updateStatus(ctx, r.Client, pgBackup, func(bcp *v2.PerconaPGBackup) {
+		if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupRunning
 			bcp.Status.JobName = job.Name
 		}); err != nil {
@@ -233,7 +283,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		if err != nil {
 			// If something has deleted the job even with the finalizer, we should fail the backup.
 			if k8serrors.IsNotFound(err) {
-				if err := updateStatus(ctx, r.Client, pgBackup, func(bcp *v2.PerconaPGBackup) {
+				if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
 					bcp.Status.State = v2.BackupFailed
 				}); err != nil {
 					return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
@@ -265,7 +315,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		if err := updateStatus(ctx, r.Client, pgBackup, func(bcp *v2.PerconaPGBackup) {
+		if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.CompletedAt = job.Status.CompletionTime
 			bcp.Status.State = status
 		}); err != nil {
@@ -301,7 +351,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		if err == nil {
 			log.Info("Got latest restorable timestamp", "timestamp", latestRestorableTime)
 
-			if err := updateStatus(ctx, r.Client, pgBackup, func(bcp *v2.PerconaPGBackup) {
+			if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
 				bcp.Status.LatestRestorableTime.Time = latestRestorableTime
 			}); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
@@ -410,7 +460,7 @@ func getBackupInProgress(ctx context.Context, c client.Client, clusterName, ns s
 }
 
 func getRepo(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) *v1beta1.PGBackRestRepo {
-	repoName := pb.Spec.RepoName
+	repoName := ptr.Deref(pb.Spec.RepoName, "")
 	for i, r := range pg.Spec.Backups.PGBackRest.Repos {
 		if repoName == r.Name {
 			return &pg.Spec.Backups.PGBackRest.Repos[i]
@@ -443,7 +493,7 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 }
 
 func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod, pgBackup *v2.PerconaPGBackup) error {
-	info, err := pgbackrest.GetInfo(ctx, pod, pgBackup.Spec.RepoName)
+	info, err := pgbackrest.GetInfo(ctx, pod, ptr.Deref(pgBackup.Spec.RepoName, ""))
 	if err != nil {
 		return errors.Wrap(err, "get pgBackRest info")
 	}
@@ -472,7 +522,7 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 
 			stanzaName = info.Name
 			if pgBackup.Status.BackupName == "" {
-				if err := updateStatus(ctx, c, pgBackup, func(bcp *v2.PerconaPGBackup) {
+				if err := pgBackup.UpdateStatus(ctx, c, func(bcp *v2.PerconaPGBackup) {
 					bcp.Status.BackupName = backup.Label
 					bcp.Status.BackupType = backup.Type
 				}); err != nil {
@@ -480,7 +530,7 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 				}
 			}
 
-			if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, pgBackup.Spec.RepoName, map[string]string{
+			if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, ptr.Deref(pgBackup.Spec.RepoName, ""), map[string]string{
 				v2.PGBackrestAnnotationJobName: pgBackup.Status.JobName,
 			}); err != nil {
 				return errors.Wrap(err, "set annotations to backup")
@@ -635,8 +685,11 @@ func startBackup(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup) e
 			pg.Spec.Backups.PGBackRest.Manual = new(v1beta1.PGBackRestManualBackup)
 		}
 
-		pg.Spec.Backups.PGBackRest.Manual.RepoName = pb.Spec.RepoName
+		pg.Spec.Backups.PGBackRest.Manual.RepoName = ptr.Deref(pb.Spec.RepoName, "")
 		pg.Spec.Backups.PGBackRest.Manual.Options = pb.Spec.Options
+
+		pg.Spec.Backups.PGBackRest.Manual.Env = pb.Spec.ContainerOptions.Env
+		pg.Spec.Backups.PGBackRest.Manual.EnvFrom = pb.Spec.ContainerOptions.EnvFrom
 
 		return c.Update(ctx, pg)
 	}); err != nil {
@@ -663,7 +716,7 @@ func findBackupJob(ctx context.Context, c client.Client, pb *v2.PerconaPGBackup)
 	err := c.List(ctx, jobList,
 		client.InNamespace(pb.Namespace),
 		client.MatchingLabelsSelector{
-			Selector: naming.PGBackRestBackupJobSelector(pb.Spec.PGCluster, pb.Spec.RepoName, naming.BackupManual),
+			Selector: naming.PGBackRestBackupJobSelector(pb.Spec.PGCluster, ptr.Deref(pb.Spec.RepoName, ""), naming.BackupManual),
 		})
 	if err != nil {
 		return nil, errors.Wrap(err, "get backup jobs")
@@ -721,7 +774,7 @@ func failIfClusterIsNotReady(ctx context.Context, cl client.Client, pgCluster *v
 
 	log.Info("Cluster is not ready for backup for too long. Setting it's state to Failed")
 
-	if err := updateStatus(ctx, cl, pgBackup, func(bcp *v2.PerconaPGBackup) {
+	if err := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupFailed
 	}); err != nil {
 		return errors.Wrap(err, "update PGBackup status")
@@ -729,15 +782,119 @@ func failIfClusterIsNotReady(ctx context.Context, cl client.Client, pgCluster *v
 	return nil
 }
 
-func updateStatus(ctx context.Context, cl client.Client, pgBackup *v2.PerconaPGBackup, updateFunc func(bcp *v2.PerconaPGBackup)) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		bcp := new(v2.PerconaPGBackup)
-		if err := cl.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
-			return errors.Wrap(err, "get PGBackup")
+func backupLeaseName(clusterName string) string {
+	return "pg-" + clusterName + "-backup-lock"
+}
+
+func backupLeaseHolder(backup *v2.PerconaPGBackup) string {
+	return fmt.Sprintf("%s|%s", backup.GetName(), backup.GetUID())
+}
+
+func parseBackupLeaseHolder(holder string) (string, types.UID) {
+	parts := strings.Split(holder, "|")
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], types.UID(parts[1])
+}
+
+func (r *PGBackupReconciler) tryAcquireLease(ctx context.Context, backup *v2.PerconaPGBackup) (bool, error) {
+	log := logging.FromContext(ctx).WithName("tryAcquireLease")
+	leaseName := backupLeaseName(backup.Spec.PGCluster)
+	leaseHolderID := backupLeaseHolder(backup)
+
+	checkStale := func(ctx context.Context, currentHolder string) (bool, error) {
+		backupName, backupUID := parseBackupLeaseHolder(currentHolder)
+		if backupName == "" || backupUID == "" {
+			log.Info("Backup lease holder is malformed, acquiring lease anyway")
+			return true, nil
 		}
 
-		updateFunc(bcp)
+		holderBackup := &v2.PerconaPGBackup{}
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: backupName, Namespace: backup.GetNamespace()}, holderBackup); k8serrors.IsNotFound(err) {
+			return true, nil
+		} else if err != nil {
+			return false, errors.Wrap(err, "failed to get backup")
+		} else if holderBackup.GetUID() != backupUID {
+			// We found a backup with the same name, but different UID.
+			// So this isn't the same backup that was holding the lease.
+			return true, nil
+		}
 
-		return cl.Status().Update(ctx, bcp)
-	})
+		// We found the backup that holds the lease. Check if it has completed fully before we acquire the lease.
+		return holderBackup.Status.State.IsTerminal() &&
+			!controllerutil.ContainsFinalizer(holderBackup, pNaming.FinalizerSnapshotInProgress), nil
+	}
+
+	acquired := true
+	if err := k8s.AcquireLease(ctx, r.Client, leaseName, leaseHolderID, backup.GetNamespace(), checkStale); err != nil {
+		if errors.Is(err, k8s.ErrLeaseAlreadyHeld) || k8serrors.IsAlreadyExists(err) || k8serrors.IsConflict(err) {
+			acquired = false
+		} else {
+			return false, errors.Wrap(err, "failed to acquire lease")
+		}
+	}
+
+	cond := metav1.Condition{
+		Type:               v2.ConditionBackupLeaseAcquired,
+		Status:             metav1.ConditionTrue,
+		Reason:             "LeaseAcquired",
+		ObservedGeneration: backup.GetGeneration(),
+	}
+	if !acquired {
+		cond.Status = metav1.ConditionFalse
+		cond.Reason = "LeaseAlreadyHeld"
+	}
+
+	if !meta.IsStatusConditionPresentAndEqual(backup.Status.Conditions, v2.ConditionBackupLeaseAcquired, cond.Status) {
+		if updErr := backup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
+			meta.SetStatusCondition(&bcp.Status.Conditions, cond)
+		}); updErr != nil {
+			return false, errors.Wrap(updErr, "failed to update backup status")
+		}
+		if cond.Status == metav1.ConditionTrue {
+			log.Info("Backup lease acquired")
+		}
+	}
+
+	return acquired, nil
+}
+
+func (r *PGBackupReconciler) releaseLeaseIfNeeded(ctx context.Context, backup *v2.PerconaPGBackup) error {
+	log := logging.FromContext(ctx).WithName("releaseLeaseIfNeeded")
+	if !meta.IsStatusConditionPresentAndEqual(backup.Status.Conditions, v2.ConditionBackupLeaseAcquired, metav1.ConditionTrue) {
+		return nil
+	}
+	if err := k8s.ReleaseLease(ctx, r.Client, backupLeaseName(backup.Spec.PGCluster), backupLeaseHolder(backup), backup.GetNamespace()); err != nil {
+		return errors.Wrap(err, "failed to release lease")
+	}
+	if updErr := backup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
+		meta.RemoveStatusCondition(&bcp.Status.Conditions, v2.ConditionBackupLeaseAcquired)
+	}); updErr != nil {
+		return errors.Wrap(updErr, "failed to update backup status")
+	}
+	log.Info("Backup lease released")
+	return nil
+}
+
+// handleLease attempts to acquire or release the lease based on
+// the backup state.
+// Returns true if the caller can continue with the reconciliation.
+func (r *PGBackupReconciler) handleLease(
+	ctx context.Context,
+	backup *v2.PerconaPGBackup,
+) (bool, error) {
+	if (backup.Status.State.IsTerminal() || !backup.DeletionTimestamp.IsZero()) &&
+		!controllerutil.ContainsFinalizer(backup, pNaming.FinalizerSnapshotInProgress) {
+		if err := r.releaseLeaseIfNeeded(ctx, backup); err != nil {
+			return false, errors.Wrap(err, "failed to release lease")
+		}
+		return true, nil
+	}
+
+	acquired, err := r.tryAcquireLease(ctx, backup)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to acquire lease")
+	}
+	return acquired, nil
 }

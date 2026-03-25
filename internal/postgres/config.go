@@ -81,6 +81,9 @@ safelink() (
 
 	// configMountPath is where to mount additional config files
 	configMountPath = "/etc/postgres"
+
+	// tmpMountPath is where to mount the temporary volume.
+	tmpMountPath = "/pgtmp"
 )
 
 // ConfigDirectory returns the absolute path to $PGDATA for cluster.
@@ -162,6 +165,21 @@ func Environment(cluster *v1beta1.PostgresCluster) []corev1.EnvVar {
 			Name:  "LDAPTLS_CACERT",
 			Value: configMountPath + "/ldap/ca.crt",
 		})
+	}
+
+	if cluster.CompareVersion("2.8.0") >= 0 {
+		env = append(env, []corev1.EnvVar{
+			// Critical for major upgrades to avoid lc_collate mismatches.
+			// - https://www.postgresql.org/docs/current/locale.html
+			{
+				Name:  "LC_ALL",
+				Value: "en_US.utf-8",
+			},
+			{
+				Name:  "LANG",
+				Value: "en_US.utf-8",
+			},
+		}...)
 	}
 
 	return env

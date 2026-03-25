@@ -32,6 +32,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -93,7 +94,7 @@ var olmClusterYAML = `
 metadata:
   name: olm
 spec:
-  postgresVersion: 13
+  postgresVersion: 17
   image: postgres
   instances:
   - name: register-now
@@ -141,6 +142,7 @@ var _ = Describe("PostgresCluster Reconciler", func() {
 		test.Reconciler.Recorder = test.Recorder
 		test.Reconciler.Registration = nil
 		test.Reconciler.Tracer = otel.Tracer("asdf")
+		test.Reconciler.CertManagerCtrlFunc = certmanager.NewController
 	})
 
 	AfterEach(func() {
@@ -231,7 +233,7 @@ var _ = Describe("PostgresCluster Reconciler", func() {
 metadata:
   name: carlos
 spec:
-  postgresVersion: 13
+  postgresVersion: 17
   image: postgres
   instances:
   - name: samba
@@ -438,7 +440,7 @@ spec:
 metadata:
   name: carlos
 spec:
-  postgresVersion: 13
+  postgresVersion: 17
   image: postgres
   instances:
   - name: samba
@@ -660,7 +662,7 @@ spec:
 metadata:
   name: test-cluster
 spec:
-  postgresVersion: 13
+  postgresVersion: 17
   image: postgres
   instances:
   - name: instance1

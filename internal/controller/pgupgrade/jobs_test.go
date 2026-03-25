@@ -110,9 +110,19 @@ func TestGenerateUpgradeJob(t *testing.T) {
 	upgrade.Spec.Resources.Requests = corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("3.14"),
 	}
+	upgrade.Spec.InitContainers = []corev1.Container{
+		{
+			Name: "upgrade-init-container",
+		},
+	}
 
 	startup := &appsv1.StatefulSet{}
 	startup.Spec.Template.Spec = corev1.PodSpec{
+		InitContainers: []corev1.Container{
+			{
+				Name: ContainerDatabase + "-init",
+			},
+		},
 		Containers: []corev1.Container{{
 			Name: ContainerDatabase,
 
@@ -203,6 +213,11 @@ spec:
         - upgrade
         - "19"
         - "25"
+        env:
+        - name: LC_ALL
+          value: en_US.utf-8
+        - name: LANG
+          value: en_US.utf-8
         image: img4
         name: database
         resources:
@@ -213,6 +228,11 @@ spec:
         volumeMounts:
         - mountPath: /mnt/some/such
           name: vm1
+      initContainers:
+      - name: database-init
+        resources: {}
+      - name: upgrade-init-container
+        resources: {}
       restartPolicy: Never
       volumes:
       - hostPath:

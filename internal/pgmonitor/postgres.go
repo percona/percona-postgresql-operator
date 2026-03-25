@@ -25,9 +25,9 @@ func PostgreSQLHBAs(inCluster *v1beta1.PostgresCluster, outHBAs *postgres.HBAs) 
 	if ExporterEnabled(inCluster) {
 		// Limit the monitoring user to local connections using SCRAM.
 		outHBAs.Mandatory = append(outHBAs.Mandatory,
-			postgres.NewHBA().TCP().User(MonitoringUser).Method("scram-sha-256").Network("127.0.0.0/8"),
-			postgres.NewHBA().TCP().User(MonitoringUser).Method("scram-sha-256").Network("::1/128"),
-			postgres.NewHBA().TCP().User(MonitoringUser).Method("reject"))
+			postgres.NewHBA().TCP().Users(MonitoringUser).Method("scram-sha-256").Network("127.0.0.0/8"),
+			postgres.NewHBA().TCP().Users(MonitoringUser).Method("scram-sha-256").Network("::1/128"),
+			postgres.NewHBA().TCP().Users(MonitoringUser).Method("reject"))
 	}
 }
 
@@ -57,7 +57,7 @@ func DisableExporterInPostgreSQL(ctx context.Context, exec postgres.Executor) er
 		\gexec`),
 		map[string]string{
 			"username": MonitoringUser,
-		})
+		}, nil)
 
 	log.V(1).Info("monitoring user disabled", "stdout", stdout, "stderr", stderr)
 

@@ -8,14 +8,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -374,16 +373,16 @@ func (c *Client) CreateAuthObject(ctx context.Context, authn AuthObject) (AuthOb
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		// 401, Unauthorized
 		case response.StatusCode == 401:
-			err = fmt.Errorf("%w: %s", errAuthentication, body)
+			err = errors.Wrap(errAuthentication, string(body))
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -405,12 +404,12 @@ func (c *Client) CreateInstallation(ctx context.Context) (Installation, error) {
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -441,12 +440,12 @@ func (c *Client) ListClusters(ctx context.Context, apiKey, teamId string) ([]*Cl
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -478,16 +477,16 @@ func (c *Client) CreateCluster(
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 				return result, err
 			}
 			if err = json.Unmarshal(body, &result.ResponsePayload); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -516,7 +515,7 @@ func (c *Client) DeleteCluster(ctx context.Context, apiKey, id string) (*Cluster
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		// Already deleted
@@ -532,7 +531,7 @@ func (c *Client) DeleteCluster(ctx context.Context, apiKey, id string) (*Cluster
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -557,16 +556,16 @@ func (c *Client) GetCluster(ctx context.Context, apiKey, id string) (*ClusterApi
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 				return result, err
 			}
 			if err = json.Unmarshal(body, &result.ResponsePayload); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -591,16 +590,16 @@ func (c *Client) GetClusterStatus(ctx context.Context, apiKey, id string) (*Clus
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 				return result, err
 			}
 			if err = json.Unmarshal(body, &result.ResponsePayload); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -625,16 +624,16 @@ func (c *Client) GetClusterUpgrade(ctx context.Context, apiKey, id string) (*Clu
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 				return result, err
 			}
 			if err = json.Unmarshal(body, &result.ResponsePayload); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -666,16 +665,16 @@ func (c *Client) UpgradeCluster(
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 				return result, err
 			}
 			if err = json.Unmarshal(body, &result.ResponsePayload); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -701,16 +700,16 @@ func (c *Client) UpgradeClusterHA(ctx context.Context, apiKey, id, action string
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 				return result, err
 			}
 			if err = json.Unmarshal(body, &result.ResponsePayload); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -742,16 +741,16 @@ func (c *Client) UpdateCluster(
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 				return result, err
 			}
 			if err = json.Unmarshal(body, &result.ResponsePayload); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -776,12 +775,12 @@ func (c *Client) GetClusterRole(ctx context.Context, apiKey, clusterId, roleName
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 
@@ -806,12 +805,12 @@ func (c *Client) ListClusterRoles(ctx context.Context, apiKey, id string) ([]*Cl
 		// 2xx, Successful
 		case response.StatusCode >= 200 && response.StatusCode < 300:
 			if err = json.Unmarshal(body, &result); err != nil {
-				err = fmt.Errorf("%w: %s", err, body)
+				err = errors.Wrap(err, string(body))
 			}
 
 		default:
 			//nolint:goerr113 // This is intentionally dynamic.
-			err = fmt.Errorf("%v: %s", response.Status, body)
+			err = errors.Errorf("%v: %s", response.Status, body)
 		}
 	}
 

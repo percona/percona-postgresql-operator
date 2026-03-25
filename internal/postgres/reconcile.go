@@ -278,7 +278,7 @@ func InstancePod(ctx context.Context,
 		startup.VolumeMounts = append(startup.VolumeMounts, tablespaceVolumeMount)
 	}
 
-	if len(inCluster.Spec.Config.Files) != 0 {
+	if inCluster.Spec.Config != nil && len(inCluster.Spec.Config.Files) != 0 {
 		additionalConfigVolumeMount := AdditionalConfigVolumeMount()
 		additionalConfigVolume := corev1.Volume{Name: additionalConfigVolumeMount.Name}
 		additionalConfigVolume.Projected = &corev1.ProjectedVolumeSource{
@@ -314,6 +314,9 @@ func InstancePod(ctx context.Context,
 	if feature.Enabled(ctx, feature.InstanceSidecars) &&
 		inInstanceSpec.Containers != nil {
 		outInstancePod.Containers = append(outInstancePod.Containers, inInstanceSpec.Containers...)
+		if inCluster.CompareVersion("2.9.0") >= 0 {
+			outInstancePod.Volumes = append(outInstancePod.Volumes, inInstanceSpec.SidecarVolumes...)
+		}
 	}
 
 	outInstancePod.InitContainers = []corev1.Container{startup}

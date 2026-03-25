@@ -1,0 +1,47 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      
+      initial_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup backup2 -ojsonpath='{.status.latestRestorableTime}')
+
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501)' \
+        "postgres:$(get_psql_user_pass backup-snapshot-pguser-postgres)@$(get_psql_user_host backup-snapshot-pguser-postgres)"
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' \
+        "postgres:$(get_psql_user_pass backup-snapshot-pguser-postgres)@$(get_psql_user_host backup-snapshot-pguser-postgres)"
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100503)' \
+        "postgres:$(get_psql_user_pass backup-snapshot-pguser-postgres)@$(get_psql_user_host backup-snapshot-pguser-postgres)"
+      
+      sleep 140 # sleep for 2 x archive_timeout + 20 seconds
+      
+      latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup backup2 -ojsonpath='{.status.latestRestorableTime}')
+      until [ "${latest_restorable_time}" != "${initial_restorable_time}" ]; do
+        sleep 5
+        latest_restorable_time=$(kubectl -n ${NAMESPACE} get pg-backup backup2 -ojsonpath='{.status.latestRestorableTime}')
+      done
+
+      run_psql_local \
+        '\c myapp \\\ TRUNCATE TABLE myApp' \
+        "postgres:$(get_psql_user_pass backup-snapshot-pguser-postgres)@$(get_psql_user_host backup-snapshot-pguser-postgres)"
+      
+      cat <<EOF | kubectl -n ${NAMESPACE} apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: restore-pitr
+      spec:
+        pgCluster: backup-snapshot
+        repoName: repo1
+        volumeSnapshotBackupName: backup3
+        options:
+        - --type=time
+        - --target="${latest_restorable_time}"
+      EOF
+    timeout: 360

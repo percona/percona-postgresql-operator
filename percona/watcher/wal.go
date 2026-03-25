@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -136,7 +137,9 @@ func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGC
 	latest := &pgv2.PerconaPGBackup{}
 	runningBackupExists := false
 	for _, backup := range backupList.Items {
-		backup := backup
+		if ptr.Deref(backup.Spec.Method, pgv2.BackupMethodPGBackrest) == pgv2.BackupMethodVolumeSnapshot {
+			continue
+		}
 
 		switch backup.Status.State {
 		case pgv2.BackupSucceeded:
@@ -213,7 +216,7 @@ func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv2.Pe
 		return time.Time{}, errors.Wrap(PrimaryPodNotFound, err.Error())
 	}
 
-	pgbackrestInfo, err := pgbackrest.GetInfo(ctx, primary, backup.Spec.RepoName)
+	pgbackrestInfo, err := pgbackrest.GetInfo(ctx, primary, ptr.Deref(backup.Spec.RepoName, ""))
 	if err != nil {
 		return time.Time{}, errors.Wrap(err, "get pgbackrest info")
 	}

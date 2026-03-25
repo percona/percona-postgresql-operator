@@ -6,13 +6,13 @@ package postgrescluster
 
 import (
 	"context"
-	"errors"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -151,6 +151,12 @@ func TestServerSideApply(t *testing.T) {
 				MatchLabels: map[string]string{"select": name},
 			}
 			sts.Spec.Template.Labels = map[string]string{"select": name}
+			sts.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "some-container",
+					Image: "some-image",
+				},
+			}
 			return &sts
 		}
 

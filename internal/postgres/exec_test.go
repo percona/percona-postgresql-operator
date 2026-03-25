@@ -6,7 +6,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -14,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
@@ -59,7 +59,7 @@ func TestExecutorExec(t *testing.T) {
 			"lots":      "of",
 			"different": "vars",
 			"CASE":      "sEnSiTiVe",
-		})
+		}, nil)
 
 	assert.Equal(t, expected, err, "expected function to be called")
 	assert.Equal(t, stdout, "some stdout")

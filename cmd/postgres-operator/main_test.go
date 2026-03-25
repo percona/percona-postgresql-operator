@@ -5,7 +5,6 @@
 package main
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -15,7 +14,7 @@ import (
 )
 
 func TestInitManager(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	t.Run("Defaults", func(t *testing.T) {
 		options, err := initManager(ctx)
 		assert.NilError(t, err)
@@ -39,6 +38,9 @@ func TestInitManager(t *testing.T) {
 
 		assert.Assert(t, options.Cache.DefaultNamespaces == nil)
 		assert.Assert(t, options.LeaderElection == true)
+		assert.Assert(t, options.LeaseDuration.Seconds() == 60)
+		assert.Assert(t, options.RenewDeadline.Seconds() == 40)
+		assert.Assert(t, options.RetryPeriod.Seconds() == 10)
 
 		{
 			options.Cache.SyncPeriod = nil
@@ -46,6 +48,9 @@ func TestInitManager(t *testing.T) {
 			options.HealthProbeBindAddress = ""
 			options.LeaderElection = false
 			options.LeaderElectionID = ""
+			options.LeaseDuration = nil
+			options.RenewDeadline = nil
+			options.RetryPeriod = nil
 
 			assert.Assert(t, reflect.ValueOf(options).IsZero(),
 				"expected remaining fields to be unset:\n%+v", options)
@@ -61,6 +66,13 @@ func TestInitManager(t *testing.T) {
 			options, err := initManager(ctx)
 			assert.ErrorContains(t, err, "PGO_CONTROLLER_LEASE_NAME")
 			assert.ErrorContains(t, err, "invalid")
+
+			assert.Assert(t, options.LeaderElection == true)
+			assert.Equal(t, options.LeaderElectionNamespace, "")
+
+			t.Setenv("PGO_CONTROLLER_LEADER_ELECTION_ENABLED", "false")
+			options, err = initManager(ctx)
+			assert.NilError(t, err)
 
 			assert.Assert(t, options.LeaderElection == false)
 			assert.Equal(t, options.LeaderElectionNamespace, "")
@@ -106,7 +118,11 @@ func TestInitManager(t *testing.T) {
 				t.Setenv("PGO_WORKERS", v)
 
 				options, err := initManager(ctx)
-				assert.NilError(t, err)
+				if v == "3.14" {
+					assert.ErrorContains(t, err, "parse env vars: envconfig.Process: assigning PGO_WORKERS to Workers: converting '3.14' to type int. details: strconv.ParseInt: parsing \"3.14\": invalid syntax")
+				} else {
+					assert.NilError(t, err)
+				}
 				assert.DeepEqual(t, options.Controller.GroupKindConcurrency,
 					map[string]int{
 						"PGAdmin.postgres-operator.crunchydata.com":         1,
@@ -136,5 +152,28 @@ func TestInitManager(t *testing.T) {
 					"PostgresCluster.postgres-operator.crunchydata.com": 19,
 				})
 		})
+	})
+
+	t.Run("PPROF_BIND_ADDRESS", func(t *testing.T) {
+		options, err := initManager(ctx)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, options.PprofBindAddress, "")
+
+		t.Setenv("PPROF_BIND_ADDRESS", "pprof-addr")
+		options, err = initManager(ctx)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, options.PprofBindAddress, "pprof-addr")
+	})
+
+	t.Run("Duration options", func(t *testing.T) {
+		t.Setenv("PGO_CONTROLLER_LEASE_DURATION", "1s")
+		t.Setenv("PGO_CONTROLLER_RENEW_DEADLINE", "2s")
+		t.Setenv("PGO_CONTROLLER_RETRY_PERIOD", "3s")
+		options, err := initManager(ctx)
+		assert.NilError(t, err)
+
+		assert.Equal(t, options.LeaseDuration.Seconds(), float64(1))
+		assert.Equal(t, options.RenewDeadline.Seconds(), float64(2))
+		assert.Equal(t, options.RetryPeriod.Seconds(), float64(3))
 	})
 }

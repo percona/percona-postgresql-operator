@@ -9,7 +9,7 @@ commands:
       source ../../functions
 
       kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=merge -p '{"metadata":{"labels":{"helm.sh/chart":"fake-chart-to-verify-telemetry-transfer"}}}'
-      sleep 5
+      sleep 7
       CR_ID=$(kubectl -n ${NAMESPACE} get perconapgcluster/${test_name} --template='{{.metadata.uid}}')
       TRANSFERRED_KEYS=$(kubectl -n ${NAMESPACE} logs -l run=version-service| grep ${CR_ID} | tail -n1 | grep -Eo '\{.*\}$' | jq '."grpc.request.content".msg | keys')
       kubectl create configmap -n "${NAMESPACE}" 05-verify-tramsferred-helm-cr --from-literal=keys="${TRANSFERRED_KEYS}"

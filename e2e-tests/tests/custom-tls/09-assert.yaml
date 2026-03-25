@@ -2,89 +2,44 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 100
 ---
-kind: StatefulSet
-apiVersion: apps/v1
+apiVersion: cert-manager.io/v1
+kind: Issuer
 metadata:
-  labels:
-    postgres-operator.crunchydata.com/cluster: custom-tls
-    postgres-operator.crunchydata.com/data: postgres
-    postgres-operator.crunchydata.com/instance-set: instance1
-  ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: custom-tls
-      controller: true
-      blockOwnerDeletion: true
+  name: new-custom-cert-tls-pg-ca-issuer
+spec:
+  selfSigned: {}
 status:
-  observedGeneration: 4
-  replicas: 1
-  readyReplicas: 1
-  updatedReplicas: 1
-  collisionCount: 0
+  conditions:
+  - observedGeneration: 1
+    reason: IsReady
+    status: "True"
+    type: Ready
 ---
-kind: Deployment
-apiVersion: apps/v1
+apiVersion: cert-manager.io/v1
+kind: Certificate
 metadata:
-  name: custom-tls-pgbouncer
-  labels:
-    postgres-operator.crunchydata.com/cluster: custom-tls
-    postgres-operator.crunchydata.com/role: pgbouncer
-  annotations:
-    deployment.kubernetes.io/revision: '3'
-  ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
-      kind: PostgresCluster
-      name: custom-tls
-      controller: true
-      blockOwnerDeletion: true
+  generation: 1
+  name: new-custom-cert-tls-pg-ca-cert
+spec:
+  commonName: new-postgres-operator-ca
+  duration: 26280h0m0s
+  isCA: true
+  issuerRef:
+    kind: Issuer
+    name: new-custom-cert-tls-pg-ca-issuer
+  renewBefore: 730h0m0s
+  secretName: new-custom-cert-tls-pg-ca-cert
+  privateKey:
+    algorithm: ECDSA
+    size: 384
+  usages:
+  - cert sign
+  - crl sign
 status:
-  observedGeneration: 3
-  replicas: 3
-  updatedReplicas: 3
-  readyReplicas: 3
----
-apiVersion: postgres-operator.crunchydata.com/v1beta1
-kind: PostgresCluster
-metadata:
-  name: custom-tls
-  ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
-      kind: PerconaPGCluster
-      name: custom-tls
-      controller: true
-      blockOwnerDeletion: true
-  finalizers:
-    - postgres-operator.crunchydata.com/finalizer
-status:
-  instances:
-    - name: instance1
-      readyReplicas: 3
-      replicas: 3
-      updatedReplicas: 3
-  observedGeneration: 3
-  pgbackrest:
-    repos:
-      - name: repo1
-        stanzaCreated: true
-  proxy:
-    pgBouncer:
-      readyReplicas: 3
-      replicas: 3
----
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
-metadata:
-  name: custom-tls
-status:
-  observedGeneration: 3
-  pgbouncer:
-    ready: 3
-    size: 3
-  postgres:
-    instances:
-    - name: instance1
-      ready: 3
-      size: 3
-    ready: 3
-    size: 3
-  state: ready
+  conditions:
+  - message: Certificate is up to date and has not expired
+    observedGeneration: 1
+    reason: Ready
+    status: "True"
+    type: Ready
+  revision: 1

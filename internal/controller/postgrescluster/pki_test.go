@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +23,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -42,8 +44,9 @@ func TestReconcileCerts(t *testing.T) {
 	namespace := setupNamespace(t, tClient).Name
 
 	r := &Reconciler{
-		Client: tClient,
-		Owner:  ControllerName,
+		Client:              tClient,
+		Owner:               ControllerName,
+		CertManagerCtrlFunc: certmanager.NewController,
 	}
 
 	// set up cluster1
@@ -188,7 +191,7 @@ func TestReconcileCerts(t *testing.T) {
 			existing := &corev1.Secret{Data: make(map[string][]byte)}
 			intent := &corev1.Secret{Data: make(map[string][]byte)}
 
-			initialLeafCert, err := r.instanceCertificate(ctx, instance, existing, intent, initialRoot)
+			initialLeafCert, err := r.instanceCertificate(ctx, instance, existing, intent, initialRoot, "")
 			assert.NilError(t, err)
 
 			fromSecret := &pki.LeafCertificate{}
@@ -215,25 +218,23 @@ func TestReconcileCerts(t *testing.T) {
 			existing := &corev1.Secret{Data: make(map[string][]byte)}
 			intent := &corev1.Secret{Data: make(map[string][]byte)}
 
-			initialLeaf, err := r.instanceCertificate(ctx, instance, existing, intent, initialRoot)
+			initialLeaf, err := r.instanceCertificate(ctx, instance, existing, intent, initialRoot, "")
 			assert.NilError(t, err)
 
 			// reconcile the certificate
-			newLeaf, err := r.instanceCertificate(ctx, instance, existing, intent, newRootCert)
+			newLeaf, err := r.instanceCertificate(ctx, instance, existing, intent, newRootCert, "")
 			assert.NilError(t, err)
 
 			// assert old leaf cert does not match the newly reconciled one
 			assert.Assert(t, !initialLeaf.Certificate.Equal(newLeaf.Certificate))
 
 			// 'reconcile' the certificate when the secret does not change. The returned leaf certificate should not change
-			newLeaf2, err := r.instanceCertificate(ctx, instance, intent, intent, newRootCert)
+			newLeaf2, err := r.instanceCertificate(ctx, instance, intent, intent, newRootCert, "")
 			assert.NilError(t, err)
 
 			// check that the leaf cert did not change after another reconciliation
 			assert.DeepEqual(t, newLeaf2, newLeaf)
-
 		})
-
 	})
 
 	t.Run("check cluster certificate secret reconciliation", func(t *testing.T) {
@@ -395,7 +396,7 @@ func getCertFromSecret(
 	// get the cert from the secret
 	secretCRT, ok := secret.Data[dataKey]
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve %s", dataKey)
+		return nil, errors.Errorf("could not retrieve %s", dataKey)
 	}
 
 	// parse the cert from binary encoded data

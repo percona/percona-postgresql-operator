@@ -1,0 +1,29 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+    - script: |-
+          set -o errexit
+          set -o xtrace
+          
+          source ../../functions
+          
+          PRIMARY=$(get_pod_by_role huge-pages primary name)
+          
+          # Verify hugepages available in pod
+          verify_hugepages_in_pod "${PRIMARY}" "${NAMESPACE}" "database"
+          
+          # Verify PostgreSQL setting
+          verify_postgresql_hugepages_setting "huge-pages" "try"
+          
+          echo "Running workload..."
+          run_psql_local \
+            "DROP TABLE IF EXISTS test_hp; CREATE TABLE test_hp AS SELECT generate_series(1, 1000000) AS id; SELECT sum(id) FROM test_hp;" \
+            "postgres:$(get_psql_user_pass huge-pages-pguser-postgres)@$(get_psql_user_host huge-pages-pguser-postgres)"
+          
+          sleep 5
+          
+          # Verify usage
+          verify_hugepages_usage "${PRIMARY}" "${NAMESPACE}" "database"
+          
+          echo "Hugepages verification passed"

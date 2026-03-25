@@ -5,6 +5,7 @@ import (
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
@@ -39,7 +40,7 @@ func (r *PGClusterReconciler) createBootstrapRestoreObject(ctx context.Context, 
 		},
 		Spec: v2.PerconaPGRestoreSpec{
 			PGCluster: cr.Name,
-			RepoName:  repoName,
+			RepoName:  ptr.To(repoName),
 		},
 	}
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
