@@ -331,7 +331,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
 					return errors.Wrap(err, "get job")
 				}
-				j.Finalizers = slices.DeleteFunc(j.Finalizers, func(s string) bool { return s == pNaming.FinalizerKeepJob })
+				controllerutil.RemoveFinalizer(j, pNaming.FinalizerKeepJob)
 
 				return r.Client.Update(ctx, j)
 			}); err != nil {
