@@ -16,3 +16,8 @@ commands:
         | yq eval '.spec.standby.repoName = "repo1"' - \
         | yq eval '.spec.standby.maxAcceptableLag = "1Ki"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
+
+      if [[ $OPENSHIFT ]]; then
+        kubectl wait --for=create "serviceaccount/standby-cluster-instance" -n "${NAMESPACE}" --timeout=120s
+        oc adm policy add-scc-to-user hostaccess -z standby-cluster-instance -n "${NAMESPACE}"
+      fi

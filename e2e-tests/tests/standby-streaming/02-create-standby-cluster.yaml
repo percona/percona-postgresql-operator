@@ -18,3 +18,8 @@ commands:
         | yq eval '.spec.secrets.customTLSSecret.name = "source-cluster-cluster-cert"' - \
         | yq eval '.spec.secrets.customReplicationTLSSecret.name = "source-cluster-replication-cert"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
+
+      if [[ $OPENSHIFT ]]; then
+        kubectl wait --for=create "serviceaccount/standby-cluster-instance" -n "${NAMESPACE}" --timeout=120s
+        oc adm policy add-scc-to-user hostaccess -z standby-cluster-instance -n "${NAMESPACE}"
+      fi
