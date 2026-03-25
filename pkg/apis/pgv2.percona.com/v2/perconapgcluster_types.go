@@ -277,7 +277,7 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.Extensions.BuiltIn.PGStatMonitor = ptr.To(true)
 		if cr.CompareVersion("2.9.0") >= 0 {
 			var qs PMMQuerySource
-			if cr.Spec.PMM != nil {
+			if cr.PMMEnabled() {
 				qs = cr.Spec.PMM.QuerySource
 			}
 			cr.Spec.Extensions.BuiltIn.PGStatMonitor = ptr.To(qs == PgStatMonitor)
@@ -287,7 +287,7 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.Extensions.BuiltIn.PGStatStatements = ptr.To(false)
 		if cr.CompareVersion("2.9.0") >= 0 {
 			var qs PMMQuerySource
-			if cr.Spec.PMM != nil {
+			if cr.PMMEnabled() {
 				qs = cr.Spec.PMM.QuerySource
 			}
 			cr.Spec.Extensions.BuiltIn.PGStatStatements = ptr.To(qs == PgStatStatements)
