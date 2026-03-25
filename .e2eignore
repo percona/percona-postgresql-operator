@@ -7,5 +7,5 @@ CONTRIBUTING.md
 LICENSE.md
 README.md
 .gitignore
-release_versions
+e2e-tests/release_versions
 .e2eignore
