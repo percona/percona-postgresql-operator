@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -163,7 +164,7 @@ func TestBackupOwnerReference(t *testing.T) {
 	}
 }
 
-func TestReconcileBackupJobCleansUpCompletedManualJob(t *testing.T) {
+func TestReconcileBackupJobCleansUpFinishedManualJob(t *testing.T) {
 	const crName = "some-cluster"
 	const ns = crName
 	const repoName = "repo1"
@@ -198,9 +199,50 @@ func TestReconcileBackupJobCleansUpCompletedManualJob(t *testing.T) {
 
 		require.NoError(t, cl.Get(ctx, types.NamespacedName{Name: jobName, Namespace: ns}, job))
 		assert.False(t, controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob))
-		for k, v := range naming.PGBackRestBackupJobLabels(crName, repoName, naming.BackupManual) {
-			assert.Equal(t, v, job.Labels[k])
+		for k := range naming.PGBackRestLabels(crName) {
+			_, ok := job.Labels[k]
+			assert.False(t, ok)
 		}
+		assert.Equal(t, string(naming.BackupManual), job.Labels[naming.LabelPGBackRestBackup])
+		assert.Equal(t, repoName, job.Labels[naming.LabelPGBackRestRepo])
+		assert.NotContains(t, job.Labels, naming.LabelPGBackRest)
+	})
+
+	t.Run("failed job without attached pg-backup", func(t *testing.T) {
+		ctx := t.Context()
+
+		cr, err := readDefaultCR(crName, ns)
+		require.NoError(t, err)
+
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       jobName,
+				Namespace:  ns,
+				Labels:     naming.PGBackRestBackupJobLabels(crName, repoName, naming.BackupManual),
+				Finalizers: []string{pNaming.FinalizerKeepJob},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{{
+					Type:   batchv1.JobFailed,
+					Status: corev1.ConditionTrue,
+				}},
+			},
+		}
+
+		cl, err := buildFakeClient(ctx, cr, job)
+		require.NoError(t, err)
+
+		require.NoError(t, reconcileBackupJob(ctx, cl, cr, *job, repoName))
+
+		require.NoError(t, cl.Get(ctx, types.NamespacedName{Name: jobName, Namespace: ns}, job))
+		assert.False(t, controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob))
+		for k := range naming.PGBackRestLabels(crName) {
+			_, ok := job.Labels[k]
+			assert.False(t, ok)
+		}
+		assert.Equal(t, string(naming.BackupManual), job.Labels[naming.LabelPGBackRestBackup])
+		assert.Equal(t, repoName, job.Labels[naming.LabelPGBackRestRepo])
+		assert.NotContains(t, job.Labels, naming.LabelPGBackRest)
 	})
 
 	t.Run("with attached pg-backup", func(t *testing.T) {
@@ -231,7 +273,7 @@ func TestReconcileBackupJobCleansUpCompletedManualJob(t *testing.T) {
 			},
 			Spec: v2.PerconaPGBackupSpec{
 				PGCluster: crName,
-				RepoName:  repoName,
+				RepoName:  ptr.To(repoName),
 			},
 			Status: v2.PerconaPGBackupStatus{
 				JobName: jobName,

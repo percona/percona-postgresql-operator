@@ -170,10 +170,13 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 						}
 
 						j.Finalizers = slices.DeleteFunc(j.Finalizers, func(s string) bool { return s == pNaming.FinalizerKeepJob })
+						for k := range naming.PGBackRestLabels(cr.Name) {
+							delete(j.Labels, k)
+						}
 
 						return cl.Update(ctx, j)
 					}); err != nil {
-						return errors.Wrap(err, "update backup job labels")
+						return errors.Wrap(err, "update backup job labels and finalizers")
 					}
 				}
 			}
