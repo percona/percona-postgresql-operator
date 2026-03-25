@@ -1,0 +1,24 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: 08-verify-extension-standby
+data:
+  pg_tde_extension: ' pg_tde'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: 08-verify-encryption-standby
+data:
+  pg_tde_is_encrypted: ' t'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: 09-verify-data-standby
+data:
+  data: ' 100500'

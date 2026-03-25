@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      main_primary=$(kubectl get pod -n "${NAMESPACE}" -l postgres-operator.crunchydata.com/cluster=source-cluster,postgres-operator.crunchydata.com/role=primary -o jsonpath='{.items[0].metadata.name}')
+      if [ -z "${main_primary}" ]; then
+        echo "ERROR: main primary pod not found"
+        exit 1
+      fi
+      
+      kubectl exec -n "${NAMESPACE}" "${main_primary}" -c database -- sh -c 'pgbench -i -s 20 postgres'
