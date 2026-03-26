@@ -13,8 +13,6 @@ commands:
 
       # wait till source cluster is paused
 
-      until [[ $(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.state}') == "paused" ]]; do
-        sleep 5
-      done 
+      kubectl -n "{NAMESPACE}" wait --for=jsonpath='{.status.state}'=paused' pg source-cluster --timeout=120s
 
       kubectl patch pg -n "${NAMESPACE}" standby-cluster --type=merge -p '{"spec":{"standby":{"enabled":false}}}'
