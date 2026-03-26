@@ -10,8 +10,6 @@ commands:
 
       cluster_name="standby-cluster"
 
-
-
       primary=$(get_pod_by_role $cluster_name primary name)
       echo "Primary pod: ${primary}"
       data=$(kubectl exec ${primary} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
