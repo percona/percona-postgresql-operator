@@ -79,6 +79,10 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 				log.Info("There are no info about backups in the pgbackrest", "repo", repo.Name)
 				continue
 			}
+			if errors.Is(err, pgbackrest.ErrStanzaNotCreated) {
+				log.Info("pgBackRest stanza not yet created, skipping backup cleanup", "repo", repo.Name)
+				continue
+			}
 			return errors.Wrap(err, "get pgBackRest info")
 		}
 
