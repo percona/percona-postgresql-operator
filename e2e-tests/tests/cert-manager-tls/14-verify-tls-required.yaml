@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if run_psql_local "SELECT 1;" \
+        "postgres:$(get_psql_user_pass cert-manager-tls-pguser-postgres)@cert-manager-tls-primary/postgres?sslmode=disable" 2>/dev/null; then
+          echo "ERROR: non-TLS connection to primary was accepted"
+          exit 1
+      fi
+      echo "Correctly rejected non-TLS connection to primary"
+
+      if run_psql_local "SELECT 1;" \
+        "cert-manager-tls:$(get_psql_user_pass cert-manager-tls-pguser-cert-manager-tls)@cert-manager-tls-pgbouncer/postgres?sslmode=disable" 2>/dev/null; then
+          echo "ERROR: non-TLS connection to pgbouncer was accepted"
+          exit 1
+      fi
+      echo "Correctly rejected non-TLS connection to pgbouncer"

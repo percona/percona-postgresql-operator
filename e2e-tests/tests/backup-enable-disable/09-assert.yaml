@@ -1,0 +1,47 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: some-name-repo-host
+  labels:
+    postgres-operator.crunchydata.com/cluster: some-name
+    postgres-operator.crunchydata.com/data: pgbackrest
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-dedicated: ''
+status:
+  replicas: 1
+  readyReplicas: 1
+  updatedReplicas: 1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: some-name-repo1
+  labels:
+    postgres-operator.crunchydata.com/cluster: some-name
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+    postgres-operator.crunchydata.com/pgbackrest-volume: ''
+---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: some-name
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+status:
+  succeeded: 1
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: some-name
+status:
+  pgbackrest:
+    repos:
+      - name: repo1
+        stanzaCreated: true
