@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"slices"
 	"strings"
 	"time"
 
@@ -325,13 +324,13 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, nil
 	case v2.BackupSucceeded:
 		job, err := findBackupJob(ctx, r.Client, pgBackup)
-		if err == nil && slices.Contains(job.Finalizers, pNaming.FinalizerKeepJob) {
+		if err == nil && controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob) {
 			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				j := new(batchv1.Job)
 				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
 					return errors.Wrap(err, "get job")
 				}
-				j.Finalizers = slices.DeleteFunc(j.Finalizers, func(s string) bool { return s == pNaming.FinalizerKeepJob })
+				controllerutil.RemoveFinalizer(j, pNaming.FinalizerKeepJob)
 
 				return r.Client.Update(ctx, j)
 			}); err != nil {
@@ -403,7 +402,6 @@ func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster) func(ctx co
 		if err != nil {
 			return errors.Wrap(err, "failed to finish backup")
 		}
-
 		if rr != nil && rr.RequeueAfter != 0 {
 			return controller.ErrFinalizerPending
 		}
