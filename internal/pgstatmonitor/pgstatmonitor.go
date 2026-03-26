@@ -39,5 +39,6 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_stat_monitor")
+	outParameters.Mandatory.Add("pg_stat_monitor.pgsm_enable_overflow", "off")
 	outParameters.Mandatory.Add("pg_stat_monitor.pgsm_query_max_len", "2048")
 }
