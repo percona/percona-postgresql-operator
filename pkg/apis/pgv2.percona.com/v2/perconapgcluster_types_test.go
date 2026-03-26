@@ -32,7 +32,6 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 		spec     PerconaPGClusterSpec
 		expected bool
 	}{
-
 		"Enabled is nil, should return true because default is true": {
 			spec:     PerconaPGClusterSpec{Backups: Backups{Enabled: nil}},
 			expected: true,
@@ -53,6 +52,17 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestPerconaPGCluster_Validate(t *testing.T) {
+	t.Run("rejects pg_stat_monitor and pg_stat_statements together", func(t *testing.T) {
+		cluster := new(PerconaPGCluster)
+		cluster.Spec.Extensions.BuiltIn.PGStatMonitor = k8sptr.To(true)
+		cluster.Spec.Extensions.BuiltIn.PGStatStatements = k8sptr.To(true)
+
+		err := cluster.Validate()
+		require.EqualError(t, err, "pg_stat_monitor and pg_stat_statements cannot both be enabled")
+	})
 }
 
 func TestPerconaPGCluster_Proxy(t *testing.T) {
@@ -122,12 +132,10 @@ func TestPerconaPGCluster_PostgresImage(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-
 			cluster.Spec.Image = tt.setImage
 
 			if tt.envImage != "" {
 				err := os.Setenv(testEnv, tt.envImage)
-
 				if err != nil {
 					t.Fatalf("Failed to set %s env variable: %v", testEnv, err)
 				}
@@ -275,7 +283,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 				Spec: PerconaPGClusterSpec{
-					CRVersion:       "2.5.0",
+					CRVersion:       "2.9.0",
 					PostgresVersion: 15,
 					PMM: &PMMSpec{
 						Enabled:     true,
@@ -308,6 +316,44 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					}
 				}
 				assert.True(t, hasMonitoringUser)
+				require.True(t, actual.Spec.Extensions.PGStatStatements)
+				assert.False(t, actual.Spec.Extensions.PGStatMonitor)
+			},
+		},
+		"handles PMM pg_stat_monitor query source": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       "2.9.0",
+					PostgresVersion: 15,
+					PMM: &PMMSpec{
+						Enabled:     true,
+						QuerySource: PgStatMonitor,
+					},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{
+								{Name: "repo1"},
+							},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				require.True(t, actual.Spec.Extensions.PGStatMonitor)
+				assert.False(t, actual.Spec.Extensions.PGStatStatements)
 			},
 		},
 		"handles AutoCreateUserSchema annotation": {
