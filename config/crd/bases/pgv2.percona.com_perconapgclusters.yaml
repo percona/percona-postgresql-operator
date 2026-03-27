@@ -23028,7 +23028,7 @@ spec:
                   postgresParams:
                     type: string
                   querySource:
-                    default: pgstatmonitor
+                    default: pgstatstatements
                     enum:
                     - pgstatmonitor
                     - pgstatstatements
