@@ -461,9 +461,9 @@ release: generate
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
-       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL17)#}" \
-       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER17)#}" \
-       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST17)#}" deploy/upgrade.yaml
+       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL18)#}" \
+       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
+       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" deploy/upgrade.yaml
 
 # Prepare main branch after release
 CURRENT_VERSION := $(shell grep -oE "crVersion: [0-9]+\.[0-9]+\.[0-9]+" deploy/cr.yaml | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
