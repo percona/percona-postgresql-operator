@@ -1,12 +1,12 @@
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGUpgrade
 metadata:
-  name: cluster1-16-to-17
+  name: cluster1-17-to-18
 spec:
   postgresClusterName: cluster1
-  image: docker.io/perconalab/percona-postgresql-operator:main-upgrade
-  fromPostgresVersion: 16
-  toPostgresVersion: 17
-  toPostgresImage: docker.io/perconalab/percona-postgresql-operator:main-ppg17-postgres
-  toPgBouncerImage: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer17
-  toPgBackRestImage: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest17
+  image: docker.io/percona/percona-postgresql-operator:2.9.0-upgrade
+  fromPostgresVersion: 17
+  toPostgresVersion: 18
+  toPostgresImage: docker.io/percona/percona-distribution-postgresql:18.3-1
+  toPgBouncerImage: docker.io/percona/percona-pgbouncer:1.25.1-1
+  toPgBackRestImage: docker.io/percona/percona-pgbackrest:2.58.0-1

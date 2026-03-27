@@ -448,22 +448,24 @@ update-version:
 
 # Prepare release
 PG_VER ?= $(shell grep -o "postgresVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+")
+CERT_MANAGER_VER := $(shell grep -Eo "cert-manager v.*" go.mod|grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
 include e2e-tests/release_versions
 release: generate
+	$(SED) -i "/CERT_MANAGER_VER/s/CERT_MANAGER_VER=\".*/CERT_MANAGER_VER=\"$(CERT_MANAGER_VER)\"/" e2e-tests/functions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
-		-e "/^spec:/,/^  image:/{/^#/! s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL17)#}" \
+		-e "/^spec:/,/^  image:/{/^#/! s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL18)#}" \
 		-e "s|    image: docker.io/perconalab/percona-postgresql-operator:main|    image: $(IMAGE)|" \
-		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER17)#}" \
-		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST17)#}" \
+		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
+		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
-       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL17)#}" \
-       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER17)#}" \
-       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST17)#}" deploy/upgrade.yaml
+       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL18)#}" \
+       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
+       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" deploy/upgrade.yaml
 
 # Prepare main branch after release
 CURRENT_VERSION := $(shell grep -oE "crVersion: [0-9]+\.[0-9]+\.[0-9]+" deploy/cr.yaml | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
