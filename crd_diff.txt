@@ -1,0 +1,10 @@
+CRD Validations
+- scope - ✓
+- storedVersionRemoval - ✓
+- existingFieldRemoval - ✓
+
+
+Same Version Validations
+
+
+Served Version Validations
