@@ -3,12 +3,12 @@ IMAGE_OPERATOR=percona/percona-postgresql-operator:2.8.2
 
 IMAGE_POSTGRESQL18=percona/percona-distribution-postgresql:18.1-3
 IMAGE_PGBOUNCER18=percona/percona-pgbouncer:1.25.0-1
-IMAGE_POSTGIS18=percona/percona-postgresql-operator:2.8.2-ppg18.1-postgres-gis3.5.4
+IMAGE_POSTGIS18=percona/percona-distribution-postgresql-with-postgis:18.1-3
 IMAGE_BACKREST18=percona/percona-pgbackrest:2.57.0-1
 
 IMAGE_POSTGRESQL17=percona/percona-distribution-postgresql:17.7-2
 IMAGE_PGBOUNCER17=percona/percona-pgbouncer:1.25.0-1
-IMAGE_POSTGIS17=percona/percona-postgresql-operator:2.8.2-ppg17.7-postgres-gis3.3.8
+IMAGE_POSTGIS17=percona/percona-distribution-postgresql-with-postgis:17.7
 IMAGE_BACKREST17=percona/percona-pgbackrest:2.57.0-1
 
 IMAGE_POSTGRESQL16=percona/percona-distribution-postgresql:16.11-2

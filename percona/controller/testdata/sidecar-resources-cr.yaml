@@ -6,7 +6,7 @@ metadata:
 spec:
   crVersion: 2.9.0
 
-  image: perconalab/percona-postgresql-operator:main-ppg17-postgres
+  image:  docker.io/perconalab/percona-distribution-postgresql-with-postgis:17
   imagePullPolicy: Always
   postgresVersion: 17
 
