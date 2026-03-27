@@ -183,7 +183,7 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/percona/percona-distribution-postgresql:17.9-1
+  image: docker.io/percona/percona-distribution-postgresql:18.3-1
   imagePullPolicy: Always
   postgresVersion: 17
 #  port: 5432
