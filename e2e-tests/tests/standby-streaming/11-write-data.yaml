@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myTable (id) VALUES (100501)' \
+        "postgres:$(get_psql_user_pass source-cluster-pguser-postgres)@$(get_psql_user_host standby-cluster-pguser-standby-cluster)"
