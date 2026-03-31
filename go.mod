@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
 	github.com/aws/aws-sdk-go v1.55.8
-	github.com/cert-manager/cert-manager v1.20.0
+	github.com/cert-manager/cert-manager v1.20.1
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/errors v0.22.7
 	github.com/go-openapi/runtime v0.29.3
@@ -141,7 +141,7 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260217215200-42d3e9bedb6d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
