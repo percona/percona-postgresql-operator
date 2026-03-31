@@ -415,7 +415,7 @@ pipeline {
         AUTHOR_NAME = sh(script: "echo ${CHANGE_AUTHOR_EMAIL} | awk -F'@' '{print \$1}'", , returnStdout: true).trim()
     }
     agent {
-        label 'docker-x64-min'
+        label 'docker'
     }
     options {
         disableConcurrentBuilds(abortPrevious: true)
@@ -535,7 +535,7 @@ pipeline {
             parallel {
                 stage('cluster1') {
                     agent {
-                        label 'docker-x64-min'
+                        label 'docker'
                     }
                     steps {
                         prepareNode()
@@ -545,7 +545,7 @@ pipeline {
                 }
                 stage('cluster2') {
                     agent {
-                        label 'docker-x64-min'
+                        label 'docker'
                     }
                     steps {
                         prepareNode()
@@ -555,7 +555,7 @@ pipeline {
                 }
                 stage('cluster3') {
                     agent {
-                        label 'docker-x64-min'
+                        label 'docker'
                     }
                     steps {
                         prepareNode()
@@ -565,7 +565,7 @@ pipeline {
                 }
                 stage('cluster4') {
                     agent {
-                        label 'docker-x64-min'
+                        label 'docker'
                     }
                     steps {
                         prepareNode()
