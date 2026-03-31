@@ -3,6 +3,8 @@
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 CERT_MANAGER_VER="1.20.0"
+CHAOS_MESH_VER="2.5.1"
+BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
@@ -794,7 +796,7 @@ deploy_chaos_mesh() {
 	destroy_chaos_mesh
 
 	helm repo add chaos-mesh https://charts.chaos-mesh.org
-	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version 2.5.1
+	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version ${CHAOS_MESH_VER}
 	if [[ $OPENSHIFT ]]; then
 		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace=${NAMESPACE}
 	fi
@@ -1536,7 +1538,7 @@ spec:
         - operator: Exists
       containers:
         - name: enable
-          image: busybox:1.36
+          image: busybox:${BUSYBOX_VER}
           securityContext:
             privileged: true
           env:

@@ -185,7 +185,7 @@ spec:
 
   image: docker.io/percona/percona-distribution-postgresql:18.3-1
   imagePullPolicy: Always
-  postgresVersion: 17
+  postgresVersion: 18
 #  port: 5432
 
 #  expose:
