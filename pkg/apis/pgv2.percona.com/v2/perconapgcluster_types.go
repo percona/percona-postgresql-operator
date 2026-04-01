@@ -638,7 +638,6 @@ const (
 	VolumeSnapshotModeOffline VolumeSnapshotMode = "offline"
 )
 
-// +kubebuilder:validation:XValidation:rule="has(self.className) && self.className != \"\"",message="className is required"
 type VolumeSnapshots struct {
 	// Mode of the VolumeSnapshot.
 	// +kubebuilder:validation:Enum={offline}
@@ -647,7 +646,8 @@ type VolumeSnapshots struct {
 	Mode VolumeSnapshotMode `json:"mode,omitempty"`
 
 	// Name of the VolumeSnapshotClass to use.
-	ClassName string `json:"className,omitempty"`
+	// +kubebuilder:validation:Required
+	ClassName string `json:"className"`
 
 	// Defines the Cron schedule for a VolumeSnapshot.
 	// Follows the standard Cron schedule syntax:
