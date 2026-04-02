@@ -9775,10 +9775,9 @@ spec:
                           https://k8s.io/docs/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
                         minLength: 6
                         type: string
+                    required:
+                    - className
                     type: object
-                    x-kubernetes-validations:
-                    - message: className is required
-                      rule: has(self.className) && self.className != ""
                 type: object
                 x-kubernetes-validations:
                 - message: At least one repository must be configured when backups
