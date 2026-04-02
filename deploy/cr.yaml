@@ -9,10 +9,10 @@ metadata:
 #  - percona.com/delete-ssl
 #  - percona.com/delete-backups
 spec:
-  crVersion: 2.9.0
+  crVersion: 2.10.0
 #  clusterServiceDNSSuffix: cluster.local
 #  initContainer:
-#    image: docker.io/percona/percona-postgresql-operator:2.9.0
+#    image: docker.io/perconalab/percona-postgresql-operator:main
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -183,7 +183,7 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/percona/percona-distribution-postgresql:18.3-1
+  image: docker.io/perconalab/percona-postgresql-operator:main-ppg18-postgres
   imagePullPolicy: Always
   postgresVersion: 18
 #  port: 5432
@@ -217,7 +217,7 @@ spec:
 #    - secretRef:
 #        name: instance-env-secret
 #    initContainer:
-#      image: docker.io/percona/percona-postgresql-operator:2.9.0
+#      image: docker.io/perconalab/percona-postgresql-operator:main
 #      resources:
 #        limits:
 #          cpu: 2.0
@@ -366,7 +366,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: docker.io/percona/percona-pgbouncer:1.25.1-1
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
@@ -492,7 +492,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: docker.io/percona/percona-pgbackrest:2.58.0-1
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest18
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
@@ -500,7 +500,7 @@ spec:
 #      - secretRef:
 #          name: repo-host-env-secret
 #      initContainer:
-#        image: docker.io/percona/percona-postgresql-operator:2.9.0
+#        image: docker.io/perconalab/percona-postgresql-operator:main
 #        resources:
 #          limits:
 #            cpu: 2.0
@@ -721,7 +721,7 @@ spec:
 
   pmm:
     enabled: false
-    image: docker.io/percona/pmm-client:3.6.0
+    image: docker.io/perconalab/pmm-client:dev-latest
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -755,7 +755,7 @@ spec:
 #    - basebackup
 
 #  extensions:
-#    image: docker.io/percona/percona-postgresql-operator:2.9.0
+#    image: docker.io/perconalab/percona-postgresql-operator:main
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
