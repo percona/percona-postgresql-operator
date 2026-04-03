@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      cr_ver=2.7.0
+      cr_ver=2.8.2
 
       get_cr \
         | yq eval '
