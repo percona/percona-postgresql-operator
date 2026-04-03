@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 100
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # Patch the underlying PostgresCluster to enable PostGIS.
+      # The Percona operator does not override postGISVersion on reconcile,
+      # so this setting is preserved and triggers PostGIS extension installation.
+      kubectl -n "${NAMESPACE}" patch postgrescluster postgis \
+        --type=merge \
+        --patch "{\"spec\":{\"postGISVersion\":\"${POSTGIS_VER}\"}}"
