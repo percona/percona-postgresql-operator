@@ -2,6 +2,7 @@ package pgcluster
 
 import (
 	"context"
+	"strings"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
@@ -71,7 +72,8 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 
 		readyPod, err := controller.GetReadyInstancePod(ctx, r.Client, cr.Name, cr.Namespace)
 		if err != nil {
-			return errors.Wrap(err, "get ready instance pod")
+			log.Info("No ready instance pod found, skipping backup cleanup", "repo", repo.Name, "reason", err.Error())
+			continue
 		}
 		info, err = pgbackrest.GetInfo(ctx, readyPod, repo.Name)
 		if err != nil {
@@ -81,6 +83,10 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 			}
 			if errors.Is(err, pgbackrest.ErrStanzaNotCreated) {
 				log.Info("pgBackRest stanza not yet created, skipping backup cleanup", "repo", repo.Name)
+				continue
+			}
+			if strings.Contains(err.Error(), "container not found") {
+				log.Info("Container not ready, skipping backup cleanup", "repo", repo.Name, "reason", err.Error())
 				continue
 			}
 			return errors.Wrap(err, "get pgBackRest info")
