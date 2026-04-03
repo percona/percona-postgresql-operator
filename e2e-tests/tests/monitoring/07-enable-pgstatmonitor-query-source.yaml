@@ -14,7 +14,7 @@ commands:
       }'
 
       # Wait for the pg_stat_monitor extension to be created and PMM to switch query source.
-      sleep 80
+      sleep 90
 
       primary=$(get_pod_by_role monitoring primary name)
       kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT * FROM pg_extension;"'
