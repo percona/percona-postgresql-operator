@@ -698,7 +698,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 {
-		var removedExtension []string
+		var removedExtensions []string
 		installedExtensions := cr.Status.InstalledCustomExtensions
 		crExtensions := make(map[string]struct{})
 		for _, ext := range extensionNames {
@@ -709,13 +709,13 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		for _, ext := range installedExtensions {
 			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
 			if _, ok := crExtensions[ext]; !ok {
-				removedExtension = append(removedExtension, ext)
+				removedExtensions = append(removedExtensions, ext)
 			}
 		}
 
-		if len(removedExtension) > 0 {
+		if len(removedExtensions) > 0 {
 			disable := func(ctx context.Context, exec postgres.Executor) error {
-				return errors.WithStack(disableCustomExtensionsInDB(ctx, exec, removedExtension))
+				return errors.WithStack(disableCustomExtensionsInDB(ctx, exec, removedExtensions))
 			}
 
 			primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, cr)
