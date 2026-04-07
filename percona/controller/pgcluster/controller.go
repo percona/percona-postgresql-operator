@@ -766,7 +766,7 @@ func disableCustomExtensionsInDB(ctx context.Context, exec postgres.Executor, cu
 		)
 
 		if err != nil {
-			return errors.Wrap(err, "custom extension deletion")
+			return errors.Wrap(err, "drop custom extension")
 		}
 
 		log.V(1).Info("extension was disabled ", "extensionName", extensionName)
