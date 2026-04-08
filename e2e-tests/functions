@@ -1158,6 +1158,7 @@ get_container_image() {
 		case $component in
 			pgbouncer)  key="IMAGE_PGBOUNCER${pgVersion}" ;;
 			pgbackrest) key="IMAGE_BACKREST${pgVersion}" ;;
+			postgis)    key="IMAGE_POSTGIS${pgVersion}" ;;
 			*)          key="IMAGE_POSTGRESQL${pgVersion}" ;;
 		esac
 		get_release_image "$key"
