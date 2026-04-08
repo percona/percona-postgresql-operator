@@ -212,7 +212,7 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 
 	if pgc.CompareVersion("2.9.0") >= 0 {
 		env = append(env, corev1.EnvVar{
-			Name:  "PMM_AGENT_SETUP_MOUNT_INFO_PATH",
+			Name:  "PMM_AGENT_SETUP_PROC_MOUNTS_PATH",
 			Value: "/proc/self/mounts",
 		})
 	}
@@ -413,7 +413,7 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 
 	if pgc.CompareVersion("2.9.0") >= 0 {
 		env = append(env, corev1.EnvVar{
-			Name:  "PMM_AGENT_SETUP_MOUNT_INFO_PATH",
+			Name:  "PMM_AGENT_SETUP_PROC_MOUNTS_PATH",
 			Value: "/proc/self/mounts",
 		})
 	}
