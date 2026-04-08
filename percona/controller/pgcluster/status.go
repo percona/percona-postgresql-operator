@@ -2,6 +2,7 @@ package pgcluster
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -11,18 +12,37 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
 func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
-	svcName := cr.Name + "-pgbouncer"
-
-	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
-		return svcName + "." + cr.Namespace + ".svc", nil
+	postgresCluster := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+		},
 	}
 
+	svcFQDN := func(svcName, ns string) string {
+		return fmt.Sprintf("%s.%s.svc", svcName, ns)
+	}
+
+	// If proxy is not configured, use the primary service as host.
+	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil {
+		return svcFQDN(naming.ClusterPrimaryService(postgresCluster).Name, postgresCluster.Namespace), nil
+	}
+
+	// Proxy is configured, but PGBouncer is not exposed, use the service name as host.
+	svcName := naming.ClusterPGBouncer(postgresCluster).Name
+	if cr.Spec.Proxy.PGBouncer.ServiceExpose == nil || cr.Spec.Proxy.PGBouncer.ServiceExpose.Type != string(corev1.ServiceTypeLoadBalancer) {
+		return svcFQDN(svcName, postgresCluster.Namespace), nil
+	}
+
+	// PGBouncer is exposed, find the IP/hostnames
 	svc := &corev1.Service{}
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: svcName}, svc)
 	if err != nil {
@@ -36,7 +56,6 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGClust
 			host = i.Hostname
 		}
 	}
-
 	return host, nil
 }
 
@@ -100,6 +119,7 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		ready += is.ReadyReplicas
 	}
 
+	log := logging.FromContext(ctx)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cluster := &v2.PerconaPGCluster{}
 		if err := r.Client.Get(ctx, types.NamespacedName{
@@ -123,7 +143,7 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 
 		if err := r.reconcileStandbyLag(ctx, cluster); err != nil {
-			return errors.Wrap(err, "reconcile replication lag status")
+			log.Error(err, "reconcile replication lag status")
 		}
 
 		cluster.Status.ObservedGeneration = cluster.Generation

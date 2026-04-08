@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +73,29 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 
 	lagBytes, err := r.getStandbyLag(ctx, cr)
 	if err != nil {
-		return errors.Wrap(err, "calculate replication lag bytes")
+		cond := metav1.Condition{
+			Type:    postgrescluster.ConditionStandbyLagging,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "ErrorGettingLag",
+			Message: err.Error(),
+		}
+
+		if errors.Is(err, ErrPrimaryPodNotFound) {
+			cond.Message = "Cannot find primary for replication lag calculation"
+		}
+		if errors.Is(err, ErrInvalidLagQueryOutput) {
+			cond.Message = "Invalid output from lag query. The WAL receiver may not be active"
+		}
+
+		// If the standby was previously lagging, we should mark the pod as ready again since now
+		// we do not know the actual state of lag.
+		if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) {
+			if err := r.setPodReplicationLagSignal(ctx, cr, true); err != nil {
+				return errors.Wrap(err, "set pod replication readiness signal")
+			}
+		}
+		meta.SetStatusCondition(&cr.Status.Conditions, cond)
+		return nil
 	}
 
 	maxLag := cr.Spec.Standby.MaxAcceptableLag.AsDec().UnscaledBig().Int64()
@@ -140,16 +163,41 @@ func (r *PGClusterReconciler) setPodReplicationLagSignal(
 }
 
 func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
+	var errs error
+	log := logging.FromContext(ctx)
 	if standby.Spec.Standby.Host != "" {
-		return r.getLagFromStreamingHost(ctx, standby)
+		lag, err := r.getLagFromStreamingHost(ctx, standby)
+		if err == nil {
+			return lag, nil
+		}
+		log.Error(err, "Failed to get lag from streaming host")
+
+		// Fallthrough to pgbackrest repo only if configured
+		if standby.Spec.Standby.RepoName == "" {
+			return 0, err
+		}
+
+		errs = multierror.Append(errs, errors.Wrap(err, "get lag from streaming host"))
+		log.Info("Falling back to using pgbackrest repo for lag calculation")
 	}
-	return r.getLagFromMainSite(ctx, standby)
+
+	lag, err := r.getLagFromMainSite(ctx, standby)
+	if err != nil {
+		log.Error(err, "Failed to get lag from main site")
+		return 0, multierror.Append(errs, errors.Wrap(err, "get lag from main site"))
+	}
+	return lag, nil
 }
+
+var (
+	ErrPrimaryPodNotFound    = errors.New("primary pod not found")
+	ErrInvalidLagQueryOutput = errors.New("invalid lag query output")
+)
 
 func (r *PGClusterReconciler) getLagFromStreamingHost(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, standby)
 	if err != nil {
-		return 0, errors.Wrap(err, "get primary pod")
+		return 0, errors.Wrapf(ErrPrimaryPodNotFound, "get primary pod: %s", err.Error())
 	}
 
 	podExecutor := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
@@ -166,6 +214,9 @@ func (r *PGClusterReconciler) getLagFromStreamingHost(ctx context.Context, stand
 	}
 
 	lagStr := strings.TrimSpace(stdout)
+	if lagStr == "" {
+		return 0, errors.Wrapf(ErrInvalidLagQueryOutput, "failed to get lag from streaming host: invalid value: %q", lagStr)
+	}
 	lagBytes, err := strconv.ParseInt(lagStr, 10, 64)
 	if err != nil {
 		return 0, errors.Wrapf(err, "parse lag bytes: %s", lagStr)
@@ -177,12 +228,12 @@ func (r *PGClusterReconciler) getLagFromMainSite(ctx context.Context, standby *v
 	// Find the main site for the standby cluster.
 	mainSiteNN, ok := standby.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
 	if !ok || mainSiteNN == "" {
-		return 0, fmt.Errorf("annotation '%s' is missing or empty", pNaming.AnnotationReplicationMainSite)
+		return 0, errors.Errorf("annotation '%s' is missing or empty", pNaming.AnnotationReplicationMainSite)
 	}
 
 	mainSiteParts := strings.Split(mainSiteNN, "/")
 	if len(mainSiteParts) != 2 {
-		return 0, fmt.Errorf("invalid format for annotation '%s': expected 'namespace/name', got '%s'", pNaming.AnnotationReplicationMainSite, mainSiteNN)
+		return 0, errors.Errorf("invalid format for annotation '%s': expected 'namespace/name', got '%s'", pNaming.AnnotationReplicationMainSite, mainSiteNN)
 	}
 
 	mainSite := &v2.PerconaPGCluster{}
@@ -209,10 +260,11 @@ func (r *PGClusterReconciler) getLagFromMainSite(ctx context.Context, standby *v
 func (r *PGClusterReconciler) getWALLagBytes(
 	ctx context.Context,
 	currentWALLSN string,
-	standby *v2.PerconaPGCluster) (int64, error) {
+	standby *v2.PerconaPGCluster,
+) (int64, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, standby)
 	if err != nil {
-		return 0, errors.Wrap(err, "get primary pod")
+		return 0, errors.Wrapf(ErrPrimaryPodNotFound, "get primary pod: %s", err.Error())
 	}
 
 	podExecutor := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
@@ -238,7 +290,7 @@ func (r *PGClusterReconciler) getWALLagBytes(
 func (r *PGClusterReconciler) getCurrentWALLSN(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, cr)
 	if err != nil {
-		return "", errors.Wrap(err, "get primary pod")
+		return "", errors.Wrapf(ErrPrimaryPodNotFound, "get primary pod: %s", err.Error())
 	}
 
 	podExecutor := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
@@ -349,7 +401,8 @@ func pollAndRequeueStandbys(
 	ctx context.Context,
 	events chan event.GenericEvent,
 	cl client.Client,
-	namespace string) {
+	namespace string,
+) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	log := logging.FromContext(ctx).WithName("PollStandbys")
@@ -372,7 +425,7 @@ func pollAndRequeueStandbys(
 				if !cluster.ShouldCheckStandbyLag() || status.Standby == nil || shouldSkipLagCheck(&cluster) {
 					continue
 				}
-				log.Info("Requeuing standby cluster for lag check", "cluster", cluster.Name)
+				log.V(1).Info("Requeuing standby cluster for lag check", "cluster", cluster.Name)
 				events <- event.GenericEvent{Object: cluster.DeepCopy()}
 			}
 		case <-ctx.Done():

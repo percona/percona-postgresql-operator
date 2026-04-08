@@ -6,10 +6,11 @@ package postgrescluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -17,11 +18,12 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +48,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -56,14 +60,17 @@ const (
 
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
-	Client          client.Client
-	DiscoveryClient *discovery.DiscoveryClient
-	IsOpenShift     bool
-	Owner           client.FieldOwner
-	PodExec         runtime.PodExecutor
-	Recorder        record.EventRecorder
-	Registration    registration.Registration
-	Tracer          trace.Tracer
+	Client              client.Client
+	Scheme              *k8sruntime.Scheme
+	DiscoveryClient     *discovery.DiscoveryClient
+	IsOpenShift         bool
+	Owner               client.FieldOwner
+	PodExec             runtime.PodExecutor
+	Recorder            record.EventRecorder
+	Registration        registration.Registration
+	Tracer              trace.Tracer
+	CertManagerCtrlFunc certmanager.NewControllerFunc
+	RestConfig          *rest.Config
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
@@ -286,7 +293,14 @@ func (r *Reconciler) Reconcile(
 		// return is no longer needed, and reconciliation can proceed normally.
 		returnEarly, err := r.reconcileDirMoveJobs(ctx, cluster)
 		if err != nil || returnEarly {
-			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
+			if patchErr := patchClusterStatus(); patchErr != nil {
+				if err == nil {
+					err = patchErr
+				} else {
+					log.Error(patchErr, "Failed to patch cluster status")
+				}
+			}
+			return runtime.ErrorWithBackoff(err)
 		}
 	}
 	if err == nil {
@@ -336,7 +350,14 @@ func (r *Reconciler) Reconcile(
 		// can proceed normally.
 		returnEarly, err := r.reconcileDataSource(ctx, cluster, instances, clusterVolumes, rootCA, backupsSpecFound)
 		if err != nil || returnEarly {
-			return runtime.ErrorWithBackoff(errors.Join(err, patchClusterStatus()))
+			if patchErr := patchClusterStatus(); patchErr != nil {
+				if err == nil {
+					err = patchErr
+				} else {
+					log.Error(patchErr, "Failed to patch cluster status")
+				}
+			}
+			return runtime.ErrorWithBackoff(err)
 		}
 	}
 	if err == nil {
@@ -428,7 +449,15 @@ func (r *Reconciler) Reconcile(
 
 	log.V(1).Info("reconciled cluster")
 
-	return result, errors.Join(err, patchClusterStatus())
+	if patchErr := patchClusterStatus(); patchErr != nil {
+		if err != nil {
+			log.Error(patchErr, "Failed to patch cluster status")
+		} else {
+			err = errors.Wrap(patchErr, "failed to patch cluster status")
+		}
+	}
+
+	return result, err
 }
 
 // deleteControlled safely deletes object when it is controlled by cluster.
@@ -527,7 +556,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		},
 	})
 
-	return builder.ControllerManagedBy(mgr).
+	bldr := builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
 		Owns(&corev1.ConfigMap{}, configMapPredicate). // K8SPG-712
 		Owns(&corev1.Endpoints{}).
@@ -544,31 +573,26 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Watches(&corev1.Pod{}, r.watchPods()).
 		Watches(&appsv1.StatefulSet{},
-			r.controllerRefHandlerFuncs()). // watch all StatefulSets
-		Complete(r)
-}
+			r.controllerRefHandlerFuncs()) // watch all StatefulSets
 
-// GroupVersionKindExists checks to see whether a given Kind for a given
-// GroupVersion exists in the Kubernetes API Server.
-func (r *Reconciler) GroupVersionKindExists(groupVersion, kind string) (*bool, error) {
-	if r.DiscoveryClient == nil {
-		return initialize.Bool(false), nil
-	}
-
-	resourceList, err := r.DiscoveryClient.ServerResourcesForGroupVersion(groupVersion)
+	// When cert-manager is installed, watch Certificate resources owned by
+	// PostgresCluster and cert-manager-issued Secrets (which are owned by
+	// Certificate, not PostgresCluster) so that deletions or renewals trigger
+	// an immediate reconcile rather than waiting for the next resync.
+	certManagerExists, err := k8s.GroupVersionKindExists(r.DiscoveryClient, "cert-manager.io/v1", "Certificate")
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return initialize.Bool(false), nil
-		}
-
-		return nil, err
+		return err
+	}
+	if certManagerExists {
+		certManagerSecretPredicate := builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			_, hasCluster := obj.GetLabels()[naming.LabelCluster]
+			_, hasCertAnnotation := obj.GetAnnotations()["cert-manager.io/certificate-name"]
+			return hasCluster && hasCertAnnotation
+		}))
+		bldr.Owns(&cmv1.Certificate{}).
+			Owns(&cmv1.Issuer{}).
+			Watches(&corev1.Secret{}, r.watchCertManagerSecrets(), certManagerSecretPredicate)
 	}
 
-	for _, resource := range resourceList.APIResources {
-		if resource.Kind == kind {
-			return initialize.Bool(true), nil
-		}
-	}
-
-	return initialize.Bool(false), nil
+	return bldr.Complete(r)
 }

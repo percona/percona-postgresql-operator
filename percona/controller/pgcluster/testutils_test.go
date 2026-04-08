@@ -20,6 +20,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
@@ -62,10 +63,11 @@ func reconciler(cr *v2.PerconaPGCluster) *PGClusterReconciler {
 
 func crunchyReconciler() *postgrescluster.Reconciler {
 	return &postgrescluster.Reconciler{
-		Client:   k8sClient,
-		Owner:    postgrescluster.ControllerName,
-		Recorder: new(record.FakeRecorder),
-		Tracer:   otel.Tracer("test"),
+		Client:              k8sClient,
+		Owner:               postgrescluster.ControllerName,
+		Recorder:            new(record.FakeRecorder),
+		Tracer:              otel.Tracer("test"),
+		CertManagerCtrlFunc: certmanager.NewController,
 		PodExec: func(context.Context, string, string, string, io.Reader, io.Writer, io.Writer, ...string) error {
 			return nil
 		},

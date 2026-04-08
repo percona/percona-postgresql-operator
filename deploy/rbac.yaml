@@ -12,7 +12,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - persistentvolumeclaims
   - pods
   - secrets
   - serviceaccounts
@@ -52,6 +51,18 @@ rules:
   - create
   - patch
 - apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - apps
   resources:
   - deployments
@@ -88,12 +99,30 @@ rules:
   - update
   - watch
 - apiGroups:
+  - cert-manager.io
+  - certmanager.k8s.io
+  resources:
+  - certificaterequests
+  - certificates
+  - issuers
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
   verbs:
   - create
+  - delete
   - get
+  - list
   - update
   - watch
 - apiGroups:

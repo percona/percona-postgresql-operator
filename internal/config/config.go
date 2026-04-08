@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
+
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -131,7 +133,6 @@ func PGONamespace() string {
 // VerifyImageValues checks that all container images required by the
 // spec are defined. If any are undefined, a list is returned in an error.
 func VerifyImageValues(cluster *v1beta1.PostgresCluster) error {
-
 	var images []string
 
 	// K8SPG-710: Image check will fail without a backup section in PostgresCluster
@@ -163,7 +164,7 @@ func VerifyImageValues(cluster *v1beta1.PostgresCluster) error {
 	}
 
 	if len(images) > 0 {
-		return fmt.Errorf("Missing image(s): %s", images)
+		return errors.Errorf("Missing image(s): %s", images)
 	}
 
 	return nil

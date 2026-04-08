@@ -21,6 +21,7 @@ func TestContainer(t *testing.T) {
 		ServerHost:               "pmm.server.local",
 		Secret:                   "pmm-secret",
 		PostgresParams:           "--environment=dev-postgres",
+		QuerySource:              v2.PgStatStatements,
 		Resources:                corev1.ResourceRequirements{},
 		ContainerSecurityContext: &corev1.SecurityContext{},
 	}
@@ -147,6 +148,7 @@ func TestSidecarContainerV2(t *testing.T) {
 		ServerHost:               "pmm.server.local",
 		Secret:                   "pmm-secret",
 		PostgresParams:           "--environment=dev-postgres",
+		QuerySource:              v2.PgStatStatements,
 		Resources:                corev1.ResourceRequirements{},
 		ContainerSecurityContext: &corev1.SecurityContext{},
 	}
@@ -260,6 +262,7 @@ func TestSidecarContainerV3(t *testing.T) {
 		ServerHost:               "pmm.server.local",
 		Secret:                   "pmm-secret",
 		PostgresParams:           "--environment=dev-postgres",
+		QuerySource:              v2.PgStatStatements,
 		Resources:                corev1.ResourceRequirements{},
 		ContainerSecurityContext: &corev1.SecurityContext{},
 	}

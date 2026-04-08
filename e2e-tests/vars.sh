@@ -6,6 +6,8 @@ export DEPLOY_DIR="${DEPLOY_DIR:-${ROOT_REPO}/deploy}"
 export TESTS_DIR="${TESTS_DIR:-${ROOT_REPO}/e2e-tests}"
 export TESTS_CONFIG_DIR="${TESTS_CONFIG_DIR:-${TESTS_DIR}/conf}"
 # shellcheck disable=SC2154
+export TEST_CONFIG_DIR="${TESTS_DIR}/tests/${test_name}/conf"
+# shellcheck disable=SC2154
 export TEMP_DIR="/tmp/kuttl/pg/${test_name}"
 
 # shellcheck disable=SC2155

@@ -41,12 +41,18 @@ type InfoStanza struct {
 	} `json:"status,omitempty"`
 }
 
-var ErrNoValidBackups = errors.New("no valid backups")
+var (
+	ErrNoValidBackups   = errors.New("no valid backups")
+	ErrStanzaNotCreated = errors.New("pgBackRest stanza not created")
+)
 
 const (
 	statusOK = 0
 	// statusNoValidBackups means that there are no backups in pgbackrest
 	statusNoValidBackups = 2
+	// statusOther indicates a transient issue, e.g. stanza not yet created
+	// or temporarily unavailable during pod restarts
+	statusOther = 99
 )
 
 func GetInfo(ctx context.Context, pod *corev1.Pod, repoName string) (InfoOutput, error) {
@@ -77,6 +83,8 @@ func GetInfo(ctx context.Context, pod *corev1.Pod, repoName string) (InfoOutput,
 		switch elem.Status.Code {
 		case statusNoValidBackups:
 			return InfoOutput{}, ErrNoValidBackups
+		case statusOther:
+			return InfoOutput{}, ErrStanzaNotCreated
 		case statusOK:
 			continue
 		default:

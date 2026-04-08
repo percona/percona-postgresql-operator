@@ -2,7 +2,9 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-CERT_MANAGER_VER="1.19.1"
+CERT_MANAGER_VER="1.20.0"
+CHAOS_MESH_VER="2.5.1"
+BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
@@ -34,6 +36,17 @@ create_namespace() {
 		kubectl delete namespace $namespace --ignore-not-found || :
 		kubectl wait --for=delete namespace "$namespace" || :
 		kubectl create namespace $namespace
+	fi
+}
+
+check_operator_panic() {
+	local operator_pod=$(get_operator_pod)
+	local panic_log
+	panic_log=$(kubectl logs -n "${OPERATOR_NS:-$NAMESPACE}" "$operator_pod" -c operator | grep -A 100 "Observed a panic" || true)
+	if [ -n "$panic_log" ]; then
+		echo "Detected panic in operator:"
+		echo "$panic_log"
+		exit 1
 	fi
 }
 
@@ -94,7 +107,7 @@ deploy_operator_gh() {
 
 	curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${git_tag}/deploy/${cw_prefix}operator.yaml" >"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml"
 
-	local docker_hub_org=$(echo "$IMAGE" | sed -E 's|(.*/)?([^/]+)/[^/]+(:.*)?|\2|')
+	local docker_hub_org=$(echo "$IMAGE" | $sed -E 's|(.*/)?([^/]+)/[^/]+(:.*)?|\2|')
 	yq eval '.spec.template.spec.containers[0].image = "'${REGISTRY_NAME_FULL}''$docker_hub_org'/percona-postgresql-operator:'${git_tag#v}'"' \
 		"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml" \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
@@ -236,32 +249,71 @@ deploy_minio() {
 		/usr/bin/aws --endpoint-url http://minio-service:9000 s3 mb s3://operator-testing"
 }
 
-deploy_s3_secrets() {
-	set +o xtrace
-	printf "[global]\nrepo1-s3-key=%s\nrepo1-s3-key-secret=%s\n" \
-		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_ACCESS_KEY_ID' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
-		"$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
-		>"${TEMP_DIR}/pgbackrest-secret.ini"
+get_repo_auth() {
+	local repo=$1
+	local type=$2
+	local key=$3
+	local secret=$4
 
-	if [[ $test_name == "demand-backup" || $test_name == "scheduled-backup" ]]; then
-		printf "repo3-azure-account=%s\nrepo3-azure-key=%s\n" \
-			"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_NAME' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
-			"$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_KEY' "${TESTS_CONFIG_DIR}/cloud-secret.yml" | base64 -d)" \
-			>>"${TEMP_DIR}/pgbackrest-secret.ini"
+	auth="${repo}-${type}-key=${key}\n${repo}-${type}-key-secret=${secret}"
+	if [[ "$type" == "azure" ]]; then
+		auth="${repo}-${type}-account=${key}\n${repo}-${type}-key=${secret}"
+	elif [[ "$type" == "gcs" ]]; then
+		auth="${repo}-${type}-key=${key}"
 	fi
 
-	case ${test_name} in
-		"scheduled-backup")
-			printf 'repo2-gcs-key=/etc/pgbackrest/conf.d/gcs-key.json\n' >>"${TEMP_DIR}/pgbackrest-secret.ini"
-			yq eval '.stringData["credentials.json"]' ${TESTS_CONFIG_DIR}/cloud-secret-minio-gw.yml >${TEMP_DIR}/gcs-key.json
-			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini" --from-file=gcs-key.json=${TEMP_DIR}/gcs-key.json
+	echo "\n$auth"
+}
+
+deploy_s3_secrets() {
+	set +o xtrace
+
+	local platform=${1:-$(detect_k8s_platform)}
+	local repo_auth=""
+	local secret_args=()
+
+	if [[ $platform == "digitalocean" ]]; then
+		key=$(yq eval 'select(.metadata.name=="*spaces*").data.ACCESS_KEY_ID' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		secret=$(yq eval 'select(.metadata.name=="*spaces*").data.SECRET_ACCESS_KEY' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		repo_auth+=$(get_repo_auth repo1 s3 $key $secret)
+
+		case $test_name in
+			"demand-backup")
+				repo_auth+=$(get_repo_auth repo3 s3 $key $secret)
 			;;
-		"custom-extensions" | "major-upgrade" | "builtin-extensions")
-			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/cloud-secret.yml"
-			kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+			"scheduled-backup")
+				repo_auth+=$(get_repo_auth repo2 s3 $key $secret)
+				repo_auth+=$(get_repo_auth repo3 s3 $key $secret)
 			;;
-		*)
-			kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbackrest-secrets" --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-secret.ini"
+		esac
+	else
+		key=$(yq eval 'select(.metadata.name=="*s3*").data.AWS_ACCESS_KEY_ID' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		secret=$(yq eval 'select(.metadata.name=="*s3*").data.AWS_SECRET_ACCESS_KEY' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		azure_key=$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_NAME' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		azure_secret=$(yq eval 'select(.metadata.name=="azure*").data.AZURE_STORAGE_ACCOUNT_KEY' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
+		repo_auth+=$(get_repo_auth repo1 s3 $key $secret)
+
+		case $test_name in
+			"demand-backup")
+				repo_auth+=$(get_repo_auth repo3 azure $azure_key $azure_secret)
+			;;
+			"scheduled-backup")
+				repo_auth+=$(get_repo_auth repo2 gcs "/etc/pgbackrest/conf.d/gcs-key.json")
+				repo_auth+=$(get_repo_auth repo3 azure $azure_key $azure_secret)
+				yq eval '.stringData["credentials.json"]' "$TESTS_CONFIG_DIR/cloud-secret-minio-gw.yml" > "$TEMP_DIR/gcs-key.json"
+				secret_args+=(--from-file=gcs-key.json="$TEMP_DIR/gcs-key.json")
+			;;
+		esac
+	fi
+
+	printf "[global]%b" "$repo_auth" > "$TEMP_DIR/pgbackrest-secret.ini"
+	secret_args+=(--from-file=cloud.conf="$TEMP_DIR/pgbackrest-secret.ini")
+	kubectl -n "$NAMESPACE" create secret generic "${test_name}-pgbackrest-secrets" "${secret_args[@]}"
+
+	case $test_name in
+		"custom-extensions" | "builtin-extensions" | major-upgrade* )
+			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/cloud-secret.yml"
+			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/minio-secret.yml"
 			;;
 	esac
 
@@ -272,19 +324,40 @@ deploy_client() {
 	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/client.yaml"
 }
 
+deploy_cmctl() {
+	envsubst < "${TESTS_CONFIG_DIR}/cmctl.yml" | kubectl -n "${NAMESPACE}" apply -f -
+	kubectl -n "${NAMESPACE}" wait deployment cmctl --for=condition=available --timeout=60s
+}
+
 get_client_pod() {
 	kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}'
 }
 
 get_cr() {
 	local cr_name=$1
-	if [ -z ${cr_name} ]; then
-		cr_name=${test_name}
-	fi
 	local repo_path=$2
 	local source_path=$3
+	if [ -z "$cr_name" ]; then
+		cr_name=${test_name}
+	fi
 
-	yq eval '
+	local platform="$(detect_k8s_platform)"
+	local cr_file="$TEST_CONFIG_DIR/${cr_name}.yaml"
+	local spaces_cr_file="$TEST_CONFIG_DIR/${cr_name}-spaces.yaml"
+	local aks_cr_file="$TEST_CONFIG_DIR/${cr_name}-aks.yaml"
+	if [[ $platform == "digitalocean" && -f "$spaces_cr_file" ]]; then
+		cr_file=$spaces_cr_file
+	elif [[ $platform == "aks" && -f "$aks_cr_file" ]]; then	
+		cr_file=$aks_cr_file
+	fi
+
+	local crs=("$DEPLOY_DIR/cr.yaml")
+	if [[ -f "$cr_file" ]]; then
+		crs+=($cr_file)
+	fi
+
+	yq eval-all '
+		select(fileIndex == 0) * (select(fileIndex == 1) // {}) |
 		.metadata.name = "'${cr_name}'" |
 		.metadata.labels = {"e2e":"'${cr_name}'"} |
 		.spec.postgresVersion = '$PG_VER' |
@@ -298,77 +371,18 @@ get_cr() {
 		.spec.pmm.secret = "'${cr_name}'-pmm-secret" |
 		.spec.pmm.customClusterName = "'${cr_name}'-pmm-custom-name" |
 		.spec.pmm.postgresParams = "--environment=dev-postgres"
-		' $DEPLOY_DIR/cr.yaml >$TEMP_DIR/cr.yaml
+	' "${crs[@]}" > "$TEMP_DIR/cr.yaml"
+
+	$sed -i "s|<repo-path>|$repo_path|g" "$TEMP_DIR/cr.yaml"
+	$sed -i "s|<source-path>|$source_path|g" "$TEMP_DIR/cr.yaml"
+	$sed -i "s|<bucket>|$BUCKET|g" "$TEMP_DIR/cr.yaml"
+	$sed -i "s|<image>|$IMAGE|g" "$TEMP_DIR/cr.yaml"
 
 	if [[ $OPENSHIFT ]]; then
-		yq eval -i '.spec.openshift = true' $TEMP_DIR/cr.yaml
+		yq eval -i '.spec.openshift = true' "$TEMP_DIR/cr.yaml"
 	fi
 
-	case $test_name in
-		"demand-backup" | "start-from-backup" | "standby-pgbackrest")
-			yq eval -i '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
-				.spec.backups.pgbackrest.manual.repoName = "repo1" |
-				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
-				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
-				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}]
-				' $TEMP_DIR/cr.yaml
-			if [[ $test_name == "demand-backup" ]]; then
-				yq eval -i '
-				.spec.backups.pgbackrest.global.repo3-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo3" |
-				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
-				' $TEMP_DIR/cr.yaml
-			fi
-			if [[ $test_name == "start-from-backup" && ! $cr_name =~ "source" ]]; then
-				yq eval -i '
-					.spec.dataSource.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
-					.spec.dataSource.pgbackrest.stanza = "db" |
-					.spec.dataSource.pgbackrest.global.repo1-path = "'${source_path}'" |
-					.spec.dataSource.pgbackrest.repo = {"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}
-					' $TEMP_DIR/cr.yaml
-			fi
-			;;
-		"scheduled-backup")
-			yq eval -i '
-				.spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
-				.spec.backups.pgbackrest.manual.repoName = "repo1" |
-				.spec.backups.pgbackrest.manual.options = ["--type=full"] |
-				.spec.backups.pgbackrest.global.repo1-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo1" |
-				.spec.backups.pgbackrest.global.repo2-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo2" |
-				.spec.backups.pgbackrest.global.repo3-path = "/backrestrepo/postgres-operator/'${repo_path}'/repo3" |
-				.spec.backups.pgbackrest.repos = [{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
-				.spec.backups.pgbackrest.repos += [{"name":"repo2","gcs":{"bucket":"'$BUCKET'"}}] |
-				.spec.backups.pgbackrest.repos += [{"name":"repo3","azure":{"container":"'$BUCKET'"}}]
-				' $TEMP_DIR/cr.yaml
-			;;
-		"major-upgrade")
-			yq eval -i '
-				.spec.extensions.image = "'$IMAGE'" |
-				.spec.extensions.imagePullPolicy = "Always" |
-				.spec.extensions.storage = {"type": "s3", "bucket": "pg-extensions", "region": "eu-central-1", "secret": {"name": "aws-s3-secret"}}
-			    ' $TEMP_DIR/cr.yaml
-			;;
-		"custom-extensions")
-			yq eval -i '
-				.spec.extensions.image = "'$IMAGE'" |
-				.spec.extensions.imagePullPolicy = "Always" |
-				.spec.extensions.storage = {"type": "s3", "bucket": "operator-testing", "region": "us-east-1", "endpoint": "http://minio-service:9000", "forcePathStyle": true, "disableSSL": true, "secret": {"name": "minio-secret"}}
-			    ' $TEMP_DIR/cr.yaml
-			;;
-		"huge-pages")
-			if [ "${platform}" == "aks" ]; then
-				yq eval -i '
-          .spec.instances |= (
-            .[] |= (
-              .affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms =
-                [{"matchExpressions":[{"key":"hugepages","operator":"In","values":["enabled"]}]}]
-            )
-          )
-        ' "$TEMP_DIR/cr.yaml"
-			fi
-			;;
-	esac
-	cat $TEMP_DIR/cr.yaml
+	cat "$TEMP_DIR/cr.yaml"
 }
 
 run_comand_on_pod() {
@@ -520,6 +534,13 @@ get_version_images() {
 	grep -i ${component} $release_versions_file | cut -d'=' -f2
 }
 
+get_release_image() {
+	local key="$1"
+	local release_versions_file="${ROOT_REPO}/e2e-tests/release_versions"
+
+	grep -E "^${key}=" "$release_versions_file" | cut -d'=' -f2
+}
+
 wait_for_delete() {
 	local res="$1"
 
@@ -639,7 +660,7 @@ generate_pmm3_server_token() {
 		-w "\n%{http_code}")
 
 	create_status_code=$(echo "$create_response" | tail -n1)
-	create_json_response=$(echo "$create_response" | sed '$ d')
+	create_json_response=$(echo "$create_response" | $sed '$ d')
 
 	if [[ $create_status_code -ne 201 ]]; then
 		echo "Error: Failed to create PMM service account. HTTP Status: $create_status_code" >&2
@@ -663,7 +684,7 @@ generate_pmm3_server_token() {
 		-w "\n%{http_code}")
 
 	token_status_code=$(echo "$token_response" | tail -n1)
-	token_json_response=$(echo "$token_response" | sed '$ d')
+	token_json_response=$(echo "$token_response" | $sed '$ d')
 
 	if [[ $token_status_code -ne 200 ]]; then
 		echo "Error: Failed to create token. HTTP Status: $token_status_code" >&2
@@ -775,7 +796,7 @@ deploy_chaos_mesh() {
 	destroy_chaos_mesh
 
 	helm repo add chaos-mesh https://charts.chaos-mesh.org
-	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version 2.5.1
+	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version ${CHAOS_MESH_VER}
 	if [[ $OPENSHIFT ]]; then
 		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace=${NAMESPACE}
 	fi
@@ -783,7 +804,7 @@ deploy_chaos_mesh() {
 }
 
 destroy_chaos_mesh() {
-	local chaos_mesh_ns=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}' | sed 's/NAMESPACE//')
+	local chaos_mesh_ns=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}' | $sed 's/NAMESPACE//')
 
 	if [ -n "${chaos_mesh_ns}" ]; then
 		helm uninstall --wait --timeout 60s chaos-mesh --namespace ${chaos_mesh_ns} || :
@@ -1131,6 +1152,18 @@ destroy_cert_manager() {
 get_container_image() {
 	local component=$1
 	local pgVersion=$2
+
+	if [[ ${IMAGE} == percona/* ]] || [[ -n ${FORCE_RELEASE_RUN} ]]; then
+		local key
+		case $component in
+			pgbouncer)  key="IMAGE_PGBOUNCER${pgVersion}" ;;
+			pgbackrest) key="IMAGE_BACKREST${pgVersion}" ;;
+			*)          key="IMAGE_POSTGRESQL${pgVersion}" ;;
+		esac
+		get_release_image "$key"
+		return
+	fi
+
 	local operatorVersion=${VERSION}
 
 	# if operator version is not a proper version (i.e. 2.5.0) use main
@@ -1283,6 +1316,9 @@ detect_k8s_platform() {
 	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "aws://"; then
 		platform="eks"
 
+	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "digitalocean://"; then
+		platform="digitalocean"
+
 	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "azure://"; then
 		platform="aks"
 
@@ -1291,6 +1327,26 @@ detect_k8s_platform() {
 	fi
 
 	echo "${platform}"
+}
+
+ensure_ebs_gp3_storage_class() {
+	local platform=${1:-$(detect_k8s_platform)}
+
+	if [[ "$platform" != "eks" && "$platform" != "openshift" ]]; then
+		return 0
+	fi
+
+	cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-csi-gp3
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+EOF
 }
 
 enable_hugepages() {
@@ -1311,6 +1367,9 @@ enable_hugepages() {
 			;;
 		aks)
 			enable_hugepages_aks "${hugepage_count}"
+			;;
+		digitalocean)
+			enable_hugepages_doks "${hugepage_count}"
 			;;
 		*)
 			echo "Unknown platform, cannot configure hugepages"
@@ -1347,6 +1406,61 @@ enable_hugepages_eks() {
 	fi
 }
 
+enable_hugepages_doks() {
+	local hugepage_count=$1
+  
+  if verify_hugepages_on_nodes; then
+		echo "Hugepages already configured"
+		return 0
+	fi
+
+	cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hugepages
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: hugepages
+  template:
+    metadata:
+      labels:
+        app: hugepages
+    spec:
+      hostPID: true
+      containers:
+      - name: hugepages
+        image: busybox
+        securityContext:
+          privileged: true
+        command:
+        - sh
+        - -c
+        - |
+          echo "Setting hugepages..."
+          echo 1024 > /proc/sys/vm/nr_hugepages
+          cat /proc/sys/vm/nr_hugepages
+          echo "Restarting Kubelet..."
+          nsenter -t 1 -m -u -i -n -p systemctl restart kubelet
+          echo "Done, sleeping..."
+          sleep infinity
+EOF
+
+	kubectl -n kube-system rollout status daemonset/hugepages --timeout=15m || {
+		echo "DOKS: DaemonSet rollout did not complete. Skipping test."
+		return 1
+	}
+
+	if verify_hugepages_on_nodes; then
+		echo "Hugepages successfully configured"
+	else
+		echo "Failed to configure hugepages"
+		return 1
+	fi
+}
+
 enable_hugepages_aks() {
 	local hugepage_count="${1:-2048}"
 	local nodepool_name="${AKS_HUGEPAGES_NODEPOOL:-hp2m}"
@@ -1369,7 +1483,7 @@ enable_hugepages_aks() {
 		-o tsv 2>/dev/null || true)"
 	[[ -n $aks_id ]] || return 1
 
-	cluster_name="$(echo "$aks_id" | sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
+	cluster_name="$(echo "$aks_id" | $sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
 	[[ -n $cluster_name ]] || return 1
 
 	if [[ -z ${cluster_name} ]]; then
@@ -1424,7 +1538,7 @@ spec:
         - operator: Exists
       containers:
         - name: enable
-          image: busybox:1.36
+          image: busybox:${BUSYBOX_VER}
           securityContext:
             privileged: true
           env:

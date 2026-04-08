@@ -44,7 +44,6 @@ metadata: {}
 spec:
   backups:
     pgbackrest: {}
-  config: {}
   extensions: {}
   instances: null
   patroni:
@@ -77,7 +76,6 @@ metadata: {}
 spec:
   backups:
     pgbackrest: {}
-  config: {}
   extensions: {}
   instances:
   - dataVolumeClaimSpec:

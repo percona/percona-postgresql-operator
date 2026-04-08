@@ -11,3 +11,4 @@ commands:
 
       deploy_operator
       deploy_s3_secrets
+      deploy_client

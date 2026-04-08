@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	merr "github.com/hashicorp/go-multierror"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,8 @@ const (
 
 	defaultSnapshotErrorDeadline = 5 * time.Minute
 )
+
+var errVolumeSnapshotFailed = errors.New("volume snapshot failed")
 
 type snapshotExecutor interface {
 	// Prepare the cluster for performing a snapshot.
@@ -72,7 +75,7 @@ func newSnapshotExec(
 	case v2.VolumeSnapshotModeOffline:
 		return newOfflineExec(cl, podExec, cluster, backup), nil
 	default:
-		return nil, fmt.Errorf("invalid or unsupported volume snapshot mode: %s", mode)
+		return nil, errors.Errorf("invalid or unsupported volume snapshot mode: %s", mode)
 	}
 }
 
@@ -92,9 +95,14 @@ func Reconcile(
 		WithName("SnapshotReconciler").
 		WithValues("backup", pgBackup.Name, "cluster", pgCluster.Name)
 
-	// Do nothing if the feature is not enabled.
+	// Fail the backup if the feature gate is not enabled so the lease is released.
 	if !feature.Enabled(ctx, feature.BackupSnapshots) {
-		log.Info(fmt.Sprintf("Feature gate '%s' is not enabled, skipping snapshot reconciliation", feature.BackupSnapshots))
+		if updErr := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
+			bcp.Status.State = v2.BackupFailed
+			bcp.Status.Error = fmt.Sprintf("Feature gate '%s' is not enabled", feature.BackupSnapshots)
+		}); updErr != nil {
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
+		}
 		return reconcile.Result{}, nil
 	}
 
@@ -104,19 +112,19 @@ func Reconcile(
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = "Volume snapshots are not enabled for this cluster"
 		}); updErr != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 		}
 		return reconcile.Result{}, nil
 	}
 
 	exec, err := newSnapshotExec(cl, podExec, pgCluster, pgBackup)
 	if err != nil {
-		stsErr := fmt.Errorf("invalid or unsupported volume snapshot mode: %s", pgCluster.Spec.Backups.VolumeSnapshots.Mode)
+		stsErr := errors.Errorf("invalid or unsupported volume snapshot mode: %s", pgCluster.Spec.Backups.VolumeSnapshots.Mode)
 		if updErr := pgBackup.UpdateStatus(ctx, cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = stsErr.Error()
 		}); updErr != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 		}
 		return reconcile.Result{}, stsErr
 	}
@@ -151,8 +159,9 @@ func (r *snapshotReconciler) reconcileNew(ctx context.Context) (reconcile.Result
 
 	if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupStarting
+		bcp.Status.BackupType = v2.PGBackupTypeSnapshot
 	}); updErr != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
+		return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 	}
 	r.log.Info("Snapshot is starting")
 	return reconcile.Result{}, nil
@@ -167,7 +176,7 @@ func (r *snapshotReconciler) reconcileStarting(ctx context.Context) (reconcile.R
 		bcp.Status.State = v2.BackupRunning
 		bcp.Status.Snapshot = &v2.SnapshotStatus{}
 	}); updErr != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", updErr)
+		return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 	}
 	r.log.Info("Snapshot is running")
 	return reconcile.Result{}, nil
@@ -177,22 +186,43 @@ func (r *snapshotReconciler) reconcileStarting(ctx context.Context) (reconcile.R
 func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Result, error) {
 	dataPVC, walPVC, tablespacePVCs, err := r.getTargetPVCs(ctx)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to get target PVCs: %w", err)
+		return reconcile.Result{}, errors.Wrap(err, "failed to get target PVCs")
 	}
 
+	// Gather VolumeSnapshot errors from all and report it at once in the status
+	// while failing the backup.
+	var snapshotErrors error
+
 	dataOk, err := r.reconcileDataSnapshot(ctx, dataPVC)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to reconcile data snapshot: %w", err)
+	if errors.Is(err, errVolumeSnapshotFailed) {
+		snapshotErrors = merr.Append(snapshotErrors, err)
+	} else if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile data snapshot")
 	}
 
 	walOk, err := r.reconcileWALSnapshot(ctx, walPVC)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to reconcile WAL snapshot: %w", err)
+	if errors.Is(err, errVolumeSnapshotFailed) {
+		snapshotErrors = merr.Append(snapshotErrors, err)
+	} else if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile WAL snapshot")
 	}
 
 	tablespaceOk, err := r.reconcileTablespaceSnapshot(ctx, tablespacePVCs)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to reconcile tablespace snapshot: %w", err)
+	if errors.Is(err, errVolumeSnapshotFailed) {
+		snapshotErrors = merr.Append(snapshotErrors, err)
+	} else if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile tablespace snapshot")
+	}
+
+	if snapshotErrors != nil {
+		if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
+			bcp.Status.State = v2.BackupFailed
+			bcp.Status.Error = fmt.Sprintf("one or more snapshots failed: %s", snapshotErrors)
+			bcp.Status.CompletedAt = ptr.To(metav1.Now())
+		}); updErr != nil {
+			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
+		}
+		return reconcile.Result{}, errors.Wrap(errVolumeSnapshotFailed, snapshotErrors.Error())
 	}
 
 	if !dataOk || !walOk || !tablespaceOk {
@@ -200,14 +230,14 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 	}
 
 	if err := r.complete(ctx); err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to complete snapshot: %w", err)
+		return reconcile.Result{}, errors.Wrap(err, "failed to complete snapshot")
 	}
 
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupSucceeded
 		bcp.Status.CompletedAt = ptr.To(metav1.Now())
 	}); err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to update backup status: %w", err)
+		return reconcile.Result{}, errors.Wrap(err, "failed to update backup status")
 	}
 	return reconcile.Result{}, nil
 }
@@ -215,7 +245,7 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 func (r *snapshotReconciler) reconcileSnapshot(ctx context.Context, volumeSnapshot *volumesnapshotv1.VolumeSnapshot) (bool, error) {
 	created, err := r.ensureSnapshot(ctx, volumeSnapshot)
 	if err != nil {
-		return false, fmt.Errorf("failed to ensure snapshot: %w", err)
+		return false, errors.Wrap(err, "failed to ensure snapshot")
 	}
 
 	log := r.log.WithValues("snapshot", volumeSnapshot.GetName())
@@ -225,7 +255,7 @@ func (r *snapshotReconciler) reconcileSnapshot(ctx context.Context, volumeSnapsh
 	}
 
 	if err := r.cl.Get(ctx, client.ObjectKeyFromObject(volumeSnapshot), volumeSnapshot); err != nil {
-		return false, fmt.Errorf("failed to get volume snapshot: %w", err)
+		return false, errors.Wrap(err, "failed to get volume snapshot")
 	}
 
 	switch {
@@ -247,7 +277,7 @@ func (r *snapshotReconciler) reconcileSnapshot(ctx context.Context, volumeSnapsh
 			return false, nil
 		}
 
-		err := errors.New(message)
+		err := errors.Wrap(errVolumeSnapshotFailed, fmt.Sprintf("VolumeSnapshot %s failed: %s", volumeSnapshot.GetName(), message))
 
 		log.Error(err, "Volume snapshot failed")
 		return false, err
@@ -259,7 +289,8 @@ func (r *snapshotReconciler) reconcileSnapshot(ctx context.Context, volumeSnapsh
 
 func (r *snapshotReconciler) generateSnapshotIntent(
 	snapshotRole,
-	sourcePVC string) (*volumesnapshotv1.VolumeSnapshot, error) {
+	sourcePVC string,
+) (*volumesnapshotv1.VolumeSnapshot, error) {
 	name := r.backup.GetName() + "-" + snapshotRole
 	namespace := r.backup.GetNamespace()
 	volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
@@ -275,7 +306,7 @@ func (r *snapshotReconciler) generateSnapshotIntent(
 		},
 	}
 	if err := controllerutil.SetControllerReference(r.backup, volumeSnapshot, r.cl.Scheme()); err != nil {
-		return nil, fmt.Errorf("failed to set owner reference on volume snapshot: %w", err)
+		return nil, errors.Wrap(err, "failed to set owner reference on volume snapshot")
 	}
 	return volumeSnapshot, nil
 }
@@ -283,18 +314,18 @@ func (r *snapshotReconciler) generateSnapshotIntent(
 func (r *snapshotReconciler) reconcileDataSnapshot(ctx context.Context, targetPVC string) (bool, error) {
 	volumeSnapshot, err := r.generateSnapshotIntent(naming.RolePostgresData, targetPVC)
 	if err != nil {
-		return false, fmt.Errorf("failed to generate snapshot intent: %w", err)
+		return false, errors.Wrap(err, "failed to generate snapshot intent")
 	}
 
 	ok, err := r.reconcileSnapshot(ctx, volumeSnapshot)
 	if err != nil {
-		return false, fmt.Errorf("failed to reconcile snapshot: %w", err)
+		return false, errors.Wrap(err, "failed to reconcile snapshot")
 	}
 
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.Snapshot.DataVolumeSnapshotRef = ptr.To(volumeSnapshot.GetName())
 	}); err != nil {
-		return false, fmt.Errorf("failed to update backup status: %w", err)
+		return false, errors.Wrap(err, "failed to update backup status")
 	}
 	return ok, nil
 }
@@ -306,17 +337,17 @@ func (r *snapshotReconciler) reconcileWALSnapshot(ctx context.Context, targetPVC
 
 	volumeSnapshot, err := r.generateSnapshotIntent(naming.RolePostgresWAL, targetPVC)
 	if err != nil {
-		return false, fmt.Errorf("failed to generate snapshot intent: %w", err)
+		return false, errors.Wrap(err, "failed to generate snapshot intent")
 	}
 
 	ok, err := r.reconcileSnapshot(ctx, volumeSnapshot)
 	if err != nil {
-		return false, fmt.Errorf("failed to reconcile snapshot: %w", err)
+		return false, errors.Wrap(err, "failed to reconcile snapshot")
 	}
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.Snapshot.WALVolumeSnapshotRef = ptr.To(volumeSnapshot.GetName())
 	}); err != nil {
-		return false, fmt.Errorf("failed to update backup status: %w", err)
+		return false, errors.Wrap(err, "failed to update backup status")
 	}
 	return ok, nil
 }
@@ -331,12 +362,12 @@ func (r *snapshotReconciler) reconcileTablespaceSnapshot(ctx context.Context, ta
 		role := tsName + "-" + naming.RoleTablespace
 		volumeSnapshot, err := r.generateSnapshotIntent(role, targetPVC)
 		if err != nil {
-			return false, fmt.Errorf("failed to generate snapshot intent: %w", err)
+			return false, errors.Wrap(err, "failed to generate snapshot intent")
 		}
 
 		ok, err := r.reconcileSnapshot(ctx, volumeSnapshot)
 		if err != nil {
-			return false, fmt.Errorf("failed to reconcile snapshot: %w", err)
+			return false, errors.Wrap(err, "failed to reconcile snapshot")
 		}
 
 		if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
@@ -345,7 +376,7 @@ func (r *snapshotReconciler) reconcileTablespaceSnapshot(ctx context.Context, ta
 			}
 			bcp.Status.Snapshot.TablespaceVolumeSnapshotRefs[tsName] = volumeSnapshot.GetName()
 		}); err != nil {
-			return false, fmt.Errorf("failed to update backup status: %w", err)
+			return false, errors.Wrap(err, "failed to update backup status")
 		}
 		if !ok {
 			done = false
@@ -372,7 +403,7 @@ func (r *snapshotReconciler) ensureSnapshot(ctx context.Context, volumeSnapshot 
 func (r *snapshotReconciler) getTargetPVCs(ctx context.Context) (string, string, map[string]string, error) {
 	targetInstance := r.backup.GetAnnotations()[annotationBackupTarget]
 	if targetInstance == "" {
-		return "", "", nil, fmt.Errorf("backup target instance is not found")
+		return "", "", nil, errors.New("backup target instance is not found")
 	}
 
 	dataPVC := ""
@@ -384,12 +415,12 @@ func (r *snapshotReconciler) getTargetPVCs(ctx context.Context) (string, string,
 			naming.LabelRole:     naming.RolePostgresData,
 		}),
 	}); err != nil {
-		return "", "", nil, fmt.Errorf("failed to list data volumes: %w", err)
+		return "", "", nil, errors.Wrap(err, "failed to list data volumes")
 	}
 	if len(dataVolumes.Items) == 1 {
 		dataPVC = dataVolumes.Items[0].GetName()
 	} else {
-		return "", "", nil, fmt.Errorf("unexpected number of data volumes: %d", len(dataVolumes.Items))
+		return "", "", nil, errors.Errorf("unexpected number of data volumes: %d", len(dataVolumes.Items))
 	}
 
 	walPVC := ""
@@ -401,7 +432,7 @@ func (r *snapshotReconciler) getTargetPVCs(ctx context.Context) (string, string,
 			naming.LabelRole:     naming.RolePostgresWAL,
 		}),
 	}); err != nil {
-		return "", "", nil, fmt.Errorf("failed to list WAL volumes: %w", err)
+		return "", "", nil, errors.Wrap(err, "failed to list WAL volumes")
 	}
 	if len(walVolumes.Items) == 1 {
 		walPVC = walVolumes.Items[0].GetName()
@@ -416,7 +447,7 @@ func (r *snapshotReconciler) getTargetPVCs(ctx context.Context) (string, string,
 			naming.LabelRole:     naming.RoleTablespace,
 		}),
 	}); err != nil {
-		return "", "", nil, fmt.Errorf("failed to list tablespace volumes: %w", err)
+		return "", "", nil, errors.Wrap(err, "failed to list tablespace volumes")
 	}
 
 	for _, vol := range tablespaceVolumes.Items {
@@ -436,7 +467,7 @@ func (r *snapshotReconciler) prepare(ctx context.Context) error {
 	// prepare the cluster
 	targetInstance, err := r.exec.prepare(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to prepare for snapshot: %w", err)
+		return errors.Wrap(err, "failed to prepare for snapshot")
 	}
 
 	// Store the backup target instance for later retrieval.
@@ -448,7 +479,7 @@ func (r *snapshotReconciler) prepare(ctx context.Context) error {
 	annotations[annotationBackupTarget] = targetInstance
 	r.backup.SetAnnotations(annotations)
 	if err := r.cl.Patch(ctx, r.backup.DeepCopy(), client.MergeFrom(orig)); err != nil {
-		return fmt.Errorf("failed to patch backup annotations: %w", err)
+		return errors.Wrap(err, "failed to patch backup annotations")
 	}
 
 	// add finalizer
@@ -461,7 +492,7 @@ func (r *snapshotReconciler) prepare(ctx context.Context) error {
 		controllerutil.AddFinalizer(bcp, pNaming.FinalizerSnapshotInProgress)
 		return r.cl.Patch(ctx, bcp, client.MergeFrom(orig))
 	}); err != nil {
-		return fmt.Errorf("failed to add backup finalizer: %w", err)
+		return errors.Wrap(err, "failed to add backup finalizer")
 	}
 	r.log.Info("Prepared for snapshot")
 	return nil
@@ -475,7 +506,7 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 
 	// run finalize
 	if err := r.exec.finalize(ctx); err != nil {
-		return fmt.Errorf("finalize failed: %w", err)
+		return errors.Wrap(err, "finalize failed")
 	}
 
 	// remove finalizer
@@ -488,7 +519,7 @@ func (r *snapshotReconciler) complete(ctx context.Context) error {
 		controllerutil.RemoveFinalizer(bcp, pNaming.FinalizerSnapshotInProgress)
 		return r.cl.Patch(ctx, bcp, client.MergeFrom(orig))
 	}); err != nil {
-		return fmt.Errorf("failed to remove finalizer: %w", err)
+		return errors.Wrap(err, "failed to remove finalizer")
 	}
 	return nil
 }

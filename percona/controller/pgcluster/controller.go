@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"slices"
 	"strings"
 	"time"
 
@@ -219,6 +218,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 // +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs=create;update
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("cluster", request.Name, "namespace", request.Namespace)
@@ -238,6 +238,9 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "set CR version")
 	}
 	cr.Default()
+	if err := cr.Validate(); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "validate PerconaPGCluster")
+	}
 
 	if cr.Spec.OpenShift == nil {
 		cr.Spec.OpenShift = &r.IsOpenShift
@@ -321,6 +324,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcileScheduledBackups(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "reconcile scheduled backups")
+	}
+
+	if err := r.reconcilePVCs(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile pvcs")
 	}
 
 	if err := r.reconcileStandbyMainSiteAnnotation(ctx, cr); err != nil {
@@ -599,7 +606,7 @@ func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v
 		m[&set.EnvFrom] = set.Metadata
 	}
 
-	if len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
+	if cr.Spec.Proxy.IsSet() && len(cr.Spec.Proxy.PGBouncer.EnvFrom) > 0 {
 		if cr.Spec.Proxy.PGBouncer.Metadata == nil {
 			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
 		}
@@ -608,7 +615,7 @@ func (r *PGClusterReconciler) reconcileEnvFromSecrets(ctx context.Context, cr *v
 
 	if len(cr.Spec.Backups.PGBackRest.EnvFrom) > 0 {
 		if cr.Spec.Backups.PGBackRest.Metadata == nil {
-			cr.Spec.Proxy.PGBouncer.Metadata = new(v1beta1.Metadata)
+			cr.Spec.Backups.PGBackRest.Metadata = new(v1beta1.Metadata)
 		}
 		m[&cr.Spec.Backups.PGBackRest.EnvFrom] = cr.Spec.Backups.PGBackRest.Metadata
 	}
@@ -866,17 +873,15 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 }
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if !slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchersDeprecated) && slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchers) {
+	if !controllerutil.ContainsFinalizer(cr, pNaming.FinalizerStopWatchersDeprecated) && controllerutil.ContainsFinalizer(cr, pNaming.FinalizerStopWatchers) {
 		return nil
 	}
 
 	if cr.Spec.Backups.TrackLatestRestorableTime != nil && *cr.Spec.Backups.TrackLatestRestorableTime {
 		orig := cr.DeepCopy()
-		cr.Finalizers = slices.DeleteFunc(cr.Finalizers, func(f string) bool {
-			return f == pNaming.FinalizerStopWatchersDeprecated
-		})
-		if !slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchers) {
-			cr.Finalizers = append(cr.Finalizers, pNaming.FinalizerStopWatchers)
+		controllerutil.RemoveFinalizer(cr, pNaming.FinalizerStopWatchersDeprecated)
+		if !controllerutil.ContainsFinalizer(cr, pNaming.FinalizerStopWatchers) {
+			controllerutil.AddFinalizer(cr, pNaming.FinalizerStopWatchers)
 		}
 		if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "patch finalizers")

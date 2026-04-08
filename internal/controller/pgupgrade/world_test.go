@@ -5,9 +5,9 @@
 package pgupgrade
 
 import (
-	"fmt"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,7 +46,7 @@ func TestPopulateCluster(t *testing.T) {
 
 	t.Run("Error", func(t *testing.T) {
 		cluster := v1beta1.NewPostgresCluster()
-		expected := fmt.Errorf("danger")
+		expected := errors.New("danger")
 
 		world := NewWorld()
 		err := world.populateCluster(cluster, expected)

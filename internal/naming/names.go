@@ -535,6 +535,24 @@ func PGBackRestSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	}
 }
 
+// PGBackRestClientCertSecret returns the ObjectMeta for the cert-manager-managed
+// Secret containing the pgBackRest client TLS certificate.
+func PGBackRestClientCertSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      cluster.GetName() + "-pgbackrest-client-tls",
+		Namespace: cluster.GetNamespace(),
+	}
+}
+
+// PGBackRestRepoCertSecret returns the ObjectMeta for the cert-manager-managed
+// Secret containing the pgBackRest repository host TLS certificate.
+func PGBackRestRepoCertSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      cluster.GetName() + "-pgbackrest-repo-tls",
+		Namespace: cluster.GetNamespace(),
+	}
+}
+
 // DeprecatedPostgresUserSecret returns the ObjectMeta necessary to lookup the
 // old Secret containing the default Postgres user and connection information.
 // Use PostgresUserSecret instead.
@@ -620,5 +638,21 @@ func UpgradeCheckConfigMap() metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: config.PGONamespace(),
 		Name:      "pgo-upgrade-check",
+	}
+}
+
+// CAIssuer returns the ObjectMeta for the CA Issuer used by cert-manager.
+func CAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-ca-issuer",
+	}
+}
+
+// TLSIssuer returns the ObjectMeta for the TLS Issuer used by cert-manager.
+func TLSIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-tls-issuer",
 	}
 }
