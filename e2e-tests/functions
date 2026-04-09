@@ -1153,7 +1153,7 @@ get_container_image() {
 	local component=$1
 	local pgVersion=$2
 
-	if [[ ${IMAGE} == percona/* ]] || [[ -n ${FORCE_RELEASE_RUN} ]]; then
+	if [[ ${IMAGE} == percona/* || ${IMAGE} == docker.io/percona/* ]] || [[ -n ${FORCE_RELEASE_RUN} ]]; then
 		local key
 		case $component in
 			pgbouncer)  key="IMAGE_PGBOUNCER${pgVersion}" ;;
