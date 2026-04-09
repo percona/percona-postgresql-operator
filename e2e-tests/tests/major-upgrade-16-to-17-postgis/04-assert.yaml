@@ -3,6 +3,13 @@ kind: TestAssert
 timeout: 360
 commands:
 - script: |-
+    set -o errexit
+    set -o xtrace
+
+    source ../../functions
+
+    wait_cluster_consistency major-upgrade-16-to-17-postgis
+
     kubectl -n ${NAMESPACE} get cm \
       -l app.kubernetes.io/instance=major-upgrade-16-to-17-postgis \
       -l app.kubernetes.io/component=pg -o yaml
