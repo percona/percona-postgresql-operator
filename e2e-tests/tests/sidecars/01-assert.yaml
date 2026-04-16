@@ -222,7 +222,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv2.percona.com/version: 2.9.0
+    pgv2.percona.com/version: 2.10.0
     postgres-operator.crunchydata.com/cluster: sidecars
     postgres-operator.crunchydata.com/pgbackrest: ""
   name: sidecar-repohost-claim
