@@ -12,7 +12,7 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-dedicated: ''
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v2
       kind: PostgresCluster
       name: finalizers-2
       controller: true
@@ -33,7 +33,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v2
       kind: PostgresCluster
       name: finalizers-2
       controller: true
@@ -56,7 +56,7 @@ metadata:
   annotations:
     deployment.kubernetes.io/revision: '1'
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v2
       kind: PostgresCluster
       name: finalizers-2
       controller: true
@@ -83,7 +83,7 @@ metadata:
 status:
   succeeded: 1
 ---
-apiVersion: postgres-operator.crunchydata.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v2
 kind: PostgresCluster
 metadata:
   name: finalizers-2

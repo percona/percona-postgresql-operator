@@ -3,6 +3,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 delete:
-  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v2
     kind: PostgresCluster
     name: clone-one

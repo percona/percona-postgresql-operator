@@ -1,6 +1,6 @@
 ---
 # Wait for the instances to be ready with the target Postgres version.
-apiVersion: postgres-operator.crunchydata.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v2
 kind: PostgresCluster
 metadata:
   name: wal-pvc-pgupgrade

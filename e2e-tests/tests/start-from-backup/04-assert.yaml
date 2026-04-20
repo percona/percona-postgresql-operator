@@ -30,7 +30,7 @@ spec:
 status:
   state: Succeeded
 ---
-apiVersion: postgres-operator.crunchydata.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v2
 kind: PostgresCluster
 metadata:
   name: start-from-backup-source

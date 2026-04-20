@@ -1,7 +1,7 @@
 ---
 # Create a cluster where the version does not match the pgupgrade's `from`
 # TODO(benjaminjb): this isn't quite working out
-# apiVersion: postgres-operator.crunchydata.com/v1beta1
+# apiVersion: upstream.pgv2.percona.com/v2
 # kind: PostgresCluster
 # metadata:
 #   name: major-upgrade

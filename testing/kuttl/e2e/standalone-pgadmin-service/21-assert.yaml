@@ -7,7 +7,7 @@ metadata:
     postgres-operator.crunchydata.com/role: pgadmin
     postgres-operator.crunchydata.com/pgadmin: pgadmin-service-owner
   ownerReferences:
-  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v2
     controller: true
     kind: PGAdmin
     name: pgadmin-service-owner
@@ -24,7 +24,7 @@ spec:
 # An event should be created for the failure to reconcile the Service
 apiVersion: v1
 involvedObject:
-  apiVersion: postgres-operator.crunchydata.com/v1beta1
+  apiVersion: upstream.pgv2.percona.com/v2
   kind: PGAdmin
   name: pgadmin-service-thief
 kind: Event

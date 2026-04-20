@@ -10,7 +10,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v2
       kind: PostgresCluster
       name: some-name
       controller: true
@@ -32,7 +32,7 @@ metadata:
   annotations:
     deployment.kubernetes.io/revision: '1'
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v2
       kind: PostgresCluster
       name: some-name
       controller: true
@@ -43,7 +43,7 @@ status:
   updatedReplicas: 3
   readyReplicas: 3
 ---
-apiVersion: postgres-operator.crunchydata.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v2
 kind: PostgresCluster
 metadata:
   name: some-name

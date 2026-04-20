@@ -36,7 +36,7 @@ metadata:
 status:
   succeeded: 1
 ---
-apiVersion: postgres-operator.crunchydata.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v2
 kind: PostgresCluster
 metadata:
   name: some-name

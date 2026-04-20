@@ -1,6 +1,6 @@
 ---
 # Create a cluster that is already at the correct version
-apiVersion: postgres-operator.crunchydata.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v2
 kind: PostgresCluster
 metadata:
   name: major-upgrade
