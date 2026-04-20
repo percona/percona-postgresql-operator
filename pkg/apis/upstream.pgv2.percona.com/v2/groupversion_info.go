@@ -4,7 +4,7 @@
 
 // Package v1beta1 contains API Schema definitions for the postgres-operator v1beta1 API group
 // +kubebuilder:object:generate=true
-// +groupName=postgres-operator.crunchydata.com
+// +groupName=upstream.pgv2.percona.com
 package v1beta1
 
 import (

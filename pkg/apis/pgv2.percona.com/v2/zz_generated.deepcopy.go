@@ -9,7 +9,7 @@
 package v2
 
 import (
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v2"
+	upstream_pgv2_percona_comv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -223,7 +223,7 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 	*out = *in
 	if in.Metadata != nil {
 		in, out := &in.Metadata, &out.Metadata
-		*out = new(v1beta1.Metadata)
+		*out = new(upstream_pgv2_percona_comv2.Metadata)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Configuration != nil {
@@ -242,44 +242,44 @@ func (in *PGBackRestArchive) DeepCopyInto(out *PGBackRestArchive) {
 	}
 	if in.InitContainer != nil {
 		in, out := &in.InitContainer, &out.InitContainer
-		*out = new(v1beta1.InitContainerSpec)
+		*out = new(upstream_pgv2_percona_comv2.InitContainerSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Jobs != nil {
 		in, out := &in.Jobs, &out.Jobs
-		*out = new(v1beta1.BackupJobs)
+		*out = new(upstream_pgv2_percona_comv2.BackupJobs)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Repos != nil {
 		in, out := &in.Repos, &out.Repos
-		*out = make([]v1beta1.PGBackRestRepo, len(*in))
+		*out = make([]upstream_pgv2_percona_comv2.PGBackRestRepo, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.RepoHost != nil {
 		in, out := &in.RepoHost, &out.RepoHost
-		*out = new(v1beta1.PGBackRestRepoHost)
+		*out = new(upstream_pgv2_percona_comv2.PGBackRestRepoHost)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Manual != nil {
 		in, out := &in.Manual, &out.Manual
-		*out = new(v1beta1.PGBackRestManualBackup)
+		*out = new(upstream_pgv2_percona_comv2.PGBackRestManualBackup)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Restore != nil {
 		in, out := &in.Restore, &out.Restore
-		*out = new(v1beta1.PGBackRestRestore)
+		*out = new(upstream_pgv2_percona_comv2.PGBackRestRestore)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Sidecars != nil {
 		in, out := &in.Sidecars, &out.Sidecars
-		*out = new(v1beta1.PGBackRestSidecars)
+		*out = new(upstream_pgv2_percona_comv2.PGBackRestSidecars)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Containers != nil {
 		in, out := &in.Containers, &out.Containers
-		*out = new(v1beta1.PGBackRestSidecars)
+		*out = new(upstream_pgv2_percona_comv2.PGBackRestSidecars)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Env != nil {
@@ -313,7 +313,7 @@ func (in *PGBouncerSpec) DeepCopyInto(out *PGBouncerSpec) {
 	*out = *in
 	if in.Metadata != nil {
 		in, out := &in.Metadata, &out.Metadata
-		*out = new(v1beta1.Metadata)
+		*out = new(upstream_pgv2_percona_comv2.Metadata)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Affinity != nil {
@@ -338,14 +338,14 @@ func (in *PGBouncerSpec) DeepCopyInto(out *PGBouncerSpec) {
 	}
 	if in.SidecarPVCs != nil {
 		in, out := &in.SidecarPVCs, &out.SidecarPVCs
-		*out = make([]v1beta1.SidecarPVC, len(*in))
+		*out = make([]upstream_pgv2_percona_comv2.SidecarPVC, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.Containers != nil {
 		in, out := &in.Containers, &out.Containers
-		*out = new(v1beta1.PGBouncerSidecars)
+		*out = new(upstream_pgv2_percona_comv2.PGBouncerSidecars)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.CustomTLSSecret != nil {
@@ -444,7 +444,7 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	*out = *in
 	if in.Metadata != nil {
 		in, out := &in.Metadata, &out.Metadata
-		*out = new(v1beta1.Metadata)
+		*out = new(upstream_pgv2_percona_comv2.Metadata)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Affinity != nil {
@@ -468,14 +468,14 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	}
 	if in.SidecarPVCs != nil {
 		in, out := &in.SidecarPVCs, &out.SidecarPVCs
-		*out = make([]v1beta1.SidecarPVC, len(*in))
+		*out = make([]upstream_pgv2_percona_comv2.SidecarPVC, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.Containers != nil {
 		in, out := &in.Containers, &out.Containers
-		*out = new(v1beta1.InstanceSidecars)
+		*out = new(upstream_pgv2_percona_comv2.InstanceSidecars)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.InitContainers != nil {
@@ -523,7 +523,7 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	in.DataVolumeClaimSpec.DeepCopyInto(&out.DataVolumeClaimSpec)
 	if in.TablespaceVolumes != nil {
 		in, out := &in.TablespaceVolumes, &out.TablespaceVolumes
-		*out = make([]v1beta1.TablespaceVolume, len(*in))
+		*out = make([]upstream_pgv2_percona_comv2.TablespaceVolume, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -542,7 +542,7 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 	}
 	if in.InitContainer != nil {
 		in, out := &in.InitContainer, &out.InitContainer
-		*out = new(v1beta1.InitContainerSpec)
+		*out = new(upstream_pgv2_percona_comv2.InitContainerSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Env != nil {
@@ -662,7 +662,7 @@ func (in *Patroni) DeepCopyInto(out *Patroni) {
 	*out = *in
 	if in.Status != nil {
 		in, out := &in.Status, &out.Status
-		*out = new(v1beta1.PatroniStatus)
+		*out = new(upstream_pgv2_percona_comv2.PatroniStatus)
 		(*in).DeepCopyInto(*out)
 	}
 }
@@ -776,7 +776,7 @@ func (in *PerconaPGBackupStatus) DeepCopyInto(out *PerconaPGBackupStatus) {
 	}
 	if in.Repo != nil {
 		in, out := &in.Repo, &out.Repo
-		*out = new(v1beta1.PGBackRestRepo)
+		*out = new(upstream_pgv2_percona_comv2.PGBackRestRepo)
 		(*in).DeepCopyInto(*out)
 	}
 	in.LatestRestorableTime.DeepCopyInto(&out.LatestRestorableTime)
@@ -868,12 +868,12 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 	*out = *in
 	if in.Metadata != nil {
 		in, out := &in.Metadata, &out.Metadata
-		*out = new(v1beta1.Metadata)
+		*out = new(upstream_pgv2_percona_comv2.Metadata)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.InitContainer != nil {
 		in, out := &in.InitContainer, &out.InitContainer
-		*out = new(v1beta1.InitContainerSpec)
+		*out = new(upstream_pgv2_percona_comv2.InitContainerSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ImagePullSecrets != nil {
@@ -883,7 +883,7 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 	}
 	if in.TLS != nil {
 		in, out := &in.TLS, &out.TLS
-		*out = new(v1beta1.TLSSpec)
+		*out = new(upstream_pgv2_percona_comv2.TLSSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Port != nil {
@@ -914,19 +914,19 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 	}
 	if in.Patroni != nil {
 		in, out := &in.Patroni, &out.Patroni
-		*out = new(v1beta1.PatroniSpec)
+		*out = new(upstream_pgv2_percona_comv2.PatroniSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Users != nil {
 		in, out := &in.Users, &out.Users
-		*out = make([]v1beta1.PostgresUserSpec, len(*in))
+		*out = make([]upstream_pgv2_percona_comv2.PostgresUserSpec, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.DatabaseInitSQL != nil {
 		in, out := &in.DatabaseInitSQL, &out.DatabaseInitSQL
-		*out = new(v1beta1.DatabaseInitSQL)
+		*out = new(upstream_pgv2_percona_comv2.DatabaseInitSQL)
 		**out = **in
 	}
 	if in.Pause != nil {
@@ -941,7 +941,7 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 	}
 	if in.DataSource != nil {
 		in, out := &in.DataSource, &out.DataSource
-		*out = new(v1beta1.DataSource)
+		*out = new(upstream_pgv2_percona_comv2.DataSource)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.InstanceSets != nil {
@@ -970,12 +970,12 @@ func (in *PerconaPGClusterSpec) DeepCopyInto(out *PerconaPGClusterSpec) {
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
-		*out = new(v1beta1.PostgresConfigSpec)
+		*out = new(upstream_pgv2_percona_comv2.PostgresConfigSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Authentication != nil {
 		in, out := &in.Authentication, &out.Authentication
-		*out = new(v1beta1.PostgresClusterAuthentication)
+		*out = new(upstream_pgv2_percona_comv2.PostgresClusterAuthentication)
 		(*in).DeepCopyInto(*out)
 	}
 }
@@ -998,7 +998,7 @@ func (in *PerconaPGClusterStatus) DeepCopyInto(out *PerconaPGClusterStatus) {
 	in.Patroni.DeepCopyInto(&out.Patroni)
 	if in.PGBackRest != nil {
 		in, out := &in.PGBackRest, &out.PGBackRest
-		*out = new(v1beta1.PGBackRestStatus)
+		*out = new(upstream_pgv2_percona_comv2.PGBackRestStatus)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.InstalledCustomExtensions != nil {
@@ -1198,7 +1198,7 @@ func (in *PerconaPGUpgradeSpec) DeepCopyInto(out *PerconaPGUpgradeSpec) {
 	*out = *in
 	if in.Metadata != nil {
 		in, out := &in.Metadata, &out.Metadata
-		*out = new(v1beta1.Metadata)
+		*out = new(upstream_pgv2_percona_comv2.Metadata)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Image != nil {
@@ -1404,7 +1404,7 @@ func (in *StandbySpec) DeepCopyInto(out *StandbySpec) {
 	*out = *in
 	if in.PostgresStandbySpec != nil {
 		in, out := &in.PostgresStandbySpec, &out.PostgresStandbySpec
-		*out = new(v1beta1.PostgresStandbySpec)
+		*out = new(upstream_pgv2_percona_comv2.PostgresStandbySpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.MaxAcceptableLag != nil {

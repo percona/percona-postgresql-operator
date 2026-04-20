@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.0
-  name: postgresclusters.postgres-operator.crunchydata.com
+  name: postgresclusters.upstream.pgv2.percona.com
 spec:
-  group: postgres-operator.crunchydata.com
+  group: upstream.pgv2.percona.com
   names:
     kind: PostgresCluster
     listKind: PostgresClusterList
