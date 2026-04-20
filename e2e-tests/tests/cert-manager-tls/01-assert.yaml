@@ -10,7 +10,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: upstream.pgv2.percona.com/v2
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: cert-manager-tls
       controller: true
@@ -31,7 +31,7 @@ metadata:
     postgres-operator.crunchydata.com/cluster: cert-manager-tls
     postgres-operator.crunchydata.com/role: pgbouncer
   ownerReferences:
-    - apiVersion: upstream.pgv2.percona.com/v2
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: cert-manager-tls
       controller: true
@@ -58,7 +58,7 @@ metadata:
 status:
   succeeded: 1
 ---
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: cert-manager-tls

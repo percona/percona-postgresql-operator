@@ -58,7 +58,7 @@ spec:
           value: 10s
         - name: PGO_FEATURE_GATES
           value: ""
-        image: docker.io/perconalab/percona-postgresql-operator:migration
+        image: docker.io/perconalab/percona-postgresql-operator:migration-27740
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

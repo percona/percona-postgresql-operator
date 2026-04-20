@@ -4,7 +4,7 @@ delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   name: start-from-backup-source
-- apiVersion: upstream.pgv2.percona.com/v2
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   name: start-from-backup-source
 timeout: 300

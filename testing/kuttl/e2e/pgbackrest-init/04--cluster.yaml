@@ -1,5 +1,5 @@
 ---
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: init-pgbackrest

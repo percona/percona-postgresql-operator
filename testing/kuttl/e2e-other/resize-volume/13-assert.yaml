@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Event
 type: Warning
 involvedObject:
-  apiVersion: upstream.pgv2.percona.com/v2
+  apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   name: resize-volume-down
 reason: PersistentVolumeError

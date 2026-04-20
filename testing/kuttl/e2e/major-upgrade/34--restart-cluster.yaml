@@ -1,7 +1,7 @@
 ---
 # Once the pgupgrade is finished, update the version and set shutdown to false
 # in the postgres cluster
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: major-upgrade

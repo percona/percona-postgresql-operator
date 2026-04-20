@@ -35,7 +35,7 @@ spec:
   pgCluster: scheduled-backup
   repoName: repo1
 ---
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: scheduled-backup

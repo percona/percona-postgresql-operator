@@ -1,7 +1,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 delete:
-  - apiVersion: upstream.pgv2.percona.com/v2
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     kind: PostgresCluster
     name: delete
 error:

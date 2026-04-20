@@ -1,6 +1,6 @@
 ---
 # Create a cluster with multiple instances and manual switchover enabled.
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: switchover

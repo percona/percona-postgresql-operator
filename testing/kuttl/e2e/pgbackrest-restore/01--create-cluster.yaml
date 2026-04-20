@@ -1,7 +1,7 @@
 ---
 # Create a cluster with a single pgBackRest repository and some parameters that
 # require attention during PostgreSQL recovery.
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: original

@@ -3,7 +3,7 @@
 # can finish reconciling. We know the reconciling is complete when
 # the pgupgrade status is succeeded and the postgres cluster status
 # has the updated version.
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PGUpgrade
 metadata:
   name: wal-pvc-pgupgrade-do-it
@@ -14,7 +14,7 @@ status:
   - type:   "Succeeded"
     status: "True"
 ---
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: wal-pvc-pgupgrade

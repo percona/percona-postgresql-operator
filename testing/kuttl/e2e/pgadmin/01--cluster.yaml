@@ -14,7 +14,7 @@ stringData:
   password: myPassword
 ---
 # Create a cluster with a configured pgAdmin UI.
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: interfaced

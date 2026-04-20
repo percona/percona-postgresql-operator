@@ -38,7 +38,7 @@ func TestPostgresClusterDefault(t *testing.T) {
 		b, err := yaml.Marshal(cluster)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, string(b), strings.TrimSpace(`
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata: {}
 spec:
@@ -70,7 +70,7 @@ status:
 		b, err := yaml.Marshal(cluster)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, string(b), strings.TrimSpace(`
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata: {}
 spec:

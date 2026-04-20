@@ -113,7 +113,7 @@ metadata:
     test-label: test
   name: init-deploy-cluster-ca-cert
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v2
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     kind: PostgresCluster
     name: init-deploy
 type: Opaque
@@ -128,7 +128,7 @@ metadata:
     test-label: test
   name: init-deploy-config
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v2
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -151,7 +151,7 @@ metadata:
     test-label: test
   name: init-deploy-pgbackrest-config
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v2
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -174,7 +174,7 @@ metadata:
     test-label: test
   name: init-deploy-pgbouncer
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v2
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -217,7 +217,7 @@ metadata:
     test-label: test
   name: init-deploy-repo-host
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v2
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster

@@ -6,7 +6,7 @@ metadata:
     postgres-operator.crunchydata.com/role: pgadmin
     postgres-operator.crunchydata.com/pgadmin: pgadmin-service-owner
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v2
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     controller: true
     kind: PGAdmin
     name: pgadmin-service-owner

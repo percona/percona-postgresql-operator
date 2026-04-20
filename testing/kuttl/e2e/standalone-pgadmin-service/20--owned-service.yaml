@@ -1,5 +1,5 @@
 # Create a pgAdmin that will create and own a service
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PGAdmin
 metadata:
   name: pgadmin-service-owner

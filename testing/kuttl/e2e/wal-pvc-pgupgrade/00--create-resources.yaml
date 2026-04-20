@@ -1,6 +1,6 @@
 ---
 # Create the cluster we will do an actual upgrade on
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: wal-pvc-pgupgrade
@@ -18,7 +18,7 @@ spec:
             volumeClaimSpec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 1Gi } } }
 ---
 # This upgrade is valid, but has no pgcluster to work on and should get that condition
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PGUpgrade
 metadata:
   name: wal-pvc-pgupgrade-do-it

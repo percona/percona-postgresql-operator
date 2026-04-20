@@ -6,14 +6,14 @@ delete:
   kind: PerconaPGCluster
   metadata:
     name: source-cluster
-- apiVersion: upstream.pgv2.percona.com/v2
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   name: source-cluster
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
     name: standby-cluster
-- apiVersion: upstream.pgv2.percona.com/v2
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   name: standby-cluster
 commands:

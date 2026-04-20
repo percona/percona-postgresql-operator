@@ -1,4 +1,4 @@
-apiVersion: upstream.pgv2.percona.com/v2
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PGAdmin
 metadata:
   name: example-pgadmin
