@@ -41,7 +41,7 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr manager.Manager) error {
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/status,verbs=patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/finalizers,verbs=patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch;patch;update
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=pgupgrades,verbs=get;list;create;update;patch;delete;watch
+// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=pgupgrades,verbs=get;list;create;update;patch;delete;watch
 
 func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("request", request)

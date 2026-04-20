@@ -22,7 +22,7 @@ import (
 // that it GETs. That informer needs the "watch" permission.
 // - https://github.com/kubernetes-sigs/controller-runtime/issues/1249
 // - https://github.com/kubernetes-sigs/controller-runtime/issues/1454
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={get,watch}
 //+kubebuilder:rbac:groups="",resources="endpoints",verbs={list,watch}
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={list,watch}
 //+kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={list,watch}

@@ -16,7 +16,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
-// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={patch}
+// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={patch}
 
 // handleDelete sets a finalizer on cluster and performs the finalization of
 // cluster when it is being deleted. It returns (nil, nil) when cluster is

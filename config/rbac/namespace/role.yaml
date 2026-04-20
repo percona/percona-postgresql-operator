@@ -192,68 +192,6 @@ rules:
   - patch
   - watch
 - apiGroups:
-  - postgres-operator.crunchydata.com
-  resources:
-  - crunchybridgeclusters
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - postgres-operator.crunchydata.com
-  resources:
-  - crunchybridgeclusters/finalizers
-  - crunchybridgeclusters/status
-  verbs:
-  - patch
-  - update
-- apiGroups:
-  - postgres-operator.crunchydata.com
-  resources:
-  - pgadmins
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - postgres-operator.crunchydata.com
-  resources:
-  - pgadmins/finalizers
-  - pgupgrades/finalizers
-  - postgresclusters/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - postgres-operator.crunchydata.com
-  resources:
-  - pgadmins/status
-  - pgupgrades/status
-  verbs:
-  - patch
-- apiGroups:
-  - postgres-operator.crunchydata.com
-  resources:
-  - pgupgrades
-  - postgresclusters
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - postgres-operator.crunchydata.com
-  resources:
-  - postgresclusters/status
-  verbs:
-  - create
-  - patch
-  - update
-- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings
@@ -276,3 +214,65 @@ rules:
   - list
   - patch
   - watch
+- apiGroups:
+  - upstream.pgv2.percona.com
+  resources:
+  - crunchybridgeclusters
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - upstream.pgv2.percona.com
+  resources:
+  - crunchybridgeclusters/finalizers
+  - crunchybridgeclusters/status
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - upstream.pgv2.percona.com
+  resources:
+  - pgadmins
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - upstream.pgv2.percona.com
+  resources:
+  - pgadmins/finalizers
+  - pgupgrades/finalizers
+  - postgresclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - upstream.pgv2.percona.com
+  resources:
+  - pgadmins/status
+  - pgupgrades/status
+  verbs:
+  - patch
+- apiGroups:
+  - upstream.pgv2.percona.com
+  resources:
+  - pgupgrades
+  - postgresclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - upstream.pgv2.percona.com
+  resources:
+  - postgresclusters/status
+  verbs:
+  - create
+  - patch
+  - update

@@ -9,4 +9,4 @@ patchesStrategicMerge:
 images:
 - name: postgres-operator
   newName: docker.io/perconalab/percona-postgresql-operator
-  newTag: migration-27740
+  newTag: migration-27741

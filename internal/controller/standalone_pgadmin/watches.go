@@ -73,7 +73,7 @@ func (r *PGAdminReconciler) watchForRelatedSecret() handler.EventHandler {
 	}
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgadmins",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgadmins",verbs={list}
 
 // findPGAdminsForSecret returns PGAdmins that have a user or users that have their password
 // stored in the Secret

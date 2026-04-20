@@ -34,7 +34,7 @@ type PGAdminReconciler struct {
 	IsOpenShift bool
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={list,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={list,watch}
 //+kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={list,watch}
 //+kubebuilder:rbac:groups="",resources="secrets",verbs={list,watch}
 //+kubebuilder:rbac:groups="",resources="configmaps",verbs={list,watch}
@@ -70,8 +70,8 @@ func (r *PGAdminReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgadmins",verbs={get}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgadmins/status",verbs={patch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgadmins",verbs={get}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgadmins/status",verbs={patch}
 
 // Reconcile which aims to move the current state of the pgAdmin closer to the
 // desired state described in a [v1beta1.PGAdmin] identified by request.
@@ -148,7 +148,7 @@ func (r *PGAdminReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // creator of such a reference have either "delete" permission on the owner or
 // "update" permission on the owner's "finalizers" subresource.
 // - https://docs.k8s.io/reference/access-authn-authz/admission-controllers/
-// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgadmins/finalizers",verbs={update}
+// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgadmins/finalizers",verbs={update}
 
 // setControllerReference sets owner as a Controller OwnerReference on controlled.
 // Only one OwnerReference can be a controller, so it returns an error if another

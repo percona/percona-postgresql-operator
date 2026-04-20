@@ -49,7 +49,7 @@ func (r *CrunchyBridgeClusterReconciler) watchForRelatedSecret() handler.EventHa
 	}
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters",verbs={list}
 
 // findCrunchyBridgeClustersForSecret returns CrunchyBridgeClusters
 // that are connected to the Secret
@@ -75,7 +75,7 @@ func (r *CrunchyBridgeClusterReconciler) findCrunchyBridgeClustersForSecret(
 	return matching
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters",verbs={list}
 
 // Watch enqueues all existing CrunchyBridgeClusters for reconciles.
 func (r *CrunchyBridgeClusterReconciler) Watch() handler.EventHandler {

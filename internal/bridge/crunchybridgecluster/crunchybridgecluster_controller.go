@@ -42,7 +42,7 @@ type CrunchyBridgeClusterReconciler struct {
 	NewClient func() bridge.ClientInterface
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters",verbs={list,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters",verbs={list,watch}
 //+kubebuilder:rbac:groups="",resources="secrets",verbs={list,watch}
 
 // SetupWithManager sets up the controller with the Manager.
@@ -71,7 +71,7 @@ func (r *CrunchyBridgeClusterReconciler) SetupWithManager(
 // creator of such a reference have either "delete" permission on the owner or
 // "update" permission on the owner's "finalizers" subresource.
 // - https://docs.k8s.io/reference/access-authn-authz/admission-controllers/
-// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters/finalizers",verbs={update}
+// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters/finalizers",verbs={update}
 
 // setControllerReference sets owner as a Controller OwnerReference on controlled.
 // Only one OwnerReference can be a controller, so it returns an error if another
@@ -82,9 +82,9 @@ func (r *CrunchyBridgeClusterReconciler) setControllerReference(
 	return controllerutil.SetControllerReference(owner, controlled, r.Client.Scheme())
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters",verbs={get,patch,update}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters/status",verbs={patch,update}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters/finalizers",verbs={patch,update}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters",verbs={get,patch,update}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters/status",verbs={patch,update}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters/finalizers",verbs={patch,update}
 //+kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 
 // Reconcile does the work to move the current state of the world toward the

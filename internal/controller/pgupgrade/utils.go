@@ -21,7 +21,7 @@ import (
 // creator of such a reference have either "delete" permission on the owner or
 // "update" permission on the owner's "finalizers" subresource.
 // - https://docs.k8s.io/reference/access-authn-authz/admission-controllers/
-// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades/finalizers",verbs={update}
+// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades/finalizers",verbs={update}
 
 // setControllerReference sets owner as a Controller OwnerReference on controlled.
 // It panics if another controller is already set.
