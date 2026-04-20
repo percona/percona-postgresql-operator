@@ -1,8 +1,0 @@
----
-# Shutdown the cluster -- but without the annotation.
-apiVersion: upstream.pgv2.percona.com/v1beta1
-kind: PostgresCluster
-metadata:
-  name: missing-primary-status
-spec:
-  shutdown: true
