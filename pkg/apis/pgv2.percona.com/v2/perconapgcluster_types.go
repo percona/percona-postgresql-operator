@@ -703,6 +703,9 @@ func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	if b.Enabled != nil && !*b.Enabled {
 		return crunchyv1beta1.Backups{
 			Enabled: ptr.To(false),
+			PGBackRest: crunchyv1beta1.PGBackRestArchive{
+				Image: b.PGBackRest.Image,
+			},
 		}
 	}
 
