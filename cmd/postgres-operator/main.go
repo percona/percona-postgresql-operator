@@ -40,6 +40,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v2/percona/controller/migration"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgcluster"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore"
@@ -48,7 +49,7 @@ import (
 	perconaRuntime "github.com/percona/percona-postgresql-operator/v2/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var (
@@ -277,6 +278,11 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 
 	if err := pgAdminReconciler.SetupWithManager(mgr); err != nil {
 		return errors.Wrap(err, "unable to create PGAdmin controller")
+	}
+
+	migrationReconciler := &migration.Reconciler{Client: mgr.GetClient()}
+	if err := migrationReconciler.SetupWithManager(mgr); err != nil {
+		return errors.Wrap(err, "unable to create legacy PostgresCluster migration controller")
 	}
 
 	return nil

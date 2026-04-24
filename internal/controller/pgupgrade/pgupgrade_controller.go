@@ -24,7 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -41,8 +41,8 @@ type PGUpgradeReconciler struct {
 }
 
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={list,watch}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={list,watch}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={list,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades",verbs={list,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={list,watch}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PGUpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -56,7 +56,7 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades",verbs={list}
 
 // findUpgradesForPostgresCluster returns PGUpgrades that target cluster.
 func (r *PGUpgradeReconciler) findUpgradesForPostgresCluster(
@@ -106,11 +106,11 @@ func (r *PGUpgradeReconciler) watchPostgresClusters() handler.Funcs {
 	}
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={get}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades/status",verbs={patch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades",verbs={get}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades/status",verbs={patch}
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={delete}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters/status",verbs={patch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={get}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters/status",verbs={patch}
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={create,patch}
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={list}
 //+kubebuilder:rbac:groups="",resources="endpoints",verbs={get}

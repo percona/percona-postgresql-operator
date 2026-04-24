@@ -1,9 +1,0 @@
-apiVersion: postgres-operator.crunchydata.com/v1beta1
-kind: PostgresCluster
-metadata:
-  name: owner2
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: pgo-root-cacert

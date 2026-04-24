@@ -7,7 +7,7 @@ weight: 100
 Packages:
 
 - [pgv2.percona.com/v2](#pgv2perconacomv2)
-- [postgres-operator.crunchydata.com/v1beta1](#postgres-operatorcrunchydatacomv1beta1)
+- [upstream.pgv2.percona.com/v1beta1](#postgres-operatorcrunchydatacomv1beta1)
 
 <h1 id="pgv2perconacomv2">pgv2.percona.com/v2</h1>
 
@@ -25928,7 +25928,7 @@ https://pgbackrest.org/command.html#command-restore</td>
       </tr></tbody>
 </table>
 
-<h1 id="postgres-operatorcrunchydatacomv1beta1">postgres-operator.crunchydata.com/v1beta1</h1>
+<h1 id="postgres-operatorcrunchydatacomv1beta1">upstream.pgv2.percona.com/v1beta1</h1>
 
 Resource Types:
 
@@ -25960,7 +25960,7 @@ PGUpgrade is the Schema for the pgupgrades API
     <tbody><tr>
       <td><b>apiVersion</b></td>
       <td>string</td>
-      <td>postgres-operator.crunchydata.com/v1beta1</td>
+      <td>upstream.pgv2.percona.com/v1beta1</td>
       <td>true</td>
       </tr>
       <tr>
@@ -27794,7 +27794,7 @@ PostgresCluster is the Schema for the postgresclusters API
     <tbody><tr>
       <td><b>apiVersion</b></td>
       <td>string</td>
-      <td>postgres-operator.crunchydata.com/v1beta1</td>
+      <td>upstream.pgv2.percona.com/v1beta1</td>
       <td>true</td>
       </tr>
       <tr>

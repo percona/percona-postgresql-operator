@@ -24,7 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // TestReconcileCerts tests the proper reconciliation of the root ca certificate
@@ -100,7 +100,7 @@ func TestReconcileCerts(t *testing.T) {
 			assert.Check(t, len(cluster1CASecret.ObjectMeta.OwnerReferences) == 1, "first owner reference not set")
 
 			expectedOR := metav1.OwnerReference{
-				APIVersion: "postgres-operator.crunchydata.com/v1beta1",
+				APIVersion: "upstream.pgv2.percona.com/v1beta1",
 				Kind:       "PostgresCluster",
 				Name:       "hippocluster1",
 				UID:        cluster1.UID,
@@ -125,7 +125,7 @@ func TestReconcileCerts(t *testing.T) {
 			assert.Check(t, len(cluster2CASecret.ObjectMeta.OwnerReferences) == 1, "should be single owner reference")
 
 			expectedOR := metav1.OwnerReference{
-				APIVersion: "postgres-operator.crunchydata.com/v1beta1",
+				APIVersion: "upstream.pgv2.percona.com/v1beta1",
 				Kind:       "PostgresCluster",
 				Name:       "hippocluster2",
 				UID:        cluster2.UID,

@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // watchForRelatedSecret handles create/update/delete events for secrets,
@@ -49,7 +49,7 @@ func (r *CrunchyBridgeClusterReconciler) watchForRelatedSecret() handler.EventHa
 	}
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters",verbs={list}
 
 // findCrunchyBridgeClustersForSecret returns CrunchyBridgeClusters
 // that are connected to the Secret
@@ -75,7 +75,7 @@ func (r *CrunchyBridgeClusterReconciler) findCrunchyBridgeClustersForSecret(
 	return matching
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="crunchybridgeclusters",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters",verbs={list}
 
 // Watch enqueues all existing CrunchyBridgeClusters for reconciles.
 func (r *CrunchyBridgeClusterReconciler) Watch() handler.EventHandler {

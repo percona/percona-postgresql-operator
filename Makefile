@@ -279,7 +279,7 @@ generate: generate-cw
 generate-crunchy-crd: ## Generate crd
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
 		crd:crdVersions='v1' \
-		paths='./pkg/apis/postgres-operator.crunchydata.com/...' \
+		paths='./pkg/apis/upstream.pgv2.percona.com/...' \
 		output:dir='build/crd/crunchy/generated' # build/crd/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
@@ -297,10 +297,10 @@ generate-crunchy-crd: ## Generate crd
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/crunchybridgeclusters/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
-	$(KUSTOMIZE) build ./build/crd/crunchy/ > ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml
-	$(KUSTOMIZE) build ./build/crd/pgupgrades > ./config/crd/bases/postgres-operator.crunchydata.com_pgupgrades.yaml
-	$(KUSTOMIZE) build ./build/crd/pgadmins > ./config/crd/bases/postgres-operator.crunchydata.com_pgadmins.yaml
-	$(KUSTOMIZE) build ./build/crd/crunchybridgeclusters > ./config/crd/bases/postgres-operator.crunchydata.com_crunchybridgeclusters.yaml
+	$(KUSTOMIZE) build ./build/crd/crunchy/ > ./config/crd/bases/upstream.pgv2.percona.com_postgresclusters.yaml
+	$(KUSTOMIZE) build ./build/crd/pgupgrades > ./config/crd/bases/upstream.pgv2.percona.com_pgupgrades.yaml
+	$(KUSTOMIZE) build ./build/crd/pgadmins > ./config/crd/bases/upstream.pgv2.percona.com_pgadmins.yaml
+	$(KUSTOMIZE) build ./build/crd/crunchybridgeclusters > ./config/crd/bases/upstream.pgv2.percona.com_crunchybridgeclusters.yaml
 
 .PHONY: generate-deepcopy
 generate-deepcopy: ## Generate deepcopy functions
