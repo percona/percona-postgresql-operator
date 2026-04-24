@@ -83,7 +83,7 @@ func (c *controller) Check(ctx context.Context, config *rest.Config, ns string) 
 		case errors.Is(err, cmapichecker.ErrCertManagerCRDsNotFound):
 			return ErrCertManagerNotFound
 		case errors.Is(err, cmapichecker.ErrWebhookCertificateFailure), errors.Is(err, cmapichecker.ErrWebhookServiceFailure), errors.Is(err, cmapichecker.ErrWebhookDeploymentFailure):
-			log.Error(cmapichecker.TranslateToSimpleError(err), "cert-manager is not ready")
+			log.Info("cert-manager is not ready", "reason", cmapichecker.TranslateToSimpleError(err))
 			return ErrCertManagerNotReady
 		}
 		return err

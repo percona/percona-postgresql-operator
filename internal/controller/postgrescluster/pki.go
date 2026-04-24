@@ -372,7 +372,8 @@ func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (boo
 		case errors.Is(err, certmanager.ErrCertManagerNotFound):
 			return false, nil
 		case errors.Is(err, certmanager.ErrCertManagerNotReady):
-			return true, nil
+			logging.FromContext(ctx).Info("cert-manager is not ready, falling back to internal PKI")
+			return false, nil
 		}
 		return false, err
 	}
