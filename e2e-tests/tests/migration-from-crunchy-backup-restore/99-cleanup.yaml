@@ -1,0 +1,33 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+delete:
+  - apiVersion: pgv2.percona.com/v2
+    kind: PerconaPGCluster
+    metadata:
+      name: percona-restored
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
+    kind: PostgresCluster
+    metadata:
+      name: percona-restored
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      CRUNCHY_NS="${NAMESPACE}-crunchy"
+
+      kubectl delete postgrescluster crunchy-source -n "${CRUNCHY_NS}" --ignore-not-found || true
+      kubectl patch postgrescluster crunchy-source -n "${CRUNCHY_NS}" \
+        --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
+
+      helm uninstall pgo --namespace "${CRUNCHY_NS}" --ignore-not-found || true
+
+      kubectl delete namespace "${CRUNCHY_NS}" --ignore-not-found || true
+
+      remove_all_finalizers
+      check_operator_panic
+      destroy_operator
+    timeout: 120

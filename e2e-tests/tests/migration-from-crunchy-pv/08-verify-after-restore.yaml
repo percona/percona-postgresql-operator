@@ -1,0 +1,47 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-migrated,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: Percona primary pod not found after restore"
+        exit 1
+      fi
+
+      data=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c \
+        "psql -q -t -d migrationtest -c 'SELECT id, value FROM migration_data ORDER BY id;'")
+
+      echo "Data after restore:"
+      echo "${data}"
+
+      kubectl create configmap -n "${NAMESPACE}" 08-restored-data \
+        --from-literal=data="${data}"
+
+      # Original rows written to the Crunchy cluster (before migration) must
+      # still be present — they were on the PV and included in the backup.
+      for expected in "row-one" "row-two" "row-three"; do
+        echo "${data}" | grep -q "${expected}" || {
+          echo "ERROR: '${expected}' missing after restore"
+          exit 1
+        }
+      done
+
+      # Rows inserted after the step-06 backup must be absent — this proves
+      # the restore rolled back to the correct backup point.
+      for absent in "post-backup-row-one" "post-backup-row-two"; do
+        if echo "${data}" | grep -q "${absent}"; then
+          echo "ERROR: '${absent}' present after restore (should be absent)"
+          exit 1
+        fi
+      done
+
+      echo "PASS: original migrated rows present, post-backup rows correctly absent"

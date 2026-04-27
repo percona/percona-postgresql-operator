@@ -1,0 +1,62 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(kubectl get pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=master \
+        -n "${NAMESPACE}" \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: Crunchy primary pod not found"
+        exit 1
+      fi
+
+      # 1. Identify the primary's postgres-data PVC and backing PV.
+      pvc_name=$(kubectl get pod -n "${NAMESPACE}" "${primary}" \
+        -o jsonpath='{.spec.volumes[?(@.name=="postgres-data")].persistentVolumeClaim.claimName}')
+
+      if [ -z "${pvc_name}" ]; then
+        echo "ERROR: could not find postgres-data PVC on pod ${primary}"
+        exit 1
+      fi
+      echo "Primary PVC: ${pvc_name}"
+
+      pv_name=$(kubectl get pvc -n "${NAMESPACE}" "${pvc_name}" \
+        -o jsonpath='{.spec.volumeName}')
+
+      if [ -z "${pv_name}" ]; then
+        echo "ERROR: could not resolve PV name from PVC ${pvc_name}"
+        exit 1
+      fi
+      echo "Backing PV: ${pv_name}"
+
+      # 2. Set PV reclaim policy to Retain BEFORE deleting anything — otherwise
+      #    the PV is deleted with the PVC and the data is lost.
+      kubectl patch pv "${pv_name}" \
+        -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+      echo "PV ${pv_name} reclaim policy set to Retain"
+
+      # Save the PV name so that subsequent steps can reference it.
+      kubectl create configmap -n "${NAMESPACE}" pv-names \
+        --from-literal=pv-name="${pv_name}" \
+        --from-literal=pvc-name="${pvc_name}"
+
+      # 3. Delete the Crunchy cluster and operator — no longer needed once the PV
+      #    is retained.  Strip finalizers first so the CR is removed cleanly.
+      kubectl patch postgrescluster crunchy-source -n "${NAMESPACE}" \
+        --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
+
+      kubectl delete postgrescluster crunchy-source -n "${NAMESPACE}" --ignore-not-found
+
+      # Uninstall pgo now — it has nothing left to reconcile and would
+      # otherwise keep running alongside the Percona operator unnecessarily.
+      helm uninstall pgo --namespace "${NAMESPACE}" --ignore-not-found || true
+
+      echo "Crunchy cluster and operator removed — waiting for PV to transition to Released (03-assert)"

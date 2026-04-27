@@ -1,0 +1,29 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-restored,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: Percona primary pod not found"
+        exit 1
+      fi
+
+      data=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c \
+        "psql -q -t -d migrationtest -c 'SELECT id, value FROM migration_data ORDER BY id;'")
+
+      kubectl create configmap -n "${NAMESPACE}" 05-percona-restored-data \
+        --from-literal=data="${data}"
+
+      # Also verify the cluster is writable after the restore
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (4, 'written-after-restore');\"
+      "

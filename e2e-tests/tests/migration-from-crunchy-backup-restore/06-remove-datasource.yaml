@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Remove the dataSource field from the PerconaPGCluster spec.
+      # dataSource is only needed to bootstrap the cluster from the Crunchy
+      # backup.  Leaving it in the spec after bootstrap causes the cluster's
+      # pgBackRest configuration to reference the Crunchy repo path instead
+      # of the cluster's own repo, which breaks subsequent backups and restores.
+      kubectl -n "${NAMESPACE}" patch perconapgcluster percona-restored \
+        --type=json \
+        -p='[{"op":"remove","path":"/spec/dataSource"}]'
+      kubectl -n "${NAMESPACE}" get perconapgcluster percona-restored -o yaml

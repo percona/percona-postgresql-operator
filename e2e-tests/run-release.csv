@@ -35,3 +35,6 @@ telemetry-transfer
 upgrade-consistency
 upgrade-minor
 users
+migration-from-crunchy-backup-restore
+migration-from-crunchy-pv
+migration-from-crunchy-standb

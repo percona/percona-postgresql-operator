@@ -1,0 +1,83 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      init_temp_dir
+
+      # The Crunchy source cluster and the Percona target cluster never coexist:
+      # Crunchy is deleted in step 03, Percona is created in step 04.
+      # A single namespace is therefore sufficient for this test.
+      helm install pgo \
+        oci://registry.developers.crunchydata.com/crunchydata/pgo \
+        --namespace "${NAMESPACE}" \
+        --version "${CPGO_VERSION}" \
+        --set singleNamespace=true \
+        --wait
+
+      # Deploy minio WITH TLS — pgBackRest requires HTTPS; repo1-s3-verify-tls=n skips validation.
+      kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+
+      access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret \
+        -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+      secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret \
+        -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+      openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${TEMP_DIR}/minio.key" \
+        -out "${TEMP_DIR}/minio.crt" \
+        -subj "/CN=minio-service"
+
+      kubectl -n "${NAMESPACE}" create secret generic minio-tls \
+        --from-file=public.crt="${TEMP_DIR}/minio.crt" \
+        --from-file=private.key="${TEMP_DIR}/minio.key"
+
+      helm repo remove minio 2>/dev/null || true
+      helm repo add minio https://charts.min.io/
+      helm uninstall -n "${NAMESPACE}" minio-service 2>/dev/null || true
+      retry 10 60 helm install minio-service minio/minio \
+        -n "${NAMESPACE}" \
+        --version "${MINIO_VER}" \
+        --set replicas=1 \
+        --set mode=standalone \
+        --set resources.requests.memory=256Mi \
+        --set rootUser=rootuser \
+        --set rootPassword=rootpass123 \
+        --set "users[0].accessKey=$(printf '%q' "$(printf '%q' "$access_key")")" \
+        --set "users[0].secretKey=$(printf '%q' "$(printf '%q' "$secret_key")")" \
+        --set "users[0].policy=consoleAdmin" \
+        --set service.type=ClusterIP \
+        --set configPathmc=/tmp/.minio/ \
+        --set persistence.size=2G \
+        --set securityContext.enabled=false \
+        --set tls.enabled=true \
+        --set tls.certSecret=minio-tls
+
+      MINIO_POD=$(kubectl -n "${NAMESPACE}" get pods \
+        --selector=release=minio-service -o 'jsonpath={.items[].metadata.name}')
+      wait_pod "${MINIO_POD}"
+
+      kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
+        --image=perconalab/awscli --restart=Never -- bash -c \
+        "AWS_ACCESS_KEY_ID='${access_key}' AWS_SECRET_ACCESS_KEY='${secret_key}' \
+        AWS_DEFAULT_REGION=us-east-1 \
+        /usr/bin/aws --endpoint-url https://minio-service:9000 --no-verify-ssl \
+        s3 mb s3://operator-testing"
+
+      cat > "${TEMP_DIR}/pgbackrest-minio.ini" << EOF
+      [global]
+      repo1-s3-key=${access_key}
+      repo1-s3-key-secret=${secret_key}
+      EOF
+
+      # One secret serves both phases: Crunchy source (for WAL archiving) and
+      # Percona target (for its own ongoing backups), on different S3 paths.
+      kubectl -n "${NAMESPACE}" create secret generic "migration-pv-pgbackrest-secrets" \
+        --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-minio.ini"
+
+      deploy_operator
+      deploy_client

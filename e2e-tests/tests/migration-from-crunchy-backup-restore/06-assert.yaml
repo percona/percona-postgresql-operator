@@ -1,0 +1,39 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Verify dataSource is absent from the Percona CR spec.
+      if kubectl -n "${NAMESPACE}" get perconapgcluster percona-restored \
+          -o jsonpath='{.spec.dataSource}' | grep -q .; then
+        echo "ERROR: spec.dataSource still present in PerconaPGCluster"
+        exit 1
+      fi
+
+      # Verify the upstream PostgresCluster (managed by the operator) also
+      # has no dataSource — the operator propagates the removal during reconcile.
+      if kubectl -n "${NAMESPACE}" get postgrescluster percona-restored \
+          -o jsonpath='{.spec.dataSource}' | grep -q .; then
+        echo "ERROR: spec.dataSource still present in upstream PostgresCluster"
+        exit 1
+      fi
+
+      echo "dataSource absent from both PerconaPGCluster and PostgresCluster"
+---
+# Cluster must remain fully ready after the dataSource removal.
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: percona-restored
+status:
+  postgres:
+    instances:
+      - name: instance1
+        ready: 3
+        size: 3
+    ready: 3
+    size: 3
+  state: ready

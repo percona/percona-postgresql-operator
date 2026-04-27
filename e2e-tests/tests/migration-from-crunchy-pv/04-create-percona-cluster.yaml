@@ -1,0 +1,49 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      pv_name=$(kubectl get configmap pv-names -n "${NAMESPACE}" \
+        -o jsonpath='{.data.pv-name}')
+      MINIO_ENDPOINT=$(kubectl get configmap pv-migration-config -n "${NAMESPACE}" \
+        -o jsonpath='{.data.minio-endpoint}')
+
+      # Fresh S3 path for the Percona cluster's own pgBackRest repository.
+      PERCONA_REPO_PATH="/migration-pv/${RANDOM}/percona-repo1"
+
+      # Clear the PV's claimRef so it transitions Released → Available.
+      # A Released PV retains its old claimRef and cannot be claimed by a new PVC.
+      kubectl patch pv "${pv_name}" --type=json \
+        -p='[{"op":"remove","path":"/spec/claimRef"}]'
+      echo "claimRef cleared from PV ${pv_name}"
+
+      attempt=0
+      while [ "${attempt}" -lt 12 ]; do
+        phase=$(kubectl get pv "${pv_name}" -o jsonpath='{.status.phase}')
+        if [ "${phase}" = "Available" ]; then break; fi
+        echo "Waiting for PV Available (attempt ${attempt}/12): phase=${phase}"
+        attempt=$((attempt + 1))
+        sleep 5
+      done
+      if [ "${phase}" != "Available" ]; then
+        echo "ERROR: PV ${pv_name} did not become Available (current: ${phase})"
+        exit 1
+      fi
+      echo "PV ${pv_name} is Available"
+
+      # Label the PV so the Percona PVC selector binds to it exclusively,
+      # avoiding accidental binding to another released volume.
+      kubectl label pv "${pv_name}" percona-pv-migration=migrated
+      echo "PV ${pv_name} labelled percona-pv-migration=migrated"
+
+      # dataVolumeClaimSpec.selector.matchLabels binds the PVC to this PV directly;
+      # no dataSource restore is needed — PGDATA is already on the volume.
+      get_cr "percona-migrated" "${PERCONA_REPO_PATH}" | \
+        yq eval 'del(.spec.users)' | \
+        $sed "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" | \
+        kubectl -n "${NAMESPACE}" apply -f -

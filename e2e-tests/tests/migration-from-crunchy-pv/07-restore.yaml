@@ -1,0 +1,53 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-migrated,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: Percona primary pod not found"
+        exit 1
+      fi
+
+      # Insert rows AFTER the step-06 backup.  These must be absent after the
+      # restore, proving we actually rolled back to the backup point.
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (4, 'post-backup-row-one');\"
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (5, 'post-backup-row-two');\"
+      "
+
+      # Resolve the label of the step-06 full backup so --set pins the restore
+      # to exactly that backup (avoids ambiguity if there are older backups from
+      # the Crunchy phase still visible in the repo).
+      backup_label=$(kubectl -n "${NAMESPACE}" exec "${primary}" -- \
+        pgbackrest info --output json --log-level-console=info --stanza=db \
+        | jq -r '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 1)][-1].label')
+
+      if [ -z "${backup_label}" ] || [ "${backup_label}" = "null" ]; then
+        echo "ERROR: could not determine latest full backup label"
+        exit 1
+      fi
+      echo "Restoring from backup: ${backup_label}"
+
+      # The cluster has replicas: 1 so there are no streaming replicas to
+      # diverge — no scale-down workaround needed.
+      cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: post-migration-restore
+      spec:
+        pgCluster: percona-migrated
+        repoName: repo1
+        options:
+        - --set=${backup_label}
+        - --type=immediate
+      EOF
