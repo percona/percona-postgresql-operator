@@ -94,7 +94,7 @@ func clusterLabels() map[string]string {
 }
 
 func TestReconcile_WaitsForNewPostgresCluster(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := testScheme(t)
 
 	legacy := newLegacyPostgresCluster(MigrationFinalizer)
@@ -113,7 +113,7 @@ func TestReconcile_WaitsForNewPostgresCluster(t *testing.T) {
 }
 
 func TestReconcile_AddsMigrationFinalizer(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := testScheme(t)
 
 	legacy := newLegacyPostgresCluster() // no finalizer yet
@@ -131,7 +131,7 @@ func TestReconcile_AddsMigrationFinalizer(t *testing.T) {
 }
 
 func TestReconcile_ReparentsAndDeletes(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := testScheme(t)
 
 	legacy := newLegacyPostgresCluster(MigrationFinalizer, naming.Finalizer)
@@ -205,7 +205,7 @@ func TestReconcile_ReparentsAndDeletes(t *testing.T) {
 }
 
 func TestReconcile_Idempotent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := testScheme(t)
 
 	newPC := newUpstreamPostgresCluster()
@@ -219,11 +219,6 @@ func TestReconcile_Idempotent(t *testing.T) {
 	require.Zero(t, res)
 }
 
-func assertOwnedBy(t *testing.T, refs []metav1.OwnerReference, uid types.UID) {
-	t.Helper()
-	assertOwnedByTagged(t, "resource", refs, uid)
-}
-
 func assertOwnedByTagged(t *testing.T, label string, refs []metav1.OwnerReference, uid types.UID) {
 	t.Helper()
 	for _, r := range refs {
@@ -231,5 +226,5 @@ func assertOwnedByTagged(t *testing.T, label string, refs []metav1.OwnerReferenc
 			return
 		}
 	}
-	t.Fatalf("%s: expected owner reference with UID %s, got %+v", label, uid, refs)
+	require.Equalf(t, uid, refs, "%s: owner reference", label)
 }
