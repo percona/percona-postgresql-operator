@@ -59,8 +59,6 @@ clean: clean-deprecated
 	rm -f bin/postgres-operator
 	rm -f config/rbac/role.yaml
 	rm -rf licenses/*/
-	[ ! -d testing/kuttl/e2e-generated ] || rm -r testing/kuttl/e2e-generated
-	[ ! -d testing/kuttl/e2e-generated-other ] || rm -r testing/kuttl/e2e-generated-other
 	rm -rf build/crd/generated build/crd/*/generated
 	[ ! -f hack/tools/setup-envtest ] || rm hack/tools/setup-envtest
 	[ ! -d hack/tools/envtest ] || { chmod -R u+w hack/tools/envtest && rm -r hack/tools/envtest; }
@@ -218,41 +216,6 @@ check-envtest-existing: createnamespaces
 	USE_EXISTING_CLUSTER=true PGO_NAMESPACE="postgres-operator" QUERIES_CONFIG_DIR="$(CURDIR)/${QUERIES_CONFIG_DIR}" \
 		$(GO_TEST) -count=1 -cover -p=1 -tags=envtest ./...
 	kubectl delete -k ./config/dev
-
-# Expects operator to be running
-.PHONY: check-kuttl
-check-kuttl: ## Run kuttl end-to-end tests
-check-kuttl: ## example command: make check-kuttl KUTTL_TEST='
-	${KUTTL_TEST} \
-		--config testing/kuttl/kuttl-test.yaml
-
-.PHONY: generate-kuttl
-generate-kuttl: export KUTTL_PG_UPGRADE_FROM_VERSION ?= 15
-generate-kuttl: export KUTTL_PG_UPGRADE_TO_VERSION ?= 16
-generate-kuttl: export KUTTL_PG_VERSION ?= 16
-generate-kuttl: export KUTTL_POSTGIS_VERSION ?= 3.4
-generate-kuttl: export KUTTL_PSQL_IMAGE ?= registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-16.3-1
-generate-kuttl: export KUTTL_TEST_DELETE_NAMESPACE ?= kuttl-test-delete-namespace
-generate-kuttl: ## Generate kuttl tests
-	[ ! -d testing/kuttl/e2e-generated ] || rm -r testing/kuttl/e2e-generated
-	[ ! -d testing/kuttl/e2e-generated-other ] || rm -r testing/kuttl/e2e-generated-other
-	bash -ceu ' \
-	case $(KUTTL_PG_VERSION) in \
-	16 ) export KUTTL_BITNAMI_IMAGE_TAG=16.0.0-debian-11-r3 ;; \
-	15 ) export KUTTL_BITNAMI_IMAGE_TAG=15.0.0-debian-11-r4 ;; \
-	14 ) export KUTTL_BITNAMI_IMAGE_TAG=14.5.0-debian-11-r37 ;; \
-	13 ) export KUTTL_BITNAMI_IMAGE_TAG=13.8.0-debian-11-r39 ;; \
-	12 ) export KUTTL_BITNAMI_IMAGE_TAG=12.12.0-debian-11-r40 ;; \
-	esac; \
-	render() { envsubst '"'"' \
-		$$KUTTL_PG_UPGRADE_FROM_VERSION $$KUTTL_PG_UPGRADE_TO_VERSION \
-		$$KUTTL_PG_VERSION $$KUTTL_POSTGIS_VERSION $$KUTTL_PSQL_IMAGE \
-		$$KUTTL_BITNAMI_IMAGE_TAG $$KUTTL_TEST_DELETE_NAMESPACE'"'"'; }; \
-	while [ $$# -gt 0 ]; do \
-		source="$${1}" target="$${1/e2e/e2e-generated}"; \
-		mkdir -p "$${target%/*}"; render < "$${source}" > "$${target}"; \
-		shift; \
-	done' - testing/kuttl/e2e/*/*.yaml testing/kuttl/e2e-other/*/*.yaml testing/kuttl/e2e/*/*/*.yaml testing/kuttl/e2e-other/*/*/*.yaml
 
 ##@ Generate
 
