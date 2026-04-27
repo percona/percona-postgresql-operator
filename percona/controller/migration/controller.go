@@ -129,8 +129,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 // ensureMigrationFinalizer adds MigrationFinalizer to the legacy object if it
 // is not already present. Returns true if it was added.
 func (r *Reconciler) ensureMigrationFinalizer(ctx context.Context, legacy *unstructured.Unstructured) (bool, error) {
+	orig := legacy.DeepCopy()
 	if added := controllerutil.AddFinalizer(legacy, MigrationFinalizer); added {
-		return true, r.Client.Patch(ctx, legacy, client.MergeFrom(legacy.DeepCopy()))
+		return true, r.Client.Patch(ctx, legacy, client.MergeFrom(orig))
 	}
 	return false, nil
 }
@@ -140,10 +141,12 @@ func (r *Reconciler) ensureMigrationFinalizer(ctx context.Context, legacy *unstr
 // because the old operator is gone; this controller takes responsibility for
 // its cleanup.
 func (r *Reconciler) removeFinalizers(ctx context.Context, legacy *unstructured.Unstructured) error {
-	if removed := controllerutil.RemoveFinalizer(legacy, MigrationFinalizer); removed {
-		return r.Client.Patch(ctx, legacy, client.MergeFrom(legacy.DeepCopy()))
+	if len(legacy.GetFinalizers()) == 0 {
+		return nil
 	}
-	return nil
+	patch := client.MergeFrom(legacy.DeepCopy())
+	legacy.SetFinalizers(nil)
+	return r.Client.Patch(ctx, legacy, patch)
 }
 
 // ownerReferenceFor returns a fresh controller OwnerReference pointing at the
