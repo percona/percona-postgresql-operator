@@ -14,8 +14,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -127,15 +129,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 // ensureMigrationFinalizer adds MigrationFinalizer to the legacy object if it
 // is not already present. Returns true if it was added.
 func (r *Reconciler) ensureMigrationFinalizer(ctx context.Context, legacy *unstructured.Unstructured) (bool, error) {
-	for _, f := range legacy.GetFinalizers() {
-		if f == MigrationFinalizer {
-			return false, nil
-		}
+	if added := controllerutil.AddFinalizer(legacy, MigrationFinalizer); added {
+		return true, r.Client.Patch(ctx, legacy, client.MergeFrom(legacy.DeepCopy()))
 	}
-
-	patch := client.MergeFrom(legacy.DeepCopy())
-	legacy.SetFinalizers(append(legacy.GetFinalizers(), MigrationFinalizer))
-	return true, r.Client.Patch(ctx, legacy, patch)
+	return false, nil
 }
 
 // removeFinalizers clears every finalizer from the legacy object. The legacy
@@ -143,26 +140,22 @@ func (r *Reconciler) ensureMigrationFinalizer(ctx context.Context, legacy *unstr
 // because the old operator is gone; this controller takes responsibility for
 // its cleanup.
 func (r *Reconciler) removeFinalizers(ctx context.Context, legacy *unstructured.Unstructured) error {
-	if len(legacy.GetFinalizers()) == 0 {
-		return nil
+	if removed := controllerutil.RemoveFinalizer(legacy, MigrationFinalizer); removed {
+		return r.Client.Patch(ctx, legacy, client.MergeFrom(legacy.DeepCopy()))
 	}
-	patch := client.MergeFrom(legacy.DeepCopy())
-	legacy.SetFinalizers(nil)
-	return r.Client.Patch(ctx, legacy, patch)
+	return nil
 }
 
 // ownerReferenceFor returns a fresh controller OwnerReference pointing at the
 // new-group PostgresCluster.
 func ownerReferenceFor(newPC *v1beta1.PostgresCluster) metav1.OwnerReference {
-	tru := true
 	gvk := v1beta1.GroupVersion.WithKind("PostgresCluster")
 	return metav1.OwnerReference{
 		APIVersion:         gvk.GroupVersion().String(),
 		Kind:               gvk.Kind,
 		Name:               newPC.Name,
 		UID:                newPC.UID,
-		Controller:         &tru,
-		BlockOwnerDeletion: &tru,
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}
 }
-
