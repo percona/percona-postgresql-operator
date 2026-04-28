@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
 commands:
   - script: |-
       set -o errexit
@@ -39,3 +38,4 @@ commands:
         pgbackrest --stanza=db --no-archive-async \
           archive-push \"\${PGDATA}/pg_wal/00000002.history\" || true
       "
+    timeout: 60

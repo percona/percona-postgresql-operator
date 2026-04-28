@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 180
 commands:
   - script: |-
       set -o errexit
@@ -52,3 +51,4 @@ commands:
         -p '{"spec": {"standby": {"enabled": true, "repoName": "repo1"}}}'
 
       echo "Crunchy cluster patch applied — demotion verified in 08-assert"
+    timeout: 180

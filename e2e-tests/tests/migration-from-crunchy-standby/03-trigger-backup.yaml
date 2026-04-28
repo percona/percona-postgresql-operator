@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -14,3 +13,4 @@ commands:
       # which is the realistic production migration pattern.
       kubectl -n "${CRUNCHY_NS}" annotate postgrescluster crunchy-source \
         postgres-operator.crunchydata.com/pgbackrest-backup="$(date +%s)"
+    timeout: 30

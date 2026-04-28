@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
 commands:
   - script: |-
       set -o errexit
@@ -25,3 +24,4 @@ commands:
         psql -d migrationtest -c \"INSERT INTO migration_data VALUES (2, 'data-added-while-standby-syncing');\"
         psql -d migrationtest -c \"INSERT INTO migration_data VALUES (3, 'more-data-for-replication-test');\"
       "
+    timeout: 60

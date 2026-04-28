@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
 commands:
   - script: |-
       set -o errexit
@@ -22,3 +21,4 @@ commands:
 
       kubectl create configmap -n "${NAMESPACE}" 14-restored-data \
         --from-literal=data="${data}"
+    timeout: 60

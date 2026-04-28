@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -51,3 +50,4 @@ commands:
         yq eval ".spec.secrets.customTLSSecret.name = \"crunchy-source-cluster-cert\"" | \
         yq eval ".spec.secrets.customReplicationTLSSecret.name = \"crunchy-source-replication-cert\"" | \
         kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 20

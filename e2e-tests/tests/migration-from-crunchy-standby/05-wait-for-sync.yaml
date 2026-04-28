@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 480
 commands:
   - script: |-
       set -o errexit
@@ -33,3 +32,4 @@ commands:
 
       kubectl create configmap -n "${NAMESPACE}" 05-standby-initial-sync \
         --from-literal=data="${data}"
+    timeout: 480
