@@ -16,6 +16,10 @@ major-upgrade-14-to-15
 major-upgrade-15-to-16
 major-upgrade-16-to-17
 major-upgrade-17-to-18
+major-upgrade-14-to-15-postgis
+major-upgrade-15-to-16-postgis
+major-upgrade-16-to-17-postgis
+major-upgrade-17-to-18-postgis
 ldap
 ldap-tls
 monitoring
