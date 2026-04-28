@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -29,3 +28,4 @@ commands:
         .spec.pgBouncer.image="percona/percona-postgresql-operator:'$PGOV1_TAG'-ppg'$PGOV1_VER'-pgbouncer"' - |
       $sed -r 's/cluster1/'$V1_CLUSTER_NAME'/g' |
       kubectl -n $NAMESPACE apply -f -
+    timeout: 10
