@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 300
 commands:
   - script: |-
       set -o errexit
@@ -78,3 +77,4 @@ commands:
         - --set=${backup_label}
         - --type=immediate
       EOF
+    timeout: 300

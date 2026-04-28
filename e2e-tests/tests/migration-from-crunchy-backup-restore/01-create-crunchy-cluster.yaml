@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -22,3 +21,4 @@ commands:
         $sed "s|<repo-path>|${CRUNCHY_REPO_PATH}|g" | \
         $sed "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" | \
         kubectl -n "${CRUNCHY_NS}" apply -f -
+    timeout: 20
