@@ -26,16 +26,3 @@ commands:
 
       kubectl create configmap -n "${NAMESPACE}" 10-percona-primary-data \
         --from-literal=data="${data}"
-
-      # Workaround for upstream Crunchy PGO bug: the operator hardcodes
-      # archive-async=y in the generated pgBackRest config, causing the
-      # background archiver to silently drop 00000002.history with error 103
-      # (archive.info missing) during the dataSource bootstrap promotion.
-      # Re-push synchronously here after the stanza has been created.
-      # In the standby flow the Percona archive shares the same S3 path as
-      # Crunchy so the file may already be present; use || true accordingly.
-      # See: https://github.com/CrunchyData/postgres-operator/issues/XXXX
-      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
-        pgbackrest --stanza=db --no-archive-async \
-          archive-push \"\${PGDATA}/pg_wal/00000002.history\" || true
-      "

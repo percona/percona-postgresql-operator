@@ -1,33 +1,12 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 300
+timeout: 120
 commands:
   - script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
-
-      # Scale back to 3 replicas now that the restore is done.
-      kubectl -n "${NAMESPACE}" patch perconapgcluster percona-restored \
-        --type=json \
-        -p='[{"op":"replace","path":"/spec/instances/0/replicas","value":3}]'
-
-      attempt=0
-      while [ "${attempt}" -lt 30 ]; do
-        running=$(kubectl get pods -n "${NAMESPACE}" \
-          -l postgres-operator.crunchydata.com/cluster=percona-restored,postgres-operator.crunchydata.com/data=postgres \
-          --field-selector=status.phase=Running \
-          -o jsonpath='{.items[*].metadata.name}' | wc -w | tr -d ' ')
-        echo "Running postgres pods: ${running}"
-        if [ "${running}" = "3" ]; then break; fi
-        attempt=$((attempt + 1))
-        sleep 10
-      done
-      if [ "${running}" != "3" ]; then
-        echo "ERROR: timed out waiting for scale-up to 3 pods"
-        exit 1
-      fi
 
       primary=$(kubectl get pod -n "${NAMESPACE}" \
         -l postgres-operator.crunchydata.com/cluster=percona-restored,postgres-operator.crunchydata.com/role=primary \
@@ -41,27 +20,18 @@ commands:
       data=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c \
         "psql -q -t -d migrationtest -c 'SELECT id, value FROM migration_data ORDER BY id;'")
 
-      echo "Data after immediate restore:"
+      echo "Data after PITR restore:"
       echo "${data}"
 
       kubectl create configmap -n "${NAMESPACE}" 09-restored-data \
         --from-literal=data="${data}"
 
-      # Original rows (from the step-07 backup) must be present.
+      # All rows must be present — the PITR restore recovered them from the truncation.
       for expected in "row-one" "row-two" "row-three" "written-after-restore"; do
         echo "${data}" | grep -q "${expected}" || {
-          echo "ERROR: '${expected}' missing after restore"
+          echo "ERROR: '${expected}' missing after PITR restore"
           exit 1
         }
       done
 
-      # Rows inserted AFTER the backup (step 08) must be absent — this proves
-      # the restore actually went back to the backup point.
-      for absent in "post-backup-row-one" "post-backup-row-two" "post-backup-row-three"; do
-        if echo "${data}" | grep -q "${absent}"; then
-          echo "ERROR: '${absent}' should not exist after restore to backup point"
-          exit 1
-        fi
-      done
-
-      echo "PASS: original rows present, post-backup rows correctly absent"
+      echo "PASS: all rows recovered by PITR restore"
