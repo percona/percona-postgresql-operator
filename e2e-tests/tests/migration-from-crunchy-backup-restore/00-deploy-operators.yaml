@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 20
 commands:
   - script: |-
       set -o errexit
@@ -83,3 +82,4 @@ commands:
 
       deploy_operator
       deploy_client
+    timeout: 20

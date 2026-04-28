@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
 commands:
   - script: |-
       set -o errexit
@@ -47,3 +46,4 @@ commands:
         yq eval 'del(.spec.users)' | \
         $sed "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" | \
         kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 60

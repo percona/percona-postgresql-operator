@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
 commands:
   - script: |-
       set -o errexit
@@ -27,3 +26,4 @@ commands:
       kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
         psql -d migrationtest -c \"INSERT INTO migration_data VALUES (4, 'written-after-restore');\"
       "
+    timeout: 60
