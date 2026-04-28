@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 300
 commands:
   - script: |-
       set -o errexit
@@ -71,3 +70,4 @@ commands:
         --from-literal=data="$(printf '%b' "${combined}")"
 
       echo "PASS: all original rows present on all 3 pods — PV migration and replication verified"
+    timeout: 300

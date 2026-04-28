@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -15,3 +14,4 @@ commands:
         --type=json \
         -p='[{"op":"remove","path":"/spec/dataSource"}]'
       kubectl -n "${NAMESPACE}" get perconapgcluster percona-restored -o yaml
+    timeout: 30

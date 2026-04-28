@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 120
 commands:
   - script: |-
       set -o errexit
@@ -60,3 +59,4 @@ commands:
       helm uninstall pgo --namespace "${NAMESPACE}" --ignore-not-found || true
 
       echo "Crunchy cluster and operator removed — waiting for PV to transition to Released (03-assert)"
+    timeout: 120
