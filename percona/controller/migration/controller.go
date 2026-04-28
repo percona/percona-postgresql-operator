@@ -100,7 +100,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		if added, err := r.ensureMigrationFinalizer(ctx, legacy); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "ensure migration finalizer")
 		} else if added {
-			return reconcile.Result{Requeue: true}, nil
+			return reconcile.Result{RequeueAfter: requeueAfter}, nil
 		}
 	}
 
@@ -118,7 +118,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	}
 
 	orphan := metav1.DeletePropagationOrphan
-	if err := r.Client.Delete(ctx, legacy, &client.DeleteOptions{PropagationPolicy: &orphan}); err != nil {
+	if err := r.Client.Delete(ctx, legacy, &client.DeleteOptions{PropagationPolicy: &orphan}); client.IgnoreNotFound(err) != nil {
 		return reconcile.Result{}, errors.Wrap(err, "delete legacy PostgresCluster")
 	}
 
