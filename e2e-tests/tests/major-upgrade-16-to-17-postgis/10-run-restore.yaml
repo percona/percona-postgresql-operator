@@ -1,0 +1,7 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
+metadata:
+  name: restore-after-16-to-17-postgis
+spec:
+  pgCluster: major-upgrade-16-to-17-postgis
+  repoName: repo1
