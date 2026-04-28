@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+
+      data=$(kubectl get configmap 13-restored-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+
+      for expected in "row-one" "row-two" "row-three" "written-after-restore" \
+                      "second-batch-one" "second-batch-two" "second-batch-three"; do
+        echo "${data}" | grep -q "${expected}" || {
+          echo "ERROR: '${expected}' missing after second PITR restore. Got: ${data}"
+          exit 1
+        }
+      done
+
+      for absent in "after-pitr-target-one" "after-pitr-target-two"; do
+        if echo "${data}" | grep -q "${absent}"; then
+          echo "ERROR: '${absent}' present after second PITR restore (should be absent). Got: ${data}"
+          exit 1
+        fi
+      done
+
+      echo "All expected rows present, post-target rows correctly absent"
