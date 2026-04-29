@@ -82,4 +82,4 @@ commands:
 
       deploy_operator
       deploy_client
-    timeout: 20
+    timeout: 300
