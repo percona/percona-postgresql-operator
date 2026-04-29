@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -97,6 +98,24 @@ func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresC
 	existing := &v1.Issuer{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name, Namespace: meta.Namespace}, existing)
 	if err == nil {
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			return errors.Wrap(c.cl.Update(ctx, existing), "failed to update issuer")
+		}
+
 		return nil
 	}
 	if !k8serrors.IsNotFound(err) {
@@ -132,6 +151,24 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 	existing := &v1.Issuer{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name, Namespace: meta.Namespace}, existing)
 	if err == nil {
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			return errors.Wrap(c.cl.Update(ctx, existing), "failed to update issuer")
+		}
+
 		return nil
 	}
 	if !k8serrors.IsNotFound(err) {
@@ -169,10 +206,35 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 	existing := &v1.Certificate{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
-		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == caDuration {
+		needsUpdate := false
+
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			needsUpdate = true
+		}
+
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != caDuration {
+			existing.Spec.Duration = &metav1.Duration{Duration: caDuration}
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
 			return nil
 		}
-		existing.Spec.Duration = &metav1.Duration{Duration: caDuration}
+
 		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update ca certificate")
 	}
 	if !k8serrors.IsNotFound(err) {
@@ -238,10 +300,35 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 	existing := &v1.Certificate{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
-		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+		needsUpdate := false
+
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			needsUpdate = true
+		}
+
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != certDuration {
+			existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
 			return nil
 		}
-		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+
 		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update cluster certificate")
 	}
 	if !k8serrors.IsNotFound(err) {
@@ -316,10 +403,35 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 	existing := &v1.Certificate{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
-		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+		needsUpdate := false
+
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			needsUpdate = true
+		}
+
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != certDuration {
+			existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
 			return nil
 		}
-		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+
 		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update instance certificate")
 	}
 	if !k8serrors.IsNotFound(err) {
@@ -393,10 +505,35 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 	existing := &v1.Certificate{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
-		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+		needsUpdate := false
+
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			needsUpdate = true
+		}
+
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != certDuration {
+			existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
 			return nil
 		}
-		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+
 		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update pgbouncer certificate")
 	}
 	if !k8serrors.IsNotFound(err) {
@@ -468,10 +605,35 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 	existing := &v1.Certificate{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
-		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+		needsUpdate := false
+
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			needsUpdate = true
+		}
+
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != certDuration {
+			existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
 			return nil
 		}
-		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+
 		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update pgbackrest client certificate")
 	}
 	if !k8serrors.IsNotFound(err) {
@@ -547,10 +709,35 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 	existing := &v1.Certificate{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
-		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration == certDuration {
+		needsUpdate := false
+
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			needsUpdate = true
+		}
+
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != certDuration {
+			existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
 			return nil
 		}
-		existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+
 		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update pgbackrest repo certificate")
 	}
 	if !k8serrors.IsNotFound(err) {
