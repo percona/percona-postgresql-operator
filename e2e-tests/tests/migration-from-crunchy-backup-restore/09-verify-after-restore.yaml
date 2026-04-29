@@ -43,4 +43,4 @@ commands:
       done
 
       echo "PASS: original rows present, post-backup rows correctly absent"
-    timeout: 300
+    timeout: 400

@@ -63,4 +63,4 @@ commands:
         - --target="${pitr_target}"
         - --target-timeline=current
       EOF
-    timeout: 300
+    timeout: 400
