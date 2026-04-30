@@ -10,33 +10,13 @@ commands:
 
       expected_cluster_name=$(kubectl get configmap cluster-name -o jsonpath='{.data.name}' -n ${NAMESPACE})
       expected_version=$(kubectl get configmap initial-cluster-version -o jsonpath='{.data.version}' -n ${NAMESPACE})
-      expected_clean=$(echo "$expected_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 
-      verify_cluster_version() {
-        current_version=$(get_cluster_version "$expected_cluster_name" "${PLATFORM}")
-        if [[ "$expected_version" != "$current_version" ]]; then
-          echo "Error current cluster version $current_version is not the same as expected version $expected_version"
-          return 1
-        fi
-      }
-
-      until verify_cluster_version; do
+      until verify_cluster_version "$expected_cluster_name" "$expected_version"; do
         echo "Waiting for the cluster to state the version $expected_version..."
-        kubectl get nodes
         sleep 10
       done
 
-      verify_nodes_version() {
-        nodes_version=$(get_nodes_version)
-        for node_version in $nodes_version; do
-          node_clean=$(echo "$node_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-          if [[ "$node_clean" != "$expected_clean" ]]; then
-            return 1
-          fi
-        done
-      }
-
-      until verify_nodes_version; do
+      until verify_nodes_version "$expected_version"; do
         echo "Waiting for all nodes to state the version $expected_clean..."
         kubectl get nodes
         sleep 10
