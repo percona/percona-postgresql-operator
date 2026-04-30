@@ -385,6 +385,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "check patroni version from instance pods")
 	}
 
+	if err := r.reconcileOwnerRefMigrationStatus(ctx, cr); err != nil {
+		if errors.Is(err, errOwnerRefMigrationInProgress) {
+			return reconcile.Result{
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		return reconcile.Result{}, errors.Wrap(err, "reconcile owner ref migration status")
+	}
+
 	return ctrl.Result{}, nil
 }
 
