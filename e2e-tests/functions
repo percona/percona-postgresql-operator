@@ -1754,11 +1754,12 @@ get_available_k8s_versions() {
 			;;
 
 		gke)
-			versions=$(gcloud container get-server-config \
-				--region "${region}" \
-				--format="value(validMasterVersions)" 2>/dev/null \
-				| tr ';' '\n' \
-				| awk -F'.' '!seen[$1"."$2]++' \
+			versions=$(
+				gcloud container get-server-config \
+					--region "${region}" \
+					--format="value(validMasterVersions)" 2>/dev/null \
+					| tr ';' '\n' \
+					| awk -F'.' '!seen[$1"."$2]++'
 			)
 			;;
 
@@ -1795,7 +1796,7 @@ create_k8s_cluster() {
 				--tag "product:pg-operator" \
 				--wait
 
-			if [[ -n "$DOKS_PROJECT" ]]; then
+			if [[ -n $DOKS_PROJECT ]]; then
 				project_id=$(doctl projects list --output json | jq -r --arg name "${DOKS_PROJECT}" '.[] | select(.name == $name) | .id')
 				cluster_id=$(doctl kubernetes cluster list --output json | jq -r --arg name "$name" '.[] | select(.name == $name) | .id')
 				urn=do:kubernetes:$cluster_id
@@ -1817,7 +1818,7 @@ create_k8s_cluster() {
 				--logging=NONE \
 				--no-enable-managed-prometheus \
 				--quiet
-			
+
 			kubectl create clusterrolebinding cluster-admin-binding1 \
 				--clusterrole=cluster-admin \
 				--user="$(gcloud config get-value core/account)"
@@ -1828,7 +1829,7 @@ create_k8s_cluster() {
 			return 1
 			;;
 	esac
-	
+
 	kubectl create namespace "${NAMESPACE}"
 	echo "Cluster $name created successfully"
 }
@@ -1879,7 +1880,7 @@ delete_k8s_cluster() {
 			echo "Deleting DOKS cluster: $name"
 			cluster_id=$(doctl kubernetes cluster list --output json | jq -r --arg name "$name" '.[] | select(.name == $name) | .id')
 			# Dangerous includes LoadBalancers, Volumes and all resources related to the cluster
-			doctl kubernetes cluster delete "$cluster_id" --force --dangerous 
+			doctl kubernetes cluster delete "$cluster_id" --force --dangerous
 			;;
 		gke)
 			echo "Deleting GKE cluster: $name"
@@ -1903,13 +1904,13 @@ get_cluster_name() {
 	case "$platform" in
 		digitalocean)
 			local nodepool_id="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.doks\.digitalocean\.com/node-pool-id}')"
-			doctl kubernetes cluster list -o json | \
-				jq -r --arg id "$nodepool_id" \
-				'.[] | select(.node_pools[]?.id == $id) | .name' 2>/dev/null
+			doctl kubernetes cluster list -o json \
+				| jq -r --arg id "$nodepool_id" \
+					'.[] | select(.node_pools[]?.id == $id) | .name' 2>/dev/null
 			;;
 		gke)
-			kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' | \
-				sed -E 's|.*gke-(.*)-default-pool.*|\1|'
+			kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' \
+				| sed -E 's|.*gke-(.*)-default-pool.*|\1|'
 			;;
 		*)
 			echo "ERROR: unsupported platform '$platform'" >&2
@@ -1924,8 +1925,8 @@ get_cluster_version() {
 
 	case "$platform" in
 		digitalocean)
-			doctl kubernetes cluster get "$name" --output json | \
-				jq -r '.[0].version'
+			doctl kubernetes cluster get "$name" --output json \
+				| jq -r '.[0].version'
 			;;
 		gke)
 			location=$(gcloud container clusters list \
