@@ -17,6 +17,10 @@ export VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' 
 # Skip warning checks used for documentation by default
 export SKIP_TEST_WARNINGS=${SKIP_TEST_WARNINGS:-"true"}
 
+# K8S upgrade test
+export PLATFORM=${PLATFORM:-"gke"}
+export REGION=${REGION:-"us-central1-a"}
+
 if command -v oc &>/dev/null; then
 	if oc get projects; then
 		export OPENSHIFT=4

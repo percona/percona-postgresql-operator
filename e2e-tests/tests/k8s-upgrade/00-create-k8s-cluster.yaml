@@ -1,0 +1,35 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 1000
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      name="k8s-upgrade-$RANDOM"
+      offset=1 # latest version
+      latest_version=$(get_available_k8s_versions "$offset" "${PLATFORM}" "$REGION")
+      offset=2 # second to last version
+      initial_version=$(get_available_k8s_versions "$offset" "${PLATFORM}" "$REGION")
+
+      if [[ "${PLATFORM}" != "gke" && "${PLATFORM}" != "digitalocean" ]]; then
+        echo "Unsupported platform: ${PLATFORM}"
+        exit 1
+      fi
+
+      create_k8s_cluster "$name" "$initial_version" "${PLATFORM}" "${REGION}"
+
+      # Saving cluster information and available versions for the next test steps
+      kubectl create configmap cluster-name \
+        --from-literal=name="$name" \
+        --namespace "${NAMESPACE}"
+
+      kubectl create configmap initial-cluster-version \
+        --from-literal=version="$initial_version" \
+        --namespace "${NAMESPACE}"
+
+      kubectl create configmap latest-cluster-version \
+        --from-literal=version="$latest_version" \
+        --namespace "${NAMESPACE}"

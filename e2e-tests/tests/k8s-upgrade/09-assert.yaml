@@ -1,0 +1,35 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+commands:
+- timeout: 600
+  script: |
+    until kubectl assert exist-enhanced perconapgrestore k8s-upgrade-restore-repo1 -n ${NAMESPACE} --field-selector status.state=Succeeded; do
+      echo "Waiting for restore to have succeeded state..."
+      sleep 10
+    done
+
+    verify_cluster() {
+      kubectl assert exist-enhanced statefulset k8s-upgrade-repo-host -n ${NAMESPACE} \
+        --field-selector status.readyReplicas=1
+
+      for sts in $(kubectl get statefulset -n ${NAMESPACE} \
+        -l postgres-operator.crunchydata.com/instance-set=instance1 \
+        -o jsonpath='{.items[*].metadata.name}'); do
+        kubectl assert exist-enhanced statefulset ${sts} -n ${NAMESPACE} \
+          --field-selector status.readyReplicas=1
+      done
+
+      kubectl assert exist-enhanced deployment k8s-upgrade-pgbouncer -n ${NAMESPACE} \
+        --field-selector status.readyReplicas=3
+
+      kubectl assert exist-enhanced postgrescluster k8s-upgrade -n ${NAMESPACE} \
+        --field-selector status.proxy.pgBouncer.readyReplicas=3
+
+      kubectl assert exist-enhanced perconapgcluster k8s-upgrade -n ${NAMESPACE} \
+        --field-selector status.state=ready
+    }
+
+    until verify_cluster; do
+      echo "Waiting for cluster to be ready..."
+      sleep 10
+    done
