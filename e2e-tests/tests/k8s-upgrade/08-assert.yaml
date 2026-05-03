@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timoeout: 30
+timeout: 30
 commands:
   - script: |
       kubectl get configmap 08-read-data \

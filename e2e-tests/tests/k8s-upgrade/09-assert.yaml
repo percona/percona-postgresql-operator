@@ -1,8 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
+timeout: 600
 commands:
-- timeout: 600
-  script: |
+- script: |
     until kubectl assert exist-enhanced perconapgrestore k8s-upgrade-restore-repo1 -n ${NAMESPACE} --field-selector status.state=Succeeded; do
       echo "Waiting for restore to have succeeded state..."
       sleep 10

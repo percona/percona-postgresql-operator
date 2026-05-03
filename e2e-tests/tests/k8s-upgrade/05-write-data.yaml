@@ -1,7 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: |-
+  - timout: 60
+    script: |-
       set -o errexit
       set -o xtrace
 
