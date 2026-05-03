@@ -18,8 +18,10 @@ export VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' 
 export SKIP_TEST_WARNINGS=${SKIP_TEST_WARNINGS:-"true"}
 
 # K8S upgrade test
-export PLATFORM=${PLATFORM:-"gke"}
-export REGION=${REGION:-"us-central1-a"}
+export K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM:-"gke"}
+export K8S_UPGRADE_REGION=${K8S_UPGRADE_REGION:-"us-central1-a"}
+export K8S_UPGRADE_INITIAL_VERSION=${K8S_UPGRADE_INITIAL_VERSION:-""}
+export K8S_UPGRADE_FINAL_VERSION=${K8S_UPGRADE_FINAL_VERSION:-""}
 
 if command -v oc &>/dev/null; then
 	if oc get projects; then

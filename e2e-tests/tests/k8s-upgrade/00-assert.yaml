@@ -28,7 +28,7 @@ commands:
         sleep 5
       done
 
-      cluster_name=$(get_cluster_name "${PLATFORM}")
+      cluster_name=$(get_cluster_name "${K8S_UPGRADE_PLATFORM}")
       if [[ "$expected_cluster_name" != "$cluster_name" ]]; then
         echo "Error current cluster $cluster_name is not the same as expected cluster name $expected_cluster_name"
         exit 1

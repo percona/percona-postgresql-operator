@@ -13,4 +13,4 @@ commands:
       check_operator_panic
       destroy_operator
       cluster_name="$(kubectl get configmap cluster-name -n ${NAMESPACE} -o jsonpath='{.data.name}')"
-      delete_k8s_cluster $cluster_name "${PLATFORM}" "${REGION}"
+      delete_k8s_cluster $cluster_name "${K8S_UPGRADE_PLATFORM}" "${K8S_UPGRADE_REGION}"
