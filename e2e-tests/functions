@@ -1898,7 +1898,7 @@ delete_k8s_cluster() {
 	echo "Cluster $name deleted successfully"
 }
 
-get_cluster_name() {
+get_k8s_cluster_name() {
 	local platform="${1:-$(detect_k8s_platform)}"
 
 	case "$platform" in
@@ -1919,7 +1919,7 @@ get_cluster_name() {
 	esac
 }
 
-get_cluster_version() {
+get_k8s_cluster_version() {
 	local name="$1"
 	local platform="${2:-$(detect_k8s_platform)}"
 
@@ -1943,16 +1943,16 @@ get_cluster_version() {
 	esac
 }
 
-get_nodes_version() {
+get_k8s_nodes_version() {
 	kubectl get nodes -o json \
 		| jq -r '.items[].status.nodeInfo.kubeletVersion' \
 		| sort -u
 }
 
-verify_cluster_version() {
+verify_k8s_cluster_version() {
 	local cluster_name="$1"
 	local expected_version="$2"
-	local current_version="$(get_cluster_version "$cluster_name")"
+	local current_version="$(get_k8s_cluster_version "$cluster_name")"
 
 	if [[ $expected_version != "$current_version" ]]; then
 		echo "Error current cluster version $current_version is not the same as expected version $expected_version"
@@ -1960,9 +1960,9 @@ verify_cluster_version() {
 	fi
 }
 
-verify_nodes_version() {
+verify_k8s_nodes_version() {
 	local expected_version="$1"
-	local nodes_version="$(get_nodes_version)"
+	local nodes_version="$(get_k8s_nodes_version)"
 	local expected_clean="$(echo "$expected_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" # Gets only Kubernetes version xx.xx.xx
 
 	for node_version in $nodes_version; do
