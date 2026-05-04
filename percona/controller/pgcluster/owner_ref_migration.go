@@ -54,6 +54,18 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 	if _, err := mapper.RESTMapping(LegacyGVK.GroupKind(), LegacyGVK.Version); err != nil {
 		if meta.IsNoMatchError(err) {
 			log.Info("legacy PostgresCluster CRD not found; no need to check references", "gvk", LegacyGVK)
+
+			err := setStatusCondition(ctx, r.Client, cr, metav1.Condition{
+				Type:               "APIGroupMigration",
+				Status:             metav1.ConditionTrue,
+				Reason:             "APIGroupMigrationNotNeeded",
+				Message:            "Legacy API group is not installed",
+				ObservedGeneration: cr.GetGeneration(),
+			})
+			if err != nil {
+				return errors.Wrap(err, "set status condition to true")
+			}
+
 			return nil
 		}
 		return errors.Wrap(err, "discover legacy PostgresCluster GVK")
@@ -127,7 +139,7 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 		ObservedGeneration: cr.GetGeneration(),
 	})
 	if err != nil {
-		return errors.Wrap(err, "set status condition to false")
+		return errors.Wrap(err, "set status condition to true")
 	}
 
 	return nil
