@@ -231,12 +231,12 @@ func (r *Reconciler) reconcileClusterCertificate(
 		return cluster.Spec.CustomTLSSecret, nil
 	}
 
-	certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
+		return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
 	}
 
-	if certManagerInstalled {
+	if certManagerManaged {
 		return r.reconcileCertManagerClusterCertificate(ctx, root, cluster, primaryService, replicaService)
 	}
 
@@ -359,6 +359,24 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 	return clusterCertSecretProjection(&corev1.Secret{
 		ObjectMeta: naming.PostgresTLSSecret(cluster),
 	}), nil
+}
+
+func (r *Reconciler) isRootCACertManagerManaged(ctx context.Context, cluster *v1beta1.PostgresCluster) (bool, error) {
+	installed, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	if err != nil || !installed {
+		return false, err
+	}
+
+	rootSecret := &corev1.Secret{ObjectMeta: naming.PostgresRootCASecret(cluster)}
+	err = r.Client.Get(ctx, client.ObjectKeyFromObject(rootSecret), rootSecret)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, errors.WithStack(err)
+	}
+
+	return rootSecret.Annotations["cert-manager.io/certificate-name"] != "", nil
 }
 
 func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (bool, error) {
