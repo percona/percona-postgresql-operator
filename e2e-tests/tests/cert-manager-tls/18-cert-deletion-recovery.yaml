@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 300
 commands:
   - script: |-
       set -o errexit
@@ -101,3 +100,4 @@ commands:
       done
 
       wait_cluster_consistency cert-manager-tls
+    timeout: 300

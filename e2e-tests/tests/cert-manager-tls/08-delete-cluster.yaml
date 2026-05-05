@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 120
 commands:
   - script: |-
       set -o errexit
@@ -19,3 +18,4 @@ commands:
           ! kubectl -n "$NAMESPACE" get postgrescluster cert-manager-tls 2>/dev/null
       }
       retry 12 5 cluster_deleted
+    timeout: 120
