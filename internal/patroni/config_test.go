@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
@@ -309,8 +308,8 @@ func TestDynamicConfiguration(t *testing.T) {
 			cluster: &v1beta1.PostgresCluster{
 				Spec: v1beta1.PostgresClusterSpec{
 					Patroni: &v1beta1.PatroniSpec{
-						LeaderLeaseDurationSeconds: initialize.Int32(99),
-						SyncPeriodSeconds:          initialize.Int32(8),
+						LeaderLeaseDurationSeconds: new(int32(99)),
+						SyncPeriodSeconds:          new(int32(8)),
 					},
 				},
 			},
@@ -892,7 +891,7 @@ func TestDynamicConfiguration(t *testing.T) {
 					Standby: &v1beta1.PostgresStandbySpec{
 						Enabled: true,
 						Host:    "0.0.0.0",
-						Port:    initialize.Int32(5432),
+						Port:    new(int32(5432)),
 					},
 				},
 			},
@@ -935,7 +934,7 @@ func TestDynamicConfiguration(t *testing.T) {
 					Standby: &v1beta1.PostgresStandbySpec{
 						Enabled:  true,
 						Host:     "0.0.0.0",
-						Port:     initialize.Int32(5432),
+						Port:     new(int32(5432)),
 						RepoName: "repo",
 					},
 				},

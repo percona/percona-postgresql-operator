@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
@@ -281,7 +280,7 @@ func TestStoreDesiredRequest(t *testing.T) {
 		Spec: v1beta1.PostgresClusterSpec{
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 				Name:     "red",
-				Replicas: initialize.Int32(1),
+				Replicas: new(int32(1)),
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 					Resources: corev1.VolumeResourceRequirements{
@@ -290,7 +289,7 @@ func TestStoreDesiredRequest(t *testing.T) {
 						}}},
 			}, {
 				Name:     "blue",
-				Replicas: initialize.Int32(1),
+				Replicas: new(int32(1)),
 			}}}}
 
 	t.Run("BadRequestNoBackup", func(t *testing.T) {
@@ -1670,7 +1669,7 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 					DisableDefaultPodScheduling: new(true),
 					InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 						Name:                "instance1",
-						Replicas:            initialize.Int32(1),
+						Replicas:            new(int32(1)),
 						DataVolumeClaimSpec: testVolumeClaimSpec(),
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{
 							MaxSkew:           int32(1),
@@ -2137,7 +2136,7 @@ func TestCleanupDisruptionBudgets(t *testing.T) {
 		t.Run("cleanup leftover pdb", func(t *testing.T) {
 			leftoverPDB := generatePDB(t, cluster, &v1beta1.PostgresInstanceSetSpec{
 				Name:     "old-instance",
-				Replicas: initialize.Int32(1),
+				Replicas: new(int32(1)),
 			}, new(intstr.FromInt32(1)))
 			assert.NilError(t, createPDB(leftoverPDB))
 

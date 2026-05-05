@@ -62,7 +62,7 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
-			Port:            initialize.Int32(5432),
+			Port:            new(int32(5432)),
 			Shutdown:        new(false),
 			PostgresVersion: 13,
 			ImagePullSecrets: []corev1.LocalObjectReference{
@@ -2728,7 +2728,7 @@ volumes:
 
 		t.Run("Zero", func(t *testing.T) {
 			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
-				TTLSecondsAfterFinished: initialize.Int32(0),
+				TTLSecondsAfterFinished: new(int32(0)),
 			}
 
 			spec := generateBackupJobSpecIntent(ctx,
@@ -2741,7 +2741,7 @@ volumes:
 
 		t.Run("Positive", func(t *testing.T) {
 			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
-				TTLSecondsAfterFinished: initialize.Int32(100),
+				TTLSecondsAfterFinished: new(int32(100)),
 			}
 
 			spec := generateBackupJobSpecIntent(ctx,

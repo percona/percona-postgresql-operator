@@ -21,7 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
@@ -143,14 +142,14 @@ func TestCustomLabels(t *testing.T) {
 			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-image",
 			},
-			Replicas:            initialize.Int32(1),
+			Replicas:            new(int32(1)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}, {
 			Name: "daisy-instance2",
 			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-image",
 			},
-			Replicas:            initialize.Int32(1),
+			Replicas:            new(int32(1)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
 		cluster.Spec.Metadata = &v1beta1.Metadata{
@@ -197,7 +196,7 @@ func TestCustomLabels(t *testing.T) {
 			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-image",
 			},
-			Replicas:            initialize.Int32(1),
+			Replicas:            new(int32(1)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 			Metadata: &v1beta1.Metadata{
 				Labels: map[string]string{"my.instance.label": "max"},
@@ -207,7 +206,7 @@ func TestCustomLabels(t *testing.T) {
 			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-image",
 			},
-			Replicas:            initialize.Int32(1),
+			Replicas:            new(int32(1)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 			Metadata: &v1beta1.Metadata{
 				Labels: map[string]string{"my.instance.label": "lucy"},
@@ -393,14 +392,14 @@ func TestCustomAnnotations(t *testing.T) {
 			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-image",
 			},
-			Replicas:            initialize.Int32(1),
+			Replicas:            new(int32(1)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}, {
 			Name: "daisy-instance2",
 			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-image",
 			},
-			Replicas:            initialize.Int32(1),
+			Replicas:            new(int32(1)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
 		cluster.Spec.Metadata = &v1beta1.Metadata{
@@ -448,7 +447,7 @@ func TestCustomAnnotations(t *testing.T) {
 			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-image",
 			},
-			Replicas:            initialize.Int32(1),
+			Replicas:            new(int32(1)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 			Metadata: &v1beta1.Metadata{
 				Annotations: map[string]string{"my.instance.annotation": "max"},
@@ -458,7 +457,7 @@ func TestCustomAnnotations(t *testing.T) {
 			InitContainer: &v1beta1.InitContainerSpec{
 				Image: "some-image",
 			},
-			Replicas:            initialize.Int32(1),
+			Replicas:            new(int32(1)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 			Metadata: &v1beta1.Metadata{
 				Annotations: map[string]string{"my.instance.annotation": "lucy"},
@@ -584,7 +583,7 @@ func TestGenerateClusterPrimaryService(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns2"
 	cluster.Name = "pg5"
-	cluster.Spec.Port = initialize.Int32(2600)
+	cluster.Spec.Port = new(int32(2600))
 
 	// K8SPG-430
 	cluster.Labels = map[string]string{
@@ -719,7 +718,7 @@ func TestGenerateClusterReplicaServiceIntent(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns1"
 	cluster.Name = "pg2"
-	cluster.Spec.Port = initialize.Int32(9876)
+	cluster.Spec.Port = new(int32(9876))
 
 	// K8SPG-430
 	cluster.Labels = map[string]string{

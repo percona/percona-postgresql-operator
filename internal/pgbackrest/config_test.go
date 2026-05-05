@@ -16,7 +16,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
@@ -28,7 +27,7 @@ func TestCreatePGBackRestConfigMapIntent(t *testing.T) {
 	cluster.Namespace = "ns1"
 	cluster.Name = "hippo-dance"
 
-	cluster.Spec.Port = initialize.Int32(2345)
+	cluster.Spec.Port = new(int32(2345))
 	cluster.Spec.PostgresVersion = 12
 
 	cluster.Labels = map[string]string{

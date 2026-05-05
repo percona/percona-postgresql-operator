@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -21,7 +20,7 @@ func TestSetHugePages(t *testing.T) {
 
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:     "test-instance1",
-			Replicas: initialize.Int32(1),
+			Replicas: new(int32(1)),
 			Resources: corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{},
 			},
@@ -40,7 +39,7 @@ func TestSetHugePages(t *testing.T) {
 		emptyQuantity, _ := resource.ParseQuantity("")
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:     "test-instance1",
-			Replicas: initialize.Int32(1),
+			Replicas: new(int32(1)),
 			Resources: corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
 					corev1.ResourceHugePagesPrefix + "2Mi": emptyQuantity,
@@ -60,7 +59,7 @@ func TestSetHugePages(t *testing.T) {
 
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:     "test-instance1",
-			Replicas: initialize.Int32(1),
+			Replicas: new(int32(1)),
 			Resources: corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
 					corev1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("0Mi"),
@@ -80,7 +79,7 @@ func TestSetHugePages(t *testing.T) {
 
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:     "test-instance1",
-			Replicas: initialize.Int32(1),
+			Replicas: new(int32(1)),
 			Resources: corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
 					corev1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("16Mi"),

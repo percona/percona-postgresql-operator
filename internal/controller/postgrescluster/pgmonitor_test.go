@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
@@ -86,7 +86,7 @@ func TestAddPGMonitorExporterToInstancePodSpec(t *testing.T) {
 
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Name = "pg1"
-	cluster.Spec.Port = initialize.Int32(5432)
+	cluster.Spec.Port = new(int32(5432))
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 
 	cluster.SetLabels(map[string]string{

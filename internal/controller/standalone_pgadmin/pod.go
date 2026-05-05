@@ -455,7 +455,7 @@ func podSecurityContext(r *PGAdminReconciler) *corev1.PodSecurityContext {
 	// - https://docs.k8s.io/tasks/configure-pod-container/security-context/
 	// - https://docs.openshift.com/container-platform/4.14/authentication/managing-security-context-constraints.html
 	if !r.IsOpenShift {
-		podSecurityContext.FSGroup = initialize.Int64(2)
+		podSecurityContext.FSGroup = new(int64(2))
 	}
 
 	return podSecurityContext

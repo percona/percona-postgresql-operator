@@ -659,10 +659,10 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	// if the cluster is set to be shutdown and no instance Pods remain, stop the repohost pod
 	if postgresCluster.Spec.Shutdown != nil && *postgresCluster.Spec.Shutdown &&
 		!instancePodExists {
-		repo.Spec.Replicas = initialize.Int32(0)
+		repo.Spec.Replicas = new(int32(0))
 	} else {
 		// the cluster should not be shutdown, set this value to 1
-		repo.Spec.Replicas = initialize.Int32(1)
+		repo.Spec.Replicas = new(int32(1))
 	}
 
 	// Use StatefulSet's "RollingUpdate" strategy and "Parallel" policy to roll

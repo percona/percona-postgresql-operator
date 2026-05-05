@@ -448,13 +448,13 @@ func (r *Reconciler) generatePGBouncerDeployment(
 
 	// if the shutdown flag is set, set pgBouncer replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {
-		deploy.Spec.Replicas = initialize.Int32(0)
+		deploy.Spec.Replicas = new(int32(0))
 	} else {
 		deploy.Spec.Replicas = cluster.Spec.Proxy.PGBouncer.Replicas
 	}
 
 	// Don't clutter the namespace with extra ReplicaSets.
-	deploy.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	deploy.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Ensure that the number of Ready pods is never less than the specified
 	// Replicas by starting new pods while old pods are still running.

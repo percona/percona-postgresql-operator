@@ -19,7 +19,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
@@ -63,7 +62,7 @@ namespace: ns5
 
 	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
 		PGBouncer: &v1beta1.PGBouncerPodSpec{
-			Port: initialize.Int32(9651),
+			Port: new(int32(9651)),
 		},
 	}
 
@@ -219,12 +218,12 @@ ownerReferences:
 		Expect      func(testing.TB, *corev1.Service, error)
 	}{
 		{Description: "ClusterIP with Port 32000", Type: "ClusterIP",
-			NodePort: initialize.Int32(32000), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32000)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.ErrorContains(t, err, "NodePort cannot be set with type ClusterIP on Service \"pg7-pgbouncer\"")
 				assert.Assert(t, service == nil)
 			}},
 		{Description: "NodePort with Port 32001", Type: "NodePort",
-			NodePort: initialize.Int32(32001), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32001)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
 				alwaysExpect(t, service)
@@ -237,7 +236,7 @@ ownerReferences:
 `))
 			}},
 		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
-			NodePort: initialize.Int32(32002), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32002)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
 				alwaysExpect(t, service)
@@ -287,7 +286,7 @@ func TestReconcilePGBouncerService(t *testing.T) {
 
 	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
 		PGBouncer: &v1beta1.PGBouncerPodSpec{
-			Port: initialize.Int32(19041),
+			Port: new(int32(19041)),
 		},
 	}
 
@@ -340,7 +339,7 @@ func TestReconcilePGBouncerService(t *testing.T) {
 
 				cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
 					PGBouncer: &v1beta1.PGBouncerPodSpec{
-						Port: initialize.Int32(19041),
+						Port: new(int32(19041)),
 					},
 				}
 				cluster.Spec.Proxy.PGBouncer.Service = &v1beta1.ServiceSpec{Type: beforeType}
@@ -562,7 +561,7 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 	t.Run("not created", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.Spec.Proxy.PGBouncer.Replicas = initialize.Int32(1)
+		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
 		cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromInt32(0))
 		assert.NilError(t, r.reconcilePGBouncerPodDisruptionBudget(ctx, cluster))
 		assert.Assert(t, !foundPDB(cluster))
@@ -571,7 +570,7 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 	t.Run("int created", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.Spec.Proxy.PGBouncer.Replicas = initialize.Int32(1)
+		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
 		cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromInt32(1))
 
 		assert.NilError(t, r.Client.Create(ctx, cluster))
@@ -598,7 +597,7 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 	t.Run("str created", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.Spec.Proxy.PGBouncer.Replicas = initialize.Int32(1)
+		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
 		cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromString("50%"))
 
 		assert.NilError(t, r.Client.Create(ctx, cluster))

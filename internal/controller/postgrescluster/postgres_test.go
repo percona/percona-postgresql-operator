@@ -25,7 +25,6 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -44,7 +43,7 @@ func TestGeneratePostgresUserSecret(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns1"
 	cluster.Name = "hippo2"
-	cluster.Spec.Port = initialize.Int32(9999)
+	cluster.Spec.Port = new(int32(9999))
 
 	cluster.Labels = map[string]string{
 		naming.LabelVersion: "2.3.0",
@@ -620,7 +619,7 @@ func TestSetVolumeSize(t *testing.T) {
 		Spec: v1beta1.PostgresClusterSpec{
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 				Name:     "some-instance",
-				Replicas: initialize.Int32(1),
+				Replicas: new(int32(1)),
 			}},
 		},
 	}

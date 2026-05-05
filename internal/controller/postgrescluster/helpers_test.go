@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -120,7 +120,7 @@ func testCluster() *v1beta1.PostgresCluster {
 				InitContainer: &v1beta1.InitContainerSpec{
 					Image: "some-image",
 				},
-				Replicas:            initialize.Int32(1),
+				Replicas:            new(int32(1)),
 				DataVolumeClaimSpec: testVolumeClaimSpec(),
 			}},
 			Backups: v1beta1.Backups{

@@ -86,7 +86,7 @@ func statefulset(
 	)
 
 	// Don't clutter the namespace with extra ControllerRevisions.
-	sts.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	sts.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Use StatefulSet's "RollingUpdate" strategy and "Parallel" policy to roll
 	// out changes to pods even when not Running or not Ready.

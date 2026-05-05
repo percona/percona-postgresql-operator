@@ -17,7 +17,6 @@ import (
 	"gotest.tools/v3/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -30,7 +29,7 @@ func TestWriteUsersInPGAdmin(t *testing.T) {
 			Namespace: "testnamespace",
 		},
 		Spec: v1beta1.PostgresClusterSpec{
-			Port: initialize.Int32(5432),
+			Port: new(int32(5432)),
 		},
 	}
 

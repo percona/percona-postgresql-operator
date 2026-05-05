@@ -159,7 +159,7 @@ func (r *Reconciler) generatePGAdminService(
 	// requires updates to the pgAdmin service configuration.
 	servicePort := corev1.ServicePort{
 		Name:       naming.PortPGAdmin,
-		Port:       *initialize.Int32(5050),
+		Port:       *new(int32(5050)),
 		Protocol:   corev1.ProtocolTCP,
 		TargetPort: intstr.FromString(naming.PortPGAdmin),
 	}
@@ -277,13 +277,13 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 
 	// if the shutdown flag is set, set pgAdmin replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {
-		sts.Spec.Replicas = initialize.Int32(0)
+		sts.Spec.Replicas = new(int32(0))
 	} else {
 		sts.Spec.Replicas = cluster.Spec.UserInterface.PGAdmin.Replicas
 	}
 
 	// Don't clutter the namespace with extra ControllerRevisions.
-	sts.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	sts.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Give the Pod a stable DNS record based on its name.
 	// - https://docs.k8s.io/concepts/workloads/controllers/statefulset/#stable-network-id
