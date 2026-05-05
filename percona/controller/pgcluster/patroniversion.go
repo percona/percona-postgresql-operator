@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -171,7 +170,7 @@ func (r *PGClusterReconciler) reconcilePatroniVersionCheckPod(ctx context.Contex
 				},
 				SecurityContext:               cr.Spec.InstanceSets[0].SecurityContext,
 				Affinity:                      cr.Spec.InstanceSets[0].Affinity,
-				TerminationGracePeriodSeconds: ptr.To(int64(5)),
+				TerminationGracePeriodSeconds: new(int64(5)),
 				ImagePullSecrets:              cr.Spec.ImagePullSecrets,
 				Resources:                     &resources,
 			},

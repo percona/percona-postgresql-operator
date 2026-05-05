@@ -63,7 +63,7 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 		}
 	}
 
-	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = ptr.To(true)
+	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = new(true)
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.RepoName = ptr.Deref(r.pgRestore.Spec.RepoName, "")
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Options = r.pgRestore.Spec.Options
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Env = r.pgRestore.Spec.ContainerOptions.Env
@@ -89,7 +89,7 @@ func (r *PGBackRestRestore) DisableRestore(ctx context.Context) error {
 		}
 	}
 
-	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = ptr.To(false)
+	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = new(false)
 	delete(r.pgCluster.Annotations, naming.PGBackRestRestore)
 
 	if err := r.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {

@@ -844,7 +844,7 @@ func (r *Reconciler) reconcilePostgresDataVolume(
 				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BootstrappingWithSnapshot",
 					"Snapshot found for %v; bootstrapping cluster with snapshot.", sourceCluster.Name)
 				pvc.Spec.DataSource = &corev1.TypedLocalObjectReference{
-					APIGroup: initialize.String("snapshot.storage.k8s.io"),
+					APIGroup: new("snapshot.storage.k8s.io"),
 					Kind:     snapshot.Kind,
 					Name:     snapshot.Name,
 				}

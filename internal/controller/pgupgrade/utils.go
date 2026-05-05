@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
 
@@ -39,8 +38,8 @@ func (r *PGUpgradeReconciler) setControllerReference(
 			Kind:               "PGUpgrade",
 			Name:               owner.GetName(),
 			UID:                owner.GetUID(),
-			BlockOwnerDeletion: initialize.Pointer(true),
-			Controller:         initialize.Pointer(true),
+			BlockOwnerDeletion: new(true),
+			Controller:         new(true),
 		},
 	))
 }

@@ -128,7 +128,7 @@ func (r *PGClusterReconciler) createScheduledBackup(log logr.Logger, backupName,
 		},
 		Spec: v2.PerconaPGBackupSpec{
 			PGCluster: cr.Name,
-			RepoName:  ptr.To(repoName),
+			RepoName:  new(repoName),
 			Options:   []string{"--type=" + backupType},
 		},
 	}

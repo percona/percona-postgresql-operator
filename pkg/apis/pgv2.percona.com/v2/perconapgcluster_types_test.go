@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8sptr "k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
@@ -57,8 +57,8 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 func TestPerconaPGCluster_Validate(t *testing.T) {
 	t.Run("rejects pg_stat_monitor and pg_stat_statements together", func(t *testing.T) {
 		cluster := new(PerconaPGCluster)
-		cluster.Spec.Extensions.BuiltIn.PGStatMonitor = k8sptr.To(true)
-		cluster.Spec.Extensions.BuiltIn.PGStatStatements = k8sptr.To(true)
+		cluster.Spec.Extensions.BuiltIn.PGStatMonitor = new(true)
+		cluster.Spec.Extensions.BuiltIn.PGStatStatements = new(true)
 
 		err := cluster.Validate()
 		require.EqualError(t, err, "pg_stat_monitor and pg_stat_statements cannot both be enabled")
@@ -488,12 +488,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, item)
 }
 
 func TestValidateDynamicConfiguration(t *testing.T) {
@@ -738,7 +733,7 @@ func TestShouldCheckStandbyLag(t *testing.T) {
 						PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
 							Enabled: true,
 						},
-						MaxAcceptableLag: k8sptr.To(resource.MustParse("0")),
+						MaxAcceptableLag: new(resource.MustParse("0")),
 					},
 				},
 			},

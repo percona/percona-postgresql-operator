@@ -583,7 +583,7 @@ terminationGracePeriodSeconds: 30
 		}
 
 		if cluster.Spec.UserInterface.PGAdmin.PriorityClassName != nil {
-			customcluster.Spec.UserInterface.PGAdmin.PriorityClassName = initialize.String("testpriorityclass")
+			customcluster.Spec.UserInterface.PGAdmin.PriorityClassName = new("testpriorityclass")
 		}
 
 		customcluster.Spec.UserInterface.PGAdmin.TopologySpreadConstraints = []corev1.TopologySpreadConstraint{
@@ -901,7 +901,7 @@ func pgAdminTestCluster(ns corev1.Namespace) *v1beta1.PostgresCluster {
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
 							},
 						},
-						StorageClassName: initialize.String("storage-class-for-data"),
+						StorageClassName: new("storage-class-for-data"),
 					},
 				},
 			},

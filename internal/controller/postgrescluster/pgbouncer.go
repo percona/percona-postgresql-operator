@@ -485,17 +485,17 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	// ShareProcessNamespace makes Kubernetes' pause process PID 1 and lets
 	// containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	deploy.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	deploy.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
 	// There's no need for individual DNS names of PgBouncer pods.
 	deploy.Spec.Template.Spec.Subdomain = ""
 
 	// PgBouncer does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	deploy.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	deploy.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// Do not add environment variables describing services in this namespace.
-	deploy.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	deploy.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if cluster.Spec.Proxy.PGBouncer.SecurityContext != nil {

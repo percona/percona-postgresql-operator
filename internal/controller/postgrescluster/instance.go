@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -326,9 +327,7 @@ func (r *Reconciler) observeInstances(
 	if autogrow {
 		for _, statusIS := range cluster.Status.InstanceSets {
 			if statusIS.DesiredPGDataVolume != nil {
-				for k, v := range statusIS.DesiredPGDataVolume {
-					previousDesiredRequests[k] = v
-				}
+				maps.Copy(previousDesiredRequests, statusIS.DesiredPGDataVolume)
 			}
 		}
 	}
@@ -1398,7 +1397,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// ShareProcessNamespace makes Kubernetes' pause process PID 1 and lets
 	// containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	sts.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	sts.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
 	// Patroni calls the Kubernetes API and pgBackRest may interact with a cloud
 	// storage provider. Use the instance ServiceAccount and automatically mount
@@ -1410,7 +1409,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// Disable environment variables for services other than the Kubernetes API.
 	// - https://docs.k8s.io/concepts/services-networking/connect-applications-service/#accessing-the-service
 	// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
-	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	sts.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if spec.SecurityContext != nil {

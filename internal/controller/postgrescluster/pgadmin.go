@@ -310,10 +310,10 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 
 	// pgAdmin does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	sts.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	sts.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// Do not add environment variables describing services in this namespace.
-	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	sts.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	sts.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
 

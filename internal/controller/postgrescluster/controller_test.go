@@ -358,7 +358,7 @@ spec:
 					MatchFields(IgnoreExtras, Fields{
 						"Manager": Equal(string(test.Reconciler.Owner)),
 						"FieldsV1": PointTo(MatchAllFields(Fields{
-							"Raw": WithTransform(func(in []byte) (out map[string]interface{}) {
+							"Raw": WithTransform(func(in []byte) (out map[string]any) {
 								Expect(yaml.Unmarshal(in, &out)).To(Succeed())
 								return out
 							}, MatchAllKeys(Keys{
@@ -376,7 +376,7 @@ spec:
 					MatchFields(IgnoreExtras, Fields{
 						"Manager": Equal(string(test.Reconciler.Owner)),
 						"FieldsV1": PointTo(MatchAllFields(Fields{
-							"Raw": WithTransform(func(in []byte) (out map[string]interface{}) {
+							"Raw": WithTransform(func(in []byte) (out map[string]any) {
 								Expect(yaml.Unmarshal(in, &out)).To(Succeed())
 								return out
 							}, MatchAllKeys(Keys{
@@ -389,7 +389,7 @@ spec:
 					MatchFields(IgnoreExtras, Fields{
 						"Manager": Equal(string(test.Reconciler.Owner)),
 						"FieldsV1": PointTo(MatchAllFields(Fields{
-							"Raw": WithTransform(func(in []byte) (out map[string]interface{}) {
+							"Raw": WithTransform(func(in []byte) (out map[string]any) {
 								Expect(yaml.Unmarshal(in, &out)).To(Succeed())
 								return out
 							}, MatchAllKeys(Keys{

@@ -20,6 +20,6 @@ import (
 )
 
 // marshalMatches converts actual to YAML and compares that to expected.
-func marshalMatches(actual interface{}, expected string) cmp.Comparison {
+func marshalMatches(actual any, expected string) cmp.Comparison {
 	return cmp.MarshalMatches(actual, expected)
 }

@@ -107,10 +107,10 @@ func statefulset(
 
 	// pgAdmin does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	sts.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	sts.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// Do not add environment variables describing services in this namespace.
-	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	sts.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// set the image pull secrets, if any exist
 	sts.Spec.Template.Spec.ImagePullSecrets = pgadmin.Spec.ImagePullSecrets

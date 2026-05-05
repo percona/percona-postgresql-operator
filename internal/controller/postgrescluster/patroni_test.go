@@ -490,7 +490,7 @@ func TestReconcilePatroniStatus(t *testing.T) {
 		instance := &Instance{
 			Name: instanceName, Runner: runner,
 		}
-		for i := 0; i < readyReplicas; i++ {
+		for range readyReplicas {
 			instance.Pods = append(instance.Pods, &corev1.Pod{
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{{
@@ -688,7 +688,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 				if test.status != "" {
 					cluster.Status = v1beta1.PostgresClusterStatus{
 						Patroni: v1beta1.PatroniStatus{
-							Switchover: initialize.String(test.status),
+							Switchover: new(test.status),
 						},
 					}
 				}
@@ -696,7 +696,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 					cluster.Spec.Patroni.Switchover.Type = test.soType
 				}
 				if test.target != "" {
-					cluster.Spec.Patroni.Switchover.TargetInstance = initialize.String(test.target)
+					cluster.Spec.Patroni.Switchover.TargetInstance = new(test.target)
 				}
 				cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(2)
 				test.check(t, r.reconcilePatroniSwitchover(ctx, cluster, getObserved()), cluster)
@@ -712,7 +712,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
 			Switchover: &v1beta1.PatroniSwitchover{
 				Enabled:        true,
-				TargetInstance: initialize.String("target"),
+				TargetInstance: new("target"),
 			},
 		}
 
@@ -761,7 +761,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
 			Switchover: &v1beta1.PatroniSwitchover{
 				Enabled:        true,
-				TargetInstance: initialize.String("target"),
+				TargetInstance: new("target"),
 			},
 		}
 
@@ -970,7 +970,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
 			Switchover: &v1beta1.PatroniSwitchover{
 				Enabled:        true,
-				TargetInstance: initialize.String("target"),
+				TargetInstance: new("target"),
 			},
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
@@ -996,7 +996,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 			Switchover: &v1beta1.PatroniSwitchover{
 				Enabled:        true,
 				Type:           "Failover",
-				TargetInstance: initialize.String("target"),
+				TargetInstance: new("target"),
 			},
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{

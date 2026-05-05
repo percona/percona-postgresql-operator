@@ -19,12 +19,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
-	"k8s.io/utils/ptr" // K8SPG-714
+	// K8SPG-714
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
@@ -204,7 +203,7 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
 
 		// Create pvc with annotation
-		pvcName := initialize.String("dedicated-snapshot-volume")
+		pvcName := new("dedicated-snapshot-volume")
 		pvc := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: *pvcName,
@@ -240,7 +239,7 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		assert.NilError(t, r.apply(ctx, snapshot1))
 
 		// Update snapshot status
-		truePtr := initialize.Bool(true)
+		truePtr := new(true)
 		snapshot1.Status = &volumesnapshotv1.VolumeSnapshotStatus{
 			ReadyToUse: truePtr,
 		}
@@ -319,7 +318,7 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
 
 		// Create pvc with annotation
-		pvcName := initialize.String("dedicated-snapshot-volume")
+		pvcName := new("dedicated-snapshot-volume")
 		pvc := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: *pvcName,
@@ -478,7 +477,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 		currentTime := metav1.Now()
 		backupJob.Status = batchv1.JobStatus{
-			StartTime:      ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
+			StartTime:      new(metav1.NewTime(currentTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
 			Succeeded:      1,
 			CompletionTime: &currentTime,
 		}
@@ -546,7 +545,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 		backupJob.Status = batchv1.JobStatus{
 			Succeeded:      1,
-			StartTime:      ptr.To(metav1.NewTime(earlierTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
+			StartTime:      new(metav1.NewTime(earlierTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
 			CompletionTime: &earlierTime,
 		}
 		// K8SPG-714: ENVTEST_K8S_VERSION=1.32
@@ -577,7 +576,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 			Succeeded:      1,
 			CompletionTime: &currentTime,
 			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
-			StartTime: ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))),
+			StartTime: new(metav1.NewTime(currentTime.Add(-time.Minute))),
 			Conditions: []batchv1.JobCondition{
 				{
 					Type:    batchv1.JobSuccessCriteriaMet,
@@ -646,7 +645,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		backupJob.Status = batchv1.JobStatus{
 			Succeeded:      1,
 			CompletionTime: &earlierTime,
-			StartTime:      ptr.To(metav1.NewTime(earlierTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
+			StartTime:      new(metav1.NewTime(earlierTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
 		}
 		// K8SPG-714: ENVTEST_K8S_VERSION=1.32
 		backupJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
@@ -676,7 +675,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 			Succeeded:      0,
 			Failed:         1,
 			CompletionTime: &currentTime,
-			StartTime:      ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
+			StartTime:      new(metav1.NewTime(currentTime.Add(-time.Minute))), // K8SPG-714: ENVTEST_K8S_VERSION=1.32
 		}
 		// K8SPG-714: ENVTEST_K8S_VERSION=1.32
 		restoreJob.Status.Conditions = append(backupJob.Status.Conditions, batchv1.JobCondition{
@@ -952,7 +951,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 			Succeeded:      1,
 			CompletionTime: &currentTime,
 			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
-			StartTime: ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))),
+			StartTime: new(metav1.NewTime(currentTime.Add(-time.Minute))),
 			Conditions: []batchv1.JobCondition{
 				{
 					Type:    batchv1.JobSuccessCriteriaMet,
@@ -998,7 +997,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 			Succeeded:      1,
 			CompletionTime: &currentTime,
 			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
-			StartTime: ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))),
+			StartTime: new(metav1.NewTime(currentTime.Add(-time.Minute))),
 			Conditions: []batchv1.JobCondition{
 				{
 					Type:    batchv1.JobSuccessCriteriaMet,
@@ -1023,7 +1022,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 			Succeeded:      1,
 			CompletionTime: &earlierTime,
 			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
-			StartTime: ptr.To(metav1.NewTime(earlierTime.Add(-time.Minute))),
+			StartTime: new(metav1.NewTime(earlierTime.Add(-time.Minute))),
 			Conditions: []batchv1.JobCondition{
 				{
 					Type:    batchv1.JobSuccessCriteriaMet,
@@ -1070,12 +1069,12 @@ func TestGetSnapshotWithLatestError(t *testing.T) {
 			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse: initialize.Bool(true),
+						ReadyToUse: new(true),
 					},
 				},
 				{
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse: initialize.Bool(false),
+						ReadyToUse: new(false),
 					},
 				},
 			},
@@ -1096,7 +1095,7 @@ func TestGetSnapshotWithLatestError(t *testing.T) {
 					},
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						CreationTime: &currentTime,
-						ReadyToUse:   initialize.Bool(true),
+						ReadyToUse:   new(true),
 					},
 				},
 				{
@@ -1105,7 +1104,7 @@ func TestGetSnapshotWithLatestError(t *testing.T) {
 						UID:  "the-uid-456",
 					},
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse: initialize.Bool(false),
+						ReadyToUse: new(false),
 						Error: &volumesnapshotv1.VolumeSnapshotError{
 							Time: &earlierTime,
 						},
@@ -1128,7 +1127,7 @@ func TestGetSnapshotWithLatestError(t *testing.T) {
 						UID:  "the-uid-123",
 					},
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse: initialize.Bool(false),
+						ReadyToUse: new(false),
 						Error: &volumesnapshotv1.VolumeSnapshotError{
 							Time: &earlierTime,
 						},
@@ -1140,7 +1139,7 @@ func TestGetSnapshotWithLatestError(t *testing.T) {
 						UID:  "the-uid-456",
 					},
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse: initialize.Bool(false),
+						ReadyToUse: new(false),
 						Error: &volumesnapshotv1.VolumeSnapshotError{
 							Time: &currentTime,
 						},
@@ -1187,8 +1186,8 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 				},
 			},
 		}
-		snapshot.Spec.Source.PersistentVolumeClaimName = initialize.String("some-pvc-name")
-		snapshot.Spec.VolumeSnapshotClassName = initialize.String("some-class-name")
+		snapshot.Spec.Source.PersistentVolumeClaimName = new("some-pvc-name")
+		snapshot.Spec.VolumeSnapshotClassName = new("some-class-name")
 		assert.NilError(t, r.apply(ctx, snapshot))
 
 		snapshots, err := r.getSnapshotsForCluster(ctx, cluster)
@@ -1210,8 +1209,8 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 				},
 			},
 		}
-		snapshot1.Spec.Source.PersistentVolumeClaimName = initialize.String("some-pvc-name")
-		snapshot1.Spec.VolumeSnapshotClassName = initialize.String("some-class-name")
+		snapshot1.Spec.Source.PersistentVolumeClaimName = new("some-pvc-name")
+		snapshot1.Spec.VolumeSnapshotClassName = new("some-class-name")
 		err := r.apply(ctx, snapshot1)
 		assert.NilError(t, err)
 
@@ -1228,8 +1227,8 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 				},
 			},
 		}
-		snapshot2.Spec.Source.PersistentVolumeClaimName = initialize.String("another-pvc-name")
-		snapshot2.Spec.VolumeSnapshotClassName = initialize.String("another-class-name")
+		snapshot2.Spec.Source.PersistentVolumeClaimName = new("another-pvc-name")
+		snapshot2.Spec.VolumeSnapshotClassName = new("another-class-name")
 		assert.NilError(t, r.apply(ctx, snapshot2))
 
 		snapshots, err := r.getSnapshotsForCluster(ctx, cluster)
@@ -1252,8 +1251,8 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 				},
 			},
 		}
-		snapshot1.Spec.Source.PersistentVolumeClaimName = initialize.String("some-pvc-name")
-		snapshot1.Spec.VolumeSnapshotClassName = initialize.String("some-class-name")
+		snapshot1.Spec.Source.PersistentVolumeClaimName = new("some-pvc-name")
+		snapshot1.Spec.VolumeSnapshotClassName = new("some-class-name")
 		err := r.apply(ctx, snapshot1)
 		assert.NilError(t, err)
 
@@ -1270,8 +1269,8 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 				},
 			},
 		}
-		snapshot2.Spec.Source.PersistentVolumeClaimName = initialize.String("another-pvc-name")
-		snapshot2.Spec.VolumeSnapshotClassName = initialize.String("another-class-name")
+		snapshot2.Spec.Source.PersistentVolumeClaimName = new("another-pvc-name")
+		snapshot2.Spec.VolumeSnapshotClassName = new("another-class-name")
 		assert.NilError(t, r.apply(ctx, snapshot2))
 
 		snapshots, err := r.getSnapshotsForCluster(ctx, cluster)
@@ -1303,12 +1302,12 @@ func TestGetLatestReadySnapshot(t *testing.T) {
 			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse: initialize.Bool(false),
+						ReadyToUse: new(false),
 					},
 				},
 				{
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse: initialize.Bool(false),
+						ReadyToUse: new(false),
 					},
 				},
 			},
@@ -1329,7 +1328,7 @@ func TestGetLatestReadySnapshot(t *testing.T) {
 					},
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						CreationTime: &earlierTime,
-						ReadyToUse:   initialize.Bool(true),
+						ReadyToUse:   new(true),
 					},
 				},
 				{
@@ -1339,7 +1338,7 @@ func TestGetLatestReadySnapshot(t *testing.T) {
 					},
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						CreationTime: &currentTime,
-						ReadyToUse:   initialize.Bool(false),
+						ReadyToUse:   new(false),
 					},
 				},
 			},
@@ -1360,7 +1359,7 @@ func TestGetLatestReadySnapshot(t *testing.T) {
 					},
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						CreationTime: &earlierTime,
-						ReadyToUse:   initialize.Bool(true),
+						ReadyToUse:   new(true),
 					},
 				},
 				{
@@ -1370,7 +1369,7 @@ func TestGetLatestReadySnapshot(t *testing.T) {
 					},
 					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						CreationTime: &currentTime,
-						ReadyToUse:   initialize.Bool(true),
+						ReadyToUse:   new(true),
 					},
 				},
 			},
@@ -1416,7 +1415,7 @@ func TestDeleteSnapshots(t *testing.T) {
 	})
 
 	t.Run("NoSnapshotsControlledByHippo", func(t *testing.T) {
-		pvcName := initialize.String("dedicated-snapshot-volume")
+		pvcName := new("dedicated-snapshot-volume")
 		snapshot1 := &volumesnapshotv1.VolumeSnapshot{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: volumesnapshotv1.SchemeGroupVersion.String(),
@@ -1450,7 +1449,7 @@ func TestDeleteSnapshots(t *testing.T) {
 	})
 
 	t.Run("OneSnapshotControlledByHippo", func(t *testing.T) {
-		pvcName := initialize.String("dedicated-snapshot-volume")
+		pvcName := new("dedicated-snapshot-volume")
 		snapshot1 := &volumesnapshotv1.VolumeSnapshot{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: volumesnapshotv1.SchemeGroupVersion.String(),

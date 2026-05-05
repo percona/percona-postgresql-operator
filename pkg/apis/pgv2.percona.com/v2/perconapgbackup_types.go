@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -213,7 +212,7 @@ const (
 
 func (b *PerconaPGBackup) Default() {
 	if b.Spec.Method == nil {
-		b.Spec.Method = ptr.To(BackupMethodPGBackrest)
+		b.Spec.Method = new(BackupMethodPGBackrest)
 	}
 
 	if *b.Spec.Method == BackupMethodPGBackrest {

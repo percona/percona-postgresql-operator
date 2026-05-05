@@ -336,8 +336,8 @@ volumeMode: Filesystem
 				},
 			},
 		}
-		snapshot.Spec.Source.PersistentVolumeClaimName = initialize.String("some-pvc-name")
-		snapshot.Spec.VolumeSnapshotClassName = initialize.String("some-class-name")
+		snapshot.Spec.Source.PersistentVolumeClaimName = new("some-pvc-name")
+		snapshot.Spec.VolumeSnapshotClassName = new("some-class-name")
 		err := reconciler.apply(ctx, snapshot)
 		assert.NilError(t, err)
 
@@ -347,7 +347,7 @@ volumeMode: Filesystem
 
 		currentTime := metav1.Now()
 		snapshot.Status = &volumesnapshotv1.VolumeSnapshotStatus{
-			ReadyToUse:   initialize.Bool(true),
+			ReadyToUse:   new(true),
 			CreationTime: &currentTime,
 		}
 		err = reconciler.Client.Status().Update(ctx, snapshot)

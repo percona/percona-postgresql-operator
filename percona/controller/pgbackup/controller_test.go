@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -221,7 +220,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("other-backup|uid-other"),
+				HolderIdentity: new("other-backup|uid-other"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -262,7 +261,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("other-backup|uid-other"),
+				HolderIdentity: new("other-backup|uid-other"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -291,7 +290,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("deleted-backup|uid-deleted"),
+				HolderIdentity: new("deleted-backup|uid-deleted"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -335,7 +334,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("completed-backup|uid-completed"),
+				HolderIdentity: new("completed-backup|uid-completed"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -371,7 +370,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("failed-backup|uid-failed"),
+				HolderIdentity: new("failed-backup|uid-failed"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -405,7 +404,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("backup-1|uid-xyz"),
+				HolderIdentity: new("backup-1|uid-xyz"),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -438,7 +437,7 @@ func TestTryAcquireLease(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("backup-1|uid-1"),
+				HolderIdentity: new("backup-1|uid-1"),
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -477,7 +476,7 @@ func TestReleaseLeaseIfNeeded(t *testing.T) {
 		existingLease := &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{Name: leaseName, Namespace: ns},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("backup-1|uid-1"),
+				HolderIdentity: new("backup-1|uid-1"),
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -511,7 +510,7 @@ func TestReleaseLeaseIfNeeded(t *testing.T) {
 		existingLease := &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{Name: leaseName, Namespace: ns},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("backup-1|uid-1"),
+				HolderIdentity: new("backup-1|uid-1"),
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -545,7 +544,7 @@ func TestReleaseLeaseIfNeeded(t *testing.T) {
 		existingLease := &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{Name: leaseName, Namespace: ns},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("backup-1|uid-1"),
+				HolderIdentity: new("backup-1|uid-1"),
 			},
 		}
 		cl := fake.NewClientBuilder().
@@ -611,7 +610,7 @@ func TestReleaseLeaseIfNeeded(t *testing.T) {
 		existingLease := &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{Name: leaseName, Namespace: ns},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("other-backup|uid-other"),
+				HolderIdentity: new("other-backup|uid-other"),
 			},
 		}
 		cl := fake.NewClientBuilder().

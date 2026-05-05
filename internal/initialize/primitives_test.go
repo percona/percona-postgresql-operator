@@ -13,12 +13,12 @@ import (
 )
 
 func TestBool(t *testing.T) {
-	n := initialize.Bool(false)
+	n := new(false)
 	if assert.Check(t, n != nil) {
 		assert.Equal(t, *n, false)
 	}
 
-	y := initialize.Bool(true)
+	y := new(true)
 	if assert.Check(t, y != nil) {
 		assert.Equal(t, *y, true)
 	}
@@ -27,28 +27,28 @@ func TestBool(t *testing.T) {
 func TestFromPointer(t *testing.T) {
 	t.Run("bool", func(t *testing.T) {
 		assert.Equal(t, initialize.FromPointer((*bool)(nil)), false)
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer(false)), false)
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer(true)), true)
+		assert.Equal(t, initialize.FromPointer(new(false)), false)
+		assert.Equal(t, initialize.FromPointer(new(true)), true)
 	})
 
 	t.Run("int32", func(t *testing.T) {
 		assert.Equal(t, initialize.FromPointer((*int32)(nil)), int32(0))
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer(int32(0))), int32(0))
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer(int32(-99))), int32(-99))
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer(int32(42))), int32(42))
+		assert.Equal(t, initialize.FromPointer(new(int32(0))), int32(0))
+		assert.Equal(t, initialize.FromPointer(new(int32(-99))), int32(-99))
+		assert.Equal(t, initialize.FromPointer(new(int32(42))), int32(42))
 	})
 
 	t.Run("int64", func(t *testing.T) {
 		assert.Equal(t, initialize.FromPointer((*int64)(nil)), int64(0))
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer(int64(0))), int64(0))
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer(int64(-99))), int64(-99))
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer(int64(42))), int64(42))
+		assert.Equal(t, initialize.FromPointer(new(int64(0))), int64(0))
+		assert.Equal(t, initialize.FromPointer(new(int64(-99))), int64(-99))
+		assert.Equal(t, initialize.FromPointer(new(int64(42))), int64(42))
 	})
 
 	t.Run("string", func(t *testing.T) {
 		assert.Equal(t, initialize.FromPointer((*string)(nil)), "")
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer("")), "")
-		assert.Equal(t, initialize.FromPointer(initialize.Pointer("sup")), "sup")
+		assert.Equal(t, initialize.FromPointer(new("")), "")
+		assert.Equal(t, initialize.FromPointer(new("sup")), "sup")
 	})
 }
 
@@ -132,58 +132,58 @@ func TestMap(t *testing.T) {
 
 func TestPointer(t *testing.T) {
 	t.Run("bool", func(t *testing.T) {
-		n := initialize.Pointer(false)
+		n := new(false)
 		if assert.Check(t, n != nil) {
 			assert.Equal(t, *n, false)
 		}
 
-		y := initialize.Pointer(true)
+		y := new(true)
 		if assert.Check(t, y != nil) {
 			assert.Equal(t, *y, true)
 		}
 	})
 
 	t.Run("int32", func(t *testing.T) {
-		z := initialize.Pointer(int32(0))
+		z := new(int32(0))
 		if assert.Check(t, z != nil) {
 			assert.Equal(t, *z, int32(0))
 		}
 
-		n := initialize.Pointer(int32(-99))
+		n := new(int32(-99))
 		if assert.Check(t, n != nil) {
 			assert.Equal(t, *n, int32(-99))
 		}
 
-		p := initialize.Pointer(int32(42))
+		p := new(int32(42))
 		if assert.Check(t, p != nil) {
 			assert.Equal(t, *p, int32(42))
 		}
 	})
 
 	t.Run("int64", func(t *testing.T) {
-		z := initialize.Pointer(int64(0))
+		z := new(int64(0))
 		if assert.Check(t, z != nil) {
 			assert.Equal(t, *z, int64(0))
 		}
 
-		n := initialize.Pointer(int64(-99))
+		n := new(int64(-99))
 		if assert.Check(t, n != nil) {
 			assert.Equal(t, *n, int64(-99))
 		}
 
-		p := initialize.Pointer(int64(42))
+		p := new(int64(42))
 		if assert.Check(t, p != nil) {
 			assert.Equal(t, *p, int64(42))
 		}
 	})
 
 	t.Run("string", func(t *testing.T) {
-		z := initialize.Pointer("")
+		z := new("")
 		if assert.Check(t, z != nil) {
 			assert.Equal(t, *z, "")
 		}
 
-		n := initialize.Pointer("sup")
+		n := new("sup")
 		if assert.Check(t, n != nil) {
 			assert.Equal(t, *n, "sup")
 		}
@@ -191,12 +191,12 @@ func TestPointer(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	z := initialize.String("")
+	z := new("")
 	if assert.Check(t, z != nil) {
 		assert.Equal(t, *z, "")
 	}
 
-	n := initialize.String("sup")
+	n := new("sup")
 	if assert.Check(t, n != nil) {
 		assert.Equal(t, *n, "sup")
 	}

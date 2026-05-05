@@ -24,7 +24,7 @@ type InfoBackup struct {
 	Timestamp  struct {
 		Start int64 `json:"start,omitempty"`
 		Stop  int64 `json:"stop,omitempty"`
-	} `json:"timestamp,omitempty"`
+	} `json:"timestamp"`
 }
 
 type InfoStanza struct {
@@ -36,9 +36,9 @@ type InfoStanza struct {
 		Lock    struct {
 			Backup struct {
 				Held bool `json:"held,omitempty"`
-			} `json:"backup,omitempty"`
-		} `json:"lock,omitempty"`
-	} `json:"status,omitempty"`
+			} `json:"backup"`
+		} `json:"lock"`
+	} `json:"status"`
 }
 
 var (

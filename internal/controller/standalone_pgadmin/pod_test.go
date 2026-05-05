@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 )
@@ -211,7 +210,7 @@ volumes:
 
 	t.Run("Customizations", func(t *testing.T) {
 		pgadmin.Spec.ImagePullPolicy = corev1.PullAlways
-		pgadmin.Spec.Image = initialize.String("new-image")
+		pgadmin.Spec.Image = new("new-image")
 		pgadmin.Spec.Resources.Requests = corev1.ResourceList{
 			corev1.ResourceCPU: resource.MustParse("100m"),
 		}

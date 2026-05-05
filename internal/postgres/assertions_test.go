@@ -19,6 +19,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 )
 
-func marshalMatches(actual interface{}, expected string) cmp.Comparison {
+func marshalMatches(actual any, expected string) cmp.Comparison {
 	return cmp.MarshalMatches(actual, expected)
 }

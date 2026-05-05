@@ -684,11 +684,11 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	// The pgBackRest TLS server must be signaled when its configuration or
 	// certificates change. Let containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	repo.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	repo.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
 	// pgBackRest does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	repo.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	repo.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// K8SPG-138
 	currVersion, err := gover.NewVersion(postgresCluster.Labels[naming.LabelVersion])
@@ -697,7 +697,7 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	}
 
 	// Do not add environment variables describing services in this namespace.
-	repo.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	repo.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.RepoHost != nil && pgbackrest.RepoHost.SecurityContext != nil {
 		repo.Spec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.RepoHost.SecurityContext
@@ -923,7 +923,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 				// Disable environment variables for services other than the Kubernetes API.
 				// - https://docs.k8s.io/concepts/services-networking/connect-applications-service/#accessing-the-service
 				// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
-				EnableServiceLinks: initialize.Bool(false),
+				EnableServiceLinks: new(false),
 
 				// Set RestartPolicy to "Never" since we want a new Pod to be created by the Job
 				// controller when there is a failure (instead of the container simply restarting).
@@ -1472,11 +1472,11 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	// possible cloud identity without mounting its Kubernetes API credentials.
 	// - https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity
 	// - https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
-	job.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	job.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 	job.Spec.Template.Spec.ServiceAccountName = naming.ClusterInstanceRBAC(cluster).Name
 
 	// Do not add environment variables describing services in this namespace.
-	job.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	job.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if pgbackrest := cluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
