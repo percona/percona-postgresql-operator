@@ -32,4 +32,4 @@ commands:
           exit 1
       fi
 
-      kubectl create configmap -n "${NAMESPACE}" 06-verify-tls-connection --from-literal=status="verified"
+      kubectl create configmap -n "${NAMESPACE}" 14-verify-tls-connection --from-literal=status="verified"

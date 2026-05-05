@@ -9,7 +9,5 @@ commands:
       source ../../functions
       init_temp_dir # do this only in the first TestStep
 
-      deploy_cert_manager
       deploy_operator
       deploy_client
-      deploy_cmctl

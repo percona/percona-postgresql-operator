@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "$NAMESPACE" delete perconapgcluster cert-manager-tls --wait=true || true
+      kubectl -n "$NAMESPACE" delete postgrescluster cert-manager-tls --wait=true || true
+
+      kubectl -n "$NAMESPACE" delete pvc -l postgres-operator.crunchydata.com/cluster=cert-manager-tls || true
+      kubectl -n "$NAMESPACE" delete secret -l postgres-operator.crunchydata.com/cluster=cert-manager-tls || true
+      kubectl -n "$NAMESPACE" delete configmap internal-pki-cert-serial || true
+
+      cluster_deleted() {
+          ! kubectl -n "$NAMESPACE" get postgrescluster cert-manager-tls 2>/dev/null
+      }
+      retry 12 5 cluster_deleted

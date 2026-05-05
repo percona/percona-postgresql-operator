@@ -1,0 +1,47 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      root_ca_annotation=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-cluster-cert \
+        -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || true)
+
+      if [[ -n "$root_ca_annotation" ]]; then
+          echo "Root CA secret has cert-manager annotation but cert-manager is not installed!"
+          exit 1
+      fi
+
+      cert_count=$(kubectl -n "$NAMESPACE" get certificate 2>/dev/null | grep -c cert-manager-tls || true)
+      if [[ "$cert_count" -gt 0 ]]; then
+          echo "Found cert-manager Certificate resources but cert-manager should not be installed"
+          exit 1
+      fi
+
+      instance_sts=$(kubectl -n "$NAMESPACE" get sts \
+        -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/instance-set=instance1 \
+        -o jsonpath='{.items[*].metadata.name}')
+
+      for sts_name in $instance_sts; do
+          secret_name="${sts_name}-certs"
+
+          cm_annotation=$(kubectl -n "$NAMESPACE" get secret "$secret_name" \
+            -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || true)
+          if [[ -n "$cm_annotation" ]]; then
+              echo "Instance secret $secret_name has cert-manager annotation unexpectedly"
+              exit 1
+          fi
+
+          for key in dns.crt dns.key patroni.ca-roots patroni.crt-combined; do
+              escaped_key="${key//./\\.}"
+              val=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath="{.data.${escaped_key}}")
+              if [[ -z "$val" ]]; then
+                  echo "Instance secret $secret_name is missing key: $key"
+                  exit 1
+              fi
+          done
+      done
