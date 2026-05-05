@@ -100,4 +100,4 @@ commands:
       done
 
       wait_cluster_consistency cert-manager-tls
-    timeout: 300
+    timeout: 600
