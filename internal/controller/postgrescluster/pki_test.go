@@ -24,7 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // TestReconcileCerts tests the proper reconciliation of the root ca certificate
@@ -93,26 +93,29 @@ func TestReconcileCerts(t *testing.T) {
 		}
 		cluster2CASecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 
-		t.Run("check root CA secret first owner reference", func(t *testing.T) {
+		t.Run("check root CA secret for cluster1", func(t *testing.T) {
 			err := tClient.Get(ctx, client.ObjectKeyFromObject(cluster1CASecret), cluster1CASecret)
 			assert.NilError(t, err)
 
 			assert.Check(t, len(cluster1CASecret.ObjectMeta.OwnerReferences) == 1, "first owner reference not set")
 
 			expectedOR := metav1.OwnerReference{
-				APIVersion: "postgres-operator.crunchydata.com/v1beta1",
-				Kind:       "PostgresCluster",
-				Name:       "hippocluster1",
-				UID:        cluster1.UID,
+				APIVersion:         "upstream.pgv2.percona.com/v1beta1",
+				Kind:               "PostgresCluster",
+				Name:               "hippocluster1",
+				UID:                cluster1.UID,
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			}
 
-			// K8SPG-553
-			if len(cluster1CASecret.ObjectMeta.OwnerReferences) > 0 {
-				assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0], expectedOR)
-			}
+			assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0].APIVersion, expectedOR.APIVersion)
+			assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0].Kind, expectedOR.Kind)
+			assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0].Name, expectedOR.Name)
+			assert.Equal(t, *cluster1CASecret.ObjectMeta.OwnerReferences[0].Controller, true)
+			assert.Equal(t, *cluster1CASecret.ObjectMeta.OwnerReferences[0].BlockOwnerDeletion, true)
 		})
 
-		t.Run("check root CA secret second owner reference", func(t *testing.T) {
+		t.Run("check root CA secret for cluster2", func(t *testing.T) {
 			_, err := r.reconcileRootCertificate(ctx, cluster2)
 			assert.NilError(t, err)
 
@@ -125,13 +128,19 @@ func TestReconcileCerts(t *testing.T) {
 			assert.Check(t, len(cluster2CASecret.ObjectMeta.OwnerReferences) == 1, "should be single owner reference")
 
 			expectedOR := metav1.OwnerReference{
-				APIVersion: "postgres-operator.crunchydata.com/v1beta1",
-				Kind:       "PostgresCluster",
-				Name:       "hippocluster2",
-				UID:        cluster2.UID,
+				APIVersion:         "upstream.pgv2.percona.com/v1beta1",
+				Kind:               "PostgresCluster",
+				Name:               "hippocluster2",
+				UID:                cluster2.UID,
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			}
 
-			assert.Equal(t, cluster2CASecret.ObjectMeta.OwnerReferences[0], expectedOR)
+			assert.Equal(t, cluster2CASecret.ObjectMeta.OwnerReferences[0].APIVersion, expectedOR.APIVersion)
+			assert.Equal(t, cluster2CASecret.ObjectMeta.OwnerReferences[0].Kind, expectedOR.Kind)
+			assert.Equal(t, cluster2CASecret.ObjectMeta.OwnerReferences[0].Name, expectedOR.Name)
+			assert.Equal(t, *cluster2CASecret.ObjectMeta.OwnerReferences[0].Controller, true)
+			assert.Equal(t, *cluster2CASecret.ObjectMeta.OwnerReferences[0].BlockOwnerDeletion, true)
 		})
 
 		t.Run("root certificate is returned correctly", func(t *testing.T) {

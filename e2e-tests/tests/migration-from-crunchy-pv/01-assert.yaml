@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+
+      kubectl wait postgrescluster/crunchy-source \
+        -n "${NAMESPACE}" \
+        --for=condition=PGBackRestReplicaRepoReady \
+        --timeout=240s
+
+      primary=$(kubectl get pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=master \
+        -n "${NAMESPACE}" \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      kubectl wait pod "${primary}" \
+        -n "${NAMESPACE}" \
+        --for=condition=Ready \
+        --timeout=60s

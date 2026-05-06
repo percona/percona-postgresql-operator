@@ -1,0 +1,20 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: percona-standby
+spec:
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: migration-from-crunchy-pgbackrest-secrets
+      global:
+        repo1-path: <repo-path>
+        repo1-s3-uri-style: path
+        repo1-s3-verify-tls: "n"
+      repos:
+        - name: repo1
+          s3:
+            bucket: operator-testing
+            endpoint: <minio-endpoint>
+            region: us-east-1

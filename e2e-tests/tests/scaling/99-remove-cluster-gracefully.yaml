@@ -5,7 +5,7 @@ delete:
   kind: PerconaPGCluster
   metadata:
     name: scheduled-backup
-- apiVersion: postgres-operator.crunchydata.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   metadata:
     name: scheduled-backup
