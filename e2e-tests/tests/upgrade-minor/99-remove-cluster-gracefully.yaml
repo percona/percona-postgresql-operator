@@ -16,8 +16,8 @@ commands:
 
       source ../../functions
 
-      kubectl -n ${NAMESPACE} patch postgrescluster upgrade-minor --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
-      kubectl -n ${NAMESPACE} delete postgrescluster upgrade-minor || true
+      kubectl -n ${NAMESPACE} patch postgresclusters.postgres-operator.crunchydata.com upgrade-minor --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+      kubectl -n ${NAMESPACE} delete postgresclusters.postgres-operator.crunchydata.com upgrade-minor || true
       remove_all_finalizers
       check_operator_panic
       destroy_operator
