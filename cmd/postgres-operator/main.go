@@ -175,6 +175,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	if cm.Controller() == nil {
 		return errors.New("missing controller in manager")
 	}
+	r.Controller = cm.Controller()
 
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
