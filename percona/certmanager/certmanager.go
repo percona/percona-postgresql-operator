@@ -602,6 +602,10 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 		certDuration = cluster.Spec.TLS.PGBackRestCertValidityDuration.Duration
 	}
 
+	// The common name must match what pgBackRest expects in its tls-server-auth option.
+	// All instances in the cluster share a single client certificate identified by cluster UID.
+	commonName := "pgbackrest@" + string(cluster.GetUID())
+
 	existing := &v1.Certificate{}
 	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
@@ -630,6 +634,12 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 			needsUpdate = true
 		}
 
+		if existing.Spec.CommonName != commonName {
+			existing.Spec.CommonName = commonName
+			existing.Spec.DNSNames = []string{commonName}
+			needsUpdate = true
+		}
+
 		if !needsUpdate {
 			return nil
 		}
@@ -639,10 +649,6 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 	if !k8serrors.IsNotFound(err) {
 		return errors.Wrap(err, "failed to get pgbackrest client certificate")
 	}
-
-	// The common name must match what pgBackRest expects in its tls-server-auth option.
-	// All instances in the cluster share a single client certificate identified by cluster UID.
-	commonName := "pgbackrest@" + string(cluster.GetUID())
 
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
