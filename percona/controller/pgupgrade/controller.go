@@ -9,6 +9,8 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,6 +44,9 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr manager.Manager) error {
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/finalizers,verbs=patch;update
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch;patch;update
 // +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=pgupgrades,verbs=get;list;create;update;patch;delete;watch
+//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={get,list,watch}
+
+var errLegacyUpgradeFinalized = errors.New("legacy upgrade is already finished")
 
 func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("request", request)
@@ -55,6 +60,14 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 			log.Error(err, "unable to fetch PerconaPGUpgrade")
 		}
 		return reconcile.Result{}, err
+	}
+
+	if err := r.checkLegacyUpgrade(ctx, request); err != nil {
+		if errors.Is(err, errLegacyUpgradeFinalized) {
+			return reconcile.Result{}, nil
+		}
+
+		return reconcile.Result{}, errors.Wrap(err, "check legacy upgrade")
 	}
 
 	pgCluster := &pgv2.PerconaPGCluster{
@@ -249,4 +262,49 @@ func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pg
 	)
 
 	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
+}
+
+func (r *PGUpgradeReconciler) checkLegacyUpgrade(ctx context.Context, request reconcile.Request) error {
+	legacyGVK := schema.GroupVersionKind{
+		Group:   "postgres-operator.crunchydata.com",
+		Version: "v1beta1",
+		Kind:    "PGUpgrade",
+	}
+
+	mapper := r.Client.RESTMapper()
+	if _, err := mapper.RESTMapping(legacyGVK.GroupKind(), legacyGVK.Version); err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil
+		}
+		return errors.Wrap(err, "discover legacy PGUpgrade GVK")
+	}
+
+	legacy := &unstructured.Unstructured{}
+	legacy.SetGroupVersionKind(legacyGVK)
+	if err := r.Client.Get(ctx, request.NamespacedName, legacy); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, "get legacy PGUpgrade")
+	}
+
+	conditions, found, err := unstructured.NestedSlice(legacy.Object, "status", "conditions")
+	if err != nil {
+		return errors.Wrap(err, "read legacy PGUpgrade status conditions")
+	}
+	if !found {
+		return nil
+	}
+	for _, c := range conditions {
+		cm, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		t, _, _ := unstructured.NestedString(cm, "type")
+		if t == "Succeeded" {
+			return errLegacyUpgradeFinalized
+		}
+	}
+
+	return nil
 }

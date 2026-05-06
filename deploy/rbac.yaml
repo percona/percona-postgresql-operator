@@ -198,6 +198,7 @@ rules:
 - apiGroups:
   - postgres-operator.crunchydata.com
   resources:
+  - pgupgrades
   - postgresclusters
   verbs:
   - get
