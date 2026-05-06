@@ -18,6 +18,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get,list,watch}
+
 var childKinds = []schema.GroupVersionKind{
 	{Group: "apps", Version: "v1", Kind: "StatefulSet"},
 	{Group: "apps", Version: "v1", Kind: "Deployment"},

@@ -192,6 +192,14 @@ rules:
   - patch
   - watch
 - apiGroups:
+  - postgres-operator.crunchydata.com
+  resources:
+  - postgresclusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings
