@@ -2643,9 +2643,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupOpts := postgresCluster.Spec.Backups.PGBackRest.Manual.Options
 	for _, opt := range backupOpts {
 		if strings.Contains(opt, "--repo=") || strings.Contains(opt, "--repo ") {
-			r.Recorder.Eventf(postgresCluster, corev1.EventTypeWarning, "InvalidManualBackup",
-				"Option '--repo' is not allowed: please use the 'repoName' field instead.",
-				repoName)
+			r.Recorder.Event(postgresCluster, corev1.EventTypeWarning, "InvalidManualBackup",
+				"Option '--repo' is not allowed: please use the 'repoName' field instead.")
 			return nil
 		}
 	}
