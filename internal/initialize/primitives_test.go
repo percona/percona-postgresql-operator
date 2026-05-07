@@ -12,18 +12,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 )
 
-func TestBool(t *testing.T) {
-	n := new(false)
-	if assert.Check(t, n != nil) {
-		assert.Equal(t, *n, false)
-	}
-
-	y := new(true)
-	if assert.Check(t, y != nil) {
-		assert.Equal(t, *y, true)
-	}
-}
-
 func TestFromPointer(t *testing.T) {
 	t.Run("bool", func(t *testing.T) {
 		assert.Equal(t, initialize.FromPointer((*bool)(nil)), false)
@@ -50,40 +38,6 @@ func TestFromPointer(t *testing.T) {
 		assert.Equal(t, initialize.FromPointer(new("")), "")
 		assert.Equal(t, initialize.FromPointer(new("sup")), "sup")
 	})
-}
-
-func TestInt32(t *testing.T) {
-	z := initialize.Int32(0)
-	if assert.Check(t, z != nil) {
-		assert.Equal(t, *z, int32(0))
-	}
-
-	n := initialize.Int32(-99)
-	if assert.Check(t, n != nil) {
-		assert.Equal(t, *n, int32(-99))
-	}
-
-	p := initialize.Int32(42)
-	if assert.Check(t, p != nil) {
-		assert.Equal(t, *p, int32(42))
-	}
-}
-
-func TestInt64(t *testing.T) {
-	z := initialize.Int64(0)
-	if assert.Check(t, z != nil) {
-		assert.Equal(t, *z, int64(0))
-	}
-
-	n := initialize.Int64(-99)
-	if assert.Check(t, n != nil) {
-		assert.Equal(t, *n, int64(-99))
-	}
-
-	p := initialize.Int64(42)
-	if assert.Check(t, p != nil) {
-		assert.Equal(t, *p, int64(42))
-	}
 }
 
 func TestMap(t *testing.T) {
@@ -128,76 +82,4 @@ func TestMap(t *testing.T) {
 		initialize.Map(&m)
 		assert.DeepEqual(t, m, map[string]string{"x": "y"})
 	})
-}
-
-func TestPointer(t *testing.T) {
-	t.Run("bool", func(t *testing.T) {
-		n := new(false)
-		if assert.Check(t, n != nil) {
-			assert.Equal(t, *n, false)
-		}
-
-		y := new(true)
-		if assert.Check(t, y != nil) {
-			assert.Equal(t, *y, true)
-		}
-	})
-
-	t.Run("int32", func(t *testing.T) {
-		z := new(int32(0))
-		if assert.Check(t, z != nil) {
-			assert.Equal(t, *z, int32(0))
-		}
-
-		n := new(int32(-99))
-		if assert.Check(t, n != nil) {
-			assert.Equal(t, *n, int32(-99))
-		}
-
-		p := new(int32(42))
-		if assert.Check(t, p != nil) {
-			assert.Equal(t, *p, int32(42))
-		}
-	})
-
-	t.Run("int64", func(t *testing.T) {
-		z := new(int64(0))
-		if assert.Check(t, z != nil) {
-			assert.Equal(t, *z, int64(0))
-		}
-
-		n := new(int64(-99))
-		if assert.Check(t, n != nil) {
-			assert.Equal(t, *n, int64(-99))
-		}
-
-		p := new(int64(42))
-		if assert.Check(t, p != nil) {
-			assert.Equal(t, *p, int64(42))
-		}
-	})
-
-	t.Run("string", func(t *testing.T) {
-		z := new("")
-		if assert.Check(t, z != nil) {
-			assert.Equal(t, *z, "")
-		}
-
-		n := new("sup")
-		if assert.Check(t, n != nil) {
-			assert.Equal(t, *n, "sup")
-		}
-	})
-}
-
-func TestString(t *testing.T) {
-	z := new("")
-	if assert.Check(t, z != nil) {
-		assert.Equal(t, *z, "")
-	}
-
-	n := new("sup")
-	if assert.Check(t, n != nil) {
-		assert.Equal(t, *n, "sup")
-	}
 }
