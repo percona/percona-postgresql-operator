@@ -19,7 +19,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -133,7 +133,6 @@ func (r *Reconciler) reconcileRootCertificate(
 	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Data = make(map[string][]byte)
-	intent.ObjectMeta.OwnerReferences = existing.ObjectMeta.OwnerReferences
 
 	if cluster.Labels != nil {
 		currVersion, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -143,17 +142,8 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
-	// A root secret is scoped to the namespace where postgrescluster(s)
-	// are deployed. For operator deployments with postgresclusters in more than
-	// one namespace, there will be one root per namespace.
-	// During reconciliation, the owner reference block of the root secret is
-	// updated to include the postgrescluster as an owner.
-	// However, unlike the leaf certificate, the postgrescluster will not be
-	// set as the controller. This allows for multiple owners to guide garbage
-	// collection, but avoids any errors related to setting multiple controllers.
-	// https://docs.k8s.io/concepts/workloads/controllers/garbage-collection/#owners-and-dependents
 	if err == nil {
-		err = errors.WithStack(r.setOwnerReference(cluster, intent))
+		err = errors.WithStack(r.setControllerReference(cluster, intent))
 	}
 	if err == nil {
 		intent.Data[keyCertificate], err = root.Certificate.MarshalText()

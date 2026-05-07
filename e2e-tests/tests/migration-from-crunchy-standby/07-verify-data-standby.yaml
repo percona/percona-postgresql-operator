@@ -1,0 +1,40 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 480
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      standby_pod=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-standby,postgres-operator.crunchydata.com/data=postgres \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${standby_pod}" ]; then
+        echo "ERROR: Percona standby pod not found"
+        exit 1
+      fi
+
+      # Poll until rows 2 and 3 (written after standby was running) are visible
+      data=""
+      attempts=0
+      max_attempts=30
+
+      until echo "${data}" | grep -q "more-data-for-replication-test"; do
+        data=$(kubectl exec -n "${NAMESPACE}" "${standby_pod}" -c database -- bash -c \
+          "psql -q -t -d migrationtest -c 'SELECT id, value FROM migration_data ORDER BY id;' 2>/dev/null" \
+          2>/dev/null || true)
+
+        attempts=$((attempts + 1))
+        if [ "${attempts}" -ge "${max_attempts}" ]; then
+          echo "ERROR: updated data not replicated to Percona standby after $((max_attempts * 15)) seconds"
+          echo "Current data on standby: ${data}"
+          exit 1
+        fi
+        sleep 15
+      done
+
+      kubectl create configmap -n "${NAMESPACE}" 06-standby-data \
+        --from-literal=data="${data}"
