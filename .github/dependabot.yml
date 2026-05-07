@@ -41,4 +41,8 @@ updates:
       interval: weekly
       day: "tuesday"
       time: "01:00"
-  
+    groups:
+      k8s-ecosystem:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
