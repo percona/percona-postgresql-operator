@@ -1,0 +1,35 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: percona-migrated
+spec:
+  instances:
+    - name: instance1
+      # Single replica: the migrated PV is the only data volume; step 05 scales out.
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        # Bind to the released Crunchy PV by label rather than by name so the
+        # PVC is not coupled to a specific PV identifier.
+        selector:
+          matchLabels:
+            percona-pv-migration: migrated
+        resources:
+          requests:
+            storage: 1Gi
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: migration-pv-pgbackrest-secrets
+      global:
+        repo1-path: <repo-path>
+        repo1-s3-uri-style: path
+        repo1-s3-verify-tls: "n"
+      repos:
+        - name: repo1
+          s3:
+            bucket: operator-testing
+            endpoint: <minio-endpoint>
+            region: us-east-1

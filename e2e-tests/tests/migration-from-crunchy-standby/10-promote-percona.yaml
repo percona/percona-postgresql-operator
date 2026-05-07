@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # Promote the Percona standby to a primary cluster by disabling standby mode
+      kubectl patch perconapgcluster percona-standby \
+        -n "${NAMESPACE}" \
+        --type=merge \
+        -p '{"spec": {"standby": {"enabled": false}}}'
+
+      echo "Percona standby promotion triggered"

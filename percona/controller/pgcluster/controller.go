@@ -46,7 +46,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -213,7 +213,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/status,verbs=patch;update
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
+// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
@@ -383,6 +383,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			}, nil
 		}
 		return reconcile.Result{}, errors.Wrap(err, "check patroni version from instance pods")
+	}
+
+	if err := r.reconcileOwnerRefMigrationStatus(ctx, cr); err != nil {
+		if errors.Is(err, errOwnerRefMigrationInProgress) {
+			return reconcile.Result{
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		return reconcile.Result{}, errors.Wrap(err, "reconcile owner ref migration status")
 	}
 
 	return ctrl.Result{}, nil

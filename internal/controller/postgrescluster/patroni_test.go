@@ -27,7 +27,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestGeneratePatroniLeaderLeaseService(t *testing.T) {
@@ -64,7 +64,7 @@ labels:
 name: pg2-ha
 namespace: ns1
 ownerReferences:
-- apiVersion: postgres-operator.crunchydata.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster

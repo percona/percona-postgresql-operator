@@ -1,0 +1,35 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(kubectl get pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=master \
+        -n "${NAMESPACE}" \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: Crunchy primary pod not found"
+        exit 1
+      fi
+
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
+        psql -c 'CREATE DATABASE migrationtest;'
+        psql -d migrationtest -c 'CREATE TABLE migration_data (id int PRIMARY KEY, value text);'
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (1, 'row-one');\"
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (2, 'row-two');\"
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (3, 'row-three');\"
+      "
+
+      data=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c \
+        "psql -q -t -d migrationtest -c 'SELECT id, value FROM migration_data ORDER BY id;'")
+      echo "Data written to Crunchy cluster:"
+      echo "${data}"
+
+      kubectl create configmap -n "${NAMESPACE}" 02-initial-data \
+        --from-literal=data="${data}"
+    timeout: 60

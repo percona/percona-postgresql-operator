@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      data=$(kubectl get configmap 10-percona-primary-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+      for expected in \
+        "initial-data-before-standby" \
+        "data-added-while-standby-syncing" \
+        "more-data-for-replication-test" \
+        "written-after-percona-promotion"; do
+        echo "${data}" | grep -q "${expected}" || {
+          echo "ERROR: '${expected}' missing from Percona primary. Got: ${data}"
+          exit 1
+        }
+      done
