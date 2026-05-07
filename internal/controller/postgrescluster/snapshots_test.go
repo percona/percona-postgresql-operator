@@ -46,7 +46,7 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		DiscoveryClient: discoveryClient,
 		Recorder:        recorder,
 	}
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 
 	// Enable snapshots feature gate
 	gate := feature.NewGate()
@@ -370,7 +370,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 	t.Run("SnapshotsDisabledDeletePvc", func(t *testing.T) {
 		// Create cluster without snapshots spec
-		ns := setupNamespace(t, cc)
+		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		cluster.ObjectMeta.UID = "the-uid-123"
@@ -427,7 +427,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 	t.Run("SnapshotsEnabledCreatePvcNoBackupNoRestore", func(t *testing.T) {
 		// Create cluster with snapshots enabled
-		ns := setupNamespace(t, cc)
+		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		cluster.ObjectMeta.UID = "the-uid-123"
@@ -459,7 +459,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 	t.Run("SnapshotsEnabledBackupExistsCreateRestore", func(t *testing.T) {
 		// Create cluster with snapshots enabled
-		ns := setupNamespace(t, cc)
+		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		cluster.ObjectMeta.UID = "the-uid-123"
@@ -523,7 +523,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 	t.Run("SnapshotsEnabledSuccessfulRestoreExists", func(t *testing.T) {
 		// Create cluster with snapshots enabled
-		ns := setupNamespace(t, cc)
+		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		cluster.ObjectMeta.UID = "the-uid-123"
@@ -622,7 +622,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 
 	t.Run("SnapshotsEnabledFailedRestoreExists", func(t *testing.T) {
 		// Create cluster with snapshots enabled
-		ns := setupNamespace(t, cc)
+		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		cluster.ObjectMeta.UID = "the-uid-123"
@@ -724,7 +724,7 @@ func TestCreateDedicatedSnapshotVolume(t *testing.T) {
 		Owner:  client.FieldOwner(t.Name()),
 	}
 
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
 	cluster.ObjectMeta.UID = "the-uid-123"
@@ -752,7 +752,7 @@ func TestDedicatedSnapshotVolumeRestore(t *testing.T) {
 		Owner:  client.FieldOwner(t.Name()),
 	}
 
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
 	cluster.ObjectMeta.UID = "the-uid-123"
@@ -793,7 +793,7 @@ func TestGenerateSnapshotOfDedicatedSnapshotVolume(t *testing.T) {
 		Client: cc,
 		Owner:  client.FieldOwner(t.Name()),
 	}
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
@@ -824,7 +824,7 @@ func TestGenerateVolumeSnapshot(t *testing.T) {
 		Client: cc,
 		Owner:  client.FieldOwner(t.Name()),
 	}
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
@@ -853,7 +853,7 @@ func TestGetDedicatedSnapshotVolumeRestoreJob(t *testing.T) {
 		Client: cc,
 		Owner:  client.FieldOwner(t.Name()),
 	}
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
@@ -908,7 +908,7 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 		Client: cc,
 		Owner:  client.FieldOwner(t.Name()),
 	}
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
@@ -976,9 +976,9 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 	})
 
 	t.Run("TwoCompleteBackupJobs", func(t *testing.T) {
-		currentTime := metav1.Now()
-		earlierTime := metav1.NewTime(currentTime.AddDate(-1, 0, 0))
-		assert.Check(t, earlierTime.Before(&currentTime))
+		laterTime := metav1.NewTime(time.Now().AddDate(-1, 0, 0))
+		earlierTime := metav1.NewTime(laterTime.AddDate(-1, 0, 0))
+		assert.Check(t, earlierTime.Before(&laterTime))
 
 		job1 := testBackupJob(cluster, "backup-job-two-complete-1")
 		job1.Namespace = ns.Name
@@ -996,9 +996,9 @@ func TestGetLatestCompleteBackupJob(t *testing.T) {
 
 		job1.Status = batchv1.JobStatus{
 			Succeeded:      1,
-			CompletionTime: &currentTime,
+			CompletionTime: &laterTime,
 			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
-			StartTime: ptr.To(metav1.NewTime(currentTime.Add(-time.Minute))),
+			StartTime: ptr.To(metav1.NewTime(laterTime.Add(-time.Minute))),
 			Conditions: []batchv1.JobCondition{
 				{
 					Type:    batchv1.JobSuccessCriteriaMet,
@@ -1162,7 +1162,7 @@ func TestGetSnapshotsForCluster(t *testing.T) {
 		Client: cc,
 		Owner:  client.FieldOwner(t.Name()),
 	}
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
@@ -1391,7 +1391,7 @@ func TestDeleteSnapshots(t *testing.T) {
 		Owner:           client.FieldOwner(t.Name()),
 		DiscoveryClient: discoveryClient,
 	}
-	ns := setupNamespace(t, cc)
+	ns := require.Namespace(t, cc)
 
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
