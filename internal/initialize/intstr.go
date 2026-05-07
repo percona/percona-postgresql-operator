@@ -28,10 +28,3 @@ func IntOrStringInt32(i int32) *intstr.IntOrString {
 func IntOrStringString(s string) *intstr.IntOrString {
 	return new(intstr.FromString(s))
 }
-
-// IntOrString returns a pointer to the provided IntOrString
-//
-//go:fix inline
-func IntOrString(ios intstr.IntOrString) *intstr.IntOrString {
-	return new(ios)
-}
