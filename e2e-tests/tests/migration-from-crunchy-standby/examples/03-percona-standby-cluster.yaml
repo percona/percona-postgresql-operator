@@ -1,0 +1,49 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: percona-standby
+spec:
+  crVersion: 2.10.0
+  image: docker.io/perconalab/percona-postgresql-operator:main-ppg18-postgres
+  postgresVersion: 18
+  instances:
+    - name: instance1
+      replicas: 3
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  proxy:
+    pgBouncer:
+      replicas: 1
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
+  backups:
+    pgbackrest:
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest18
+      configuration:
+        - secret:
+            name: percona-pgbackrest-secret
+      global:
+        # Must match repo1-path in the Crunchy source cluster exactly.
+        repo1-path: /crunchy-to-percona/repo1
+        repo1-s3-uri-style: path
+        repo1-s3-verify-tls: "n"
+      repos:
+        - name: repo1
+          s3:
+            bucket: pg-migration
+            endpoint: minio-service.postgres-migration.svc.cluster.local:9000
+            region: us-east-1
+  standby:
+    enabled: true
+    repoName: repo1
+    # Crunchy HA service — Patroni always routes this to the current leader.
+    host: crunchy-source-ha.postgres-migration.svc.cluster.local
+    port: 5432
+  secrets:
+    customTLSSecret:
+      name: crunchy-source-cluster-cert
+    customReplicationTLSSecret:
+      name: crunchy-source-replication-cert

@@ -5,11 +5,9 @@ commands:
   - script: |-
       set -o errexit
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
       kubectl wait pod \
         -l postgres-operator.crunchydata.com/cluster=crunchy-source \
-        -n "${CRUNCHY_NS}" \
+        -n "${NAMESPACE}" \
         --for=delete \
         --timeout=120s || true
 

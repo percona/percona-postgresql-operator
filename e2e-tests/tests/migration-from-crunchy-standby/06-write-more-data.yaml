@@ -8,11 +8,9 @@ commands:
 
       source ../../functions
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
       primary=$(kubectl get pod \
         -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=master \
-        -n "${CRUNCHY_NS}" \
+        -n "${NAMESPACE}" \
         -o jsonpath='{.items[0].metadata.name}')
 
       if [ -z "${primary}" ]; then
@@ -21,7 +19,7 @@ commands:
       fi
 
       # Write additional rows after standby is already syncing
-      kubectl exec -n "${CRUNCHY_NS}" "${primary}" -c database -- bash -c "
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
         psql -d migrationtest -c \"INSERT INTO migration_data VALUES (2, 'data-added-while-standby-syncing');\"
         psql -d migrationtest -c \"INSERT INTO migration_data VALUES (3, 'more-data-for-replication-test');\"
       "

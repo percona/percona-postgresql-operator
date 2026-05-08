@@ -8,8 +8,6 @@ commands:
 
       source ../../functions
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
       # -----------------------------------------------------------------------
       # Pre-cutover: verify streaming replication lag is minimal.
       # Query pg_stat_replication on the Crunchy primary to confirm the Percona
@@ -17,12 +15,12 @@ commands:
       # -----------------------------------------------------------------------
       primary=$(kubectl get pod \
         -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=master \
-        -n "${CRUNCHY_NS}" \
+        -n "${NAMESPACE}" \
         -o jsonpath='{.items[0].metadata.name}')
 
       attempts=0
       max_attempts=12
-      until kubectl exec -n "${CRUNCHY_NS}" "${primary}" -c database -- \
+      until kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
           psql -q -t -c "
             SELECT count(*) FROM pg_stat_replication
             WHERE state = 'streaming'
@@ -32,7 +30,7 @@ commands:
         attempts=$((attempts + 1))
         if [ "${attempts}" -ge "${max_attempts}" ]; then
           echo "ERROR: Percona standby replication lag too high before cutover"
-          kubectl exec -n "${CRUNCHY_NS}" "${primary}" -c database -- \
+          kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
             psql -c "SELECT client_addr, state, write_lag, flush_lag, replay_lag FROM pg_stat_replication;"
           exit 1
         fi
@@ -47,7 +45,7 @@ commands:
       # the final WAL segments to S3, then enters recovery.
       # -----------------------------------------------------------------------
       kubectl patch postgrescluster crunchy-source \
-        -n "${CRUNCHY_NS}" \
+        -n "${NAMESPACE}" \
         --type=merge \
         -p '{"spec": {"standby": {"enabled": true, "repoName": "repo1"}}}'
 

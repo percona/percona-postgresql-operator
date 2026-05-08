@@ -8,12 +8,10 @@ commands:
 
       source ../../functions
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
-      # Get the primary pod in the Crunchy namespace
+      # Get the primary pod
       primary=$(kubectl get pod \
         -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=master \
-        -n "${CRUNCHY_NS}" \
+        -n "${NAMESPACE}" \
         -o jsonpath='{.items[0].metadata.name}')
 
       if [ -z "${primary}" ]; then
@@ -22,13 +20,13 @@ commands:
       fi
 
       # Write initial test data directly via psql on the primary pod
-      kubectl exec -n "${CRUNCHY_NS}" "${primary}" -c database -- bash -c "
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
         psql -c 'CREATE DATABASE migrationtest;'
         psql -d migrationtest -c 'CREATE TABLE migration_data (id int PRIMARY KEY, value text);'
         psql -d migrationtest -c \"INSERT INTO migration_data VALUES (1, 'initial-data-before-standby');\"
       "
 
-      data=$(kubectl exec -n "${CRUNCHY_NS}" "${primary}" -c database -- bash -c \
+      data=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c \
         "psql -q -t -d migrationtest -c 'SELECT id, value FROM migration_data ORDER BY id;'")
 
       kubectl create configmap -n "${NAMESPACE}" 02-initial-data \

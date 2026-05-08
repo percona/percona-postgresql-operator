@@ -17,15 +17,12 @@ commands:
 
       source ../../functions
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
       # Strip finalizers so deletion is not blocked by a missing operator
-      kubectl delete postgrescluster crunchy-source -n "${CRUNCHY_NS}" --ignore-not-found || true
-      kubectl patch postgrescluster crunchy-source -n "${CRUNCHY_NS}" \
+      kubectl delete postgrescluster crunchy-source -n "${NAMESPACE}" --ignore-not-found || true
+      kubectl patch postgrescluster crunchy-source -n "${NAMESPACE}" \
         --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
 
-      helm uninstall pgo --namespace "${CRUNCHY_NS}" --ignore-not-found || true
-      kubectl delete namespace "${CRUNCHY_NS}" --ignore-not-found || true
+      helm uninstall pgo --namespace "${NAMESPACE}" --ignore-not-found || true
 
       remove_all_finalizers
       check_operator_panic

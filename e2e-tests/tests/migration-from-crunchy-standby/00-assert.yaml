@@ -35,6 +35,6 @@ timeout: 120
 commands:
   - script: |-
       kubectl wait deployment pgo \
-        -n "${NAMESPACE}-crunchy" \
+        -n "${NAMESPACE}" \
         --for=condition=Available \
         --timeout=120s

@@ -8,29 +8,14 @@ commands:
 
       source ../../functions
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
       # Retrieve the S3 repo path set when the Crunchy cluster was created
       REPO_PATH=$(kubectl get configmap crunchy-migration-config -n "${NAMESPACE}" \
         -o jsonpath='{.data.repo-path}')
       MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
 
-      # -----------------------------------------------------------------------
-      # Copy TLS certificates from the Crunchy namespace to the Percona namespace.
-      # The cluster-cert provides the shared CA so each side can verify the other.
-      # The replication-cert (CN=_crunchyreplication) is presented by the Percona
-      # standby when opening a streaming replication connection to the Crunchy primary.
-      # -----------------------------------------------------------------------
-      for secret in crunchy-source-cluster-cert crunchy-source-replication-cert; do
-        kubectl get secret "${secret}" -n "${CRUNCHY_NS}" -o json | \
-          yq '{"apiVersion": .apiVersion, "kind": .kind, "data": .data,
-               "metadata": {"name": .metadata.name}, "type": .type}' -o yaml | \
-          kubectl apply -n "${NAMESPACE}" -f -
-      done
-
-      # Use the Crunchy HA service DNS as the streaming replication host.
-      # In-cluster cross-namespace DNS avoids the need for a LoadBalancer IP.
-      CRUNCHY_HOST="crunchy-source-ha.${CRUNCHY_NS}.svc.cluster.local"
+      # Both clusters are in the same namespace; TLS secrets are already present.
+      # Use the Crunchy HA service DNS for streaming replication.
+      CRUNCHY_HOST="crunchy-source-ha.${NAMESPACE}.svc.cluster.local"
 
       # -----------------------------------------------------------------------
       # Create the Percona standby cluster:

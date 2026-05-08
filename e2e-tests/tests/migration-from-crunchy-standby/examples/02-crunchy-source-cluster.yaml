@@ -1,0 +1,47 @@
+---
+# Crunchy PGO source cluster with pgBackRest configured to archive WAL to MinIO.
+#
+# Key requirements:
+#   - pgBackRest repo1 must point at a bucket accessible from both clusters.
+#   - The Percona standby uses the same bucket and path to restore and replay WAL.
+#   - repo1-s3-uri-style: path  is required for MinIO (virtual-host style is AWS-only).
+#   - repo1-s3-verify-tls: "n" skips TLS verification; safe for in-cluster MinIO
+#     with a self-signed cert.  Remove this option when using AWS S3 or any
+#     endpoint with a valid certificate.
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: crunchy-source
+spec:
+  postgresVersion: 18
+  instances:
+    - name: instance1
+      replicas: 3
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: crunchy-pgbackrest-secret
+      manual:
+        repoName: repo1
+        options:
+          - --type=full
+      global:
+        repo1-path: /crunchy-to-percona/repo1
+        repo1-s3-uri-style: path
+        repo1-s3-verify-tls: "n"
+      repos:
+        - name: repo1
+          s3:
+            bucket: pg-migration
+            endpoint: minio-service.postgres-migration.svc.cluster.local:9000
+            region: us-east-1
+  proxy:
+    pgBouncer:
+      replicas: 1

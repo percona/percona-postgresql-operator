@@ -5,8 +5,6 @@ commands:
   - script: |-
       set -o errexit
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
       # Verify Crunchy actually demoted to standby mode.
       #
       # PGO 5.8.7 does NOT:
@@ -19,18 +17,18 @@ commands:
       # pod that was the primary.  Poll until it does.
       attempt=0
       while [ "${attempt}" -lt 36 ]; do
-        master_pod=$(kubectl get pods -n "${CRUNCHY_NS}" \
+        master_pod=$(kubectl get pods -n "${NAMESPACE}" \
           -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=master \
           -o jsonpath='{.items[0].metadata.name}')
 
         if [ -z "${master_pod}" ]; then
           # No master-labelled pod at all — pick any postgres pod.
-          master_pod=$(kubectl get pods -n "${CRUNCHY_NS}" \
+          master_pod=$(kubectl get pods -n "${NAMESPACE}" \
             -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/data=postgres \
             -o jsonpath='{.items[0].metadata.name}')
         fi
 
-        in_recovery=$(kubectl exec -n "${CRUNCHY_NS}" "${master_pod}" -c database -- \
+        in_recovery=$(kubectl exec -n "${NAMESPACE}" "${master_pod}" -c database -- \
           psql -q -t -c "SELECT pg_is_in_recovery();" 2>/dev/null | tr -d ' \n') || true
 
         if [ "${in_recovery}" = "t" ]; then
