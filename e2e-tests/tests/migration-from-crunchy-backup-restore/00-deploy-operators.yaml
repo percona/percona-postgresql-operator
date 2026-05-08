@@ -8,13 +8,9 @@ commands:
       source ../../functions
       init_temp_dir
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
-      kubectl create namespace "${CRUNCHY_NS}" || true
-
       helm install pgo \
         oci://registry.developers.crunchydata.com/crunchydata/pgo \
-        --namespace "${CRUNCHY_NS}" \
+        --namespace "${NAMESPACE}" \
         --version "${CPGO_VERSION}" \
         --set singleNamespace=true \
         --wait
@@ -77,7 +73,7 @@ commands:
       kubectl -n "${NAMESPACE}" create secret generic "migration-backup-restore-pgbackrest-secrets" \
         --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-minio.ini"
 
-      kubectl -n "${CRUNCHY_NS}" create secret generic "crunchy-pgbackrest-secret" \
+      kubectl -n "${NAMESPACE}" create secret generic "crunchy-pgbackrest-secret" \
         --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-minio.ini"
 
       deploy_operator

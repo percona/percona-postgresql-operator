@@ -6,7 +6,7 @@ commands:
       set -o errexit
 
       kubectl wait pod \
-        -l postgres-operator.crunchydata.com/cluster=crunchy-source \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/data=postgres \
         -n "${NAMESPACE}" \
         --for=delete \
         --timeout=120s || true

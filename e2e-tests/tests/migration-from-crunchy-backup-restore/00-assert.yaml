@@ -5,10 +5,8 @@ commands:
   - script: |-
       set -o errexit
 
-      CRUNCHY_NS="${NAMESPACE}-crunchy"
-
       kubectl wait deployment pgo \
-        -n "${CRUNCHY_NS}" \
+        -n "${NAMESPACE}" \
         --for=condition=Available \
         --timeout=120s
 
