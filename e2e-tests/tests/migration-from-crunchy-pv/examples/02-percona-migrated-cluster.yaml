@@ -1,0 +1,37 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: percona-migrated
+spec:
+  crVersion: 2.10.0
+  image: docker.io/perconalab/percona-postgresql-operator:main-ppg18-postgres
+  postgresVersion: 18
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        # Bind exclusively to the PV that was released from the Crunchy cluster.
+        selector:
+          matchLabels:
+            percona-pv-migration: migrated
+        resources:
+          requests:
+            storage: 10Gi
+  proxy:
+    pgBouncer:
+      replicas: 1
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
+  backups:
+    pgbackrest:
+      image: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest18
+      repos:
+        - name: repo1
+          volume:
+            volumeClaimSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 10Gi
