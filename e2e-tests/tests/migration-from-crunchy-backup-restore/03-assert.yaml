@@ -1,9 +1,22 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 300
+timeout: 360
 commands:
   - script: |-
       set -o errexit
+
+      # kubectl wait --for=condition=Complete fails immediately when no resources
+      # match the selector. Poll until the job exists, then wait for completion.
+      deadline=$(( $(date +%s) + 300 ))
+      until kubectl get job \
+        -l postgres-operator.crunchydata.com/pgbackrest-backup=manual,postgres-operator.crunchydata.com/cluster=crunchy-source \
+        -n "${NAMESPACE}" --no-headers 2>/dev/null | grep -q .; do
+        if [ "$(date +%s)" -ge "${deadline}" ]; then
+          echo "Timed out waiting for manual backup job to be created"
+          exit 1
+        fi
+        sleep 5
+      done
 
       kubectl wait job \
         -l postgres-operator.crunchydata.com/pgbackrest-backup=manual,postgres-operator.crunchydata.com/cluster=crunchy-source \

@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      MINIO_ENDPOINT="seaweedfs-all-in-one.${NAMESPACE}.svc.cluster.local:8443"
       REPO_PATH="/migration-from-crunchy/${RANDOM}/repo1"
 
       kubectl create configmap -n "${NAMESPACE}" crunchy-migration-config \

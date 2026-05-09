@@ -38,7 +38,7 @@ spec:
         - name: repo1
           s3:
             bucket: pg-migration
-            endpoint: minio-service.postgres-migration.svc.cluster.local:9000
+            endpoint: seaweedfs-all-in-one.postgres-migration.svc.cluster.local:8443
             region: us-east-1
   proxy:
     pgBouncer:

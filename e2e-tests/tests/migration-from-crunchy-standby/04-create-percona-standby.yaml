@@ -11,7 +11,7 @@ commands:
       # Retrieve the S3 repo path set when the Crunchy cluster was created
       REPO_PATH=$(kubectl get configmap crunchy-migration-config -n "${NAMESPACE}" \
         -o jsonpath='{.data.repo-path}')
-      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      MINIO_ENDPOINT="seaweedfs-all-in-one.${NAMESPACE}.svc.cluster.local:8443"
 
       # Both clusters are in the same namespace; TLS secrets are already present.
       # Use the Crunchy HA service DNS for streaming replication.

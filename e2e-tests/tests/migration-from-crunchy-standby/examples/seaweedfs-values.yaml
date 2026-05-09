@@ -1,0 +1,46 @@
+# createClusterRole=false avoids a cluster-scoped resource that persists
+# after namespace deletion and blocks re-installation.
+global:
+  seaweedfs:
+    createClusterRole: false
+
+allInOne:
+  enabled: true
+  s3:
+    enabled: true
+    enableAuth: true
+    createBuckets:
+      - name: pg-migration
+        anonymousRead: false
+  extraArgs:
+    - "-s3.port.https=8443"
+    - "-s3.cert.file=/tls/tls.crt"
+    - "-s3.key.file=/tls/tls.key"
+  extraVolumeMounts: |
+    - name: s3-tls
+      readOnly: true
+      mountPath: /tls
+  extraVolumes: |
+    - name: s3-tls
+      secret:
+        secretName: seaweedfs-s3-tls
+
+# Disable standalone components — allInOne runs all services in one pod.
+# Without this, the chart also deploys master/filer/volume StatefulSets
+# that use hostPath volumes which fail on managed Kubernetes (GKE, EKS, AKS).
+master:
+  enabled: false
+
+filer:
+  enabled: false
+
+volume:
+  enabled: false
+
+s3:
+  httpsPort: 8443
+  enableAuth: true
+  credentials:
+    admin:
+      accessKey: pgmigration
+      secretKey: pgmigration123
