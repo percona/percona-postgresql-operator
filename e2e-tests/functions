@@ -1783,7 +1783,7 @@ create_k8s_cluster() {
 	local version="$2"
 	local platform="$3"
 	local region="$4"
-	local ttl="${5:-"1h"}"
+	local ttl="${5:-"1"}"
 
 	case "$platform" in
 
