@@ -352,6 +352,10 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 }
 
 func (r *Reconciler) isRootCACertManagerManaged(ctx context.Context, cluster *v1beta1.PostgresCluster) (bool, error) {
+	if cluster.Spec.CustomRootCATLSSecret != nil {
+		return false, nil
+	}
+
 	installed, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
 	if err != nil || !installed {
 		return false, err

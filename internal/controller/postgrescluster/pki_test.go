@@ -519,6 +519,19 @@ func TestUpgradeCertManagerDoesNotTakeOverInternalPKI(t *testing.T) {
 		assert.Assert(t, managed)
 	})
 
+	t.Run("isRootCACertManagerManaged returns false when CustomRootCATLSSecret is set", func(t *testing.T) {
+		clusterWithCustomRoot := testCluster()
+		clusterWithCustomRoot.Name = cluster.Name
+		clusterWithCustomRoot.Namespace = namespace
+		clusterWithCustomRoot.Spec.CustomRootCATLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "my-custom-root-ca"},
+		}
+
+		managed, err := reconcilerWithCertManager.isRootCACertManagerManaged(ctx, clusterWithCustomRoot)
+		assert.NilError(t, err)
+		assert.Assert(t, !managed)
+	})
+
 	t.Run("isRootCACertManagerManaged returns false when cert-manager not installed", func(t *testing.T) {
 		rNoCertManager := &Reconciler{
 			Client:              tClient,
