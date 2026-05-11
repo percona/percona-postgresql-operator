@@ -31,11 +31,11 @@ func TestFromContext(t *testing.T) {
 }
 
 func TestFromContextTraceContext(t *testing.T) {
-	var calls []map[string]interface{}
+	var calls []map[string]any
 
 	SetLogSink(&sink{
-		fnInfo: func(_ int, _ string, kv ...interface{}) {
-			m := make(map[string]interface{})
+		fnInfo: func(_ int, _ string, kv ...any) {
+			m := make(map[string]any)
 			for i := 0; i < len(kv); i += 2 {
 				m[kv[i].(string)] = kv[i+1]
 			}
@@ -63,7 +63,7 @@ func TestSetLogSink(t *testing.T) {
 	var calls []string
 
 	SetLogSink(&sink{
-		fnInfo: func(_ int, m string, _ ...interface{}) {
+		fnInfo: func(_ int, m string, _ ...any) {
 			calls = append(calls, m)
 		},
 	})

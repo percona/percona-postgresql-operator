@@ -6,7 +6,6 @@ import (
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
 )
 
 func TestPGBackRestRepo_StorageEquals(t *testing.T) {
@@ -261,7 +260,7 @@ func TestPGBackRestRepo_StorageEquals(t *testing.T) {
 				Volume: &RepoPVC{
 					VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						StorageClassName: ptr.To("standard"),
+						StorageClassName: new("standard"),
 						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -275,7 +274,7 @@ func TestPGBackRestRepo_StorageEquals(t *testing.T) {
 				Volume: &RepoPVC{
 					VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						StorageClassName: ptr.To("premium"),
+						StorageClassName: new("premium"),
 						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),

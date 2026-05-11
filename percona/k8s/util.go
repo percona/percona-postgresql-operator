@@ -161,7 +161,7 @@ func GetOperatorNamespace() (string, error) {
 }
 
 func ObjectHash(obj runtime.Object) (string, error) {
-	var dataToMarshal interface{}
+	var dataToMarshal any
 
 	switch object := obj.(type) {
 	case *appsv1.StatefulSet:

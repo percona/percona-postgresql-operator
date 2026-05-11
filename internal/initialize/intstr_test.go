@@ -41,6 +41,6 @@ func TestIntOrStringString(t *testing.T) {
 func TestIntOrString(t *testing.T) {
 	upstream := intstr.FromInt(0)
 
-	ios := initialize.IntOrString(intstr.FromInt(0))
+	ios := new(intstr.FromInt(0))
 	assert.DeepEqual(t, *ios, upstream)
 }

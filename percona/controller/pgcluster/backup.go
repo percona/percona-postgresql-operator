@@ -194,7 +194,7 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 			},
 			Spec: v2.PerconaPGBackupSpec{
 				PGCluster: cr.Name,
-				RepoName:  ptr.To(repoName),
+				RepoName:  new(repoName),
 			},
 		}
 		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
@@ -235,7 +235,6 @@ func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster
 	}
 
 	for _, pb := range pbList {
-		pb := pb
 		if pb.GetAnnotations()[pNaming.AnnotationPGBackrestBackupJobName] == job.Name || pb.Status.JobName == job.Name {
 			return &pb, nil
 		}

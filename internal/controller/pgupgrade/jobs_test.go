@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
@@ -103,7 +102,7 @@ func TestGenerateUpgradeJob(t *testing.T) {
 	upgrade.Namespace = "ns1"
 	upgrade.Name = "pgu2"
 	upgrade.UID = "uid3"
-	upgrade.Spec.Image = initialize.Pointer("img4")
+	upgrade.Spec.Image = new("img4")
 	upgrade.Spec.PostgresClusterName = "pg5"
 	upgrade.Spec.FromPostgresVersion = 19
 	upgrade.Spec.ToPostgresVersion = 25
@@ -265,7 +264,7 @@ func TestGenerateRemoveDataJob(t *testing.T) {
 	upgrade.Namespace = "ns1"
 	upgrade.Name = "pgu2"
 	upgrade.UID = "uid3"
-	upgrade.Spec.Image = initialize.Pointer("img4")
+	upgrade.Spec.Image = new("img4")
 	upgrade.Spec.PostgresClusterName = "pg5"
 	upgrade.Spec.FromPostgresVersion = 19
 	upgrade.Spec.ToPostgresVersion = 25

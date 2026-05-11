@@ -34,7 +34,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/standalone_pgadmin"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
@@ -289,7 +288,7 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	log := logging.FromContext(ctx)
 
 	options := runtime.Options{}
-	options.Cache.SyncPeriod = initialize.Pointer(time.Hour)
+	options.Cache.SyncPeriod = new(time.Hour)
 
 	options.HealthProbeBindAddress = ":8081"
 

@@ -580,7 +580,7 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 	// cache does not yet have the updated `cluster.Status.Patroni.Switchover` field.
 	if statusTimeline != nil && *statusTimeline != timeline {
 		log.V(1).Info("SwitchoverTimeline does not match current timeline, assuming already completed switchover")
-		cluster.Status.Patroni.Switchover = initialize.String(annotation)
+		cluster.Status.Patroni.Switchover = new(annotation)
 		cluster.Status.Patroni.SwitchoverTimeline = nil
 		return nil
 	}
@@ -615,7 +615,7 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 	// If we've reached this point, a switchover has successfully been triggered
 	// and we set the status accordingly.
 	if err == nil {
-		cluster.Status.Patroni.Switchover = initialize.String(annotation)
+		cluster.Status.Patroni.Switchover = new(annotation)
 		cluster.Status.Patroni.SwitchoverTimeline = nil
 	}
 

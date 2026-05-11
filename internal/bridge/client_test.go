@@ -18,8 +18,6 @@ import (
 	gocmpopts "github.com/google/go-cmp/cmp/cmpopts"
 	"gotest.tools/v3/assert"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 )
 
 var testApiKey = "9012"
@@ -1155,7 +1153,7 @@ func TestUpdateCluster(t *testing.T) {
 		ClusterName: "new-cluster-name",
 	}
 	clusterUpdateRequestPayload := &PatchClustersRequestPayload{
-		IsProtected: initialize.Bool(true),
+		IsProtected: new(true),
 	}
 
 	t.Run("WeSendCorrectData", func(t *testing.T) {
