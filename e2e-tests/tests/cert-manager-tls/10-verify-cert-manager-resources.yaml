@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
 commands:
   - script: |-
       set -o errexit
@@ -60,3 +59,4 @@ commands:
           fi
           echo "Instance certificate $cert_name is ready"
       done
+    timeout: 60

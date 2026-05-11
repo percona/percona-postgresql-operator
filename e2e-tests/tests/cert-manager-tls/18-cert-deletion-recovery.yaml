@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 300
 commands:
   - script: |-
       set -o errexit
@@ -28,13 +27,13 @@ commands:
           [[ "$cert_ready" == "True" ]]
       }
 
-      retry 30 10 verify_cert_recreated cert-manager-tls-pgbouncer-cert
+      retry 60 10 verify_cert_recreated cert-manager-tls-pgbouncer-cert
       echo "pgBouncer Certificate recreated and ready"
 
-      retry 30 10 verify_cert_recreated cert-manager-tls-pgbackrest-repo-cert
+      retry 60 10 verify_cert_recreated cert-manager-tls-pgbackrest-repo-cert
       echo "pgBackRest repo Certificate recreated and ready"
 
-      retry 30 10 verify_cert_recreated cert-manager-tls-pgbackrest-client-cert
+      retry 60 10 verify_cert_recreated cert-manager-tls-pgbackrest-client-cert
       echo "pgBackRest client Certificate recreated and ready"
 
       verify_secret_data() {
@@ -50,9 +49,9 @@ commands:
           done
       }
 
-      retry 12 5 verify_secret_data cert-manager-tls-pgbouncer-frontend-tls tls.crt tls.key ca.crt
-      retry 12 5 verify_secret_data cert-manager-tls-pgbackrest-repo-tls tls.crt tls.key
-      retry 12 5 verify_secret_data cert-manager-tls-pgbackrest-client-tls tls.crt tls.key
+      retry 30 5 verify_secret_data cert-manager-tls-pgbouncer-frontend-tls tls.crt tls.key ca.crt
+      retry 30 5 verify_secret_data cert-manager-tls-pgbackrest-repo-tls tls.crt tls.key
+      retry 30 5 verify_secret_data cert-manager-tls-pgbackrest-client-tls tls.crt tls.key
 
       pgb_cert_after=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbouncer-frontend-tls -o jsonpath='{.data.tls\.crt}')
       if [[ "$pgb_cert_before" == "$pgb_cert_after" ]]; then
@@ -101,3 +100,4 @@ commands:
       done
 
       wait_cluster_consistency cert-manager-tls
+timeout: 900

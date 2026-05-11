@@ -223,12 +223,12 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	var frontendCertManagerSecret *corev1.Secret
 	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-		certManagerInstalled, certErr := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
 		if certErr != nil {
-			return nil, errors.Wrap(certErr, "failed to check if cert-manager is installed")
+			return nil, errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
 		}
 
-		if certManagerInstalled {
+		if certManagerManaged {
 			c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
 
 			dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service, cluster.Spec.ClusterServiceDNSSuffix)
@@ -448,13 +448,13 @@ func (r *Reconciler) generatePGBouncerDeployment(
 
 	// if the shutdown flag is set, set pgBouncer replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {
-		deploy.Spec.Replicas = initialize.Int32(0)
+		deploy.Spec.Replicas = new(int32(0))
 	} else {
 		deploy.Spec.Replicas = cluster.Spec.Proxy.PGBouncer.Replicas
 	}
 
 	// Don't clutter the namespace with extra ReplicaSets.
-	deploy.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	deploy.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Ensure that the number of Ready pods is never less than the specified
 	// Replicas by starting new pods while old pods are still running.
@@ -485,17 +485,17 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	// ShareProcessNamespace makes Kubernetes' pause process PID 1 and lets
 	// containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	deploy.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	deploy.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
 	// There's no need for individual DNS names of PgBouncer pods.
 	deploy.Spec.Template.Spec.Subdomain = ""
 
 	// PgBouncer does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	deploy.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	deploy.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// Do not add environment variables describing services in this namespace.
-	deploy.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	deploy.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if cluster.Spec.Proxy.PGBouncer.SecurityContext != nil {

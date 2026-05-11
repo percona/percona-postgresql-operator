@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -862,7 +861,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 		},
 		Spec: v2.PerconaPGBackupSpec{
 			PGCluster: crName,
-			RepoName:  ptr.To("repo1"),
+			RepoName:  new("repo1"),
 		},
 	}
 
@@ -2500,10 +2499,10 @@ var _ = Describe("Init Container", Ordered, func() {
 							"ALL",
 						},
 					},
-					Privileged:               ptr.To(false),
-					RunAsNonRoot:             ptr.To(true),
-					ReadOnlyRootFilesystem:   ptr.To(true),
-					AllowPrivilegeEscalation: ptr.To(false),
+					Privileged:               new(false),
+					RunAsNonRoot:             new(true),
+					ReadOnlyRootFilesystem:   new(true),
+					AllowPrivilegeEscalation: new(false),
 					SeccompProfile: &corev1.SeccompProfile{
 						Type: corev1.SeccompProfileTypeRuntimeDefault,
 					},
@@ -2542,10 +2541,10 @@ var _ = Describe("Init Container", Ordered, func() {
 						"ALL",
 					},
 				},
-				Privileged:               ptr.To(false),
-				RunAsNonRoot:             ptr.To(true),
-				ReadOnlyRootFilesystem:   ptr.To(true),
-				AllowPrivilegeEscalation: ptr.To(false),
+				Privileged:               new(false),
+				RunAsNonRoot:             new(true),
+				ReadOnlyRootFilesystem:   new(true),
+				AllowPrivilegeEscalation: new(false),
 				SeccompProfile: &corev1.SeccompProfile{
 					Type: corev1.SeccompProfileTypeRuntimeDefault,
 				},
@@ -2565,7 +2564,7 @@ var _ = Describe("Init Container", Ordered, func() {
 
 			cr.Spec.InitContainer.Image = "new-image"
 			cr.Spec.InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(false),
+				RunAsNonRoot: new(false),
 			}
 			cr.Spec.InitContainer.Resources = &corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -2626,7 +2625,7 @@ var _ = Describe("Init Container", Ordered, func() {
 					},
 				}))
 				Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-					RunAsNonRoot: ptr.To(false),
+					RunAsNonRoot: new(false),
 				}))
 				Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 				Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
@@ -2661,7 +2660,7 @@ var _ = Describe("Init Container", Ordered, func() {
 				},
 			}))
 			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(false),
+				RunAsNonRoot: new(false),
 			}))
 			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
@@ -2679,7 +2678,7 @@ var _ = Describe("Init Container", Ordered, func() {
 			cr.Spec.InstanceSets[0].InitContainer = new(v1beta1.InitContainerSpec)
 			cr.Spec.InstanceSets[0].InitContainer.Image = "instance-image"
 			cr.Spec.InstanceSets[0].InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(true),
+				RunAsNonRoot: new(true),
 			}
 			cr.Spec.InstanceSets[0].InitContainer.Resources = &corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -2740,7 +2739,7 @@ var _ = Describe("Init Container", Ordered, func() {
 					},
 				}))
 				Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-					RunAsNonRoot: ptr.To(true),
+					RunAsNonRoot: new(true),
 				}))
 				Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 				Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
@@ -2775,7 +2774,7 @@ var _ = Describe("Init Container", Ordered, func() {
 				},
 			}))
 			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(false),
+				RunAsNonRoot: new(false),
 			}))
 			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
@@ -2800,8 +2799,8 @@ var _ = Describe("Init Container", Ordered, func() {
 			cr.Spec.Backups.PGBackRest.InitContainer = new(v1beta1.InitContainerSpec)
 			cr.Spec.Backups.PGBackRest.InitContainer.Image = "pgbackrest-image"
 			cr.Spec.Backups.PGBackRest.InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(false),
-				Privileged:   ptr.To(true),
+				RunAsNonRoot: new(false),
+				Privileged:   new(true),
 			}
 			cr.Spec.Backups.PGBackRest.InitContainer.Resources = &corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -2846,8 +2845,8 @@ var _ = Describe("Init Container", Ordered, func() {
 				},
 			}))
 			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-				Privileged:   ptr.To(true),
-				RunAsNonRoot: ptr.To(false),
+				Privileged:   new(true),
+				RunAsNonRoot: new(false),
 			}))
 			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))

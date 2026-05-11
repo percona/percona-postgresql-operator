@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/bridge"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
@@ -558,8 +557,8 @@ func TestHandleUpgradeHA(t *testing.T) {
 	ns := setupNamespace(t, tClient).Name
 	clusterInBridgeWithHaDisabled := testClusterApiResource()
 	clusterInBridgeWithHaEnabled := testClusterApiResource()
-	clusterInBridgeWithHaEnabled.ID = "2345"                  // originally "1234"
-	clusterInBridgeWithHaEnabled.IsHA = initialize.Bool(true) // originally "false"
+	clusterInBridgeWithHaEnabled.ID = "2345"      // originally "1234"
+	clusterInBridgeWithHaEnabled.IsHA = new(true) // originally "false"
 
 	reconciler := &CrunchyBridgeClusterReconciler{
 		Client: tClient,

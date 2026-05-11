@@ -6,6 +6,7 @@ package pgbouncer
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -199,9 +200,7 @@ func clusterINI(cluster *v1beta1.PostgresCluster) string {
 	}
 
 	// Override the above with any specified settings.
-	for k, v := range cluster.Spec.Proxy.PGBouncer.Config.Global {
-		global[k] = v
-	}
+	maps.Copy(global, cluster.Spec.Proxy.PGBouncer.Config.Global)
 
 	// Prevent the user from bypassing the main configuration file.
 	global["conffile"] = iniFileAbsolutePath
