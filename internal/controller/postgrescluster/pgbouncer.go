@@ -223,12 +223,12 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	var frontendCertManagerSecret *corev1.Secret
 	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-		certManagerInstalled, certErr := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
 		if certErr != nil {
-			return nil, errors.Wrap(certErr, "failed to check if cert-manager is installed")
+			return nil, errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
 		}
 
-		if certManagerInstalled {
+		if certManagerManaged {
 			c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
 
 			dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service, cluster.Spec.ClusterServiceDNSSuffix)
