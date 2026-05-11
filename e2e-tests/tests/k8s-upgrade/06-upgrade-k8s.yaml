@@ -9,6 +9,5 @@ commands:
       source ../../functions
 
       name=$(kubectl get configmap cluster-name -o jsonpath='{.data.name}' -n ${NAMESPACE})
-      offset=1 # latest version
       version=$(kubectl get configmap final-cluster-version -o jsonpath='{.data.version}' -n ${NAMESPACE})
       upgrade_k8s_cluster "$name" "$version"
