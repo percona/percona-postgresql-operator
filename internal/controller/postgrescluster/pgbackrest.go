@@ -2227,16 +2227,16 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	// }
 
 	if err == nil && repoHost != nil {
-		certManagerInstalled := false
+		certManagerManaged := false
 		if cluster.Spec.CustomTLSSecret == nil {
 			var certErr error
-			certManagerInstalled, certErr = r.isCertManagerInstalled(ctx, cluster.Namespace)
+			certManagerManaged, certErr = r.isRootCACertManagerManaged(ctx, cluster)
 			if certErr != nil {
-				return errors.Wrap(certErr, "failed to check if cert-manager is installed")
+				return errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
 			}
 		}
 
-		if certManagerInstalled {
+		if certManagerManaged {
 			err = r.reconcileCertManagerPGBackRestSecret(ctx, cluster, repoHost, rootCA, existing, intent)
 		} else {
 			err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)

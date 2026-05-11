@@ -7,6 +7,7 @@ package postgrescluster
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
@@ -26,12 +27,16 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
@@ -60,17 +65,20 @@ const (
 
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
-	Client              client.Client
-	Scheme              *k8sruntime.Scheme
-	DiscoveryClient     *discovery.DiscoveryClient
-	IsOpenShift         bool
-	Owner               client.FieldOwner
-	PodExec             runtime.PodExecutor
-	Recorder            record.EventRecorder
-	Registration        registration.Registration
-	Tracer              trace.Tracer
-	CertManagerCtrlFunc certmanager.NewControllerFunc
-	RestConfig          *rest.Config
+	Client                       client.Client
+	Scheme                       *k8sruntime.Scheme
+	DiscoveryClient              *discovery.DiscoveryClient
+	IsOpenShift                  bool
+	Owner                        client.FieldOwner
+	PodExec                      runtime.PodExecutor
+	Recorder                     record.EventRecorder
+	Registration                 registration.Registration
+	Tracer                       trace.Tracer
+	CertManagerCtrlFunc          certmanager.NewControllerFunc
+	RestConfig                   *rest.Config
+	Controller                   controller.Controller
+	Cache                        cache.Cache
+	certManagerWatchesRegistered atomic.Bool
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
@@ -282,6 +290,16 @@ func (r *Reconciler) Reconcile(
 
 	if err == nil {
 		rootCA, err = r.reconcileRootCertificate(ctx, cluster)
+	}
+
+	if err == nil && rootCA != nil {
+		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
+		if certErr != nil {
+			log.V(1).Info("failed to check if root CA is cert-manager managed, will retry on next reconcile",
+				"error", certErr)
+		} else if certManagerManaged {
+			r.registerCertManagerWatches(ctx)
+		}
 	}
 
 	if err == nil {
@@ -543,6 +561,8 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		}
 	}
 
+	r.Cache = mgr.GetCache()
+
 	// K8SPG-712: Allow overriding default configurations
 	configMapPredicate := builder.WithPredicates(predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
@@ -595,4 +615,73 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 	}
 
 	return bldr.Complete(r)
+}
+
+// registerCertManagerWatches dynamically registers watches for cert-manager
+// Certificate, Issuer, and cert-manager-issued Secret resources for
+// case where cert-manager is installed after the operator starts, so the
+// watches were not registered in SetupWithManager.
+func (r *Reconciler) registerCertManagerWatches(ctx context.Context) {
+	if r.Controller == nil || r.Cache == nil {
+		return
+	}
+
+	if r.certManagerWatchesRegistered.Load() {
+		return
+	}
+
+	log := logging.FromContext(ctx)
+
+	certHandler := handler.TypedEnqueueRequestForOwner[*cmv1.Certificate](
+		r.Scheme, r.Client.RESTMapper(),
+		&v1beta1.PostgresCluster{},
+		handler.OnlyControllerOwner(),
+	)
+	if err := r.Controller.Watch(source.Kind(
+		r.Cache, &cmv1.Certificate{}, certHandler,
+	)); err != nil {
+		log.Error(err, "failed to register dynamic watch for Certificates")
+		return
+	}
+
+	issuerHandler := handler.TypedEnqueueRequestForOwner[*cmv1.Issuer](
+		r.Scheme, r.Client.RESTMapper(),
+		&v1beta1.PostgresCluster{},
+		handler.OnlyControllerOwner(),
+	)
+	if err := r.Controller.Watch(source.Kind(
+		r.Cache, &cmv1.Issuer{}, issuerHandler,
+	)); err != nil {
+		log.Error(err, "failed to register dynamic watch for Issuers")
+		return
+	}
+	secretHandler := handler.TypedEnqueueRequestsFromMapFunc(
+		func(ctx context.Context, secret *corev1.Secret) []reconcile.Request {
+			cluster := secret.GetLabels()[naming.LabelCluster]
+			if len(cluster) > 0 {
+				return []reconcile.Request{
+					{NamespacedName: client.ObjectKey{
+						Namespace: secret.GetNamespace(),
+						Name:      cluster,
+					}},
+				}
+			}
+			return nil
+		},
+	)
+	certManagerSecretPredicate := predicate.NewTypedPredicateFuncs(func(secret *corev1.Secret) bool {
+		_, hasCluster := secret.GetLabels()[naming.LabelCluster]
+		_, hasCertAnnotation := secret.GetAnnotations()["cert-manager.io/certificate-name"]
+		return hasCluster && hasCertAnnotation
+	})
+	if err := r.Controller.Watch(source.Kind(
+		r.Cache, &corev1.Secret{}, secretHandler, certManagerSecretPredicate,
+	)); err != nil {
+		log.Error(err, "failed to register dynamic watch for cert-manager Secrets")
+		return
+	}
+
+	r.certManagerWatchesRegistered.Store(true)
+
+	log.Info("dynamically registered cert-manager watches")
 }

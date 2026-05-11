@@ -1486,12 +1486,12 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	rootCertificateAuth *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
 	if cluster.Spec.CustomTLSSecret == nil {
-		certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
+			return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
 		}
 
-		if certManagerInstalled {
+		if certManagerManaged {
 			return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
 		}
 	}
