@@ -24,7 +24,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
@@ -43,7 +42,7 @@ func TestGeneratePatroniLeaderLeaseService(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns1"
 	cluster.Name = "pg2"
-	cluster.Spec.Port = initialize.Int32(9876)
+	cluster.Spec.Port = new(int32(9876))
 
 	cluster.Labels = map[string]string{
 		naming.LabelVersion: "2.3.0",
@@ -193,12 +192,12 @@ ownerReferences:
 		Expect      func(testing.TB, *corev1.Service, error)
 	}{
 		{Description: "ClusterIP with Port 32000", Type: "ClusterIP",
-			NodePort: initialize.Int32(32000), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32000)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.ErrorContains(t, err, "NodePort cannot be set with type ClusterIP on Service \"pg2-ha\"")
 				assert.Assert(t, service == nil)
 			}},
 		{Description: "NodePort with Port 32001", Type: "NodePort",
-			NodePort: initialize.Int32(32001), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32001)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				alwaysExpect(t, service)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
@@ -211,7 +210,7 @@ ownerReferences:
 `))
 			}},
 		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
-			NodePort: initialize.Int32(32002), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32002)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
 				assert.NilError(t, err)
 				alwaysExpect(t, service)
@@ -490,7 +489,7 @@ func TestReconcilePatroniStatus(t *testing.T) {
 		instance := &Instance{
 			Name: instanceName, Runner: runner,
 		}
-		for i := 0; i < readyReplicas; i++ {
+		for range readyReplicas {
 			instance.Pods = append(instance.Pods, &corev1.Pod{
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{{
@@ -670,7 +669,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 				cluster := testCluster()
 				cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 					Name:                "target",
-					Replicas:            initialize.Int32(2),
+					Replicas:            new(int32(2)),
 					DataVolumeClaimSpec: testVolumeClaimSpec(),
 				}}
 				if test.enabled {
@@ -688,7 +687,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 				if test.status != "" {
 					cluster.Status = v1beta1.PostgresClusterStatus{
 						Patroni: v1beta1.PatroniStatus{
-							Switchover: initialize.String(test.status),
+							Switchover: new(test.status),
 						},
 					}
 				}
@@ -696,9 +695,9 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 					cluster.Spec.Patroni.Switchover.Type = test.soType
 				}
 				if test.target != "" {
-					cluster.Spec.Patroni.Switchover.TargetInstance = initialize.String(test.target)
+					cluster.Spec.Patroni.Switchover.TargetInstance = new(test.target)
 				}
-				cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(2)
+				cluster.Status.Patroni.SwitchoverTimeline = new(int64(2))
 				test.check(t, r.reconcilePatroniSwitchover(ctx, cluster, getObserved()), cluster)
 			})
 		}
@@ -712,7 +711,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
 			Switchover: &v1beta1.PatroniSwitchover{
 				Enabled:        true,
-				TargetInstance: initialize.String("target"),
+				TargetInstance: new("target"),
 			},
 		}
 
@@ -761,7 +760,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
 			Switchover: &v1beta1.PatroniSwitchover{
 				Enabled:        true,
-				TargetInstance: initialize.String("target"),
+				TargetInstance: new("target"),
 			},
 		}
 
@@ -784,7 +783,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
 		timelineCall, timelineCallNoLeader = false, false
@@ -807,7 +806,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
 		timelineCall, timelineCallNoLeader = false, true
@@ -830,7 +829,7 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
 		timelineCall, timelineCallNoLeader = true, false
@@ -853,10 +852,10 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
-		cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(11)
+		cluster.Status.Patroni.SwitchoverTimeline = new(int64(11))
 		timelineCall, timelineCallNoLeader = true, false
 		called, failover, callError, callFails = false, false, false, false
 		err := r.reconcilePatroniSwitchover(ctx, cluster, getObserved())
@@ -877,10 +876,10 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
-		cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(11)
+		cluster.Status.Patroni.SwitchoverTimeline = new(int64(11))
 		timelineCall, timelineCallNoLeader = true, false
 		called, failover, callError, callFails = false, false, false, false
 		err := r.reconcilePatroniSwitchover(ctx, cluster, getObserved())
@@ -901,10 +900,10 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
-		cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(4)
+		cluster.Status.Patroni.SwitchoverTimeline = new(int64(4))
 		timelineCall, timelineCallNoLeader = true, false
 		called, failover, callError, callFails = false, false, false, true
 		err := r.reconcilePatroniSwitchover(ctx, cluster, getObserved())
@@ -926,10 +925,10 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
-		cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(4)
+		cluster.Status.Patroni.SwitchoverTimeline = new(int64(4))
 		timelineCall, timelineCallNoLeader = true, false
 		called, failover, callError, callFails = false, false, true, false
 		err := r.reconcilePatroniSwitchover(ctx, cluster, getObserved())
@@ -950,10 +949,10 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
-		cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(4)
+		cluster.Status.Patroni.SwitchoverTimeline = new(int64(4))
 		timelineCall, timelineCallNoLeader = true, false
 		called, failover, callError, callFails = false, false, false, false
 		assert.NilError(t, r.reconcilePatroniSwitchover(ctx, cluster, getObserved()))
@@ -970,15 +969,15 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
 			Switchover: &v1beta1.PatroniSwitchover{
 				Enabled:        true,
-				TargetInstance: initialize.String("target"),
+				TargetInstance: new("target"),
 			},
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
-		cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(4)
+		cluster.Status.Patroni.SwitchoverTimeline = new(int64(4))
 		timelineCall, timelineCallNoLeader = true, false
 		called, failover, callError, callFails = false, false, false, false
 		assert.NilError(t, r.reconcilePatroniSwitchover(ctx, cluster, getObserved()))
@@ -996,15 +995,15 @@ func TestReconcilePatroniSwitchover(t *testing.T) {
 			Switchover: &v1beta1.PatroniSwitchover{
 				Enabled:        true,
 				Type:           "Failover",
-				TargetInstance: initialize.String("target"),
+				TargetInstance: new("target"),
 			},
 		}
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name:                "target",
-			Replicas:            initialize.Int32(2),
+			Replicas:            new(int32(2)),
 			DataVolumeClaimSpec: testVolumeClaimSpec(),
 		}}
-		cluster.Status.Patroni.SwitchoverTimeline = initialize.Int64(4)
+		cluster.Status.Patroni.SwitchoverTimeline = new(int64(4))
 		timelineCall, timelineCallNoLeader = true, false
 		called, failover, callError, callFails = false, true, false, false
 		assert.NilError(t, r.reconcilePatroniSwitchover(ctx, cluster, getObserved()))

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
-	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
@@ -71,7 +70,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 		cluster.Spec.Standby = nil
 		cluster.Spec.Patroni.DynamicConfiguration = nil
-		cluster.Spec.Backups.TrackLatestRestorableTime = ptr.To(true)
+		cluster.Spec.Backups.TrackLatestRestorableTime = new(true)
 
 		PostgreSQL(cluster, parameters, true)
 		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
@@ -175,7 +174,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 		cluster.Spec.Standby = nil
 		cluster.Spec.Patroni.DynamicConfiguration = nil
-		cluster.Spec.Backups.TrackLatestRestorableTime = ptr.To(true)
+		cluster.Spec.Backups.TrackLatestRestorableTime = new(true)
 
 		PostgreSQL(cluster, parameters, true)
 		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
