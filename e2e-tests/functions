@@ -2,7 +2,7 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-CERT_MANAGER_VER="1.20.0"
+CERT_MANAGER_VER="1.20.2"
 CHAOS_MESH_VER="2.5.1"
 BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
