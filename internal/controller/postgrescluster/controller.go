@@ -662,28 +662,11 @@ func (r *Reconciler) registerCertManagerWatches(ctx context.Context) {
 				return nil
 			},
 		)
-		certManagerSecretPredicate := predicate.TypedFuncs[*corev1.Secret]{
-			CreateFunc: func(e event.TypedCreateEvent[*corev1.Secret]) bool {
-				_, hasCluster := e.Object.GetLabels()[naming.LabelCluster]
-				_, hasCertAnnotation := e.Object.GetAnnotations()["cert-manager.io/certificate-name"]
-				return hasCluster && hasCertAnnotation
-			},
-			UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Secret]) bool {
-				_, hasCluster := e.ObjectNew.GetLabels()[naming.LabelCluster]
-				_, hasCertAnnotation := e.ObjectNew.GetAnnotations()["cert-manager.io/certificate-name"]
-				return hasCluster && hasCertAnnotation
-			},
-			DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Secret]) bool {
-				_, hasCluster := e.Object.GetLabels()[naming.LabelCluster]
-				_, hasCertAnnotation := e.Object.GetAnnotations()["cert-manager.io/certificate-name"]
-				return hasCluster && hasCertAnnotation
-			},
-			GenericFunc: func(e event.TypedGenericEvent[*corev1.Secret]) bool {
-				_, hasCluster := e.Object.GetLabels()[naming.LabelCluster]
-				_, hasCertAnnotation := e.Object.GetAnnotations()["cert-manager.io/certificate-name"]
-				return hasCluster && hasCertAnnotation
-			},
-		}
+		certManagerSecretPredicate := predicate.NewTypedPredicateFuncs(func(secret *corev1.Secret) bool {
+			_, hasCluster := secret.GetLabels()[naming.LabelCluster]
+			_, hasCertAnnotation := secret.GetAnnotations()["cert-manager.io/certificate-name"]
+			return hasCluster && hasCertAnnotation
+		})
 		if err := r.Controller.Watch(source.Kind(
 			r.Cache, &corev1.Secret{}, secretHandler, certManagerSecretPredicate,
 		)); err != nil {
