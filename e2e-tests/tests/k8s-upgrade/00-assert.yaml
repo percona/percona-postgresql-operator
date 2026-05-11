@@ -17,7 +17,7 @@ commands:
       done
 
       until verify_k8s_nodes_version "$expected_version"; do
-        echo "Waiting for all nodes to state the version $expected_clean..."
+        echo "Waiting for all nodes to state the version $expected_version..."
         kubectl get nodes
         sleep 10
       done

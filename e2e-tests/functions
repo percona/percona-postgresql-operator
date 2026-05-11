@@ -1968,7 +1968,7 @@ verify_k8s_nodes_version() {
 	for node_version in $nodes_version; do
 		node_clean=$(echo "$node_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 		if [[ $node_clean != "$expected_clean" ]]; then
-			echo "Error current node version $node_version is not the same as expected version $expected_version"
+			echo "Error current node version $node_clean is not the same as expected version $expected_clean"
 			return 1
 		fi
 	done
