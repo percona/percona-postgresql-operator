@@ -1,0 +1,18 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+
+      data=$(kubectl get configmap 05-percona-restored-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+
+      for expected in "row-one" "row-two" "row-three"; do
+        echo "${data}" | grep -q "${expected}" || {
+          echo "ERROR: '${expected}' missing from Percona restored cluster. Got: ${data}"
+          exit 1
+        }
+      done
+
+      echo "All expected rows found in Percona restored cluster"

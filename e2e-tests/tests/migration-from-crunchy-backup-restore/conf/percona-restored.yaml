@@ -1,0 +1,48 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: percona-restored
+spec:
+  instances:
+    - name: instance1
+      replicas: 3
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: migration-backup-restore-pgbackrest-secrets
+      global:
+        repo1-path: <repo-path>
+        repo1-s3-uri-style: path
+        repo1-s3-verify-tls: "n"
+      repos:
+        - name: repo1
+          s3:
+            bucket: operator-testing
+            endpoint: <minio-endpoint>
+            region: us-east-1
+  # dataSource bootstraps the cluster from the Crunchy pgBackRest backup.
+  # All values are substituted via sed so that "n" is preserved as a quoted
+  # YAML string — yq creates unquoted bare `n` which YAML 1.1 parses as boolean.
+  dataSource:
+    pgbackrest:
+      stanza: db
+      configuration:
+        - secret:
+            name: migration-backup-restore-pgbackrest-secrets
+      global:
+        repo1-path: <crunchy-repo-path>
+        repo1-s3-uri-style: path
+        repo1-s3-verify-tls: "n"
+      repo:
+        name: repo1
+        s3:
+          bucket: operator-testing
+          endpoint: <minio-endpoint>
+          region: us-east-1

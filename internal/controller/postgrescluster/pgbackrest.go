@@ -43,7 +43,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -2643,9 +2643,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupOpts := postgresCluster.Spec.Backups.PGBackRest.Manual.Options
 	for _, opt := range backupOpts {
 		if strings.Contains(opt, "--repo=") || strings.Contains(opt, "--repo ") {
-			r.Recorder.Eventf(postgresCluster, corev1.EventTypeWarning, "InvalidManualBackup",
-				"Option '--repo' is not allowed: please use the 'repoName' field instead.",
-				repoName)
+			r.Recorder.Event(postgresCluster, corev1.EventTypeWarning, "InvalidManualBackup",
+				"Option '--repo' is not allowed: please use the 'repoName' field instead.")
 			return nil
 		}
 	}
