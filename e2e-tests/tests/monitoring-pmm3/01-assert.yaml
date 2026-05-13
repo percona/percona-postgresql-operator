@@ -20,7 +20,6 @@ metadata:
   name: monitoring-service
 ---
 apiVersion: v1
-count: 1
 involvedObject:
   apiVersion: v1
   kind: Service
