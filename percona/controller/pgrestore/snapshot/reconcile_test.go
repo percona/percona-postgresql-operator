@@ -134,7 +134,7 @@ func TestGeneratePrepareJob(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "my-restore", Namespace: ns},
 			Spec: v2.PerconaPGRestoreSpec{
 				PGCluster:                clusterName,
-				RepoName:                 ptr.To("repo1"),
+				RepoName:                 new("repo1"),
 				VolumeSnapshotBackupName: "my-backup",
 			},
 		}
@@ -192,7 +192,7 @@ func TestGeneratePrepareJob(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "my-restore", Namespace: ns},
 			Spec: v2.PerconaPGRestoreSpec{
 				PGCluster:                clusterName,
-				RepoName:                 ptr.To("repo1"),
+				RepoName:                 new("repo1"),
 				VolumeSnapshotBackupName: "my-backup",
 			},
 		}
@@ -284,7 +284,7 @@ func TestReconcileDataVolume(t *testing.T) {
 		Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 		Status: v2.PerconaPGBackupStatus{
 			Snapshot: &v2.SnapshotStatus{
-				DataVolumeSnapshotRef: ptr.To(snapshotName),
+				DataVolumeSnapshotRef: new(snapshotName),
 			},
 		},
 	}
@@ -503,7 +503,7 @@ func TestReconcileWALVolume(t *testing.T) {
 		Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
 		Status: v2.PerconaPGBackupStatus{
 			Snapshot: &v2.SnapshotStatus{
-				WALVolumeSnapshotRef: ptr.To(walSnapshotName),
+				WALVolumeSnapshotRef: new(walSnapshotName),
 			},
 		},
 	}

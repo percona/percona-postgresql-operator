@@ -6,6 +6,7 @@ package postgres
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -70,9 +71,7 @@ func NewParameterSet() *ParameterSet {
 // AsMap returns a copy of ps as a map.
 func (ps *ParameterSet) AsMap() map[string]string {
 	out := make(map[string]string, len(ps.values))
-	for name, value := range ps.values {
-		out[name] = value
-	}
+	maps.Copy(out, ps.values)
 	return out
 }
 

@@ -17,7 +17,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -386,6 +388,160 @@ func TestReconcileCerts(t *testing.T) {
 				})
 			}
 		})
+	})
+}
+
+type mockCertManagerController struct{}
+
+func (m *mockCertManagerController) Check(context.Context, *rest.Config, string) error { return nil }
+func (m *mockCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected call")
+}
+func (m *mockCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected call")
+}
+func (m *mockCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected call")
+}
+func (m *mockCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	panic("unexpected call")
+}
+func (m *mockCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
+	panic("unexpected call")
+}
+func (m *mockCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	panic("unexpected call")
+}
+func (m *mockCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected call")
+}
+func (m *mockCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	panic("unexpected call")
+}
+
+func mockCertManagerCtrlFunc(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+	return &mockCertManagerController{}
+}
+
+func TestUpgradeCertManagerDoesNotTakeOverInternalPKI(t *testing.T) {
+	if strings.EqualFold(os.Getenv("USE_EXISTING_CLUSTER"), "true") {
+		t.Skip("USE_EXISTING_CLUSTER: Test fails due to garbage collection")
+	}
+
+	_, tClient := setupKubernetes(t)
+	require.ParallelCapacity(t, 1)
+	ctx := t.Context()
+	namespace := require.Namespace(t, tClient).Name
+
+	reconcilerWithoutCertManager := &Reconciler{
+		Client:              tClient,
+		Owner:               ControllerName,
+		CertManagerCtrlFunc: certmanager.NewController,
+	}
+
+	cluster := testCluster()
+	cluster.Name = "upgrade-test"
+	cluster.Namespace = namespace
+	assert.NilError(t, tClient.Create(ctx, cluster))
+
+	root, err := reconcilerWithoutCertManager.reconcileRootCertificate(ctx, cluster)
+	assert.NilError(t, err)
+
+	primaryService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace, Name: "upgrade-test-primary",
+	}}
+	replicaService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace, Name: "upgrade-test-replicas",
+	}}
+
+	_, err = reconcilerWithoutCertManager.reconcileClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+	assert.NilError(t, err)
+
+	rootSecret := &corev1.Secret{}
+	assert.NilError(t, tClient.Get(ctx, types.NamespacedName{
+		Name:      naming.PostgresRootCASecret(cluster).Name,
+		Namespace: namespace,
+	}, rootSecret))
+	assert.Equal(t, rootSecret.Annotations["cert-manager.io/certificate-name"], "")
+
+	clusterCertSecret := &corev1.Secret{}
+	assert.NilError(t, tClient.Get(ctx, types.NamespacedName{
+		Name:      fmt.Sprintf(naming.ClusterCertSecret, cluster.Name),
+		Namespace: namespace,
+	}, clusterCertSecret))
+	originalCertData := clusterCertSecret.Data["tls.crt"]
+
+	reconcilerWithCertManager := &Reconciler{
+		Client:              tClient,
+		Owner:               ControllerName,
+		CertManagerCtrlFunc: mockCertManagerCtrlFunc,
+		RestConfig:          &rest.Config{},
+	}
+
+	t.Run("isRootCACertManagerManaged returns false for internal PKI root", func(t *testing.T) {
+		managed, err := reconcilerWithCertManager.isRootCACertManagerManaged(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, !managed)
+	})
+
+	t.Run("reconcileClusterCertificate uses internal PKI after upgrade", func(t *testing.T) {
+		_, err := reconcilerWithCertManager.reconcileClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+		assert.NilError(t, err)
+
+		updatedCertSecret := &corev1.Secret{}
+		assert.NilError(t, tClient.Get(ctx, types.NamespacedName{
+			Name:      fmt.Sprintf(naming.ClusterCertSecret, cluster.Name),
+			Namespace: namespace,
+		}, updatedCertSecret))
+
+		assert.DeepEqual(t, originalCertData, updatedCertSecret.Data["tls.crt"])
+	})
+
+	t.Run("isRootCACertManagerManaged returns true for cert-manager root", func(t *testing.T) {
+		rootSecret.Annotations = map[string]string{
+			"cert-manager.io/certificate-name": "test-ca-cert",
+		}
+		assert.NilError(t, tClient.Update(ctx, rootSecret))
+
+		managed, err := reconcilerWithCertManager.isRootCACertManagerManaged(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, managed)
+	})
+
+	t.Run("isRootCACertManagerManaged returns true when no root CA exists", func(t *testing.T) {
+		freshCluster := testCluster()
+		freshCluster.Name = "fresh-cluster"
+		freshCluster.Namespace = namespace
+		assert.NilError(t, tClient.Create(ctx, freshCluster))
+
+		managed, err := reconcilerWithCertManager.isRootCACertManagerManaged(ctx, freshCluster)
+		assert.NilError(t, err)
+		assert.Assert(t, managed)
+	})
+
+	t.Run("isRootCACertManagerManaged returns false when CustomRootCATLSSecret is set", func(t *testing.T) {
+		clusterWithCustomRoot := testCluster()
+		clusterWithCustomRoot.Name = cluster.Name
+		clusterWithCustomRoot.Namespace = namespace
+		clusterWithCustomRoot.Spec.CustomRootCATLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "my-custom-root-ca"},
+		}
+
+		managed, err := reconcilerWithCertManager.isRootCACertManagerManaged(ctx, clusterWithCustomRoot)
+		assert.NilError(t, err)
+		assert.Assert(t, !managed)
+	})
+
+	t.Run("isRootCACertManagerManaged returns false when cert-manager not installed", func(t *testing.T) {
+		rNoCertManager := &Reconciler{
+			Client:              tClient,
+			Owner:               ControllerName,
+			CertManagerCtrlFunc: certmanager.NewController,
+		}
+
+		managed, err := rNoCertManager.isRootCACertManagerManaged(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, !managed)
 	})
 }
 

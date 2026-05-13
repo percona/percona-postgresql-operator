@@ -4,7 +4,7 @@ kind: PerconaPGCluster
 metadata:
   name: cluster1
 spec:
-  crVersion: 2.10.0
+  crVersion: 3.0.0
 
   image: docker.io/perconalab/percona-postgresql-operator:main-ppg18-postgres
   imagePullPolicy: Always

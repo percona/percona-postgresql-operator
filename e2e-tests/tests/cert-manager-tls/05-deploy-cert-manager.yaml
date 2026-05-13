@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      deploy_cert_manager
+      deploy_cmctl
+
+      kubectl -n "$NAMESPACE" delete pod -l postgres-operator.crunchydata.com/role=pgbouncer,postgres-operator.crunchydata.com/cluster=cert-manager-tls
+
+      wait_cluster_consistency cert-manager-tls
+    timeout: 120

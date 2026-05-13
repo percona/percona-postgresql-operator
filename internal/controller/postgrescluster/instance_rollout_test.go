@@ -23,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -211,7 +210,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 	t.Run("Steady", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
-			{Name: "00", Replicas: initialize.Int32(1)},
+			{Name: "00", Replicas: new(int32(1))},
 		}
 		instances := []*Instance{
 			{
@@ -256,7 +255,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 	t.Run("SingletonOutdated", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
-			{Name: "00", Replicas: initialize.Int32(1)},
+			{Name: "00", Replicas: new(int32(1))},
 		}
 		instances := []*Instance{
 			{
@@ -301,7 +300,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 	t.Run("ManyOutdated", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
-			{Name: "00", Replicas: initialize.Int32(2)},
+			{Name: "00", Replicas: new(int32(2))},
 		}
 		instances := []*Instance{
 			{
@@ -371,7 +370,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 	t.Run("ManyOutdatedWithPrimary", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
-			{Name: "00", Replicas: initialize.Int32(2)},
+			{Name: "00", Replicas: new(int32(2))},
 		}
 		instances := []*Instance{
 			{
@@ -442,7 +441,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 	t.Run("ManyOutdatedWithNotReady", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
-			{Name: "00", Replicas: initialize.Int32(2)},
+			{Name: "00", Replicas: new(int32(2))},
 		}
 		instances := []*Instance{
 			{
@@ -512,7 +511,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 	t.Run("ManyOutdatedWithTerminating", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
-			{Name: "00", Replicas: initialize.Int32(2)},
+			{Name: "00", Replicas: new(int32(2))},
 		}
 		instances := []*Instance{
 			{
@@ -583,7 +582,7 @@ func TestReconcilerRolloutInstances(t *testing.T) {
 	t.Run("ManyOutdatedWithOrphan", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{
-			{Name: "00", Replicas: initialize.Int32(2)},
+			{Name: "00", Replicas: new(int32(2))},
 		}
 		instances := []*Instance{
 			{

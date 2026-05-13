@@ -183,7 +183,7 @@ func AddConfigToRestorePod(
 	secret := corev1.VolumeProjection{Secret: &corev1.SecretProjection{}}
 	secret.Secret.Name = naming.PGBackRestSecret(cluster).Name
 	secret.Secret.Items = append(secret.Secret.Items, clientCertificates()...)
-	secret.Secret.Optional = initialize.Bool(true)
+	secret.Secret.Optional = new(true)
 
 	// Start with a copy of projections specified in the cluster. Items later in
 	// the list take precedence over earlier items (that is, last write wins).

@@ -11,7 +11,6 @@ import (
 
 	r "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 )
 
@@ -32,7 +31,7 @@ func CreateRuntimeManager(config *rest.Config, features feature.MutableGate, opt
 	}
 
 	options.Cache = cache.Options{
-		SyncPeriod: initialize.Pointer(refreshInterval),
+		SyncPeriod: new(refreshInterval),
 	}
 	nn := strings.Split(namespaces, ",")
 	if len(nn) > 0 && nn[0] != "" {
