@@ -4,8 +4,8 @@ metadata:
   name: percona-restored
 spec:
   crVersion: 3.0.0
-  image: docker.io/percona/percona-postgresql-operator:3.0.0
   postgresVersion: 18
+  image: docker.io/percona/percona-distribution-postgresql:18.3-2
   instances:
     - name: instance1
       replicas: 3

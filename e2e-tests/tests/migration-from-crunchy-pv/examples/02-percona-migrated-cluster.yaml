@@ -4,7 +4,7 @@ metadata:
   name: percona-migrated
 spec:
   crVersion: 3.0.0
-  image: docker.io/percona/percona-postgresql-operator:3.0.0
+  image: docker.io/percona/percona-distribution-postgresql:18.3-2
   postgresVersion: 18
   instances:
     - name: instance1
