@@ -1,0 +1,35 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+commands:
+  - script: |
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      expected_cluster_name=$(kubectl get configmap cluster-name -o jsonpath='{.data.name}' -n ${NAMESPACE})
+      expected_version=$(kubectl get configmap initial-cluster-version -o jsonpath='{.data.version}' -n ${NAMESPACE})
+
+      until verify_k8s_cluster_version "$expected_cluster_name" "$expected_version"; do
+        echo "Waiting for the cluster to state the version $expected_version..."
+        sleep 10
+      done
+
+      until verify_k8s_nodes_version "$expected_version"; do
+        echo "Waiting for all nodes to state the version $expected_version..."
+        kubectl get nodes
+        sleep 10
+      done
+
+      until [[ -z "$(kubectl get nodes --no-headers | awk '$2 != "Ready" {print}')" ]]; do
+        echo "Waiting for all nodes to be Ready..."
+        kubectl get nodes
+        sleep 5
+      done
+
+      cluster_name=$(get_k8s_cluster_name "${K8S_UPGRADE_PLATFORM}")
+      if [[ "$expected_cluster_name" != "$cluster_name" ]]; then
+        echo "Error current cluster $cluster_name is not the same as expected cluster name $expected_cluster_name"
+        exit 1
+      fi
