@@ -142,6 +142,7 @@ rules:
   resources:
   - perconapgbackups/finalizers
   - perconapgclusters/status
+  - perconapgrestores/finalizers
   - perconapgrestores/status
   - perconapgupgrades/finalizers
   - perconapgupgrades/status
