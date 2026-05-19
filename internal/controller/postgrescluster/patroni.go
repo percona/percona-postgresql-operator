@@ -379,6 +379,23 @@ func (r *Reconciler) reconcileReplicationSecret(
 		return custom, err
 	}
 
+	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
+	}
+
+	if certManagerManaged {
+		return r.reconcileCertManagerReplicationSecret(ctx, cluster)
+	}
+
+	return r.reconcileInternalReplicationSecret(ctx, cluster, root)
+}
+
+// reconcileInternalReplicationSecret creates a replication certificate using internal PKI.
+func (r *Reconciler) reconcileInternalReplicationSecret(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+	root *pki.RootCertificateAuthority,
+) (*corev1.Secret, error) {
 	existing := &corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
@@ -434,6 +451,20 @@ func (r *Reconciler) reconcileReplicationSecret(
 		err = errors.WithStack(r.apply(ctx, intent))
 	}
 	return intent, err
+}
+
+// reconcileCertManagerReplicationSecret creates the replication certificate using cert-manager.
+func (r *Reconciler) reconcileCertManagerReplicationSecret(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) (*corev1.Secret, error) {
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+	if err := c.ApplyReplicationCertificate(ctx, cluster); err != nil {
+		return nil, errors.Wrap(err, "failed to apply replication certificate")
+	}
+
+	secret := &corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)}
+	return secret, nil
 }
 
 // replicationCertSecretProjection returns a secret projection of the postgrescluster's

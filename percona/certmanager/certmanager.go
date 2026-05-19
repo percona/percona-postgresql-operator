@@ -32,6 +32,7 @@ type Controller interface {
 	ApplyClusterCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 	ApplyInstanceCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, instanceName string, dnsNames []string) error
 	ApplyPGBouncerCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
+	ApplyReplicationCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyPGBackRestRepoCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 }
@@ -585,6 +586,104 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 
 	if err := c.cl.Create(ctx, cert); err != nil {
 		return errors.Wrap(err, "failed to create pgbouncer certificate")
+	}
+
+	return nil
+}
+
+// ApplyReplicationCertificate creates a cert-manager Certificate resource for the replication client.
+func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	secretMeta := naming.ReplicationClientCertSecret(cluster)
+	certName := cluster.Name + "-replication-cert"
+	commonName := "_crunchyrepl"
+
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		needsUpdate := false
+
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			needsUpdate = true
+		}
+
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != certDuration {
+			existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
+			return nil
+		}
+
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update replication certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get replication certificate")
+	}
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster:            cluster.Name,
+				naming.LabelClusterCertificate: "replication-client-tls",
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: secretMeta.Name,
+			CommonName: commonName,
+			DNSNames:   []string{commonName},
+			IssuerRef: cmmeta.IssuerReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: certDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
+			},
+			Usages: []v1.KeyUsage{
+				v1.UsageClientAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster:            cluster.Name,
+					naming.LabelClusterCertificate: "replication-client-tls",
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	if err := c.cl.Create(ctx, cert); err != nil {
+		return errors.Wrap(err, "failed to create replication certificate")
 	}
 
 	return nil
