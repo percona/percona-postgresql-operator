@@ -412,6 +412,9 @@ func (m *mockCertManagerController) ApplyInstanceCertificate(context.Context, *v
 func (m *mockCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	panic("unexpected call")
 }
+func (m *mockCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected call")
+}
 func (m *mockCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
