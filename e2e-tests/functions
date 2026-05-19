@@ -224,7 +224,7 @@ deploy_minio() {
 	local aws_extra_args=""
 	local service_account_name="minio-sa"
 	local -a additional_helm_args
-	
+
 	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
