@@ -25,6 +25,8 @@ import (
 
 type Controller interface {
 	Check(ctx context.Context, config *rest.Config, ns string) error
+	CertificateExists(ctx context.Context, namespace, certName string) (bool, error)
+
 	ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyCAIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyCACertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
@@ -91,6 +93,23 @@ func (c *controller) Check(ctx context.Context, config *rest.Config, ns string) 
 		return err
 	}
 	return nil
+}
+
+// CertificateExists reports whether a cert-manager Certificate CR with the
+// given name exists in the namespace. NotFound is returned as (false, nil);
+// other API errors are returned as (false, err).
+func (c *controller) CertificateExists(ctx context.Context, namespace, certName string) (bool, error) {
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: namespace}, existing)
+	if err == nil {
+		return true, nil
+	}
+
+	if k8serrors.IsNotFound(err) {
+		return false, nil
+	}
+
+	return false, errors.Wrapf(err, "get certificate/%s", certName)
 }
 
 func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
@@ -291,7 +310,7 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 		return errors.New("dnsNames cannot be empty")
 	}
 
-	certName := naming.PostgresTLSSecret(cluster).Name
+	certName := ClusterCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
@@ -393,7 +412,7 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 		return errors.New("dnsNames cannot be empty")
 	}
 
-	certName := instanceName + "-cert"
+	certName := InstanceCertificateName(instanceName)
 	secretName := instanceName + "-certs"
 
 	certDuration := DefaultCertDuration
@@ -496,7 +515,7 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 	}
 
 	secretMeta := naming.ClusterPGBouncer(cluster)
-	certName := cluster.Name + "-pgbouncer-cert"
+	certName := PGBouncerCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
@@ -594,7 +613,7 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 // ApplyReplicationCertificate creates a cert-manager Certificate resource for the replication client.
 func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
 	secretMeta := naming.ReplicationClientCertSecret(cluster)
-	certName := cluster.Name + "-replication-cert"
+	certName := ReplicationCertificateName(cluster)
 	commonName := "_crunchyrepl"
 
 	certDuration := DefaultCertDuration
@@ -694,7 +713,7 @@ func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v
 // repository host.
 func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
 	secretMeta := naming.PGBackRestClientCertSecret(cluster)
-	certName := cluster.Name + "-pgbackrest-client-cert"
+	certName := PGBackRestClientCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.PGBackRestCertValidityDuration != nil {
@@ -804,7 +823,7 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 	}
 
 	secretMeta := naming.PGBackRestRepoCertSecret(cluster)
-	certName := cluster.Name + "-pgbackrest-repo-cert"
+	certName := PGBackRestRepoCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.PGBackRestCertValidityDuration != nil {
