@@ -216,15 +216,41 @@ retry() {
 }
 
 deploy_minio() {
+	local name="${1:-"minio-service"}"
+	local tls_secret="${2:-}"
 	local access_key
 	local secret_key
+	local endpoint_url="http://minio-service:9000"
+	local aws_extra_args=""
+	local service_account_name="minio-sa"
+	local -a additional_helm_args
+
 	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
-	helm uninstall -n "${NAMESPACE}" minio-service || :
+	if [[ $(detect_k8s_platform) == "openshift" ]]; then
+		kubectl create serviceaccount "${service_account_name}" \
+			--namespace "${NAMESPACE}"
+		oc adm policy add-scc-to-user anyuid -z "${service_account_name}" -n "${NAMESPACE}"
+		additional_helm_args+=(
+			--set serviceAccount.create=false
+			--set serviceAccount.name="${service_account_name}"
+		)
+	fi
+
+	if [[ -n $tls_secret ]]; then
+		additional_helm_args+=(
+			--set tls.enabled=true
+			--set tls.certSecret="${tls_secret}"
+		)
+		endpoint_url="https://${name}:9000"
+		aws_extra_args="--no-verify-ssl"
+	fi
+
+	helm uninstall -n "${NAMESPACE}" "${name}" || :
 	helm repo remove minio || :
 	helm repo add minio https://charts.min.io/
-	retry 10 60 helm install minio-service \
+	retry 10 60 helm install "${name}" \
 		-n "${NAMESPACE}" \
 		--version "${MINIO_VER}" \
 		--set replicas=1 \
@@ -236,17 +262,23 @@ deploy_minio() {
 		--set "users[0].secretKey"="$(printf '%q' "$(printf '%q' "$secret_key")")" \
 		--set "users[0].policy"=consoleAdmin \
 		--set service.type=ClusterIP \
-		--set configPathmc=/tmp/.minio/ \
 		--set persistence.size=2G \
 		--set securityContext.enabled=false \
+		"${additional_helm_args[@]}" \
 		minio/minio
-	MINIO_POD=$(kubectl -n "${NAMESPACE}" get pods --selector=release=minio-service -o 'jsonpath={.items[].metadata.name}')
+
+	MINIO_POD=$(
+		kubectl -n "${NAMESPACE}" get pods \
+			--selector=release=${name} \
+			-o 'jsonpath={.items[].metadata.name}'
+	)
+
 	wait_pod $MINIO_POD
 
 	# create bucket
 	kubectl -n "${NAMESPACE}" run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
 		bash -c "AWS_ACCESS_KEY_ID='$access_key' AWS_SECRET_ACCESS_KEY='$secret_key' AWS_DEFAULT_REGION=us-east-1 \
-		/usr/bin/aws --endpoint-url http://minio-service:9000 s3 mb s3://operator-testing"
+		/usr/bin/aws --endpoint-url ${endpoint_url} ${aws_extra_args} s3 mb s3://operator-testing"
 }
 
 get_repo_auth() {
