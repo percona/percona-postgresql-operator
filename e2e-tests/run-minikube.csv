@@ -1,5 +1,4 @@
 backup-enable-disable
-custom-extensions
 custom-tls
 database-init-sql
 demand-backup
