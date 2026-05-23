@@ -19,6 +19,10 @@ KUTTL ?= kubectl-kuttl
 KUTTL_TEST ?= $(KUTTL) test
 SED := $(shell which gsed || which sed)
 
+# CRDs without descriptions are used in Helm and Bundles to avoid hitting the maximum file size limit.
+CRD_OPTIONS ?= crd:crdVersions='v1'
+CRD_OPTIONS_WITHOUT_DESCRIPTION = crd:crdVersions='v1',maxDescLen=0
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -241,22 +245,22 @@ generate: generate-cw
 .PHONY: generate-crunchy-crd
 generate-crunchy-crd: ## Generate crd
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/upstream.pgv2.percona.com/...' \
 		output:dir='build/crd/crunchy/generated' # build/crd/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/pgupgrades/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/pgadmins/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/crunchybridgeclusters/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
@@ -277,13 +281,19 @@ generate-rbac: ## Generate rbac
 		'./...' 'config/rbac/'
 	$(KUSTOMIZE) build ./config/rbac/namespace/ > ./deploy/rbac.yaml
 
+.PHONY: generate-crd
 generate-crd: generate-crunchy-crd generate-percona-crd
 	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
 
+.PHONY: generate-crd-without-description
+generate-crd-without-description: CRD_OPTIONS = $(CRD_OPTIONS_WITHOUT_DESCRIPTION)
+generate-crd-without-description: kustomize generate-crd
+
+.PHONY: generate-percona-crd
 generate-percona-crd:
 	go generate ./percona/...
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/pgv2.percona.com/...' \
 		output:dir='build/crd/percona/generated' # build/crd/generated/{group}_{plural}.yaml
 	$(KUSTOMIZE) build ./build/crd/percona/ > ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml

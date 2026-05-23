@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 30
+timeout: 210
 commands:
   - script: |-
       data=$(kubectl get configmap 10-percona-primary-data -n "${NAMESPACE}" \
@@ -15,3 +15,13 @@ commands:
           exit 1
         }
       done
+  - script: |-
+      kubectl wait perconapgcluster/percona-standby \
+        -n "${NAMESPACE}" \
+        --for=jsonpath='{.status.pgbackrest.repos[0].stanzaCreated}'=true \
+        --timeout=90s
+  - script: |-
+      kubectl wait perconapgcluster/percona-standby \
+        -n "${NAMESPACE}" \
+        --for=jsonpath='{.status.pgbackrest.repos[0].replicaCreateBackupComplete}'=true \
+        --timeout=90s

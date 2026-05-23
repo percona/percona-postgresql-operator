@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -24,6 +25,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -195,14 +197,56 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,delete,patch}
 
+// reconcileCertManagerPGBouncerSecret applies the cert-manager Certificate CR
+// for the PgBouncer frontend and returns the resulting -frontend-tls Secret,
+// which the caller uses to populate the main pgbouncer secret with the
+// cert-manager-issued material. Returns (nil, nil) when the Certificate has
+// been applied but cert-manager has not yet issued the Secret, so callers can
+// continue reconciling with internal-PKI material during the transition.
+func (r *Reconciler) reconcileCertManagerPGBouncerSecret(ctx context.Context, cluster *v1beta1.PostgresCluster, service *corev1.Service) (*corev1.Secret, error) {
+	log := logging.FromContext(ctx)
+
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+	dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service, cluster.Spec.ClusterServiceDNSSuffix)
+	if dnsErr != nil {
+		return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
+	}
+
+	err := c.ApplyPGBouncerCertificate(ctx, cluster, dnsNames)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to apply pgbouncer certificate")
+	}
+
+	log.V(1).Info("cert-manager pgbouncer certificate applied")
+
+	// Fetch the cert-manager-managed frontend TLS secret to populate
+	// the main pgbouncer secret with cert-manager-issued certs.
+	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Name:      naming.ClusterPGBouncer(cluster).Name + "-frontend-tls",
+		Namespace: cluster.Namespace,
+	}}
+	err = r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret)
+	if k8serrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get pgbouncer frontend TLS secret")
+	}
+
+	return secret, nil
+}
+
 // reconcilePGBouncerSecret writes the Secret for a PgBouncer Pod.
-// When cert-manager is installed and no custom TLS secret is provided,
-// it creates a Certificate CR for PgBouncer frontend TLS.
+// When the root CA is cert-manager-managed and no custom TLS secret is
+// provided, it creates a Certificate CR for PgBouncer frontend TLS.
+// When the root CA is internal but a stale Certificate CR was left by
+// K8SPG-1017, the CR is reconciled to update its ownerRef (K8SPG-1007
+// recovery) before populating the secret from the internal PKI.
 func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
 ) (*corev1.Secret, error) {
-	log := logging.FromContext(ctx)
 
 	existing := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	err := errors.WithStack(
@@ -229,32 +273,22 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 		}
 
 		if certManagerManaged {
-			c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
-
-			dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service, cluster.Spec.ClusterServiceDNSSuffix)
-			if dnsErr != nil {
-				return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
+			s, err := r.reconcileCertManagerPGBouncerSecret(ctx, cluster, service)
+			if err != nil {
+				return nil, errors.Wrap(err, "reconcile cert-manager Certificate for pgbouncer frontend")
 			}
-
-			certErr = c.ApplyPGBouncerCertificate(ctx, cluster, dnsNames)
-			if certErr != nil {
-				return nil, errors.Wrap(certErr, "failed to apply pgbouncer certificate")
-			}
-
-			log.V(1).Info("cert-manager pgbouncer certificate applied")
-
-			// Fetch the cert-manager-managed frontend TLS secret to populate
-			// the main pgbouncer secret with cert-manager-issued certs.
-			s := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
-				Name:      naming.ClusterPGBouncer(cluster).Name + "-frontend-tls",
-				Namespace: cluster.Namespace,
-			}}
-			fetchErr := r.Client.Get(ctx, client.ObjectKeyFromObject(s), s)
-			if fetchErr != nil && client.IgnoreNotFound(fetchErr) != nil {
-				return nil, errors.Wrap(fetchErr, "failed to get pgbouncer frontend TLS secret")
-			}
-			if fetchErr == nil {
-				frontendCertManagerSecret = s
+			// s is nil when cert-manager has not yet issued the frontend TLS secret;
+			// the caller will fall through to internal PKI material during that window.
+			frontendCertManagerSecret = s
+		} else {
+			// cluster certificates are not managed by cert-manager
+			// but Certificate object exists due to the bug described in K8SPG-1017
+			// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+			if cert := certmanager.PGBouncerCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+				_, err := r.reconcileCertManagerPGBouncerSecret(ctx, cluster, service)
+				if err != nil {
+					logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+				}
 			}
 		}
 	}

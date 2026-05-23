@@ -54,7 +54,6 @@ commands:
         "${access_key}" "${secret_key}" \
         > "${TEMP_DIR}/pgbackrest-s3.ini"
 
-      # Both operators and clusters share the same namespace; create both secrets there.
       kubectl -n "${NAMESPACE}" create secret generic "migration-from-crunchy-pgbackrest-secrets" \
         --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-s3.ini"
       kubectl -n "${NAMESPACE}" create secret generic "crunchy-pgbackrest-secret" \

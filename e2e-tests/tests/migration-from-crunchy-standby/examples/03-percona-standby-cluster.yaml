@@ -4,7 +4,7 @@ metadata:
   name: percona-standby
 spec:
   crVersion: 3.0.0
-  image: docker.io/percona/percona-distribution-postgresql:18.3-2
+  image: docker.io/percona/percona-distribution-postgresql:18.4-1
   postgresVersion: 18
   instances:
     - name: instance1
@@ -18,10 +18,10 @@ spec:
   proxy:
     pgBouncer:
       replicas: 1
-      image: docker.io/percona/percona-pgbouncer:1.25.1-1
+      image: docker.io/percona/percona-pgbouncer:1.25.2-1
   backups:
     pgbackrest:
-      image: docker.io/percona/percona-pgbackrest:2.58.0-1
+      image: docker.io/percona/percona-pgbackrest:2.58.0-2
       configuration:
         - secret:
             name: percona-pgbackrest-secret
