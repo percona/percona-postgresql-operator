@@ -447,7 +447,9 @@ MINOR_VER       := $(word 2,$(subst ., ,$(CURRENT_VERSION)))
 NEXT_VER        := $(MAJOR_VER).$(shell expr $(MINOR_VER) + 1).0
 PREV1_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 1).0
 PREV2_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 2).0
-after-release: update-version generate
+
+.PHONY: after-release after-release-versions
+after-release: update-version generate after-release-versions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
@@ -467,3 +469,33 @@ after-release: update-version generate
 	$(SED) -i "s/$(PREV2_VERSION)/$(PREV1_VERSION)/g" e2e-tests/tests/upgrade-consistency/01-*.yaml
 	$(SED) -i "s/$(PREV1_VERSION)/$(CURRENT_VERSION)/g" e2e-tests/tests/upgrade-consistency/02-*.yaml
 	$(SED) -i "s/$(CURRENT_VERSION)/$(NEXT_VER)/g" e2e-tests/tests/upgrade-consistency/03-*.yaml e2e-tests/tests/init-deploy/05-assert.yaml
+
+after-release-versions:
+	$(SED) -i \
+		-e "s#^IMAGE_OPERATOR=.*#IMAGE_OPERATOR=$(IMAGE_TAG_BASE):main#" \
+		-e "s#^IMAGE_POSTGRESQL14=.*#IMAGE_POSTGRESQL14=$(IMAGE_TAG_BASE):main-ppg14-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER14=.*#IMAGE_PGBOUNCER14=$(IMAGE_TAG_BASE):main-pgbouncer14#" \
+		-e "s#^IMAGE_POSTGIS14=.*#IMAGE_POSTGIS14=$(IMAGE_TAG_BASE):main-ppg14-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST14=.*#IMAGE_BACKREST14=$(IMAGE_TAG_BASE):main-pgbackrest14#" \
+		-e "s#^IMAGE_POSTGRESQL15=.*#IMAGE_POSTGRESQL15=$(IMAGE_TAG_BASE):main-ppg15-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER15=.*#IMAGE_PGBOUNCER15=$(IMAGE_TAG_BASE):main-pgbouncer15#" \
+		-e "s#^IMAGE_POSTGIS15=.*#IMAGE_POSTGIS15=$(IMAGE_TAG_BASE):main-ppg15-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST15=.*#IMAGE_BACKREST15=$(IMAGE_TAG_BASE):main-pgbackrest15#" \
+		-e "s#^IMAGE_POSTGRESQL16=.*#IMAGE_POSTGRESQL16=$(IMAGE_TAG_BASE):main-ppg16-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER16=.*#IMAGE_PGBOUNCER16=$(IMAGE_TAG_BASE):main-pgbouncer16#" \
+		-e "s#^IMAGE_POSTGIS16=.*#IMAGE_POSTGIS16=$(IMAGE_TAG_BASE):main-ppg16-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST16=.*#IMAGE_BACKREST16=$(IMAGE_TAG_BASE):main-pgbackrest16#" \
+		-e "s#^IMAGE_POSTGRESQL17=.*#IMAGE_POSTGRESQL17=$(IMAGE_TAG_BASE):main-ppg17-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER17=.*#IMAGE_PGBOUNCER17=$(IMAGE_TAG_BASE):main-pgbouncer17#" \
+		-e "s#^IMAGE_POSTGIS17=.*#IMAGE_POSTGIS17=$(IMAGE_TAG_BASE):main-ppg17-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST17=.*#IMAGE_BACKREST17=$(IMAGE_TAG_BASE):main-pgbackrest17#" \
+		-e "s#^IMAGE_POSTGRESQL18=.*#IMAGE_POSTGRESQL18=$(IMAGE_TAG_BASE):main-ppg18-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER18=.*#IMAGE_PGBOUNCER18=$(IMAGE_TAG_BASE):main-pgbouncer18#" \
+		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=$(IMAGE_TAG_BASE):main-ppg18-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=$(IMAGE_TAG_BASE):main-pgbackrest18#" \
+		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=$(IMAGE_TAG_BASE):main-upgrade#" \
+		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:dev-latest#" \
+		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:dev-latest#" \
+		-e "s#^IMAGE_PMM3_CLIENT=.*#IMAGE_PMM3_CLIENT=perconalab/pmm-client:3-dev-latest#" \
+		-e "s#^IMAGE_PMM3_SERVER=.*#IMAGE_PMM3_SERVER=perconalab/pmm-server:3-dev-latest#" \
+		e2e-tests/release_versions
