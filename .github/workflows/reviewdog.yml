@@ -104,6 +104,67 @@ jobs:
           make generate VERSION=main
           git diff --exit-code
 
+  deploy-cr-release-versions:
+    name: deploy/cr.yaml vs e2e-tests/release_versions
+    if: ${{ contains(github.base_ref, 'release-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify deploy/cr.yaml images match release_versions
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source e2e-tests/release_versions
+
+          registry="${REGISTRY_NAME:-docker.io}"
+          pg_ver=$(grep -E '^[[:space:]]*postgresVersion:' deploy/cr.yaml | head -1 | sed 's/.*postgresVersion:[[:space:]]*//')
+          if [ -z "$pg_ver" ]; then
+            echo "::error::postgresVersion not found in deploy/cr.yaml"
+            exit 1
+          fi
+
+          postgres_var="IMAGE_POSTGRESQL${pg_ver}"
+          pgbouncer_var="IMAGE_PGBOUNCER${pg_ver}"
+          backrest_var="IMAGE_BACKREST${pg_ver}"
+          for var in "$postgres_var" "$pgbouncer_var" "$backrest_var"; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::${var} is not defined in e2e-tests/release_versions"
+              exit 1
+            fi
+          done
+
+          expected_postgres="${registry}/${!postgres_var}"
+          expected_pgbouncer="${registry}/${!pgbouncer_var}"
+          expected_backrest="${registry}/${!backrest_var}"
+          expected_pmm="${registry}/${IMAGE_PMM3_CLIENT}"
+          expected_cr_version="${IMAGE_OPERATOR##*:}"
+
+          spec_image=$(grep -E '^  image: ' deploy/cr.yaml | head -1 | awk '{print $2}')
+          pgbouncer_image=$(sed -n '/^    pgBouncer:/,/^      image:/p' deploy/cr.yaml | grep -E '^      image: ' | head -1 | awk '{print $2}')
+          backrest_image=$(sed -n '/^    pgbackrest:/,/^      image:/p' deploy/cr.yaml | grep -E '^      image: ' | head -1 | awk '{print $2}')
+          pmm_image=$(sed -n '/^  pmm:/,/^    image:/p' deploy/cr.yaml | grep -E '^    image: ' | head -1 | awk '{print $2}')
+          cr_version=$(grep -E '^[[:space:]]*crVersion:' deploy/cr.yaml | head -1 | awk '{print $2}')
+
+          failed=0
+          check() {
+            local name="$1" actual="$2" expected="$3"
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::${name}: deploy/cr.yaml has '${actual}', e2e-tests/release_versions expects '${expected}'"
+              failed=1
+            fi
+          }
+
+          check "spec.image (IMAGE_POSTGRESQL${pg_ver})" "$spec_image" "$expected_postgres"
+          check "proxy.pgBouncer.image (IMAGE_PGBOUNCER${pg_ver})" "$pgbouncer_image" "$expected_pgbouncer"
+          check "backups.pgbackrest.image (IMAGE_BACKREST${pg_ver})" "$backrest_image" "$expected_backrest"
+          check "pmm.image (IMAGE_PMM3_CLIENT)" "$pmm_image" "$expected_pmm"
+          check "spec.crVersion (IMAGE_OPERATOR tag)" "$cr_version" "$expected_cr_version"
+
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "deploy/cr.yaml images match e2e-tests/release_versions."
+
   e2e-release-versions-images:
     name: e2e-tests release_versions image availability
     runs-on: ubuntu-latest
