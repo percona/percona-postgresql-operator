@@ -409,11 +409,17 @@ endef
 update-version:
 	echo $(NEXT_VER) > percona/version/version.txt
 
-# Prepare release
+# Release
+RELEASE_VERSION ?= $(if $(filter file,$(origin VERSION)),$(shell cat percona/version/version.txt),$(VERSION))
+include e2e-tests/release_versions
+.PHONY: release-update
+release-update:
+	hack/update-release-versions.sh --operator-version '$(RELEASE_VERSION)' e2e-tests/release_versions
+	hack/update-platform-versions.sh e2e-tests/release_versions
+
 PG_VER ?= $(shell grep -o "postgresVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+")
 CERT_MANAGER_VER := $(shell grep -Eo "cert-manager v.*" go.mod|grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
-include e2e-tests/release_versions
-release: generate
+release: generate release-update
 	$(SED) -i "/CERT_MANAGER_VER/s/CERT_MANAGER_VER=\".*/CERT_MANAGER_VER=\"$(CERT_MANAGER_VER)\"/" e2e-tests/functions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
