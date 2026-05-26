@@ -98,7 +98,6 @@ Common variables:
 ```text
 VERSION              Release version. Required.
 OPENSHIFT_VERSIONS   OpenShift range annotation. Default: v4.18-v4.21
-PACKAGE_CHANNEL      Bundle channel. Default: preview
 IMAGE                Community operator image.
 REDHAT_OPERATOR_IMAGE Red Hat operator image.
 BUNDLE_DISTRO        Bundle to build: community or redhat.

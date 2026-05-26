@@ -13,20 +13,20 @@ SHELL := /bin/bash
 
 # Project configuration
 NAME ?= percona-postgresql-operator
+COMMUNITY_REGISTRY ?= docker.io
 IMAGE_TAG_OWNER ?= percona
 IMAGE_TAG_BASE ?= $(IMAGE_TAG_OWNER)/$(NAME)
 CONTAINER ?= docker
 
 # Bundle configuration
 OPENSHIFT_VERSIONS ?= v4.18-v4.21
-PACKAGE_CHANNEL ?= stable
 DOCKER_DEFAULT_PLATFORM ?= linux/amd64
 
 # Image configuration
-IMAGE ?= $(IMAGE_TAG_BASE):$(VERSION)
+IMAGE ?= $(COMMUNITY_REGISTRY)/$(IMAGE_TAG_BASE):$(VERSION)
 BUNDLE_REPO ?= $(IMAGE_TAG_BASE)
 BUNDLE_DISTRO ?= community
-BUNDLE_IMG ?= $(BUNDLE_REPO):$(VERSION)-community-bundle
+BUNDLE_IMG ?= $(BUNDLE_REPO):$(VERSION)-$(BUNDLE_DISTRO)-bundle
 REDHAT_OPERATOR_IMAGE ?= registry.connect.redhat.com/percona/percona-postgresql-operator:$(VERSION)
 
 # Paths
@@ -50,7 +50,7 @@ GREEN := $(shell tput setaf 2)
 RESET := $(shell tput sgr0)
 
 # Export variables for generate.sh
-export VERSION BUNDLE_REPO OPENSHIFT_VERSIONS PACKAGE_CHANNEL DOCKER_DEFAULT_PLATFORM
+export VERSION IMAGE REDHAT_OPERATOR_IMAGE BUNDLE_REPO OPENSHIFT_VERSIONS DOCKER_DEFAULT_PLATFORM
 
 # ==============================================================================
 # Bundle Targets
@@ -67,7 +67,7 @@ bundles: check-prereqs $(DISTROS:%=bundles/%)
 bundles/community: tools $(KUSTOMIZE)
 	@echo "$(GREEN)Building community bundle...$(RESET)"
 	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image 'postgres-operator=$(IMAGE)'
-	IMAGE='$(IMAGE)' ./generate.sh community
+	./generate.sh community
 	operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
 	@echo "$(GREEN)Bundle stored in installers/olm/bundles/community$(RESET)"
 
@@ -76,7 +76,7 @@ bundles/community: tools $(KUSTOMIZE)
 bundles/redhat: tools $(KUSTOMIZE)
 	@echo "$(GREEN)Building redhat bundle...$(RESET)"
 	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image 'postgres-operator=$(REDHAT_OPERATOR_IMAGE)'
-	REDHAT_OPERATOR_IMAGE='$(REDHAT_OPERATOR_IMAGE)' ./generate.sh redhat
+	./generate.sh redhat
 	operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
 	@echo "$(GREEN)Bundle stored in installers/olm/bundles/redhat$(RESET)"
 

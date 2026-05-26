@@ -24,6 +24,7 @@ csv_stem=""
 related_images="[]"
 skips=""
 operator_image=""
+distribution_images="{}"
 
 log() {
 	echo >&2 "[olm] $*"
@@ -67,6 +68,7 @@ check_tools() {
 
 	require kubectl
 	require operator-sdk
+	require jq
 	require bash -c "yq --help | grep -q -- '--yaml-roundtrip'"
 
 	log "All tools available"
@@ -111,15 +113,15 @@ prepare_distribution() {
 		bundle_package_name="percona-postgresql-operator-certified"
 		bundle_filename="percona-postgresql-operator-certified"
 		disconnected="true"
-		build_redhat_related_images
-		operator_image="${redhat_operator_image}"
-		related_images="${redhat_related_images}"
+		distribution_images="$(build_redhat_related_images)"
+		operator_image="$(jq --raw-output '.operatorImage' <<<"${distribution_images}")"
+		related_images="$(jq --compact-output '.relatedImages' <<<"${distribution_images}")"
 		skips="$(prepare_redhat_csv_vars "${bundle_filename}")"
 
 		log "Red Hat configuration completed"
 	else
 		require_env IMAGE
-		operator_image="docker.io/${IMAGE#docker.io/}"
+		operator_image="${IMAGE}"
 	fi
 
 	log "Operator image: ${operator_image}"
@@ -224,17 +226,15 @@ render_scorecard_tests() {
 render_bundle_metadata() {
 	log "Rendering bundle annotations for ${DISTRIBUTION}"
 
-	require_env PACKAGE_CHANNEL
 	require_env OPENSHIFT_VERSIONS
 
 	yq --yaml-roundtrip \
 		--arg distribution "${DISTRIBUTION}" \
 		--arg package "${bundle_package_name}" \
-		--arg package_channel "${PACKAGE_CHANNEL}" \
 		--arg openshift_supported_versions "${OPENSHIFT_VERSIONS}" \
 		'
         .annotations["operators.operatorframework.io.bundle.package.v1"] = $package
-        | .annotations["operators.operatorframework.io.bundle.channels.v1"] = $package_channel
+        | .annotations["operators.operatorframework.io.bundle.channels.v1"] = "stable"
         | .annotations["operators.operatorframework.io.bundle.channel.default.v1"] = "stable"
         | .annotations["com.redhat.openshift.versions"] = $openshift_supported_versions
         | if $distribution == "community" then
@@ -390,6 +390,7 @@ rewrite_crd_examples() {
 		log "Rewriting Red Hat alm-examples image references"
 
 		rewrite_crd_examples_images crd_examples \
+			"${distribution_images}" \
 			|| abort "Failed to rewrite images"
 
 		log "Image rewrite completed"

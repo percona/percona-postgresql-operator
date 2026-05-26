@@ -59,7 +59,7 @@ spec:
       url: "https://docs.percona.com/percona-operator-for-postgresql/index.html"
     - name: Cloud Native Landing Page
       url: "https://www.percona.com/cloud-native/"
-    - name: Github
+    - name: GitHub
       url: "https://github.com/percona/percona-postgresql-operator"
   maintainers:
     - name: Percona

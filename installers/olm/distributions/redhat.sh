@@ -11,14 +11,6 @@ redhat_operator_repository="percona/percona-postgresql-operator"
 redhat_containers_repository="percona/percona-postgresql-operator-containers"
 redhat_operator_tag="${REDHAT_OPERATOR_TAG:-${redhat_release}}"
 redhat_upgrade_tag="${REDHAT_UPGRADE_TAG:-${redhat_release}-upgrade}"
-
-# Images
-redhat_operator_image=""
-redhat_postgres_image=""
-redhat_pgbouncer_image=""
-redhat_pgbackrest_image=""
-redhat_pmm_image=""
-redhat_upgrade_image=""
 redhat_related_images="[]"
 
 required_vars=(
@@ -29,7 +21,7 @@ required_vars=(
 )
 
 for var in "${required_vars[@]}"; do
-	: "${!var:?Environment variable "${var}" is required}"
+	: "${!var:?Environment variable ${var} is required}"
 done
 
 digest_key() {
@@ -111,17 +103,6 @@ add_related_image() {
 
 	log "Related image ${name}: ${image}"
 
-	case "${name}" in
-		operator) redhat_operator_image="${image}" ;;
-		"postgres-${current_pg_major}") redhat_postgres_image="${image}" ;;
-		"postgis-${current_pg_major}") redhat_postgres_image="${image}" ;;
-		pgbouncer) redhat_pgbouncer_image="${image}" ;;
-		pgbackrest) redhat_pgbackrest_image="${image}" ;;
-		pmm3) redhat_pmm_image="${image}" ;;
-		pmm2) redhat_pmm_image="${image}" ;;
-		pgupgrade) redhat_upgrade_image="${image}" ;;
-	esac
-
 	redhat_related_images="$(
 		jq -c \
 			--arg name "${name}" \
@@ -131,8 +112,18 @@ add_related_image() {
 	)"
 }
 
+related_image_by_name() {
+	local name="$1"
+
+	jq --raw-output \
+		--arg name "${name}" \
+		'map(select(.name == $name)) | last.image // ""' \
+		<<<"${redhat_related_images}"
+}
+
 build_redhat_related_images() {
 	local repo_root="${repo_root}"
+	local current_pg_major
 	local pg_major
 	local image_var
 	local pg_versions
@@ -174,6 +165,24 @@ build_redhat_related_images() {
 	add_related_image "pmm2" "${redhat_containers_repository}" "${redhat_release}-pmm2"
 	add_related_image "operator" "${redhat_operator_repository}" "${redhat_operator_tag}"
 	add_related_image "pgupgrade" "${redhat_containers_repository}" "${redhat_upgrade_tag}"
+
+	jq -nc \
+		--arg operator_image "$(related_image_by_name operator)" \
+		--arg postgres_image "$(related_image_by_name "postgres-${current_pg_major}")" \
+		--arg pgbouncer_image "$(related_image_by_name pgbouncer)" \
+		--arg pgbackrest_image "$(related_image_by_name pgbackrest)" \
+		--arg pmm_image "$(related_image_by_name pmm3)" \
+		--arg upgrade_image "$(related_image_by_name pgupgrade)" \
+		--argjson related_images "${redhat_related_images}" \
+		'{
+			operatorImage: $operator_image,
+			postgresImage: $postgres_image,
+			pgbouncerImage: $pgbouncer_image,
+			pgbackrestImage: $pgbackrest_image,
+			pmmImage: $pmm_image,
+			upgradeImage: $upgrade_image,
+			relatedImages: $related_images
+		}'
 }
 
 apply_csv_overrides() {
@@ -234,6 +243,7 @@ prepare_redhat_csv_vars() {
 
 rewrite_crd_examples_images() {
 	local var_name="$1"
+	local images="$2"
 	local ref
 	local rewritten
 
@@ -241,12 +251,7 @@ rewrite_crd_examples_images() {
 
 	rewritten="$(
 		jq \
-			--arg operator_image "${redhat_operator_image}" \
-			--arg postgres_image "${redhat_postgres_image}" \
-			--arg pgbouncer_image "${redhat_pgbouncer_image}" \
-			--arg pgbackrest_image "${redhat_pgbackrest_image}" \
-			--arg pmm_image "${redhat_pmm_image}" \
-			--arg upgrade_image "${redhat_upgrade_image}" \
+			--argjson images "${images}" \
 			'
         map(
           if .kind == "PerconaPGCluster" then
@@ -254,7 +259,7 @@ rewrite_crd_examples_images() {
               {
                 crVersion: .spec.crVersion,
                 initContainer: {
-                  image: $operator_image
+                  image: $images.operatorImage
                 }
               } + (
                 .spec
@@ -264,16 +269,16 @@ rewrite_crd_examples_images() {
                   )
               )
             )
-            | .spec.image = $postgres_image
-            | .spec.proxy.pgBouncer.image = $pgbouncer_image
-            | .spec.backups.pgbackrest.image = $pgbackrest_image
-            | .spec.pmm.image = $pmm_image
+            | .spec.image = $images.postgresImage
+            | .spec.proxy.pgBouncer.image = $images.pgbouncerImage
+            | .spec.backups.pgbackrest.image = $images.pgbackrestImage
+            | .spec.pmm.image = $images.pmmImage
 
           elif .kind == "PerconaPGUpgrade" then
-            .spec.image = $upgrade_image
-            | .spec.toPostgresImage = $postgres_image
-            | .spec.toPgBouncerImage = $pgbouncer_image
-            | .spec.toPgBackRestImage = $pgbackrest_image
+            .spec.image = $images.upgradeImage
+            | .spec.toPostgresImage = $images.postgresImage
+            | .spec.toPgBouncerImage = $images.pgbouncerImage
+            | .spec.toPgBackRestImage = $images.pgbackrestImage
 
           else
             .
