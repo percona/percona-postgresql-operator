@@ -1,0 +1,9 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 360
+commands:
+  - script: |
+      until kubectl assert exist-enhanced perconapgbackup k8s-upgrade-full-repo1 -n ${NAMESPACE} --field-selector status.state=Succeeded; do
+        echo "Waiting for backup to have succeeded state..."
+        sleep 10
+      done

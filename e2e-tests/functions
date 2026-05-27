@@ -1777,3 +1777,236 @@ verify_hugepages_usage() {
         return 1
     fi
 }
+
+get_available_k8s_versions() {
+	local offset="${1:-1}"
+	local platform="$2"
+	local region="$3"
+	local versions=""
+
+	case "$platform" in
+		digitalocean)
+			versions=$(doctl kubernetes options versions -o json \
+				| jq -r '.[].slug')
+			;;
+
+		gke)
+			versions=$(
+				gcloud container get-server-config \
+					--region "${region}" \
+					--format="value(validMasterVersions)" 2>/dev/null \
+					| tr ';' '\n' \
+					| awk -F'.' '!seen[$1"."$2]++'
+			)
+			;;
+
+		*)
+			echo "ERROR: unsupported platform '$platform'"
+			return 1
+			;;
+	esac
+
+	versions_sorted=$(echo "$versions" | sort -u -V)
+	echo "$versions_sorted" | tail -n "$offset" | head -n 1
+}
+
+create_k8s_cluster() {
+	local name="$1"
+	local version="$2"
+	local platform="$3"
+	local region="$4"
+	local ttl="${5:-"1"}"
+
+	case "$platform" in
+
+		digitalocean)
+			echo "Creating DOKS cluster: $name ($version)"
+			creation_time=$(date +%s)
+			doctl kubernetes cluster create "$name" \
+				--region "$region" \
+				--version "$version" \
+				--size "s-4vcpu-16gb-amd" \
+				--count "3" \
+				--tag "delete-cluster-after-hours:$ttl" \
+				--tag "creation-time:$creation_time" \
+				--tag "team:cloud" \
+				--tag "product:pg-operator" \
+				--wait
+
+			if [[ -n $DOKS_PROJECT ]]; then
+				project_id=$(doctl projects list --output json | jq -r --arg name "${DOKS_PROJECT}" '.[] | select(.name == $name) | .id')
+				cluster_id=$(doctl kubernetes cluster list --output json | jq -r --arg name "$name" '.[] | select(.name == $name) | .id')
+				urn=do:kubernetes:$cluster_id
+				doctl projects resources assign "$project_id" --resource "$urn"
+			fi
+			;;
+
+		gke)
+			echo "Creating GKE cluster: $name ($version)"
+			gcloud container clusters create "$name" \
+				--zone "$region" \
+				--cluster-ipv4-cidr=/21 \
+				--cluster-version "$version" \
+				--num-nodes "3" \
+				--machine-type "n1-standard-4" \
+				--labels="delete-cluster-after-hours=$ttl,team=cloud,product=pg-operator" \
+				--no-enable-autoupgrade \
+				--monitoring=NONE \
+				--logging=NONE \
+				--no-enable-managed-prometheus \
+				--quiet
+
+			kubectl create clusterrolebinding cluster-admin-binding1 \
+				--clusterrole=cluster-admin \
+				--user="$(gcloud config get-value core/account)"
+			;;
+
+		*)
+			echo "ERROR: unsupported platform '$platform'"
+			return 1
+			;;
+	esac
+
+	kubectl create namespace "${NAMESPACE}"
+	echo "Cluster $name created successfully"
+}
+
+upgrade_k8s_cluster() {
+	local name="$1"
+	local version="$2"
+	local platform="$(detect_k8s_platform)"
+
+	case "$platform" in
+		digitalocean)
+			echo "Upgrading DOKS cluster: $name to $version"
+			doctl kubernetes cluster upgrade "$name" \
+				--version "$version"
+			;;
+		gke)
+			echo "Upgrading GKE cluster: $name to $version"
+			location=$(gcloud container clusters list \
+				--filter="name=$name" \
+				--format="value(location)")
+			gcloud container clusters upgrade "$name" \
+				--master \
+				--cluster-version "$version" \
+				--zone "$location" \
+				--quiet
+			gcloud container clusters upgrade "$name" \
+				--node-pool default-pool \
+				--cluster-version "$version" \
+				--zone "$location" \
+				--quiet
+			;;
+		*)
+			echo "ERROR: unsupported platform '$platform'"
+			return 1
+			;;
+	esac
+
+	echo "Cluster $name upgraded to $version successfully"
+}
+
+delete_k8s_cluster() {
+	local name="$1"
+	local platform="$2"
+	local region="$3"
+
+	case "$platform" in
+		digitalocean)
+			echo "Deleting DOKS cluster: $name"
+			cluster_id=$(doctl kubernetes cluster list --output json | jq -r --arg name "$name" '.[] | select(.name == $name) | .id')
+			# Dangerous includes LoadBalancers, Volumes and all resources related to the cluster
+			doctl kubernetes cluster delete "$cluster_id" --force --dangerous
+			;;
+		gke)
+			echo "Deleting GKE cluster: $name"
+			gcloud container clusters delete "$name" \
+				--zone "$region" \
+				--quiet \
+				--async
+			;;
+		*)
+			echo "ERROR: unsupported platform '$platform'"
+			return 1
+			;;
+	esac
+
+	echo "Cluster $name deleted successfully"
+}
+
+get_k8s_cluster_name() {
+	local platform="${1:-$(detect_k8s_platform)}"
+
+	case "$platform" in
+		digitalocean)
+			local nodepool_id="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.doks\.digitalocean\.com/node-pool-id}')"
+			doctl kubernetes cluster list -o json \
+				| jq -r --arg id "$nodepool_id" \
+					'.[] | select(.node_pools[]?.id == $id) | .name' 2>/dev/null
+			;;
+		gke)
+			kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' \
+				| sed -E 's|.*gke-(.*)-default-pool.*|\1|'
+			;;
+		*)
+			echo "ERROR: unsupported platform '$platform'" >&2
+			return 1
+			;;
+	esac
+}
+
+get_k8s_cluster_version() {
+	local name="$1"
+	local platform="${2:-$(detect_k8s_platform)}"
+
+	case "$platform" in
+		digitalocean)
+			doctl kubernetes cluster get "$name" --output json \
+				| jq -r '.[0].version'
+			;;
+		gke)
+			location=$(gcloud container clusters list \
+				--filter="name=$name" \
+				--format="value(location)")
+			gcloud container clusters describe "$name" \
+				--zone "$location" \
+				--format="value(currentMasterVersion)"
+			;;
+		*)
+			echo "ERROR: unsupported platform '$platform'" >&2
+			return 1
+			;;
+	esac
+}
+
+get_k8s_nodes_version() {
+	kubectl get nodes -o json \
+		| jq -r '.items[].status.nodeInfo.kubeletVersion' \
+		| sort -u
+}
+
+verify_k8s_cluster_version() {
+	local cluster_name="$1"
+	local expected_version="$2"
+	local current_version="$(get_k8s_cluster_version "$cluster_name")"
+
+	if [[ $expected_version != "$current_version" ]]; then
+		echo "Error current cluster version $current_version is not the same as expected version $expected_version"
+		return 1
+	fi
+}
+
+verify_k8s_nodes_version() {
+	local expected_version="$1"
+	local nodes_version="$(get_k8s_nodes_version)"
+	local expected_clean="$(echo "$expected_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" # Gets only Kubernetes version xx.xx.xx
+
+	for node_version in $nodes_version; do
+		node_clean=$(echo "$node_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+		if [[ $node_clean != "$expected_clean" ]]; then
+			echo "Error current node version $node_clean is not the same as expected version $expected_clean"
+			return 1
+		fi
+	done
+}

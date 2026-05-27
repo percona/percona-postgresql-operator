@@ -9,6 +9,7 @@ demand-backup-offline-snapshot
 dynamic-configuration
 finalizers
 init-deploy
+k8s-upgrade
 huge-pages
 major-upgrade-14-to-15
 major-upgrade-15-to-16
