@@ -523,9 +523,11 @@ render_csv() {
 	log "CSV rendered: ${bundle_directory}/manifests/${bundle_filename}.clusterserviceversion.yaml"
 }
 
-apply_csv_overrides() {
-	log "No CSV overrides for ${DISTRIBUTION}"
-}
+if ! declare -F apply_csv_overrides >/dev/null; then
+	apply_csv_overrides() {
+		log "No CSV overrides for ${DISTRIBUTION}"
+	}
+fi
 
 print_bundle_tree() {
 	if command -v tree >/dev/null 2>&1; then
