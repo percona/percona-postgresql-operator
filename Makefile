@@ -440,6 +440,9 @@ release: generate
        -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
        -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" deploy/upgrade.yaml
 
+# Update sidecars
+	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(VERSION)#" e2e-tests/tests/sidecars/01-assert.yaml
+
 # Prepare main branch after release
 CURRENT_VERSION := $(shell grep -oE "crVersion: [0-9]+\.[0-9]+\.[0-9]+" deploy/cr.yaml | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
 MAJOR_VER       := $(word 1,$(subst ., ,$(CURRENT_VERSION)))
@@ -464,6 +467,9 @@ after-release: update-version generate after-release-versions
 		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
 		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" deploy/upgrade.yaml
+
+# Update sidecars
+	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(NEXT_VER)#" e2e-tests/tests/sidecars/01-assert.yaml
 
 # Update upgrade-consistency
 	$(SED) -i "s/$(PREV2_VERSION)/$(PREV1_VERSION)/g" e2e-tests/tests/upgrade-consistency/01-*.yaml
