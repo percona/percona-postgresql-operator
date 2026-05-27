@@ -220,7 +220,7 @@ deploy_minio() {
 	local tls_secret="${2:-}"
 	local access_key
 	local secret_key
-	local endpoint_url="http://minio-service:9000"
+	local endpoint_url="http://${name}:9000"
 	local aws_extra_args=""
 	local service_account_name="minio-sa"
 	local -a additional_helm_args
