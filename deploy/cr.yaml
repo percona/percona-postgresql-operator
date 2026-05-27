@@ -721,7 +721,7 @@ spec:
 
   pmm:
     enabled: false
-    image: docker.io/perconalab/pmm-client:dev-latest
+    image: docker.io/perconalab/pmm-client:3-dev-latest
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service

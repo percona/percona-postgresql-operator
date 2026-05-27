@@ -460,7 +460,7 @@ after-release: update-version generate after-release-versions
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:3-dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-upgrade#}" \
