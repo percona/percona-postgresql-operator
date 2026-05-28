@@ -505,7 +505,7 @@ render_csv() {
 						| .spec.template.spec.containers[].image = $operator_image
 						| (
 								.spec.template.spec.containers[].env[]?
-								| select(.valueFrom.fieldRef.fieldPath == "metadata.namespace")
+								| select(.name == "WATCH_NAMESPACE")
 								| .valueFrom.fieldRef.fieldPath
 							) = $target_namespaces_field_path
 						| {
