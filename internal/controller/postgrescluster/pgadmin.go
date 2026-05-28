@@ -24,7 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgadmin"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // reconcilePGAdmin writes the objects necessary to run a pgAdmin Pod.
@@ -159,7 +159,7 @@ func (r *Reconciler) generatePGAdminService(
 	// requires updates to the pgAdmin service configuration.
 	servicePort := corev1.ServicePort{
 		Name:       naming.PortPGAdmin,
-		Port:       *initialize.Int32(5050),
+		Port:       *new(int32(5050)),
 		Protocol:   corev1.ProtocolTCP,
 		TargetPort: intstr.FromString(naming.PortPGAdmin),
 	}
@@ -277,13 +277,13 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 
 	// if the shutdown flag is set, set pgAdmin replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {
-		sts.Spec.Replicas = initialize.Int32(0)
+		sts.Spec.Replicas = new(int32(0))
 	} else {
 		sts.Spec.Replicas = cluster.Spec.UserInterface.PGAdmin.Replicas
 	}
 
 	// Don't clutter the namespace with extra ControllerRevisions.
-	sts.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	sts.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Give the Pod a stable DNS record based on its name.
 	// - https://docs.k8s.io/concepts/workloads/controllers/statefulset/#stable-network-id
@@ -310,10 +310,10 @@ func (r *Reconciler) reconcilePGAdminStatefulSet(
 
 	// pgAdmin does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	sts.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	sts.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// Do not add environment variables describing services in this namespace.
-	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	sts.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	sts.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(cluster)
 

@@ -34,7 +34,7 @@ func TestShouldFailSnapshot(t *testing.T) {
 			volumeSnapshot: &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
 					Error: &volumesnapshotv1.VolumeSnapshotError{
-						Time: ptr.To(metav1.Time{}),
+						Time: new(metav1.Time{}),
 					},
 				},
 			},
@@ -45,7 +45,7 @@ func TestShouldFailSnapshot(t *testing.T) {
 			volumeSnapshot: &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
 					Error: &volumesnapshotv1.VolumeSnapshotError{
-						Time: ptr.To(metav1.NewTime(now.Add(-1 * time.Minute))), // 1mins ago, within deadline
+						Time: new(metav1.NewTime(now.Add(-1 * time.Minute))), // 1mins ago, within deadline
 					},
 				},
 			},
@@ -56,7 +56,7 @@ func TestShouldFailSnapshot(t *testing.T) {
 			volumeSnapshot: &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
 					Error: &volumesnapshotv1.VolumeSnapshotError{
-						Time: ptr.To(metav1.NewTime(now.Add(-10 * time.Minute))), // 10 minutes ago (past 5min deadline)
+						Time: new(metav1.NewTime(now.Add(-10 * time.Minute))), // 10 minutes ago (past 5min deadline)
 					},
 				},
 			},
@@ -175,13 +175,13 @@ func TestReconcileDataSnapshot(t *testing.T) {
 		existingVS := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{Name: vsName, Namespace: ns},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To(pvcName),
+					PersistentVolumeClaimName: new(pvcName),
 				},
 			},
 			Status: &volumesnapshotv1.VolumeSnapshotStatus{
-				ReadyToUse: ptr.To(true),
+				ReadyToUse: new(true),
 			},
 		}
 
@@ -281,13 +281,13 @@ func TestReconcileWALSnapshot(t *testing.T) {
 		existingVS := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{Name: vsName, Namespace: ns},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To(walPVCName),
+					PersistentVolumeClaimName: new(walPVCName),
 				},
 			},
 			Status: &volumesnapshotv1.VolumeSnapshotStatus{
-				ReadyToUse: ptr.To(true),
+				ReadyToUse: new(true),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -407,22 +407,22 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 		existingVS1 := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{Name: vs1Name, Namespace: ns},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To(ts1PVC),
+					PersistentVolumeClaimName: new(ts1PVC),
 				},
 			},
-			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: new(true)},
 		}
 		existingVS2 := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{Name: vs2Name, Namespace: ns},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To(ts2PVC),
+					PersistentVolumeClaimName: new(ts2PVC),
 				},
 			},
-			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: new(true)},
 		}
 		backup := &v2.PerconaPGBackup{
 			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
@@ -554,12 +554,12 @@ func TestReconcileRunning(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To("data-pvc"),
+					PersistentVolumeClaimName: new("data-pvc"),
 				},
 			},
-			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: new(true)},
 		}
 		walVS := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
@@ -567,12 +567,12 @@ func TestReconcileRunning(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To("wal-pvc"),
+					PersistentVolumeClaimName: new("wal-pvc"),
 				},
 			},
-			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: new(true)},
 		}
 
 		cl := fake.NewClientBuilder().
@@ -615,15 +615,15 @@ func TestReconcileRunning(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To("data-pvc"),
+					PersistentVolumeClaimName: new("data-pvc"),
 				},
 			},
 			Status: &volumesnapshotv1.VolumeSnapshotStatus{
 				Error: &volumesnapshotv1.VolumeSnapshotError{
-					Time:    ptr.To(metav1.NewTime(time.Now().Add(-10 * time.Minute))),
-					Message: ptr.To("disk full"),
+					Time:    new(metav1.NewTime(time.Now().Add(-10 * time.Minute))),
+					Message: new("disk full"),
 				},
 			},
 		}

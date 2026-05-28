@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+
+      kubectl wait deployment pgo \
+        -n "${NAMESPACE}" \
+        --for=condition=Available \
+        --timeout=120s
+
+      kubectl wait deployment percona-postgresql-operator \
+        -n "${OPERATOR_NS:-$NAMESPACE}" \
+        --for=condition=Available \
+        --timeout=120s

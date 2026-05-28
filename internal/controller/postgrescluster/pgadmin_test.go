@@ -21,11 +21,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestGeneratePGAdminConfigMap(t *testing.T) {
@@ -84,7 +83,7 @@ labels:
 name: pg1-pgadmin
 namespace: some-ns
 ownerReferences:
-- apiVersion: postgres-operator.crunchydata.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster
@@ -179,7 +178,7 @@ labels:
 name: my-cluster-pgadmin
 namespace: my-ns
 ownerReferences:
-- apiVersion: postgres-operator.crunchydata.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster
@@ -314,12 +313,12 @@ ownerReferences:
 		Expect      func(testing.TB, *corev1.Service, error)
 	}{
 		{Description: "ClusterIP with Port 32000", Type: "ClusterIP",
-			NodePort: initialize.Int32(32000), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32000)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.ErrorContains(t, err, "NodePort cannot be set with type ClusterIP on Service \"my-cluster-pgadmin\"")
 				assert.Assert(t, service == nil)
 			}},
 		{Description: "NodePort with Port 32001", Type: "NodePort",
-			NodePort: initialize.Int32(32001), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32001)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
 				alwaysExpect(t, service)
@@ -332,7 +331,7 @@ ownerReferences:
 `))
 			}},
 		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
-			NodePort: initialize.Int32(32002), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32002)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
 				alwaysExpect(t, service)
@@ -583,7 +582,7 @@ terminationGracePeriodSeconds: 30
 		}
 
 		if cluster.Spec.UserInterface.PGAdmin.PriorityClassName != nil {
-			customcluster.Spec.UserInterface.PGAdmin.PriorityClassName = initialize.String("testpriorityclass")
+			customcluster.Spec.UserInterface.PGAdmin.PriorityClassName = new("testpriorityclass")
 		}
 
 		customcluster.Spec.UserInterface.PGAdmin.TopologySpreadConstraints = []corev1.TopologySpreadConstraint{
@@ -741,7 +740,7 @@ func TestReconcilePGAdminUsers(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns1"
 	cluster.Name = "pgc1"
-	cluster.Spec.Port = initialize.Int32(5432)
+	cluster.Spec.Port = new(int32(5432))
 	cluster.Spec.UserInterface =
 		&v1beta1.UserInterfaceSpec{PGAdmin: &v1beta1.PGAdminPodSpec{}}
 
@@ -901,7 +900,7 @@ func pgAdminTestCluster(ns corev1.Namespace) *v1beta1.PostgresCluster {
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
 							},
 						},
-						StorageClassName: initialize.String("storage-class-for-data"),
+						StorageClassName: new("storage-class-for-data"),
 					},
 				},
 			},

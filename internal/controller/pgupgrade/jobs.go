@@ -20,7 +20,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // Upgrade job
@@ -178,7 +178,7 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 	job.Spec.Template.Spec.ImagePullSecrets = upgrade.Spec.ImagePullSecrets
 
 	// Attempt the upgrade exactly once.
-	job.Spec.BackoffLimit = initialize.Int32(0)
+	job.Spec.BackoffLimit = new(int32(0))
 	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 
 	// When enabled, calculate the number of CPUs for pg_upgrade.
@@ -335,7 +335,7 @@ func (r *PGUpgradeReconciler) generateRemoveDataJob(
 	job.Spec.Template.Spec.ImagePullSecrets = upgrade.Spec.ImagePullSecrets
 
 	// Attempt the removal exactly once.
-	job.Spec.BackoffLimit = initialize.Int32(0)
+	job.Spec.BackoffLimit = new(int32(0))
 	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 
 	// Replace all containers with one that removes the data.

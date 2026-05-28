@@ -34,7 +34,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/standalone_pgadmin"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
@@ -48,7 +47,7 @@ import (
 	perconaRuntime "github.com/percona/percona-postgresql-operator/v2/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var (
@@ -175,6 +174,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	if cm.Controller() == nil {
 		return errors.New("missing controller in manager")
 	}
+	r.Controller = cm.Controller()
 
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
@@ -288,7 +288,7 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	log := logging.FromContext(ctx)
 
 	options := runtime.Options{}
-	options.Cache.SyncPeriod = initialize.Pointer(time.Hour)
+	options.Cache.SyncPeriod = new(time.Hour)
 
 	options.HealthProbeBindAddress = ":8081"
 

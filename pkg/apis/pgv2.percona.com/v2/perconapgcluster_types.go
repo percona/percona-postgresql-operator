@@ -21,7 +21,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var allowedWALLevels = []string{"logical", "replica"}
@@ -258,7 +258,7 @@ func (cr *PerconaPGCluster) Default() {
 
 	if cr.Spec.Backups.IsEnabled() {
 		if cr.Spec.Backups.TrackLatestRestorableTime == nil {
-			cr.Spec.Backups.TrackLatestRestorableTime = ptr.To(true)
+			cr.Spec.Backups.TrackLatestRestorableTime = new(true)
 		}
 		if cr.Spec.Backups.PGBackRest.Metadata == nil {
 			cr.Spec.Backups.PGBackRest.Metadata = new(crunchyv1beta1.Metadata)
@@ -274,37 +274,37 @@ func (cr *PerconaPGCluster) Default() {
 	}
 
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatMonitor = ptr.To(true)
+		cr.Spec.Extensions.BuiltIn.PGStatMonitor = new(true)
 		if cr.CompareVersion("2.9.0") >= 0 {
 			var qs PMMQuerySource
 			if cr.PMMEnabled() {
 				qs = cr.Spec.PMM.QuerySource
 			}
-			cr.Spec.Extensions.BuiltIn.PGStatMonitor = ptr.To(qs == PgStatMonitor)
+			cr.Spec.Extensions.BuiltIn.PGStatMonitor = new(qs == PgStatMonitor)
 		}
 	}
 	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatStatements = ptr.To(false)
+		cr.Spec.Extensions.BuiltIn.PGStatStatements = new(false)
 		if cr.CompareVersion("2.9.0") >= 0 {
 			var qs PMMQuerySource
 			if cr.PMMEnabled() {
 				qs = cr.Spec.PMM.QuerySource
 			}
-			cr.Spec.Extensions.BuiltIn.PGStatStatements = ptr.To(qs == PgStatStatements)
+			cr.Spec.Extensions.BuiltIn.PGStatStatements = new(qs == PgStatStatements)
 		}
 	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
-		cr.Spec.Extensions.BuiltIn.PGAudit = ptr.To(true)
+		cr.Spec.Extensions.BuiltIn.PGAudit = new(true)
 	}
 	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
-		cr.Spec.Extensions.BuiltIn.PGVector = ptr.To(false)
+		cr.Spec.Extensions.BuiltIn.PGVector = new(false)
 	}
 	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
-		cr.Spec.Extensions.BuiltIn.PGRepack = ptr.To(false)
+		cr.Spec.Extensions.BuiltIn.PGRepack = new(false)
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
-		cr.Spec.AutoCreateUserSchema = ptr.To(true)
+		cr.Spec.AutoCreateUserSchema = new(true)
 	}
 
 	if cr.CompareVersion("2.9.0") < 0 && cr.Spec.Config == nil {
@@ -665,8 +665,8 @@ type VolumeSnapshots struct {
 func DefaultOfflineSnapshotConfig() *OfflineSnapshotConfig {
 	return &OfflineSnapshotConfig{
 		Checkpoint: &CheckpointConfig{
-			Enabled:        ptr.To(true),
-			TimeoutSeconds: ptr.To(int32(300)),
+			Enabled:        new(true),
+			TimeoutSeconds: new(int32(300)),
 		},
 	}
 }
@@ -702,7 +702,7 @@ func (b Backups) IsEnabled() bool {
 func (b Backups) ToCrunchy(version string) crunchyv1beta1.Backups {
 	if b.Enabled != nil && !*b.Enabled {
 		return crunchyv1beta1.Backups{
-			Enabled: ptr.To(false),
+			Enabled: new(false),
 			PGBackRest: crunchyv1beta1.PGBackRestArchive{
 				Image: b.PGBackRest.Image,
 			},

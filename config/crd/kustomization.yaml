@@ -2,11 +2,11 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- bases/postgres-operator.crunchydata.com_crunchybridgeclusters.yaml
-- bases/postgres-operator.crunchydata.com_postgresclusters.yaml
+- bases/upstream.pgv2.percona.com_crunchybridgeclusters.yaml
+- bases/upstream.pgv2.percona.com_postgresclusters.yaml
 - bases/pgv2.percona.com_perconapgclusters.yaml
-- bases/postgres-operator.crunchydata.com_pgupgrades.yaml
-- bases/postgres-operator.crunchydata.com_pgadmins.yaml
+- bases/upstream.pgv2.percona.com_pgupgrades.yaml
+- bases/upstream.pgv2.percona.com_pgadmins.yaml
 
 patchesStrategicMerge:
 - patches/versionlabel_in_perconapgclusters.yaml

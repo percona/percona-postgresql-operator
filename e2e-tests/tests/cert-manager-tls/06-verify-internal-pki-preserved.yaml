@@ -1,0 +1,46 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      root_ca_annotation=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-cluster-cert \
+        -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || true)
+
+      if [[ -n "$root_ca_annotation" ]]; then
+          echo "FAIL: Root CA secret was taken over by cert-manager!"
+          exit 1
+      fi
+
+      cert_count=$(kubectl -n "$NAMESPACE" get certificate 2>/dev/null | grep -c cert-manager-tls || true)
+      if [[ "$cert_count" -gt 0 ]]; then
+          echo "FAIL: cert-manager Certificate resources were created for the existing cluster"
+          exit 1
+      fi
+
+      instance_sts=$(kubectl -n "$NAMESPACE" get sts \
+        -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/instance-set=instance1 \
+        -o jsonpath='{.items[*].metadata.name}')
+
+      for sts_name in $instance_sts; do
+          secret_name="${sts_name}-certs"
+
+          cm_annotation=$(kubectl -n "$NAMESPACE" get secret "$secret_name" \
+            -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || true)
+          if [[ -n "$cm_annotation" ]]; then
+              echo "FAIL: Instance secret $secret_name was taken over by cert-manager"
+              exit 1
+          fi
+      done
+
+      pg_cert_serial=$(run_comand_on_pod "openssl s_client -connect cert-manager-tls-primary:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -serial" | tr -d '[:space:]')
+      pg_cert_serial_before=$(kubectl -n "$NAMESPACE" get configmap internal-pki-cert-serial -o jsonpath='{.data.pg-serial}')
+
+      if [[ "$pg_cert_serial" != "$pg_cert_serial_before" ]]; then
+          echo "FAIL: PostgreSQL certificate changed after cert-manager installation!"
+          exit 1
+      fi
+    timeout: 60

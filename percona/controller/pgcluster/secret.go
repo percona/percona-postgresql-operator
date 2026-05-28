@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,11 +29,11 @@ func getEnvFromSecrets(ctx context.Context, cl client.Client, cr *v2.PerconaPGCl
 }
 
 func getSecretHash(secrets ...corev1.Secret) string {
-	var data string
+	var data strings.Builder
 
 	for _, secret := range secrets {
-		data += fmt.Sprintln(secret.Data)
+		data.WriteString(fmt.Sprintln(secret.Data))
 	}
 
-	return fmt.Sprintf("%x", md5.Sum([]byte(data))) //nolint:gosec
+	return fmt.Sprintf("%x", md5.Sum([]byte(data.String()))) //nolint:gosec
 }

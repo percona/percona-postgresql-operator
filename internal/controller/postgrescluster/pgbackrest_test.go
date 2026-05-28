@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/ptr" // K8SPG-714
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -44,7 +43,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var testCronSchedule string = "*/15 * * * *"
@@ -62,8 +61,8 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 			},
 		},
 		Spec: v1beta1.PostgresClusterSpec{
-			Port:            initialize.Int32(5432),
-			Shutdown:        initialize.Bool(false),
+			Port:            new(int32(5432)),
+			Shutdown:        new(false),
 			PostgresVersion: 13,
 			ImagePullSecrets: []corev1.LocalObjectReference{
 				{
@@ -89,7 +88,7 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 				PGBackRest: v1beta1.PGBackRestArchive{
 					Image: "example.com/crunchy-pgbackrest:test",
 					Jobs: &v1beta1.BackupJobs{
-						PriorityClassName: initialize.String("some-priority-class"),
+						PriorityClassName: new("some-priority-class"),
 					},
 					Global: map[string]string{
 						"repo2-test": "config",
@@ -140,7 +139,7 @@ func fakePostgresCluster(clusterName, namespace, clusterUID string,
 			},
 		}
 		postgresCluster.Spec.Backups.PGBackRest.RepoHost = &v1beta1.PGBackRestRepoHost{
-			PriorityClassName: initialize.String("some-priority-class"),
+			PriorityClassName: new("some-priority-class"),
 			Resources:         corev1.ResourceRequirements{},
 			Affinity:          &corev1.Affinity{},
 			Tolerations: []corev1.Toleration{
@@ -2434,7 +2433,7 @@ func TestCopyConfigurationResources(t *testing.T) {
 		assert.NilError(t, checkConfigMap(configMap.Name, ns1.Name))
 
 		sc := sourceCluster("4")
-		sc.Spec.Backups.PGBackRest.Configuration[0].Secret.Optional = initialize.Bool(true)
+		sc.Spec.Backups.PGBackRest.Configuration[0].Secret.Optional = new(true)
 
 		nc := cluster("4", sc.Name, sc.Namespace)
 		if err := tClient.Create(ctx, nc); err != nil {
@@ -2455,7 +2454,7 @@ func TestCopyConfigurationResources(t *testing.T) {
 		assert.NilError(t, checkSecret(secret.Name, ns1.Name))
 
 		sc := sourceCluster("5")
-		sc.Spec.Backups.PGBackRest.Configuration[1].ConfigMap.Optional = initialize.Bool(true)
+		sc.Spec.Backups.PGBackRest.Configuration[1].ConfigMap.Optional = new(true)
 
 		nc := cluster("5", sc.Name, sc.Namespace)
 		if err := tClient.Create(ctx, nc); err != nil {
@@ -2471,8 +2470,8 @@ func TestCopyConfigurationResources(t *testing.T) {
 		secret := secret("6")
 		configMap := configMap("6")
 		sc := sourceCluster("6")
-		sc.Spec.Backups.PGBackRest.Configuration[0].Secret.Optional = initialize.Bool(true)
-		sc.Spec.Backups.PGBackRest.Configuration[1].ConfigMap.Optional = initialize.Bool(true)
+		sc.Spec.Backups.PGBackRest.Configuration[0].Secret.Optional = new(true)
+		sc.Spec.Backups.PGBackRest.Configuration[1].ConfigMap.Optional = new(true)
 
 		nc := cluster("6", sc.Name, sc.Namespace)
 		if err := tClient.Create(ctx, nc); err != nil {
@@ -2679,7 +2678,7 @@ volumes:
 	t.Run("PriorityClassName", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
-			PriorityClassName: initialize.String("some-priority-class"),
+			PriorityClassName: new("some-priority-class"),
 		}
 		job := generateBackupJobSpecIntent(ctx,
 			cluster, v1beta1.PGBackRestRepo{},
@@ -2728,7 +2727,7 @@ volumes:
 
 		t.Run("Zero", func(t *testing.T) {
 			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
-				TTLSecondsAfterFinished: initialize.Int32(0),
+				TTLSecondsAfterFinished: new(int32(0)),
 			}
 
 			spec := generateBackupJobSpecIntent(ctx,
@@ -2741,7 +2740,7 @@ volumes:
 
 		t.Run("Positive", func(t *testing.T) {
 			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
-				TTLSecondsAfterFinished: initialize.Int32(100),
+				TTLSecondsAfterFinished: new(int32(100)),
 			}
 
 			spec := generateBackupJobSpecIntent(ctx,
@@ -2913,7 +2912,7 @@ volumes:
 									EnvFrom: []corev1.EnvFromSource{
 										{
 											SecretRef: &corev1.SecretEnvSource{
-												Optional: ptr.To(true),
+												Optional: new(true),
 											},
 										},
 									},
@@ -2927,7 +2926,7 @@ volumes:
 								EnvFrom: []corev1.EnvFromSource{
 									{
 										SecretRef: &corev1.SecretEnvSource{
-											Optional: ptr.To(false),
+											Optional: new(false),
 										},
 									},
 								},
@@ -2955,7 +2954,7 @@ volumes:
 				assert.DeepEqual(t, container.EnvFrom, []corev1.EnvFromSource{
 					{
 						SecretRef: &corev1.SecretEnvSource{
-							Optional: ptr.To(true),
+							Optional: new(true),
 						},
 					},
 				})
@@ -2979,7 +2978,7 @@ volumes:
 								EnvFrom: []corev1.EnvFromSource{
 									{
 										SecretRef: &corev1.SecretEnvSource{
-											Optional: ptr.To(false),
+											Optional: new(false),
 										},
 									},
 								},
@@ -3007,7 +3006,7 @@ volumes:
 				assert.DeepEqual(t, container.EnvFrom, []corev1.EnvFromSource{
 					{
 						SecretRef: &corev1.SecretEnvSource{
-							Optional: ptr.To(false),
+							Optional: new(false),
 						},
 					},
 				})
@@ -3032,7 +3031,7 @@ volumes:
 							EnvFrom: []corev1.EnvFromSource{
 								{
 									SecretRef: &corev1.SecretEnvSource{
-										Optional: ptr.To(false),
+										Optional: new(false),
 									},
 								},
 							},
@@ -3046,7 +3045,7 @@ volumes:
 								EnvFrom: []corev1.EnvFromSource{
 									{
 										SecretRef: &corev1.SecretEnvSource{
-											Optional: ptr.To(false),
+											Optional: new(false),
 										},
 									},
 								},
@@ -3107,7 +3106,7 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 	t.Run("PG instances observed, do not shutdown repo host", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{
 			Spec: v1beta1.PostgresClusterSpec{
-				Shutdown: initialize.Bool(true),
+				Shutdown: new(true),
 			},
 		}
 		observed := &observedInstances{forCluster: []*Instance{{Pods: []*corev1.Pod{{}}}}}
@@ -3119,7 +3118,7 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 	t.Run("No PG instances observed, shutdown repo host", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{
 			Spec: v1beta1.PostgresClusterSpec{
-				Shutdown: initialize.Bool(true),
+				Shutdown: new(true),
 			},
 		}
 		observed := &observedInstances{forCluster: []*Instance{{}}}
@@ -3183,7 +3182,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 			Key:      "key",
 			Operator: "Exist",
 		}},
-		PriorityClassName: initialize.String("some-priority-class"),
+		PriorityClassName: new("some-priority-class"),
 	}
 	cluster := &v1beta1.PostgresCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3210,7 +3209,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 	}
 
 	for _, openshift := range []bool{true, false} {
-		cluster.Spec.OpenShift = initialize.Bool(openshift)
+		cluster.Spec.OpenShift = new(openshift)
 
 		job := &batchv1.Job{}
 		err := r.generateRestoreJobIntent(cluster, configHash, instanceName,
@@ -3365,7 +3364,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 											{
 												Prefix: "restore",
 												SecretRef: &corev1.SecretEnvSource{
-													Optional: ptr.To(true),
+													Optional: new(true),
 												},
 											},
 										},
@@ -3381,7 +3380,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 									EnvFrom: []corev1.EnvFromSource{
 										{
 											SecretRef: &corev1.SecretEnvSource{
-												Optional: ptr.To(true),
+												Optional: new(true),
 											},
 										},
 									},
@@ -3395,7 +3394,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 								EnvFrom: []corev1.EnvFromSource{
 									{
 										SecretRef: &corev1.SecretEnvSource{
-											Optional: ptr.To(false),
+											Optional: new(false),
 										},
 									},
 								},
@@ -3424,7 +3423,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 						{
 							Prefix: "restore",
 							SecretRef: &corev1.SecretEnvSource{
-								Optional: ptr.To(true),
+								Optional: new(true),
 							},
 						},
 					},
@@ -3450,7 +3449,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 									EnvFrom: []corev1.EnvFromSource{
 										{
 											SecretRef: &corev1.SecretEnvSource{
-												Optional: ptr.To(true),
+												Optional: new(true),
 											},
 										},
 									},
@@ -3464,7 +3463,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 								EnvFrom: []corev1.EnvFromSource{
 									{
 										SecretRef: &corev1.SecretEnvSource{
-											Optional: ptr.To(false),
+											Optional: new(false),
 										},
 									},
 								},
@@ -3491,7 +3490,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 				assert.DeepEqual(t, container.EnvFrom, []corev1.EnvFromSource{
 					{
 						SecretRef: &corev1.SecretEnvSource{
-							Optional: ptr.To(false),
+							Optional: new(false),
 						},
 					},
 				})
@@ -3519,7 +3518,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 										{
 											Prefix: "restore",
 											SecretRef: &corev1.SecretEnvSource{
-												Optional: ptr.To(true),
+												Optional: new(true),
 											},
 										},
 									},
@@ -3534,7 +3533,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 							EnvFrom: []corev1.EnvFromSource{
 								{
 									SecretRef: &corev1.SecretEnvSource{
-										Optional: ptr.To(false),
+										Optional: new(false),
 									},
 								},
 							},
@@ -3548,7 +3547,7 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 								EnvFrom: []corev1.EnvFromSource{
 									{
 										SecretRef: &corev1.SecretEnvSource{
-											Optional: ptr.To(false),
+											Optional: new(false),
 										},
 									},
 								},
@@ -3616,14 +3615,14 @@ func TestObserveRestoreEnv(t *testing.T) {
 			},
 			// K8SPG-714: ENVTEST_K8S_VERSION=1.32
 			Status: batchv1.JobStatus{
-				StartTime: ptr.To(metav1.NewTime(time.Now().Add(-time.Minute))),
+				StartTime: new(metav1.NewTime(time.Now().Add(-time.Minute))),
 			},
 		}
 
 		if completed != nil {
 			if *completed {
 				// K8SPG-714: ENVTEST_K8S_VERSION=1.32
-				restoreJob.Status.CompletionTime = ptr.To(metav1.Now())
+				restoreJob.Status.CompletionTime = new(metav1.Now())
 				restoreJob.Status.Succeeded = 1
 				restoreJob.Status.Conditions = append(restoreJob.Status.Conditions, batchv1.JobCondition{
 					Type:    batchv1.JobSuccessCriteriaMet,
@@ -3700,7 +3699,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 				fakeFailoverEP.ObjectMeta.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeFailoverEP))
 
-				job := generateJob(cluster.Name, initialize.Bool(false), initialize.Bool(false))
+				job := generateJob(cluster.Name, new(false), new(false))
 				assert.NilError(t, r.Client.Create(ctx, job))
 			},
 			result: testResult{
@@ -3732,7 +3731,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 		}, {
 			desc: "restore job only exists",
 			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
-				job := generateJob(cluster.Name, initialize.Bool(false), initialize.Bool(false))
+				job := generateJob(cluster.Name, new(false), new(false))
 				assert.NilError(t, r.Client.Create(ctx, job))
 			},
 			result: testResult{
@@ -3746,7 +3745,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 				if strings.EqualFold(os.Getenv("USE_EXISTING_CLUSTER"), "true") {
 					t.Skip("requires mocking of Job conditions")
 				}
-				job := generateJob(cluster.Name, initialize.Bool(true), nil)
+				job := generateJob(cluster.Name, new(true), nil)
 				assert.NilError(t, r.Client.Create(ctx, job.DeepCopy()))
 				assert.NilError(t, r.Client.Status().Update(ctx, job))
 			},
@@ -3766,7 +3765,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 				if strings.EqualFold(os.Getenv("USE_EXISTING_CLUSTER"), "true") {
 					t.Skip("requires mocking of Job conditions")
 				}
-				job := generateJob(cluster.Name, nil, initialize.Bool(true))
+				job := generateJob(cluster.Name, nil, new(true))
 				assert.NilError(t, r.Client.Create(ctx, job.DeepCopy()))
 				assert.NilError(t, r.Client.Status().Update(ctx, job))
 			},

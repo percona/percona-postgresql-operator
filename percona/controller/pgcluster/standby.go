@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -23,7 +22,7 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -122,7 +121,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 
 	meta.SetStatusCondition(&cr.Status.Conditions, cond)
 	cr.Status.Standby.LagBytes = lagBytes
-	cr.Status.Standby.LagLastComputedAt = ptr.To(metav1.Now())
+	cr.Status.Standby.LagLastComputedAt = new(metav1.Now())
 	return nil
 }
 

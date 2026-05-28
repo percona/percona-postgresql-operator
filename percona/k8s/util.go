@@ -19,7 +19,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const WatchNamespaceEnvVar = "WATCH_NAMESPACE"
@@ -161,7 +161,7 @@ func GetOperatorNamespace() (string, error) {
 }
 
 func ObjectHash(obj runtime.Object) (string, error) {
-	var dataToMarshal interface{}
+	var dataToMarshal any
 
 	switch object := obj.(type) {
 	case *appsv1.StatefulSet:

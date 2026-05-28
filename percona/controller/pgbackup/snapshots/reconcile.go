@@ -218,7 +218,7 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 		if updErr := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.State = v2.BackupFailed
 			bcp.Status.Error = fmt.Sprintf("one or more snapshots failed: %s", snapshotErrors)
-			bcp.Status.CompletedAt = ptr.To(metav1.Now())
+			bcp.Status.CompletedAt = new(metav1.Now())
 		}); updErr != nil {
 			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
 		}
@@ -235,7 +235,7 @@ func (r *snapshotReconciler) reconcileRunning(ctx context.Context) (reconcile.Re
 
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
 		bcp.Status.State = v2.BackupSucceeded
-		bcp.Status.CompletedAt = ptr.To(metav1.Now())
+		bcp.Status.CompletedAt = new(metav1.Now())
 	}); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to update backup status")
 	}
@@ -299,7 +299,7 @@ func (r *snapshotReconciler) generateSnapshotIntent(
 			Namespace: namespace,
 		},
 		Spec: volumesnapshotv1.VolumeSnapshotSpec{
-			VolumeSnapshotClassName: ptr.To(r.cluster.Spec.Backups.VolumeSnapshots.ClassName),
+			VolumeSnapshotClassName: new(r.cluster.Spec.Backups.VolumeSnapshots.ClassName),
 			Source: volumesnapshotv1.VolumeSnapshotSource{
 				PersistentVolumeClaimName: &sourcePVC,
 			},
@@ -323,7 +323,7 @@ func (r *snapshotReconciler) reconcileDataSnapshot(ctx context.Context, targetPV
 	}
 
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
-		bcp.Status.Snapshot.DataVolumeSnapshotRef = ptr.To(volumeSnapshot.GetName())
+		bcp.Status.Snapshot.DataVolumeSnapshotRef = new(volumeSnapshot.GetName())
 	}); err != nil {
 		return false, errors.Wrap(err, "failed to update backup status")
 	}
@@ -345,7 +345,7 @@ func (r *snapshotReconciler) reconcileWALSnapshot(ctx context.Context, targetPVC
 		return false, errors.Wrap(err, "failed to reconcile snapshot")
 	}
 	if err := r.backup.UpdateStatus(ctx, r.cl, func(bcp *v2.PerconaPGBackup) {
-		bcp.Status.Snapshot.WALVolumeSnapshotRef = ptr.To(volumeSnapshot.GetName())
+		bcp.Status.Snapshot.WALVolumeSnapshotRef = new(volumeSnapshot.GetName())
 	}); err != nil {
 		return false, errors.Wrap(err, "failed to update backup status")
 	}

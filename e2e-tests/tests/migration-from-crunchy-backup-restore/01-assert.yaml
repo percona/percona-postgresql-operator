@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 480
+commands:
+  - script: |-
+      set -o errexit
+
+      CRUNCHY_NS="${NAMESPACE}-crunchy"
+
+      kubectl wait pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/data=postgres \
+        -n "${CRUNCHY_NS}" \
+        --for=condition=Ready \
+        --timeout=420s
+
+      kubectl wait pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=pgbouncer \
+        -n "${CRUNCHY_NS}" \
+        --for=condition=Ready \
+        --timeout=120s
+
+      kubectl wait postgrescluster/crunchy-source \
+        -n "${CRUNCHY_NS}" \
+        --for=jsonpath='{.status.pgbackrest.repos[0].stanzaCreated}'=true \
+        --timeout=300s

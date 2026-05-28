@@ -1,0 +1,54 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      init_temp_dir
+
+      # The Crunchy source cluster and the Percona target cluster never coexist:
+      # Crunchy is deleted in step 03, Percona is created in step 04.
+      # A single namespace is therefore sufficient for this test.
+      helm install pgo \
+        oci://registry.developers.crunchydata.com/crunchydata/pgo \
+        --namespace "${NAMESPACE}" \
+        --version "${CPGO_VERSION}" \
+        --set singleNamespace=true \
+        --wait
+
+      # Deploy MinIO using the shared helper so this test follows the same
+      # setup path as the rest of the suite.
+      kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+
+      access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret \
+        -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+      secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret \
+        -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+      openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${TEMP_DIR}/minio.key" \
+        -out "${TEMP_DIR}/minio.crt" \
+        -subj "/CN=minio-service"
+
+      kubectl -n "${NAMESPACE}" create secret generic minio-tls \
+        --from-file=public.crt="${TEMP_DIR}/minio.crt" \
+        --from-file=private.key="${TEMP_DIR}/minio.key"
+
+      deploy_minio minio-service minio-tls
+
+      cat > "${TEMP_DIR}/pgbackrest-minio.ini" << EOF
+      [global]
+      repo1-s3-key=${access_key}
+      repo1-s3-key-secret=${secret_key}
+      EOF
+
+      # One secret serves both phases: Crunchy source (for WAL archiving) and
+      # Percona target (for its own ongoing backups), on different S3 paths.
+      kubectl -n "${NAMESPACE}" create secret generic "migration-pv-pgbackrest-secrets" \
+        --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-minio.ini"
+
+      deploy_operator
+      deploy_client
+    timeout: 300

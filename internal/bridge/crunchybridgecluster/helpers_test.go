@@ -18,9 +18,8 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/bridge"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // Scale extends d according to PGO_TEST_TIMEOUT_SCALE.
@@ -105,8 +104,8 @@ func testClusterApiResource() *bridge.ClusterApiResource {
 	cluster := bridge.ClusterApiResource{
 		ID:           "1234",
 		Host:         "example.com",
-		IsHA:         initialize.Bool(false),
-		IsProtected:  initialize.Bool(false),
+		IsHA:         new(false),
+		IsProtected:  new(false),
 		MajorVersion: 15,
 		ClusterName:  "hippo-cluster",
 		Plan:         "standard-8",

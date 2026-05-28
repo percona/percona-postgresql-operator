@@ -40,10 +40,11 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -659,10 +660,10 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	// if the cluster is set to be shutdown and no instance Pods remain, stop the repohost pod
 	if postgresCluster.Spec.Shutdown != nil && *postgresCluster.Spec.Shutdown &&
 		!instancePodExists {
-		repo.Spec.Replicas = initialize.Int32(0)
+		repo.Spec.Replicas = new(int32(0))
 	} else {
 		// the cluster should not be shutdown, set this value to 1
-		repo.Spec.Replicas = initialize.Int32(1)
+		repo.Spec.Replicas = new(int32(1))
 	}
 
 	// Use StatefulSet's "RollingUpdate" strategy and "Parallel" policy to roll
@@ -684,11 +685,11 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	// The pgBackRest TLS server must be signaled when its configuration or
 	// certificates change. Let containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	repo.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	repo.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
 	// pgBackRest does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	repo.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	repo.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// K8SPG-138
 	currVersion, err := gover.NewVersion(postgresCluster.Labels[naming.LabelVersion])
@@ -697,7 +698,7 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	}
 
 	// Do not add environment variables describing services in this namespace.
-	repo.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	repo.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.RepoHost != nil && pgbackrest.RepoHost.SecurityContext != nil {
 		repo.Spec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.RepoHost.SecurityContext
@@ -923,7 +924,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 				// Disable environment variables for services other than the Kubernetes API.
 				// - https://docs.k8s.io/concepts/services-networking/connect-applications-service/#accessing-the-service
 				// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
-				EnableServiceLinks: initialize.Bool(false),
+				EnableServiceLinks: new(false),
 
 				// Set RestartPolicy to "Never" since we want a new Pod to be created by the Job
 				// controller when there is a failure (instead of the container simply restarting).
@@ -1472,11 +1473,11 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	// possible cloud identity without mounting its Kubernetes API credentials.
 	// - https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity
 	// - https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
-	job.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	job.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 	job.Spec.Template.Spec.ServiceAccountName = naming.ClusterInstanceRBAC(cluster).Name
 
 	// Do not add environment variables describing services in this namespace.
-	job.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	job.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if pgbackrest := cluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
@@ -2227,18 +2228,28 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	// }
 
 	if err == nil && repoHost != nil {
-		certManagerInstalled := false
+		certManagerManaged := false
 		if cluster.Spec.CustomTLSSecret == nil {
 			var certErr error
-			certManagerInstalled, certErr = r.isCertManagerInstalled(ctx, cluster.Namespace)
+			certManagerManaged, certErr = r.isRootCACertManagerManaged(ctx, cluster)
 			if certErr != nil {
-				return errors.Wrap(certErr, "failed to check if cert-manager is installed")
+				return errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
 			}
 		}
 
-		if certManagerInstalled {
+		if certManagerManaged {
 			err = r.reconcileCertManagerPGBackRestSecret(ctx, cluster, repoHost, rootCA, existing, intent)
 		} else {
+			// cluster certificates are not managed by cert-manager
+			// but Certificate object exists due to the bug described in K8SPG-1017
+			// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+			if cert := certmanager.PGBackRestClientCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+				err := r.reconcileCertManagerPGBackRestSecret(ctx, cluster, repoHost, rootCA, existing, intent)
+				if err != nil {
+					logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+				}
+			}
+
 			err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
 		}
 	} else if err == nil {
@@ -2643,9 +2654,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupOpts := postgresCluster.Spec.Backups.PGBackRest.Manual.Options
 	for _, opt := range backupOpts {
 		if strings.Contains(opt, "--repo=") || strings.Contains(opt, "--repo ") {
-			r.Recorder.Eventf(postgresCluster, corev1.EventTypeWarning, "InvalidManualBackup",
-				"Option '--repo' is not allowed: please use the 'repoName' field instead.",
-				repoName)
+			r.Recorder.Event(postgresCluster, corev1.EventTypeWarning, "InvalidManualBackup",
+				"Option '--repo' is not allowed: please use the 'repoName' field instead.")
 			return nil
 		}
 	}

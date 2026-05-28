@@ -21,12 +21,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestHandlePersistentVolumeClaimError(t *testing.T) {
@@ -683,7 +682,7 @@ func TestReconcileMoveDirectories(t *testing.T) {
 						corev1.ResourceCPU: resource.MustParse("1m"),
 					},
 				},
-				PriorityClassName: initialize.String("some-priority-class"),
+				PriorityClassName: new("some-priority-class"),
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteMany},
@@ -703,7 +702,7 @@ func TestReconcileMoveDirectories(t *testing.T) {
 								corev1.ResourceCPU: resource.MustParse("1m"),
 							},
 						},
-						PriorityClassName: initialize.String("some-priority-class"),
+						PriorityClassName: new("some-priority-class"),
 					},
 					Repos: []v1beta1.PGBackRestRepo{{
 						Name: "repo1",

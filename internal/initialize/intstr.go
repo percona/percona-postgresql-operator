@@ -21,15 +21,10 @@ import (
 
 // IntOrStringInt32 returns an *intstr.IntOrString containing i.
 func IntOrStringInt32(i int32) *intstr.IntOrString {
-	return IntOrString(intstr.FromInt(int(i)))
+	return new(intstr.FromInt(int(i)))
 }
 
 // IntOrStringString returns an *intstr.IntOrString containing s.
 func IntOrStringString(s string) *intstr.IntOrString {
-	return IntOrString(intstr.FromString(s))
-}
-
-// IntOrString returns a pointer to the provided IntOrString
-func IntOrString(ios intstr.IntOrString) *intstr.IntOrString {
-	return &ios
+	return new(intstr.FromString(s))
 }

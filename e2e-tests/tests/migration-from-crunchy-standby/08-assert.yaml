@@ -1,0 +1,47 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 180
+commands:
+  - script: |-
+      set -o errexit
+
+      CRUNCHY_NS="${NAMESPACE}-crunchy"
+
+      # Verify Crunchy actually demoted to standby mode.
+      #
+      # PGO 5.8.7 does NOT:
+      #   - delete the pod (Patroni restarts postgres in recovery, pod stays)
+      #   - remove the role=master label (the Standby Leader still holds the DCS
+      #     leader key, so PGO keeps the label)
+      #   - write status.standby.enabled (no such field in PGO's status schema)
+      #
+      # The only reliable signal is pg_is_in_recovery() returning true on the
+      # pod that was the primary.  Poll until it does.
+      attempt=0
+      while [ "${attempt}" -lt 36 ]; do
+        master_pod=$(kubectl get pods -n "${CRUNCHY_NS}" \
+          -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=master \
+          -o jsonpath='{.items[0].metadata.name}')
+
+        if [ -z "${master_pod}" ]; then
+          # No master-labelled pod at all — pick any postgres pod.
+          master_pod=$(kubectl get pods -n "${CRUNCHY_NS}" \
+            -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/data=postgres \
+            -o jsonpath='{.items[0].metadata.name}')
+        fi
+
+        in_recovery=$(kubectl exec -n "${CRUNCHY_NS}" "${master_pod}" -c database -- \
+          psql -q -t -c "SELECT pg_is_in_recovery();" 2>/dev/null | tr -d ' \n') || true
+
+        if [ "${in_recovery}" = "t" ]; then
+          echo "Crunchy source confirmed demoted — postgres is in recovery (Standby Leader)"
+          exit 0
+        fi
+
+        echo "Waiting for Crunchy demotion (attempt ${attempt}/36): in_recovery=${in_recovery} pod=${master_pod}"
+        attempt=$((attempt + 1))
+        sleep 5
+      done
+
+      echo "ERROR: Crunchy primary still not in recovery after timeout"
+      exit 1

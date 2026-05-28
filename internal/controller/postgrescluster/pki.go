@@ -19,7 +19,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -133,7 +133,6 @@ func (r *Reconciler) reconcileRootCertificate(
 	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Data = make(map[string][]byte)
-	intent.ObjectMeta.OwnerReferences = existing.ObjectMeta.OwnerReferences
 
 	if cluster.Labels != nil {
 		currVersion, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -143,17 +142,8 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
-	// A root secret is scoped to the namespace where postgrescluster(s)
-	// are deployed. For operator deployments with postgresclusters in more than
-	// one namespace, there will be one root per namespace.
-	// During reconciliation, the owner reference block of the root secret is
-	// updated to include the postgrescluster as an owner.
-	// However, unlike the leaf certificate, the postgrescluster will not be
-	// set as the controller. This allows for multiple owners to guide garbage
-	// collection, but avoids any errors related to setting multiple controllers.
-	// https://docs.k8s.io/concepts/workloads/controllers/garbage-collection/#owners-and-dependents
 	if err == nil {
-		err = errors.WithStack(r.setOwnerReference(cluster, intent))
+		err = errors.WithStack(r.setControllerReference(cluster, intent))
 	}
 	if err == nil {
 		intent.Data[keyCertificate], err = root.Certificate.MarshalText()
@@ -212,14 +202,13 @@ func (r *Reconciler) reconcileCertManagerRootCertificate(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
-// reconcileClusterCertificate first checks if a custom certificate
-// secret is configured. If so, that secret projection is returned.
-// Otherwise, it checks if cert-manager is installed. If installed, cert-manager
-// is used to create and manage the certificate. Otherwise, a secret containing
-// a generated leaf certificate is created using the internal PKI.
-// In either case, the relevant secret is expected to contain three files:
-// tls.crt, tls.key and ca.crt which are the TLS certificate, private key
-// and CA certificate, respectively.
+// reconcileClusterCertificate returns the cluster TLS secret projection.
+// If CustomTLSSecret is set, that projection is returned. Otherwise the
+// path depends on the root CA: when it is cert-manager-managed,
+// cert-manager issues the leaf; when it is internal but a stale
+// Certificate CR is left behind by K8SPG-1017, the CR is reconciled
+// (K8SPG-1007 ownerRef recovery) before falling back to the internal PKI
+// leaf. The returned secret contains tls.crt, tls.key and ca.crt.
 func (r *Reconciler) reconcileClusterCertificate(
 	ctx context.Context, root *pki.RootCertificateAuthority,
 	cluster *v1beta1.PostgresCluster, primaryService *corev1.Service,
@@ -231,13 +220,23 @@ func (r *Reconciler) reconcileClusterCertificate(
 		return cluster.Spec.CustomTLSSecret, nil
 	}
 
-	certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
+		return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
 	}
 
-	if certManagerInstalled {
+	if certManagerManaged {
 		return r.reconcileCertManagerClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+	}
+
+	// cluster certificates are not managed by cert-manager
+	// but Certificate object exists due to the bug described in K8SPG-1017
+	// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+	if cert := certmanager.ClusterCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+		_, err := r.reconcileCertManagerClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+		if err != nil {
+			logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+		}
 	}
 
 	return r.reconcileInternalClusterCertificate(ctx, root, cluster, primaryService, replicaService)
@@ -359,6 +358,48 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 	return clusterCertSecretProjection(&corev1.Secret{
 		ObjectMeta: naming.PostgresTLSSecret(cluster),
 	}), nil
+}
+
+// shouldReconcileCertManagerCertificate reports whether a stale cert-manager
+// Certificate CR exists for the cluster and should be reconciled to update
+// its ownerRef (K8SPG-1007 recovery for Certificates left behind by the
+// K8SPG-1017 bug). Returns false when cert-manager is not installed or the
+// Certificate CR does not exist.
+func (r *Reconciler) shouldReconcileCertManagerCertificate(ctx context.Context, namespace, certName string) bool {
+	installed, err := r.isCertManagerInstalled(ctx, namespace)
+	if err != nil || !installed {
+		return false
+	}
+
+	// CertificateExists is read-only, so use the dry-run controller to match
+	// the intent (no mutating cert-manager calls happen on this path).
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, true /* dry run */)
+
+	exists, err := c.CertificateExists(ctx, namespace, certName)
+
+	return err == nil && exists
+}
+
+func (r *Reconciler) isRootCACertManagerManaged(ctx context.Context, cluster *v1beta1.PostgresCluster) (bool, error) {
+	if cluster.Spec.CustomRootCATLSSecret != nil {
+		return false, nil
+	}
+
+	installed, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	if err != nil || !installed {
+		return false, err
+	}
+
+	rootSecret := &corev1.Secret{ObjectMeta: naming.PostgresRootCASecret(cluster)}
+	err = r.Client.Get(ctx, client.ObjectKeyFromObject(rootSecret), rootSecret)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, errors.WithStack(err)
+	}
+
+	return rootSecret.Annotations["cert-manager.io/certificate-name"] != "", nil
 }
 
 func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (bool, error) {
