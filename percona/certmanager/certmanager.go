@@ -25,6 +25,8 @@ import (
 
 type Controller interface {
 	Check(ctx context.Context, config *rest.Config, ns string) error
+	CertificateExists(ctx context.Context, namespace, certName string) (bool, error)
+
 	ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyCAIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyCACertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
@@ -32,6 +34,7 @@ type Controller interface {
 	ApplyClusterCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 	ApplyInstanceCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, instanceName string, dnsNames []string) error
 	ApplyPGBouncerCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
+	ApplyReplicationCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error
 	ApplyPGBackRestRepoCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster, dnsNames []string) error
 }
@@ -90,6 +93,23 @@ func (c *controller) Check(ctx context.Context, config *rest.Config, ns string) 
 		return err
 	}
 	return nil
+}
+
+// CertificateExists reports whether a cert-manager Certificate CR with the
+// given name exists in the namespace. NotFound is returned as (false, nil);
+// other API errors are returned as (false, err).
+func (c *controller) CertificateExists(ctx context.Context, namespace, certName string) (bool, error) {
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: namespace}, existing)
+	if err == nil {
+		return true, nil
+	}
+
+	if k8serrors.IsNotFound(err) {
+		return false, nil
+	}
+
+	return false, errors.Wrapf(err, "get certificate/%s", certName)
 }
 
 func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
@@ -290,7 +310,7 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 		return errors.New("dnsNames cannot be empty")
 	}
 
-	certName := naming.PostgresTLSSecret(cluster).Name
+	certName := ClusterCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
@@ -392,7 +412,7 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 		return errors.New("dnsNames cannot be empty")
 	}
 
-	certName := instanceName + "-cert"
+	certName := InstanceCertificateName(instanceName)
 	secretName := instanceName + "-certs"
 
 	certDuration := DefaultCertDuration
@@ -495,7 +515,7 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 	}
 
 	secretMeta := naming.ClusterPGBouncer(cluster)
-	certName := cluster.Name + "-pgbouncer-cert"
+	certName := PGBouncerCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
@@ -590,12 +610,110 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 	return nil
 }
 
+// ApplyReplicationCertificate creates a cert-manager Certificate resource for the replication client.
+func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	secretMeta := naming.ReplicationClientCertSecret(cluster)
+	certName := ReplicationCertificateName(cluster)
+	commonName := "_crunchyrepl"
+
+	certDuration := DefaultCertDuration
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertValidityDuration != nil {
+		certDuration = cluster.Spec.TLS.CertValidityDuration.Duration
+	}
+
+	existing := &v1.Certificate{}
+	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	if err == nil {
+		needsUpdate := false
+
+		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+		if err != nil {
+			return errors.Wrap(err, "check owner reference")
+		}
+
+		if !hasOwnerRef {
+			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+			existing.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         gvk.GroupVersion().String(),
+				Kind:               gvk.Kind,
+				Name:               cluster.GetName(),
+				UID:                cluster.GetUID(),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
+			}}
+			needsUpdate = true
+		}
+
+		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != certDuration {
+			existing.Spec.Duration = &metav1.Duration{Duration: certDuration}
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
+			return nil
+		}
+
+		return errors.Wrap(c.cl.Update(ctx, existing), "failed to update replication certificate")
+	}
+	if !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get replication certificate")
+	}
+
+	cert := &v1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certName,
+			Namespace: cluster.Namespace,
+			Labels: naming.WithPerconaLabels(map[string]string{
+				naming.LabelCluster:            cluster.Name,
+				naming.LabelClusterCertificate: "replication-client-tls",
+			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+		},
+		Spec: v1.CertificateSpec{
+			SecretName: secretMeta.Name,
+			CommonName: commonName,
+			DNSNames:   []string{commonName},
+			IssuerRef: cmmeta.IssuerReference{
+				Name: naming.TLSIssuer(cluster).Name,
+				Kind: v1.IssuerKind,
+			},
+			Duration:    &metav1.Duration{Duration: certDuration},
+			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
+			PrivateKey: &v1.CertificatePrivateKey{
+				Algorithm:      v1.ECDSAKeyAlgorithm,
+				Size:           256,
+				RotationPolicy: v1.RotationPolicyNever,
+			},
+			Usages: []v1.KeyUsage{
+				v1.UsageClientAuth,
+				v1.UsageDigitalSignature,
+				v1.UsageKeyEncipherment,
+			},
+			SecretTemplate: &v1.CertificateSecretTemplate{
+				Labels: naming.WithPerconaLabels(map[string]string{
+					naming.LabelCluster:            cluster.Name,
+					naming.LabelClusterCertificate: "replication-client-tls",
+				}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+		return errors.Wrap(err, "failed to set controller reference")
+	}
+
+	if err := c.cl.Create(ctx, cert); err != nil {
+		return errors.Wrap(err, "failed to create replication certificate")
+	}
+
+	return nil
+}
+
 // ApplyPGBackRestClientCertificate creates a cert-manager Certificate resource
 // for the pgBackRest client used by all PostgreSQL instances to connect to the
 // repository host.
 func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
 	secretMeta := naming.PGBackRestClientCertSecret(cluster)
-	certName := cluster.Name + "-pgbackrest-client-cert"
+	certName := PGBackRestClientCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.PGBackRestCertValidityDuration != nil {
@@ -705,7 +823,7 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 	}
 
 	secretMeta := naming.PGBackRestRepoCertSecret(cluster)
-	certName := cluster.Name + "-pgbackrest-repo-cert"
+	certName := PGBackRestRepoCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.PGBackRestCertValidityDuration != nil {

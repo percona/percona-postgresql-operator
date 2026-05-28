@@ -37,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -1477,9 +1478,11 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
 // reconcileInstanceCertificates writes the Secret that contains certificates
-// and private keys for instance of cluster. When cert-manager is installed,
-// it creates a Certificate CR and augments the resulting secret with Patroni
-// and pgBackRest keys. Otherwise, it uses internal PKI.
+// and private keys for instance of cluster. When the root CA is cert-manager-
+// managed, it creates a Certificate CR and augments the resulting secret with
+// Patroni and pgBackRest keys. Otherwise, it uses internal PKI — first
+// reconciling any stale Certificate CR left by K8SPG-1017 to update its
+// ownerRef (K8SPG-1007 recovery).
 func (r *Reconciler) reconcileInstanceCertificates(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
@@ -1493,6 +1496,16 @@ func (r *Reconciler) reconcileInstanceCertificates(
 
 		if certManagerManaged {
 			return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+		}
+
+		// cluster certificates are not managed by cert-manager
+		// but Certificate object exists due to the bug described in K8SPG-1017
+		// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+		if cert := certmanager.InstanceCertificateName(instance.Name); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+			_, err := r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+			if err != nil {
+				logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+			}
 		}
 	}
 

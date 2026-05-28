@@ -394,6 +394,9 @@ func TestReconcileCerts(t *testing.T) {
 type mockCertManagerController struct{}
 
 func (m *mockCertManagerController) Check(context.Context, *rest.Config, string) error { return nil }
+func (m *mockCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
+	return false, nil
+}
 func (m *mockCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
@@ -412,6 +415,9 @@ func (m *mockCertManagerController) ApplyInstanceCertificate(context.Context, *v
 func (m *mockCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	panic("unexpected call")
 }
+func (m *mockCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected call")
+}
 func (m *mockCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
@@ -421,6 +427,59 @@ func (m *mockCertManagerController) ApplyPGBackRestRepoCertificate(context.Conte
 
 func mockCertManagerCtrlFunc(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
 	return &mockCertManagerController{}
+}
+
+// recoveryCertManagerController reports the cert-manager Certificate object as
+// existing and records which Apply* methods are invoked. It drives the
+// K8SPG-1007 recovery branches that reconcile a stale Certificate left behind
+// by the K8SPG-1017 bug, when the cluster otherwise uses internal PKI.
+type recoveryCertManagerController struct {
+	applyIssuerCalls               int
+	applyClusterCertificateCalls   int
+	applyInstanceCertificateCalls  int
+	applyPGBouncerCertificateCalls int
+	applyReplicationCalls          int
+	applyPGBackRestClientCalls     int
+}
+
+func (m *recoveryCertManagerController) Check(context.Context, *rest.Config, string) error {
+	return nil
+}
+func (m *recoveryCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
+	return true, nil
+}
+func (m *recoveryCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
+	m.applyIssuerCalls++
+	return nil
+}
+func (m *recoveryCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
+	return nil
+}
+func (m *recoveryCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
+	return nil
+}
+func (m *recoveryCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	m.applyClusterCertificateCalls++
+	return nil
+}
+func (m *recoveryCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
+	m.applyInstanceCertificateCalls++
+	return nil
+}
+func (m *recoveryCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	m.applyPGBouncerCertificateCalls++
+	return nil
+}
+func (m *recoveryCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	m.applyReplicationCalls++
+	return nil
+}
+func (m *recoveryCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	m.applyPGBackRestClientCalls++
+	return nil
+}
+func (m *recoveryCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	return nil
 }
 
 func TestUpgradeCertManagerDoesNotTakeOverInternalPKI(t *testing.T) {
@@ -495,6 +554,166 @@ func TestUpgradeCertManagerDoesNotTakeOverInternalPKI(t *testing.T) {
 		}, updatedCertSecret))
 
 		assert.DeepEqual(t, originalCertData, updatedCertSecret.Data["tls.crt"])
+	})
+
+	t.Run("shouldReconcileCertManagerCertificate", func(t *testing.T) {
+		t.Run("returns false when cert-manager is not installed", func(t *testing.T) {
+			// RestConfig is nil, so isCertManagerInstalled short-circuits to false.
+			r := &Reconciler{
+				Client:              tClient,
+				Owner:               ControllerName,
+				CertManagerCtrlFunc: mockCertManagerCtrlFunc,
+			}
+			assert.Assert(t, !r.shouldReconcileCertManagerCertificate(ctx, namespace, "any-cert"))
+		})
+
+		t.Run("returns false when cert-manager Certificate does not exist", func(t *testing.T) {
+			// The default mockCertManagerController reports CertificateExists=false.
+			r := &Reconciler{
+				Client:              tClient,
+				Owner:               ControllerName,
+				CertManagerCtrlFunc: mockCertManagerCtrlFunc,
+				RestConfig:          &rest.Config{},
+			}
+			assert.Assert(t, !r.shouldReconcileCertManagerCertificate(ctx, namespace, "missing-cert"))
+		})
+
+		t.Run("returns true when cert-manager is installed and Certificate exists", func(t *testing.T) {
+			r := &Reconciler{
+				Client: tClient,
+				Owner:  ControllerName,
+				CertManagerCtrlFunc: func(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+					return &recoveryCertManagerController{}
+				},
+				RestConfig: &rest.Config{},
+			}
+			assert.Assert(t, r.shouldReconcileCertManagerCertificate(ctx, namespace, "any-cert"))
+		})
+	})
+
+	t.Run("reconcileClusterCertificate recovers stale cert-manager Certificate (K8SPG-1007)", func(t *testing.T) {
+		// Internal PKI is in use (root CA secret has no cert-manager annotation),
+		// but a stale Certificate CR was left behind by K8SPG-1017. The reconciler
+		// should reconcile it to update ownerRefs, then still write the internal
+		// leaf secret.
+		recovery := &recoveryCertManagerController{}
+		r := &Reconciler{
+			Client: tClient,
+			Owner:  ControllerName,
+			CertManagerCtrlFunc: func(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+				return recovery
+			},
+			RestConfig: &rest.Config{},
+		}
+
+		preCertData := clusterCertSecret.Data["tls.crt"]
+		_, err := r.reconcileClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+		assert.NilError(t, err)
+
+		assert.Equal(t, recovery.applyIssuerCalls, 1)
+		assert.Equal(t, recovery.applyClusterCertificateCalls, 1)
+
+		// Internal leaf is still written by the fall-through path.
+		updatedCertSecret := &corev1.Secret{}
+		assert.NilError(t, tClient.Get(ctx, types.NamespacedName{
+			Name:      fmt.Sprintf(naming.ClusterCertSecret, cluster.Name),
+			Namespace: namespace,
+		}, updatedCertSecret))
+		assert.DeepEqual(t, preCertData, updatedCertSecret.Data["tls.crt"])
+	})
+
+	t.Run("reconcileInstanceCertificates recovers stale cert-manager Certificate (K8SPG-1007)", func(t *testing.T) {
+		recovery := &recoveryCertManagerController{}
+		r := &Reconciler{
+			Client: tClient,
+			Owner:  ControllerName,
+			CertManagerCtrlFunc: func(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+				return recovery
+			},
+			RestConfig: &rest.Config{},
+		}
+
+		instance := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      cluster.Name + "-instance1-abcd",
+		}}
+		instance.Spec.ServiceName = cluster.Name + "-pods"
+		spec := &cluster.Spec.InstanceSets[0]
+
+		returned, err := r.reconcileInstanceCertificates(ctx, cluster, spec, instance, root)
+		assert.NilError(t, err)
+		assert.Equal(t, recovery.applyInstanceCertificateCalls, 1)
+		// Fall-through wrote the internal-PKI leaf into the instance certs secret.
+		assert.Assert(t, len(returned.Data) > 0)
+	})
+
+	t.Run("reconcileReplicationSecret recovers stale cert-manager Certificate (K8SPG-1007)", func(t *testing.T) {
+		recovery := &recoveryCertManagerController{}
+		r := &Reconciler{
+			Client: tClient,
+			Owner:  ControllerName,
+			CertManagerCtrlFunc: func(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+				return recovery
+			},
+			RestConfig: &rest.Config{},
+		}
+
+		returned, err := r.reconcileReplicationSecret(ctx, cluster, root)
+		assert.NilError(t, err)
+		assert.Equal(t, recovery.applyReplicationCalls, 1)
+		// Fall-through wrote the internal-PKI replication leaf.
+		assert.Assert(t, len(returned.Data) > 0)
+	})
+
+	t.Run("reconcilePGBackRestSecret recovers stale cert-manager Certificate (K8SPG-1007)", func(t *testing.T) {
+		recovery := &recoveryCertManagerController{}
+		r := &Reconciler{
+			Client: tClient,
+			Owner:  ControllerName,
+			CertManagerCtrlFunc: func(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+				return recovery
+			},
+			RestConfig: &rest.Config{},
+		}
+
+		repoHost := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      cluster.Name + "-repo-host",
+		}}
+		repoHost.Spec.ServiceName = cluster.Name + "-pods"
+
+		assert.NilError(t, r.reconcilePGBackRestSecret(ctx, cluster, repoHost, root))
+		assert.Equal(t, recovery.applyPGBackRestClientCalls, 1)
+		// Fall-through wrote the internal-PKI pgBackRest secret to the API.
+		pgbackrestSecret := &corev1.Secret{}
+		assert.NilError(t, tClient.Get(ctx, types.NamespacedName{
+			Name:      naming.PGBackRestSecret(cluster).Name,
+			Namespace: namespace,
+		}, pgbackrestSecret))
+		assert.Assert(t, len(pgbackrestSecret.Data) > 0)
+	})
+
+	t.Run("reconcilePGBouncerSecret recovers stale cert-manager Certificate (K8SPG-1007)", func(t *testing.T) {
+		recovery := &recoveryCertManagerController{}
+		r := &Reconciler{
+			Client: tClient,
+			Owner:  ControllerName,
+			CertManagerCtrlFunc: func(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+				return recovery
+			},
+			RestConfig: &rest.Config{},
+		}
+
+		pgbouncerService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      cluster.Name + "-pgbouncer",
+		}}
+
+		returned, err := r.reconcilePGBouncerSecret(ctx, cluster, root, pgbouncerService)
+		assert.NilError(t, err)
+		assert.Equal(t, recovery.applyPGBouncerCertificateCalls, 1)
+		// Fall-through populated the pgbouncer secret from internal PKI.
+		assert.Assert(t, len(returned.Data) > 0)
 	})
 
 	t.Run("isRootCACertManagerManaged returns true for cert-manager root", func(t *testing.T) {
