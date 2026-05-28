@@ -19,6 +19,10 @@ KUTTL ?= kubectl-kuttl
 KUTTL_TEST ?= $(KUTTL) test
 SED := $(shell which gsed || which sed)
 
+# CRDs without descriptions are used in Helm and Bundles to avoid hitting the maximum file size limit.
+CRD_OPTIONS ?= crd:crdVersions='v1'
+CRD_OPTIONS_WITHOUT_DESCRIPTION = crd:crdVersions='v1',maxDescLen=0
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -241,22 +245,22 @@ generate: generate-cw
 .PHONY: generate-crunchy-crd
 generate-crunchy-crd: ## Generate crd
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/upstream.pgv2.percona.com/...' \
 		output:dir='build/crd/crunchy/generated' # build/crd/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/pgupgrades/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/pgadmins/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/crunchybridgeclusters/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
@@ -277,13 +281,19 @@ generate-rbac: ## Generate rbac
 		'./...' 'config/rbac/'
 	$(KUSTOMIZE) build ./config/rbac/namespace/ > ./deploy/rbac.yaml
 
+.PHONY: generate-crd
 generate-crd: generate-crunchy-crd generate-percona-crd
 	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
 
+.PHONY: generate-crd-without-description
+generate-crd-without-description: CRD_OPTIONS = $(CRD_OPTIONS_WITHOUT_DESCRIPTION)
+generate-crd-without-description: kustomize generate-crd
+
+.PHONY: generate-percona-crd
 generate-percona-crd:
 	go generate ./percona/...
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/pgv2.percona.com/...' \
 		output:dir='build/crd/percona/generated' # build/crd/generated/{group}_{plural}.yaml
 	$(KUSTOMIZE) build ./build/crd/percona/ > ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml
@@ -430,6 +440,9 @@ release: generate
        -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
        -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" deploy/upgrade.yaml
 
+# Update sidecars
+	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(VERSION)#" e2e-tests/tests/sidecars/01-assert.yaml
+
 # Prepare main branch after release
 CURRENT_VERSION := $(shell grep -oE "crVersion: [0-9]+\.[0-9]+\.[0-9]+" deploy/cr.yaml | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
 MAJOR_VER       := $(word 1,$(subst ., ,$(CURRENT_VERSION)))
@@ -437,7 +450,9 @@ MINOR_VER       := $(word 2,$(subst ., ,$(CURRENT_VERSION)))
 NEXT_VER        := $(MAJOR_VER).$(shell expr $(MINOR_VER) + 1).0
 PREV1_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 1).0
 PREV2_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 2).0
-after-release: update-version generate
+
+.PHONY: after-release after-release-versions
+after-release: update-version generate after-release-versions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
@@ -445,7 +460,7 @@ after-release: update-version generate
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:3-dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-upgrade#}" \
@@ -453,7 +468,40 @@ after-release: update-version generate
 		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" deploy/upgrade.yaml
 
+# Update sidecars
+	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(NEXT_VER)#" e2e-tests/tests/sidecars/01-assert.yaml
+
 # Update upgrade-consistency
 	$(SED) -i "s/$(PREV2_VERSION)/$(PREV1_VERSION)/g" e2e-tests/tests/upgrade-consistency/01-*.yaml
 	$(SED) -i "s/$(PREV1_VERSION)/$(CURRENT_VERSION)/g" e2e-tests/tests/upgrade-consistency/02-*.yaml
 	$(SED) -i "s/$(CURRENT_VERSION)/$(NEXT_VER)/g" e2e-tests/tests/upgrade-consistency/03-*.yaml e2e-tests/tests/init-deploy/05-assert.yaml
+
+after-release-versions:
+	$(SED) -i \
+		-e "s#^IMAGE_OPERATOR=.*#IMAGE_OPERATOR=$(IMAGE_TAG_BASE):main#" \
+		-e "s#^IMAGE_POSTGRESQL14=.*#IMAGE_POSTGRESQL14=$(IMAGE_TAG_BASE):main-ppg14-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER14=.*#IMAGE_PGBOUNCER14=$(IMAGE_TAG_BASE):main-pgbouncer14#" \
+		-e "s#^IMAGE_POSTGIS14=.*#IMAGE_POSTGIS14=$(IMAGE_TAG_BASE):main-ppg14-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST14=.*#IMAGE_BACKREST14=$(IMAGE_TAG_BASE):main-pgbackrest14#" \
+		-e "s#^IMAGE_POSTGRESQL15=.*#IMAGE_POSTGRESQL15=$(IMAGE_TAG_BASE):main-ppg15-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER15=.*#IMAGE_PGBOUNCER15=$(IMAGE_TAG_BASE):main-pgbouncer15#" \
+		-e "s#^IMAGE_POSTGIS15=.*#IMAGE_POSTGIS15=$(IMAGE_TAG_BASE):main-ppg15-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST15=.*#IMAGE_BACKREST15=$(IMAGE_TAG_BASE):main-pgbackrest15#" \
+		-e "s#^IMAGE_POSTGRESQL16=.*#IMAGE_POSTGRESQL16=$(IMAGE_TAG_BASE):main-ppg16-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER16=.*#IMAGE_PGBOUNCER16=$(IMAGE_TAG_BASE):main-pgbouncer16#" \
+		-e "s#^IMAGE_POSTGIS16=.*#IMAGE_POSTGIS16=$(IMAGE_TAG_BASE):main-ppg16-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST16=.*#IMAGE_BACKREST16=$(IMAGE_TAG_BASE):main-pgbackrest16#" \
+		-e "s#^IMAGE_POSTGRESQL17=.*#IMAGE_POSTGRESQL17=$(IMAGE_TAG_BASE):main-ppg17-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER17=.*#IMAGE_PGBOUNCER17=$(IMAGE_TAG_BASE):main-pgbouncer17#" \
+		-e "s#^IMAGE_POSTGIS17=.*#IMAGE_POSTGIS17=$(IMAGE_TAG_BASE):main-ppg17-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST17=.*#IMAGE_BACKREST17=$(IMAGE_TAG_BASE):main-pgbackrest17#" \
+		-e "s#^IMAGE_POSTGRESQL18=.*#IMAGE_POSTGRESQL18=$(IMAGE_TAG_BASE):main-ppg18-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER18=.*#IMAGE_PGBOUNCER18=$(IMAGE_TAG_BASE):main-pgbouncer18#" \
+		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=$(IMAGE_TAG_BASE):main-ppg18-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=$(IMAGE_TAG_BASE):main-pgbackrest18#" \
+		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=$(IMAGE_TAG_BASE):main-upgrade#" \
+		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:dev-latest#" \
+		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:dev-latest#" \
+		-e "s#^IMAGE_PMM3_CLIENT=.*#IMAGE_PMM3_CLIENT=perconalab/pmm-client:3-dev-latest#" \
+		-e "s#^IMAGE_PMM3_SERVER=.*#IMAGE_PMM3_SERVER=perconalab/pmm-server:3-dev-latest#" \
+		e2e-tests/release_versions
