@@ -1,0 +1,98 @@
+# Default image configuration for Percona PostgreSQL Operator
+# This file is embedded into the operator binary at build time
+# Users can override these values via ConfigMap or environment variable
+
+# Global registry for all images
+registry: docker.io
+
+# Versions define repositories and tags per CR version
+versions:
+  - crVersion: "3.0.0"
+    repositories:
+      postgres: percona/percona-distribution-postgresql
+      postgresGIS: percona/percona-distribution-postgresql-with-postgis
+      pgbackrest: percona/percona-pgbackrest
+      pgbouncer: percona/percona-pgbouncer
+    tags:
+      postgres:
+        "14": "14.23-1"
+        "15": "15.18-1"
+        "16": "16.14-1"
+        "17": "17.10-1"
+        "18": "18.4-1"
+      postgresGIS:
+        "14": "14.23-2"
+        "15": "15.18-2"
+        "16": "16.14-2"
+        "17": "17.10-2"
+        "18": "18.4-2"
+      pgbackrest: "2.58.0-2"
+      pgbouncer: "1.25.2-1"
+
+  - crVersion: "2.9.0"
+    repositories:
+      postgres: percona/percona-distribution-postgresql
+      postgresGIS: percona/percona-distribution-postgresql-with-postgis
+      pgbackrest: percona/percona-pgbackrest
+      pgbouncer: percona/percona-pgbouncer
+    tags:
+      postgres:
+        "14": "14.22-1"
+        "15": "15.17-1"
+        "16": "16.13-1"
+        "17": "17.9-1"
+        "18": "18.3-1"
+      postgresGIS:
+        "14": "14.22-1"
+        "15": "15.17-1"
+        "16": "16.13-1"
+        "17": "17.9-1"
+        "18": "18.3-1"
+      pgbackrest: "2.58.0-1"
+      pgbouncer: "1.25.1-1"
+
+  - crVersion: "2.8.1"
+    repositories:
+      postgres: percona/percona-distribution-postgresql
+      postgresGIS: percona/percona-postgresql-operator
+      pgbackrest: percona/percona-pgbackrest
+      pgbouncer: percona/percona-pgbouncer
+    tags:
+      postgres:
+        "13": "13.23-1"
+        "14": "14.20-1"
+        "15": "15.15-1"
+        "16": "16.11-1"
+        "17": "17.7-1"
+        "18": "18.1-1"
+      postgresGIS:
+        "13": "2.8.1-ppg13.23-postgres-gis3.3.8"
+        "14": "2.8.1-ppg14.20-postgres-gis3.3.8"
+        "15": "2.8.1-ppg15.15-postgres-gis3.3.8"
+        "16": "2.8.1-ppg16.11-postgres-gis3.3.8"
+        "17": "2.8.1-ppg17.7-postgres-gis3.5.4"
+        "18": "2.8.1-ppg18.1-postgres-gis3.5.4"
+      pgbackrest: "2.57.0-1"
+      pgbouncer: "1.25.0-1"
+
+  - crVersion: "2.8.0"
+    repositories:
+      postgres: percona/percona-distribution-postgresql
+      postgresGIS: percona/percona-postgresql-operator
+      pgbackrest: percona/percona-pgbackrest
+      pgbouncer: percona/percona-pgbouncer
+    tags:
+      postgres:
+        "13": "13.22-1"
+        "14": "14.19-1"
+        "15": "15.14-1"
+        "16": "16.10-1"
+        "17": "17.6-1"
+      postgresGIS:
+        "13": "2.8.0-ppg13.22-postgres-gis3.3.8"
+        "14": "2.8.0-ppg14.19-postgres-gis3.3.8"
+        "15": "2.8.0-ppg15.14-postgres-gis3.3.8"
+        "16": "2.8.0-ppg16.10-postgres-gis3.3.8"
+        "17": "2.8.0-ppg17.6-postgres-gis3.3.8"
+      pgbackrest: "2.56.0-1"
+      pgbouncer: "1.24.1-1"

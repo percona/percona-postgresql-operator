@@ -10,6 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/percona/percona-postgresql-operator/v2/percona/config/images"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -19,6 +21,35 @@ func defaultFromEnv(value, key string) string {
 		return os.Getenv(key)
 	}
 	return value
+}
+
+// getImageFromOperatorConfig attempts to get image from operator-wide configuration
+func getImageFromOperatorConfig(cluster *v1beta1.PostgresCluster, component string) string {
+	crVersion := getCRVersionForCluster(cluster)
+	if crVersion == "" {
+		return ""
+	}
+
+	pgVersion := fmt.Sprintf("%d", cluster.Spec.PostgresVersion)
+
+	// If PostGIS is enabled, use the postgresGIS component instead
+	if cluster.Spec.PostGISVersion != "" {
+		component = "postgresGIS"
+	}
+
+	return images.GetImageForCluster(crVersion, component, pgVersion)
+}
+
+// getCRVersionForCluster retrieves the CR version for a cluster
+// The Percona operator stores the CR version in the LabelOperatorVersion label
+func getCRVersionForCluster(cluster *v1beta1.PostgresCluster) string {
+	// Check the standard Percona version label
+	if cluster.Labels != nil {
+		if version, ok := cluster.Labels[pNaming.LabelOperatorVersion]; ok {
+			return version
+		}
+	}
+	return ""
 }
 
 // FetchKeyCommand returns the fetch_key_cmd value stored in the encryption_key_command
@@ -53,7 +84,17 @@ func FetchKeyCommand(spec *v1beta1.PostgresClusterSpec) string {
 func PGBackRestContainerImage(cluster *v1beta1.PostgresCluster) string {
 	image := cluster.Spec.Backups.PGBackRest.Image
 
-	return defaultFromEnv(image, "RELATED_IMAGE_PGBACKREST")
+	// Try operator-wide config first
+	if image == "" {
+		image = getImageFromOperatorConfig(cluster, "pgbackrest")
+	}
+
+	// Fallback to env var
+	if image == "" {
+		image = defaultFromEnv(image, "RELATED_IMAGE_PGBACKREST")
+	}
+
+	return image
 }
 
 // PGAdminContainerImage returns the container image to use for pgAdmin.
@@ -64,7 +105,17 @@ func PGAdminContainerImage(cluster *v1beta1.PostgresCluster) string {
 		image = cluster.Spec.UserInterface.PGAdmin.Image
 	}
 
-	return defaultFromEnv(image, "RELATED_IMAGE_PGADMIN")
+	// Try operator-wide config first
+	if image == "" {
+		image = getImageFromOperatorConfig(cluster, "pgadmin")
+	}
+
+	// Fallback to env var
+	if image == "" {
+		image = defaultFromEnv(image, "RELATED_IMAGE_PGADMIN")
+	}
+
+	return image
 }
 
 // StandalonePGAdminContainerImage returns the container image to use for pgAdmin.
@@ -74,7 +125,18 @@ func StandalonePGAdminContainerImage(pgadmin *v1beta1.PGAdmin) string {
 		image = *pgadmin.Spec.Image
 	}
 
-	return defaultFromEnv(image, "RELATED_IMAGE_STANDALONE_PGADMIN")
+	// Try operator-wide config first
+	if image == "" {
+		// For standalone pgadmin, we don't have cluster context
+		// Use a default version or skip
+	}
+
+	// Fallback to env var
+	if image == "" {
+		image = defaultFromEnv(image, "RELATED_IMAGE_STANDALONE_PGADMIN")
+	}
+
+	return image
 }
 
 // PGBouncerContainerImage returns the container image to use for pgBouncer.
@@ -85,7 +147,17 @@ func PGBouncerContainerImage(cluster *v1beta1.PostgresCluster) string {
 		image = cluster.Spec.Proxy.PGBouncer.Image
 	}
 
-	return defaultFromEnv(image, "RELATED_IMAGE_PGBOUNCER")
+	// Try operator-wide config first
+	if image == "" {
+		image = getImageFromOperatorConfig(cluster, "pgbouncer")
+	}
+
+	// Fallback to env var
+	if image == "" {
+		image = defaultFromEnv(image, "RELATED_IMAGE_PGBOUNCER")
+	}
+
+	return image
 }
 
 // PGExporterContainerImage returns the container image to use for the
@@ -98,7 +170,17 @@ func PGExporterContainerImage(cluster *v1beta1.PostgresCluster) string {
 		image = cluster.Spec.Monitoring.PGMonitor.Exporter.Image
 	}
 
-	return defaultFromEnv(image, "RELATED_IMAGE_PGEXPORTER")
+	// Try operator-wide config first
+	if image == "" {
+		image = getImageFromOperatorConfig(cluster, "pgexporter")
+	}
+
+	// Fallback to env var
+	if image == "" {
+		image = defaultFromEnv(image, "RELATED_IMAGE_PGEXPORTER")
+	}
+
+	return image
 }
 
 // PostgresContainerImageString returns the container image to use for PostgreSQL (from string params).
@@ -117,10 +199,20 @@ func PostgresContainerImageString(image string, postgresVersion int, postGISVers
 // Made as a wrapper of PostgresContainerImageString for compat reasons
 func PostgresContainerImage(cluster *v1beta1.PostgresCluster) string {
 	image := cluster.Spec.Image
-	postgresVersion := cluster.Spec.PostgresVersion
-	postGISVersion := cluster.Spec.PostGISVersion
 
-	return PostgresContainerImageString(image, postgresVersion, postGISVersion)
+	// Try operator-wide config first
+	if image == "" {
+		image = getImageFromOperatorConfig(cluster, "postgres")
+	}
+
+	// Fallback to env var
+	if image == "" {
+		postgresVersion := cluster.Spec.PostgresVersion
+		postGISVersion := cluster.Spec.PostGISVersion
+		image = PostgresContainerImageString("", postgresVersion, postGISVersion)
+	}
+
+	return image
 }
 
 // PGONamespace returns the namespace where the PGO is running,
