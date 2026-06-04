@@ -46,3 +46,4 @@ updates:
         patterns:
           - "k8s.io/*"
           - "sigs.k8s.io/*"
+          - "github.com/go-openapi/*"
