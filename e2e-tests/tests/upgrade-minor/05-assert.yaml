@@ -137,7 +137,7 @@ status:
   - type: ProxyAvailable
     status: "True"
   - type: APIGroupMigration
-    reason: APIGroupMigrationCompleted
+    reason: APIGroupMigrationNotNeeded
     status: "True"
   pgbouncer:
     ready: 3
