@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/cert-manager/cert-manager v1.20.2
 	github.com/go-logr/logr v1.4.3
-	github.com/go-openapi/errors v0.22.7
+	github.com/go-openapi/errors v0.22.8
 	github.com/go-openapi/runtime v0.32.3
 	github.com/go-openapi/strfmt v0.26.3
 	github.com/go-openapi/swag v0.26.0
@@ -28,11 +28,11 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/xdg-go/stringprep v1.0.4
 	go.nhat.io/grpcmock v0.34.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.43.0
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.44.0
 	go.opentelemetry.io/otel/sdk v1.44.0
 	go.opentelemetry.io/otel/trace v1.44.0
 	go.uber.org/zap v1.28.0
