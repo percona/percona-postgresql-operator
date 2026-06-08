@@ -110,6 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: mikefarah/yq@v4
       - name: Verify deploy/cr.yaml images match release_versions
         run: |
           set -euo pipefail
@@ -117,9 +118,9 @@ jobs:
           source e2e-tests/release_versions
 
           registry="${REGISTRY_NAME:-docker.io}"
-          pg_ver=$(grep -E '^[[:space:]]*postgresVersion:' deploy/cr.yaml | head -1 | sed 's/.*postgresVersion:[[:space:]]*//')
-          if [ -z "$pg_ver" ]; then
-            echo "::error::postgresVersion not found in deploy/cr.yaml"
+          pg_ver=$(yq -r '.spec.postgresVersion' deploy/cr.yaml)
+          if [ -z "$pg_ver" ] || [ "$pg_ver" = "null" ]; then
+            echo "::error::spec.postgresVersion not found in deploy/cr.yaml"
             exit 1
           fi
 
@@ -139,15 +140,20 @@ jobs:
           expected_pmm="${registry}/${IMAGE_PMM3_CLIENT}"
           expected_cr_version="${IMAGE_OPERATOR##*:}"
 
-          spec_image=$(grep -E '^  image: ' deploy/cr.yaml | head -1 | awk '{print $2}')
-          pgbouncer_image=$(sed -n '/^    pgBouncer:/,/^      image:/p' deploy/cr.yaml | grep -E '^      image: ' | head -1 | awk '{print $2}')
-          backrest_image=$(sed -n '/^    pgbackrest:/,/^      image:/p' deploy/cr.yaml | grep -E '^      image: ' | head -1 | awk '{print $2}')
-          pmm_image=$(sed -n '/^  pmm:/,/^    image:/p' deploy/cr.yaml | grep -E '^    image: ' | head -1 | awk '{print $2}')
-          cr_version=$(grep -E '^[[:space:]]*crVersion:' deploy/cr.yaml | head -1 | awk '{print $2}')
+          spec_image=$(yq -r '.spec.image' deploy/cr.yaml)
+          pgbouncer_image=$(yq -r '.spec.proxy.pgBouncer.image' deploy/cr.yaml)
+          backrest_image=$(yq -r '.spec.backups.pgbackrest.image' deploy/cr.yaml)
+          pmm_image=$(yq -r '.spec.pmm.image' deploy/cr.yaml)
+          cr_version=$(yq -r '.spec.crVersion' deploy/cr.yaml)
 
           failed=0
           check() {
             local name="$1" actual="$2" expected="$3"
+            if [ -z "$actual" ] || [ "$actual" = "null" ]; then
+              echo "::error::${name}: missing in deploy/cr.yaml"
+              failed=1
+              return
+            fi
             if [ "$actual" != "$expected" ]; then
               echo "::error::${name}: deploy/cr.yaml has '${actual}', e2e-tests/release_versions expects '${expected}'"
               failed=1
@@ -155,9 +161,9 @@ jobs:
           }
 
           check "spec.image (IMAGE_POSTGRESQL${pg_ver})" "$spec_image" "$expected_postgres"
-          check "proxy.pgBouncer.image (IMAGE_PGBOUNCER${pg_ver})" "$pgbouncer_image" "$expected_pgbouncer"
-          check "backups.pgbackrest.image (IMAGE_BACKREST${pg_ver})" "$backrest_image" "$expected_backrest"
-          check "pmm.image (IMAGE_PMM3_CLIENT)" "$pmm_image" "$expected_pmm"
+          check "spec.proxy.pgBouncer.image (IMAGE_PGBOUNCER${pg_ver})" "$pgbouncer_image" "$expected_pgbouncer"
+          check "spec.backups.pgbackrest.image (IMAGE_BACKREST${pg_ver})" "$backrest_image" "$expected_backrest"
+          check "spec.pmm.image (IMAGE_PMM3_CLIENT)" "$pmm_image" "$expected_pmm"
           check "spec.crVersion (IMAGE_OPERATOR tag)" "$cr_version" "$expected_cr_version"
 
           if [ "$failed" -ne 0 ]; then
