@@ -23,6 +23,7 @@ spec:
       labels:
         app.kubernetes.io/name: openldap
     spec:
+      serviceAccountName: openldap
       containers:
         - name: openldap
           image: osixia/openldap:latest
