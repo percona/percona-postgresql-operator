@@ -20,7 +20,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.6.0
 	github.com/onsi/ginkgo/v2 v2.29.0
-	github.com/onsi/gomega v1.40.0
+	github.com/onsi/gomega v1.41.0
 	github.com/pganalyze/pg_query_go/v6 v6.2.2
 	github.com/pkg/errors v0.9.1
 	github.com/robfig/cron/v3 v3.0.1
