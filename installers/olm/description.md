@@ -9,7 +9,7 @@ fault tolerant cluster in production, or are running your own database-as-a-serv
 features you need to keep your clusters healthy.
 
 Consult the
-[documentation](https://www.percona.com/doc/kubernetes-operator-for-postgresql/index.html)
+[documentation](https://docs.percona.com/percona-operator-for-postgresql/index.html)
 on the Percona Operator for PostgreSQL for complete details on capabilities
 and options.
 
@@ -58,7 +58,7 @@ Create, Scale, & Delete PostgreSQL clusters with ease, while fully customizing y
 
 * **Connection Pooling**
 
-    Use [pgBouncer](https://access.crunchydata.com/documentation/postgres-operator/latest/tutorial/pgbouncer/) for connection pooling
+    Use pgBouncer for connection pooling.
 
 * **Affinity and Tolerations**
 
