@@ -17,6 +17,12 @@ export VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' 
 # Skip warning checks used for documentation by default
 export SKIP_TEST_WARNINGS=${SKIP_TEST_WARNINGS:-"true"}
 
+# K8S upgrade test
+export K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM:-"gke"}
+export K8S_UPGRADE_REGION=${K8S_UPGRADE_REGION:-"us-central1-a"}
+export K8S_UPGRADE_INITIAL_VERSION=${K8S_UPGRADE_INITIAL_VERSION:-""}
+export K8S_UPGRADE_FINAL_VERSION=${K8S_UPGRADE_FINAL_VERSION:-""}
+
 if command -v oc &>/dev/null; then
 	if oc get projects; then
 		export OPENSHIFT=4
@@ -40,8 +46,8 @@ export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
 export IMAGE_PMM_CLIENT=${IMAGE_PMM_CLIENT:-"perconalab/pmm-client:dev-latest"}
 export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:dev-latest"}
-export IMAGE_PMM3_CLIENT=${IMAGE_PMM3_CLIENT:-"perconalab/pmm-client:3.4"}
-export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3.4"}
+export IMAGE_PMM3_CLIENT=${IMAGE_PMM3_CLIENT:-"perconalab/pmm-client:3-dev-latest"}
+export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3-dev-latest"}
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 export CPGO_VERSION=${CPGO_VERSION:-"5.8.7"}

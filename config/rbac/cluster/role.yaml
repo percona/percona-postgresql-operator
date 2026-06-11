@@ -138,6 +138,7 @@ rules:
   resources:
   - perconapgbackups/finalizers
   - perconapgclusters/status
+  - perconapgrestores/finalizers
   - perconapgrestores/status
   - perconapgupgrades/finalizers
   - perconapgupgrades/status
@@ -194,20 +195,12 @@ rules:
 - apiGroups:
   - postgres-operator.crunchydata.com
   resources:
+  - pgupgrades
   - postgresclusters
   verbs:
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - postgres-operator.crunchydata.com
-  resources:
-  - postgresclusters/finalizers
-  verbs:
-  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:

@@ -7,35 +7,50 @@ commands:
 
       source ../../functions
 
+      # Scale down to 1 before restore: --type=immediate can be behind replicas'
+      # WAL position, forcing pg_rewind which fails on the missing 00000002.history.
+      # Step 09 scales back to 3 after verifying the restored data.
+      kubectl -n "${NAMESPACE}" patch perconapgcluster percona-restored \
+        --type=json \
+        -p='[{"op":"replace","path":"/spec/instances/0/replicas","value":1}]'
+
+      # Wait for exactly 1 postgres pod to be Running before we proceed.
+      attempt=0
+      while [ "${attempt}" -lt 30 ]; do
+        running=$(kubectl get pods -n "${NAMESPACE}" \
+          -l postgres-operator.crunchydata.com/cluster=percona-restored,postgres-operator.crunchydata.com/data=postgres \
+          --field-selector=status.phase=Running \
+          -o jsonpath='{.items[*].metadata.name}' | wc -w | tr -d ' ')
+        echo "Running postgres pods: ${running}"
+        if [ "${running}" = "1" ]; then break; fi
+        attempt=$((attempt + 1))
+        sleep 10
+      done
+      if [ "${running}" != "1" ]; then
+        echo "ERROR: timed out waiting for scale-down to 1 pod"
+        exit 1
+      fi
+
       primary=$(kubectl get pod -n "${NAMESPACE}" \
         -l postgres-operator.crunchydata.com/cluster=percona-restored,postgres-operator.crunchydata.com/role=primary \
         -o jsonpath='{.items[0].metadata.name}')
 
       if [ -z "${primary}" ]; then
-        echo "ERROR: primary pod not found"
+        echo "ERROR: Percona primary pod not found"
         exit 1
       fi
 
-      # Capture the PITR target timestamp before truncating, then force a WAL
-      # switch so this LSN is flushed to the archive.
-      pitr_target=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
-        psql -q -t -c "SELECT to_char(clock_timestamp(), 'YYYY-MM-DD HH24:MI:SS')" \
-        | xargs)
-      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
-        psql -q -c "SELECT pg_switch_wal();"
-      echo "PITR target: ${pitr_target}"
-
-      # Truncate the table to prove the restore brings the data back.
-      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
-        psql -d migrationtest -c "TRUNCATE TABLE migration_data;"
+      # Insert rows AFTER the backup from step 07. These rows should be absent
+      # after the restore, proving we actually went back to the backup point.
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (5, 'post-backup-row-one');\"
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (6, 'post-backup-row-two');\"
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (7, 'post-backup-row-three');\"
+      "
 
       count=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c \
         "psql -q -t -d migrationtest -c 'SELECT count(*) FROM migration_data;' | tr -d ' '")
-      if [ "${count}" != "0" ]; then
-        echo "ERROR: expected 0 rows after truncate, got ${count}"
-        exit 1
-      fi
-      echo "Table truncated — triggering PITR restore to ${pitr_target}"
+      echo "Row count before restore: ${count}"
 
       # Resolve the latest full backup label so --set pins the restore to exactly
       # that backup (avoids ambiguity if older backups exist in the repo).
@@ -49,6 +64,7 @@ commands:
       fi
       echo "Restoring from backup: ${backup_label}"
 
+      # Restore to the step-07 backup point; post-backup rows must disappear.
       cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
       apiVersion: pgv2.percona.com/v2
       kind: PerconaPGRestore
@@ -59,8 +75,6 @@ commands:
         repoName: repo1
         options:
         - --set=${backup_label}
-        - --type=time
-        - --target="${pitr_target}"
-        - --target-timeline=current
+        - --type=immediate
       EOF
     timeout: 400

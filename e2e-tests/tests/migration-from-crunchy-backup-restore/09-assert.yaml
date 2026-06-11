@@ -10,9 +10,16 @@ commands:
 
       for expected in "row-one" "row-two" "row-three" "written-after-restore"; do
         echo "${data}" | grep -q "${expected}" || {
-          echo "ERROR: '${expected}' missing after PITR restore. Got: ${data}"
+          echo "ERROR: '${expected}' missing after restore. Got: ${data}"
           exit 1
         }
       done
 
-      echo "All expected rows present after PITR restore"
+      for absent in "post-backup-row-one" "post-backup-row-two" "post-backup-row-three"; do
+        if echo "${data}" | grep -q "${absent}"; then
+          echo "ERROR: '${absent}' present after restore (should have been removed). Got: ${data}"
+          exit 1
+        fi
+      done
+
+      echo "All expected rows present, post-backup rows correctly absent"

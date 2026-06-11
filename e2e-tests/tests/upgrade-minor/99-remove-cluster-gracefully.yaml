@@ -3,12 +3,8 @@ kind: TestStep
 delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
-  metadata:
-    name: upgrade-minor
 - apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
-  metadata:
-    name: upgrade-minor
 commands:
   - script: |-
       set -o errexit

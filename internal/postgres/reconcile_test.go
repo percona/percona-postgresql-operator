@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
@@ -1660,7 +1659,7 @@ fsGroup: 26
 fsGroupChangePolicy: OnRootMismatch
 	`))
 
-	cluster.Spec.OpenShift = initialize.Bool(true)
+	cluster.Spec.OpenShift = new(true)
 
 	cluster.Spec.SupplementalGroups = []int64{}
 	assert.Assert(t, cmp.MarshalMatches(PodSecurityContext(cluster), `

@@ -16,23 +16,16 @@ commands:
         exit 1
       fi
 
-      # Capture the PITR target timestamp before inserting post-backup rows,
-      # then force a WAL switch so this LSN is flushed to the archive.
-      pitr_target=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
-        psql -q -t -c "SELECT to_char(clock_timestamp(), 'YYYY-MM-DD HH24:MI:SS')" \
-        | xargs)
-      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
-        psql -q -c "SELECT pg_switch_wal();"
-      echo "PITR target: ${pitr_target}"
-
-      # Insert rows AFTER the captured timestamp — these must be absent after restore.
+      # Insert rows AFTER the step-06 backup.  These must be absent after the
+      # restore, proving we actually rolled back to the backup point.
       kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
         psql -d migrationtest -c \"INSERT INTO migration_data VALUES (4, 'post-backup-row-one');\"
         psql -d migrationtest -c \"INSERT INTO migration_data VALUES (5, 'post-backup-row-two');\"
       "
 
-      # Resolve the step-06 full backup label so --set pins the restore to exactly
-      # that backup (avoids ambiguity if older backups exist in the repo).
+      # Resolve the label of the step-06 full backup so --set pins the restore
+      # to exactly that backup (avoids ambiguity if there are older backups from
+      # the Crunchy phase still visible in the repo).
       backup_label=$(kubectl -n "${NAMESPACE}" exec "${primary}" -- \
         pgbackrest info --output json --log-level-console=info --stanza=db \
         | jq -r '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 1)][-1].label')
@@ -43,6 +36,8 @@ commands:
       fi
       echo "Restoring from backup: ${backup_label}"
 
+      # The cluster has replicas: 1 so there are no streaming replicas to
+      # diverge — no scale-down workaround needed.
       cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
       apiVersion: pgv2.percona.com/v2
       kind: PerconaPGRestore
@@ -53,8 +48,6 @@ commands:
         repoName: repo1
         options:
         - --set=${backup_label}
-        - --type=time
-        - --target="${pitr_target}"
-        - --target-timeline=current
+        - --type=immediate
       EOF
     timeout: 60

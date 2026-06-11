@@ -15,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -102,7 +101,7 @@ func TestPopulateShutdown(t *testing.T) {
 
 	t.Run("NotShutdown", func(t *testing.T) {
 		cluster := v1beta1.NewPostgresCluster()
-		cluster.Spec.Shutdown = initialize.Bool(false)
+		cluster.Spec.Shutdown = new(false)
 
 		world := NewWorld()
 		world.Cluster = cluster
@@ -114,7 +113,7 @@ func TestPopulateShutdown(t *testing.T) {
 	t.Run("OldStatus", func(t *testing.T) {
 		cluster := v1beta1.NewPostgresCluster()
 		cluster.SetGeneration(99)
-		cluster.Spec.Shutdown = initialize.Bool(true)
+		cluster.Spec.Shutdown = new(true)
 		cluster.Status.ObservedGeneration = 21
 
 		world := NewWorld()
@@ -127,7 +126,7 @@ func TestPopulateShutdown(t *testing.T) {
 	t.Run("InstancesRunning", func(t *testing.T) {
 		cluster := v1beta1.NewPostgresCluster()
 		cluster.SetGeneration(99)
-		cluster.Spec.Shutdown = initialize.Bool(true)
+		cluster.Spec.Shutdown = new(true)
 		cluster.Status.ObservedGeneration = 99
 		cluster.Status.InstanceSets = []v1beta1.PostgresInstanceSetStatus{{Replicas: 2}}
 
@@ -141,7 +140,7 @@ func TestPopulateShutdown(t *testing.T) {
 	t.Run("InstancesStopped", func(t *testing.T) {
 		cluster := v1beta1.NewPostgresCluster()
 		cluster.SetGeneration(99)
-		cluster.Spec.Shutdown = initialize.Bool(true)
+		cluster.Spec.Shutdown = new(true)
 		cluster.Status.ObservedGeneration = 99
 		cluster.Status.InstanceSets = []v1beta1.PostgresInstanceSetStatus{{Replicas: 0}}
 

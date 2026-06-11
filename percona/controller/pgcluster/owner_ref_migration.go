@@ -18,6 +18,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get,list,watch}
+
+
 var childKinds = []schema.GroupVersionKind{
 	{Group: "apps", Version: "v1", Kind: "StatefulSet"},
 	{Group: "apps", Version: "v1", Kind: "Deployment"},
@@ -54,9 +57,43 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 	if _, err := mapper.RESTMapping(LegacyGVK.GroupKind(), LegacyGVK.Version); err != nil {
 		if meta.IsNoMatchError(err) {
 			log.Info("legacy PostgresCluster CRD not found; no need to check references", "gvk", LegacyGVK)
+
+			err := setStatusCondition(ctx, r.Client, cr, metav1.Condition{
+				Type:               "APIGroupMigration",
+				Status:             metav1.ConditionTrue,
+				Reason:             "APIGroupMigrationNotNeeded",
+				Message:            "Legacy API group is not installed",
+				ObservedGeneration: cr.GetGeneration(),
+			})
+			if err != nil {
+				return errors.Wrap(err, "set status condition to true")
+			}
+
 			return nil
 		}
 		return errors.Wrap(err, "discover legacy PostgresCluster GVK")
+	}
+
+	legacy := &unstructured.Unstructured{}
+	legacy.SetGroupVersionKind(LegacyGVK)
+
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, legacy); err != nil {
+		if apierrors.IsNotFound(err) {
+			err := setStatusCondition(ctx, r.Client, cr, metav1.Condition{
+				Type:               "APIGroupMigration",
+				Status:             metav1.ConditionTrue,
+				Reason:             "APIGroupMigrationNotNeeded",
+				Message:            "Legacy PostgresCluster not found",
+				ObservedGeneration: cr.GetGeneration(),
+			})
+			if err != nil {
+				return errors.Wrap(err, "set status condition to true")
+			}
+
+			return nil
+		}
+
+		return errors.Wrap(err, "get legacy PostgresCluster")
 	}
 
 	err := setStatusCondition(ctx, r.Client, cr, metav1.Condition{
@@ -68,13 +105,6 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 	})
 	if err != nil {
 		return errors.Wrap(err, "set status condition to false")
-	}
-
-	legacy := &unstructured.Unstructured{}
-	legacy.SetGroupVersionKind(LegacyGVK)
-
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, legacy); err != nil {
-		return client.IgnoreNotFound(err)
 	}
 
 	newPC := &v1beta1.PostgresCluster{}
@@ -127,7 +157,7 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 		ObservedGeneration: cr.GetGeneration(),
 	})
 	if err != nil {
-		return errors.Wrap(err, "set status condition to false")
+		return errors.Wrap(err, "set status condition to true")
 	}
 
 	return nil

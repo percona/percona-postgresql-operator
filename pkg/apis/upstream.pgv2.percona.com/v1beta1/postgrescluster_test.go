@@ -27,7 +27,7 @@ func TestPostgresClusterDefault(t *testing.T) {
 		assert.NilError(t, err)
 
 		assert.Equal(t, cluster.APIVersion, GroupVersion.String())
-		assert.Equal(t, cluster.Kind, reflect.TypeOf(cluster).Name())
+		assert.Equal(t, cluster.Kind, reflect.TypeFor[PostgresCluster]().Name())
 	})
 
 	t.Run("no instance sets", func(t *testing.T) {

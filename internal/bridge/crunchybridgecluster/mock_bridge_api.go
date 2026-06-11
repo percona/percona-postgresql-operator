@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/bridge"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -165,7 +164,7 @@ func (tbc *TestBridgeClient) CreateCluster(ctx context.Context, apiKey string,
 		cluster := &bridge.ClusterApiResource{
 			ID:           fmt.Sprint(len(tbc.Clusters)),
 			Host:         "example.com",
-			IsHA:         initialize.Bool(clusterRequestPayload.IsHA),
+			IsHA:         new(clusterRequestPayload.IsHA),
 			MajorVersion: clusterRequestPayload.PostgresVersion.IntValue(),
 			ClusterName:  clusterRequestPayload.Name,
 			Plan:         clusterRequestPayload.Plan,

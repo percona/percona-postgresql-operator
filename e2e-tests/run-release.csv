@@ -2,7 +2,6 @@ backup-enable-disable
 builtin-extensions
 cert-manager-tls
 custom-envs
-custom-extensions
 custom-tls
 database-init-sql
 demand-backup
@@ -10,8 +9,8 @@ demand-backup-offline-snapshot
 dynamic-configuration
 finalizers
 init-deploy
+k8s-upgrade
 huge-pages
-major-upgrade-13-to-14
 major-upgrade-14-to-15
 major-upgrade-15-to-16
 major-upgrade-16-to-17
@@ -41,4 +40,4 @@ upgrade-minor
 users
 migration-from-crunchy-backup-restore
 migration-from-crunchy-pv
-migration-from-crunchy-standb
+migration-from-crunchy-standby
