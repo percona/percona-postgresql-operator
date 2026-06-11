@@ -758,7 +758,6 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 			needsUpdate = true
 		}
 
-
 		if !needsUpdate {
 			return nil
 		}
