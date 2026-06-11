@@ -12,8 +12,8 @@ commands:
 
       source ../../functions
 
-      kubectl -n ${NAMESPACE} patch postgrescluster upgrade-minor --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
-      kubectl -n ${NAMESPACE} delete postgrescluster upgrade-minor || true
+      kubectl -n ${NAMESPACE} patch postgrescluster upgrade-minor --type=merge -p='{"metadata":{"finalizers":[]}}' 2>/dev/null || true
+      kubectl -n ${NAMESPACE} delete postgrescluster upgrade-minor --ignore-not-found
       remove_all_finalizers
       check_operator_panic
       destroy_operator
