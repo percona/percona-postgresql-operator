@@ -141,6 +141,30 @@ func TestContainer(t *testing.T) {
 
 }
 
+func TestPMMConfigFile(t *testing.T) {
+	newPGC := func(crVersion string) *v2.PerconaPGCluster {
+		return &v2.PerconaPGCluster{
+			Spec: v2.PerconaPGClusterSpec{CRVersion: crVersion},
+		}
+	}
+
+	t.Run("v3.1.0 PMM2", func(t *testing.T) {
+		assert.Equal(t, "/tmp/pmm/pmm-agent.yaml", pmmConfigFile(newPGC("3.1.0"), false))
+	})
+	t.Run("v3.1.0 PMM3", func(t *testing.T) {
+		assert.Equal(t, "/tmp/pmm/pmm-agent.yaml", pmmConfigFile(newPGC("3.1.0"), true))
+	})
+	t.Run("newer than 3.1.0", func(t *testing.T) {
+		assert.Equal(t, "/tmp/pmm/pmm-agent.yaml", pmmConfigFile(newPGC("3.2.0"), true))
+	})
+	t.Run("older than 3.1.0 PMM2", func(t *testing.T) {
+		assert.Equal(t, "/usr/local/percona/pmm2/config/pmm-agent.yaml", pmmConfigFile(newPGC("3.0.0"), false))
+	})
+	t.Run("older than 3.1.0 PMM3", func(t *testing.T) {
+		assert.Equal(t, "/usr/local/percona/pmm/config/pmm-agent.yaml", pmmConfigFile(newPGC("3.0.0"), true))
+	})
+}
+
 func TestSidecarContainerV2(t *testing.T) {
 	pmmSpec := &v2.PMMSpec{
 		Image:                    "percona/pmm-client:pmm2-enabled",
@@ -200,7 +224,7 @@ func TestSidecarContainerV2(t *testing.T) {
 		"PMM_AGENT_LISTEN_PORT":            "7777",
 		"PMM_AGENT_PORTS_MIN":              "30100",
 		"PMM_AGENT_PORTS_MAX":              "30105",
-		"PMM_AGENT_CONFIG_FILE":            "/usr/local/percona/pmm2/config/pmm-agent.yaml",
+		"PMM_AGENT_CONFIG_FILE":            "/tmp/pmm/pmm-agent.yaml",
 		"PMM_AGENT_LOG_LEVEL":              "info",
 		"PMM_AGENT_DEBUG":                  "false",
 		"PMM_AGENT_TRACE":                  "false",
@@ -217,7 +241,7 @@ func TestSidecarContainerV2(t *testing.T) {
 		"DB_USER":                          v2.UserMonitoring,
 		"DB_PASS":                          "", // secret reference is asserted separately
 		"PMM_AGENT_PRERUN_SCRIPT":          "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source=pgstatements --cluster=test-cluster --environment=dev-postgres; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
-		"PMM_AGENT_PATHS_TEMPDIR":          "/tmp",
+		"PMM_AGENT_PATHS_TEMPDIR":          "/tmp/pmm",
 		"PMM_AGENT_SETUP_PROC_MOUNTS_PATH": "/proc/self/mounts",
 	}
 
@@ -309,7 +333,7 @@ func TestSidecarContainerV3(t *testing.T) {
 		"PMM_AGENT_LISTEN_PORT":            "7777",
 		"PMM_AGENT_PORTS_MIN":              "30100",
 		"PMM_AGENT_PORTS_MAX":              "30105",
-		"PMM_AGENT_CONFIG_FILE":            "/usr/local/percona/pmm/config/pmm-agent.yaml",
+		"PMM_AGENT_CONFIG_FILE":            "/tmp/pmm/pmm-agent.yaml",
 		"PMM_AGENT_LOG_LEVEL":              "info",
 		"PMM_AGENT_DEBUG":                  "false",
 		"PMM_AGENT_TRACE":                  "false",
