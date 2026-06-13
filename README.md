@@ -70,7 +70,7 @@ See the [Contribution Guide](CONTRIBUTING.md) on how you can contribute.
 
 ## Roadmap
 
-We have a public roadmap which can be found [here](https://github.com/orgs/percona/projects/10). Please feel free to contribute and propose new features by following the roadmap [guidelines](https://github.com/percona/roadmap).
+We have a public roadmap which can be found [here](https://github.com/orgs/percona/projects/10/views/6). Please feel free to contribute and propose new features by following the roadmap [guidelines](https://github.com/percona/roadmap).
 
 ## Submitting Bug Reports
 
