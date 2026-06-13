@@ -261,7 +261,6 @@ void runTest(Integer TEST_ID) {
                     fi
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
-                    export PG_DISTRIBUTION=community
                     set -o pipefail
                     kubectl kuttl test --config e2e-tests/kuttl.yaml --test "^${testName}\$" |& tee e2e-tests/logs/${testName}.log
                 """
