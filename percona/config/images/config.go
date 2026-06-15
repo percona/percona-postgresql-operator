@@ -6,9 +6,9 @@ package images
 
 import (
 	_ "embed"
-	"fmt"
 
-	"gopkg.in/yaml.v3"
+	"github.com/pkg/errors"
+	"sigs.k8s.io/yaml"
 )
 
 //go:embed default-images.yaml
@@ -21,7 +21,7 @@ var DefaultConfig *DefaultImagesConfig
 func mustLoadDefault() *DefaultImagesConfig {
 	var cfg DefaultImagesConfig
 	if err := yaml.Unmarshal(defaultImagesYAML, &cfg); err != nil {
-		panic(fmt.Sprintf("failed to parse embedded default images: %v", err))
+		panic(errors.Wrap(err, "failed to parse embedded default images"))
 	}
 	return &cfg
 }

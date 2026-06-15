@@ -8,12 +8,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
-	"gopkg.in/yaml.v3"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -60,17 +62,30 @@ func (l *ImageConfigLoader) Embedded() *DefaultImagesConfig {
 	return l.embedded
 }
 
-// LoadUserConfigFromFile loads user configuration from a YAML file
-// Returns error if file doesn't exist or fails to parse
+// LoadUserConfigFromFile loads user configuration from a YAML file.
+// Returns error if file doesn't exist, fails to parse, or path validation fails.
 func (l *ImageConfigLoader) LoadUserConfigFromFile(path string) error {
-	data, err := os.ReadFile(path)
+	// Clean the path first to resolve any .. or . components
+	cleanPath := filepath.Clean(path)
+
+	// Verify the cleaned path is absolute
+	if !filepath.IsAbs(cleanPath) {
+		return errors.Errorf("config file path must be absolute, got: %q", cleanPath)
+	}
+
+	// Verify file extension is .yaml or .yml
+	if ext := filepath.Ext(cleanPath); ext != ".yaml" && ext != ".yml" {
+		return errors.Errorf("config file must have .yaml or .yml extension, got: %q", ext)
+	}
+
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
-		return fmt.Errorf("read config file %q: %w", path, err)
+		return errors.Wrapf(err, "read config file %q", cleanPath)
 	}
 
 	var cfg DefaultImagesConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return fmt.Errorf("parse config file %q: %w", path, err)
+		return errors.Wrapf(err, "parse config file %q", cleanPath)
 	}
 
 	l.userConfig = &cfg
@@ -89,17 +104,17 @@ func (l *ImageConfigLoader) LoadUserConfigFromConfigMap(
 		Name: cmName, Namespace: cmNamespace,
 	}, cm)
 	if err != nil {
-		return fmt.Errorf("get ConfigMap %s/%s: %w", cmNamespace, cmName, err)
+		return errors.Wrapf(err, "get ConfigMap %s/%s", cmNamespace, cmName)
 	}
 
 	data, ok := cm.Data[cmKey]
 	if !ok {
-		return fmt.Errorf("ConfigMap %s/%s exists but key %q is missing", cmNamespace, cmName, cmKey)
+		return errors.Errorf("ConfigMap %s/%s exists but key %q is missing", cmNamespace, cmName, cmKey)
 	}
 
 	var cfg DefaultImagesConfig
 	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
-		return fmt.Errorf("ConfigMap %s/%s: failed to parse YAML in key %q: %w", cmNamespace, cmName, cmKey, err)
+		return errors.Wrapf(err, "ConfigMap %s/%s: failed to parse YAML in key %q", cmNamespace, cmName, cmKey)
 	}
 
 	l.userConfig = &cfg
@@ -130,7 +145,7 @@ func (l *ImageConfigLoader) LoadAuto(ctx context.Context, k8sClient client.Clien
 		// Only silently ignore "ConfigMap not found" - this is expected when using defaults
 		// All other errors (parse failures, permission errors, missing key) should be returned
 		// because they indicate a misconfigured ConfigMap that the user explicitly created
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Log for visibility that we're using defaults
 			fmt.Printf("INFO: ConfigMap %s/%s not found, using default image configuration\n", cmNamespace, cmName)
 			return nil

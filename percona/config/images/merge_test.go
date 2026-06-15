@@ -77,7 +77,7 @@ func TestDeepMergeConfigs(t *testing.T) {
 		}
 
 		result := DeepMergeConfigs(base, user)
-		assert.Equal(t, 1, len(result.Versions))
+		assert.Len(t, result.Versions, 1)
 		assert.Equal(t, "2.9.0", result.Versions[0].CRVersion)
 		assert.Equal(t, "custom/postgres", result.Versions[0].Repositories["postgres"])
 		assert.Equal(t, "percona/pgbackrest", result.Versions[0].Repositories["pgbackrest"]) // from base
@@ -118,7 +118,7 @@ func TestDeepMergeConfigs(t *testing.T) {
 		}
 
 		result := DeepMergeConfigs(base, user)
-		assert.Equal(t, 2, len(result.Versions))
+		assert.Len(t, result.Versions, 2)
 		// Check that both versions exist
 		has29 := false
 		has210 := false
@@ -164,7 +164,7 @@ func TestDeepMergeConfigs(t *testing.T) {
 		}
 
 		result := DeepMergeConfigs(base, user)
-		assert.Equal(t, 3, len(result.Versions[0].Tags.Postgres))
+		assert.Len(t, result.Versions[0].Tags.Postgres, 3)
 		assert.Equal(t, "1.0", result.Versions[0].Tags.Postgres["14"])
 		assert.Equal(t, "2.0", result.Versions[0].Tags.Postgres["15"])
 		assert.Equal(t, "3.0", result.Versions[0].Tags.Postgres["16"])
@@ -200,7 +200,7 @@ func TestDeepMergeConfigs(t *testing.T) {
 		}
 
 		result := DeepMergeConfigs(base, user)
-		assert.Equal(t, 2, len(result.Versions[0].Tags.PostgresGIS))
+		assert.Len(t, result.Versions[0].Tags.PostgresGIS, 2)
 		assert.Equal(t, "1.0", result.Versions[0].Tags.PostgresGIS["14-gis-3.3"])
 		assert.Equal(t, "2.0", result.Versions[0].Tags.PostgresGIS["15-gis-3.3"])
 	})
@@ -256,11 +256,11 @@ func TestMergeTags(t *testing.T) {
 		result := mergeTags(base, user)
 
 		// Verify result has merged data
-		assert.Equal(t, 3, len(result.Postgres))
+		assert.Len(t, result.Postgres, 3)
 		assert.Equal(t, "3.0", result.Postgres["16"])
 
 		// Verify base was NOT mutated
-		assert.Equal(t, 2, len(base.Postgres), "base map should not have new keys added")
+		assert.Len(t, base.Postgres, 2, "base map should not have new keys added")
 		assert.Equal(t, originalBasePostgres, base.Postgres, "base map should be unchanged")
 	})
 }

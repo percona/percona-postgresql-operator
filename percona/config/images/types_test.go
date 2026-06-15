@@ -17,12 +17,11 @@ func TestDefaultImagesConfig_GetImage(t *testing.T) {
 			{
 				CRVersion: "2.9.0",
 				Repositories: map[string]string{
-					"postgres":     "percona/percona-postgresql",
-					"pgbackrest":   "percona/pgbackrest",
-					"pgbouncer":    "percona/pgbouncer",
-					"pgadmin":      "percona/pgadmin4",
-					"pgexporter":   "percona/pg_exporter",
-					"postgresGIS":  "percona/percona-postgresql-gis",
+					"postgres":    "percona/percona-postgresql",
+					"pgbackrest":  "percona/pgbackrest",
+					"pgbouncer":   "percona/pgbouncer",
+					"pgadmin":     "percona/pgadmin4",
+					"postgresGIS": "percona/percona-postgresql-gis",
 				},
 				Tags: VersionTags{
 					Postgres: map[string]string{
@@ -41,11 +40,11 @@ func TestDefaultImagesConfig_GetImage(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		crVersion   string
-		component   string
-		pgVersion   string
-		expected    string
+		name      string
+		crVersion string
+		component string
+		pgVersion string
+		expected  string
 	}{
 		{
 			name:      "PostgreSQL 14",
@@ -202,6 +201,6 @@ func TestGlobalConfig(t *testing.T) {
 
 		SetGlobalConfig(nil)
 		result := GetImageForCluster("2.9.0", "postgres", "14")
-		assert.Equal(t, "", result)
+		assert.Empty(t, result)
 	})
 }

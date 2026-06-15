@@ -125,12 +125,6 @@ func StandalonePGAdminContainerImage(pgadmin *v1beta1.PGAdmin) string {
 		image = *pgadmin.Spec.Image
 	}
 
-	// Try operator-wide config first
-	if image == "" {
-		// For standalone pgadmin, we don't have cluster context
-		// Use a default version or skip
-	}
-
 	// Fallback to env var
 	if image == "" {
 		image = defaultFromEnv(image, "RELATED_IMAGE_STANDALONE_PGADMIN")

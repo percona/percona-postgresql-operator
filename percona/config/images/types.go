@@ -6,25 +6,25 @@ package images
 
 // VersionImages defines image configuration for a specific CR version
 type VersionImages struct {
-	CRVersion    string            `json:"crVersion"`
-	Repositories map[string]string `json:"repositories"`
-	Tags         VersionTags       `json:"tags"`
+	CRVersion    string            `json:"crVersion" yaml:"crVersion"`
+	Repositories map[string]string `json:"repositories" yaml:"repositories"`
+	Tags         VersionTags       `json:"tags" yaml:"tags"`
 }
 
 // VersionTags separates PostgreSQL tags (per version) from component tags (single)
 type VersionTags struct {
-	Postgres    map[string]string `json:"postgres"`
-	PostgresGIS map[string]string `json:"postgresGIS"`
-	PGBackRest  string            `json:"pgbackrest"`
-	PGBouncer   string            `json:"pgbouncer"`
-	PGAdmin     string            `json:"pgadmin"`
+	Postgres    map[string]string `json:"postgres" yaml:"postgres"`
+	PostgresGIS map[string]string `json:"postgresGIS" yaml:"postgresGIS"`
+	PGBackRest  string            `json:"pgbackrest" yaml:"pgbackrest"`
+	PGBouncer   string            `json:"pgbouncer" yaml:"pgbouncer"`
+	PGAdmin     string            `json:"pgadmin" yaml:"pgadmin"`
 }
 
 // DefaultImagesConfig is the root configuration structure
 type DefaultImagesConfig struct {
 	// Global registry for all images (e.g., "docker.io", "quay.io")
-	Registry string          `json:"registry"`
-	Versions []VersionImages `json:"versions"`
+	Registry string          `json:"registry" yaml:"registry"`
+	Versions []VersionImages `json:"versions" yaml:"versions"`
 }
 
 // GetImage builds full image reference: registry/repository:tag
