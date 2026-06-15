@@ -32,10 +32,9 @@ func TestDefaultImagesConfig_GetImage(t *testing.T) {
 					PostgresGIS: map[string]string{
 						"14": "14.10-3.3-1",
 					},
-					PGBackRest:  "2.9.0",
-					PGBouncer:   "2.9.0",
-					PGAdmin:     "2.9.0",
-					PGExporter:  "2.9.0",
+					PGBackRest: "2.9.0",
+					PGBouncer:  "2.9.0",
+					PGAdmin:    "2.9.0",
 				},
 			},
 		},
@@ -89,13 +88,6 @@ func TestDefaultImagesConfig_GetImage(t *testing.T) {
 			component: "pgadmin",
 			pgVersion: "",
 			expected:  "docker.io/percona/pgadmin4:2.9.0",
-		},
-		{
-			name:      "pgExporter",
-			crVersion: "2.9.0",
-			component: "pgexporter",
-			pgVersion: "",
-			expected:  "docker.io/percona/pg_exporter:2.9.0",
 		},
 		{
 			name:      "unknown CR version",
@@ -167,6 +159,10 @@ func TestDefaultImagesConfig_GetVersionConfig(t *testing.T) {
 
 func TestGlobalConfig(t *testing.T) {
 	t.Run("Set and Get", func(t *testing.T) {
+		// Capture and restore previous global config
+		prevConfig := GetGlobalConfig()
+		t.Cleanup(func() { SetGlobalConfig(prevConfig) })
+
 		cfg := &DefaultImagesConfig{
 			Registry: "test.io",
 		}
@@ -176,6 +172,10 @@ func TestGlobalConfig(t *testing.T) {
 	})
 
 	t.Run("GetImageForCluster", func(t *testing.T) {
+		// Capture and restore previous global config
+		prevConfig := GetGlobalConfig()
+		t.Cleanup(func() { SetGlobalConfig(prevConfig) })
+
 		cfg := &DefaultImagesConfig{
 			Registry: "docker.io",
 			Versions: []VersionImages{
@@ -196,6 +196,10 @@ func TestGlobalConfig(t *testing.T) {
 	})
 
 	t.Run("GetImageForCluster with nil config", func(t *testing.T) {
+		// Capture and restore previous global config
+		prevConfig := GetGlobalConfig()
+		t.Cleanup(func() { SetGlobalConfig(prevConfig) })
+
 		SetGlobalConfig(nil)
 		result := GetImageForCluster("2.9.0", "postgres", "14")
 		assert.Equal(t, "", result)

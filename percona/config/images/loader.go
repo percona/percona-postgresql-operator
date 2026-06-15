@@ -11,6 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -60,15 +61,16 @@ func (l *ImageConfigLoader) Embedded() *DefaultImagesConfig {
 }
 
 // LoadUserConfigFromFile loads user configuration from a YAML file
+// Returns error if file doesn't exist or fails to parse
 func (l *ImageConfigLoader) LoadUserConfigFromFile(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read config file: %w", err)
+		return fmt.Errorf("read config file %q: %w", path, err)
 	}
 
 	var cfg DefaultImagesConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return fmt.Errorf("parse config file: %w", err)
+		return fmt.Errorf("parse config file %q: %w", path, err)
 	}
 
 	l.userConfig = &cfg
@@ -76,6 +78,7 @@ func (l *ImageConfigLoader) LoadUserConfigFromFile(path string) error {
 }
 
 // LoadUserConfigFromConfigMap loads user configuration from a Kubernetes ConfigMap
+// Returns error if ConfigMap exists but key is missing or YAML parsing fails
 func (l *ImageConfigLoader) LoadUserConfigFromConfigMap(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -86,17 +89,17 @@ func (l *ImageConfigLoader) LoadUserConfigFromConfigMap(
 		Name: cmName, Namespace: cmNamespace,
 	}, cm)
 	if err != nil {
-		return fmt.Errorf("get ConfigMap: %w", err)
+		return fmt.Errorf("get ConfigMap %s/%s: %w", cmNamespace, cmName, err)
 	}
 
 	data, ok := cm.Data[cmKey]
 	if !ok {
-		return fmt.Errorf("key %q not found in ConfigMap", cmKey)
+		return fmt.Errorf("ConfigMap %s/%s exists but key %q is missing", cmNamespace, cmName, cmKey)
 	}
 
 	var cfg DefaultImagesConfig
 	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
-		return fmt.Errorf("parse ConfigMap data: %w", err)
+		return fmt.Errorf("ConfigMap %s/%s: failed to parse YAML in key %q: %w", cmNamespace, cmName, cmKey, err)
 	}
 
 	l.userConfig = &cfg
@@ -122,13 +125,17 @@ func (l *ImageConfigLoader) LoadAuto(ctx context.Context, k8sClient client.Clien
 		cmNamespace = env
 	}
 
-	// Only try ConfigMap if client is available
-	if k8sClient != nil {
-		err := l.LoadUserConfigFromConfigMap(ctx, k8sClient, cmName, cmNamespace, DefaultConfigMapKey)
-		if err != nil {
-			// Log but don't fail - use defaults
-			// The caller should handle logging
+	err := l.LoadUserConfigFromConfigMap(ctx, k8sClient, cmName, cmNamespace, DefaultConfigMapKey)
+	if err != nil {
+		// Only silently ignore "ConfigMap not found" - this is expected when using defaults
+		// All other errors (parse failures, permission errors, missing key) should be returned
+		// because they indicate a misconfigured ConfigMap that the user explicitly created
+		if errors.IsNotFound(err) {
+			// Log for visibility that we're using defaults
+			fmt.Printf("INFO: ConfigMap %s/%s not found, using default image configuration\n", cmNamespace, cmName)
+			return nil
 		}
+		return err
 	}
 
 	return nil

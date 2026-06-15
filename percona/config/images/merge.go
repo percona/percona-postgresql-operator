@@ -4,6 +4,20 @@
 
 package images
 
+import "maps"
+
+// DeepCopy returns a deep copy of the VersionTags struct
+// This is used to avoid mutating the original when merging configurations
+func (v VersionTags) DeepCopy() VersionTags {
+	return VersionTags{
+		PGBackRest:  v.PGBackRest,
+		PGBouncer:   v.PGBouncer,
+		PGAdmin:     v.PGAdmin,
+		Postgres:    maps.Clone(v.Postgres),
+		PostgresGIS: maps.Clone(v.PostgresGIS),
+	}
+}
+
 // DeepMergeConfigs merges user configuration into base configuration
 // User values take precedence over base values at all levels
 func DeepMergeConfigs(base, user *DefaultImagesConfig) *DefaultImagesConfig {
@@ -68,8 +82,10 @@ func DeepMergeConfigs(base, user *DefaultImagesConfig) *DefaultImagesConfig {
 }
 
 // mergeTags merges user tags into base tags
+// Returns a new VersionTags struct without mutating base or user
 func mergeTags(base, user VersionTags) VersionTags {
-	result := base
+	// Create a deep copy to avoid mutating base
+	result := base.DeepCopy()
 
 	// Merge postgres tags map
 	if len(user.Postgres) > 0 {
@@ -95,8 +111,6 @@ func mergeTags(base, user VersionTags) VersionTags {
 	result.PGBackRest = pickString(user.PGBackRest, base.PGBackRest)
 	result.PGBouncer = pickString(user.PGBouncer, base.PGBouncer)
 	result.PGAdmin = pickString(user.PGAdmin, base.PGAdmin)
-	result.PGExporter = pickString(user.PGExporter, base.PGExporter)
-	result.StandalonePGAdmin = pickString(user.StandalonePGAdmin, base.StandalonePGAdmin)
 
 	return result
 }

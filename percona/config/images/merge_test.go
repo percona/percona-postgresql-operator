@@ -209,10 +209,9 @@ func TestDeepMergeConfigs(t *testing.T) {
 func TestMergeTags(t *testing.T) {
 	t.Run("merge single value tags", func(t *testing.T) {
 		base := VersionTags{
-			PGBackRest:  "2.9.0",
-			PGBouncer:   "2.9.0",
-			PGAdmin:     "2.9.0",
-			PGExporter:  "2.9.0",
+			PGBackRest: "2.9.0",
+			PGBouncer:  "2.9.0",
+			PGAdmin:    "2.9.0",
 		}
 
 		user := VersionTags{
@@ -224,7 +223,6 @@ func TestMergeTags(t *testing.T) {
 		assert.Equal(t, "2.10.0", result.PGBackRest)
 		assert.Equal(t, "2.9.0", result.PGBouncer) // from base
 		assert.Equal(t, "2.10.0", result.PGAdmin)
-		assert.Equal(t, "2.9.0", result.PGExporter) // from base
 	})
 
 	t.Run("empty user values don't override", func(t *testing.T) {
@@ -238,6 +236,32 @@ func TestMergeTags(t *testing.T) {
 
 		result := mergeTags(base, user)
 		assert.Equal(t, "2.9.0", result.PGBackRest)
+	})
+
+	t.Run("does not mutate base maps", func(t *testing.T) {
+		base := VersionTags{
+			Postgres: map[string]string{"14": "1.0", "15": "2.0"},
+		}
+
+		user := VersionTags{
+			Postgres: map[string]string{"16": "3.0"},
+		}
+
+		// Capture original base map state
+		originalBasePostgres := make(map[string]string)
+		for k, v := range base.Postgres {
+			originalBasePostgres[k] = v
+		}
+
+		result := mergeTags(base, user)
+
+		// Verify result has merged data
+		assert.Equal(t, 3, len(result.Postgres))
+		assert.Equal(t, "3.0", result.Postgres["16"])
+
+		// Verify base was NOT mutated
+		assert.Equal(t, 2, len(base.Postgres), "base map should not have new keys added")
+		assert.Equal(t, originalBasePostgres, base.Postgres, "base map should be unchanged")
 	})
 }
 

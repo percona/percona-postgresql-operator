@@ -13,13 +13,11 @@ type VersionImages struct {
 
 // VersionTags separates PostgreSQL tags (per version) from component tags (single)
 type VersionTags struct {
-	Postgres          map[string]string `json:"postgres"`
-	PostgresGIS       map[string]string `json:"postgresGIS"`
-	PGBackRest        string            `json:"pgbackrest"`
-	PGBouncer         string            `json:"pgbouncer"`
-	PGAdmin           string            `json:"pgadmin"`
-	PGExporter        string            `json:"pgexporter"`
-	StandalonePGAdmin string            `json:"standalonePGAdmin"`
+	Postgres    map[string]string `json:"postgres"`
+	PostgresGIS map[string]string `json:"postgresGIS"`
+	PGBackRest  string            `json:"pgbackrest"`
+	PGBouncer   string            `json:"pgbouncer"`
+	PGAdmin     string            `json:"pgadmin"`
 }
 
 // DefaultImagesConfig is the root configuration structure
@@ -76,10 +74,6 @@ func (c *DefaultImagesConfig) getTag(v *VersionImages, component, pgVersion stri
 		return v.Tags.PGBouncer
 	case "pgadmin":
 		return v.Tags.PGAdmin
-	case "pgexporter":
-		return v.Tags.PGExporter
-	case "standalonePGAdmin":
-		return v.Tags.StandalonePGAdmin
 	}
 	return ""
 }
