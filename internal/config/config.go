@@ -32,11 +32,6 @@ func getImageFromOperatorConfig(cluster *v1beta1.PostgresCluster, component stri
 
 	pgVersion := fmt.Sprintf("%d", cluster.Spec.PostgresVersion)
 
-	// If PostGIS is enabled, use the postgresGIS component instead
-	if cluster.Spec.PostGISVersion != "" {
-		component = "postgresGIS"
-	}
-
 	return images.GetImageForCluster(crVersion, component, pgVersion)
 }
 
@@ -164,11 +159,6 @@ func PGExporterContainerImage(cluster *v1beta1.PostgresCluster) string {
 		image = cluster.Spec.Monitoring.PGMonitor.Exporter.Image
 	}
 
-	// Try operator-wide config first
-	if image == "" {
-		image = getImageFromOperatorConfig(cluster, "pgexporter")
-	}
-
 	// Fallback to env var
 	if image == "" {
 		image = defaultFromEnv(image, "RELATED_IMAGE_PGEXPORTER")
@@ -196,7 +186,12 @@ func PostgresContainerImage(cluster *v1beta1.PostgresCluster) string {
 
 	// Try operator-wide config first
 	if image == "" {
-		image = getImageFromOperatorConfig(cluster, "postgres")
+		// Use postgresGIS component if PostGIS is enabled
+		component := "postgres"
+		if cluster.Spec.PostGISVersion != "" {
+			component = "postgresGIS"
+		}
+		image = getImageFromOperatorConfig(cluster, component)
 	}
 
 	// Fallback to env var

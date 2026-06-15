@@ -157,50 +157,24 @@ func TestDefaultImagesConfig_GetVersionConfig(t *testing.T) {
 }
 
 func TestGlobalConfig(t *testing.T) {
-	t.Run("Set and Get", func(t *testing.T) {
-		// Capture and restore previous global config
-		prevConfig := GetGlobalConfig()
-		t.Cleanup(func() { SetGlobalConfig(prevConfig) })
-
-		cfg := &DefaultImagesConfig{
-			Registry: "test.io",
+	t.Run("SetGlobalConfig is idempotent", func(t *testing.T) {
+		// This test verifies that SetGlobalConfig can only be called once
+		// The first call sets the config, subsequent calls are ignored
+		firstCfg := &DefaultImagesConfig{
+			Registry: "first.io",
 		}
-		SetGlobalConfig(cfg)
+		secondCfg := &DefaultImagesConfig{
+			Registry: "second.io",
+		}
+
+		// First call should set the config
+		SetGlobalConfig(firstCfg)
 		result := GetGlobalConfig()
-		assert.Equal(t, cfg, result)
-	})
+		assert.Equal(t, "first.io", result.Registry)
 
-	t.Run("GetImageForCluster", func(t *testing.T) {
-		// Capture and restore previous global config
-		prevConfig := GetGlobalConfig()
-		t.Cleanup(func() { SetGlobalConfig(prevConfig) })
-
-		cfg := &DefaultImagesConfig{
-			Registry: "docker.io",
-			Versions: []VersionImages{
-				{
-					CRVersion: "2.9.0",
-					Repositories: map[string]string{
-						"postgres": "percona/postgres",
-					},
-					Tags: VersionTags{
-						Postgres: map[string]string{"14": "1.0"},
-					},
-				},
-			},
-		}
-		SetGlobalConfig(cfg)
-		result := GetImageForCluster("2.9.0", "postgres", "14")
-		assert.Equal(t, "docker.io/percona/postgres:1.0", result)
-	})
-
-	t.Run("GetImageForCluster with nil config", func(t *testing.T) {
-		// Capture and restore previous global config
-		prevConfig := GetGlobalConfig()
-		t.Cleanup(func() { SetGlobalConfig(prevConfig) })
-
-		SetGlobalConfig(nil)
-		result := GetImageForCluster("2.9.0", "postgres", "14")
-		assert.Empty(t, result)
+		// Second call should be ignored (sync.Once behavior)
+		SetGlobalConfig(secondCfg)
+		result = GetGlobalConfig()
+		assert.Equal(t, "first.io", result.Registry, "second SetGlobalConfig should be ignored")
 	})
 }

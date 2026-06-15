@@ -6,7 +6,6 @@ package images
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -92,8 +91,9 @@ func (l *ImageConfigLoader) LoadUserConfigFromFile(path string) error {
 	return nil
 }
 
-// LoadUserConfigFromConfigMap loads user configuration from a Kubernetes ConfigMap
-// Returns error if ConfigMap exists but key is missing or YAML parsing fails
+// LoadUserConfigFromConfigMap loads user configuration from a Kubernetes ConfigMap.
+// Returns error if ConfigMap exists but key is missing or YAML parsing fails.
+// Returns the raw Kubernetes API error for NotFound so callers can handle it appropriately.
 func (l *ImageConfigLoader) LoadUserConfigFromConfigMap(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -104,6 +104,10 @@ func (l *ImageConfigLoader) LoadUserConfigFromConfigMap(
 		Name: cmName, Namespace: cmNamespace,
 	}, cm)
 	if err != nil {
+		// Don't wrap NotFound errors so callers can check with apierrors.IsNotFound()
+		if apierrors.IsNotFound(err) {
+			return err
+		}
 		return errors.Wrapf(err, "get ConfigMap %s/%s", cmNamespace, cmName)
 	}
 
@@ -146,8 +150,6 @@ func (l *ImageConfigLoader) LoadAuto(ctx context.Context, k8sClient client.Clien
 		// All other errors (parse failures, permission errors, missing key) should be returned
 		// because they indicate a misconfigured ConfigMap that the user explicitly created
 		if apierrors.IsNotFound(err) {
-			// Log for visibility that we're using defaults
-			fmt.Printf("INFO: ConfigMap %s/%s not found, using default image configuration\n", cmNamespace, cmName)
 			return nil
 		}
 		return err

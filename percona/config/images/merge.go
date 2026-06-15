@@ -44,7 +44,7 @@ func DeepMergeConfigs(base, user *DefaultImagesConfig) *DefaultImagesConfig {
 		mergedVer := VersionImages{
 			CRVersion:    baseVer.CRVersion,
 			Repositories: make(map[string]string),
-			Tags:         baseVer.Tags,
+			Tags:         baseVer.Tags.DeepCopy(),
 		}
 
 		// Copy base repositories
@@ -70,7 +70,7 @@ func DeepMergeConfigs(base, user *DefaultImagesConfig) *DefaultImagesConfig {
 		newVer := VersionImages{
 			CRVersion:    crVer,
 			Repositories: make(map[string]string),
-			Tags:         userVer.Tags,
+			Tags:         userVer.Tags.DeepCopy(),
 		}
 		for k, v := range userVer.Repositories {
 			newVer.Repositories[k] = v

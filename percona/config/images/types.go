@@ -4,6 +4,10 @@
 
 package images
 
+import (
+	"sync"
+)
+
 // VersionImages defines image configuration for a specific CR version
 type VersionImages struct {
 	CRVersion    string            `json:"crVersion" yaml:"crVersion"`
@@ -93,14 +97,22 @@ func (c *DefaultImagesConfig) buildImageRef(repository, tag string) string {
 }
 
 // Global config accessor
-var globalConfig *DefaultImagesConfig
+var (
+	globalConfig     *DefaultImagesConfig
+	globalConfigOnce sync.Once
+)
 
-// SetGlobalConfig sets the global image configuration
+// SetGlobalConfig sets the global image configuration.
+// This function should only be called once during initialization.
+// Subsequent calls will be ignored.
 func SetGlobalConfig(config *DefaultImagesConfig) {
-	globalConfig = config
+	globalConfigOnce.Do(func() {
+		globalConfig = config
+	})
 }
 
-// GetGlobalConfig returns the global image configuration
+// GetGlobalConfig returns the global image configuration.
+// This is safe for concurrent use after initialization.
 func GetGlobalConfig() *DefaultImagesConfig {
 	return globalConfig
 }
