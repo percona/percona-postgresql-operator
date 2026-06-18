@@ -35,23 +35,17 @@ func Container(secret *corev1.Secret, pgc *v2.PerconaPGCluster) (corev1.Containe
 
 // sidecarContainerV2 refers to the construction of the PMM2 container.
 // pmmConfigFile returns the path for the stateless pmm-agent.yaml. From v3.1.0
-// it is placed in the writable "/tmp" emptyDir so PMM works with
-// readOnlyRootFilesystem.
+// it is placed directly in the writable "/tmp" emptyDir (pmm-agent does not
+// create the config's parent dir, so a subdirectory cannot be used) so PMM
+// works with readOnlyRootFilesystem.
 func pmmConfigFile(pgc *v2.PerconaPGCluster, isPMM3 bool) string {
 	if pgc.CompareVersion("3.1.0") >= 0 {
-		return "/tmp/pmm/pmm-agent.yaml"
+		return "/tmp/pmm-agent.yaml"
 	}
 	if isPMM3 {
 		return "/usr/local/percona/pmm/config/pmm-agent.yaml"
 	}
 	return "/usr/local/percona/pmm2/config/pmm-agent.yaml"
-}
-
-func pmmTempDir(pgc *v2.PerconaPGCluster) string {
-	if pgc.CompareVersion("3.1.0") >= 0 {
-		return "/tmp/pmm"
-	}
-	return "/tmp"
 }
 
 func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
@@ -226,7 +220,7 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 		},
 		{
 			Name:  "PMM_AGENT_PATHS_TEMPDIR",
-			Value: pmmTempDir(pgc),
+			Value: "/tmp",
 		},
 	}
 
