@@ -107,6 +107,7 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		Owns(&v1beta1.PostgresCluster{}).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Service{}, r.watchServices())).
 		Watches(&corev1.Secret{}, r.watchEnvFromSecrets()).
+		Watches(&corev1.Secret{}, r.watchPatroniEtcdSecrets()).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
@@ -194,6 +195,33 @@ func (r *PGClusterReconciler) watchEnvFromSecrets() handler.TypedEventHandler[cl
 	})
 }
 
+func (r *PGClusterReconciler) watchPatroniEtcdSecrets() handler.TypedEventHandler[client.Object, reconcile.Request] {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		log := logf.FromContext(ctx).WithName("watchPatroniEtcdSecrets")
+
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var clusters v2.PerconaPGClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v2.IndexFieldPatroniEtcdSecrets: secret.Name,
+		}, client.InNamespace(secret.Namespace)); err != nil {
+			log.Error(err, "Failed to list clusters by patroni etcd secrets index", "key", client.ObjectKeyFromObject(secret).String())
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for _, cr := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&cr),
+			})
+		}
+		return reqs
+	})
+}
+
 func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, reconcile.Request] {
 	return handler.TypedFuncs[*corev1.Secret, reconcile.Request]{
 		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Secret], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -240,6 +268,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	cr.Default()
 	if err := cr.Validate(); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "validate PerconaPGCluster")
+	}
+
+	if err := r.reconcilePatroniEtcd(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile patroni etcd")
 	}
 
 	if cr.Spec.OpenShift == nil {

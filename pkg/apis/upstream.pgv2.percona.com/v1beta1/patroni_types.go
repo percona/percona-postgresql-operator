@@ -46,14 +46,71 @@ type PatroniSpec struct {
 	// +optional
 	CreateReplicaMethods []CreateReplicaMethod `json:"createReplicaMethods,omitempty"`
 
-	// TODO(cbandy): Add UseConfigMaps bool, default false.
-	// TODO(cbandy): Allow other DCS: etcd, raft, etc?
-	// N.B. changing this will cause downtime.
-	// - https://patroni.readthedocs.io/en/latest/kubernetes.html
+	// DCS configures the distributed configuration store backend.
+	// Defaults to the Kubernetes-native backend (Endpoints).
+	// N.B. Changing the DCS type causes downtime; all instances must restart simultaneously.
+	// +optional
+	DCS *PatroniDCS `json:"dcs,omitempty"`
 
 	// RemoveDataDirectoryOnDivergedTimelines allows controlling remove_data_directory_on_diverged_timelines in Patroni cluster config.
 	// +optional
 	RemoveDataDirectoryOnDivergedTimelines bool `json:"removeDataDirectoryOnDivergedTimelines,omitempty"`
+}
+
+// GetDCS returns the DCS configuration, or nil if unset.
+func (s *PatroniSpec) GetDCS() *PatroniDCS {
+	if s == nil {
+		return nil
+	}
+	return s.DCS
+}
+
+// PatroniDCSType identifies which DCS backend Patroni should use.
+// +kubebuilder:validation:Enum={kubernetes,etcd}
+type PatroniDCSType string
+
+const (
+	PatroniDCSTypeKubernetes PatroniDCSType = "kubernetes"
+	PatroniDCSTypeEtcd       PatroniDCSType = "etcd"
+)
+
+// PatroniDCS configures the Patroni distributed configuration store (DCS).
+// +kubebuilder:validation:XValidation:rule="self.type != 'etcd' || (has(self.etcd) && size(self.etcd.endpoints) > 0)",message="etcd.endpoints must be non-empty when type is etcd"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.type) || oldSelf.type == self.type",message="DCS type is immutable after cluster creation"
+type PatroniDCS struct {
+	// Type of DCS backend. Defaults to "kubernetes".
+	// Changing this value causes cluster downtime; all instances must restart.
+	// This field is immutable after cluster creation.
+	// +optional
+	// +kubebuilder:default=kubernetes
+	Type PatroniDCSType `json:"type,omitempty"`
+
+	// Etcd holds settings for the external etcd DCS backend.
+	// Required when type is "etcd".
+	// +optional
+	Etcd *PatroniEtcdSpec `json:"etcd,omitempty"`
+}
+
+// PatroniEtcdSpec defines connectivity to an external etcd cluster used as DCS.
+// +kubebuilder:validation:XValidation:rule="self.endpoints.all(e, e.startsWith('https://')) || self.endpoints.all(e, e.startsWith('http://'))",message="all endpoints must use the same scheme (http or https)"
+type PatroniEtcdSpec struct {
+	// Endpoints is the list of etcd endpoints including scheme and port.
+	// Example: ["https://etcd.etcd-cluster.svc:2379"]
+	// The scheme of the first endpoint determines the protocol used.
+	// All endpoints must use the same scheme.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:items:Pattern=`^https?://[^/]`
+	Endpoints []string `json:"endpoints"`
+
+	// TLSSecret is the name of a Secret in the same namespace with keys
+	// ca.crt, tls.crt, and tls.key for mutual TLS with etcd.
+	// +optional
+	TLSSecret string `json:"tlsSecret,omitempty"`
+
+	// AuthSecret is the name of a Secret in the same namespace with keys
+	// username and password for etcd authentication.
+	// +optional
+	AuthSecret string `json:"authSecret,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={basebackup,pgbackrest}
