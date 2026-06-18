@@ -34,22 +34,29 @@ import (
 
 // Permissions returns the RBAC rules Patroni needs for cluster.
 func Permissions(cluster *v1beta1.PostgresCluster) []rbacv1.PolicyRule {
-	// TODO(cbandy): This must change when using ConfigMaps for DCS.
-
 	rules := make([]rbacv1.PolicyRule, 0, 4)
 
-	rules = append(rules, rbacv1.PolicyRule{
-		APIGroups: []string{corev1.SchemeGroupVersion.Group},
-		Resources: []string{"endpoints"},
-		Verbs:     []string{"create", "deletecollection", "get", "list", "patch", "watch"},
-	})
+	usingKubernetesDCS := cluster.Spec.Patroni == nil ||
+		cluster.Spec.Patroni.GetDCS() == nil ||
+		cluster.Spec.Patroni.GetDCS().Type != v1beta1.PatroniDCSTypeEtcd
 
-	if cluster.Spec.OpenShift != nil && *cluster.Spec.OpenShift {
+	if usingKubernetesDCS {
+		// When using Endpoints for DCS, "create", "list", "patch", and "watch"
+		// are required. The `patronictl scaffold` and `patronictl remove`
+		// commands require "deletecollection".
 		rules = append(rules, rbacv1.PolicyRule{
 			APIGroups: []string{corev1.SchemeGroupVersion.Group},
-			Resources: []string{"endpoints/restricted"},
-			Verbs:     []string{"create"},
+			Resources: []string{"endpoints"},
+			Verbs:     []string{"create", "deletecollection", "get", "list", "patch", "watch"},
 		})
+
+		if cluster.Spec.OpenShift != nil && *cluster.Spec.OpenShift {
+			rules = append(rules, rbacv1.PolicyRule{
+				APIGroups: []string{corev1.SchemeGroupVersion.Group},
+				Resources: []string{"endpoints/restricted"},
+				Verbs:     []string{"create"},
+			})
+		}
 	}
 
 	rules = append(rules, rbacv1.PolicyRule{
@@ -58,15 +65,17 @@ func Permissions(cluster *v1beta1.PostgresCluster) []rbacv1.PolicyRule {
 		Verbs:     []string{"get", "list", "patch", "watch"},
 	})
 
-	// When using Endpoints for DCS, Patroni tries to create the "{scope}-config" service.
-	// NOTE(cbandy): The PostgresCluster controller already creates this Service;
-	// it might be possible to eliminate this permission if it also created the
-	// Endpoints.
-	rules = append(rules, rbacv1.PolicyRule{
-		APIGroups: []string{corev1.SchemeGroupVersion.Group},
-		Resources: []string{"services"},
-		Verbs:     []string{"create"},
-	})
+	if usingKubernetesDCS {
+		// Patroni tries to create the "{scope}-config" service.
+		// NOTE(cbandy): The PostgresCluster controller already creates this
+		// Service; it might be possible to eliminate this permission if it
+		// also created the Endpoints.
+		rules = append(rules, rbacv1.PolicyRule{
+			APIGroups: []string{corev1.SchemeGroupVersion.Group},
+			Resources: []string{"services"},
+			Verbs:     []string{"create"},
+		})
+	}
 
 	return rules
 }

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1372,19 +1373,10 @@ func TestInstanceEnvironment(t *testing.T) {
 		for _, ev := range etcdVars {
 			names = append(names, ev.Name)
 		}
-		assert.Assert(t, contains(names, "PATRONI_NAME"), "expected PATRONI_NAME")
-		assert.Assert(t, contains(names, "PATRONI_POSTGRESQL_CONNECT_ADDRESS"), "expected PATRONI_POSTGRESQL_CONNECT_ADDRESS")
-		assert.Assert(t, contains(names, "PATRONICTL_CONFIG_FILE"), "expected PATRONICTL_CONFIG_FILE")
+		assert.Assert(t, slices.Contains(names, "PATRONI_NAME"), "expected PATRONI_NAME")
+		assert.Assert(t, slices.Contains(names, "PATRONI_POSTGRESQL_CONNECT_ADDRESS"), "expected PATRONI_POSTGRESQL_CONNECT_ADDRESS")
+		assert.Assert(t, slices.Contains(names, "PATRONICTL_CONFIG_FILE"), "expected PATRONICTL_CONFIG_FILE")
 	})
-}
-
-func contains(slice []string, s string) bool {
-	for _, v := range slice {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }
 
 func TestInstanceYAML(t *testing.T) {

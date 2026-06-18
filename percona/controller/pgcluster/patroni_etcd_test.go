@@ -140,7 +140,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 		assert.ErrorContains(t, err, "ca.crt")
 		events := drainEvents(r)
 		assert.Equal(t, len(events), 1)
-		assert.Assert(t, strings.Contains(events[0], "EtcdTLSSecretNotFound"))
+		assert.Assert(t, strings.Contains(events[0], "EtcdTLSSecretInvalid"))
 	})
 
 	t.Run("auth secret missing emits warning and error", func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 		assert.ErrorContains(t, err, "password")
 		events := drainEvents(r)
 		assert.Equal(t, len(events), 1)
-		assert.Assert(t, strings.Contains(events[0], "EtcdAuthSecretNotFound"))
+		assert.Assert(t, strings.Contains(events[0], "EtcdAuthSecretInvalid"))
 	})
 
 	t.Run("both secrets valid returns nil", func(t *testing.T) {
@@ -209,6 +209,23 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 		})
 		assert.NilError(t, r.reconcilePatroniEtcd(ctx, cr))
 		assert.Equal(t, len(drainEvents(r)), 0)
+	})
+
+	t.Run("both secrets missing reports both in one cycle", func(t *testing.T) {
+		r := newEtcdTestReconciler(t)
+		cr := etcdCR("ns", &v1beta1.PatroniDCS{
+			Type: v1beta1.PatroniDCSTypeEtcd,
+			Etcd: &v1beta1.PatroniEtcdSpec{
+				Endpoints:  []string{"https://etcd:2379"},
+				TLSSecret:  "missing-tls",
+				AuthSecret: "missing-auth",
+			},
+		})
+		err := r.reconcilePatroniEtcd(ctx, cr)
+		assert.ErrorContains(t, err, "missing-tls")
+		assert.ErrorContains(t, err, "missing-auth")
+		events := drainEvents(r)
+		assert.Equal(t, len(events), 2)
 	})
 }
 

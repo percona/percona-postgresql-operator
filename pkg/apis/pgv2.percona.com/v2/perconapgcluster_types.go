@@ -1386,7 +1386,7 @@ var PatroniEtcdSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) [
 		return nil
 	}
 	dcs := cr.Spec.Patroni.GetDCS()
-	if dcs == nil || dcs.Etcd == nil {
+	if dcs == nil || dcs.Type != crunchyv1beta1.PatroniDCSTypeEtcd || dcs.Etcd == nil {
 		return nil
 	}
 	var names []string

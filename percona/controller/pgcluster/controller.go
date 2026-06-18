@@ -106,8 +106,10 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		For(&v2.PerconaPGCluster{}).
 		Owns(&v1beta1.PostgresCluster{}).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Service{}, r.watchServices())).
-		Watches(&corev1.Secret{}, r.watchEnvFromSecrets()).
-		Watches(&corev1.Secret{}, r.watchPatroniEtcdSecrets()).
+		Watches(&corev1.Secret{}, r.watchNamedSecrets(
+			namedSecretIndex{v2.IndexFieldEnvFromSecrets, "watchEnvFromSecrets"},
+			namedSecretIndex{v2.IndexFieldPatroniEtcdSecrets, "watchPatroniEtcdSecrets"},
+		)).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
@@ -168,55 +170,41 @@ func (r *PGClusterReconciler) watchPGBackups() handler.TypedFuncs[*v2.PerconaPGB
 	}
 }
 
-func (r *PGClusterReconciler) watchEnvFromSecrets() handler.TypedEventHandler[client.Object, reconcile.Request] {
-	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		log := logf.FromContext(ctx).WithName("watchEnvFromSecrets")
-
-		secret, ok := obj.(*corev1.Secret)
-		if !ok {
-			return nil
-		}
-
-		var clusters v2.PerconaPGClusterList
-		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
-			v2.IndexFieldEnvFromSecrets: secret.Name,
-		}, client.InNamespace(secret.Namespace)); err != nil {
-			log.Error(err, "Failed to list clusters by env from secrets index failed", "key", client.ObjectKeyFromObject(secret).String())
-			return nil
-		}
-
-		reqs := make([]reconcile.Request, 0, len(clusters.Items))
-		for _, cr := range clusters.Items {
-			reqs = append(reqs, reconcile.Request{
-				NamespacedName: client.ObjectKeyFromObject(&cr),
-			})
-		}
-		return reqs
-	})
+// namedSecretIndex pairs a field index name with a log label for watchNamedSecrets.
+type namedSecretIndex struct {
+	field   string
+	logName string
 }
 
-func (r *PGClusterReconciler) watchPatroniEtcdSecrets() handler.TypedEventHandler[client.Object, reconcile.Request] {
+// watchNamedSecrets returns a single handler that, for each Secret event,
+// queries all provided field indexes and enqueues deduplicated reconcile
+// requests. Using one Watches registration avoids redundant per-event
+// iterations when multiple indexes cover the same Secret GVK.
+func (r *PGClusterReconciler) watchNamedSecrets(indexes ...namedSecretIndex) handler.TypedEventHandler[client.Object, reconcile.Request] {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		log := logf.FromContext(ctx).WithName("watchPatroniEtcdSecrets")
-
 		secret, ok := obj.(*corev1.Secret)
 		if !ok {
 			return nil
 		}
 
-		var clusters v2.PerconaPGClusterList
-		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
-			v2.IndexFieldPatroniEtcdSecrets: secret.Name,
-		}, client.InNamespace(secret.Namespace)); err != nil {
-			log.Error(err, "Failed to list clusters by patroni etcd secrets index", "key", client.ObjectKeyFromObject(secret).String())
-			return nil
-		}
-
-		reqs := make([]reconcile.Request, 0, len(clusters.Items))
-		for _, cr := range clusters.Items {
-			reqs = append(reqs, reconcile.Request{
-				NamespacedName: client.ObjectKeyFromObject(&cr),
-			})
+		seen := make(map[types.NamespacedName]struct{})
+		var reqs []reconcile.Request
+		for _, idx := range indexes {
+			log := logf.FromContext(ctx).WithName(idx.logName)
+			var clusters v2.PerconaPGClusterList
+			if err := r.Client.List(ctx, &clusters,
+				client.MatchingFields{idx.field: secret.Name},
+				client.InNamespace(secret.Namespace)); err != nil {
+				log.Error(err, "list clusters by secret index", "key", client.ObjectKeyFromObject(secret).String())
+				continue
+			}
+			for _, cl := range clusters.Items {
+				key := client.ObjectKeyFromObject(&cl)
+				if _, dup := seen[key]; !dup {
+					seen[key] = struct{}{}
+					reqs = append(reqs, reconcile.Request{NamespacedName: key})
+				}
+			}
 		}
 		return reqs
 	})
@@ -270,10 +258,6 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "validate PerconaPGCluster")
 	}
 
-	if err := r.reconcilePatroniEtcd(ctx, cr); err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "reconcile patroni etcd")
-	}
-
 	if cr.Spec.OpenShift == nil {
 		cr.Spec.OpenShift = &r.IsOpenShift
 	}
@@ -307,6 +291,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.ensureFinalizers(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
+	}
+
+	if err := r.reconcilePatroniEtcd(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile patroni etcd")
 	}
 
 	if err := r.reconcilePatroniVersionCheckPod(ctx, cr); err != nil {

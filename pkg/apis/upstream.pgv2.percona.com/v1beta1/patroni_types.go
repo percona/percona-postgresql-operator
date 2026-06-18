@@ -4,6 +4,7 @@
 
 package v1beta1
 
+// +kubebuilder:validation:XValidation:rule="(has(oldSelf.dcs) ? oldSelf.dcs.type : 'kubernetes') == (has(self.dcs) ? self.dcs.type : 'kubernetes')",message="DCS type is immutable after cluster creation"
 type PatroniSpec struct {
 	// Patroni dynamic configuration settings. Changes to this value will be
 	// automatically reloaded without validation. Changes to certain PostgreSQL
