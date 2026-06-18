@@ -1,0 +1,46 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      PSQL_URI="postgres:$(get_psql_user_pass postgis-pguser-postgres)@$(get_psql_user_host postgis-pguser-postgres)/postgres"
+
+      result=$(run_psql_local \
+        "SELECT left(postgis_version(),1);" \
+        "${PSQL_URI}")
+      if [[ "${result}" != "${POSTGIS_VER:0:1}" ]]; then
+        echo "PostGIS version check failed: expected major version ${POSTGIS_VER:0:1}, got ${result}"
+        exit 1
+      fi
+
+      for schema in tiger tiger_data topology; do
+        result=$(run_psql_local \
+          "SELECT nspname FROM pg_catalog.pg_namespace WHERE nspname='${schema}';" \
+          "${PSQL_URI}")
+        if [[ "${result}" != "${schema}" ]]; then
+          echo "PostGIS schema '${schema}' is missing"
+          exit 1
+        fi
+      done
+
+      result=$(run_psql_local \
+        "SELECT pg_typeof(ST_MakePoint(28.385200,-81.563900));" \
+        "${PSQL_URI}")
+      if [[ "${result}" != "geometry" ]]; then
+        echo "ST_MakePoint check failed: expected 'geometry', got '${result}'"
+        exit 1
+      fi
+
+      result=$(run_psql_local \
+        "SELECT ST_AsGeoJSON('SRID=4326;POINT(-118.4079 33.9434)'::geography);" \
+        "${PSQL_URI}")
+      expected='{"type":"Point","coordinates":[-118.4079,33.9434]}'
+      if [[ "${result}" != "${expected}" ]]; then
+        echo "ST_AsGeoJSON check failed: expected '${expected}', got '${result}'"
+        exit 1
+      fi
