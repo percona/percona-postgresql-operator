@@ -9,7 +9,7 @@ commands:
       source ../../functions
 
       keys=$(kubectl -n "${NAMESPACE}" exec etcd-0 -- \
-        env ETCDCTL_API=3 etcdctl --endpoints=http://localhost:2379 \
+        /usr/local/bin/etcdctl --endpoints=http://localhost:2379 \
         get / --prefix --keys-only)
 
       echo "${keys}"

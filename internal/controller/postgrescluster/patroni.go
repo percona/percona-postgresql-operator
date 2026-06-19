@@ -336,28 +336,34 @@ func (r *Reconciler) reconcilePatroniStatus(
 		}
 	}
 
-	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
-	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
+	// When using an external etcd DCS, Patroni writes the "initialize" value to etcd rather
+	// than to a Kubernetes Endpoints object. Skip the Kubernetes Endpoints lookup in that case.
+	if patroniDCS := cluster.Spec.Patroni.GetDCS(); patroniDCS == nil || patroniDCS.Type != v1beta1.PatroniDCSTypeEtcd {
+		dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
+		err := errors.WithStack(client.IgnoreNotFound(
+			r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
 
-	if err == nil {
-		if dcs.Annotations["initialize"] != "" {
-			// After bootstrap, Patroni writes the cluster system identifier to DCS.
-			cluster.Status.Patroni.SystemIdentifier = dcs.Annotations["initialize"]
-		} else if readyInstance {
-			// While we typically expect a value for the initialize key to be present in the
-			// Endpoints above by the time the StatefulSet for any instance indicates "ready"
-			// (since Patroni writes this value after successful cluster bootstrap, at which time
-			// the initial primary should transition to "ready"), sometimes this is not the case
-			// and the "initialize" key is not yet present.  Therefore, if a "ready" instance
-			// is detected in the cluster we assume this is the case, and simply log a message and
-			// requeue in order to try again until the expected value is found.
-			log.Info("detected ready instance but no initialize value")
-			requeue = time.Second
+		if err == nil {
+			if dcs.Annotations["initialize"] != "" {
+				// After bootstrap, Patroni writes the cluster system identifier to DCS.
+				cluster.Status.Patroni.SystemIdentifier = dcs.Annotations["initialize"]
+			} else if readyInstance {
+				// While we typically expect a value for the initialize key to be present in the
+				// Endpoints above by the time the StatefulSet for any instance indicates "ready"
+				// (since Patroni writes this value after successful cluster bootstrap, at which time
+				// the initial primary should transition to "ready"), sometimes this is not the case
+				// and the "initialize" key is not yet present.  Therefore, if a "ready" instance
+				// is detected in the cluster we assume this is the case, and simply log a message and
+				// requeue in order to try again until the expected value is found.
+				log.Info("detected ready instance but no initialize value")
+				requeue = time.Second
+			}
 		}
+
+		return requeue, err
 	}
 
-	return requeue, err
+	return requeue, nil
 }
 
 // reconcileReplicationSecret creates a secret containing the TLS
