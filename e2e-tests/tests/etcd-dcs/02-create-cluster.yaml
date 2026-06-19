@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      ETCD_ENDPOINT="http://etcd-0.etcd.${NAMESPACE}.svc:2379"
+
+      get_cr \
+        | yq eval '
+            .spec.proxy.pgBouncer.replicas=1 |
+            .spec.instances[].replicas=1' - \
+        | yq eval '.spec.patroni.dcs.type = "etcd"' - \
+        | yq eval ".spec.patroni.dcs.etcd.endpoints = [\"${ETCD_ENDPOINT}\"]" - \
+        | kubectl -n "${NAMESPACE}" apply -f -
