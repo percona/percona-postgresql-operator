@@ -19,7 +19,7 @@ metadata:
     postgres-operator.crunchydata.com/cluster: etcd-dcs
     postgres-operator.crunchydata.com/cluster-certificate: replication-client-tls
   name: etcd-dcs-replication-cert
-type: Opaque
+type: kubernetes.io/tls
 ---
 apiVersion: v1
 kind: Secret
@@ -58,17 +58,13 @@ metadata:
     postgres-operator.crunchydata.com/cluster: etcd-dcs
     postgres-operator.crunchydata.com/cluster-certificate: postgres-tls
   name: etcd-dcs-cluster-cert
-type: Opaque
+type: kubernetes.io/tls
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: etcd-dcs-cluster-ca-cert
-  ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v1beta1
-    kind: PostgresCluster
-    name: etcd-dcs
-type: Opaque
+type: kubernetes.io/tls
 ---
 apiVersion: v1
 kind: ConfigMap
