@@ -1,8 +1,10 @@
 #!/bin/bash
-# Patroni on_role_change callback.
-# Called by Patroni as: <script> on_role_change <role> <scope>
-# Patches this pod's role label so Kubernetes Services can route correctly
-# when etcd is the DCS (Patroni does not update pod labels in this case).
+# Patroni on_role_change / on_start callback.
+# Called by Patroni as: <script> <event> <role> <scope>
+# With etcd DCS, Patroni does not update pod labels or annotations.
+# This script patches both so that:
+#   - Service selectors work (role label)
+#   - IsWritable() works (status annotation read by the operator)
 
 ROLE=${2}
 
@@ -17,9 +19,11 @@ case "${ROLE}" in
     *)               LABEL="${ROLE}" ;;
 esac
 
+PATCH_BODY="{\"metadata\":{\"labels\":{\"postgres-operator.crunchydata.com/role\":\"${LABEL}\"},\"annotations\":{\"status\":\"{\\\"role\\\":\\\"${LABEL}\\\"}\"}}}"
+
 curl -sf -X PATCH \
     --cacert "${CA}" \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/strategic-merge-patch+json" \
     "https://kubernetes.default.svc/api/v1/namespaces/${NAMESPACE}/pods/${POD}" \
-    -d "{\"metadata\":{\"labels\":{\"postgres-operator.crunchydata.com/role\":\"${LABEL}\"}}}"
+    -d "${PATCH_BODY}"
