@@ -214,3 +214,35 @@ func (exec Executor) GetTimeline(ctx context.Context) (int64, error) {
 
 	return 0, err
 }
+
+// GetLeaderName returns the pod name of the current Patroni leader by calling
+// "patronictl list". This is used when the Kubernetes DCS is not in use (e.g.
+// when etcd is the DCS), since in that case Patroni does not update pod
+// annotations or labels with the member role.
+// Returns an empty string when no running leader is found.
+func (exec Executor) GetLeaderName(ctx context.Context) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	err := exec(ctx, nil, &stdout, &stderr,
+		"patronictl", "list", "--format", "json")
+	if err != nil {
+		return "", err
+	}
+
+	var members []struct {
+		Name  string `json:"Member"`
+		Role  string `json:"Role"`
+		State string `json:"State"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &members); err != nil {
+		return "", err
+	}
+
+	for _, member := range members {
+		if member.Role == "Leader" && member.State == "running" {
+			return member.Name, nil
+		}
+	}
+
+	return "", nil
+}
