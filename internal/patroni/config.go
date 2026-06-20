@@ -177,6 +177,12 @@ func clusterYAML(
 			etcd3["key"] = path.Join(configDirectory, "etcd-tls", "tls.key")
 		}
 		root["etcd3"] = etcd3
+
+		// With etcd DCS, Patroni does not update pod labels. Use a callback to
+		// patch the role label on each role change so Service selectors keep working.
+		root["postgresql"].(map[string]any)["callbacks"] = map[string]any{
+			"on_role_change": "/opt/crunchy/bin/patroni-role-change.sh",
+		}
 	} else {
 		// Use Kubernetes Endpoints for the distributed configuration store (DCS).
 		//

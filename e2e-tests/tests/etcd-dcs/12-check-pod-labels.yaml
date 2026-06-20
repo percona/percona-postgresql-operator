@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # With etcd DCS, Patroni does not set pod role labels itself.
+      # The on_role_change callback script does. Verify it ran.
+      primary_pods=$(kubectl -n "${NAMESPACE}" get pods \
+        -l postgres-operator.crunchydata.com/cluster=etcd-dcs,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[*].metadata.name}')
+
+      if [ -z "${primary_pods}" ]; then
+        echo "ERROR: no pod with role=primary label found; on_role_change callback may not have run"
+        exit 1
+      fi
+
+      echo "OK: primary pod(s) with role label: ${primary_pods}"

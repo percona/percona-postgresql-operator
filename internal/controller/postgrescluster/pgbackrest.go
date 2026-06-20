@@ -2989,33 +2989,6 @@ func (r *Reconciler) reconcileStanzaCreate(ctx context.Context,
 		}
 	}
 
-	// When using etcd DCS, Patroni does not update pod annotations or labels
-	// with the member role, so IsWritable() will never return true. Fall back
-	// to querying patronictl in a running instance pod.
-	if !clusterWritable {
-		if dcs := postgresCluster.Spec.Patroni.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd {
-			for _, instance := range instances.forCluster {
-				if terminating, known := instance.IsTerminating(); terminating || !known {
-					continue
-				}
-				if running, known := instance.IsRunning(naming.ContainerDatabase); !running || !known {
-					continue
-				}
-				candidatePod := instance.Name + "-0"
-				tryExec := func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
-					return r.PodExec(ctx, postgresCluster.GetNamespace(), candidatePod, naming.ContainerDatabase, stdin, stdout, stderr, command...)
-				}
-				leaderName, err := patroni.Executor(tryExec).GetLeaderName(ctx)
-				if err != nil || leaderName == "" {
-					continue
-				}
-				clusterWritable = true
-				writableInstanceName = leaderName
-				break
-			}
-		}
-	}
-
 	stanzasCreated := true
 	for _, repoStatus := range postgresCluster.Status.PGBackRest.Repos {
 		if !repoStatus.StanzaCreated {
