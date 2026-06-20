@@ -178,9 +178,12 @@ func clusterYAML(
 		}
 		root["etcd3"] = etcd3
 
-		// With etcd DCS, Patroni does not update pod labels. Use a callback to
-		// patch the role label on each role change so Service selectors keep working.
+		// With etcd DCS, Patroni does not update pod labels. Use callbacks to
+		// patch the role label on start and on each role change so Service
+		// selectors keep working. on_start covers pod restarts where the role
+		// does not change; on_role_change covers failovers.
 		root["postgresql"].(map[string]any)["callbacks"] = map[string]any{
+			"on_start":       "/opt/crunchy/bin/patroni-role-change.sh",
 			"on_role_change": "/opt/crunchy/bin/patroni-role-change.sh",
 		}
 	} else {

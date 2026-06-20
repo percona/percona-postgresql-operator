@@ -14,6 +14,7 @@ commands:
       echo "${patroni_yaml}" | grep -q "etcd3:"
       echo "${patroni_yaml}" | grep -q "protocol: http"
       echo "${patroni_yaml}" | grep -q "callbacks:"
+      echo "${patroni_yaml}" | grep -q "on_start: /opt/crunchy/bin/patroni-role-change.sh"
       echo "${patroni_yaml}" | grep -q "on_role_change: /opt/crunchy/bin/patroni-role-change.sh"
 
       if echo "${patroni_yaml}" | grep -q "kubernetes:"; then
