@@ -100,6 +100,7 @@ type PatroniEtcdSpec struct {
 	// The scheme of the first endpoint determines the protocol used.
 	// All endpoints must use the same scheme.
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=7
 	// +kubebuilder:validation:items:Pattern=`^https?://[^/]`
 	Endpoints []string `json:"endpoints"`
 
