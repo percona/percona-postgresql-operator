@@ -145,6 +145,11 @@ func (r *Reconciler) handlePatroniRestarts(
 func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) error {
+	// With etcd DCS, Patroni stores distributed configuration in etcd, not k8s Endpoints.
+	if dcs := cluster.Spec.Patroni.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd {
+		return nil
+	}
+
 	// When using Endpoints for DCS, Patroni needs a Service to ensure that the
 	// Endpoints object is not removed by Kubernetes at startup. Patroni will
 	// create this object if it has permission to do so, but it won't set any
@@ -308,6 +313,11 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 func (r *Reconciler) reconcilePatroniLeaderLease(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) (*corev1.Service, error) {
+	// With etcd DCS, Patroni does not use k8s Endpoints for leader elections.
+	if dcs := cluster.Spec.Patroni.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd {
+		return nil, nil
+	}
+
 	// When using Endpoints for DCS, Patroni needs a Service to ensure that the
 	// Endpoints object is not removed by Kubernetes at startup.
 	// - https://releases.k8s.io/v1.16.0/pkg/controller/endpoint/endpoints_controller.go#L547

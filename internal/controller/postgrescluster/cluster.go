@@ -122,6 +122,24 @@ func (r *Reconciler) generateClusterPrimaryService(
 	service.ObjectMeta.DeepCopyInto(&endpoints.ObjectMeta)
 	endpoints.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Endpoints"))
 
+	// With etcd DCS, Patroni does not manage k8s Endpoints for leader election.
+	// Use a label-selector service instead: pods labeled role=primary by the
+	// on_role_change/on_start callback receive primary traffic directly.
+	if dcs := cluster.Spec.Patroni.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd {
+		service.Spec.Type = corev1.ServiceTypeClusterIP
+		service.Spec.Selector = map[string]string{
+			naming.LabelCluster: cluster.Name,
+			naming.LabelRole:    naming.RolePatroniLeader,
+		}
+		service.Spec.Ports = []corev1.ServicePort{{
+			Name:       naming.PortPostgreSQL,
+			Port:       *cluster.Spec.Port,
+			Protocol:   corev1.ProtocolTCP,
+			TargetPort: intstr.FromString(naming.PortPostgreSQL),
+		}}
+		return service, nil, err
+	}
+
 	if leader == nil {
 		// TODO(cbandy): We need to build a different kind of Service here.
 		return nil, nil, errors.New("Patroni DCS other than Kubernetes Endpoints is not implemented")
@@ -176,7 +194,7 @@ func (r *Reconciler) reconcileClusterPrimaryService(
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, service))
 	}
-	if err == nil {
+	if err == nil && endpoints != nil {
 		err = errors.WithStack(r.apply(ctx, endpoints))
 	}
 	return service, err

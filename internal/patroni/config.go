@@ -398,17 +398,20 @@ func instanceEnvironment(
 	)
 
 	// Gather Endpoint ports for any Container ports that match the leader
-	// Service definition.
+	// Service definition. leaderService is nil when using etcd DCS (no k8s
+	// leader Endpoints), in which case the ports list stays empty.
 	ports := []corev1.EndpointPort{}
-	for _, sp := range leaderService.Spec.Ports {
-		for i := range podContainers {
-			for _, cp := range podContainers[i].Ports {
-				if sp.TargetPort.StrVal == cp.Name {
-					ports = append(ports, corev1.EndpointPort{
-						Name:     sp.Name,
-						Port:     cp.ContainerPort,
-						Protocol: cp.Protocol,
-					})
+	if leaderService != nil {
+		for _, sp := range leaderService.Spec.Ports {
+			for i := range podContainers {
+				for _, cp := range podContainers[i].Ports {
+					if sp.TargetPort.StrVal == cp.Name {
+						ports = append(ports, corev1.EndpointPort{
+							Name:     sp.Name,
+							Port:     cp.ContainerPort,
+							Protocol: cp.Protocol,
+						})
+					}
 				}
 			}
 		}
