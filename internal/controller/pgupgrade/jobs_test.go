@@ -255,10 +255,13 @@ status: {}
 		// Verify the job name fits within DNS limits and has the correct format
 		assert.Assert(t, len(longJob.Name) <= 63, "job name %q exceeds 63 characters", longJob.Name)
 		assert.Assert(t, len(longJob.Name) == 63, "truncated job name %q should be exactly 63 characters", longJob.Name)
-		// Verify the name ends with a dash followed by 4 alphanumeric characters (the random suffix)
+		// Verify the name ends with a dash followed by 4 alphanumeric characters (the deterministic suffix)
 		// Pattern: <prefix>-<4 alphanumeric chars>
 		assert.Assert(t, regexp.MustCompile(`-[a-zA-Z0-9]{4}$`).MatchString(longJob.Name),
 			"job name %q should end with -<4 alphanumeric chars>", longJob.Name)
+		// Verify the suffix is deterministic (same input always produces same output)
+		longJob2 := reconciler.generateUpgradeJob(ctx, longNameUpgrade, startup, "")
+		assert.Assert(t, longJob.Name == longJob2.Name, "job name should be deterministic: %q vs %q", longJob.Name, longJob2.Name)
 	})
 
 	t.Run(feature.PGUpgradeCPUConcurrency+"Enabled", func(t *testing.T) {

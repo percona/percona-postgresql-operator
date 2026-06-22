@@ -251,10 +251,11 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Get the status version and check the jobs to see if this upgrade has completed
 	statusVersion := int64(world.Cluster.Status.PostgresVersion)
 
-	// Find the upgrade job by its role label
+	// Find the upgrade job by its role and PGUpgrade name labels
 	var upgradeJob *batchv1.Job
 	for _, job := range world.Jobs {
-		if job.GetLabels()[LabelRole] == pgUpgrade {
+		if job.GetLabels()[LabelRole] == pgUpgrade &&
+			job.GetLabels()[LabelPGUpgrade] == upgrade.Name {
 			upgradeJob = job
 			break
 		}
@@ -268,7 +269,8 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	var removeDataJobsFailed bool
 	var removeDataJobsCompleted []*batchv1.Job
 	for _, job := range world.Jobs {
-		if job.GetLabels()[LabelRole] == removeData {
+		if job.GetLabels()[LabelRole] == removeData &&
+			job.GetLabels()[LabelPGUpgrade] == upgrade.Name {
 			if jobCompleted(job) {
 				removeDataJobsCompleted = append(removeDataJobsCompleted, job)
 			} else if jobFailed(job) {
