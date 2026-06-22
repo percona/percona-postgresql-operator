@@ -12,7 +12,42 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
+
+// maxDNSSafeLength is the maximum length for a Kubernetes DNS-1123 label (63 characters).
+// This is the universal limit for resource names that get used in DNS.
+// https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names
+const maxDNSSafeLength = 63
+
+// SafeDNSName truncates a name to fit within the Kubernetes DNS-1123 label limit of 63 characters.
+// It also ensures the name doesn't end with a hyphen, which is invalid for DNS labels.
+// This should be used for any resource name that may be used in DNS (Pods, Services, Jobs, etc.).
+func SafeDNSName(name string) string {
+	if len(name) <= maxDNSSafeLength {
+		return name
+	}
+	name = name[:maxDNSSafeLength]
+	// Strip trailing hyphens which are invalid in DNS labels
+	return strings.TrimRight(name, "-")
+}
+
+// SafeDNSUniqueName ensures the name fits within the 63-character DNS-1123 label limit.
+// If the name exceeds the limit, it truncates to 58 characters and appends a 4-character
+// random suffix (e.g., "-a1b2") to maintain uniqueness.
+// It also ensures the name doesn't end with a hyphen, which is invalid for DNS labels.
+// This is useful for resources that need unique names like Jobs or Pods.
+func SafeDNSUniqueName(name string) string {
+	if len(name) <= maxDNSSafeLength {
+		return name
+	}
+
+	// Reserve 5 characters for the dash + 4 random chars
+	name = name[:maxDNSSafeLength-5]
+	// Strip trailing hyphens from the truncated prefix
+	name = strings.TrimRight(name, "-")
+	return name + "-" + rand.String(4)
+}
 
 // InstancePodDNSNames returns the possible DNS names for instance. The first
 // name is the fully qualified domain name (FQDN).

@@ -250,7 +250,16 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Get the status version and check the jobs to see if this upgrade has completed
 	statusVersion := int64(world.Cluster.Status.PostgresVersion)
-	upgradeJob := world.Jobs[pgUpgradeJob(upgrade).Name]
+
+	// Find the upgrade job by its role label
+	var upgradeJob *batchv1.Job
+	for _, job := range world.Jobs {
+		if job.GetLabels()[LabelRole] == pgUpgrade {
+			upgradeJob = job
+			break
+		}
+	}
+
 	upgradeJobComplete := upgradeJob != nil &&
 		jobCompleted(upgradeJob)
 	upgradeJobFailed := upgradeJob != nil &&
@@ -502,7 +511,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func setStatusToProgressingIfReasonWas(reason string, upgrade *v1beta1.PGUpgrade) {
 	progressing := meta.FindStatusCondition(upgrade.Status.Conditions,
 		ConditionPGUpgradeProgressing)
-	if progressing == nil || (progressing != nil && progressing.Reason == reason) {
+	if progressing == nil || progressing.Reason == reason {
 		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
 			ObservedGeneration: upgrade.GetGeneration(),
 			Type:               ConditionPGUpgradeProgressing,
