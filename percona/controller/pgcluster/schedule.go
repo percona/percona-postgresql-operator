@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
@@ -138,10 +139,27 @@ func (r *PGClusterReconciler) createScheduledBackup(log logr.Logger, backupName,
 		pb.Labels = cr.Spec.Metadata.Labels
 	}
 
-	err := r.Client.Create(ctx, pb)
-	if err != nil {
+	if pb.Labels == nil {
+		pb.Labels = make(map[string]string)
+	}
+	pb.Labels[pNaming.LabelBackupSource] = pNaming.LabelBackupSourceScheduled
+
+	if err := r.Client.Create(ctx, pb); err != nil {
+		if statusErr := r.setScheduledBackupDegraded(ctx, cr, err.Error()); statusErr != nil {
+			log.Error(statusErr, "failed to set ScheduledBackupDegraded condition")
+		}
 		return errors.Wrapf(err, "failed to create PerconaPGBackup %s", backupName)
 	}
+
+	// Clear BackupCreationFailed if that was the previous reason.
+	// Don't clear BackupFailed — that's resolved by the backup completion handler.
+	cond := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionScheduledBackupDegraded)
+	if cond != nil && cond.Reason == "BackupCreationFailed" {
+		if err := r.clearScheduledBackupDegraded(ctx, cr); err != nil {
+			log.Error(err, "failed to clear ScheduledBackupDegraded condition")
+		}
+	}
+
 	return nil
 }
 
@@ -222,4 +240,28 @@ func (r *PGClusterReconciler) reconcileScheduledSnapshots(
 	}
 
 	return nil
+}
+
+func (r *PGClusterReconciler) setScheduledBackupDegraded(ctx context.Context, cr *v2.PerconaPGCluster, msg string) error {
+	orig := cr.DeepCopy()
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:               pNaming.ConditionScheduledBackupDegraded,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: cr.Generation,
+		Reason:             "BackupCreationFailed",
+		Message:            msg,
+	})
+	return r.Client.Status().Patch(ctx, cr, client.MergeFrom(orig))
+}
+
+func (r *PGClusterReconciler) clearScheduledBackupDegraded(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	orig := cr.DeepCopy()
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:               pNaming.ConditionScheduledBackupDegraded,
+		Status:             metav1.ConditionFalse,
+		ObservedGeneration: cr.Generation,
+		Reason:             "BackupCreationRecovered",
+		Message:            "Backup creation succeeded on retry",
+	})
+	return r.Client.Status().Patch(ctx, cr, client.MergeFrom(orig))
 }

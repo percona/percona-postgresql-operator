@@ -251,6 +251,19 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		log.Info("Backup is starting", "backup", pgBackup.Name, "cluster", pgCluster.Name)
 		return reconcile.Result{}, nil
 	case v2.BackupStarting:
+		// Fail if the Job hasn't appeared within 10 minutes.
+		// Once the Job exists, activeDeadlineSeconds (from BackupJobs config) handles runtime timeout.
+		if time.Since(pgBackup.CreationTimestamp.Time) > 10*time.Minute {
+			log.Info("Backup timed out waiting for job to start")
+			if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
+				bcp.Status.State = v2.BackupFailed
+				bcp.Status.Error = "timed out waiting for job to start (timeout: 10m)"
+			}); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+			}
+			return reconcile.Result{}, nil
+		}
+
 		if pgCluster == nil {
 			return reconcile.Result{}, errors.Errorf("PostgresCluster %s is not found", pgBackup.Spec.PGCluster)
 		}
@@ -341,6 +354,14 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			bcp.Status.State = status
 		}); err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
+		}
+
+		// Update the cluster's ScheduledBackupDegraded condition when a
+		// scheduled backup reaches a terminal state.
+		if pgCluster != nil && pgBackup.Labels[pNaming.LabelBackupSource] == pNaming.LabelBackupSourceScheduled {
+			if err := r.updateClusterBackupCondition(ctx, pgCluster, status); err != nil {
+				log.Error(err, "failed to update cluster ScheduledBackupDegraded condition")
+			}
 		}
 
 		return reconcile.Result{}, nil
@@ -980,4 +1001,28 @@ func (r *PGBackupReconciler) handleLease(
 		return false, errors.Wrap(err, "failed to acquire lease")
 	}
 	return acquired, nil
+}
+
+func (r *PGBackupReconciler) updateClusterBackupCondition(
+	ctx context.Context, pgCluster *v2.PerconaPGCluster, status v2.PGBackupState,
+) error {
+	orig := pgCluster.DeepCopy()
+	if status == v2.BackupFailed {
+		meta.SetStatusCondition(&pgCluster.Status.Conditions, metav1.Condition{
+			Type:               pNaming.ConditionScheduledBackupDegraded,
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: pgCluster.Generation,
+			Reason:             "BackupFailed",
+			Message:            "Latest scheduled backup failed",
+		})
+	} else {
+		meta.SetStatusCondition(&pgCluster.Status.Conditions, metav1.Condition{
+			Type:               pNaming.ConditionScheduledBackupDegraded,
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: pgCluster.Generation,
+			Reason:             "BackupCompleted",
+			Message:            "Latest scheduled backup completed",
+		})
+	}
+	return r.Client.Status().Patch(ctx, pgCluster, client.MergeFrom(orig))
 }
