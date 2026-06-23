@@ -42,6 +42,8 @@ func SafeDNSName(name string) string {
 // It also ensures the name doesn't end with a hyphen, which is invalid for DNS labels.
 // This is useful for resources that need unique names like Jobs or Pods.
 func SafeDNSUniqueName(name string) string {
+	// Strip trailing hyphens which are invalid in DNS labels
+	name = strings.TrimRight(name, "-")
 	if len(name) <= maxDNSSafeLength {
 		return name
 	}
@@ -51,7 +53,7 @@ func SafeDNSUniqueName(name string) string {
 	// Strip trailing hyphens from the truncated prefix
 	prefix = strings.TrimRight(prefix, "-")
 
-	// Use a deterministic suffix based on the full name (not random!)
+	// Use a deterministic suffix based on the cleaned name (not random!)
 	// This ensures the same name always produces the same output across reconciles
 	hash := fnv.New32a()
 	hash.Write([]byte(name))
