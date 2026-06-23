@@ -505,7 +505,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 }
 
 func (cr *PerconaPGCluster) Version() *gover.Version {
-	return gover.Must(gover.NewVersion(cr.Spec.CRVersion))
+	crVersion := cr.Spec.CRVersion
+	if crVersion == "" {
+		crVersion = version.Version()
+	}
+	return gover.Must(gover.NewVersion(crVersion))
 }
 
 func (cr *PerconaPGCluster) CompareVersion(ver string) int {
