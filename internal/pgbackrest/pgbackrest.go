@@ -107,3 +107,62 @@ fi
 
 	return false, nil
 }
+
+// ArchivePushHistoryFiles pushes any timeline history files (*.history) found
+// in pg_wal to the pgBackRest archive synchronously.
+//
+// During a dataSource bootstrap restore, postgres promotes from TL1 to TL2 and
+// immediately hands 00000002.history to archive_command.  pgBackRest's async
+// archiver silently drops the push when archive.info does not yet exist (error
+// 103), and postgres never retries.  Without 00000002.history in the archive,
+// pg_rewind on replicas fails after any subsequent PITR restore.
+//
+// Calling this method right after stanza-create recovers any such stranded
+// files.  The combined stdout+stderr is returned for structured logging.
+func (exec Executor) ArchivePushHistoryFiles(ctx context.Context) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	const script = `
+set -eu
+
+if [ -z "${PGDATA:-}" ]; then
+    echo "PGDATA is not set; skipping history file recovery" >&2
+    exit 0
+fi
+
+# Use -L so find follows the pg_wal symlink ($PGDATA/pg_wal -> /pgdata/<cluster>_wal).
+# Use a temp file to avoid running the push loop in a subshell where set -e is ineffective.
+tmplist=$(mktemp)
+find -L "${PGDATA}/pg_wal" -maxdepth 1 -name '*.history' 2>/dev/null | sort > "${tmplist}"
+
+if [ ! -s "${tmplist}" ]; then
+    rm -f "${tmplist}"
+    exit 0
+fi
+
+echo "history files to push:"
+cat "${tmplist}"
+
+push_failed=0
+while IFS= read -r f; do
+    if pgbackrest --stanza=db --log-level-console=info archive-push --no-archive-async "${f}"; then
+        echo "pushed ${f}"
+    else
+        echo "FAILED to push ${f}" >&2
+        push_failed=1
+    fi
+done < "${tmplist}"
+rm -f "${tmplist}"
+
+[ "${push_failed}" -eq 0 ] || exit 1
+`
+	err := exec(ctx, nil, &stdout, &stderr, "bash", "-ceu", "--", script)
+	combined := stdout.String()
+	if s := stderr.String(); s != "" {
+		combined += "\nstderr: " + s
+	}
+	if err != nil {
+		return combined, errors.Wrap(err, combined)
+	}
+	return combined, nil
+}
