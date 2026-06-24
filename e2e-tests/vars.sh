@@ -38,13 +38,14 @@ else
 	export PG_VER="${PG_VER:-18}"
 fi
 
+PG_DISTRIBUTION='community'
 export PG_DISTRIBUTION="${PG_DISTRIBUTION:-}"
 
 if [[ $PG_DISTRIBUTION == "community" ]]; then
-	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer-community"}
-	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-postgres${PG_VER}-community"}
-	export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest-community"}
-	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade-community"}
+	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-ubi8-pgbouncer-community"}
+	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ubi8-postgres${PG_VER}-community-ubi8"}
+	export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-ubi8-pgbackrest-community"}
+	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-ubi8-upgrade-community-ubi8"}
 else
 	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
 	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
