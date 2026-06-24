@@ -52,7 +52,7 @@ type PerconaPGCluster struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
-// +kubebuilder:validation:XValidation:rule="!has(self.crVersion) || self.crVersion == '' || self.crVersion.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9.+-]+)?$')",message="CRVersion must be a valid semantic version"
+// +kubebuilder:validation:XValidation:rule="!has(self.crVersion) || self.crVersion == \"\" || self.crVersion.matches('^[0-9]+\\\\.[0-9]+\\\\.[0-9]+(-[a-zA-Z0-9.+-]+)?$')",message="CRVersion must be a valid semantic version"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`

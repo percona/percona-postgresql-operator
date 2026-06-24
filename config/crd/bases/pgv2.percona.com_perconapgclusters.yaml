@@ -29473,6 +29473,8 @@ spec:
                 and is true
               rule: '!has(self.users) || self.postgresVersion >= 15 || self.users.all(u,
                 !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)'
+            - message: CRVersion must be a valid semantic version
+              rule: '!has(self.crVersion) || self.crVersion == "" || self.crVersion.matches(''^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9.+-]+)?$'')'
           status:
             properties:
               conditions:
