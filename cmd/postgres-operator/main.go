@@ -38,6 +38,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/percona/config/images"
 	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgcluster"
@@ -123,6 +124,15 @@ func main() {
 		options,
 	)
 	assertNoError(err)
+
+	// Initialize image configuration
+	log.Info("Initializing image configuration")
+	if err := images.InitializeGlobalConfig(ctx, mgr.GetClient()); err != nil {
+		log.Error(err, "Failed to initialize image configuration, using embedded defaults")
+		images.SetGlobalConfig(images.DefaultConfig)
+	} else {
+		log.Info("Image configuration initialized successfully")
+	}
 
 	// Add Percona custom resource types to scheme
 	assertNoError(v2.AddToScheme(mgr.GetScheme()))
