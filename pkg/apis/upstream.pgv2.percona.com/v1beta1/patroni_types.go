@@ -66,6 +66,11 @@ func (s *PatroniSpec) GetDCS() *PatroniDCS {
 	return s.DCS
 }
 
+// GetDCS returns the DCS configuration for the cluster, or nil if unset.
+func (c *PostgresCluster) GetDCS() *PatroniDCS {
+	return c.Spec.Patroni.GetDCS()
+}
+
 // PatroniDCSType identifies which DCS backend Patroni should use.
 // +kubebuilder:validation:Enum={kubernetes,etcd}
 type PatroniDCSType string

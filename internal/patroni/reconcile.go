@@ -138,52 +138,50 @@ func InstancePod(ctx context.Context,
 	})
 
 	// Mount etcd TLS Secret and inject auth env vars when the etcd DCS backend is configured.
-	if p := inCluster.Spec.Patroni; p != nil {
-		if dcs := p.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd && dcs.Etcd != nil {
-			etcd := dcs.Etcd
+	if dcs := inCluster.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd && dcs.Etcd != nil {
+		etcd := dcs.Etcd
 
-			if etcd.TLSSecret != "" {
-				etcdTLSVol := corev1.Volume{
-					Name: "patroni-etcd-tls",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName:  etcd.TLSSecret,
-							DefaultMode: ptr.To(int32(0o400)),
-						},
+		if etcd.TLSSecret != "" {
+			etcdTLSVol := corev1.Volume{
+				Name: "patroni-etcd-tls",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName:  etcd.TLSSecret,
+						DefaultMode: ptr.To(int32(0o400)),
 					},
-				}
-				outInstancePod.Spec.Volumes = append(outInstancePod.Spec.Volumes, etcdTLSVol)
-				container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-					Name:      "patroni-etcd-tls",
-					MountPath: path.Join(configDirectory, "etcd-tls"),
-					ReadOnly:  true,
-				})
+				},
 			}
+			outInstancePod.Spec.Volumes = append(outInstancePod.Spec.Volumes, etcdTLSVol)
+			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+				Name:      "patroni-etcd-tls",
+				MountPath: path.Join(configDirectory, "etcd-tls"),
+				ReadOnly:  true,
+			})
+		}
 
-			if etcd.AuthSecret != "" {
-				// Patroni reads PATRONI_ETCD3_USERNAME and PATRONI_ETCD3_PASSWORD
-				// as overrides for etcd3.username and etcd3.password in the config.
-				container.Env = append(container.Env,
-					corev1.EnvVar{
-						Name: "PATRONI_ETCD3_USERNAME",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: etcd.AuthSecret},
-								Key:                  "username",
-							},
+		if etcd.AuthSecret != "" {
+			// Patroni reads PATRONI_ETCD3_USERNAME and PATRONI_ETCD3_PASSWORD
+			// as overrides for etcd3.username and etcd3.password in the config.
+			container.Env = append(container.Env,
+				corev1.EnvVar{
+					Name: "PATRONI_ETCD3_USERNAME",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: etcd.AuthSecret},
+							Key:                  "username",
 						},
 					},
-					corev1.EnvVar{
-						Name: "PATRONI_ETCD3_PASSWORD",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: etcd.AuthSecret},
-								Key:                  "password",
-							},
+				},
+				corev1.EnvVar{
+					Name: "PATRONI_ETCD3_PASSWORD",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: etcd.AuthSecret},
+							Key:                  "password",
 						},
 					},
-				)
-			}
+				},
+			)
 		}
 	}
 

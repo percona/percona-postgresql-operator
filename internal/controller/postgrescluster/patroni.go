@@ -146,7 +146,7 @@ func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) error {
 	// With etcd DCS, Patroni stores distributed configuration in etcd, not k8s Endpoints.
-	if dcs := cluster.Spec.Patroni.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd {
+	if dcs := cluster.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd {
 		return nil
 	}
 
@@ -314,7 +314,7 @@ func (r *Reconciler) reconcilePatroniLeaderLease(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) (*corev1.Service, error) {
 	// With etcd DCS, Patroni does not use k8s Endpoints for leader elections.
-	if dcs := cluster.Spec.Patroni.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd {
+	if dcs := cluster.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd {
 		return nil, nil
 	}
 
@@ -348,7 +348,7 @@ func (r *Reconciler) reconcilePatroniStatus(
 
 	// When using an external etcd DCS, Patroni writes the "initialize" value to etcd rather
 	// than to a Kubernetes Endpoints object. Skip the Kubernetes Endpoints lookup in that case.
-	if patroniDCS := cluster.Spec.Patroni.GetDCS(); patroniDCS == nil || patroniDCS.Type != v1beta1.PatroniDCSTypeEtcd {
+	if patroniDCS := cluster.GetDCS(); patroniDCS == nil || patroniDCS.Type != v1beta1.PatroniDCSTypeEtcd {
 		dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
 		err := errors.WithStack(client.IgnoreNotFound(
 			r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
