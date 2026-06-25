@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # Attempt to change the DCS type from etcd to kubernetes after cluster creation.
+      # The CRD CEL validation rule must reject this with "DCS type is immutable after cluster creation".
+      rejection_output=$(kubectl -n "${NAMESPACE}" patch perconapgcluster etcd-dcs \
+        --type=merge \
+        -p '{"spec":{"patroni":{"dcs":{"type":"kubernetes"}}}}' 2>&1 || true)
+
+      if echo "${rejection_output}" | grep -q "DCS type is immutable after cluster creation"; then
+        echo "OK: DCS type change correctly rejected by the API server"
+      else
+        echo "ERROR: expected rejection with 'DCS type is immutable after cluster creation', got: ${rejection_output}"
+        exit 1
+      fi

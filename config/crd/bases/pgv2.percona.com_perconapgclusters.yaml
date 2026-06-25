@@ -22726,6 +22726,64 @@ spec:
                       - pgbackrest
                       type: string
                     type: array
+                  dcs:
+                    description: |-
+                      DCS configures the distributed configuration store backend.
+                      Defaults to the Kubernetes-native backend (Endpoints).
+                      N.B. Changing the DCS type causes downtime; all instances must restart simultaneously.
+                    properties:
+                      etcd:
+                        description: |-
+                          Etcd holds settings for the external etcd DCS backend.
+                          Required when type is "etcd".
+                        properties:
+                          authSecret:
+                            description: |-
+                              AuthSecret is the name of a Secret in the same namespace with keys
+                              username and password for etcd authentication.
+                            type: string
+                          endpoints:
+                            description: |-
+                              Endpoints is the list of etcd endpoints including scheme and port.
+                              Example: ["https://etcd.etcd-cluster.svc:2379"]
+                              The scheme of the first endpoint determines the protocol used.
+                              All endpoints must use the same scheme.
+                            items:
+                              pattern: ^https?://[^/]
+                              type: string
+                            maxItems: 7
+                            minItems: 1
+                            type: array
+                          tlsSecret:
+                            description: |-
+                              TLSSecret is the name of a Secret in the same namespace with keys
+                              ca.crt, tls.crt, and tls.key for mutual TLS with etcd.
+                            type: string
+                        required:
+                        - endpoints
+                        type: object
+                        x-kubernetes-validations:
+                        - message: all endpoints must use the same scheme (http or
+                            https)
+                          rule: self.endpoints.all(e, e.startsWith('https://')) ||
+                            self.endpoints.all(e, e.startsWith('http://'))
+                      type:
+                        default: kubernetes
+                        description: |-
+                          Type of DCS backend. Defaults to "kubernetes".
+                          Changing this value causes cluster downtime; all instances must restart.
+                          This field is immutable after cluster creation.
+                        enum:
+                        - kubernetes
+                        - etcd
+                        type: string
+                    type: object
+                    x-kubernetes-validations:
+                    - message: etcd.endpoints must be non-empty when type is etcd
+                      rule: self.type != 'etcd' || (has(self.etcd) && size(self.etcd.endpoints)
+                        > 0)
+                    - message: DCS type is immutable after cluster creation
+                      rule: '!has(oldSelf.type) || oldSelf.type == self.type'
                   dynamicConfiguration:
                     description: |-
                       Patroni dynamic configuration settings. Changes to this value will be
@@ -22796,6 +22854,10 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
+                x-kubernetes-validations:
+                - message: DCS type is immutable after cluster creation
+                  rule: '(has(oldSelf.dcs) ? oldSelf.dcs.type : ''kubernetes'') ==
+                    (has(self.dcs) ? self.dcs.type : ''kubernetes'')'
               pause:
                 description: |-
                   Whether or not the PostgreSQL cluster should be stopped.

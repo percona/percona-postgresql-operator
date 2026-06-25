@@ -33,3 +33,4 @@ telemetry-transfer
 upgrade-consistency
 upgrade-minor
 users
+etcd-dcs

@@ -326,8 +326,25 @@ func (cr *PerconaPGCluster) Validate() error {
 		ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatStatements, false) {
 		return errors.New("pg_stat_monitor and pg_stat_statements cannot both be enabled")
 	}
+	if err := cr.ValidatePatroniDCS(); err != nil {
+		return err
+	}
 	if err := cr.ValidateDynamicConfiguration(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (cr *PerconaPGCluster) ValidatePatroniDCS() error {
+	if cr.Spec.Patroni == nil {
+		return nil
+	}
+	if cr.Spec.Patroni.DCSType() != crunchyv1beta1.PatroniDCSTypeEtcd {
+		return nil
+	}
+	dcs := cr.Spec.Patroni.GetDCS()
+	if dcs.Etcd == nil || len(dcs.Etcd.Endpoints) == 0 {
+		return errors.New("spec.patroni.dcs.etcd.endpoints must be non-empty when type is etcd")
 	}
 	return nil
 }
@@ -1355,4 +1372,32 @@ var EnvFromSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []str
 		return nil
 	}
 	return cr.EnvFromSecrets()
+}
+
+// IndexFieldPatroniEtcdSecrets is the field index name for secrets referenced
+// by spec.patroni.dcs.etcd (tlsSecret and authSecret).
+const IndexFieldPatroniEtcdSecrets = "pgCluster.patroniEtcdSecrets" //nolint:gosec
+
+// PatroniEtcdSecretsIndexerFunc returns the names of secrets referenced by
+// the etcd DCS configuration so that Secret changes can trigger reconciliation.
+var PatroniEtcdSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	cr, ok := obj.(*PerconaPGCluster)
+	if !ok || cr.Spec.Patroni == nil {
+		return nil
+	}
+	if cr.Spec.Patroni.DCSType() != crunchyv1beta1.PatroniDCSTypeEtcd {
+		return nil
+	}
+	dcs := cr.Spec.Patroni.GetDCS()
+	if dcs.Etcd == nil {
+		return nil
+	}
+	var names []string
+	if dcs.Etcd.TLSSecret != "" {
+		names = append(names, dcs.Etcd.TLSSecret)
+	}
+	if dcs.Etcd.AuthSecret != "" {
+		names = append(names, dcs.Etcd.AuthSecret)
+	}
+	return names
 }

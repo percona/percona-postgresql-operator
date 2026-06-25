@@ -1,0 +1,61 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "${NAMESPACE}" apply -f - <<EOF
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: etcd
+      spec:
+        clusterIP: None
+        ports:
+          - name: etcd-client
+            port: 2379
+            targetPort: 2379
+          - name: etcd-peer
+            port: 2380
+            targetPort: 2380
+        selector:
+          app: etcd
+      ---
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: etcd
+      spec:
+        serviceName: etcd
+        replicas: 1
+        selector:
+          matchLabels:
+            app: etcd
+        template:
+          metadata:
+            labels:
+              app: etcd
+          spec:
+            containers:
+              - name: etcd
+                image: registry.k8s.io/etcd:3.6.6-0
+                command:
+                  - /usr/local/bin/etcd
+                  - --name=etcd-0
+                  - --data-dir=/var/etcd/data
+                  - --listen-client-urls=http://0.0.0.0:2379
+                  - --advertise-client-urls=http://etcd-0.etcd.${NAMESPACE}.svc:2379
+                  - --listen-peer-urls=http://0.0.0.0:2380
+                  - --initial-advertise-peer-urls=http://etcd-0.etcd.${NAMESPACE}.svc:2380
+                  - --initial-cluster=etcd-0=http://etcd-0.etcd.${NAMESPACE}.svc:2380
+                  - --initial-cluster-state=new
+                  - --initial-cluster-token=etcd-cluster-token
+                ports:
+                  - containerPort: 2379
+                    name: client
+                  - containerPort: 2380
+                    name: peer
+      EOF

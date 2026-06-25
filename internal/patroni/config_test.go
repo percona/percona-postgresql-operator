@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -252,6 +253,227 @@ watchdog:
   mode: "off"
 	`)+"\n")
 	})
+
+	t.Run("etcd DCS - minimal", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			DCS: &v1beta1.PatroniDCS{
+				Type: v1beta1.PatroniDCSTypeEtcd,
+				Etcd: &v1beta1.PatroniEtcdSpec{
+					Endpoints: []string{"https://etcd.etcd-cluster.svc:2379"},
+				},
+			},
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		_, hasKubernetes := parsed["kubernetes"]
+		assert.Assert(t, !hasKubernetes, "expected no kubernetes section for etcd DCS")
+
+		etcd3, ok := parsed["etcd3"].(map[string]any)
+		assert.Assert(t, ok, "expected etcd3 section")
+		assert.Equal(t, etcd3["protocol"], "https")
+
+		hosts, ok := etcd3["hosts"].([]any)
+		assert.Assert(t, ok, "expected etcd3.hosts to be a list")
+		assert.Equal(t, len(hosts), 1)
+		assert.Equal(t, hosts[0], "etcd.etcd-cluster.svc:2379")
+
+		_, hasCacert := etcd3["cacert"]
+		assert.Assert(t, !hasCacert, "expected no cacert without tlsSecret")
+		_, hasUsername := etcd3["username"]
+		assert.Assert(t, !hasUsername, "expected no username in etcd3 section")
+		_, hasPassword := etcd3["password"]
+		assert.Assert(t, !hasPassword, "expected no password in etcd3 section")
+	})
+
+	t.Run("etcd DCS - http protocol", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			DCS: &v1beta1.PatroniDCS{
+				Type: v1beta1.PatroniDCSTypeEtcd,
+				Etcd: &v1beta1.PatroniEtcdSpec{
+					Endpoints: []string{"http://etcd:2379"},
+				},
+			},
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		etcd3, ok := parsed["etcd3"].(map[string]any)
+		assert.Assert(t, ok, "expected etcd3 section")
+		assert.Equal(t, etcd3["protocol"], "http")
+
+		hosts, ok := etcd3["hosts"].([]any)
+		assert.Assert(t, ok, "expected etcd3.hosts to be a list")
+		assert.Equal(t, hosts[0], "etcd:2379")
+	})
+
+	t.Run("etcd DCS - with TLS", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			DCS: &v1beta1.PatroniDCS{
+				Type: v1beta1.PatroniDCSTypeEtcd,
+				Etcd: &v1beta1.PatroniEtcdSpec{
+					Endpoints: []string{"https://etcd:2379"},
+					TLSSecret: "etcd-tls-secret",
+				},
+			},
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		etcd3, ok := parsed["etcd3"].(map[string]any)
+		assert.Assert(t, ok, "expected etcd3 section")
+		assert.Equal(t, etcd3["cacert"], "/etc/patroni/etcd-tls/ca.crt")
+		assert.Equal(t, etcd3["cert"], "/etc/patroni/etcd-tls/tls.crt")
+		assert.Equal(t, etcd3["key"], "/etc/patroni/etcd-tls/tls.key")
+	})
+
+	t.Run("etcd DCS - multiple endpoints", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			DCS: &v1beta1.PatroniDCS{
+				Type: v1beta1.PatroniDCSTypeEtcd,
+				Etcd: &v1beta1.PatroniEtcdSpec{
+					Endpoints: []string{
+						"https://etcd0:2379",
+						"https://etcd1:2379",
+						"https://etcd2:2379",
+					},
+				},
+			},
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		etcd3, ok := parsed["etcd3"].(map[string]any)
+		assert.Assert(t, ok, "expected etcd3 section")
+
+		hosts, ok := etcd3["hosts"].([]any)
+		assert.Assert(t, ok, "expected etcd3.hosts to be a list")
+		assert.Equal(t, len(hosts), 3)
+		assert.Equal(t, hosts[0], "etcd0:2379")
+		assert.Equal(t, hosts[1], "etcd1:2379")
+		assert.Equal(t, hosts[2], "etcd2:2379")
+	})
+}
+
+func TestEtcdHosts(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name      string
+		endpoints []string
+		want      []string
+	}{
+		{
+			name:      "strips https scheme",
+			endpoints: []string{"https://etcd.cluster.svc:2379"},
+			want:      []string{"etcd.cluster.svc:2379"},
+		},
+		{
+			name:      "strips http scheme",
+			endpoints: []string{"http://etcd:2379"},
+			want:      []string{"etcd:2379"},
+		},
+		{
+			name:      "multiple endpoints",
+			endpoints: []string{"https://etcd0:2379", "https://etcd1:2379"},
+			want:      []string{"etcd0:2379", "etcd1:2379"},
+		},
+		{
+			name:      "bare host passthrough",
+			endpoints: []string{"etcd:2379"},
+			want:      []string{"etcd:2379"},
+		},
+		{
+			name:      "empty list",
+			endpoints: []string{},
+			want:      []string{},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := etcdHosts(tt.endpoints)
+			assert.Equal(t, len(got), len(tt.want))
+			for i := range tt.want {
+				assert.Equal(t, got[i], tt.want[i])
+			}
+		})
+	}
+}
+
+func TestEtcdProtocol(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name      string
+		endpoints []string
+		want      string
+	}{
+		{
+			name:      "https from first endpoint",
+			endpoints: []string{"https://etcd:2379"},
+			want:      "https",
+		},
+		{
+			name:      "http from first endpoint",
+			endpoints: []string{"http://etcd:2379"},
+			want:      "http",
+		},
+		{
+			name:      "first endpoint determines protocol",
+			endpoints: []string{"https://etcd0:2379", "http://etcd1:2379"},
+			want:      "https",
+		},
+		{
+			name:      "bare host defaults to http",
+			endpoints: []string{"etcd:2379"},
+			want:      "http",
+		},
+		{
+			name:      "empty list defaults to http",
+			endpoints: []string{},
+			want:      "http",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := etcdProtocol(tt.endpoints)
+			assert.Equal(t, got, tt.want)
+		})
+	}
 }
 
 func TestDynamicConfiguration(t *testing.T) {
@@ -1123,6 +1345,38 @@ func TestInstanceEnvironment(t *testing.T) {
   value: /etc/patroni
 		`))
 	})
+
+	t.Run("etcd DCS - no PATRONI_KUBERNETES_* vars", func(t *testing.T) {
+		clusterEtcd := new(v1beta1.PostgresCluster)
+		assert.NilError(t, clusterEtcd.Default(context.Background(), nil))
+		clusterEtcd.Spec.PostgresVersion = 12
+		clusterEtcd.Spec.Patroni = &v1beta1.PatroniSpec{
+			DCS: &v1beta1.PatroniDCS{
+				Type: v1beta1.PatroniDCSTypeEtcd,
+				Etcd: &v1beta1.PatroniEtcdSpec{
+					Endpoints: []string{"https://etcd:2379"},
+				},
+			},
+		}
+		clusterEtcd.Spec.Patroni.Default()
+
+		etcdVars := instanceEnvironment(clusterEtcd, podService, leaderService, nil)
+
+		for _, ev := range etcdVars {
+			assert.Assert(t, ev.Name != "PATRONI_KUBERNETES_POD_IP",
+				"expected no PATRONI_KUBERNETES_POD_IP for etcd DCS")
+			assert.Assert(t, ev.Name != "PATRONI_KUBERNETES_PORTS",
+				"expected no PATRONI_KUBERNETES_PORTS for etcd DCS")
+		}
+
+		var names []string
+		for _, ev := range etcdVars {
+			names = append(names, ev.Name)
+		}
+		assert.Assert(t, slices.Contains(names, "PATRONI_NAME"), "expected PATRONI_NAME")
+		assert.Assert(t, slices.Contains(names, "PATRONI_POSTGRESQL_CONNECT_ADDRESS"), "expected PATRONI_POSTGRESQL_CONNECT_ADDRESS")
+		assert.Assert(t, slices.Contains(names, "PATRONICTL_CONFIG_FILE"), "expected PATRONICTL_CONFIG_FILE")
+	})
 }
 
 func TestInstanceYAML(t *testing.T) {
@@ -1250,6 +1504,37 @@ postgresql:
 restapi: {}
 tags: {}
 	`, "\t\n")+"\n")
+
+	t.Run("etcd DCS - no kubernetes section", func(t *testing.T) {
+		clusterEtcd := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					pNaming.ToCrunchyAnnotation(pNaming.AnnotationPatroniVersion): "4.0.1",
+				},
+			},
+			Spec: v1beta1.PostgresClusterSpec{
+				PostgresVersion: 12,
+				Patroni: &v1beta1.PatroniSpec{
+					DCS: &v1beta1.PatroniDCS{
+						Type: v1beta1.PatroniDCSTypeEtcd,
+						Etcd: &v1beta1.PatroniEtcdSpec{
+							Endpoints: []string{"https://etcd:2379"},
+						},
+					},
+				},
+			},
+		}
+		etcdInstance := new(v1beta1.PostgresInstanceSetSpec)
+
+		etcdData, err := instanceYAML(clusterEtcd, etcdInstance, nil)
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(etcdData), &parsed))
+
+		_, hasKubernetes := parsed["kubernetes"]
+		assert.Assert(t, !hasKubernetes, "expected no kubernetes section for etcd DCS")
+	})
 }
 
 func TestPGBackRestCreateReplicaCommand(t *testing.T) {

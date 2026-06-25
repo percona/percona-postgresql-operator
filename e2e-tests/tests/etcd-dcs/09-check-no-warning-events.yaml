@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      events=$(kubectl -n "${NAMESPACE}" get events \
+        --field-selector involvedObject.name=etcd-dcs,type=Warning \
+        -o jsonpath='{.items[*].reason}')
+
+      for reason in EtcdTLSSecretNotFound EtcdAuthSecretNotFound; do
+        if echo "${events}" | grep -q "${reason}"; then
+          echo "ERROR: found unexpected Warning event reason: ${reason}"
+          exit 1
+        fi
+      done
