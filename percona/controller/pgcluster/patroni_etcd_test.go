@@ -65,7 +65,6 @@ func etcdCR(namespace string, dcs *v1beta1.PatroniDCS) *v2.PerconaPGCluster {
 }
 
 func TestReconcilePatroniEtcd(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("nil patroni spec returns nil", func(t *testing.T) {
