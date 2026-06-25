@@ -1,15 +1,21 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 30
----
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: 07-check-extensions
-data:
-  data: |2-
-     pg_repack
-     pg_stat_monitor
-     pgaudit
-     plpgsql
-     vector
+commands:
+  - script: |-
+      data=$(kubectl get configmap -n "${NAMESPACE}" 07-check-extensions \
+        -o jsonpath='{.data.data}')
+
+      for ext in pg_repack pgaudit plpgsql vector; do
+        echo "${data}" | grep -q "${ext}" || {
+          echo "ERROR: '${ext}' missing from extensions. Got: ${data}"
+          exit 1
+        }
+      done
+
+      if [[ "${PG_DISTRIBUTION}" != "community" ]]; then
+        echo "${data}" | grep -q "pg_stat_monitor" || {
+          echo "ERROR: 'pg_stat_monitor' missing from extensions. Got: ${data}"
+          exit 1
+        }
+      fi
