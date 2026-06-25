@@ -1,19 +1,38 @@
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
-metadata:
-  name: builtin-extensions
-spec:
-  patroni:
-    dynamicConfiguration:
-      postgresql:
-        parameters:
-          pgaudit.log: 'ddl,write,role'
-          pgaudit.log_level: 'warning'
-          logging_collector: 'off'
-  extensions:
-    builtin:
-      pg_stat_monitor: true 
-      pg_stat_statements: false # you can't enable both pg_stat_statements and pg_stat_monitor
-      pg_audit: true
-      pgvector: true
-      pg_repack: true
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # community images do not ship pg_stat_monitor; keep the patch so the
+      # cluster generation still increments and 06-assert.yaml passes.
+      PG_STAT_MONITOR="true"
+      if [[ "${PG_DISTRIBUTION}" == "community" ]]; then
+        PG_STAT_MONITOR="false"
+      fi
+
+      kubectl patch -n "${NAMESPACE}" perconapgcluster/builtin-extensions --type=merge -p "{
+        \"spec\": {
+          \"patroni\": {
+            \"dynamicConfiguration\": {
+              \"postgresql\": {
+                \"parameters\": {
+                  \"pgaudit.log\": \"ddl,write,role\",
+                  \"pgaudit.log_level\": \"warning\",
+                  \"logging_collector\": \"off\"
+                }
+              }
+            }
+          },
+          \"extensions\": {
+            \"builtin\": {
+              \"pg_stat_monitor\": ${PG_STAT_MONITOR},
+              \"pg_stat_statements\": false,
+              \"pg_audit\": true,
+              \"pgvector\": true,
+              \"pg_repack\": true
+            }
+          }
+        }
+      }"
