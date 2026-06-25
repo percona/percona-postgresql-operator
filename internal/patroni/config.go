@@ -166,25 +166,27 @@ func clusterYAML(
 
 	// DCS configuration — either external etcd or the Kubernetes-native Endpoints backend.
 	// These values cannot change during the cluster's lifetime.
-	if dcs := cluster.GetDCS(); dcs != nil && dcs.Type == v1beta1.PatroniDCSTypeEtcd && dcs.Etcd != nil {
-		etcd3 := map[string]any{
-			"hosts":    etcdHosts(dcs.Etcd.Endpoints),
-			"protocol": etcdProtocol(dcs.Etcd.Endpoints),
-		}
-		if dcs.Etcd.TLSSecret != "" {
-			etcd3["cacert"] = path.Join(configDirectory, "etcd-tls", "ca.crt")
-			etcd3["cert"] = path.Join(configDirectory, "etcd-tls", "tls.crt")
-			etcd3["key"] = path.Join(configDirectory, "etcd-tls", "tls.key")
-		}
-		root["etcd3"] = etcd3
+	if cluster.DCSType() == v1beta1.PatroniDCSTypeEtcd {
+		if dcs := cluster.GetDCS(); dcs.Etcd != nil {
+			etcd3 := map[string]any{
+				"hosts":    etcdHosts(dcs.Etcd.Endpoints),
+				"protocol": etcdProtocol(dcs.Etcd.Endpoints),
+			}
+			if dcs.Etcd.TLSSecret != "" {
+				etcd3["cacert"] = path.Join(configDirectory, "etcd-tls", "ca.crt")
+				etcd3["cert"] = path.Join(configDirectory, "etcd-tls", "tls.crt")
+				etcd3["key"] = path.Join(configDirectory, "etcd-tls", "tls.key")
+			}
+			root["etcd3"] = etcd3
 
-		// With etcd DCS, Patroni does not update pod labels. Use callbacks to
-		// patch the role label on start and on each role change so Service
-		// selectors keep working. on_start covers pod restarts where the role
-		// does not change; on_role_change covers failovers.
-		root["postgresql"].(map[string]any)["callbacks"] = map[string]any{
-			"on_start":       "/opt/crunchy/bin/patroni-role-change.sh",
-			"on_role_change": "/opt/crunchy/bin/patroni-role-change.sh",
+			// With etcd DCS, Patroni does not update pod labels. Use callbacks to
+			// patch the role label on start and on each role change so Service
+			// selectors keep working. on_start covers pod restarts where the role
+			// does not change; on_role_change covers failovers.
+			root["postgresql"].(map[string]any)["callbacks"] = map[string]any{
+				"on_start":       "/opt/crunchy/bin/patroni-role-change.sh",
+				"on_role_change": "/opt/crunchy/bin/patroni-role-change.sh",
+			}
 		}
 	} else {
 		// Use Kubernetes Endpoints for the distributed configuration store (DCS).
@@ -436,7 +438,7 @@ func instanceEnvironment(
 	}
 
 	// The PATRONI_KUBERNETES_* variables are only needed for the Kubernetes DCS backend.
-	if dcs := cluster.GetDCS(); dcs == nil || dcs.Type != v1beta1.PatroniDCSTypeEtcd {
+	if cluster.DCSType() != v1beta1.PatroniDCSTypeEtcd {
 		variables = append(variables,
 			// Set "kubernetes.pod_ip" to the v1.Pod's primary IP address.
 			// Patroni must be restarted when changing this value.
@@ -574,7 +576,7 @@ func instanceYAML(
 
 	// For the Kubernetes DCS backend, include an empty kubernetes section that
 	// receives pod_ip and ports from the PATRONI_KUBERNETES_* environment variables.
-	if dcs := cluster.GetDCS(); dcs == nil || dcs.Type != v1beta1.PatroniDCSTypeEtcd {
+	if cluster.DCSType() != v1beta1.PatroniDCSTypeEtcd {
 		root["kubernetes"] = map[string]any{
 			// Missing here is "pod_ip" which cannot be known until the instance Pod is
 			// created. That value should be injected using the downward API and the

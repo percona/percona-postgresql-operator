@@ -36,8 +36,7 @@ import (
 func Permissions(cluster *v1beta1.PostgresCluster) []rbacv1.PolicyRule {
 	rules := make([]rbacv1.PolicyRule, 0, 4)
 
-	dcs := cluster.GetDCS()
-	usingKubernetesDCS := dcs == nil || dcs.Type != v1beta1.PatroniDCSTypeEtcd
+	usingKubernetesDCS := cluster.DCSType() != v1beta1.PatroniDCSTypeEtcd
 
 	if usingKubernetesDCS {
 		// When using Endpoints for DCS, "create", "list", "patch", and "watch"

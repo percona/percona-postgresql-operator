@@ -71,6 +71,19 @@ func (c *PostgresCluster) GetDCS() *PatroniDCS {
 	return c.Spec.Patroni.GetDCS()
 }
 
+// DCSType returns the effective DCS type. Returns PatroniDCSTypeKubernetes when unset (the default).
+func (s *PatroniSpec) DCSType() PatroniDCSType {
+	if dcs := s.GetDCS(); dcs != nil {
+		return dcs.Type
+	}
+	return PatroniDCSTypeKubernetes
+}
+
+// DCSType returns the effective DCS type. Returns PatroniDCSTypeKubernetes when unset (the default).
+func (c *PostgresCluster) DCSType() PatroniDCSType {
+	return c.Spec.Patroni.DCSType()
+}
+
 // PatroniDCSType identifies which DCS backend Patroni should use.
 // +kubebuilder:validation:Enum={kubernetes,etcd}
 type PatroniDCSType string

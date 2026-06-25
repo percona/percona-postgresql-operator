@@ -339,10 +339,10 @@ func (cr *PerconaPGCluster) ValidatePatroniDCS() error {
 	if cr.Spec.Patroni == nil {
 		return nil
 	}
-	dcs := cr.Spec.Patroni.GetDCS()
-	if dcs == nil || dcs.Type != crunchyv1beta1.PatroniDCSTypeEtcd {
+	if cr.Spec.Patroni.DCSType() != crunchyv1beta1.PatroniDCSTypeEtcd {
 		return nil
 	}
+	dcs := cr.Spec.Patroni.GetDCS()
 	if dcs.Etcd == nil || len(dcs.Etcd.Endpoints) == 0 {
 		return errors.New("spec.patroni.dcs.etcd.endpoints must be non-empty when type is etcd")
 	}
@@ -1385,8 +1385,11 @@ var PatroniEtcdSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) [
 	if !ok || cr.Spec.Patroni == nil {
 		return nil
 	}
+	if cr.Spec.Patroni.DCSType() != crunchyv1beta1.PatroniDCSTypeEtcd {
+		return nil
+	}
 	dcs := cr.Spec.Patroni.GetDCS()
-	if dcs == nil || dcs.Type != crunchyv1beta1.PatroniDCSTypeEtcd || dcs.Etcd == nil {
+	if dcs.Etcd == nil {
 		return nil
 	}
 	var names []string

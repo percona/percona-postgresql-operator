@@ -25,8 +25,11 @@ func (r *PGClusterReconciler) reconcilePatroniEtcd(ctx context.Context, cr *v2.P
 	if cr.Spec.Patroni == nil {
 		return nil
 	}
+	if cr.Spec.Patroni.DCSType() != v1beta1.PatroniDCSTypeEtcd {
+		return nil
+	}
 	dcs := cr.Spec.Patroni.GetDCS()
-	if dcs == nil || dcs.Type != v1beta1.PatroniDCSTypeEtcd || dcs.Etcd == nil {
+	if dcs.Etcd == nil {
 		return nil
 	}
 	etcd := dcs.Etcd
