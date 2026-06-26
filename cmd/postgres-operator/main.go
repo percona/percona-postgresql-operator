@@ -358,69 +358,112 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	return options, nil
 }
 
-func isGKE(ctx context.Context, cfg *rest.Config) bool {
-	log := logging.FromContext(ctx)
-
-	const groupName, kind = "cloud.google.com", "BackendConfig"
-
+// hasAPIGroup returns true if the cluster exposes the given API group name.
+// Uses the discovery API which is available to all authenticated users with no extra RBAC.
+func hasAPIGroup(ctx context.Context, cfg *rest.Config, groupName string) bool {
 	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
-
+	if err != nil {
+		return false
+	}
 	groups, err := client.ServerGroups()
 	if err != nil {
-		assertNoError(err)
+		return false
 	}
 	for _, g := range groups.Groups {
-		if g.Name != groupName {
-			continue
-		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == kind {
-					log.Info("detected GKE environment")
-					return true
-				}
-			}
+		if g.Name == groupName {
+			return true
 		}
 	}
+	return false
+}
 
+func isGKE(ctx context.Context, cfg *rest.Config) bool {
+	// networking.gke.io is registered on all GKE clusters by the built-in network controller.
+	if hasAPIGroup(ctx, cfg, "networking.gke.io") {
+		logging.FromContext(ctx).Info("detected GKE environment")
+		return true
+	}
 	return false
 }
 
 func isEKS(ctx context.Context, cfg *rest.Config) bool {
-	log := logging.FromContext(ctx)
-
-	const groupName, kind = "vpcresources.k8s.aws", "SecurityGroupPolicy"
-
-	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
-
-	groups, err := client.ServerGroups()
-	if err != nil {
-		assertNoError(err)
+	// EKS API server hostnames always end with .eks.amazonaws.com.
+	if strings.Contains(cfg.Host, ".eks.amazonaws.com") {
+		logging.FromContext(ctx).Info("detected EKS environment")
+		return true
 	}
-	for _, g := range groups.Groups {
-		if g.Name != groupName {
-			continue
-		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == kind {
-					log.Info("detected EKS environment")
-					return true
-				}
-			}
-		}
-	}
+	return false
+}
 
+func isAKS(ctx context.Context, cfg *rest.Config) bool {
+	// AKS API server hostnames always end with .azmk8s.io.
+	if strings.Contains(cfg.Host, ".azmk8s.io") {
+		logging.FromContext(ctx).Info("detected AKS environment")
+		return true
+	}
+	return false
+}
+
+func isDOKS(ctx context.Context, cfg *rest.Config) bool {
+	// DOKS API server hostnames always end with .k8s.ondigitalocean.com.
+	if strings.Contains(cfg.Host, ".k8s.ondigitalocean.com") {
+		logging.FromContext(ctx).Info("detected DOKS environment")
+		return true
+	}
+	return false
+}
+
+func isOKE(ctx context.Context, cfg *rest.Config) bool {
+	// OKE API server hostnames always end with .oraclecloud.com.
+	if strings.Contains(cfg.Host, ".oraclecloud.com") {
+		logging.FromContext(ctx).Info("detected OKE environment")
+		return true
+	}
+	return false
+}
+
+func isACK(ctx context.Context, cfg *rest.Config) bool {
+	// ACK API server hostnames always end with .aliyuncs.com.
+	if strings.Contains(cfg.Host, ".aliyuncs.com") {
+		logging.FromContext(ctx).Info("detected ACK environment")
+		return true
+	}
+	return false
+}
+
+func isNKP(ctx context.Context, cfg *rest.Config) bool {
+	// NKP registers nkp.nutanix.com; legacy D2iQ/Konvoy used kommander.mesosphere.io.
+	if hasAPIGroup(ctx, cfg, "nkp.nutanix.com") || hasAPIGroup(ctx, cfg, "kommander.mesosphere.io") {
+		logging.FromContext(ctx).Info("detected NKP environment")
+		return true
+	}
+	return false
+}
+
+func isPlatform9(ctx context.Context, cfg *rest.Config) bool {
+	// Platform9 API server hostnames contain .platform9.io or .platform9.net.
+	if strings.Contains(cfg.Host, ".platform9.io") || strings.Contains(cfg.Host, ".platform9.net") {
+		logging.FromContext(ctx).Info("detected Platform9 environment")
+		return true
+	}
+	return false
+}
+
+func isTanzu(ctx context.Context, cfg *rest.Config) bool {
+	// Tanzu registers run.tanzu.vmware.com on all TKG clusters.
+	if hasAPIGroup(ctx, cfg, "run.tanzu.vmware.com") {
+		logging.FromContext(ctx).Info("detected Tanzu environment")
+		return true
+	}
+	return false
+}
+
+func isRancher(ctx context.Context, cfg *rest.Config) bool {
+	// Rancher registers management.cattle.io on all managed clusters.
+	if hasAPIGroup(ctx, cfg, "management.cattle.io") {
+		logging.FromContext(ctx).Info("detected Rancher environment")
+		return true
+	}
 	return false
 }
 
@@ -432,6 +475,22 @@ func detectPlatform(ctx context.Context, cfg *rest.Config) string {
 		return "gke"
 	case isEKS(ctx, cfg):
 		return "eks"
+	case isAKS(ctx, cfg):
+		return "aks"
+	case isDOKS(ctx, cfg):
+		return "doks"
+	case isOKE(ctx, cfg):
+		return "oke"
+	case isACK(ctx, cfg):
+		return "ack"
+	case isNKP(ctx, cfg):
+		return "nkp"
+	case isPlatform9(ctx, cfg):
+		return "platform9"
+	case isTanzu(ctx, cfg):
+		return "tanzu"
+	case isRancher(ctx, cfg):
+		return "rancher"
 	default:
 		return "unknown"
 	}
