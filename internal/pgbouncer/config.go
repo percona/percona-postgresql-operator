@@ -66,7 +66,7 @@ func (vs iniValueSet) String() string {
 }
 
 // authFileContents returns a PgBouncer user database.
-func authFileContents(password string) []byte {
+func authFileContents(password string, userSecret *corev1.Secret) ([]byte, error) {
 	// > There should be at least 2 fields, surrounded by double quotes.
 	// > Double quotes in a field value can be escaped by writing two double quotes.
 	// - https://www.pgbouncer.org/config.html#authentication-file-format
@@ -74,9 +74,28 @@ func authFileContents(password string) []byte {
 		return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 	}
 
-	user1 := quote(postgresqlUser) + " " + quote(password) + "\n"
+	users := make(map[string]string)
+	if userSecret != nil {
+		for name, password := range userSecret.Data {
+			if strings.ContainsAny(string(password), "\r\n") {
+				return nil, fmt.Errorf("pgbouncer user %q in Secret %q contains a newline", name, userSecret.Name)
+			}
+			users[name] = string(password)
+		}
+	}
+	sortedUsers := make([]string, 0, len(users))
+	for name := range users {
+		sortedUsers = append(sortedUsers, name)
+	}
+	sort.Strings(sortedUsers)
 
-	return []byte(user1)
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "%s %s\n", quote(postgresqlUser), quote(password))
+	for _, name := range sortedUsers {
+		_, _ = fmt.Fprintf(&b, "%s %s\n", quote(name), quote(users[name]))
+	}
+
+	return []byte(b.String()), nil
 }
 
 func hasLDAPRules(cluster *v1beta1.PostgresCluster) bool {

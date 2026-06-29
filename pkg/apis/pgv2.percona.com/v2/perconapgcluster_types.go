@@ -1255,6 +1255,11 @@ type PGBouncerSpec struct {
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 
+	// Secret with users to add to PgBouncer's authentication file. Each key is
+	// a PgBouncer user name and its value is the password or verifier.
+	// +optional
+	UsersSecret *corev1.LocalObjectReference `json:"usersSecret,omitempty"`
+
 	Env     []corev1.EnvVar        `json:"env,omitempty"`
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
@@ -1284,6 +1289,7 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		Tolerations:               p.Tolerations,
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
 		SecurityContext:           p.SecurityContext,
+		UsersSecret:               p.UsersSecret,
 		Env:                       p.Env,
 		EnvFrom:                   p.EnvFrom,
 	}
@@ -1355,4 +1361,23 @@ var EnvFromSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []str
 		return nil
 	}
 	return cr.EnvFromSecrets()
+}
+
+func (cr *PerconaPGCluster) PGBouncerUserSecrets() []string {
+	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil ||
+		cr.Spec.Proxy.PGBouncer.UsersSecret == nil {
+		return nil
+	}
+
+	return []string{cr.Spec.Proxy.PGBouncer.UsersSecret.Name}
+}
+
+const IndexFieldPGBouncerUserSecrets = "pgCluster.pgBouncerUserSecrets" //nolint:gosec
+
+var PGBouncerUserSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	cr, ok := obj.(*PerconaPGCluster)
+	if !ok {
+		return nil
+	}
+	return cr.PGBouncerUserSecrets()
 }

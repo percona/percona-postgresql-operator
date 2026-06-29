@@ -47,6 +47,7 @@ func Secret(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inRoot *pki.RootCertificateAuthority,
 	inSecret *corev1.Secret,
+	inUserSecret *corev1.Secret,
 	inService *corev1.Service,
 	outSecret *corev1.Secret,
 	// frontendCertManagerSecret is the cert-manager-managed TLS secret for the
@@ -76,7 +77,7 @@ func Secret(ctx context.Context,
 	if err == nil {
 		// Store the SCRAM verifier alongside the plaintext password so that
 		// later reconciles don't generate it repeatedly.
-		outSecret.Data[authFileSecretKey] = authFileContents(password)
+		outSecret.Data[authFileSecretKey], err = authFileContents(password, inUserSecret)
 		outSecret.Data[passwordSecretKey] = []byte(password)
 		outSecret.Data[verifierSecretKey] = []byte(verifier)
 	}
