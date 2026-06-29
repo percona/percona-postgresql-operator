@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"os"
 	goruntime "runtime"
 	"strconv"
@@ -157,13 +158,15 @@ func main() {
 func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	os.Setenv("REGISTRATION_REQUIRED", "false")
 
+	openShift := isOpenshift(ctx, mgr.GetConfig())
+
 	r := &postgrescluster.Reconciler{
 		Client:              mgr.GetClient(),
 		Scheme:              mgr.GetScheme(),
 		Owner:               postgrescluster.ControllerName,
 		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName),
 		Tracer:              otel.Tracer(postgrescluster.ControllerName),
-		IsOpenShift:         isOpenshift(ctx, mgr.GetConfig()),
+		IsOpenShift:         openShift,
 		CertManagerCtrlFunc: certmanager.NewController,
 		RestConfig:          mgr.GetConfig(),
 	}
@@ -193,10 +196,10 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Owner:                pgcluster.PGClusterControllerName,
 		Recorder:             mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
 		Tracer:               otel.Tracer(pgcluster.PGClusterControllerName),
-		Platform:             detectPlatform(ctx, mgr.GetConfig()),
+		Platform:             detectPlatform(ctx, mgr.GetConfig(), openShift),
 		KubeVersion:          getServerVersion(ctx, mgr.GetConfig()),
 		CrunchyController:    cm.Controller(),
-		IsOpenShift:          isOpenshift(ctx, mgr.GetConfig()),
+		IsOpenShift:          openShift,
 		Cron:                 pgcluster.NewCronRegistry(),
 		ExternalChan:         externalEvents,
 		StopExternalWatchers: stopChan,
@@ -272,7 +275,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Client:      mgr.GetClient(),
 		Owner:       "pgadmin-controller",
 		Recorder:    mgr.GetEventRecorderFor(naming.ControllerPGAdmin),
-		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
+		IsOpenShift: openShift,
 	}
 
 	if err := pgAdminReconciler.SetupWithManager(mgr); err != nil {
@@ -358,80 +361,154 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	return options, nil
 }
 
-func isGKE(ctx context.Context, cfg *rest.Config) bool {
+// hasAPIGroup returns true if the cluster exposes the given API group name.
+// Uses the discovery API; note that hardened clusters may restrict discovery access.
+func hasAPIGroup(ctx context.Context, cfg *rest.Config, groupName string) bool {
 	log := logging.FromContext(ctx)
-
-	const groupName, kind = "cloud.google.com", "BackendConfig"
-
 	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
-
+	if err != nil {
+		log.V(1).Info("platform detection: could not create discovery client", "error", err.Error())
+		return false
+	}
 	groups, err := client.ServerGroups()
 	if err != nil {
-		assertNoError(err)
+		log.V(1).Info("platform detection: could not list API groups", "error", err.Error())
+		return false
 	}
 	for _, g := range groups.Groups {
-		if g.Name != groupName {
-			continue
-		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == kind {
-					log.Info("detected GKE environment")
-					return true
-				}
-			}
+		if g.Name == groupName {
+			return true
 		}
 	}
+	return false
+}
 
+func isGKE(ctx context.Context, cfg *rest.Config) bool {
+	if hasAPIGroup(ctx, cfg, "networking.gke.io") {
+		logging.FromContext(ctx).Info("detected GKE environment")
+		return true
+	}
 	return false
 }
 
 func isEKS(ctx context.Context, cfg *rest.Config) bool {
-	log := logging.FromContext(ctx)
-
-	const groupName, kind = "vpcresources.k8s.aws", "SecurityGroupPolicy"
-
-	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
-
-	groups, err := client.ServerGroups()
-	if err != nil {
-		assertNoError(err)
+	// crd.k8s.amazonaws.com (VPC CNI) and metrics.eks.amazonaws.com (control plane metrics)
+	// are independent EKS signals; either is sufficient.
+	if hasAPIGroup(ctx, cfg, "crd.k8s.amazonaws.com") || hasAPIGroup(ctx, cfg, "metrics.eks.amazonaws.com") {
+		logging.FromContext(ctx).Info("detected EKS environment")
+		return true
 	}
-	for _, g := range groups.Groups {
-		if g.Name != groupName {
-			continue
-		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == kind {
-					log.Info("detected EKS environment")
-					return true
-				}
-			}
-		}
-	}
-
 	return false
 }
 
-func detectPlatform(ctx context.Context, cfg *rest.Config) string {
+func isAKS(ctx context.Context, cfg *rest.Config) bool {
+	// AKS exposes no unique API groups, so we inspect the API server TLS certificate:
+	// its SAN always contains a hostname ending in .azmk8s.io regardless of network plugin.
+	tlsCfg, err := rest.TLSConfigFor(cfg)
+	if err != nil {
+		logging.FromContext(ctx).V(1).Info("platform detection: could not build TLS config", "error", err.Error())
+		return false
+	}
+	host := strings.TrimPrefix(cfg.Host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+	conn, err := tls.Dial("tcp", host, tlsCfg)
+	if err != nil {
+		logging.FromContext(ctx).V(1).Info("platform detection: could not dial API server", "error", err.Error())
+		return false
+	}
+	defer conn.Close()
+	for _, cert := range conn.ConnectionState().PeerCertificates {
+		for _, san := range cert.DNSNames {
+			if strings.HasSuffix(san, ".azmk8s.io") {
+				logging.FromContext(ctx).Info("detected AKS environment")
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isDOKS(ctx context.Context, cfg *rest.Config) bool {
+	if hasAPIGroup(ctx, cfg, "dataplane-operator.doks.digitalocean.com") {
+		logging.FromContext(ctx).Info("detected DOKS environment")
+		return true
+	}
+	return false
+}
+
+func isOKE(ctx context.Context, cfg *rest.Config) bool {
+	if strings.Contains(cfg.Host, ".oraclecloud.com") {
+		logging.FromContext(ctx).Info("detected OKE environment")
+		return true
+	}
+	return false
+}
+
+func isACK(ctx context.Context, cfg *rest.Config) bool {
+	if strings.Contains(cfg.Host, ".aliyuncs.com") {
+		logging.FromContext(ctx).Info("detected ACK environment")
+		return true
+	}
+	return false
+}
+
+func isNKP(ctx context.Context, cfg *rest.Config) bool {
+	// kommander.mesosphere.io is the legacy D2iQ/Konvoy group name.
+	if hasAPIGroup(ctx, cfg, "nkp.nutanix.com") || hasAPIGroup(ctx, cfg, "kommander.mesosphere.io") {
+		logging.FromContext(ctx).Info("detected NKP environment")
+		return true
+	}
+	return false
+}
+
+func isPlatform9(ctx context.Context, cfg *rest.Config) bool {
+	if strings.Contains(cfg.Host, ".platform9.io") || strings.Contains(cfg.Host, ".platform9.net") {
+		logging.FromContext(ctx).Info("detected Platform9 environment")
+		return true
+	}
+	return false
+}
+
+func isTanzu(ctx context.Context, cfg *rest.Config) bool {
+	if hasAPIGroup(ctx, cfg, "run.tanzu.vmware.com") {
+		logging.FromContext(ctx).Info("detected Tanzu environment")
+		return true
+	}
+	return false
+}
+
+func isRancher(ctx context.Context, cfg *rest.Config) bool {
+	if hasAPIGroup(ctx, cfg, "management.cattle.io") {
+		logging.FromContext(ctx).Info("detected Rancher environment")
+		return true
+	}
+	return false
+}
+
+func detectPlatform(ctx context.Context, cfg *rest.Config, openShift bool) string {
 	switch {
-	case isOpenshift(ctx, cfg):
+	case openShift:
 		return "openshift"
 	case isGKE(ctx, cfg):
 		return "gke"
 	case isEKS(ctx, cfg):
 		return "eks"
+	case isAKS(ctx, cfg):
+		return "aks"
+	case isDOKS(ctx, cfg):
+		return "doks"
+	case isOKE(ctx, cfg):
+		return "oke"
+	case isACK(ctx, cfg):
+		return "ack"
+	case isNKP(ctx, cfg):
+		return "nkp"
+	case isPlatform9(ctx, cfg):
+		return "platform9"
+	case isTanzu(ctx, cfg):
+		return "tanzu"
+	case isRancher(ctx, cfg):
+		return "rancher"
 	default:
 		return "unknown"
 	}
@@ -496,35 +573,10 @@ func getLogLevel() zapcore.LevelEnabler {
 }
 
 func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
-	log := logging.FromContext(ctx)
-
-	const sccGroupName, sccKind = "security.openshift.io", "SecurityContextConstraints"
-
-	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
-
-	groups, err := client.ServerGroups()
-	if err != nil {
-		assertNoError(err)
+	if hasAPIGroup(ctx, cfg, "security.openshift.io") {
+		logging.FromContext(ctx).Info("detected Openshift environment")
+		return true
 	}
-	for _, g := range groups.Groups {
-		if g.Name != sccGroupName {
-			continue
-		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == sccKind {
-					log.Info("detected Openshift environment")
-					return true
-				}
-			}
-		}
-	}
-
 	return false
 }
 
