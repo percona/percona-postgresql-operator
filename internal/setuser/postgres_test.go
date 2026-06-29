@@ -20,7 +20,8 @@ func TestEnableInPostgreSQL(t *testing.T) {
 		assert.Assert(t, stdout != nil, "should capture stdout")
 		assert.Assert(t, stderr != nil, "should capture stderr")
 
-		assert.Assert(t, strings.Contains(strings.Join(command, "\n"),
+		assert.Assert(t, strings.Contains(
+			strings.Join(command, "\n"),
 			`SELECT datname FROM pg_catalog.pg_database`,
 		), "expected all databases and templates")
 
@@ -33,8 +34,7 @@ SET client_min_messages = WARNING; CREATE EXTENSION IF NOT EXISTS set_user; ALTE
 		return expected
 	}
 
-	ctx := context.Background()
-	assert.Equal(t, expected, EnableInPostgreSQL(ctx, exec))
+	assert.Equal(t, expected, EnableInPostgreSQL(t.Context(), exec))
 }
 
 func TestDisableInPostgreSQL(t *testing.T) {
@@ -45,7 +45,8 @@ func TestDisableInPostgreSQL(t *testing.T) {
 		assert.Assert(t, stdout != nil, "should capture stdout")
 		assert.Assert(t, stderr != nil, "should capture stderr")
 
-		assert.Assert(t, strings.Contains(strings.Join(command, "\n"),
+		assert.Assert(t, strings.Contains(
+			strings.Join(command, "\n"),
 			`SELECT datname FROM pg_catalog.pg_database`,
 		), "expected all databases and templates")
 
@@ -58,8 +59,7 @@ SET client_min_messages = WARNING; DROP EXTENSION IF EXISTS set_user;
 		return expected
 	}
 
-	ctx := context.Background()
-	assert.Equal(t, expected, DisableInPostgreSQL(ctx, exec))
+	assert.Equal(t, expected, DisableInPostgreSQL(t.Context(), exec))
 }
 
 func TestPostgreSQLParameters(t *testing.T) {

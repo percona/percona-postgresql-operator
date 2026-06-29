@@ -33,8 +33,7 @@ func TestEnableInPostgreSQL(t *testing.T) {
 		return expected
 	}
 
-	ctx := context.Background()
-	assert.Equal(t, expected, EnableInPostgreSQL(ctx, exec))
+	assert.Equal(t, expected, EnableInPostgreSQL(t.Context(), exec))
 }
 
 func TestDisableInPostgreSQL(t *testing.T) {
@@ -58,8 +57,7 @@ func TestDisableInPostgreSQL(t *testing.T) {
 		return expected
 	}
 
-	ctx := context.Background()
-	assert.Equal(t, expected, DisableInPostgreSQL(ctx, exec))
+	assert.Equal(t, expected, DisableInPostgreSQL(t.Context(), exec))
 }
 
 func TestPostgreSQLParameters(t *testing.T) {
@@ -87,11 +85,12 @@ func TestEnableInPostgreSQLDoesNotUseAllDatabases(t *testing.T) {
 	exec := func(
 		_ context.Context, _ io.Reader, _, _ io.Writer, command ...string,
 	) error {
-		assert.Assert(t, !strings.Contains(strings.Join(command, "\n"),
+		assert.Assert(t, !strings.Contains(
+			strings.Join(command, "\n"),
 			`SELECT datname FROM pg_catalog.pg_database`,
 		), "expected only the postgres database")
 		return nil
 	}
 
-	assert.NilError(t, EnableInPostgreSQL(context.Background(), exec))
+	assert.NilError(t, EnableInPostgreSQL(t.Context(), exec))
 }
