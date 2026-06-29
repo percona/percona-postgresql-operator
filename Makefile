@@ -1,16 +1,6 @@
-PGO_IMAGE_NAME ?= percona-postgresql-operator
-PGO_IMAGE_MAINTAINER ?= Percona
-PGO_IMAGE_SUMMARY ?= Percona PostgreSQL Operator
-PGO_IMAGE_DESCRIPTION ?= $(PGO_IMAGE_SUMMARY)
-PGO_IMAGE_URL ?= https://github.com/percona/percona-postgresql-operator
-PGO_IMAGE_PREFIX ?= localhost
-
 PGMONITOR_DIR ?= hack/tools/pgmonitor
 PGMONITOR_VERSION ?= v4.11.0
 QUERIES_CONFIG_DIR ?= hack/tools/queries
-
-# Buildah's "build" used to be "bud". Use the alias to be compatible for a while.
-BUILDAH_BUILD ?= buildah bud
 
 GO ?= CGO_ENABLED=1 go
 GO_BUILD = $(GO) build -trimpath
@@ -44,10 +34,6 @@ help: ## Display this help.
 all: ## Build all images
 all: build-docker-image
 
-.PHONY: setup
-setup: ## Run Setup needed to build images
-setup: get-pgmonitor
-
 .PHONY: get-pgmonitor
 get-pgmonitor:
 	git -C '$(dir $(PGMONITOR_DIR))' clone https://github.com/CrunchyData/pgmonitor.git || git -C '$(PGMONITOR_DIR)' fetch origin
@@ -59,7 +45,6 @@ get-pgmonitor:
 
 .PHONY: clean
 clean: ## Clean resources
-clean: clean-deprecated
 	rm -f bin/postgres-operator
 	rm -f config/rbac/role.yaml
 	rm -rf licenses/*/
@@ -70,25 +55,6 @@ clean: clean-deprecated
 	[ ! -d hack/tools/external-snapshotter ] || rm -rf hack/tools/external-snapshotter
 	[ ! -n "$$(ls hack/tools)" ] || rm -r hack/tools/*
 	[ ! -d hack/.kube ] || rm -r hack/.kube
-
-.PHONY: clean-deprecated
-clean-deprecated: ## Clean deprecated resources
-	@# packages used to be downloaded into the vendor directory
-	[ ! -d vendor ] || rm -r vendor
-	@# executables used to be compiled into the $GOBIN directory
-	[ ! -n '$(GOBIN)' ] || rm -f $(GOBIN)/postgres-operator $(GOBIN)/apiserver $(GOBIN)/*pgo
-	@# executables used to be in subdirectories
-	[ ! -d bin/pgo-rmdata ] || rm -r bin/pgo-rmdata
-	[ ! -d bin/pgo-backrest ] || rm -r bin/pgo-backrest
-	[ ! -d bin/pgo-scheduler ] || rm -r bin/pgo-scheduler
-	[ ! -d bin/postgres-operator ] || rm -r bin/postgres-operator
-	@# keys used to be generated before install
-	[ ! -d conf/pgo-backrest-repo ] || rm -r conf/pgo-backrest-repo
-	[ ! -d conf/postgres-operator ] || rm -r conf/postgres-operator
-	@# crunchy-postgres-exporter used to live in this repo
-	[ ! -d bin/crunchy-postgres-exporter ] || rm -r bin/crunchy-postgres-exporter
-	[ ! -d build/crunchy-postgres-exporter ] || rm -r build/crunchy-postgres-exporter
-
 
 ##@ Deployment
 .PHONY: createnamespaces
@@ -152,44 +118,6 @@ build-postgres-operator: ## Build the postgres-operator binary
 		) --ldflags '-X "main.versionString=$(PGO_VERSION)"' $(\
 		) --trimpath -o bin/postgres-operator ./cmd/postgres-operator
 
-##@ Build - Images
-.PHONY: build-postgres-operator-image
-build-postgres-operator-image: ## Build the postgres-operator image
-build-postgres-operator-image: PGO_IMAGE_REVISION := $(shell git rev-parse HEAD)
-build-postgres-operator-image: PGO_IMAGE_TIMESTAMP := $(shell date -u +%FT%TZ)
-build-postgres-operator-image: build-postgres-operator
-build-postgres-operator-image: build/postgres-operator/Dockerfile
-	$(if $(shell (echo 'buildah version 1.24'; $(word 1,$(BUILDAH_BUILD)) --version) | sort -Vc 2>&1), \
-		$(warning WARNING: old buildah does not invalidate its cache for changed labels: \
-			https://github.com/containers/buildah/issues/3517))
-	$(if $(IMAGE_TAG),,	$(error missing IMAGE_TAG))
-	$(strip $(BUILDAH_BUILD)) \
-		--tag $(BUILDAH_TRANSPORT)$(PGO_IMAGE_PREFIX)/$(PGO_IMAGE_NAME):$(IMAGE_TAG) \
-		--label name='$(PGO_IMAGE_NAME)' \
-		--label build-date='$(PGO_IMAGE_TIMESTAMP)' \
-		--label description='$(PGO_IMAGE_DESCRIPTION)' \
-		--label maintainer='$(PGO_IMAGE_MAINTAINER)' \
-		--label summary='$(PGO_IMAGE_SUMMARY)' \
-		--label url='$(PGO_IMAGE_URL)' \
-		--label vcs-ref='$(PGO_IMAGE_REVISION)' \
-		--label vendor='$(PGO_IMAGE_MAINTAINER)' \
-		--label io.k8s.display-name='$(PGO_IMAGE_NAME)' \
-		--label io.k8s.description='$(PGO_IMAGE_DESCRIPTION)' \
-		--label io.openshift.tags="postgresql,postgres,sql,nosql,crunchy" \
-		--annotation org.opencontainers.image.authors='$(PGO_IMAGE_MAINTAINER)' \
-		--annotation org.opencontainers.image.vendor='$(PGO_IMAGE_MAINTAINER)' \
-		--annotation org.opencontainers.image.created='$(PGO_IMAGE_TIMESTAMP)' \
-		--annotation org.opencontainers.image.description='$(PGO_IMAGE_DESCRIPTION)' \
-		--annotation org.opencontainers.image.revision='$(PGO_IMAGE_REVISION)' \
-		--annotation org.opencontainers.image.title='$(PGO_IMAGE_SUMMARY)' \
-		--annotation org.opencontainers.image.url='$(PGO_IMAGE_URL)' \
-		$(if $(PGO_VERSION),$(strip \
-			--label release='$(PGO_VERSION)' \
-			--label version='$(PGO_VERSION)' \
-			--annotation org.opencontainers.image.version='$(PGO_VERSION)' \
-		)) \
-		--file $< --format docker --layers .
-
 ##@ Test
 .PHONY: check
 check: ## Run basic go tests with coverage output
@@ -222,15 +150,6 @@ check-envtest-existing: createnamespaces
 	kubectl delete -k ./config/dev
 
 ##@ Generate
-
-.PHONY: check-generate
-check-generate: ## Check crd, deepcopy functions, and rbac generation
-check-generate: generate-crd
-check-generate: generate-deepcopy
-check-generate: generate-rbac
-	git diff --exit-code -- config/crd
-	git diff --exit-code -- config/rbac
-	git diff --exit-code -- pkg/apis
 
 .PHONY: generate
 generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
@@ -327,18 +246,6 @@ license: licenses
 licenses: ## Aggregate license files
 	./bin/license_aggregator.sh ./cmd/...
 
-.PHONY: release-postgres-operator-image release-postgres-operator-image-labels
-release-postgres-operator-image: ## Build the postgres-operator image and all its prerequisites
-release-postgres-operator-image: release-postgres-operator-image-labels
-release-postgres-operator-image: licenses
-release-postgres-operator-image: build-postgres-operator-image
-release-postgres-operator-image-labels:
-	$(if $(PGO_IMAGE_DESCRIPTION),,	$(error missing PGO_IMAGE_DESCRIPTION))
-	$(if $(PGO_IMAGE_MAINTAINER),, 	$(error missing PGO_IMAGE_MAINTAINER))
-	$(if $(PGO_IMAGE_NAME),,       	$(error missing PGO_IMAGE_NAME))
-	$(if $(PGO_IMAGE_SUMMARY),,    	$(error missing PGO_IMAGE_SUMMARY))
-	$(if $(PGO_VERSION),,			$(error missing PGO_VERSION))
-
 ##@ Percona
 
 # Default values if not already set
@@ -385,9 +292,6 @@ tools/setup-envtest:
 build-docker-image: get-pgmonitor
 	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE) $(ROOT_REPO)/e2e-tests/build
 
-build-extension-installer-image:
-	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE)-ext-installer COMPONENT=extension-installer $(ROOT_REPO)/e2e-tests/build
-
 SWAGGER = $(shell pwd)/bin/swagger
 swagger: ## Download swagger locally if necessary.
 	$(call go-get-tool,$(SWAGGER),github.com/go-swagger/go-swagger/cmd/swagger@latest)
@@ -423,7 +327,7 @@ update-version:
 PG_VER ?= $(shell grep -o "postgresVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+")
 CERT_MANAGER_VER := $(shell grep -Eo "cert-manager v.*" go.mod|grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
 include e2e-tests/release_versions
-release: generate
+release: generate license
 	$(SED) -i "/CERT_MANAGER_VER/s/CERT_MANAGER_VER=\".*/CERT_MANAGER_VER=\"$(CERT_MANAGER_VER)\"/" e2e-tests/functions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
