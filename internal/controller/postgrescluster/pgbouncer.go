@@ -265,6 +265,14 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	err = client.IgnoreNotFound(err)
 
+	var userSecret *corev1.Secret
+	if ref := cluster.Spec.Proxy.PGBouncer.UsersSecret; ref != nil {
+		userSecret = &corev1.Secret{}
+		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: ref.Name}, userSecret); err != nil {
+			return nil, errors.Wrapf(err, "get PgBouncer users Secret %q", ref.Name)
+		}
+	}
+
 	var frontendCertManagerSecret *corev1.Secret
 	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
@@ -315,7 +323,7 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 
 	if err == nil {
-		err = pgbouncer.Secret(ctx, cluster, root, existing, service, intent, frontendCertManagerSecret)
+		err = pgbouncer.Secret(ctx, cluster, root, existing, userSecret, service, intent, frontendCertManagerSecret)
 	}
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, intent))

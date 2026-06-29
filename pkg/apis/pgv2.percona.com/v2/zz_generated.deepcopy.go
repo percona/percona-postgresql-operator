@@ -398,6 +398,11 @@ func (in *PGBouncerSpec) DeepCopyInto(out *PGBouncerSpec) {
 		*out = new(corev1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.UsersSecret != nil {
+		in, out := &in.UsersSecret, &out.UsersSecret
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))

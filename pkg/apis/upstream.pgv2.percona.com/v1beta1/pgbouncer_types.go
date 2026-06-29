@@ -145,6 +145,11 @@ type PGBouncerPodSpec struct {
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 
+	// Secret with users to add to PgBouncer's authentication file. Each key is
+	// a PgBouncer user name and its value is the password or verifier.
+	// +optional
+	UsersSecret *corev1.LocalObjectReference `json:"usersSecret,omitempty"`
+
 	// K8SPG-833
 	Env []corev1.EnvVar `json:"env,omitempty"`
 	// K8SPG-833
