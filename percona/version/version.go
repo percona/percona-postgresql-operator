@@ -39,6 +39,7 @@ type Meta struct {
 	PMMVersion         string
 	BackupVersion      string
 	CRUID              string
+	Distribution       string
 	PMMEnabled         bool
 	HelmDeployCR       bool
 	HelmDeployOperator bool
