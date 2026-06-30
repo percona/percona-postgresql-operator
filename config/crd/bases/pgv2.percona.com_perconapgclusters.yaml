@@ -29777,6 +29777,8 @@ spec:
                 type: object
               postgres:
                 properties:
+                  distribution:
+                    type: string
                   imageID:
                     type: string
                   instances:

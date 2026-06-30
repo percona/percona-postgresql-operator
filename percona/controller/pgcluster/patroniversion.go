@@ -56,12 +56,18 @@ func (r *PGClusterReconciler) reconcilePatroniVersionFromCluster(ctx context.Con
 		return errors.Wrap(err, "failed to get patroni version")
 	}
 
+	distribution, err := r.getPostgresDistribution(ctx, &p, naming.ContainerDatabase)
+	if err != nil {
+		return errors.Wrap(err, "failed to get postgres distribution")
+	}
+
 	orig := cr.DeepCopy()
 
 	cr.Status.Patroni.Version = patroniVersion
 	cr.Status.PatroniVersion = patroniVersion
 	cr.Status.Postgres.Version = pgVersion
 	cr.Status.Postgres.ImageID = imageID
+	cr.Status.Postgres.Distribution = distribution
 
 	if err := r.Client.Status().Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
 		return errors.Wrap(err, "failed to patch patroni version")
@@ -321,6 +327,21 @@ func (r *PGClusterReconciler) getInstancePods(ctx context.Context, cr *v2.Percon
 		return nil, errors.Wrap(err, "failed to list instances")
 	}
 	return pods, nil
+}
+
+func (r *PGClusterReconciler) getPostgresDistribution(ctx context.Context, pod *corev1.Pod, containerName string) (string, error) {
+	var stdout, stderr bytes.Buffer
+	execCli, err := clientcmd.NewClient()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create exec client")
+	}
+	if err := execCli.Exec(ctx, pod, containerName, nil, &stdout, &stderr, "postgres", "-V"); err != nil {
+		return "", errors.Wrap(err, "exec")
+	}
+	if strings.Contains(stdout.String(), "Percona Server for PostgreSQL") {
+		return "percona", nil
+	}
+	return "community", nil
 }
 
 func getImageIDFromPod(pod *corev1.Pod, containerName string) string {

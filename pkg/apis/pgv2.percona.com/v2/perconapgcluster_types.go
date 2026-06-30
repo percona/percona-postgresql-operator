@@ -544,6 +544,9 @@ type PostgresStatus struct {
 
 	// +optional
 	ImageID string `json:"imageID"`
+
+	// +optional
+	Distribution string `json:"distribution,omitempty"`
 }
 
 type PGBouncerStatus struct {
