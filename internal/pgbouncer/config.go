@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -78,7 +79,7 @@ func authFileContents(password string, userSecret *corev1.Secret) ([]byte, error
 	if userSecret != nil {
 		for name, password := range userSecret.Data {
 			if strings.ContainsAny(string(password), "\r\n") {
-				return nil, fmt.Errorf("pgbouncer user %q in Secret %q contains a newline", name, userSecret.Name)
+				return nil, errors.Errorf("pgbouncer user %q in Secret %q contains a newline", name, userSecret.Name)
 			}
 			users[name] = string(password)
 		}
