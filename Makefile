@@ -32,7 +32,7 @@ help: ## Display this help.
 
 .PHONY: all
 all: ## Build all images
-all: build-docker-image
+all: build
 
 .PHONY: get-pgmonitor
 get-pgmonitor:
@@ -289,7 +289,7 @@ tools: tools/setup-envtest
 tools/setup-envtest:
 	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
-build-docker-image: get-pgmonitor
+build: get-pgmonitor
 	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE) $(ROOT_REPO)/e2e-tests/build
 
 SWAGGER = $(shell pwd)/bin/swagger
