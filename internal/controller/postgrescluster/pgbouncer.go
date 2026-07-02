@@ -69,7 +69,7 @@ func (r *Reconciler) reconcilePGBouncerConfigMap(
 	configmap := &corev1.ConfigMap{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	configmap.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; delete the ConfigMap if it exists. Check the
 		// client cache first using Get.
 		key := client.ObjectKeyFromObject(configmap)
@@ -134,7 +134,7 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 
 	// K8SPG-345
 	var exposeSuperusers bool
-	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
+	if cluster.Spec.Proxy.PGBouncerEnabled() {
 		exposeSuperusers = cluster.Spec.Proxy.PGBouncer.ExposeSuperusers
 		if exposeSuperusers {
 			log.Info("Superusers are exposed through PGBouncer")
@@ -144,7 +144,7 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 	action := func(ctx context.Context, exec postgres.Executor) error {
 		return errors.WithStack(pgbouncer.EnableInPostgreSQL(ctx, exec, clusterSecret, exposeSuperusers))
 	}
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled.
 		action = func(ctx context.Context, exec postgres.Executor) error {
 			return errors.WithStack(pgbouncer.DisableInPostgreSQL(ctx, exec))
@@ -255,7 +255,7 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 		return nil, err
 	}
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; delete the Secret if it exists.
 		if err == nil {
 			err = errors.WithStack(r.deleteControlled(ctx, cluster, existing))
@@ -332,7 +332,7 @@ func (r *Reconciler) generatePGBouncerService(
 	service := &corev1.Service{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	service.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		return service, false, nil
 	}
 
@@ -439,7 +439,7 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	deploy := &appsv1.Deployment{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	deploy.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		return deploy, false, nil
 	}
 
@@ -628,7 +628,7 @@ func (r *Reconciler) reconcilePGBouncerPodDisruptionBudget(
 		return client.IgnoreNotFound(err)
 	}
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		return deleteExistingPDB(cluster)
 	}
 

@@ -60,6 +60,24 @@ namespace: ns5
 		}
 	})
 
+	t.Run("ZeroReplicas", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+			PGBouncer: &v1beta1.PGBouncerPodSpec{
+				Replicas: new(int32),
+			},
+		}
+
+		service, specified, err := reconciler.generatePGBouncerService(cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, !specified)
+
+		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
+name: pg7-pgbouncer
+namespace: ns5
+		`))
+	})
+
 	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
 		PGBouncer: &v1beta1.PGBouncerPodSpec{
 			Port: new(int32(9651)),
