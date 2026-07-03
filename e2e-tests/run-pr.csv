@@ -1,5 +1,4 @@
 backup-enable-disable
-backup-size-by-type
 builtin-extensions
 cert-manager-tls
 custom-envs
