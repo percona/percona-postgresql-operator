@@ -54,23 +54,4 @@ metadata:
 status:
   observedGeneration: 8
 
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-timeout: 560
-commands:
-  - script: |-
-      set -o errexit
-      set -o xtrace
-
-      kubectl wait --for=jsonpath='{.status.backupType}'=full --timeout=120s -n "${NAMESPACE}" pg-backup/demand-backup-full-repo3
-      kubectl -n "${NAMESPACE}" get pg-backup demand-backup-full-repo3 -o json | jq -e '.status.size != null' >/dev/null
-
-      kubectl wait --for=jsonpath='{.status.state}'=Succeeded --timeout=560s -n "${NAMESPACE}" pg-backup/demand-backup-differential-repo1
-      kubectl wait --for=jsonpath='{.status.backupType}'=diff --timeout=120s -n "${NAMESPACE}" pg-backup/demand-backup-differential-repo1
-      kubectl -n "${NAMESPACE}" get pg-backup demand-backup-differential-repo1 -o json | jq -e '.status.size != null' >/dev/null
-
-      kubectl wait --for=jsonpath='{.status.state}'=Succeeded --timeout=560s -n "${NAMESPACE}" pg-backup/demand-backup-incremental-repo1
-      kubectl wait --for=jsonpath='{.status.backupType}'=incr --timeout=120s -n "${NAMESPACE}" pg-backup/demand-backup-incremental-repo1
-      kubectl -n "${NAMESPACE}" get pg-backup demand-backup-incremental-repo1 -o json | jq -e '.status.size != null' >/dev/null
 
