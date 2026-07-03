@@ -1,0 +1,10 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGBackup
+metadata:
+  name: backup-size-incremental
+spec:
+  pgCluster: backup-size-by-type
+  repoName: repo1
+  options:
+    - --type=incr
+

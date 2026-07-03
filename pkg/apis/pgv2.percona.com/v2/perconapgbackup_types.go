@@ -122,6 +122,7 @@ type PerconaPGBackupStatus struct {
 	Repo                 *crunchyv1beta1.PGBackRestRepo `json:"repo,omitempty"`
 	Image                string                         `json:"image,omitempty"`
 	BackupName           string                         `json:"backupName,omitempty"`
+	Size                 int64                          `json:"size,omitempty"`
 	CRVersion            string                         `json:"crVersion,omitempty"`
 	LatestRestorableTime PITRestoreDateTime             `json:"latestRestorableTime,omitempty"`
 	Snapshot             *SnapshotStatus                `json:"snapshot,omitempty"`
