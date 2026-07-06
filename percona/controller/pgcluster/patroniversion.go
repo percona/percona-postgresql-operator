@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
@@ -43,9 +44,12 @@ func (r *PGClusterReconciler) reconcilePatroniVersionFromCluster(ctx context.Con
 	imageID := getImageIDFromPod(&p, naming.ContainerDatabase)
 	pgVersion := cr.Spec.PostgresVersion
 
-	// If patroni version is set, and neither imageID nor PG version have changed,
-	// we don't need to check the patroni version again.
+	// If patroni version and distribution are set, and neither imageID nor PG
+	// version have changed, we don't need to check them again. The distribution
+	// check ensures existing clusters (upgraded from an operator version that
+	// didn't populate it) get their distribution detected at least once.
 	if cr.Status.Patroni.Version != "" &&
+		cr.Status.Postgres.Distribution != "" &&
 		cr.Status.Postgres.ImageID == imageID &&
 		cr.Status.Postgres.Version == pgVersion {
 		return nil
@@ -56,9 +60,15 @@ func (r *PGClusterReconciler) reconcilePatroniVersionFromCluster(ctx context.Con
 		return errors.Wrap(err, "failed to get patroni version")
 	}
 
+	// Distribution is optional telemetry metadata. A detection failure (e.g. the
+	// postgres binary is missing or exec is denied) must not abort reconciliation,
+	// so log it and continue with the empty (unknown) value. The empty value also
+	// keeps the early-return guard above from short-circuiting, so detection is
+	// retried on subsequent reconciles.
 	distribution, err := r.getPostgresDistribution(ctx, &p, naming.ContainerDatabase)
 	if err != nil {
-		return errors.Wrap(err, "failed to get postgres distribution")
+		logging.FromContext(ctx).Error(err, "failed to detect postgres distribution, continuing with unknown")
+		distribution = ""
 	}
 
 	orig := cr.DeepCopy()
@@ -329,19 +339,37 @@ func (r *PGClusterReconciler) getInstancePods(ctx context.Context, cr *v2.Percon
 	return pods, nil
 }
 
+// perconaDistributionMarker appears in the `postgres -V` output of Percona Server
+// for PostgreSQL. The branded version string is compiled into the `postgres`
+// binary shipped by the `percona-postgresql<N>-server` package that the database
+// image installs; community PostgreSQL builds do not contain it.
+const perconaDistributionMarker = "Percona Server for PostgreSQL"
+
+// distributionExecBackoff retries the `postgres -V` exec while the database
+// container is briefly unavailable during pod startup. It is a package variable
+// so tests can shorten it.
+var distributionExecBackoff = wait.Backoff{
+	Duration: 5 * time.Second,
+	Factor:   1.0,
+	Steps:    12,
+	Cap:      time.Minute,
+}
+
 func (r *PGClusterReconciler) getPostgresDistribution(ctx context.Context, pod *corev1.Pod, containerName string) (string, error) {
 	var stdout, stderr bytes.Buffer
-	execCli, err := clientcmd.NewClient()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to create exec client")
+	if err := retry.OnError(distributionExecBackoff, func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "container not found")
+	}, func() error {
+		stdout.Reset()
+		stderr.Reset()
+		return r.PodExec(ctx, pod.Namespace, pod.Name, containerName, nil, &stdout, &stderr, "postgres", "-V")
+	}); err != nil {
+		return "", errors.Wrapf(err, "exec: %s", strings.TrimSpace(stderr.String()))
 	}
-	if err := execCli.Exec(ctx, pod, containerName, nil, &stdout, &stderr, "postgres", "-V"); err != nil {
-		return "", errors.Wrap(err, "exec")
+	if strings.Contains(stdout.String(), perconaDistributionMarker) {
+		return v2.PostgresDistributionPercona, nil
 	}
-	if strings.Contains(stdout.String(), "Percona Server for PostgreSQL") {
-		return "percona", nil
-	}
-	return "community", nil
+	return v2.PostgresDistributionCommunity, nil
 }
 
 func getImageIDFromPod(pod *corev1.Pod, containerName string) string {
