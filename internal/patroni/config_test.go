@@ -335,7 +335,7 @@ watchdog:
 				Type: v1beta1.PatroniDCSTypeEtcd,
 				Etcd: &v1beta1.PatroniEtcdSpec{
 					Endpoints: []string{"https://etcd:2379"},
-					TLSSecret: "etcd-tls-secret",
+					TLSSecret: "etcd-tls",
 				},
 			},
 		}

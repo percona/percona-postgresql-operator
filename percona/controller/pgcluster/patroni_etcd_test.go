@@ -108,11 +108,11 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 			Type: v1beta1.PatroniDCSTypeEtcd,
 			Etcd: &v1beta1.PatroniEtcdSpec{
 				Endpoints: []string{"https://etcd:2379"},
-				TLSSecret: "missing-tls-secret",
+				TLSSecret: "missing-tls",
 			},
 		})
 		err := r.reconcilePatroniEtcd(ctx, cr)
-		assert.ErrorContains(t, err, "missing-tls-secret")
+		assert.ErrorContains(t, err, "missing-tls")
 		events := drainEvents(r)
 		assert.Equal(t, len(events), 1)
 		assert.Assert(t, strings.Contains(events[0], "EtcdTLSSecretNotFound"))
@@ -227,4 +227,3 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 		assert.Equal(t, len(events), 2)
 	})
 }
-
