@@ -445,7 +445,7 @@ func isOKE(ctx context.Context, cfg *rest.Config) bool {
 }
 
 func isACK(ctx context.Context, cfg *rest.Config) bool {
-	if strings.Contains(cfg.Host, ".aliyuncs.com") {
+	if strings.Contains(cfg.Host, ".aliyuncs.com") || hasAPIGroup(ctx, cfg, "alibabacloud.com") {
 		logging.FromContext(ctx).Info("detected ACK environment")
 		return true
 	}
