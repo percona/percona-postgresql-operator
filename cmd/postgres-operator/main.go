@@ -383,27 +383,48 @@ func hasAPIGroup(ctx context.Context, cfg *rest.Config, groupName string) bool {
 	return false
 }
 
-func isGKE(ctx context.Context, cfg *rest.Config) bool {
-	if hasAPIGroup(ctx, cfg, "networking.gke.io") {
-		logging.FromContext(ctx).Info("detected GKE environment")
-		return true
+type platformProbe struct {
+	name      string
+	label     string
+	apiGroups []string
+	hosts     []string
+	custom    func(ctx context.Context, cfg *rest.Config) bool
+}
+
+func (p platformProbe) detect(ctx context.Context, cfg *rest.Config) bool {
+	if p.custom != nil {
+		return p.custom(ctx, cfg)
+	}
+	for _, g := range p.apiGroups {
+		if hasAPIGroup(ctx, cfg, g) {
+			return true
+		}
+	}
+	for _, h := range p.hosts {
+		if strings.Contains(cfg.Host, h) {
+			return true
+		}
 	}
 	return false
 }
 
-func isEKS(ctx context.Context, cfg *rest.Config) bool {
-	// crd.k8s.amazonaws.com (VPC CNI) and metrics.eks.amazonaws.com (control plane metrics)
-	// are independent EKS signals; either is sufficient.
-	if hasAPIGroup(ctx, cfg, "crd.k8s.amazonaws.com") || hasAPIGroup(ctx, cfg, "metrics.eks.amazonaws.com") {
-		logging.FromContext(ctx).Info("detected EKS environment")
-		return true
-	}
-	return false
+var platformProbes = []platformProbe{
+	{name: "gke", label: "GKE", apiGroups: []string{"networking.gke.io"}},
+	// crd.k8s.amazonaws.com (VPC CNI) and metrics.eks.amazonaws.com are independent EKS signals.
+	{name: "eks", label: "EKS", apiGroups: []string{"crd.k8s.amazonaws.com", "metrics.eks.amazonaws.com"}},
+	// AKS exposes no unique API groups; inspect the API server TLS cert SAN instead.
+	{name: "aks", label: "AKS", custom: detectAKS},
+	{name: "doks", label: "DOKS", apiGroups: []string{"dataplane-operator.doks.digitalocean.com"}},
+	{name: "oke", label: "OKE", hosts: []string{".oraclecloud.com"}},
+	{name: "ack", label: "ACK", apiGroups: []string{"alibabacloud.com"}, hosts: []string{".aliyuncs.com"}},
+	// kommander.mesosphere.io is the legacy D2iQ/Konvoy group name for NKP.
+	{name: "nkp", label: "NKP", apiGroups: []string{"nkp.nutanix.com", "kommander.mesosphere.io"}},
+	{name: "platform9", label: "Platform9", hosts: []string{".platform9.io", ".platform9.net"}},
+	{name: "tanzu", label: "Tanzu", apiGroups: []string{"run.tanzu.vmware.com"}},
+	{name: "rancher", label: "Rancher", apiGroups: []string{"management.cattle.io"}},
 }
 
-func isAKS(ctx context.Context, cfg *rest.Config) bool {
-	// AKS exposes no unique API groups, so we inspect the API server TLS certificate:
-	// its SAN always contains a hostname ending in .azmk8s.io regardless of network plugin.
+func detectAKS(ctx context.Context, cfg *rest.Config) bool {
 	tlsCfg, err := rest.TLSConfigFor(cfg)
 	if err != nil {
 		logging.FromContext(ctx).V(1).Info("platform detection: could not build TLS config", "error", err.Error())
@@ -420,7 +441,6 @@ func isAKS(ctx context.Context, cfg *rest.Config) bool {
 	for _, cert := range conn.ConnectionState().PeerCertificates {
 		for _, san := range cert.DNSNames {
 			if strings.HasSuffix(san, ".azmk8s.io") {
-				logging.FromContext(ctx).Info("detected AKS environment")
 				return true
 			}
 		}
@@ -428,90 +448,17 @@ func isAKS(ctx context.Context, cfg *rest.Config) bool {
 	return false
 }
 
-func isDOKS(ctx context.Context, cfg *rest.Config) bool {
-	if hasAPIGroup(ctx, cfg, "dataplane-operator.doks.digitalocean.com") {
-		logging.FromContext(ctx).Info("detected DOKS environment")
-		return true
-	}
-	return false
-}
-
-func isOKE(ctx context.Context, cfg *rest.Config) bool {
-	if strings.Contains(cfg.Host, ".oraclecloud.com") {
-		logging.FromContext(ctx).Info("detected OKE environment")
-		return true
-	}
-	return false
-}
-
-func isACK(ctx context.Context, cfg *rest.Config) bool {
-	if strings.Contains(cfg.Host, ".aliyuncs.com") || hasAPIGroup(ctx, cfg, "alibabacloud.com") {
-		logging.FromContext(ctx).Info("detected ACK environment")
-		return true
-	}
-	return false
-}
-
-func isNKP(ctx context.Context, cfg *rest.Config) bool {
-	// kommander.mesosphere.io is the legacy D2iQ/Konvoy group name.
-	if hasAPIGroup(ctx, cfg, "nkp.nutanix.com") || hasAPIGroup(ctx, cfg, "kommander.mesosphere.io") {
-		logging.FromContext(ctx).Info("detected NKP environment")
-		return true
-	}
-	return false
-}
-
-func isPlatform9(ctx context.Context, cfg *rest.Config) bool {
-	if strings.Contains(cfg.Host, ".platform9.io") || strings.Contains(cfg.Host, ".platform9.net") {
-		logging.FromContext(ctx).Info("detected Platform9 environment")
-		return true
-	}
-	return false
-}
-
-func isTanzu(ctx context.Context, cfg *rest.Config) bool {
-	if hasAPIGroup(ctx, cfg, "run.tanzu.vmware.com") {
-		logging.FromContext(ctx).Info("detected Tanzu environment")
-		return true
-	}
-	return false
-}
-
-func isRancher(ctx context.Context, cfg *rest.Config) bool {
-	if hasAPIGroup(ctx, cfg, "management.cattle.io") {
-		logging.FromContext(ctx).Info("detected Rancher environment")
-		return true
-	}
-	return false
-}
-
 func detectPlatform(ctx context.Context, cfg *rest.Config, openShift bool) string {
-	switch {
-	case openShift:
+	if openShift {
 		return "openshift"
-	case isGKE(ctx, cfg):
-		return "gke"
-	case isEKS(ctx, cfg):
-		return "eks"
-	case isAKS(ctx, cfg):
-		return "aks"
-	case isDOKS(ctx, cfg):
-		return "doks"
-	case isOKE(ctx, cfg):
-		return "oke"
-	case isACK(ctx, cfg):
-		return "ack"
-	case isNKP(ctx, cfg):
-		return "nkp"
-	case isPlatform9(ctx, cfg):
-		return "platform9"
-	case isTanzu(ctx, cfg):
-		return "tanzu"
-	case isRancher(ctx, cfg):
-		return "rancher"
-	default:
-		return "unknown"
 	}
+	for _, probe := range platformProbes {
+		if probe.detect(ctx, cfg) {
+			logging.FromContext(ctx).Info("detected "+probe.label+" environment")
+			return probe.name
+		}
+	}
+	return "unknown"
 }
 
 // getServerVersion returns the stringified server version (i.e., the same info `kubectl version`
