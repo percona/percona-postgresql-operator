@@ -538,7 +538,7 @@ func TestReconcilePatroniStatusEtcd(t *testing.T) {
 	ctx := context.Background()
 
 	newCluster := func() *v1beta1.PostgresCluster {
-		return &v1beta1.PostgresCluster{
+		cluster := &v1beta1.PostgresCluster{
 			ObjectMeta: metav1.ObjectMeta{Name: "etcd-status", Namespace: "postgres-operator"},
 			Spec: v1beta1.PostgresClusterSpec{
 				Patroni: &v1beta1.PatroniSpec{
@@ -546,6 +546,10 @@ func TestReconcilePatroniStatusEtcd(t *testing.T) {
 				},
 			},
 		}
+		// SyncPeriodSeconds is normally set by cluster.Default(), called
+		// earlier in Reconcile.
+		cluster.Spec.Patroni.Default()
+		return cluster
 	}
 
 	runningInstance := func() *observedInstances {

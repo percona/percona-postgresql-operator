@@ -22508,10 +22508,6 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
-                x-kubernetes-validations:
-                - message: DCS type is immutable after cluster creation
-                  rule: '(has(oldSelf.dcs) ? oldSelf.dcs.type : ''kubernetes'') ==
-                    (has(self.dcs) ? self.dcs.type : ''kubernetes'')'
               paused:
                 description: |-
                   Suspends the rollout and reconciliation of changes made to the

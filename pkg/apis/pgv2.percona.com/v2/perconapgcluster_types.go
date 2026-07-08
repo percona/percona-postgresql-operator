@@ -326,25 +326,8 @@ func (cr *PerconaPGCluster) Validate() error {
 		ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatStatements, false) {
 		return errors.New("pg_stat_monitor and pg_stat_statements cannot both be enabled")
 	}
-	if err := cr.ValidatePatroniDCS(); err != nil {
-		return err
-	}
 	if err := cr.ValidateDynamicConfiguration(); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (cr *PerconaPGCluster) ValidatePatroniDCS() error {
-	if cr.Spec.Patroni == nil {
-		return nil
-	}
-	if cr.Spec.Patroni.DCSType() != crunchyv1beta1.PatroniDCSTypeEtcd {
-		return nil
-	}
-	dcs := cr.Spec.Patroni.GetDCS()
-	if dcs.Etcd == nil || len(dcs.Etcd.Endpoints) == 0 {
-		return errors.New("spec.patroni.dcs.etcd.endpoints must be non-empty when type is etcd")
 	}
 	return nil
 }

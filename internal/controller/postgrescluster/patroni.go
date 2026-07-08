@@ -435,11 +435,9 @@ func (r *Reconciler) reconcilePatroniStatus(
 			// pending restarts never fires under non-Kubernetes DCS (Patroni
 			// doesn't write that annotation), so poll at roughly Patroni's
 			// own loop_wait cadence instead. See handlePatroniRestarts.
-			syncPeriod := int32(10)
-			if cluster.Spec.Patroni.SyncPeriodSeconds != nil {
-				syncPeriod = *cluster.Spec.Patroni.SyncPeriodSeconds
-			}
-			requeue = time.Duration(syncPeriod) * time.Second
+			// cluster.Default() (called earlier in Reconcile) guarantees
+			// SyncPeriodSeconds is set.
+			requeue = time.Duration(*cluster.Spec.Patroni.SyncPeriodSeconds) * time.Second
 		}
 
 		return requeue, nil
