@@ -432,12 +432,13 @@ func detectAKS(ctx context.Context, cfg *rest.Config) bool {
 	}
 	host := strings.TrimPrefix(cfg.Host, "https://")
 	host = strings.TrimPrefix(host, "http://")
-	conn, err := tls.Dial("tcp", host, tlsCfg)
+	netConn, err := (&tls.Dialer{Config: tlsCfg}).DialContext(ctx, "tcp", host)
 	if err != nil {
 		logging.FromContext(ctx).V(1).Info("platform detection: could not dial API server", "error", err.Error())
 		return false
 	}
-	defer conn.Close()
+	defer netConn.Close()
+	conn := netConn.(*tls.Conn)
 	for _, cert := range conn.ConnectionState().PeerCertificates {
 		for _, san := range cert.DNSNames {
 			if strings.HasSuffix(san, ".azmk8s.io") {
@@ -454,7 +455,7 @@ func detectPlatform(ctx context.Context, cfg *rest.Config, openShift bool) strin
 	}
 	for _, probe := range platformProbes {
 		if probe.detect(ctx, cfg) {
-			logging.FromContext(ctx).Info("detected "+probe.label+" environment")
+			logging.FromContext(ctx).Info("detected " + probe.label + " environment")
 			return probe.name
 		}
 	}
