@@ -33,6 +33,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgcron"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgrepack"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
@@ -40,6 +41,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgis"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	pgpassword "github.com/percona/percona-postgresql-operator/v2/internal/postgres/password"
+	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
 	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
@@ -249,7 +251,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
 	// K8SPG-375, K8SPG-577, K8SPG-699
-	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, postgisInstallOK bool
+	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, pgCronOK, setUserOK, postgisInstallOK bool
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
 		_, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -336,6 +338,30 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
+		if cluster.Spec.Extensions.PGCron {
+			if pgCronOK = pgcron.EnableInPostgreSQL(ctx, exec) == nil; !pgCronOK {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronDisabled",
+					"Unable to install pg_cron")
+			}
+		} else {
+			if pgCronOK = pgcron.DisableInPostgreSQL(ctx, exec) == nil; !pgCronOK {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronEnabled",
+					"Unable to disable pg_cron")
+			}
+		}
+
+		if cluster.Spec.Extensions.SetUser {
+			if setUserOK = setuser.EnableInPostgreSQL(ctx, exec) == nil; !setUserOK {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "setUserDisabled",
+					"Unable to install set_user")
+			}
+		} else {
+			if setUserOK = setuser.DisableInPostgreSQL(ctx, exec) == nil; !setUserOK {
+				r.Recorder.Event(cluster, corev1.EventTypeWarning, "setUserEnabled",
+					"Unable to disable set_user")
+			}
+		}
+
 		// Enabling PostGIS extensions is a one-way operation
 		// e.g., you can take a PostgresCluster and turn it into a PostGISCluster,
 		// but you cannot reverse the process, as that would potentially remove an extension
@@ -381,7 +407,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
 	}
 	// K8SPG-472
-	if err == nil && pgStatMonitorOK && pgAuditOK && pgvectorOK && postgisInstallOK && pgRepackOK {
+	if err == nil && pgStatMonitorOK && pgAuditOK && pgvectorOK && postgisInstallOK && pgRepackOK && pgCronOK && setUserOK {
 		cluster.Status.DatabaseRevision = revision
 	}
 
