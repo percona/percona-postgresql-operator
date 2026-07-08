@@ -415,7 +415,7 @@ var platformProbes = []platformProbe{
 	// AKS exposes no unique API groups; inspect the API server TLS cert SAN instead.
 	{name: "aks", label: "AKS", custom: detectAKS},
 	{name: "doks", label: "DOKS", apiGroups: []string{"dataplane-operator.doks.digitalocean.com"}},
-	{name: "oke", label: "OKE", hosts: []string{".oraclecloud.com"}},
+	{name: "oke", label: "OKE", apiGroups: []string{"oci.oraclecloud.com"}, hosts: []string{".oraclecloud.com"}},
 	{name: "ack", label: "ACK", apiGroups: []string{"alibabacloud.com"}, hosts: []string{".aliyuncs.com"}},
 	// kommander.mesosphere.io is the legacy D2iQ/Konvoy group name for NKP.
 	{name: "nkp", label: "NKP", apiGroups: []string{"nkp.nutanix.com", "kommander.mesosphere.io"}},
