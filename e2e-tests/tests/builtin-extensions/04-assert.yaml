@@ -8,9 +8,10 @@ metadata:
   name: 04-check-extensions
 data:
   data: |2-
+     pg_cron
      pg_repack
      pg_stat_statements
      pgaudit
      plpgsql
+     set_user
      vector
-
