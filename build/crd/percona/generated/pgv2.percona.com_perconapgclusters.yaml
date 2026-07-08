@@ -22059,6 +22059,11 @@ spec:
                             maxItems: 7
                             minItems: 1
                             type: array
+                            x-kubernetes-validations:
+                            - message: all endpoints must use the same scheme (http
+                                or https)
+                              rule: self.all(e, url(e).getScheme() == 'http') || self.all(e,
+                                url(e).getScheme() == 'https')
                           tlsSecret:
                             description: |-
                               TLSSecret is the name of a Secret in the same namespace with keys
@@ -22067,20 +22072,17 @@ spec:
                         required:
                         - endpoints
                         type: object
-                        x-kubernetes-validations:
-                        - message: all endpoints must use the same scheme (http or
-                            https)
-                          rule: self.endpoints.all(e, e.startsWith('https://')) ||
-                            self.endpoints.all(e, e.startsWith('http://'))
                       type:
+                        allOf:
+                        - enum:
+                          - kubernetes
+                          - etcd
+                        - enum:
+                          - kubernetes
+                          - etcd
                         default: kubernetes
-                        description: |-
-                          Type of DCS backend. Defaults to "kubernetes".
-                          Changing this value causes cluster downtime; all instances must restart.
-                          This field is immutable after cluster creation.
-                        enum:
-                        - kubernetes
-                        - etcd
+                        description: PatroniDCSType identifies which DCS backend Patroni
+                          should use.
                         type: string
                     type: object
                     x-kubernetes-validations:

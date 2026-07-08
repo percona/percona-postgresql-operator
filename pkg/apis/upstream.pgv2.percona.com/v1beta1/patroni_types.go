@@ -98,10 +98,12 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.type) || oldSelf.type == self.type",message="DCS type is immutable after cluster creation"
 type PatroniDCS struct {
 	// Type of DCS backend. Defaults to "kubernetes".
-	// Changing this value causes cluster downtime; all instances must restart.
+	// Changing this is not allowed because it will lead to a downtime
 	// This field is immutable after cluster creation.
 	// +optional
 	// +kubebuilder:default=kubernetes
+	// +kubebuilder:validation:Enum={kubernetes,etcd}
+
 	Type PatroniDCSType `json:"type,omitempty"`
 
 	// Etcd holds settings for the external etcd DCS backend.
@@ -111,7 +113,6 @@ type PatroniDCS struct {
 }
 
 // PatroniEtcdSpec defines connectivity to an external etcd cluster used as DCS.
-// +kubebuilder:validation:XValidation:rule="self.endpoints.all(e, e.startsWith('https://')) || self.endpoints.all(e, e.startsWith('http://'))",message="all endpoints must use the same scheme (http or https)"
 type PatroniEtcdSpec struct {
 	// Endpoints is the list of etcd endpoints including scheme and port.
 	// Example: ["https://etcd.etcd-cluster.svc:2379"]
@@ -120,6 +121,7 @@ type PatroniEtcdSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=7
 	// +kubebuilder:validation:items:Pattern=`^https?://[^/]`
+	// +kubebuilder:validation:XValidation:rule="self.all(e, url(e).getScheme() == 'http') || self.all(e, url(e).getScheme() == 'https')",message="all endpoints must use the same scheme (http or https)"
 	Endpoints []string `json:"endpoints"`
 
 	// TLSSecret is the name of a Secret in the same namespace with keys
