@@ -14388,6 +14388,8 @@ spec:
                     properties:
                       pg_audit:
                         type: boolean
+                      pg_cron:
+                        type: boolean
                       pg_repack:
                         type: boolean
                       pg_stat_monitor:
@@ -14395,6 +14397,8 @@ spec:
                       pg_stat_statements:
                         type: boolean
                       pgvector:
+                        type: boolean
+                      set_user:
                         type: boolean
                     type: object
                   custom:
