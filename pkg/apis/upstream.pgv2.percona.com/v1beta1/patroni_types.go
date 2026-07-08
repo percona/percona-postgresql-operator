@@ -83,6 +83,15 @@ func (c *PostgresCluster) DCSType() PatroniDCSType {
 	return c.Spec.Patroni.DCSType()
 }
 
+// UsesExternalDCS returns true when Patroni's DCS backend is anything other
+// than the built-in Kubernetes Endpoints/ConfigMap store (e.g. etcd). Prefer
+// this over comparing DCSType() to a specific non-Kubernetes value when the
+// logic in question only cares whether Patroni manages its own state outside
+// Kubernetes -- not which external backend it uses.
+func (c *PostgresCluster) UsesExternalDCS() bool {
+	return c.DCSType() != PatroniDCSTypeKubernetes
+}
+
 // PatroniDCSType identifies which DCS backend Patroni should use.
 // +kubebuilder:validation:Enum={kubernetes,etcd}
 type PatroniDCSType string

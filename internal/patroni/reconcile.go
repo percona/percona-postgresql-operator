@@ -6,6 +6,7 @@ package patroni
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"strings"
 
@@ -138,53 +139,12 @@ func InstancePod(ctx context.Context,
 	})
 
 	// Mount etcd TLS Secret and inject auth env vars when the etcd DCS backend is configured.
+	//TODO: support other dcs
 	if inCluster.DCSType() == v1beta1.PatroniDCSTypeEtcd {
-		if dcs := inCluster.GetDCS(); dcs.Etcd != nil {
-			etcd := dcs.Etcd
-
-			if etcd.TLSSecret != "" {
-				etcdTLSVol := corev1.Volume{
-					Name: "patroni-etcd-tls",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName:  etcd.TLSSecret,
-							DefaultMode: ptr.To(int32(0o400)),
-						},
-					},
-				}
-				outInstancePod.Spec.Volumes = append(outInstancePod.Spec.Volumes, etcdTLSVol)
-				container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-					Name:      "patroni-etcd-tls",
-					MountPath: path.Join(configDirectory, "etcd-tls"),
-					ReadOnly:  true,
-				})
-			}
-
-			if etcd.AuthSecret != "" {
-				// Patroni reads PATRONI_ETCD3_USERNAME and PATRONI_ETCD3_PASSWORD
-				// as overrides for etcd3.username and etcd3.password in the config.
-				container.Env = append(container.Env,
-					corev1.EnvVar{
-						Name: "PATRONI_ETCD3_USERNAME",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: etcd.AuthSecret},
-								Key:                  "username",
-							},
-						},
-					},
-					corev1.EnvVar{
-						Name: "PATRONI_ETCD3_PASSWORD",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: etcd.AuthSecret},
-								Key:                  "password",
-							},
-						},
-					},
-				)
-			}
-		}
+		volumes, mounts, env := etcdDCSMounts(inCluster)
+		outInstancePod.Spec.Volumes = append(outInstancePod.Spec.Volumes, volumes...)
+		container.VolumeMounts = append(container.VolumeMounts, mounts...)
+		container.Env = append(container.Env, env...)
 	}
 
 	instanceProbes(inCluster, container)
@@ -195,6 +155,111 @@ func InstancePod(ctx context.Context,
 	}
 
 	return nil
+}
+
+// etcdDCSMounts returns the etcd TLS volume/mount and PATRONI_ETCD3_* auth env
+// vars needed by any Patroni process (a running instance or a one-off
+// "patronictl" invocation) to reach cluster's etcd DCS. Returns nils when TLS
+// or auth secrets aren't configured.
+func etcdDCSMounts(cluster *v1beta1.PostgresCluster) (
+	volumes []corev1.Volume, mounts []corev1.VolumeMount, env []corev1.EnvVar,
+) {
+	dcs := cluster.GetDCS()
+	if dcs == nil || dcs.Etcd == nil {
+		return nil, nil, nil
+	}
+	etcd := dcs.Etcd
+
+	if etcd.TLSSecret != "" {
+		volumes = append(volumes, corev1.Volume{
+			Name: "patroni-etcd-tls",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  etcd.TLSSecret,
+					DefaultMode: ptr.To(int32(0o400)),
+				},
+			},
+		})
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      "patroni-etcd-tls",
+			MountPath: path.Join(configDirectory, "etcd-tls"),
+			ReadOnly:  true,
+		})
+	}
+
+	if etcd.AuthSecret != "" {
+		// Patroni reads PATRONI_ETCD3_USERNAME and PATRONI_ETCD3_PASSWORD
+		// as overrides for etcd3.username and etcd3.password in the config.
+		env = append(env,
+			corev1.EnvVar{
+				Name: "PATRONI_ETCD3_USERNAME",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: etcd.AuthSecret},
+						Key:                  "username",
+					},
+				},
+			},
+			corev1.EnvVar{
+				Name: "PATRONI_ETCD3_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: etcd.AuthSecret},
+						Key:                  "password",
+					},
+				},
+			},
+		)
+	}
+
+	return volumes, mounts, env
+}
+
+// DCSCleanupJob populates a PodTemplateSpec's existing "database"-named
+// container to run "patronictl remove" against cluster's Patroni DCS
+// backend. Used only when cluster.UsesExternalDCS() (e.g. etcd), to clear
+// Patroni's DCS state (leader lock, members, and the "initialize" key) before
+// an in-place restore re-bootstraps the cluster against a restored data
+// directory.
+func DCSCleanupJob(
+	cluster *v1beta1.PostgresCluster,
+	clusterConfigMap, instanceConfigMap *corev1.ConfigMap,
+	inInstanceCertificates *corev1.Secret,
+	outPod *corev1.PodTemplateSpec,
+) {
+	var container *corev1.Container
+	for i := range outPod.Spec.Containers {
+		if outPod.Spec.Containers[i].Name == naming.ContainerDatabase {
+			container = &outPod.Spec.Containers[i]
+		}
+	}
+
+	scope := naming.PatroniScope(cluster)
+	configFile := path.Join(configDirectory, "~postgres-operator_cluster.yaml")
+	container.Command = []string{"sh", "-c",
+		fmt.Sprintf("printf '%s\\nYes I am aware\\n' %s | exec patronictl -c %s remove %s",
+			quoteShellWord(scope), quoteShellWord(scope), quoteShellWord(configFile), quoteShellWord(scope)),
+	}
+
+	volume := corev1.Volume{Name: "patroni-config"}
+	volume.Projected = new(corev1.ProjectedVolumeSource)
+	volume.Projected.Sources = append(append(volume.Projected.Sources,
+		instanceConfigFiles(clusterConfigMap, instanceConfigMap)...),
+		instanceCertificates(inInstanceCertificates)...)
+
+	outPod.Spec.Volumes = append(outPod.Spec.Volumes, volume)
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      volume.Name,
+		MountPath: configDirectory,
+		ReadOnly:  true,
+	})
+
+	if cluster.DCSType() == v1beta1.PatroniDCSTypeEtcd {
+		volumes, mounts, env := etcdDCSMounts(cluster)
+		outPod.Spec.Volumes = append(outPod.Spec.Volumes, volumes...)
+		container.VolumeMounts = append(container.VolumeMounts, mounts...)
+		container.Env = append(container.Env, env...)
+	}
 }
 
 // K8SPG-708 instanceInitContainer adds the instance init container

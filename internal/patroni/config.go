@@ -438,7 +438,7 @@ func instanceEnvironment(
 	}
 
 	// The PATRONI_KUBERNETES_* variables are only needed for the Kubernetes DCS backend.
-	if cluster.DCSType() != v1beta1.PatroniDCSTypeEtcd {
+	if !cluster.UsesExternalDCS() {
 		variables = append(variables,
 			// Set "kubernetes.pod_ip" to the v1.Pod's primary IP address.
 			// Patroni must be restarted when changing this value.
@@ -576,7 +576,7 @@ func instanceYAML(
 
 	// For the Kubernetes DCS backend, include an empty kubernetes section that
 	// receives pod_ip and ports from the PATRONI_KUBERNETES_* environment variables.
-	if cluster.DCSType() != v1beta1.PatroniDCSTypeEtcd {
+	if !cluster.UsesExternalDCS() {
 		root["kubernetes"] = map[string]any{
 			// Missing here is "pod_ip" which cannot be known until the instance Pod is
 			// created. That value should be injected using the downward API and the

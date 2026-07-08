@@ -433,6 +433,16 @@ func PatroniLeaderEndpoints(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta 
 	}
 }
 
+// PatroniDCSCleanupJob returns the ObjectMeta for the Job that runs
+// "patronictl remove" to clear cluster's Patroni state from an external DCS
+// (e.g. etcd) before an in-place restore re-bootstraps the cluster.
+func PatroniDCSCleanupJob(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.GetNamespace(),
+		Name:      cluster.Name + "-patroni-dcs-cleanup",
+	}
+}
+
 // PatroniScope returns the "scope" Patroni uses for cluster.
 func PatroniScope(cluster *v1beta1.PostgresCluster) string {
 	return cluster.Name + "-ha"

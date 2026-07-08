@@ -3791,7 +3791,7 @@ func TestObserveRestoreEnv(t *testing.T) {
 				cluster := fakePostgresCluster(clusterName, namespace, clusterUID, dedicated)
 				tc.createResources(t, cluster)
 
-				endpoints, job, err := r.observeRestoreEnv(ctx, cluster)
+				endpoints, job, _, err := r.observeRestoreEnv(ctx, cluster)
 				assert.NilError(t, err)
 
 				assert.Assert(t, tc.result.foundRestoreJob == (job != nil))
@@ -3809,6 +3809,84 @@ func TestObserveRestoreEnv(t *testing.T) {
 			})
 		}
 	}
+
+	t.Run("etcd DCS", func(t *testing.T) {
+		generateDCSCleanupJob := func(clusterName string, completed, failed *bool) *batchv1.Job {
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+			}
+			meta := naming.PatroniDCSCleanupJob(cluster)
+			meta.Labels = naming.PatroniDCSCleanupJobLabels(cluster.Name)
+
+			job := &batchv1.Job{
+				ObjectMeta: meta,
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: meta,
+						Spec: corev1.PodSpec{
+							Containers:    []corev1.Container{{Image: "test", Name: naming.ContainerDatabase}},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					},
+				},
+				Status: batchv1.JobStatus{
+					StartTime: new(metav1.NewTime(time.Now().Add(-time.Minute))),
+				},
+			}
+			if completed != nil && *completed {
+				job.Status.CompletionTime = new(metav1.Now())
+				job.Status.Succeeded = 1
+				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+					Type: batchv1.JobComplete, Status: corev1.ConditionTrue, Reason: "test", Message: "test",
+				})
+			}
+			if failed != nil && *failed {
+				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+					Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "test", Message: "test",
+				})
+			}
+			return job
+		}
+
+		testCases := []struct {
+			desc            string
+			createResources func(t *testing.T, cluster *v1beta1.PostgresCluster)
+			foundJob        bool
+		}{{
+			desc:            "no cleanup job exists",
+			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {},
+			foundJob:        false,
+		}, {
+			desc: "cleanup job exists",
+			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				job := generateDCSCleanupJob(cluster.Name, nil, nil)
+				assert.NilError(t, r.Client.Create(ctx, job))
+			},
+			foundJob: true,
+		}}
+
+		for i, tc := range testCases {
+			t.Run(tc.desc, func(t *testing.T) {
+				clusterName := "observe-restore-env-etcd" + strconv.Itoa(i)
+				cluster := fakePostgresCluster(clusterName, namespace, clusterName, false)
+				cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+					DCS: &v1beta1.PatroniDCS{
+						Type: v1beta1.PatroniDCSTypeEtcd,
+						Etcd: &v1beta1.PatroniEtcdSpec{Endpoints: []string{"http://etcd:2379"}},
+					},
+				}
+				tc.createResources(t, cluster)
+
+				endpoints, restoreJob, dcsCleanupJob, err := r.observeRestoreEnv(ctx, cluster)
+				assert.NilError(t, err)
+				// Under etcd DCS, Patroni never creates the k8s Endpoints objects, so this
+				// must stay empty regardless of the DCS cleanup Job's presence.
+				assert.Assert(t, len(endpoints) == 0)
+				assert.Assert(t, restoreJob == nil)
+				assert.Assert(t, tc.foundJob == (dcsCleanupJob != nil))
+			})
+		}
+	})
 }
 
 func TestPrepareForRestore(t *testing.T) {
@@ -3993,7 +4071,7 @@ func TestPrepareForRestore(t *testing.T) {
 					fakeObserved = tc.fakeObserved
 				}
 				assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, endpoints,
-					job, restoreID))
+					job, nil, restoreID))
 
 				var primaryInstance *Instance
 				for i, instance := range fakeObserved.forCluster {
@@ -4059,6 +4137,141 @@ func TestPrepareForRestore(t *testing.T) {
 			})
 		}
 	}
+
+	t.Run("etcd DCS", func(t *testing.T) {
+		generateDCSCleanupJob := func(clusterName string, completed, failed *bool) *batchv1.Job {
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+			}
+			jobMeta := naming.PatroniDCSCleanupJob(cluster)
+			jobMeta.Labels = naming.PatroniDCSCleanupJobLabels(cluster.Name)
+
+			job := &batchv1.Job{
+				ObjectMeta: jobMeta,
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: jobMeta,
+						Spec: corev1.PodSpec{
+							Containers:    []corev1.Container{{Image: "test", Name: naming.ContainerDatabase}},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					},
+				},
+			}
+			if completed != nil && *completed {
+				job.Status.CompletionTime = new(metav1.Now())
+				job.Status.Succeeded = 1
+				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+					Type: batchv1.JobComplete, Status: corev1.ConditionTrue, Reason: "test", Message: "test",
+				})
+			}
+			if failed != nil && *failed {
+				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+					Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "test", Message: "test",
+				})
+			}
+			return job
+		}
+
+		newEtcdCluster := func(clusterName string) *v1beta1.PostgresCluster {
+			cluster := fakePostgresCluster(clusterName, namespace, clusterName, false)
+			cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+				DCS: &v1beta1.PatroniDCS{
+					Type: v1beta1.PatroniDCSTypeEtcd,
+					Etcd: &v1beta1.PatroniEtcdSpec{Endpoints: []string{"http://etcd:2379"}},
+				},
+			}
+			cluster.Status.Patroni = v1beta1.PatroniStatus{SystemIdentifier: "abcde12345"}
+			cluster.Status.Proxy.PGBouncer.PostgreSQLRevision = "abcde12345"
+			cluster.Status.Monitoring.ExporterConfiguration = "abcde12345"
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				ObservedGeneration: cluster.GetGeneration(),
+				Type:               ConditionPostgresDataInitialized,
+				Status:             metav1.ConditionTrue,
+				Reason:             "PGBackRestRestoreComplete",
+				Message:            "pgBackRest restore completed successfully",
+			})
+			return cluster
+		}
+
+		t.Run("no cleanup job creates one", func(t *testing.T) {
+			cluster := newEtcdCluster("prepare-restore-etcd-create")
+			startupInstanceName := naming.GenerateStartupInstance(cluster, &cluster.Spec.InstanceSets[0]).Name
+			assert.NilError(t, r.Client.Create(ctx, &corev1.ConfigMap{ObjectMeta: naming.ClusterConfigMap(cluster)}))
+			instanceMeta := metav1.ObjectMeta{Namespace: namespace, Name: startupInstanceName}
+			assert.NilError(t, r.Client.Create(ctx,
+				&corev1.ConfigMap{ObjectMeta: naming.InstanceConfigMap(&instanceMeta)}))
+			assert.NilError(t, r.Client.Create(ctx,
+				&corev1.Secret{ObjectMeta: naming.InstanceCertificates(&instanceMeta)}))
+
+			fakeObserved := &observedInstances{forCluster: []*Instance{}}
+			assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, nil, nil, nil, "test-restore-id"))
+
+			assert.NilError(t, r.Client.Get(ctx,
+				naming.AsObjectKey(naming.PatroniDCSCleanupJob(cluster)), &batchv1.Job{}))
+
+			condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionPGBackRestRestoreProgressing)
+			if assert.Check(t, condition != nil) {
+				assert.Equal(t, condition.Message, "Preparing cluster to restore in-place: removing DCS")
+			}
+			assert.Assert(t, meta.FindStatusCondition(cluster.Status.Conditions,
+				ConditionPostgresDataInitialized) != nil)
+		})
+
+		t.Run("failed cleanup job is deleted", func(t *testing.T) {
+			cluster := newEtcdCluster("prepare-restore-etcd-failed")
+			job := generateDCSCleanupJob(cluster.Name, nil, new(true))
+			assert.NilError(t, r.Client.Create(ctx, job))
+
+			fakeObserved := &observedInstances{forCluster: []*Instance{}}
+			assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, nil, nil, job, "test-restore-id"))
+
+			err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniDCSCleanupJob(cluster)), &batchv1.Job{})
+			assert.Assert(t, apierrors.IsNotFound(err))
+
+			condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionPGBackRestRestoreProgressing)
+			if assert.Check(t, condition != nil) {
+				assert.Equal(t, condition.Message, "Preparing cluster to restore in-place: removing DCS")
+			}
+			assert.Assert(t, meta.FindStatusCondition(cluster.Status.Conditions,
+				ConditionPostgresDataInitialized) != nil)
+		})
+
+		t.Run("running cleanup job waits", func(t *testing.T) {
+			cluster := newEtcdCluster("prepare-restore-etcd-running")
+			job := generateDCSCleanupJob(cluster.Name, nil, nil)
+			assert.NilError(t, r.Client.Create(ctx, job))
+
+			fakeObserved := &observedInstances{forCluster: []*Instance{}}
+			assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, nil, nil, job, "test-restore-id"))
+
+			// the Job is left alone and the cluster is not bootstrapped yet
+			assert.NilError(t, r.Client.Get(ctx,
+				naming.AsObjectKey(naming.PatroniDCSCleanupJob(cluster)), &batchv1.Job{}))
+			assert.Assert(t, meta.FindStatusCondition(cluster.Status.Conditions,
+				ConditionPostgresDataInitialized) != nil)
+		})
+
+		t.Run("completed cleanup job triggers bootstrap", func(t *testing.T) {
+			cluster := newEtcdCluster("prepare-restore-etcd-completed")
+			job := generateDCSCleanupJob(cluster.Name, new(true), nil)
+			assert.NilError(t, r.Client.Create(ctx, job))
+
+			fakeObserved := &observedInstances{forCluster: []*Instance{}}
+			assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, nil, nil, job, "test-restore-id"))
+
+			condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionPGBackRestRestoreProgressing)
+			if assert.Check(t, condition != nil) {
+				assert.Equal(t, condition.Reason, ReasonReadyForRestore)
+				assert.Equal(t, condition.Message, "Restoring cluster in-place")
+			}
+			assert.Assert(t, cluster.Status.Patroni.SystemIdentifier == "")
+			assert.Assert(t, cluster.Status.Proxy.PGBouncer.PostgreSQLRevision == "")
+			assert.Assert(t, cluster.Status.Monitoring.ExporterConfiguration == "")
+			assert.Assert(t, meta.FindStatusCondition(cluster.Status.Conditions,
+				ConditionPostgresDataInitialized) == nil)
+		})
+	})
 }
 
 func TestReconcileScheduledBackups(t *testing.T) {

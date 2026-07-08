@@ -53,12 +53,11 @@ func (r *Reconciler) handlePatroniRestarts(
 	var primaryNeedsRestart, replicaNeedsRestart *Instance
 
 	// Only Kubernetes DCS has Patroni write the "status" pod annotation that
-	// PodRequiresRestart reads. Every other DCS backend (currently just etcd,
+	// PodRequiresRestart reads. Every external DCS backend (currently just etcd,
 	// but this isn't etcd-specific) needs a live check via Patroni's own
 	// monitoring REST API instead.
-	usesKubernetesDCS := cluster.DCSType() == v1beta1.PatroniDCSTypeKubernetes
 	requiresRestart := func(pod *corev1.Pod) bool {
-		if usesKubernetesDCS {
+		if !cluster.UsesExternalDCS() {
 			return patroni.PodRequiresRestart(pod)
 		}
 		exec := patroni.Executor(func(
@@ -167,8 +166,9 @@ func (r *Reconciler) handlePatroniRestarts(
 func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) error {
-	// With etcd DCS, Patroni stores distributed configuration in etcd, not k8s Endpoints.
-	if cluster.DCSType() == v1beta1.PatroniDCSTypeEtcd {
+	// With an external DCS backend, Patroni stores distributed configuration there
+	// instead of in k8s Endpoints.
+	if cluster.UsesExternalDCS() {
 		return nil
 	}
 
@@ -335,8 +335,8 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 func (r *Reconciler) reconcilePatroniLeaderLease(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) (*corev1.Service, error) {
-	// With etcd DCS, Patroni does not use k8s Endpoints for leader elections.
-	if cluster.DCSType() == v1beta1.PatroniDCSTypeEtcd {
+	// With an external DCS backend, Patroni does not use k8s Endpoints for leader elections.
+	if cluster.UsesExternalDCS() {
 		return nil, nil
 	}
 
@@ -370,7 +370,7 @@ func (r *Reconciler) reconcilePatroniStatus(
 
 	// Only Kubernetes DCS has Patroni write the "initialize" value to a
 	// Kubernetes Endpoints object.
-	if cluster.DCSType() == v1beta1.PatroniDCSTypeKubernetes {
+	if !cluster.UsesExternalDCS() {
 		dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
 		err := errors.WithStack(client.IgnoreNotFound(
 			r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
