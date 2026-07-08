@@ -20,12 +20,12 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="snapshot.storage.k8s.io",resources="volumesnapshots",verbs={get,list,create,patch,delete}
@@ -384,7 +384,7 @@ func (r *Reconciler) dedicatedSnapshotVolumeRestore(ctx context.Context,
 	}
 
 	// Attempt the restore exactly once. If the restore job fails, we prompt the user to investigate.
-	restoreJob.Spec.BackoffLimit = initialize.Int32(0)
+	restoreJob.Spec.BackoffLimit = new(int32(0))
 	restoreJob.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 
 	// Add pgBackRest configs to template.

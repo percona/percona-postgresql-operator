@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func setupFakeClient(t *testing.T, objs ...sigs.Object) sigs.Client {
@@ -685,6 +685,84 @@ func TestApplyPGBackRestClientCertificate(t *testing.T) {
 	})
 }
 
+func TestApplyReplicationCertificate(t *testing.T) {
+	t.Run("create replication certificate successfully", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "replication-cert-test"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyReplicationCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		certName := cluster.Name + "-replication-cert"
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+
+		assert.Equal(t, certName, cert.Name)
+		assert.Equal(t, cluster.Namespace, cert.Namespace)
+		assert.Equal(t, naming.ReplicationClientCertSecret(cluster).Name, cert.Spec.SecretName)
+		assert.Equal(t, "_crunchyrepl", cert.Spec.CommonName)
+		assert.Equal(t, []string{"_crunchyrepl"}, cert.Spec.DNSNames)
+		assert.Equal(t, naming.TLSIssuer(cluster).Name, cert.Spec.IssuerRef.Name)
+		assert.Equal(t, v1.IssuerKind, cert.Spec.IssuerRef.Kind)
+		assert.NotNil(t, cert.Spec.Duration)
+		assert.Equal(t, DefaultCertDuration, cert.Spec.Duration.Duration)
+		assert.NotNil(t, cert.Spec.RenewBefore)
+		assert.Equal(t, DefaultRenewBefore, cert.Spec.RenewBefore.Duration)
+		assert.NotNil(t, cert.Spec.PrivateKey)
+		assert.Equal(t, v1.ECDSAKeyAlgorithm, cert.Spec.PrivateKey.Algorithm)
+		assert.Equal(t, 256, cert.Spec.PrivateKey.Size)
+		assert.Equal(t, v1.RotationPolicyNever, cert.Spec.PrivateKey.RotationPolicy)
+
+		assert.Contains(t, cert.Spec.Usages, v1.UsageClientAuth)
+		assert.Contains(t, cert.Spec.Usages, v1.UsageDigitalSignature)
+		assert.Contains(t, cert.Spec.Usages, v1.UsageKeyEncipherment)
+		assert.NotContains(t, cert.Spec.Usages, v1.UsageServerAuth)
+
+		assert.NotNil(t, cert.Spec.SecretTemplate)
+		assert.Equal(t, cluster.Name, cert.Spec.SecretTemplate.Labels[naming.LabelCluster])
+		assert.Equal(t, "replication-client-tls", cert.Spec.SecretTemplate.Labels[naming.LabelClusterCertificate])
+
+		assert.Equal(t, cluster.Name, cert.Labels[naming.LabelCluster])
+		assert.Equal(t, "replication-client-tls", cert.Labels[naming.LabelClusterCertificate])
+		assert.NotEmpty(t, cert.Labels[naming.LabelPerconaManagedBy])
+
+		require.Len(t, cert.OwnerReferences, 1)
+		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
+
+		// return nil when certificate already exists
+		err = ctrl.ApplyReplicationCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+	})
+
+	t.Run("uses CertValidityDuration when set", func(t *testing.T) {
+		customDuration := 4320 * time.Hour // 180 days
+		cluster := testCluster()
+		cluster.Name = "replication-cert-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: customDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyReplicationCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-replication-cert",
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, customDuration, cert.Spec.Duration.Duration)
+	})
+}
+
 func TestUpdateCertificateDuration(t *testing.T) {
 	initialDuration := 2160 * time.Hour    // 90 days
 	updatedDuration := 4320 * time.Hour    // 180 days
@@ -793,6 +871,31 @@ func TestUpdateCertificateDuration(t *testing.T) {
 		err = client.Get(t.Context(), sigs.ObjectKey{
 			Namespace: cluster.Namespace,
 			Name:      certName,
+		}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)
+	})
+
+	t.Run("replication certificate duration updated when spec changes", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "update-repl-dur"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertValidityDuration: &metav1.Duration{Duration: initialDuration},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyReplicationCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cluster.Spec.TLS.CertValidityDuration = &metav1.Duration{Duration: updatedDuration}
+		err = ctrl.ApplyReplicationCertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		err = client.Get(t.Context(), sigs.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + "-replication-cert",
 		}, cert)
 		require.NoError(t, err)
 		assert.Equal(t, updatedDuration, cert.Spec.Duration.Duration)

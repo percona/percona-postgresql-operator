@@ -17,6 +17,12 @@ export VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' 
 # Skip warning checks used for documentation by default
 export SKIP_TEST_WARNINGS=${SKIP_TEST_WARNINGS:-"true"}
 
+# K8S upgrade test
+export K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM:-"gke"}
+export K8S_UPGRADE_REGION=${K8S_UPGRADE_REGION:-"us-central1-a"}
+export K8S_UPGRADE_INITIAL_VERSION=${K8S_UPGRADE_INITIAL_VERSION:-""}
+export K8S_UPGRADE_FINAL_VERSION=${K8S_UPGRADE_FINAL_VERSION:-""}
+
 if command -v oc &>/dev/null; then
 	if oc get projects; then
 		export OPENSHIFT=4
@@ -26,24 +32,34 @@ fi
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
 if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
-	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -E 's/.*:(.*ppg)?([0-9]+).*/\2/')
+	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -E 's/.*-(ppg|postgres)([0-9]+).*/\2/')
 	export PG_VER="${pg_version_value}"
 else
 	export PG_VER="${PG_VER:-18}"
 fi
 
-export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
-export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
-export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
-export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade"}
+export PG_DISTRIBUTION="${PG_DISTRIBUTION:-}"
+
+if [[ $PG_DISTRIBUTION == "community" ]]; then
+	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer-community"}
+	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-postgres${PG_VER}-community"}
+	export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest-community"}
+	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade-community"}
+else
+	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"${IMAGE_BASE}:main-pgbouncer$PG_VER"}
+	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
+	export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
+	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade"}
+fi
 export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
 export IMAGE_PMM_CLIENT=${IMAGE_PMM_CLIENT:-"perconalab/pmm-client:dev-latest"}
 export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:dev-latest"}
-export IMAGE_PMM3_CLIENT=${IMAGE_PMM3_CLIENT:-"perconalab/pmm-client:3.4"}
-export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3.4"}
+export IMAGE_PMM3_CLIENT=${IMAGE_PMM3_CLIENT:-"perconalab/pmm-client:3-dev-latest"}
+export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3-dev-latest"}
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
+export CPGO_VERSION=${CPGO_VERSION:-"5.8.7"}
 export MINIO_VER="5.4.0"
 
 # Add 'docker.io' for images that are provided without registry

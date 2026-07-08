@@ -8,11 +8,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 type testGetCluster func() *v1beta1.PostgresCluster
@@ -77,9 +76,9 @@ volumeMounts:
 			"image",
 			corev1.PullAlways,
 			&corev1.SecurityContext{
-				RunAsUser:                ptr.To(int64(1001)),
-				RunAsGroup:               ptr.To(int64(26)),
-				AllowPrivilegeEscalation: ptr.To(true),
+				RunAsUser:                new(int64(1001)),
+				RunAsGroup:               new(int64(26)),
+				AllowPrivilegeEscalation: new(true),
 			},
 			corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -132,9 +131,9 @@ volumeMounts:
 			"image",
 			corev1.PullAlways,
 			&corev1.SecurityContext{
-				RunAsUser:                ptr.To(int64(1001)),
-				RunAsGroup:               ptr.To(int64(26)),
-				AllowPrivilegeEscalation: ptr.To(true),
+				RunAsUser:                new(int64(1001)),
+				RunAsGroup:               new(int64(26)),
+				AllowPrivilegeEscalation: new(true),
 			},
 			corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -166,9 +165,9 @@ volumeMounts:
 					}},
 				}
 				cr.Spec.Backups.PGBackRest.InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
-					RunAsUser:                ptr.To(int64(26)),
-					RunAsGroup:               ptr.To(int64(1001)),
-					AllowPrivilegeEscalation: ptr.To(false),
+					RunAsUser:                new(int64(26)),
+					RunAsGroup:               new(int64(1001)),
+					AllowPrivilegeEscalation: new(false),
 				}
 				return cr
 			},

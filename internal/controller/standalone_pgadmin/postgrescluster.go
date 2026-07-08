@@ -12,10 +12,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgadmins",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgadmins",verbs={list}
 
 // findPGAdminsForPostgresCluster returns PGAdmins that target a given cluster.
 func (r *PGAdminReconciler) findPGAdminsForPostgresCluster(
@@ -50,7 +50,7 @@ func (r *PGAdminReconciler) findPGAdminsForPostgresCluster(
 	return matching
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={list,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={list,watch}
 
 // getClustersForPGAdmin returns clusters managed by the given pgAdmin
 func (r *PGAdminReconciler) getClustersForPGAdmin(

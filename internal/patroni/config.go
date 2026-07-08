@@ -6,6 +6,7 @@ package patroni
 
 import (
 	"fmt"
+	"maps"
 	"path"
 	"strings"
 
@@ -16,7 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -192,9 +193,7 @@ func DynamicConfiguration(
 ) map[string]any {
 	// Copy the entire configuration before making any changes.
 	root := make(map[string]any, len(configuration))
-	for k, v := range configuration {
-		root[k] = v
-	}
+	maps.Copy(root, configuration)
 
 	root["ttl"] = *cluster.Spec.Patroni.LeaderLeaseDurationSeconds
 	root["loop_wait"] = *cluster.Spec.Patroni.SyncPeriodSeconds
@@ -214,9 +213,7 @@ func DynamicConfiguration(
 	}
 
 	if section, ok := root["postgresql"].(map[string]any); ok {
-		for k, v := range section {
-			postgresql[k] = v
-		}
+		maps.Copy(postgresql, section)
 	}
 	root["postgresql"] = postgresql
 
@@ -228,9 +225,7 @@ func DynamicConfiguration(
 		}
 	}
 	if section, ok := postgresql["parameters"].(map[string]any); ok {
-		for k, v := range section {
-			parameters[k] = v
-		}
+		maps.Copy(parameters, section)
 	}
 	// Override the above with mandatory parameters.
 	if pgParameters.Mandatory != nil {
@@ -304,9 +299,7 @@ func DynamicConfiguration(
 		// Copy the "standby_cluster" section before making any changes.
 		standby := make(map[string]any)
 		if section, ok := root["standby_cluster"].(map[string]any); ok {
-			for k, v := range section {
-				standby[k] = v
-			}
+			maps.Copy(standby, section)
 		}
 
 		// Unset any previous value for restore_command - we will set it later if needed

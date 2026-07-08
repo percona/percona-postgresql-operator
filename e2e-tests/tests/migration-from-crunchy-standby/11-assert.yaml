@@ -1,0 +1,27 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 210
+commands:
+  - script: |-
+      data=$(kubectl get configmap 10-percona-primary-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+      for expected in \
+        "initial-data-before-standby" \
+        "data-added-while-standby-syncing" \
+        "more-data-for-replication-test" \
+        "written-after-percona-promotion"; do
+        echo "${data}" | grep -q "${expected}" || {
+          echo "ERROR: '${expected}' missing from Percona primary. Got: ${data}"
+          exit 1
+        }
+      done
+  - script: |-
+      kubectl wait perconapgcluster/percona-standby \
+        -n "${NAMESPACE}" \
+        --for=jsonpath='{.status.pgbackrest.repos[0].stanzaCreated}'=true \
+        --timeout=90s
+  - script: |-
+      kubectl wait perconapgcluster/percona-standby \
+        -n "${NAMESPACE}" \
+        --for=jsonpath='{.status.pgbackrest.repos[0].replicaCreateBackupComplete}'=true \
+        --timeout=90s

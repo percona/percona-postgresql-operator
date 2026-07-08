@@ -6,12 +6,13 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"gotest.tools/v3/assert"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestFetchKeyCommand(t *testing.T) {
@@ -201,57 +202,142 @@ func TestPostgresContainerImage(t *testing.T) {
 }
 
 func TestVerifyImageValues(t *testing.T) {
-	cluster := &v1beta1.PostgresCluster{}
-
-	verifyImageCheck := func(t *testing.T, envVar, errString string, cluster *v1beta1.PostgresCluster) {
-		t.Setenv(envVar, "")
-		os.Unsetenv(envVar)
-		err := VerifyImageValues(cluster)
-		assert.ErrorContains(t, err, errString)
-	}
-
 	t.Run("crunchy-postgres", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.PostgresVersion = 14
-		verifyImageCheck(t, "RELATED_IMAGE_POSTGRES_14", "crunchy-postgres", cluster)
+		t.Setenv("RELATED_IMAGE_POSTGRES_14", "")
+		os.Unsetenv("RELATED_IMAGE_POSTGRES_14")
+
+		err := VerifyImageValues(cluster)
+		assert.ErrorContains(t, err, "crunchy-postgres")
 	})
 
 	t.Run("crunchy-postgres-gis", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.PostgresVersion = 14
 		cluster.Spec.PostGISVersion = "3.3"
-		verifyImageCheck(t, "RELATED_IMAGE_POSTGRES_14_GIS_3.3", "crunchy-postgres-gis", cluster)
+		t.Setenv("RELATED_IMAGE_POSTGRES_14_GIS_3.3", "")
+		os.Unsetenv("RELATED_IMAGE_POSTGRES_14_GIS_3.3")
+
+		err := VerifyImageValues(cluster)
+		assert.ErrorContains(t, err, "crunchy-postgres-gis")
 	})
 
-	// K8SPG-710: Image check will fail without a backup section in PostgresCluster
-	// t.Run("crunchy-pgbackrest", func(t *testing.T) {
-	// 	verifyImageCheck(t, "RELATED_IMAGE_PGBACKREST", "crunchy-pgbackrest", cluster)
-	// })
+	t.Run("crunchy-pgbackrest-enabled", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.PostgresVersion = 14
+		enabled := true
+		cluster.Spec.Backups.Enabled = &enabled
+		t.Setenv("RELATED_IMAGE_PGBACKREST", "")
+		os.Unsetenv("RELATED_IMAGE_PGBACKREST")
+
+		err := VerifyImageValues(cluster)
+		assert.ErrorContains(t, err, "crunchy-pgbackrest")
+	})
+
+	t.Run("crunchy-pgbackrest-disabled", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.PostgresVersion = 14
+		enabled := false
+		cluster.Spec.Backups.Enabled = &enabled
+		t.Setenv("RELATED_IMAGE_PGBACKREST", "")
+		os.Unsetenv("RELATED_IMAGE_PGBACKREST")
+
+		err := VerifyImageValues(cluster)
+		assert.Assert(t, !strings.Contains(err.Error(), "crunchy-pgbackrest"))
+	})
 
 	t.Run("crunchy-pgbouncer", func(t *testing.T) {
-		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
-		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
-		verifyImageCheck(t, "RELATED_IMAGE_PGBOUNCER", "crunchy-pgbouncer", cluster)
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.PostgresVersion = 14
+		cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+			PGBouncer: &v1beta1.PGBouncerPodSpec{},
+		}
+		t.Setenv("RELATED_IMAGE_PGBOUNCER", "")
+		os.Unsetenv("RELATED_IMAGE_PGBOUNCER")
+
+		err := VerifyImageValues(cluster)
+		assert.ErrorContains(t, err, "crunchy-pgbouncer")
 	})
 
 	t.Run("crunchy-pgadmin4", func(t *testing.T) {
-		cluster.Spec.UserInterface = new(v1beta1.UserInterfaceSpec)
-		cluster.Spec.UserInterface.PGAdmin = new(v1beta1.PGAdminPodSpec)
-		verifyImageCheck(t, "RELATED_IMAGE_PGADMIN", "crunchy-pgadmin4", cluster)
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.PostgresVersion = 14
+		cluster.Spec.UserInterface = &v1beta1.UserInterfaceSpec{
+			PGAdmin: &v1beta1.PGAdminPodSpec{},
+		}
+		t.Setenv("RELATED_IMAGE_PGADMIN", "")
+		os.Unsetenv("RELATED_IMAGE_PGADMIN")
+
+		err := VerifyImageValues(cluster)
+		assert.ErrorContains(t, err, "crunchy-pgadmin4")
 	})
 
 	t.Run("crunchy-postgres-exporter", func(t *testing.T) {
-		cluster.Spec.Monitoring = new(v1beta1.MonitoringSpec)
-		cluster.Spec.Monitoring.PGMonitor = new(v1beta1.PGMonitorSpec)
-		cluster.Spec.Monitoring.PGMonitor.Exporter = new(v1beta1.ExporterSpec)
-		verifyImageCheck(t, "RELATED_IMAGE_PGEXPORTER", "crunchy-postgres-exporter", cluster)
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.PostgresVersion = 14
+		cluster.Spec.Monitoring = &v1beta1.MonitoringSpec{
+			PGMonitor: &v1beta1.PGMonitorSpec{
+				Exporter: &v1beta1.ExporterSpec{},
+			},
+		}
+		t.Setenv("RELATED_IMAGE_PGEXPORTER", "")
+		os.Unsetenv("RELATED_IMAGE_PGEXPORTER")
+
+		err := VerifyImageValues(cluster)
+		assert.ErrorContains(t, err, "crunchy-postgres-exporter")
 	})
 
-	t.Run("multiple images", func(t *testing.T) {
+	t.Run("multiple missing images", func(t *testing.T) {
+		enabled := true
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.PostgresVersion = 14
+		cluster.Spec.PostGISVersion = "3.3"
+		cluster.Spec.Backups.Enabled = &enabled
+		cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+			PGBouncer: &v1beta1.PGBouncerPodSpec{},
+		}
+		cluster.Spec.UserInterface = &v1beta1.UserInterfaceSpec{
+			PGAdmin: &v1beta1.PGAdminPodSpec{},
+		}
+		cluster.Spec.Monitoring = &v1beta1.MonitoringSpec{
+			PGMonitor: &v1beta1.PGMonitorSpec{
+				Exporter: &v1beta1.ExporterSpec{},
+			},
+		}
+
 		err := VerifyImageValues(cluster)
 		assert.ErrorContains(t, err, "crunchy-postgres-gis")
-		// K8SPG-710: Image check will fail without a backup section in PostgresCluster
-		// assert.ErrorContains(t, err, "crunchy-pgbackrest")
+		assert.ErrorContains(t, err, "crunchy-pgbackrest")
 		assert.ErrorContains(t, err, "crunchy-pgbouncer")
 		assert.ErrorContains(t, err, "crunchy-pgadmin4")
 		assert.ErrorContains(t, err, "crunchy-postgres-exporter")
 	})
 
+	t.Run("all images set", func(t *testing.T) {
+		enabled := true
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.PostgresVersion = 14
+		cluster.Spec.PostGISVersion = "3.3"
+		cluster.Spec.Backups.Enabled = &enabled
+		cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+			PGBouncer: &v1beta1.PGBouncerPodSpec{},
+		}
+		cluster.Spec.UserInterface = &v1beta1.UserInterfaceSpec{
+			PGAdmin: &v1beta1.PGAdminPodSpec{},
+		}
+		cluster.Spec.Monitoring = &v1beta1.MonitoringSpec{
+			PGMonitor: &v1beta1.PGMonitorSpec{
+				Exporter: &v1beta1.ExporterSpec{},
+			},
+		}
+
+		t.Setenv("RELATED_IMAGE_POSTGRES_14_GIS_3.3", "img")
+		t.Setenv("RELATED_IMAGE_PGBACKREST", "img")
+		t.Setenv("RELATED_IMAGE_PGBOUNCER", "img")
+		t.Setenv("RELATED_IMAGE_PGADMIN", "img")
+		t.Setenv("RELATED_IMAGE_PGEXPORTER", "img")
+
+		assert.NilError(t, VerifyImageValues(cluster))
+	})
 }

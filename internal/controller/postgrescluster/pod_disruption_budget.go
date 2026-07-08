@@ -15,8 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // generatePodDisruptionBudget takes parameters required to fill out a PDB and
@@ -64,5 +63,5 @@ func getMinAvailable(
 	}
 
 	// If more than one replica is not defined, we will default to '0'
-	return initialize.Pointer(intstr.FromInt32(expect))
+	return new(intstr.FromInt32(expect))
 }

@@ -1,6 +1,0 @@
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-apply:
-- files/01-pause-cluster.yaml
-assert:
-- files/01-cluster-paused.yaml

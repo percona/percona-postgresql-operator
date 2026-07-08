@@ -10,7 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // defaultFromEnv reads the environment variable key when value is empty.
@@ -135,8 +135,10 @@ func PGONamespace() string {
 func VerifyImageValues(cluster *v1beta1.PostgresCluster) error {
 	var images []string
 
+	backupsEnabled := cluster.Spec.Backups.Enabled == nil || *cluster.Spec.Backups.Enabled
+	dataSourceRestore := cluster.Spec.DataSource != nil && cluster.Spec.DataSource.PostgresCluster != nil
 	// K8SPG-710: Image check will fail without a backup section in PostgresCluster
-	if cluster.BackupSpecFound() && PGBackRestContainerImage(cluster) == "" {
+	if (cluster.BackupSpecFound() && backupsEnabled || dataSourceRestore) && PGBackRestContainerImage(cluster) == "" {
 		images = append(images, "crunchy-pgbackrest")
 	}
 	if PGAdminContainerImage(cluster) == "" &&

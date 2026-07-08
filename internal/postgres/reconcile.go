@@ -14,7 +14,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var (
@@ -77,7 +77,7 @@ func InstancePod(ctx context.Context,
 				// PostgreSQL expects client certificate keys to not be readable
 				// by any other user.
 				// - https://www.postgresql.org/docs/current/libpq-ssl.html
-				DefaultMode: initialize.Int32(0o600),
+				DefaultMode: new(int32(0o600)),
 				Sources: []corev1.VolumeProjection{
 					{Secret: inClusterCertificates},
 					{Secret: inClientCertificates},
@@ -344,7 +344,7 @@ func PodSecurityContext(cluster *v1beta1.PostgresCluster) *corev1.PodSecurityCon
 	// - https://docs.k8s.io/tasks/configure-pod-container/security-context/
 	// - https://docs.openshift.com/container-platform/4.8/authentication/managing-security-context-constraints.html
 	if cluster.Spec.OpenShift == nil || !*cluster.Spec.OpenShift {
-		podSecurityContext.FSGroup = initialize.Int64(26)
+		podSecurityContext.FSGroup = new(int64(26))
 	}
 
 	return podSecurityContext

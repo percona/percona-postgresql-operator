@@ -1,0 +1,35 @@
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: crunchy-source
+spec:
+  postgresVersion: 16
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            # Shared with the Percona target cluster — same minio credentials,
+            # different S3 path (substituted at apply time).
+            name: migration-pv-pgbackrest-secrets
+      global:
+        repo1-path: <repo-path>
+        repo1-s3-uri-style: path
+        repo1-s3-verify-tls: "n"
+      repos:
+        - name: repo1
+          s3:
+            bucket: operator-testing
+            endpoint: <minio-endpoint>
+            region: us-east-1
+  proxy:
+    pgBouncer:
+      replicas: 1

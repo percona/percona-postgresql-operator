@@ -18,12 +18,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestReconcilePGAdminDataVolume(t *testing.T) {
@@ -48,7 +47,7 @@ func TestReconcilePGAdminDataVolume(t *testing.T) {
 				Resources: corev1.VolumeResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceStorage: resource.MustParse("1Gi")}},
-				StorageClassName: initialize.String("storage-class-for-data"),
+				StorageClassName: new("storage-class-for-data"),
 			}}}
 
 	assert.NilError(t, cc.Create(ctx, pgadmin))

@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -36,9 +37,10 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // Instance represents a single PostgreSQL instance of a PostgresCluster.
@@ -326,9 +328,7 @@ func (r *Reconciler) observeInstances(
 	if autogrow {
 		for _, statusIS := range cluster.Status.InstanceSets {
 			if statusIS.DesiredPGDataVolume != nil {
-				for k, v := range statusIS.DesiredPGDataVolume {
-					previousDesiredRequests[k] = v
-				}
+				maps.Copy(previousDesiredRequests, statusIS.DesiredPGDataVolume)
 			}
 		}
 	}
@@ -1334,7 +1334,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 
 	// Don't clutter the namespace with extra ControllerRevisions.
 	// The "controller-revision-hash" label still exists on the Pod.
-	sts.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	sts.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Give the Pod a stable DNS record based on its name.
 	// - https://docs.k8s.io/concepts/workloads/controllers/statefulset/#stable-network-id
@@ -1371,24 +1371,24 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// is always the first to startup and the last to shutdown.
 	if cluster.Status.StartupInstance == "" {
 		// there is no designated startup instance; all instances should run.
-		sts.Spec.Replicas = initialize.Int32(1)
+		sts.Spec.Replicas = new(int32(1))
 	} else if cluster.Status.StartupInstance != sts.Name {
 		// there is a startup instance defined, but not this instance; do not run.
-		sts.Spec.Replicas = initialize.Int32(0)
+		sts.Spec.Replicas = new(int32(0))
 	} else if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown &&
 		numInstancePods <= 1 {
 		// this is the last instance of the shutdown sequence; do not run.
-		sts.Spec.Replicas = initialize.Int32(0)
+		sts.Spec.Replicas = new(int32(0))
 	} else {
 		// this is the designated instance, but
 		// - others are still running during shutdown, or
 		// - it is time to startup.
-		sts.Spec.Replicas = initialize.Int32(1)
+		sts.Spec.Replicas = new(int32(1))
 	}
 
 	// K8SPG-771
 	if suspend {
-		sts.Spec.Replicas = initialize.Int32(0)
+		sts.Spec.Replicas = new(int32(0))
 	}
 
 	// Restart containers any time they stop, die, are killed, etc.
@@ -1398,7 +1398,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// ShareProcessNamespace makes Kubernetes' pause process PID 1 and lets
 	// containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	sts.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	sts.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
 	// Patroni calls the Kubernetes API and pgBackRest may interact with a cloud
 	// storage provider. Use the instance ServiceAccount and automatically mount
@@ -1410,7 +1410,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// Disable environment variables for services other than the Kubernetes API.
 	// - https://docs.k8s.io/concepts/services-networking/connect-applications-service/#accessing-the-service
 	// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
-	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	sts.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if spec.SecurityContext != nil {
@@ -1478,22 +1478,34 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
 // reconcileInstanceCertificates writes the Secret that contains certificates
-// and private keys for instance of cluster. When cert-manager is installed,
-// it creates a Certificate CR and augments the resulting secret with Patroni
-// and pgBackRest keys. Otherwise, it uses internal PKI.
+// and private keys for instance of cluster. When the root CA is cert-manager-
+// managed, it creates a Certificate CR and augments the resulting secret with
+// Patroni and pgBackRest keys. Otherwise, it uses internal PKI — first
+// reconciling any stale Certificate CR left by K8SPG-1017 to update its
+// ownerRef (K8SPG-1007 recovery).
 func (r *Reconciler) reconcileInstanceCertificates(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	rootCertificateAuth *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
 	if cluster.Spec.CustomTLSSecret == nil {
-		certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
+			return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
 		}
 
-		if certManagerInstalled {
+		if certManagerManaged {
 			return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+		}
+
+		// cluster certificates are not managed by cert-manager
+		// but Certificate object exists due to the bug described in K8SPG-1017
+		// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+		if cert := certmanager.InstanceCertificateName(instance.Name); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+			_, err := r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+			if err != nil {
+				logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+			}
 		}
 	}
 

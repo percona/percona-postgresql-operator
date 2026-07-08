@@ -12,8 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const finalizer = "crunchybridgecluster.postgres-operator.crunchydata.com/finalizer"
@@ -49,7 +48,7 @@ func (r *CrunchyBridgeClusterReconciler) handleDelete(
 			}
 
 			if !deletedAlready {
-				return initialize.Pointer(runtime.RequeueWithoutBackoff(time.Second)), err
+				return new(runtime.RequeueWithoutBackoff(time.Second)), err
 			}
 
 			// Remove finalizer if deleted already

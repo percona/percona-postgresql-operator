@@ -1,0 +1,78 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+# The Percona operator creates a PerconaPGRestore named <cluster>-bootstrap
+# with annotation pgv2.percona.com/cluster-bootstrap-restore=true when
+# spec.dataSource.pgbackrest is set.  Wait for it to succeed instead of
+# watching the underlying Job directly.
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
+metadata:
+  name: percona-restored-bootstrap
+  annotations:
+    pgv2.percona.com/cluster-bootstrap-restore: "true"
+status:
+  state: Succeeded
+---
+# Percona operator creates ONE StatefulSet per pod instance (not one StatefulSet
+# with N replicas).  For a 3-instance cluster this yields three separate StatefulSets
+# each with replicas=1.  KUTTL matches this block against ANY StatefulSet with these
+# labels, so readyReplicas=1 is correct.  The aggregate is validated below.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: percona-restored
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
+      kind: PostgresCluster
+      name: percona-restored
+      controller: true
+      blockOwnerDeletion: true
+status:
+  availableReplicas: 1
+  currentReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+# upstream PostgresCluster aggregates readyReplicas across all StatefulSets (1+1+1=3).
+# The bootstrap restore id uses internal naming (~pgo-bootstrap-*), so we only
+# check finished/succeeded here and not the id field.
+apiVersion: upstream.pgv2.percona.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: percona-restored
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: percona-restored
+      controller: true
+      blockOwnerDeletion: true
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  pgbackrest:
+    restore:
+      finished: true
+      succeeded: 1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: percona-restored
+status:
+  postgres:
+    instances:
+      - name: instance1
+        ready: 3
+        size: 3
+    ready: 3
+    size: 3
+  state: ready

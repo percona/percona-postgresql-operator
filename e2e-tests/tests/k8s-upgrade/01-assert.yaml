@@ -1,0 +1,14 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: check-operator-deploy-status
+timeout: 120
+commands:
+  - script: |
+      set -euo pipefail
+
+      kubectl assert exist-enhanced crd perconapgclusters.pgv2.percona.com
+      kubectl assert exist-enhanced crd perconapgbackups.pgv2.percona.com
+      kubectl assert exist-enhanced crd perconapgrestores.pgv2.percona.com
+      kubectl assert exist-enhanced crd perconapgupgrades.pgv2.percona.com
+      kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1

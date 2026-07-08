@@ -17,7 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func (r *PGClusterReconciler) reconcileScheduledBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
@@ -128,7 +128,7 @@ func (r *PGClusterReconciler) createScheduledBackup(log logr.Logger, backupName,
 		},
 		Spec: v2.PerconaPGBackupSpec{
 			PGCluster: cr.Name,
-			RepoName:  ptr.To(repoName),
+			RepoName:  new(repoName),
 			Options:   []string{"--type=" + backupType},
 		},
 	}

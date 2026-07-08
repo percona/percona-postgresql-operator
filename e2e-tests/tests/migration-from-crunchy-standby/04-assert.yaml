@@ -1,0 +1,67 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+# Percona operator creates ONE StatefulSet per pod instance (not one StatefulSet
+# with N replicas).  For a 3-instance cluster this yields three separate StatefulSets
+# (e.g. percona-standby-instance1-xxxx), each with replicas=1.
+# KUTTL matches this block against ANY StatefulSet with these labels, so checking
+# readyReplicas=1 here is correct.  The aggregate "3 pods ready" is validated by
+# the PostgresCluster and PerconaPGCluster status blocks further below.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: percona-standby
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
+      kind: PostgresCluster
+      name: percona-standby
+      controller: true
+      blockOwnerDeletion: true
+status:
+  availableReplicas: 1
+  currentReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+# upstream PostgresCluster aggregates across all StatefulSets:
+# readyReplicas=3 is the sum of the three individual StatefulSets (1+1+1).
+apiVersion: upstream.pgv2.percona.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: percona-standby
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: percona-standby
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  pgbackrest:
+    repos:
+      - name: repo1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: percona-standby
+status:
+  postgres:
+    instances:
+      - name: instance1
+        ready: 3
+        size: 3
+    ready: 3
+    size: 3
+  state: ready

@@ -9,7 +9,7 @@
 package v2
 
 import (
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,6 +72,16 @@ func (in *BuiltInExtensionsSpec) DeepCopyInto(out *BuiltInExtensionsSpec) {
 	}
 	if in.PGRepack != nil {
 		in, out := &in.PGRepack, &out.PGRepack
+		*out = new(bool)
+		**out = **in
+	}
+	if in.PGCron != nil {
+		in, out := &in.PGCron, &out.PGCron
+		*out = new(bool)
+		**out = **in
+	}
+	if in.SetUser != nil {
+		in, out := &in.SetUser, &out.SetUser
 		*out = new(bool)
 		**out = **in
 	}

@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      CRUNCHY_REPO_PATH=$(kubectl get configmap crunchy-backup-restore-config -n "${NAMESPACE}" \
+        -o jsonpath='{.data.crunchy-repo-path}')
+      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+
+      # Percona cluster's own repo uses a separate S3 path from the Crunchy source:
+      #   crunchy source: .../crunchy-repo1  (dataSource only)
+      #   percona own:    .../percona-repo1  (ongoing backups/restores)
+      PERCONA_REPO_PATH="/migration-backup-restore/${RANDOM}/percona-repo1"
+
+      # sed (not yq) preserves the quoted "n" in repo1-s3-verify-tls;
+      # yq outputs bare `n` which YAML 1.1 parses as boolean → API rejection.
+      get_cr "percona-restored" "${PERCONA_REPO_PATH}" | \
+        yq eval 'del(.spec.users)' | \
+        $sed "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" | \
+        $sed "s|<crunchy-repo-path>|${CRUNCHY_REPO_PATH}|g" | \
+        kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 20

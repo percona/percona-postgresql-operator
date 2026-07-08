@@ -9,7 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -159,10 +159,10 @@ if os.path.isfile('` + ldapPasswordAbsolutePath + `'):
 }
 
 // systemSettings returns pgAdmin settings as a value that can be marshaled to JSON.
-func systemSettings(spec *v1beta1.PGAdminPodSpec) map[string]interface{} {
+func systemSettings(spec *v1beta1.PGAdminPodSpec) map[string]any {
 	settings := spec.Config.Settings.DeepCopy()
 	if settings == nil {
-		settings = make(map[string]interface{})
+		settings = make(map[string]any)
 	}
 
 	// SERVER_MODE must always be enabled when running on a webserver.
