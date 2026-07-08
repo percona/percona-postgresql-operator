@@ -22,6 +22,7 @@ esac
 PATCH_BODY="{\"metadata\":{\"labels\":{\"postgres-operator.crunchydata.com/role\":\"${LABEL}\"},\"annotations\":{\"status\":\"{\\\"role\\\":\\\"${LABEL}\\\"}\"}}}"
 
 curl -sf -X PATCH \
+    --retry 3 --retry-delay 1 --retry-connrefused \
     --cacert "${CA}" \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/strategic-merge-patch+json" \
