@@ -10,3 +10,5 @@ spec:
       pg_audit: false
       pgvector: false
       pg_repack: false
+      pg_cron: false
+      set_user: false
