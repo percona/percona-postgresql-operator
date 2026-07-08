@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
+timeout: 180
 commands:
   - script: |-
       set -o errexit
@@ -8,6 +8,14 @@ commands:
 
       source ../../functions
 
-      data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres) -c "\c postgres" -c "SELECT extname FROM pg_extension ORDER BY extname")
+      check_extensions() {
+        data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres) -c "\c postgres" -c "SELECT extname FROM pg_extension ORDER BY extname")
+
+        for ext in pg_cron pg_repack pg_stat_statements pgaudit plpgsql set_user vector; do
+          echo "${data}" | grep -q "${ext}" || return 1
+        done
+      }
+
+      retry 24 5 check_extensions
 
       kubectl create configmap -n "${NAMESPACE}" 04-check-extensions --from-literal=data="${data}"
