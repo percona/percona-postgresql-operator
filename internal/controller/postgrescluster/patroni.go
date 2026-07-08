@@ -6,6 +6,7 @@ package postgrescluster
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -46,6 +47,13 @@ func (r *Reconciler) deletePatroniArtifacts(
 	return err
 }
 
+// patroniPodHost returns pod's own stable DNS name, matching the DNS SAN on
+// its Patroni REST API certificate. Patroni's REST API does not certify
+// "localhost", so calls made inside the pod must target this name instead.
+func patroniPodHost(pod *corev1.Pod) string {
+	return fmt.Sprintf("%s.%s.%s.svc", pod.Spec.Hostname, pod.Spec.Subdomain, pod.Namespace)
+}
+
 func (r *Reconciler) handlePatroniRestarts(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
 ) error {
@@ -65,7 +73,7 @@ func (r *Reconciler) handlePatroniRestarts(
 		) error {
 			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
 		})
-		restart, err := exec.PodRequiresRestart(ctx, cluster.Spec.Patroni.GetPort())
+		restart, err := exec.PodRequiresRestart(ctx, patroniPodHost(pod), cluster.Spec.Patroni.GetPort())
 		return err == nil && restart
 	}
 
@@ -420,7 +428,7 @@ func (r *Reconciler) reconcilePatroniStatus(
 					return r.PodExec(ctx, pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 				})
 
-				status, err := exec.GetMemberStatus(ctx, cluster.Spec.Patroni.GetPort())
+				status, err := exec.GetMemberStatus(ctx, patroniPodHost(pod), cluster.Spec.Patroni.GetPort())
 				if err == nil && status.DatabaseSystemIdentifier != "" {
 					cluster.Status.Patroni.SystemIdentifier = status.DatabaseSystemIdentifier
 				} else if readyInstance {

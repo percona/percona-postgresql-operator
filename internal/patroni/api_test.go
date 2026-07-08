@@ -295,7 +295,7 @@ func TestExecutorGetMemberStatus(t *testing.T) {
 			context.Context, io.Reader, io.Writer, io.Writer, ...string,
 		) error {
 			return expected
-		}).GetMemberStatus(context.Background(), 8008)
+		}).GetMemberStatus(context.Background(), "some-host", 8008)
 
 		assert.Equal(t, expected, actual)
 		assert.DeepEqual(t, status, MemberStatus{})
@@ -307,7 +307,7 @@ func TestExecutorGetMemberStatus(t *testing.T) {
 		) error {
 			_, _ = stderr.Write([]byte(`no luck`))
 			return nil
-		}).GetMemberStatus(context.Background(), 8008)
+		}).GetMemberStatus(context.Background(), "some-host", 8008)
 
 		assert.Error(t, actual, "no luck")
 		assert.DeepEqual(t, status, MemberStatus{})
@@ -319,7 +319,7 @@ func TestExecutorGetMemberStatus(t *testing.T) {
 		) error {
 			_, _ = stdout.Write([]byte(`no luck`))
 			return nil
-		}).GetMemberStatus(context.Background(), 8008)
+		}).GetMemberStatus(context.Background(), "some-host", 8008)
 
 		assert.ErrorContains(t, actual, "invalid character")
 		assert.DeepEqual(t, status, MemberStatus{})
@@ -330,7 +330,7 @@ func TestExecutorGetMemberStatus(t *testing.T) {
 			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
 			assert.DeepEqual(t, command, strings.Fields(
-				`curl --silent --fail --cacert /etc/patroni/~postgres-operator/patroni.ca-roots https://localhost:8008/patroni`,
+				`curl --silent --fail --cacert /etc/patroni/~postgres-operator/patroni.ca-roots https://some-host:8008/patroni`,
 			))
 			assert.Assert(t, stdin == nil, "expected no stdin, got %T", stdin)
 
@@ -338,7 +338,7 @@ func TestExecutorGetMemberStatus(t *testing.T) {
 				`{"state": "running", "role": "primary", "database_system_identifier": "6287881213849985952", "pending_restart": true}`,
 			))
 			return nil
-		}).GetMemberStatus(context.Background(), 8008)
+		}).GetMemberStatus(context.Background(), "some-host", 8008)
 
 		assert.NilError(t, actual)
 		assert.Equal(t, status.DatabaseSystemIdentifier, "6287881213849985952")
@@ -353,7 +353,7 @@ func TestExecutorPodRequiresRestart(t *testing.T) {
 			context.Context, io.Reader, io.Writer, io.Writer, ...string,
 		) error {
 			return expected
-		}).PodRequiresRestart(context.Background(), 8008)
+		}).PodRequiresRestart(context.Background(), "some-host", 8008)
 
 		assert.Equal(t, expected, actual)
 		assert.Equal(t, restart, false)
@@ -365,7 +365,7 @@ func TestExecutorPodRequiresRestart(t *testing.T) {
 		) error {
 			_, _ = stdout.Write([]byte(`{"state": "running", "pending_restart": false}`))
 			return nil
-		}).PodRequiresRestart(context.Background(), 8008)
+		}).PodRequiresRestart(context.Background(), "some-host", 8008)
 
 		assert.NilError(t, actual)
 		assert.Equal(t, restart, false)
@@ -377,7 +377,7 @@ func TestExecutorPodRequiresRestart(t *testing.T) {
 		) error {
 			_, _ = stdout.Write([]byte(`{"state": "running", "pending_restart": true}`))
 			return nil
-		}).PodRequiresRestart(context.Background(), 8008)
+		}).PodRequiresRestart(context.Background(), "some-host", 8008)
 
 		assert.NilError(t, actual)
 		assert.Equal(t, restart, true)

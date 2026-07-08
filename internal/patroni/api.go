@@ -188,17 +188,20 @@ type MemberStatus struct {
 }
 
 // GetMemberStatus curls Patroni's own monitoring REST endpoint inside the
-// pod over loopback and returns the parsed response. Unlike reading
-// Kubernetes annotations, this works identically regardless of DCS backend,
-// since it's PostgreSQL/Patroni introspection rather than a DCS read.
-func (exec Executor) GetMemberStatus(ctx context.Context, port int32) (MemberStatus, error) {
+// pod and returns the parsed response. Unlike reading Kubernetes annotations,
+// this works identically regardless of DCS backend, since it's
+// PostgreSQL/Patroni introspection rather than a DCS read.
+//
+// host must match a DNS SAN on Patroni's REST API certificate (i.e. the
+// pod's own stable DNS name) since Patroni does not certify "localhost".
+func (exec Executor) GetMemberStatus(ctx context.Context, host string, port int32) (MemberStatus, error) {
 	var stdout, stderr bytes.Buffer
 	var status MemberStatus
 
 	err := exec(ctx, nil, &stdout, &stderr,
 		"curl", "--silent", "--fail",
 		"--cacert", path.Join(configDirectory, certAuthorityConfigPath),
-		fmt.Sprintf("https://localhost:%d/patroni", port))
+		fmt.Sprintf("https://%s:%d/patroni", host, port))
 	if err != nil {
 		return status, err
 	}
@@ -216,8 +219,8 @@ func (exec Executor) GetMemberStatus(ctx context.Context, port int32) (MemberSta
 // Patroni's own monitoring REST API directly. Unlike the package-level
 // PodRequiresRestart function, this works under any DCS backend, since it
 // doesn't depend on Patroni having written a Kubernetes annotation.
-func (exec Executor) PodRequiresRestart(ctx context.Context, port int32) (bool, error) {
-	status, err := exec.GetMemberStatus(ctx, port)
+func (exec Executor) PodRequiresRestart(ctx context.Context, host string, port int32) (bool, error) {
+	status, err := exec.GetMemberStatus(ctx, host, port)
 	return status.PendingRestart, err
 }
 
