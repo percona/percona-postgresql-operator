@@ -49,5 +49,17 @@ commands:
         exit 1
       fi
 
-    timeout: 360
+      # pg_cron
+      run_psql_local \
+        "SELECT cron.unschedule(cron.schedule('\''builtin_extensions_smoke_'\'' || extract(epoch from clock_timestamp())::bigint, '\''* * * * *'\'', '\''SELECT 1'\''));" \
+        "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres"
 
+      # set_user
+      run_psql_local \
+        "CREATE ROLE set_user_smoke;
+        SELECT set_user('\''set_user_smoke'\'');
+        SELECT reset_user();
+        DROP ROLE set_user_smoke;" \
+        "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres"
+
+    timeout: 360
