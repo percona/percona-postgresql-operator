@@ -314,11 +314,9 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 
 	var additionalTrustedCAs [][]byte
-	additionalTrustedCAs, err = r.getAdditionalTrustedCAs(ctx, cluster)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		additionalTrustedCAs, err = r.getAdditionalTrustedCAs(ctx, cluster)
 	}
-
 	if err == nil {
 		err = pgbouncer.Secret(ctx, cluster, root, existing, service, intent, frontendCertManagerSecret, additionalTrustedCAs)
 	}
@@ -330,8 +328,36 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 }
 
 func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1beta1.PostgresCluster) ([][]byte, error) {
+	pgBouncer := cluster.Spec.Proxy.PGBouncer
+	if len(pgBouncer.AdditionalTrustedCAs) == 0 {
+		return nil, nil
+	}
+
 	result := [][]byte{}
-	for _, ref := range cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs {
+
+	// K8SPG-952: in manual TLS mode the frontend CA file is built solely from
+	// this list, so it must begin with the authority of the custom TLS Secret.
+	if projection := pgBouncer.CustomTLSSecret; projection != nil {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      projection.Name,
+				Namespace: cluster.GetNamespace(),
+			},
+		}
+
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+			return nil, errors.Wrapf(err, "failed to get custom TLS secret '%s'", projection.Name)
+		}
+
+		key := pgbouncer.CustomTLSAuthorityKey(projection)
+		ca, ok := secret.Data[key]
+		if !ok {
+			return nil, errors.Errorf("custom TLS secret '%s' does not contain key '%s'", projection.Name, key)
+		}
+		result = append(result, ca)
+	}
+
+	for _, ref := range pgBouncer.AdditionalTrustedCAs {
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ref.Name,
@@ -349,6 +375,7 @@ func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1bet
 			result = append(result, ca)
 		}
 	}
+
 	return result, nil
 }
 

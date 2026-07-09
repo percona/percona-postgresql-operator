@@ -160,9 +160,10 @@ func Pod(
 	}
 	configVolume := corev1.Volume{Name: configVolumeMount.Name}
 	configVolume.Projected = &corev1.ProjectedVolumeSource{
-		Sources: append(append([]corev1.VolumeProjection{},
+		Sources: append(append(append([]corev1.VolumeProjection{},
 			podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
-			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret),
+			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
+				len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}

@@ -330,6 +330,59 @@ volumes:
 		assert.DeepEqual(t, before, pod)
 	})
 
+	// K8SPG-952: in manual TLS mode with additional CAs, the frontend
+	// authority is mounted from the operator Secret where the merged CA
+	// bundle is stored; tls.crt/tls.key still come from the custom Secret.
+	t.Run("CustomTLSSecretWithAdditionalTrustedCAs", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "tls-name"},
+			Items: []corev1.KeyToPath{
+				{Key: "k1", Path: "tls.crt"},
+				{Key: "k2", Path: "tls.key"},
+			},
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "external-ca"},
+		}
+
+		pod := new(corev1.PodSpec)
+		Pod(ctx, cluster, configMap, primaryCertificate, secret, pod)
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
+- name: pgbouncer-config
+  projected:
+    sources:
+    - configMap:
+        items:
+        - key: pgbouncer-empty
+          path: pgbouncer.ini
+    - configMap:
+        items:
+        - key: pgbouncer.ini
+          path: ~postgres-operator.ini
+    - secret:
+        items:
+        - key: pgbouncer-users.txt
+          path: ~postgres-operator/users.txt
+    - secret:
+        items:
+        - key: k1
+          path: ~postgres-operator/frontend-tls.crt
+        - key: k2
+          path: ~postgres-operator/frontend-tls.key
+        name: tls-name
+    - secret:
+        items:
+        - key: pgbouncer-frontend.ca-roots
+          path: ~postgres-operator/frontend-ca.crt
+    - secret:
+        items:
+        - key: ca.crt
+          path: ~postgres-operator/backend-ca.crt
+		`))
+	})
+
 	t.Run("Customizations", func(t *testing.T) {
 		cluster.Spec.ImagePullPolicy = corev1.PullAlways
 		cluster.Spec.Proxy.PGBouncer.Image = "image-town"
