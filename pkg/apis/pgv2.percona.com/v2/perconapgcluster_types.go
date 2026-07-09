@@ -52,7 +52,6 @@ type PerconaPGCluster struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
-// +kubebuilder:validation:XValidation:rule="!has(self.crVersion) || self.crVersion == \"\" || self.crVersion.matches('^[0-9]+\\\\.[0-9]+\\\\.[0-9]+(-[a-zA-Z0-9.+-]+)?$')",message="CRVersion must be a valid semantic version"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
@@ -61,6 +60,7 @@ type PerconaPGClusterSpec struct {
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == \"\" || self.matches('^[0-9]+\\\\.[0-9]+\\\\.[0-9]+(-[a-zA-Z0-9.+-]+)?$')",message="CRVersion must be a valid semantic version"
 	CRVersion string `json:"crVersion,omitempty"`
 
 	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
