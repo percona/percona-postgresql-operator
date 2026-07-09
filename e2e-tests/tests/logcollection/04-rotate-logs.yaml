@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role logcollection primary name)
+
+      kubectl -n "${NAMESPACE}" exec "${primary}" -c logrotate -- \
+        logrotate -f -v -s /pgdata/logrotate.status \
+          /opt/crunchy/logcollector/logrotate/conf.d/postgres.conf

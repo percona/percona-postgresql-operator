@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role logcollection primary name)
+
+      kubectl -n "${NAMESPACE}" exec "${primary}" -c logrotate -- \
+        sh -c 'ls /pgdata/pg*/log/*.1 2>/dev/null | head -1' | grep -q .
+
+      echo "OK: logrotate produced a rotated file"

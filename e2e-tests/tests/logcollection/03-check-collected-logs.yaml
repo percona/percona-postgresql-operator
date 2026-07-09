@@ -1,0 +1,50 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster=logcollection
+      primary=$(get_pod_by_role ${cluster} primary name)
+
+      retry() {
+        local deadline=$((SECONDS + $1)); shift
+        until "$@"; do
+          if [ "${SECONDS}" -ge "${deadline}" ]; then
+            echo "FAIL: timed out waiting for: $*"
+            return 1
+          fi
+          sleep 5
+        done
+      }
+
+      # 1. sidecar containers present on the instance pod
+      instance_containers=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
+        -o 'jsonpath={.spec.containers[*].name}')
+      echo "${instance_containers}" | grep -qw logs
+      echo "${instance_containers}" | grep -qw logrotate
+
+      # 2. postgres writes to its default log dir (/pgdata/pgNN/log) and is collected.
+      # log_statement=all logs the marker SELECT from step 02 into the postgres log,
+      # so requiring the marker proves the postgres server logs (not just pgbackrest)
+      # were read from that dir and emitted by fluent-bit.
+      retry 60 bash -c "kubectl -n '${NAMESPACE}' exec '${primary}' -c database -- \
+        sh -c 'ls /pgdata/pg*/log/*.log /pgdata/pg*/log/*.csv 2>/dev/null | head -1' | grep -q ."
+      retry 120 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 \
+        | grep -q 'e2e-postgres-log-marker'"
+
+      # 3. pgBackRest client/archive logs collected on the instance
+      retry 180 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 | grep -q pgbackrest"
+
+      # 4. custom fluent-bit configuration was loaded
+      retry 120 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 | grep -q e2e_marker"
+
+      # 5. custom logrotate configuration is mounted
+      kubectl -n "${NAMESPACE}" exec "${primary}" -c logrotate -- \
+        cat /opt/crunchy/logcollector/logrotate/conf.d/postgres.conf | grep -q hourly
+
+      echo "OK: postgres and pgbackrest logs verified"

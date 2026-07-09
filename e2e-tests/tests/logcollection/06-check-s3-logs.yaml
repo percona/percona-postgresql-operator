@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+      secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+      check_s3_logs() {
+        kubectl -n "${NAMESPACE}" run -i --rm "aws-cli-${RANDOM}" \
+          --image=perconalab/awscli --restart=Never -- \
+          bash -c "AWS_ACCESS_KEY_ID='${access_key}' AWS_SECRET_ACCESS_KEY='${secret_key}' AWS_DEFAULT_REGION=us-east-1 \
+          /usr/bin/aws --endpoint-url https://minio-service:9000 --no-verify-ssl s3 ls s3://operator-testing/ --recursive" \
+          | grep -q postgres
+      }
+
+      retry 18 15 check_s3_logs
+      echo "OK: postgres logs shipped to MinIO"

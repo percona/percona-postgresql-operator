@@ -399,6 +399,7 @@ get_cr() {
 		.spec.initContainer.image = "'$IMAGE'" |
 		.spec.backups.pgbackrest.image = "'$IMAGE_BACKREST'" |
 		.spec.proxy.pgBouncer.image = "'$IMAGE_PGBOUNCER'" |
+		.spec.logcollector.image = "'$IMAGE_LOGCOLLECTOR'" |
 		.spec.pmm.image = "'$IMAGE_PMM_CLIENT'" |
 		.spec.pmm.secret = "'${cr_name}'-pmm-secret" |
 		.spec.pmm.customClusterName = "'${cr_name}'-pmm-custom-name" |

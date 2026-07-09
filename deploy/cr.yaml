@@ -735,6 +735,56 @@ spec:
 #    customClusterName: "<string>"
 #    postgresParams: "<string>"
 #    querySource: pgstatmonitor
+  logcollector:
+    enabled: false
+    image: docker.io/perconalab/fluentbit:main-logcollector
+#    imagePullPolicy: IfNotPresent
+#    # Extra fluent-bit configuration merged with the operator-managed config.
+#    configuration: |
+#      [FILTER]
+#          Name    record_modifier
+#          Match   *
+#          Record  cluster_name cluster1
+#    env:
+#    - name: MY_ENV
+#      value: "my-value"
+#    envFrom:
+#    - secretRef:
+#        name: my-log-collector-secret
+#    resources:
+#      limits:
+#        memory: 200M
+#        cpu: 350m
+#      requests:
+#        memory: 150M
+#        cpu: 300m
+#    # Extra volumes/mounts for the collector sidecars, e.g. a CA bundle so an
+#    # S3 output can verify TLS via tls.ca_file.
+#    volumeMounts:
+#    - name: s3-ca
+#      mountPath: /etc/fluentbit/tls
+#      readOnly: true
+#    volumes:
+#    - name: s3-ca
+#      secret:
+#        secretName: my-s3-ca
+#    logRotate:
+#      # Override the operator-managed logrotate config for the postgres logs.
+#      configuration: |
+#        /pgdata/logs/postgres/*.log
+#        /pgdata/logs/postgres/*.csv {
+#            daily
+#            rotate 7
+#            missingok
+#            notifempty
+#            copytruncate
+#            sharedscripts
+#        }
+#      # Additional logrotate config supplied via a ConfigMap.
+#      extraConfig:
+#        name: my-logrotate-config
+#      # Cron schedule for logrotate runs (default "0 0 * * *").
+#      schedule: "0 0 * * *"
 #  patroni:
 #    # Some values of the Liveness/Readiness probes of the patroni container are calculated using syncPeriodSeconds by the following formulas:
 #    # - timeoutSeconds:   syncPeriodSeconds / 2;

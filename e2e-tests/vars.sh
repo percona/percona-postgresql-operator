@@ -57,6 +57,7 @@ export IMAGE_PMM_CLIENT=${IMAGE_PMM_CLIENT:-"perconalab/pmm-client:dev-latest"}
 export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:dev-latest"}
 export IMAGE_PMM3_CLIENT=${IMAGE_PMM3_CLIENT:-"perconalab/pmm-client:3-dev-latest"}
 export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3-dev-latest"}
+export IMAGE_LOGCOLLECTOR=${IMAGE_LOGCOLLECTOR:-"perconalab/fluentbit:main-logcollector"}
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 export CPGO_VERSION=${CPGO_VERSION:-"5.8.7"}

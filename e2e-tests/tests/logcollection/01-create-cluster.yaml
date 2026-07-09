@@ -1,0 +1,52 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      export fluentbit_custom="$(printf '%s\n' \
+        '[FILTER]' \
+        '    Name    record_modifier' \
+        '    Match   *' \
+        '    Record  e2e_marker present' \
+        '[OUTPUT]' \
+        '    Name                         s3' \
+        '    Match                        *.postgres' \
+        '    bucket                       operator-testing' \
+        '    endpoint                     https://minio-service:9000' \
+        '    tls                          On' \
+        '    tls.ca_file                  /etc/fluentbit/tls/ca.crt' \
+        '    region                       us-east-1' \
+        '    store_dir                    /tmp/fluent-bit/s3' \
+        '    total_file_size              1M' \
+        '    upload_timeout               15s' \
+        '    use_put_object               On' \
+        '    s3_key_format                /$TAG/%Y/%m/%d/%H-%M-%S-$UUID' \
+        '    s3_key_format_tag_delimiters .')"
+
+      export logrotate_custom="$(printf '%s\n' \
+        '/pgdata/pg*/log/*.log' \
+        '/pgdata/pg*/log/*.csv {' \
+        '    hourly' \
+        '    rotate 3' \
+        '    missingok' \
+        '    notifempty' \
+        '    copytruncate' \
+        '    sharedscripts' \
+        '}')"
+
+      get_cr \
+        | yq eval '.spec.logcollector.enabled = true' - \
+        | yq eval '.spec.logcollector.configuration = strenv(fluentbit_custom)' - \
+        | yq eval '.spec.logcollector.envFrom = [{"secretRef": {"name": "minio-secret"}}]' - \
+        | yq eval '.spec.logcollector.volumeMounts = [{"name": "s3-ca", "mountPath": "/etc/fluentbit/tls", "readOnly": true}]' - \
+        | yq eval '.spec.logcollector.volumes = [{"name": "s3-ca", "secret": {"secretName": "minio-tls", "items": [{"key": "public.crt", "path": "ca.crt"}]}}]' - \
+        | yq eval '.spec.logcollector.logRotate.configuration = strenv(logrotate_custom)' - \
+        | yq eval '.spec.logcollector.logRotate.schedule = "*/5 * * * *"' - \
+        | yq eval '.spec.patroni.dynamicConfiguration.postgresql.parameters.log_statement = "all"' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 30
