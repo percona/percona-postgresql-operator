@@ -125,7 +125,7 @@ func (r *Reconciler) generateClusterPrimaryService(
 	// With external DCS, Patroni does not manage k8s Endpoints for leader election.
 	// Use a label-selector service instead: pods labeled role=primary by the
 	// on_role_change/on_start callback receive primary traffic directly.
-	if if cluster.UsesExternalDCS() {
+	if cluster.UsesExternalDCS() {
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 		service.Spec.Selector = map[string]string{
 			naming.LabelCluster: cluster.Name,
