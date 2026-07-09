@@ -1208,6 +1208,11 @@ type PGBouncerSpec struct {
 	// +optional
 	CustomTLSSecret *corev1.SecretProjection `json:"customTLSSecret,omitempty"`
 
+	// K8SPG-952
+	// Additional CA bundles that PgBouncer should trust when verifying client certificates.
+	// Each item is a reference to a Secret that contains a PEM-encoded CA bundle in key `ca.crt`.
+	AdditionalTrustedCAs []corev1.LocalObjectReference `json:"additionalTrustedCAs,omitempty"`
+
 	// Allow SUPERUSERs to connect through PGBouncer.
 	// +optional
 	ExposeSuperusers bool `json:"exposeSuperusers,omitempty"`
@@ -1300,6 +1305,7 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		SecurityContext:           p.SecurityContext,
 		Env:                       p.Env,
 		EnvFrom:                   p.EnvFrom,
+		AdditionalTrustedCAs:      p.AdditionalTrustedCAs,
 	}
 
 	spec.Default()
