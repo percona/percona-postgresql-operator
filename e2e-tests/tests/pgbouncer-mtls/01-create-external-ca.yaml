@@ -1,0 +1,33 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # An "external" CA the operator knows nothing about, and a client
+      # certificate signed by it. The CN matches the application user
+      # created by get_cr.
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout "${TEMP_DIR}/external-ca.key" \
+        -out "${TEMP_DIR}/external-ca.crt" \
+        -subj "/CN=external-client-ca"
+
+      openssl req -nodes -newkey rsa:2048 \
+        -keyout "${TEMP_DIR}/client.key" \
+        -out "${TEMP_DIR}/client.csr" \
+        -subj "/CN=pgbouncer-mtls"
+
+      openssl x509 -req -days 365 \
+        -in "${TEMP_DIR}/client.csr" \
+        -CA "${TEMP_DIR}/external-ca.crt" \
+        -CAkey "${TEMP_DIR}/external-ca.key" \
+        -CAserial "${TEMP_DIR}/external-ca.srl" \
+        -CAcreateserial \
+        -out "${TEMP_DIR}/client.crt"
+
+      kubectl -n "${NAMESPACE}" create secret generic external-ca \
+        --from-file=ca.crt="${TEMP_DIR}/external-ca.crt"
