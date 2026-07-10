@@ -10290,7 +10290,7 @@ spec:
                 type: string
                 x-kubernetes-validations:
                 - message: CRVersion must be a valid semantic version
-                  rule: self == "" || self.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9.+-]+)?$')
+                  rule: self == "" || self.matches('^[0-9]+\\.[0-9]+\\.[0-9]+([-+][a-zA-Z0-9.+-]+)?$')
               dataSource:
                 description: Specifies a data source for bootstrapping the PostgreSQL
                   cluster.

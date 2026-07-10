@@ -60,7 +60,7 @@ type PerconaPGClusterSpec struct {
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == \"\" || self.matches('^[0-9]+\\\\.[0-9]+\\\\.[0-9]+(-[a-zA-Z0-9.+-]+)?$')",message="CRVersion must be a valid semantic version"
+	// +kubebuilder:validation:XValidation:rule="self == \"\" || self.matches('^[0-9]+\\\\.[0-9]+\\\\.[0-9]+([-+][a-zA-Z0-9.+-]+)?$')",message="CRVersion must be a valid semantic version"
 	CRVersion string `json:"crVersion,omitempty"`
 
 	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
