@@ -372,7 +372,7 @@ func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1bet
 			return nil, errors.Wrapf(err, "failed to get additional CA secret '%s'", ref.Name)
 		}
 		if ca, ok := secret.Data["ca.crt"]; !ok {
-			return nil, errors.Errorf("additional CA Secret does not contain key 'ca.crt'", ref.Name)
+			return nil, errors.Errorf("additional CA Secret '%s' does not contain key 'ca.crt'", ref.Name)
 		} else {
 			result = append(result, ca)
 		}
