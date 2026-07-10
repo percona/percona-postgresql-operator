@@ -1,0 +1,38 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-restored,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: primary pod not found"
+        exit 1
+      fi
+
+      # Insert the second batch of rows that must survive the upcoming PITR.
+      # The PITR target is captured in step 12 AFTER the step 11 backup
+      # completes, so the backup's start time is guaranteed to be before the
+      # target and pgBackRest can use it for the restore.
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
+        psql -d migrationtest -c "
+          INSERT INTO migration_data VALUES
+            (5, 'second-batch-one'),
+            (6, 'second-batch-two'),
+            (7, 'second-batch-three');
+        "
+
+      # Force a WAL switch so the inserted rows reach the archive before the
+      # step 11 backup starts.
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
+        psql -q -c "SELECT pg_switch_wal();"
+
+      kubectl create configmap -n "${NAMESPACE}" 10-second-batch-written \
+        --from-literal=rows="5,6,7"
+    timeout: 120
