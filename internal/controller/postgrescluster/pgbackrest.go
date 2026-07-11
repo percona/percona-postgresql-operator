@@ -3173,6 +3173,21 @@ func (r *Reconciler) reconcileStanzaCreate(ctx context.Context,
 	r.Recorder.Event(postgresCluster, corev1.EventTypeNormal, EventStanzasCreated,
 		"pgBackRest stanza creation completed successfully")
 
+	// Re-push any timeline history files stranded by the async-archiver race:
+	// postgres archives 00000002.history during bootstrap promotion before the
+	// stanza exists; pgBackRest drops it silently (error 103) and postgres
+	// never retries.  Without it pg_rewind fails on replicas after PITR.
+	log := logging.FromContext(ctx)
+	historyOut, historyErr := pgbackrest.Executor(exec).ArchivePushHistoryFiles(ctx)
+	if historyErr != nil {
+		r.Recorder.Event(postgresCluster, corev1.EventTypeWarning,
+			"ArchivePushHistoryFilesFailed", historyErr.Error())
+		log.Error(historyErr, "timeline history file recovery failed",
+			"pod", writableInstanceName, "output", historyOut)
+	} else if historyOut != "" {
+		log.Info("timeline history file recovery", "output", historyOut)
+	}
+
 	// if no errors then stanza(s) created successfully
 	for i := range postgresCluster.Status.PGBackRest.Repos {
 		postgresCluster.Status.PGBackRest.Repos[i].StanzaCreated = true
