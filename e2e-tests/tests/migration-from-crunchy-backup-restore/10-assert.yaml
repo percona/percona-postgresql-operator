@@ -1,0 +1,7 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      kubectl get configmap -n "${NAMESPACE}" 10-second-batch-written

@@ -556,7 +556,16 @@ type PostgresStatus struct {
 
 	// +optional
 	ImageID string `json:"imageID"`
+
+	// +optional
+	Distribution string `json:"distribution,omitempty"`
 }
+
+// PostgreSQL distribution values reported in PostgresStatus.Distribution.
+const (
+	PostgresDistributionPercona   = "percona"
+	PostgresDistributionCommunity = "community"
+)
 
 type PGBouncerStatus struct {
 	Size int32 `json:"size"`
