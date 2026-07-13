@@ -663,6 +663,9 @@ spec:
                 required:
                 - name
                 type: object
+              size:
+                format: int64
+                type: integer
               snapshot:
                 properties:
                   dataVolumeSnapshotRef:
