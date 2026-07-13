@@ -29385,6 +29385,25 @@ spec:
                     type: string
                   certValidityDuration:
                     type: string
+                  issuerConf:
+                    description: K8SPG-951
+                    properties:
+                      group:
+                        description: |-
+                          Group of the issuer being referred to.
+                          Defaults to 'cert-manager.io'.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the issuer being referred to.
+                          Defaults to 'Issuer'.
+                        type: string
+                      name:
+                        description: Name of the issuer being referred to.
+                        type: string
+                    required:
+                    - name
+                    type: object
                   pgBackRestCertValidityDuration:
                     type: string
                 type: object

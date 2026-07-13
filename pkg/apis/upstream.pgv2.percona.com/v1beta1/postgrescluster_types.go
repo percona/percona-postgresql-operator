@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -230,6 +231,9 @@ type TLSSpec struct {
 	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 	// +optional
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
+	// K8SPG-951
+	// +optional
+	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.
