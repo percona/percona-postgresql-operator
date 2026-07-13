@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 240
 commands:
   - script: |-
       set -o errexit
@@ -18,3 +17,4 @@ commands:
           -o jsonpath='{.data.pgbouncer-frontend\.ca-roots}' | base64 -d | grep -c 'BEGIN CERTIFICATE') -ge 2 ]]
       }
       retry 30 5 bundle_has_two_cas
+    timeout: 240

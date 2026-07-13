@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
   - script: |-
       set -o errexit
@@ -14,3 +13,4 @@ commands:
       get_cr "pgbouncer-mtls" ${RANDOM} \
         | yq '.spec.proxy.pgBouncer.config.global.client_tls_sslmode="verify-ca"' \
         | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 10

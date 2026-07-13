@@ -1,6 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
   - script: |-
       set -o errexit
@@ -31,3 +30,4 @@ commands:
 
       kubectl -n "${NAMESPACE}" create secret generic external-ca \
         --from-file=ca.crt="${TEMP_DIR}/external-ca.crt"
+    timeout: 30
