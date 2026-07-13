@@ -1365,7 +1365,7 @@ var EnvFromSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []str
 
 func (cr *PerconaPGCluster) PGBouncerUserSecrets() []string {
 	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil ||
-		cr.Spec.Proxy.PGBouncer.UsersSecret == nil {
+		cr.Spec.Proxy.PGBouncer.UsersSecret == nil || cr.Spec.Proxy.PGBouncer.UsersSecret.Name == "" {
 		return nil
 	}
 

@@ -78,6 +78,9 @@ func authFileContents(password string, userSecret *corev1.Secret) ([]byte, error
 	users := make(map[string]string)
 	if userSecret != nil {
 		for name, password := range userSecret.Data {
+			if name == postgresqlUser {
+				return nil, errors.Errorf("pgbouncer user %q in Secret %q conflicts with the reserved operator user", name, userSecret.Name)
+			}
 			if strings.ContainsAny(string(password), "\r\n") {
 				return nil, errors.Errorf("pgbouncer user %q in Secret %q contains a newline", name, userSecret.Name)
 			}

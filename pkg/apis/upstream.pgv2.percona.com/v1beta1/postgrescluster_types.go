@@ -211,7 +211,7 @@ func (cluster *PostgresCluster) PGBouncerUserSecrets() []string {
 	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
 		return nil
 	}
-	if cluster.Spec.Proxy.PGBouncer.UsersSecret == nil {
+	if cluster.Spec.Proxy.PGBouncer.UsersSecret == nil || cluster.Spec.Proxy.PGBouncer.UsersSecret.Name == "" {
 		return nil
 	}
 	return []string{cluster.Spec.Proxy.PGBouncer.UsersSecret.Name}
