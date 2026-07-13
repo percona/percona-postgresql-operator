@@ -20,8 +20,6 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
-type finalizerFunc func(context.Context, *v2.PerconaPGCluster) error
-
 func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
@@ -212,19 +210,7 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 	return nil
 }
 
-func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	type finalizerEntry struct {
-		name string
-		fn   controller.FinalizerFunc[*v2.PerconaPGCluster]
-	}
-
-	finalizers := []finalizerEntry{
-		{pNaming.FinalizerDeletePVC, r.deletePVCAndSecrets},
-		{pNaming.FinalizerDeleteSSL, r.deleteTLSSecrets},
-		{pNaming.FinalizerStopWatchers, r.stopExternalWatchers},
-		{pNaming.FinalizerDeleteBackups, r.deleteBackups},
-	}
-
+func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster, finalizers []finalizerEntry) error {
 	for _, entry := range finalizers {
 		if _, err := controller.RunFinalizer(ctx, r.Client, cr, entry.name, entry.fn); err != nil {
 			return errors.Wrapf(err, "run finalizer %s", entry.name)
@@ -232,4 +218,31 @@ func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaP
 	}
 
 	return nil
+}
+
+type finalizerEntry struct {
+	name string
+	fn   controller.FinalizerFunc[*v2.PerconaPGCluster]
+}
+
+func (r *PGClusterReconciler) prePostgresClusterDeletionFinalizers() []finalizerEntry {
+	return []finalizerEntry{
+		{pNaming.FinalizerStopWatchers, r.stopExternalWatchers},
+		{pNaming.FinalizerDeleteBackups, r.deleteBackups},
+	}
+}
+
+func (r *PGClusterReconciler) postPostgresClusterDeletionFinalizers() []finalizerEntry {
+	return []finalizerEntry{
+		{pNaming.FinalizerDeletePVC, r.deletePVCAndSecrets},
+		{pNaming.FinalizerDeleteSSL, r.deleteTLSSecrets},
+	}
+}
+
+func (r *PGClusterReconciler) runPrePostgresClusterDeletionFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	return r.runFinalizers(ctx, cr, r.prePostgresClusterDeletionFinalizers())
+}
+
+func (r *PGClusterReconciler) runPostPostgresClusterDeletionFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	return r.runFinalizers(ctx, cr, r.postPostgresClusterDeletionFinalizers())
 }
