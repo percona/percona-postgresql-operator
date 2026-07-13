@@ -492,18 +492,9 @@ func getDestination(pg *v2.PerconaPGCluster, pb *v2.PerconaPGBackup) string {
 	return destination
 }
 
-func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod, pgBackup *v2.PerconaPGBackup) error {
-	info, err := pgbackrest.GetInfo(ctx, pod, ptr.Deref(pgBackup.Spec.RepoName, ""))
-	if err != nil {
-		return errors.Wrap(err, "get pgBackRest info")
-	}
-
-	stanzaName := ""
-	for _, info := range info {
-		if stanzaName != "" {
-			break
-		}
-		for _, backup := range info.Backup {
+func findBackupInPGBackrestInfo(infoOutput pgbackrest.InfoOutput, pgBackup *v2.PerconaPGBackup) (string, pgbackrest.InfoBackup, bool) {
+	for _, stanzaInfo := range infoOutput {
+		for _, backup := range stanzaInfo.Backup {
 			if len(backup.Annotation) == 0 {
 				continue
 			}
@@ -520,28 +511,44 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 				continue
 			}
 
-			stanzaName = info.Name
-			if pgBackup.Status.BackupName == "" {
-				if err := pgBackup.UpdateStatus(ctx, c, func(bcp *v2.PerconaPGBackup) {
-					bcp.Status.BackupName = backup.Label
-					bcp.Status.BackupType = backup.Type
-				}); err != nil {
-					return errors.Wrap(err, "update PGBackup status")
-				}
-			}
-
-			if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, ptr.Deref(pgBackup.Spec.RepoName, ""), map[string]string{
-				v2.PGBackrestAnnotationJobName: pgBackup.Status.JobName,
-			}); err != nil {
-				return errors.Wrap(err, "set annotations to backup")
-			}
-			return nil
+			return stanzaInfo.Name, backup, true
 		}
 	}
-	log := logging.FromContext(ctx)
-	// We should log error here instead of returning it
-	// to allow deletion of the backup in the Starting/Running state
-	log.Error(nil, "backup annotations are not found in pgbackrest")
+
+	return "", pgbackrest.InfoBackup{}, false
+}
+
+func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod, pgBackup *v2.PerconaPGBackup) error {
+	infoOutput, err := pgbackrest.GetInfo(ctx, pod, ptr.Deref(pgBackup.Spec.RepoName, ""))
+	if err != nil {
+		return errors.Wrap(err, "get pgBackRest info")
+	}
+
+	stanzaName, backup, found := findBackupInPGBackrestInfo(infoOutput, pgBackup)
+	if !found {
+		log := logging.FromContext(ctx)
+		// We should log error here instead of returning it
+		// to allow deletion of the backup in the Starting/Running state
+		log.Error(nil, "backup annotations are not found in pgbackrest")
+		return nil
+	}
+
+	if pgBackup.Status.BackupName != backup.Label || pgBackup.Status.BackupType != backup.Type || pgBackup.Status.Size != backup.Info.Size {
+		if err := pgBackup.UpdateStatus(ctx, c, func(bcp *v2.PerconaPGBackup) {
+			bcp.Status.BackupName = backup.Label
+			bcp.Status.BackupType = backup.Type
+			bcp.Status.Size = backup.Info.Size
+		}); err != nil {
+			return errors.Wrap(err, "update PGBackup status")
+		}
+	}
+
+	if err := pgbackrest.SetAnnotationsToBackup(ctx, pod, stanzaName, backup.Label, ptr.Deref(pgBackup.Spec.RepoName, ""), map[string]string{
+		v2.PGBackrestAnnotationJobName: pgBackup.Status.JobName,
+	}); err != nil {
+		return errors.Wrap(err, "set annotations to backup")
+	}
+
 	return nil
 }
 

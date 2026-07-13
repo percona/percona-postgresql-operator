@@ -6,7 +6,7 @@ commands:
       data=$(kubectl get configmap -n "${NAMESPACE}" 07-check-extensions \
         -o jsonpath='{.data.data}')
 
-      for ext in pg_repack pgaudit plpgsql vector; do
+      for ext in pg_cron pg_repack pgaudit plpgsql set_user vector; do
         echo "${data}" | grep -q "${ext}" || {
           echo "ERROR: '${ext}' missing from extensions. Got: ${data}"
           exit 1

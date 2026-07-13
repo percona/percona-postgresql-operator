@@ -662,6 +662,9 @@ spec:
                 required:
                 - name
                 type: object
+              size:
+                format: int64
+                type: integer
               snapshot:
                 properties:
                   dataVolumeSnapshotRef:
@@ -14388,6 +14391,8 @@ spec:
                     properties:
                       pg_audit:
                         type: boolean
+                      pg_cron:
+                        type: boolean
                       pg_repack:
                         type: boolean
                       pg_stat_monitor:
@@ -14395,6 +14400,8 @@ spec:
                       pg_stat_statements:
                         type: boolean
                       pgvector:
+                        type: boolean
+                      set_user:
                         type: boolean
                     type: object
                   custom:
@@ -29793,6 +29800,8 @@ spec:
                 type: object
               postgres:
                 properties:
+                  distribution:
+                    type: string
                   imageID:
                     type: string
                   instances:

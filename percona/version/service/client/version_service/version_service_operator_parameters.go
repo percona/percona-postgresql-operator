@@ -86,6 +86,11 @@ type VersionServiceOperatorParams struct {
 	// DatabaseVersion.
 	DatabaseVersion *string
 
+	// Distribution.
+	//
+	// PostgreSQL distribution running in the cluster. Empty string means unknown (e.g. no running pods yet).
+	Distribution *string
+
 	// Extensions.
 	Extensions *string
 
@@ -273,6 +278,17 @@ func (o *VersionServiceOperatorParams) WithDatabaseVersion(databaseVersion *stri
 // SetDatabaseVersion adds the databaseVersion to the version service operator params
 func (o *VersionServiceOperatorParams) SetDatabaseVersion(databaseVersion *string) {
 	o.DatabaseVersion = databaseVersion
+}
+
+// WithDistribution adds the distribution to the version service operator params
+func (o *VersionServiceOperatorParams) WithDistribution(distribution *string) *VersionServiceOperatorParams {
+	o.SetDistribution(distribution)
+	return o
+}
+
+// SetDistribution adds the distribution to the version service operator params
+func (o *VersionServiceOperatorParams) SetDistribution(distribution *string) {
+	o.Distribution = distribution
 }
 
 // WithExtensions adds the extensions to the version service operator params
@@ -578,6 +594,23 @@ func (o *VersionServiceOperatorParams) WriteToRequest(r runtime.ClientRequest, r
 		if qDatabaseVersion != "" {
 
 			if err := r.SetQueryParam("databaseVersion", qDatabaseVersion); err != nil {
+				return err
+			}
+		}
+	}
+
+	if o.Distribution != nil {
+
+		// query param distribution
+		var qrDistribution string
+
+		if o.Distribution != nil {
+			qrDistribution = *o.Distribution
+		}
+		qDistribution := qrDistribution
+		if qDistribution != "" {
+
+			if err := r.SetQueryParam("distribution", qDistribution); err != nil {
 				return err
 			}
 		}
