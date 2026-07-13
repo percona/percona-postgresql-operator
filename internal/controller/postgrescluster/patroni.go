@@ -380,6 +380,14 @@ func (r *Reconciler) reconcileReplicationSecret(
 		return custom, err
 	}
 
+	if cluster.Spec.TLS.CertManagementPolicy == v1beta1.CertManagementUserProvidedOnly {
+		secret := &corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)}
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+			return nil, errors.Wrapf(err, "get user-provided replication TLS secret %s", secret.Name)
+		}
+		return secret, nil
+	}
+
 	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")

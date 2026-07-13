@@ -247,13 +247,14 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
 ) (*corev1.Secret, error) {
-
 	existing := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	err := errors.WithStack(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	)
 	if client.IgnoreNotFound(err) != nil {
 		return nil, err
 	}
+	secretFound := err == nil
 
 	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
 		// PgBouncer is disabled; delete the Secret if it exists.
@@ -264,6 +265,13 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	}
 
 	err = client.IgnoreNotFound(err)
+
+	if cluster.Spec.TLS.CertManagementPolicy == v1beta1.CertManagementUserProvidedOnly {
+		if !secretFound {
+			return nil, errors.Errorf("user-provided PgBouncer secret %q is missing", naming.ClusterPGBouncer(cluster).Name)
+		}
+		return existing, nil
+	}
 
 	var frontendCertManagerSecret *corev1.Secret
 	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {

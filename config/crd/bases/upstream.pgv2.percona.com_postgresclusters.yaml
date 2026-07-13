@@ -28665,6 +28665,12 @@ spec:
                 properties:
                   caValidityDuration:
                     type: string
+                  certManagementPolicy:
+                    default: auto
+                    enum:
+                    - auto
+                    - userProvidedOnly
+                    type: string
                   certValidityDuration:
                     type: string
                   pgBackRestCertValidityDuration:

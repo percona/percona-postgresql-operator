@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+
+      get_cr "$cluster" \
+        | yq '.spec.tls.certManagementPolicy = "userProvidedOnly"' \
+        | yq '.spec.proxy.pgBouncer.replicas = 1' \
+        | yq '.spec.instances[].replicas = 1' \
+        | kubectl -n "$NAMESPACE" apply -f -

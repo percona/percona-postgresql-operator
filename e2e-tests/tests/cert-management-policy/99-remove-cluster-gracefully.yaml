@@ -1,0 +1,31 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+- apiVersion: pgv2.percona.com/v2
+  kind: PerconaPGCluster
+  metadata:
+    name: cert-management-policy
+- apiVersion: upstream.pgv2.percona.com/v1beta1
+  kind: PostgresCluster
+  metadata:
+    name: cert-management-policy
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+
+      remove_all_finalizers
+      kubectl -n "$NAMESPACE" delete pvc -l postgres-operator.crunchydata.com/cluster="$cluster" || true
+      kubectl -n "$NAMESPACE" delete secret -l postgres-operator.crunchydata.com/cluster="$cluster" || true
+      kubectl -n "$NAMESPACE" delete secret \
+        "${cluster}-cluster-ca-cert" \
+        "${cluster}-cluster-cert" \
+        "${cluster}-replication-cert" \
+        --ignore-not-found || true
+      check_operator_panic
+      destroy_operator
+    timeout: 60

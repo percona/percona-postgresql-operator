@@ -17,6 +17,23 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
 )
 
+// watchClusterSecrets returns a handler.EventHandler for Secrets that are
+// labeled with a PostgresCluster name but intentionally have no owner reference.
+func (*Reconciler) watchClusterSecrets() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		cluster := obj.GetLabels()[naming.LabelCluster]
+		if len(cluster) > 0 {
+			return []reconcile.Request{
+				{NamespacedName: client.ObjectKey{
+					Namespace: obj.GetNamespace(),
+					Name:      cluster,
+				}},
+			}
+		}
+		return nil
+	})
+}
+
 // watchCertManagerSecrets returns a handler.EventHandler for cert-manager-issued
 // Secrets. These Secrets are owned by Certificate resources (not PostgresCluster),
 // so they are not covered by Owns(&corev1.Secret{}).

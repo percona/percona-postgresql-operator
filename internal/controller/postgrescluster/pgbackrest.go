@@ -2219,7 +2219,15 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 
 	existing := &corev1.Secret{}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(intent), existing)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(intent), existing),
+	))
+
+	if err == nil && cluster.Spec.TLS.CertManagementPolicy == v1beta1.CertManagementUserProvidedOnly {
+		if repoHost != nil && len(existing.Name) == 0 {
+			return errors.Errorf("user-provided pgBackRest secret %q is missing", intent.Name)
+		}
+		return nil
+	}
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.

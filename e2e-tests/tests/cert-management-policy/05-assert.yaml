@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 180
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: cert-management-policy
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1

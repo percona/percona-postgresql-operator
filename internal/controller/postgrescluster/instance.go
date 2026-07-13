@@ -1489,6 +1489,14 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	rootCertificateAuth *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
 	if cluster.Spec.CustomTLSSecret == nil {
+		if cluster.Spec.TLS.CertManagementPolicy == v1beta1.CertManagementUserProvidedOnly {
+			existing := &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
+			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing); err != nil {
+				return nil, errors.Wrapf(err, "get user-provided instance TLS secret %s", existing.Name)
+			}
+			return existing, nil
+		}
+
 		certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
