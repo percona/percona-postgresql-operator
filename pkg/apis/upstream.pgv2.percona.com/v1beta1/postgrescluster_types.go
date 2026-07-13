@@ -682,7 +682,7 @@ func (s *PostgresProxySpec) Default() {
 
 // K8SPG-1062
 func (s *PostgresProxySpec) PGBouncerEnabled() bool {
-	return !(s == nil || s.PGBouncer == nil || (s.PGBouncer.Replicas != nil && *s.PGBouncer.Replicas == 0))
+	return s != nil && s.PGBouncer != nil && (s.PGBouncer.Replicas == nil || *s.PGBouncer.Replicas != 0)
 }
 
 type RegistrationRequirementStatus struct {

@@ -1148,7 +1148,7 @@ func (p *PGProxySpec) IsSet() bool {
 }
 
 func (p *PGProxySpec) PGBouncerEnabled() bool {
-	return !(p == nil || p.PGBouncer == nil || (p.PGBouncer.Replicas != nil && *p.PGBouncer.Replicas == 0))
+	return p.IsSet() && (p.PGBouncer.Replicas == nil || *p.PGBouncer.Replicas != 0)
 }
 
 func (p *PGProxySpec) ToCrunchy(version string) *crunchyv1beta1.PostgresProxySpec {
