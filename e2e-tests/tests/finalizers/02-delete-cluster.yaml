@@ -5,7 +5,8 @@ delete:
   kind: PerconaPGCluster
   name: finalizers
 commands:
-  - script: |-
+  - timeout: 180
+    script: |-
       set -o errexit
       set -o xtrace
 
