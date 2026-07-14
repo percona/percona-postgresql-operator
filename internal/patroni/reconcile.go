@@ -12,14 +12,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 // ClusterBootstrapped returns a bool indicating whether or not Patroni has successfully

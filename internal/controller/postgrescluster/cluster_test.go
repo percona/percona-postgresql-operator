@@ -20,11 +20,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 var gvks = []runtime.GVK{{
@@ -613,7 +613,7 @@ labels:
 name: pg5-primary
 namespace: ns2
 ownerReferences:
-- apiVersion: upstream.pgv2.percona.com/v1beta1
+- apiVersion: upstream.pgv3.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster
@@ -646,7 +646,7 @@ metadata:
   name: pg5-primary
   namespace: ns2
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v1beta1
+  - apiVersion: upstream.pgv3.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -745,7 +745,7 @@ labels:
 name: pg2-replicas
 namespace: ns1
 ownerReferences:
-- apiVersion: upstream.pgv2.percona.com/v1beta1
+- apiVersion: upstream.pgv3.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster

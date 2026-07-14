@@ -27,19 +27,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup/snapshots"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/clientcmd"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller/pgbackup/snapshots"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/percona/watcher"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 const (
@@ -94,13 +94,13 @@ func (r *PGBackupReconciler) SetupWithManager(ctx context.Context, mgr manager.M
 	return b.Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete;patch
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/finalizers,verbs=update;patch
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores/finalizers,verbs=update;patch
-// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
-// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=postgresclusters/status,verbs=create;update;patch
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete;patch
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgbackups/finalizers,verbs=update;patch
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgrestores/finalizers,verbs=update;patch
+// +kubebuilder:rbac:groups=upstream.pgv3.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=upstream.pgv3.percona.com,resources=postgresclusters/status,verbs=create;update;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 
 func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {

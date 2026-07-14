@@ -4,7 +4,7 @@ commands:
   - timeout: 30
     script: |
       kubectl apply -n ${NAMESPACE} -f - <<EOF
-      apiVersion: pgv2.percona.com/v2
+      apiVersion: pgv3.percona.com/v2
       kind: PerconaPGBackup
       metadata:
         name: k8s-upgrade-full-repo1

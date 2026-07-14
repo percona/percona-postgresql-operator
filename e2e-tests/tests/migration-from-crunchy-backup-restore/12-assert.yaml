@@ -2,7 +2,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: second-pitr-restore
@@ -18,7 +18,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: upstream.pgv2.percona.com/v1beta1
+    - apiVersion: upstream.pgv3.percona.com/v1beta1
       kind: PostgresCluster
       name: percona-restored
       controller: true
@@ -29,7 +29,7 @@ status:
   replicas: 1
   updatedReplicas: 1
 ---
-apiVersion: upstream.pgv2.percona.com/v1beta1
+apiVersion: upstream.pgv3.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: percona-restored
@@ -45,7 +45,7 @@ status:
       id: second-pitr-restore
       succeeded: 1
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: percona-restored

@@ -1,9 +1,9 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 delete:
-- apiVersion: pgv2.percona.com/v2
+- apiVersion: pgv3.percona.com/v2
   kind: PerconaPGCluster
-- apiVersion: upstream.pgv2.percona.com/v1beta1
+- apiVersion: upstream.pgv3.percona.com/v1beta1
   kind: PostgresCluster
 commands:
   - script: |-

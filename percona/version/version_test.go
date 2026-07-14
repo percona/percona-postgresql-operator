@@ -11,16 +11,16 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
+	"github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/version"
 )
 
 func TestCRDVersionLabel(t *testing.T) {
 	crdNames := []string{
-		"perconapgbackups.pgv2.percona.com",
-		"perconapgclusters.pgv2.percona.com",
-		"perconapgrestores.pgv2.percona.com",
-		"perconapgupgrades.pgv2.percona.com",
+		"perconapgbackups.pgv3.percona.com",
+		"perconapgclusters.pgv3.percona.com",
+		"perconapgrestores.pgv3.percona.com",
+		"perconapgupgrades.pgv3.percona.com",
 	}
 
 	_, filename, _, ok := runtime.Caller(0)

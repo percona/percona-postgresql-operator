@@ -11,7 +11,7 @@ import (
 
 const (
 	labelPrefix        = "postgres-operator.crunchydata.com/"
-	perconaLabelPrefix = "pgv2.percona.com/"
+	perconaLabelPrefix = "pgv3.percona.com/"
 	appK8sPrefix       = "app.kubernetes.io/"
 
 	LabelVersion = perconaLabelPrefix + "version"

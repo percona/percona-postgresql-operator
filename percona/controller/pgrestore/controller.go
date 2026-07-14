@@ -16,13 +16,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/snapshot"
-	restoreutils "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/utils"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller/pgrestore/snapshot"
+	restoreutils "github.com/percona/percona-postgresql-operator/v3/percona/controller/pgrestore/utils"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
 )
 
 const (
@@ -51,10 +51,10 @@ func (r *PGRestoreReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&v2.PerconaPGRestore{}).Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores,verbs=get;list;watch;create;patch
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores/status,verbs=patch;update
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
-// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgrestores,verbs=get;list;watch;create;patch
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgrestores/status,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=upstream.pgv3.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 
 func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {

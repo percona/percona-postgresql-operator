@@ -10,9 +10,9 @@ import (
 
 	"gotest.tools/v3/assert"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/percona/version"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 func TestPostgreSQLParameters(t *testing.T) {
@@ -23,7 +23,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 		if cluster.Labels == nil {
 			cluster.Labels = make(map[string]string)
 		}
-		cluster.Labels["pgv2.percona.com/version"] = version.Version()
+		cluster.Labels["pgv3.percona.com/version"] = version.Version()
 
 		PostgreSQL(cluster, parameters, true)
 		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
@@ -97,7 +97,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 		if cluster.Labels == nil {
 			cluster.Labels = make(map[string]string)
 		}
-		cluster.Labels["pgv2.percona.com/version"] = "2.7.0"
+		cluster.Labels["pgv3.percona.com/version"] = "2.7.0"
 
 		PostgreSQL(cluster, parameters, true)
 		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{

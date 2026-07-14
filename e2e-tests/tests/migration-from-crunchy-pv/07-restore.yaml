@@ -39,7 +39,7 @@ commands:
       # The cluster has replicas: 1 so there are no streaming replicas to
       # diverge — no scale-down workaround needed.
       cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
-      apiVersion: pgv2.percona.com/v2
+      apiVersion: pgv3.percona.com/v2
       kind: PerconaPGRestore
       metadata:
         name: post-migration-restore

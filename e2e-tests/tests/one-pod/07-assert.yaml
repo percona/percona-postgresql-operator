@@ -2,13 +2,13 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 180
 ---
-apiVersion: upstream.pgv2.percona.com/v1beta1
+apiVersion: upstream.pgv3.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: one-pod
   generation: 4
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
+    - apiVersion: pgv3.percona.com/v2
       kind: PerconaPGCluster
       name: one-pod
       controller: true
@@ -36,7 +36,7 @@ status:
       readyReplicas: 1
       replicas: 1
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: one-pod-restore

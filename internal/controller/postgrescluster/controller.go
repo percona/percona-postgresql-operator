@@ -38,26 +38,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgcron"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
-	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgcron"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgmonitor"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatmonitor"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pmm"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v3/internal/setuser"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 const (
@@ -84,8 +84,8 @@ type Reconciler struct {
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
-// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={get,list,watch}
-// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters/status",verbs={patch}
+// +kubebuilder:rbac:groups="upstream.pgv3.percona.com",resources="postgresclusters",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="upstream.pgv3.percona.com",resources="postgresclusters/status",verbs={patch}
 
 // Reconcile reconciles a ConfigMap in a namespace managed by the PostgreSQL Operator
 func (r *Reconciler) Reconcile(
@@ -518,7 +518,7 @@ func (r *Reconciler) patch(
 // creator of such a reference have either "delete" permission on the owner or
 // "update" permission on the owner's "finalizers" subresource.
 // - https://docs.k8s.io/reference/access-authn-authz/admission-controllers/
-// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters/finalizers",verbs={update}
+// +kubebuilder:rbac:groups="upstream.pgv3.percona.com",resources="postgresclusters/finalizers",verbs={update}
 
 // setControllerReference sets owner as a Controller OwnerReference on controlled.
 // Only one OwnerReference can be a controller, so it returns an error if another

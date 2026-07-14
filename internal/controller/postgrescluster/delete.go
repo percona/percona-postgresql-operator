@@ -12,11 +12,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
-// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={patch}
+// +kubebuilder:rbac:groups="upstream.pgv3.percona.com",resources="postgresclusters",verbs={patch}
 
 // handleDelete sets a finalizer on cluster and performs the finalization of
 // cluster when it is being deleted. It returns (nil, nil) when cluster is

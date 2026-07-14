@@ -6,9 +6,9 @@ metadata:
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: 5.4.2
-  name: postgresclusters.upstream.pgv2.percona.com
+  name: postgresclusters.upstream.pgv3.percona.com
 spec:
-  group: upstream.pgv2.percona.com
+  group: upstream.pgv3.percona.com
   names:
     kind: PostgresCluster
     listKind: PostgresClusterList

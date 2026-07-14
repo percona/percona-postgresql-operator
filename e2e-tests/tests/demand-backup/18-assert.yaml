@@ -2,13 +2,13 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 240
 ---
-apiVersion: upstream.pgv2.percona.com/v1beta1
+apiVersion: upstream.pgv3.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: demand-backup
   generation: 12
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
+    - apiVersion: pgv3.percona.com/v2
       kind: PerconaPGCluster
       name: demand-backup
       controller: true
@@ -38,7 +38,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: demand-backup
@@ -66,7 +66,7 @@ status:
     size: 3
   state: ready
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: demand-backup-restore-repo1

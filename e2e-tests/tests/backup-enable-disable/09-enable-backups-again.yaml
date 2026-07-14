@@ -8,6 +8,6 @@ commands:
       source ../../functions
 
       get_cr "some-name" ${RANDOM} \
-        | yq 'del(.metadata.annotations."pgv2.percona.com/authorizeBackupRemoval")' \
+        | yq 'del(.metadata.annotations."pgv3.percona.com/authorizeBackupRemoval")' \
         | yq 'del(.spec.backups.enabled)' \
         | kubectl -n "${NAMESPACE}" apply -f -

@@ -11,14 +11,14 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
+    - apiVersion: pgv3.percona.com/v2
       kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
 status:
   succeeded: 1
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   name: backup-after-16-to-17-postgis

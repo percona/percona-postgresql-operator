@@ -6,8 +6,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
 )
 
 func GetExtensionKey(pgMajor int, name, version string) string {
@@ -16,7 +16,7 @@ func GetExtensionKey(pgMajor int, name, version string) string {
 
 // RelocatorContainer returns a container that will relocate extensions from the base image (i.e. pg_stat_monitor, pg_audit)
 // to the data directory so we don't lose them when user adds a custom extension.
-func RelocatorContainer(cr *pgv2.PerconaPGCluster, image string, imagePullPolicy corev1.PullPolicy, postgresVersion int) corev1.Container {
+func RelocatorContainer(cr *pgv3.PerconaPGCluster, image string, imagePullPolicy corev1.PullPolicy, postgresVersion int) corev1.Container {
 	mounts := []corev1.VolumeMount{
 		{
 			Name:      "postgres-data",
@@ -49,7 +49,7 @@ func RelocatorContainer(cr *pgv2.PerconaPGCluster, image string, imagePullPolicy
 	}
 }
 
-func InstallerContainer(cr *pgv2.PerconaPGCluster, postgresVersion int, spec *pgv2.ExtensionsSpec, extensions string, openshift *bool) corev1.Container {
+func InstallerContainer(cr *pgv3.PerconaPGCluster, postgresVersion int, spec *pgv3.ExtensionsSpec, extensions string, openshift *bool) corev1.Container {
 	mounts := []corev1.VolumeMount{
 		{
 			Name:      "postgres-data",

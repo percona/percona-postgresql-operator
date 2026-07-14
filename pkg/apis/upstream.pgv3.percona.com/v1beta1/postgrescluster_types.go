@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 )
 
 // PostgresClusterSpec defines the desired state of PostgresCluster
@@ -912,7 +912,7 @@ func NewPostgresCluster() *PostgresCluster {
 	return cluster
 }
 
-const LabelVersion = "pgv2.percona.com/version"
+const LabelVersion = "pgv3.percona.com/version"
 
 func (cr *PostgresCluster) CompareVersion(ver string) int {
 	crVersion, err := gover.NewVersion(cr.Labels[LabelVersion])

@@ -1,4 +1,4 @@
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: k8s-upgrade

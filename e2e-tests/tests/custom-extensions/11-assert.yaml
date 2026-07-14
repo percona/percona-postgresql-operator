@@ -10,7 +10,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: upstream.pgv2.percona.com/v1beta1
+    - apiVersion: upstream.pgv3.percona.com/v1beta1
       kind: PostgresCluster
       name: custom-extensions
       controller: true
@@ -56,7 +56,7 @@ status:
   readyReplicas: 1
   availableReplicas: 1
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: custom-extensions

@@ -15,16 +15,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	pgpassword "github.com/percona/percona-postgresql-operator/v2/internal/postgres/password"
-	"github.com/percona/percona-postgresql-operator/v2/internal/util"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgmonitor"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	pgpassword "github.com/percona/percona-postgresql-operator/v3/internal/postgres/password"
+	"github.com/percona/percona-postgresql-operator/v3/internal/util"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 // If pgMonitor is enabled the pgMonitor sidecar(s) have been added to the

@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 // watchPostgresClusters returns a [handler.EventHandler] for PostgresClusters.
@@ -73,7 +73,7 @@ func (r *PGAdminReconciler) watchForRelatedSecret() handler.EventHandler {
 	}
 }
 
-//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgadmins",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv3.percona.com",resources="pgadmins",verbs={list}
 
 // findPGAdminsForSecret returns PGAdmins that have a user or users that have their password
 // stored in the Secret

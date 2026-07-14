@@ -1,5 +1,5 @@
 // +kubebuilder:object:generate=true
-// +groupName=pgv2.percona.com
+// +groupName=pgv3.percona.com
 package v2
 
 import (
@@ -9,7 +9,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "pgv2.percona.com", Version: "v2"}
+	GroupVersion = schema.GroupVersion{Group: "pgv3.percona.com", Version: "v2"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

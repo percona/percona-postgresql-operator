@@ -44,7 +44,7 @@ commands:
       fi
 
       cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
-      apiVersion: pgv2.percona.com/v2
+      apiVersion: pgv3.percona.com/v2
       kind: PerconaPGRestore
       metadata:
         name: post-migration-restore

@@ -1,11 +1,11 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 delete:
-- apiVersion: pgv2.percona.com/v2
+- apiVersion: pgv3.percona.com/v2
   kind: PerconaPGCluster
   metadata:
     name: major-upgrade-17-to-18-postgis
-- apiVersion: upstream.pgv2.percona.com/v1beta1
+- apiVersion: upstream.pgv3.percona.com/v1beta1
   kind: PostgresCluster
   metadata:
     name: major-upgrade-17-to-18-postgis

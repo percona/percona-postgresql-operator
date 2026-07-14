@@ -14,7 +14,7 @@ import (
 
 	"gotest.tools/v3/assert"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
 )
 
 func TestCertificateTextMarshaling(t *testing.T) {

@@ -24,7 +24,7 @@ commands:
       echo "dataSource absent from both PerconaPGCluster and PostgresCluster"
 ---
 # Cluster must remain fully ready after the dataSource removal.
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: percona-restored

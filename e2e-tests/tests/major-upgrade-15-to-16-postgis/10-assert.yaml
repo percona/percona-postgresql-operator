@@ -27,7 +27,7 @@ collectors:
     selector: "postgres-operator.crunchydata.com/pgbackrest-restore=''"
     tail: 30
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: restore-after-15-to-16-postgis
@@ -37,7 +37,7 @@ spec:
 status:
   state: Succeeded
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: major-upgrade-15-to-16-postgis

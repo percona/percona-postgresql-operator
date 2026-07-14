@@ -6,9 +6,9 @@ metadata:
   labels:
     app.kubernetes.io/name: pgo
     app.kubernetes.io/version: latest
-  name: pgupgrades.upstream.pgv2.percona.com
+  name: pgupgrades.upstream.pgv3.percona.com
 spec:
-  group: upstream.pgv2.percona.com
+  group: upstream.pgv3.percona.com
   names:
     kind: PGUpgrade
     listKind: PGUpgradeList

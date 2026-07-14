@@ -24,10 +24,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 func TestGeneratePatroniLeaderLeaseService(t *testing.T) {
@@ -64,7 +64,7 @@ labels:
 name: pg2-ha
 namespace: ns1
 ownerReferences:
-- apiVersion: upstream.pgv2.percona.com/v1beta1
+- apiVersion: upstream.pgv3.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster

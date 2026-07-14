@@ -18,10 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
-	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/percona/extensions"
+	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
 const (
@@ -36,14 +36,14 @@ type PGUpgradeReconciler struct {
 
 // SetupWithManager adds the PerconaPerconaPGUpgrade controller to the provided runtime manager
 func (r *PGUpgradeReconciler) SetupWithManager(mgr manager.Manager) error {
-	return builder.ControllerManagedBy(mgr).For(&pgv2.PerconaPGUpgrade{}).Complete(r)
+	return builder.ControllerManagedBy(mgr).For(&pgv3.PerconaPGUpgrade{}).Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades,verbs=get;list;create;update;patch;watch
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/status,verbs=patch;update
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/finalizers,verbs=patch;update
-// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch;patch;update
-// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=pgupgrades,verbs=get;list;create;update;patch;delete;watch
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgupgrades,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgupgrades/status,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgupgrades/finalizers,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgclusters,verbs=get;list;watch;patch;update
+// +kubebuilder:rbac:groups=upstream.pgv3.percona.com,resources=pgupgrades,verbs=get;list;create;update;patch;delete;watch
 //+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={get,list,watch}
 
 var errLegacyUpgradeFinalized = errors.New("legacy upgrade is already finished")
@@ -51,7 +51,7 @@ var errLegacyUpgradeFinalized = errors.New("legacy upgrade is already finished")
 func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("request", request)
 
-	perconaPGUpgrade := &pgv2.PerconaPGUpgrade{}
+	perconaPGUpgrade := &pgv3.PerconaPGUpgrade{}
 	if err := r.Client.Get(ctx, request.NamespacedName, perconaPGUpgrade); err != nil {
 		// NotFound cannot be fixed by requeuing so ignore it. During background
 		// deletion, we receive delete events from cluster's dependents after
@@ -70,7 +70,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "check legacy upgrade")
 	}
 
-	pgCluster := &pgv2.PerconaPGCluster{
+	pgCluster := &pgv3.PerconaPGCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      perconaPGUpgrade.Spec.PostgresClusterName,
 			Namespace: perconaPGUpgrade.Namespace,
@@ -162,7 +162,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 	return reconcile.Result{}, nil
 }
 
-func (r *PGUpgradeReconciler) createPGUpgrade(ctx context.Context, cluster *pgv2.PerconaPGCluster, pgUpgrade *crunchyv1beta1.PGUpgrade, perconaPGUpgrade *pgv2.PerconaPGUpgrade) error {
+func (r *PGUpgradeReconciler) createPGUpgrade(ctx context.Context, cluster *pgv3.PerconaPGCluster, pgUpgrade *crunchyv1beta1.PGUpgrade, perconaPGUpgrade *pgv3.PerconaPGUpgrade) error {
 	pgUpgrade.Spec.Metadata = perconaPGUpgrade.Spec.Metadata
 	pgUpgrade.Spec.PostgresClusterName = perconaPGUpgrade.Spec.PostgresClusterName
 
@@ -213,7 +213,7 @@ func (r *PGUpgradeReconciler) createPGUpgrade(ctx context.Context, cluster *pgv2
 	return r.Client.Create(ctx, pgUpgrade)
 }
 
-func (r *PGUpgradeReconciler) pauseCluster(ctx context.Context, pgCluster *pgv2.PerconaPGCluster) error {
+func (r *PGUpgradeReconciler) pauseCluster(ctx context.Context, pgCluster *pgv3.PerconaPGCluster) error {
 	orig := pgCluster.DeepCopy()
 
 	t := true
@@ -222,7 +222,7 @@ func (r *PGUpgradeReconciler) pauseCluster(ctx context.Context, pgCluster *pgv2.
 	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
 }
 
-func (r *PGUpgradeReconciler) resumeCluster(ctx context.Context, pgCluster *pgv2.PerconaPGCluster) error {
+func (r *PGUpgradeReconciler) resumeCluster(ctx context.Context, pgCluster *pgv3.PerconaPGCluster) error {
 	orig := pgCluster.DeepCopy()
 
 	pgCluster.Spec.Pause = nil
@@ -230,24 +230,24 @@ func (r *PGUpgradeReconciler) resumeCluster(ctx context.Context, pgCluster *pgv2
 	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
 }
 
-func (r *PGUpgradeReconciler) annotateCluster(ctx context.Context, pgCluster *pgv2.PerconaPGCluster, pgUpgrade *pgv2.PerconaPGUpgrade) error {
+func (r *PGUpgradeReconciler) annotateCluster(ctx context.Context, pgCluster *pgv3.PerconaPGCluster, pgUpgrade *pgv3.PerconaPGUpgrade) error {
 	orig := pgCluster.DeepCopy()
 
 	if pgCluster.Annotations == nil {
 		pgCluster.Annotations = make(map[string]string)
 	}
 
-	pgCluster.Annotations[pgv2.AnnotationAllowUpgrade] = pgUpgrade.Name
+	pgCluster.Annotations[pgv3.AnnotationAllowUpgrade] = pgUpgrade.Name
 
 	return r.Client.Patch(ctx, pgCluster.DeepCopy(), client.MergeFrom(orig))
 }
 
-func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pgv2.PerconaPGCluster, pgUpgrade *pgv2.PerconaPGUpgrade) error {
+func (r *PGUpgradeReconciler) finalizeUpgrade(ctx context.Context, pgCluster *pgv3.PerconaPGCluster, pgUpgrade *pgv3.PerconaPGUpgrade) error {
 	log := logging.FromContext(ctx)
 
 	orig := pgCluster.DeepCopy()
 
-	delete(pgCluster.Annotations, pgv2.AnnotationAllowUpgrade)
+	delete(pgCluster.Annotations, pgv3.AnnotationAllowUpgrade)
 
 	pgCluster.Spec.PostgresVersion = pgUpgrade.Spec.ToPostgresVersion
 	pgCluster.Spec.Image = pgUpgrade.Spec.ToPostgresImage

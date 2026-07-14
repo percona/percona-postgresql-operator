@@ -16,7 +16,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: upstream.pgv2.percona.com/v1beta1
+    - apiVersion: upstream.pgv3.percona.com/v1beta1
       kind: PostgresCluster
       name: percona-standby
       controller: true
@@ -30,12 +30,12 @@ status:
 ---
 # upstream PostgresCluster aggregates across all StatefulSets:
 # readyReplicas=3 is the sum of the three individual StatefulSets (1+1+1).
-apiVersion: upstream.pgv2.percona.com/v1beta1
+apiVersion: upstream.pgv3.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: percona-standby
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
+    - apiVersion: pgv3.percona.com/v2
       kind: PerconaPGCluster
       name: percona-standby
       controller: true
@@ -52,7 +52,7 @@ status:
     repos:
       - name: repo1
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: percona-standby

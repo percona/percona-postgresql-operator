@@ -11,7 +11,7 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
+    - apiVersion: pgv3.percona.com/v2
       kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
@@ -27,14 +27,14 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest-backup: manual
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
+    - apiVersion: pgv3.percona.com/v2
       kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
 status:
   succeeded: 1
 ---
-apiVersion: pgv2.percona.com/v2
+apiVersion: pgv3.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   name: demand-backup-full-repo1
@@ -46,7 +46,7 @@ spec:
 status:
   state: Succeeded
 ---
-apiVersion: upstream.pgv2.percona.com/v1beta1
+apiVersion: upstream.pgv3.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: demand-backup
