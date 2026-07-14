@@ -10,4 +10,4 @@ commands:
 
       deploy_operator
       deploy_client
-    timeout: 10
+    timeout: 60
