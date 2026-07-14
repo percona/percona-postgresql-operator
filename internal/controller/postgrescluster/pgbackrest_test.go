@@ -4571,3 +4571,40 @@ func TestBackupsEnabled(t *testing.T) {
 		assert.Assert(t, backupsReconciliationAllowed)
 	})
 }
+
+func TestPgBackRestCACert(t *testing.T) {
+	t.Run("uses rootCA when present", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+
+		caCert, err := pgBackRestCACert(root, &corev1.Secret{}, &corev1.Secret{})
+		assert.NilError(t, err)
+
+		want, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+		assert.DeepEqual(t, want, caCert)
+	})
+
+	t.Run("falls back to client secret ca.crt when rootCA is nil", func(t *testing.T) {
+		clientSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: []byte("client-ca-bytes")}}
+		repoSecret := &corev1.Secret{}
+
+		caCert, err := pgBackRestCACert(nil, clientSecret, repoSecret)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, []byte("client-ca-bytes"), caCert)
+	})
+
+	t.Run("falls back to repo secret ca.crt when client secret has none", func(t *testing.T) {
+		clientSecret := &corev1.Secret{}
+		repoSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: []byte("repo-ca-bytes")}}
+
+		caCert, err := pgBackRestCACert(nil, clientSecret, repoSecret)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, []byte("repo-ca-bytes"), caCert)
+	})
+
+	t.Run("errors when neither secret has a CA cert", func(t *testing.T) {
+		_, err := pgBackRestCACert(nil, &corev1.Secret{}, &corev1.Secret{})
+		assert.ErrorContains(t, err, "did not return a CA certificate")
+	})
+}

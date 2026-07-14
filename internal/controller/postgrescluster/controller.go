@@ -300,7 +300,7 @@ func (r *Reconciler) Reconcile(
 		rootCA, err = r.reconcileRootCertificate(ctx, cluster)
 	}
 
-	if err == nil && rootCA != nil {
+	if err == nil {
 		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
 		if certErr != nil {
 			log.V(1).Info("failed to check if root CA is cert-manager managed, will retry on next reconcile",

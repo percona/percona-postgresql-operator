@@ -1575,15 +1575,20 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 	_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
 	_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
 
+	caCert, err := instanceCACert(rootCertificateAuth, existing)
+	if err != nil {
+		return nil, err
+	}
+
 	err = patroni.InstanceCertificates(ctx,
-		rootCertificateAuth.Certificate, leafCert.Certificate,
+		caCert, leafCert.Certificate,
 		leafCert.PrivateKey, instanceCerts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to add patroni certificates")
 	}
 
 	err = pgbackrest.InstanceCertificates(ctx, cluster,
-		rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
+		caCert, leafCert.Certificate, leafCert.PrivateKey,
 		instanceCerts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
@@ -1595,6 +1600,28 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 	}
 
 	return instanceCerts, nil
+}
+
+// instanceCACert returns the CA certificate to embed alongside an instance's
+// leaf certificate. When rootCertificateAuth is set (the operator manages
+// the CA itself), it's the source of truth. When it's nil (external issuer —
+// see K8SPG-951), this reads the ca.crt cert-manager wrote into the
+// instance's own just-issued secret.
+func instanceCACert(rootCertificateAuth *pki.RootCertificateAuthority, issuedSecret *corev1.Secret) (pki.Certificate, error) {
+	if rootCertificateAuth != nil {
+		return rootCertificateAuth.Certificate, nil
+	}
+
+	ca := issuedSecret.Data[corev1.ServiceAccountRootCAKey]
+	if len(ca) == 0 {
+		return pki.Certificate{}, errors.New("external issuer did not return a CA certificate for the instance")
+	}
+
+	var caCert pki.Certificate
+	if err := caCert.UnmarshalText(ca); err != nil {
+		return pki.Certificate{}, errors.Wrap(err, "failed to parse CA certificate from cert-manager secret")
+	}
+	return caCert, nil
 }
 
 // reconcileInternalInstanceCertificates creates instance certificates using internal PKI.

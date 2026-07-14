@@ -332,3 +332,23 @@ func TestPortNamesUniqueAndValid(t *testing.T) {
 		names.Insert(name)
 	}
 }
+
+func TestClusterCAIssuer(t *testing.T) {
+	cluster := &v1beta1.PostgresCluster{}
+	cluster.Namespace = "postgres-operator"
+	cluster.Name = "hippo"
+
+	meta := ClusterCAIssuer(cluster)
+	assert.Equal(t, meta.Name, "hippo-postgres-operator-ca-issuer")
+	assert.Equal(t, meta.Namespace, "")
+}
+
+func TestClusterCACertSecret(t *testing.T) {
+	cluster := &v1beta1.PostgresCluster{}
+	cluster.Namespace = "postgres-operator"
+	cluster.Name = "hippo"
+
+	meta := ClusterCACertSecret(cluster, "cert-manager")
+	assert.Equal(t, meta.Name, "hippo-postgres-operator-cluster-ca-cert")
+	assert.Equal(t, meta.Namespace, "cert-manager")
+}
